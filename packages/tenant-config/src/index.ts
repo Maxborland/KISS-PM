@@ -41,6 +41,80 @@ export type CustomFieldDefinition = {
   updatedAt: string;
 };
 
+export type OpportunityIntakeStandardFieldKey =
+  | "account_contact_intent"
+  | "planned_dates"
+  | "expected_value"
+  | "probability"
+  | "category"
+  | "typology"
+  | "scope_hints";
+
+export type OpportunityCategoryDefinition = {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+};
+
+export type OpportunityTypologyDefinition = {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+};
+
+export type OpportunityIntakeTemplate = {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  categoryKey: string;
+  typologyKey: string;
+  requiredStandardFieldKeys: OpportunityIntakeStandardFieldKey[];
+  requiredCustomFieldKeys: string[];
+  active: boolean;
+  version: number;
+  updatedAt: string;
+};
+
+export type OpportunityIntakeMetadataRegistry = {
+  tenantId: TenantId;
+  version: number;
+  categories: OpportunityCategoryDefinition[];
+  typologies: OpportunityTypologyDefinition[];
+  customFields: CustomFieldDefinition[];
+  templates: OpportunityIntakeTemplate[];
+  updatedAt: string;
+};
+
+export type OpportunityIntakeRequirements = {
+  tenantId: TenantId;
+  registryVersion: number;
+  templateKey: string;
+  templateLabel: string;
+  category: {
+    key: string;
+    label: string;
+  };
+  typology: {
+    key: string;
+    label: string;
+  };
+  requiredStandardFieldKeys: OpportunityIntakeStandardFieldKey[];
+  requiredCustomFields: Array<{
+    definitionId: string;
+    key: string;
+    label: string;
+    valueType: CustomFieldValueType;
+  }>;
+  trace: string[];
+};
+
 export type CustomFieldRegistry = {
   tenantId: TenantId;
   version: number;
@@ -109,6 +183,14 @@ function requireNonEmptyString(value: string | undefined, fieldName: string): st
 function requirePositiveInteger(value: number | undefined, fieldName: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw new TenantConfigModelError("validation_error", `${fieldName} must be a positive integer`);
+  }
+
+  return value;
+}
+
+function requireArray<T>(value: T[] | undefined, fieldName: string): T[] {
+  if (!Array.isArray(value)) {
+    throw new TenantConfigModelError("validation_error", `${fieldName} must be an array`);
   }
 
   return value;
@@ -183,6 +265,22 @@ function requireCustomFieldValueType(value: string | undefined): CustomFieldValu
     value !== "multi_select"
   ) {
     throw new TenantConfigModelError("validation_error", `Unsupported custom field value type: ${value}`);
+  }
+
+  return value;
+}
+
+function requireOpportunityIntakeStandardFieldKey(value: string | undefined): OpportunityIntakeStandardFieldKey {
+  if (
+    value !== "account_contact_intent" &&
+    value !== "planned_dates" &&
+    value !== "expected_value" &&
+    value !== "probability" &&
+    value !== "category" &&
+    value !== "typology" &&
+    value !== "scope_hints"
+  ) {
+    throw new TenantConfigModelError("validation_error", `Unsupported opportunity intake standard field: ${value}`);
   }
 
   return value;
@@ -265,6 +363,28 @@ function createBindingFlags(input: CustomFieldBindingFlags): CustomFieldBindingF
   };
 }
 
+function cloneStandardFieldKeys(keys: OpportunityIntakeStandardFieldKey[] | undefined): OpportunityIntakeStandardFieldKey[] {
+  const cloned = requireArray(keys, "opportunityIntakeTemplate.requiredStandardFieldKeys").map((key) =>
+    requireOpportunityIntakeStandardFieldKey(key)
+  );
+  if (new Set(cloned).size !== cloned.length) {
+    throw new TenantConfigModelError("conflict", "Duplicate opportunity intake standard field key");
+  }
+
+  return cloned;
+}
+
+function cloneCustomFieldKeys(keys: string[] | undefined): string[] {
+  const cloned = requireArray(keys, "opportunityIntakeTemplate.requiredCustomFieldKeys").map((key) =>
+    requireSystemKey(key, "opportunityIntakeTemplate.requiredCustomFieldKey")
+  );
+  if (new Set(cloned).size !== cloned.length) {
+    throw new TenantConfigModelError("conflict", "Duplicate opportunity intake custom field key");
+  }
+
+  return cloned;
+}
+
 function normalizeLabels(labels: Record<string, string>): Record<string, string> {
   const normalized: Record<string, string> = {};
 
@@ -303,6 +423,70 @@ export function createTenantConfiguration(input: {
   };
 }
 
+export function createOpportunityCategoryDefinition(input: {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+}): OpportunityCategoryDefinition {
+  return {
+    id: requireNonEmptyString(input.id, "opportunityCategory.id"),
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    key: requireSystemKey(input.key, "opportunityCategory.key"),
+    label: requireNonEmptyString(input.label, "opportunityCategory.label"),
+    active: requireBoolean(input.active, "opportunityCategory.active"),
+    sortOrder: requirePositiveInteger(input.sortOrder, "opportunityCategory.sortOrder")
+  };
+}
+
+export function createOpportunityTypologyDefinition(input: {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  active: boolean;
+  sortOrder: number;
+}): OpportunityTypologyDefinition {
+  return {
+    id: requireNonEmptyString(input.id, "opportunityTypology.id"),
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    key: requireSystemKey(input.key, "opportunityTypology.key"),
+    label: requireNonEmptyString(input.label, "opportunityTypology.label"),
+    active: requireBoolean(input.active, "opportunityTypology.active"),
+    sortOrder: requirePositiveInteger(input.sortOrder, "opportunityTypology.sortOrder")
+  };
+}
+
+export function createOpportunityIntakeTemplate(input: {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  categoryKey: string;
+  typologyKey: string;
+  requiredStandardFieldKeys: OpportunityIntakeStandardFieldKey[];
+  requiredCustomFieldKeys: string[];
+  active: boolean;
+  version: number;
+  updatedAt: string;
+}): OpportunityIntakeTemplate {
+  return {
+    id: requireNonEmptyString(input.id, "opportunityIntakeTemplate.id"),
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    key: requireSystemKey(input.key, "opportunityIntakeTemplate.key"),
+    label: requireNonEmptyString(input.label, "opportunityIntakeTemplate.label"),
+    categoryKey: requireSystemKey(input.categoryKey, "opportunityIntakeTemplate.categoryKey"),
+    typologyKey: requireSystemKey(input.typologyKey, "opportunityIntakeTemplate.typologyKey"),
+    requiredStandardFieldKeys: cloneStandardFieldKeys(input.requiredStandardFieldKeys),
+    requiredCustomFieldKeys: cloneCustomFieldKeys(input.requiredCustomFieldKeys),
+    active: requireBoolean(input.active, "opportunityIntakeTemplate.active"),
+    version: requirePositiveInteger(input.version, "opportunityIntakeTemplate.version"),
+    updatedAt: requireValidTimestamp(input.updatedAt, "opportunityIntakeTemplate.updatedAt")
+  };
+}
+
 export function createCustomFieldDefinition(input: {
   id: string;
   tenantId: TenantId;
@@ -334,6 +518,206 @@ export function createCustomFieldDefinition(input: {
     ...(input.permissionRules !== undefined ? { permissionRules: clonePermissionRules(input.permissionRules) } : {}),
     bindingFlags: createBindingFlags(input.bindingFlags),
     updatedAt: requireValidTimestamp(input.updatedAt, "customField.updatedAt")
+  };
+}
+
+function indexByKey<T extends { key: string }>(items: T[], duplicateMessage: (key: string) => string): Map<string, T> {
+  const index = new Map<string, T>();
+
+  for (const item of items) {
+    if (index.has(item.key)) {
+      throw new TenantConfigModelError("conflict", duplicateMessage(item.key));
+    }
+    index.set(item.key, item);
+  }
+
+  return index;
+}
+
+export function createOpportunityIntakeMetadataRegistry(input: {
+  tenantId: TenantId;
+  version: number;
+  categories: OpportunityCategoryDefinition[];
+  typologies: OpportunityTypologyDefinition[];
+  customFields: CustomFieldDefinition[];
+  templates: OpportunityIntakeTemplate[];
+  updatedAt: string;
+}): OpportunityIntakeMetadataRegistry {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const categories = requireArray(input.categories, "opportunityIntakeMetadata.categories").map((category) =>
+    createOpportunityCategoryDefinition(category)
+  );
+  const typologies = requireArray(input.typologies, "opportunityIntakeMetadata.typologies").map((typology) =>
+    createOpportunityTypologyDefinition(typology)
+  );
+  const customFields = requireArray(input.customFields, "opportunityIntakeMetadata.customFields").map((field) =>
+    createCustomFieldDefinition(field)
+  );
+  const templates = requireArray(input.templates, "opportunityIntakeMetadata.templates").map((template) =>
+    createOpportunityIntakeTemplate(template)
+  );
+
+  for (const category of categories) {
+    if (category.tenantId !== tenantId) {
+      throw new TenantConfigModelError("validation_error", `Opportunity category tenant mismatch: ${category.id}`);
+    }
+  }
+  for (const typology of typologies) {
+    if (typology.tenantId !== tenantId) {
+      throw new TenantConfigModelError("validation_error", `Opportunity typology tenant mismatch: ${typology.id}`);
+    }
+  }
+  for (const field of customFields) {
+    if (field.tenantId !== tenantId) {
+      throw new TenantConfigModelError("validation_error", `Opportunity intake custom field tenant mismatch: ${field.id}`);
+    }
+    if (field.targetEntityType !== "opportunity") {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Opportunity intake custom field must target opportunity: ${field.id}`
+      );
+    }
+  }
+  for (const template of templates) {
+    if (template.tenantId !== tenantId) {
+      throw new TenantConfigModelError("validation_error", `Opportunity intake template tenant mismatch: ${template.id}`);
+    }
+  }
+
+  const categoryByKey = indexByKey(categories, (key) => `Duplicate opportunity category key: ${key}`);
+  const typologyByKey = indexByKey(typologies, (key) => `Duplicate opportunity typology key: ${key}`);
+  const customFieldByKey = indexByKey(customFields, (key) => `Duplicate opportunity intake custom field key: ${key}`);
+  indexByKey(templates, (key) => `Duplicate opportunity intake template key: ${key}`);
+
+  const activeTemplatePairs = new Set<string>();
+
+  for (const template of templates) {
+    const category = categoryByKey.get(template.categoryKey);
+    if (category === undefined) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Opportunity intake template references unknown category: ${template.categoryKey}`
+      );
+    }
+    if (template.active && !category.active) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Opportunity intake template references inactive category: ${template.categoryKey}`
+      );
+    }
+
+    const typology = typologyByKey.get(template.typologyKey);
+    if (typology === undefined) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Opportunity intake template references unknown typology: ${template.typologyKey}`
+      );
+    }
+    if (template.active && !typology.active) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Opportunity intake template references inactive typology: ${template.typologyKey}`
+      );
+    }
+
+    if (template.active) {
+      const pairKey = `${template.categoryKey}/${template.typologyKey}`;
+      if (activeTemplatePairs.has(pairKey)) {
+        throw new TenantConfigModelError(
+          "conflict",
+          `Duplicate active opportunity intake template for ${pairKey}`
+        );
+      }
+      activeTemplatePairs.add(pairKey);
+    }
+
+    for (const customFieldKey of template.requiredCustomFieldKeys) {
+      const customField = customFieldByKey.get(customFieldKey);
+      if (customField === undefined) {
+        throw new TenantConfigModelError(
+          "validation_error",
+          `Opportunity intake template references unknown custom field: ${customFieldKey}`
+        );
+      }
+      if (!customField.active) {
+        throw new TenantConfigModelError(
+          "validation_error",
+          `Opportunity intake template requires inactive custom field: ${customFieldKey}`
+        );
+      }
+    }
+  }
+
+  return {
+    tenantId,
+    version: requirePositiveInteger(input.version, "opportunityIntakeMetadata.version"),
+    categories,
+    typologies,
+    customFields,
+    templates,
+    updatedAt: requireValidTimestamp(input.updatedAt, "opportunityIntakeMetadata.updatedAt")
+  };
+}
+
+export function resolveOpportunityIntakeRequirements(
+  registry: OpportunityIntakeMetadataRegistry,
+  input: {
+    categoryKey: string;
+    typologyKey: string;
+  }
+): OpportunityIntakeRequirements {
+  const categoryKey = requireSystemKey(input.categoryKey, "opportunityIntakeRequirements.categoryKey");
+  const typologyKey = requireSystemKey(input.typologyKey, "opportunityIntakeRequirements.typologyKey");
+  const category = registry.categories.find((item) => item.key === categoryKey && item.active);
+  if (category === undefined) {
+    throw new TenantConfigModelError("validation_error", `Opportunity category is not configured or active: ${categoryKey}`);
+  }
+  const typology = registry.typologies.find((item) => item.key === typologyKey && item.active);
+  if (typology === undefined) {
+    throw new TenantConfigModelError("validation_error", `Opportunity typology is not configured or active: ${typologyKey}`);
+  }
+  const template = registry.templates.find(
+    (item) => item.categoryKey === categoryKey && item.typologyKey === typologyKey && item.active
+  );
+  if (template === undefined) {
+    throw new TenantConfigModelError(
+      "validation_error",
+      `Opportunity intake template is not configured for ${categoryKey}/${typologyKey}`
+    );
+  }
+  const customFieldByKey = new Map(registry.customFields.map((field) => [field.key, field]));
+
+  return {
+    tenantId: registry.tenantId,
+    registryVersion: registry.version,
+    templateKey: template.key,
+    templateLabel: template.label,
+    category: {
+      key: category.key,
+      label: category.label
+    },
+    typology: {
+      key: typology.key,
+      label: typology.label
+    },
+    requiredStandardFieldKeys: [...template.requiredStandardFieldKeys],
+    requiredCustomFields: template.requiredCustomFieldKeys.map((key) => {
+      const field = customFieldByKey.get(key);
+      if (field === undefined || !field.active) {
+        throw new TenantConfigModelError("validation_error", `Opportunity intake custom field is not active: ${key}`);
+      }
+
+      return {
+        definitionId: field.id,
+        key: field.key,
+        label: field.label,
+        valueType: field.valueType
+      };
+    }),
+    trace: [
+      `opportunity_intake_metadata:registry:${registry.version}`,
+      `opportunity_intake_metadata:template:${template.key}`
+    ]
   };
 }
 
