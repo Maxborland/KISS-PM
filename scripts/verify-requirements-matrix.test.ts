@@ -718,6 +718,73 @@ describe("verify-requirements-matrix", () => {
     expect(result.stderr).toContain("P4-008: required_e2e must exactly match phase contract");
   });
 
+  it("accepts partially implemented P4 rows without E2E evidence only in allow-blocked tracking mode", () => {
+    const matrixPath = writePhaseMatrixFixture("P4", "partial-p4-without-e2e.json", p4RequiredE2e, {
+      "P4-001": {
+        status: "verified",
+        evidence: ["P4-001 domain templates verified by unit tests"],
+        tests: ["npm test -- packages/project-core/src/processTemplate.test.ts exit 0"],
+        cleanup: "No runtime cleanup",
+        blocker: null
+      }
+    });
+
+    const trackingResult = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    const phaseExitResult = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(trackingResult.status).toBe(0);
+    expect(trackingResult.stdout).toContain("Requirements matrix verified");
+    expect(phaseExitResult.status).toBe(1);
+    expect(phaseExitResult.stderr).toContain("P4-001: verified row missing structured E2E evidence for E2E-030");
+  });
+
+  it("still requires structured E2E evidence for completed earlier phase rows in allow-blocked mode", () => {
+    const matrixPath = writePhaseMatrixFixture("P3", "partial-p3-without-e2e.json", p3RequiredE2e, {
+      "P3-001": {
+        status: "verified",
+        evidence: ["P3-001 should not defer E2E after Phase 3 completion"],
+        tests: ["npm run test:e2e:phase -- --phase=3 exit 0"],
+        cleanup: "No runtime cleanup",
+        blocker: null
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P3-001: verified row missing structured E2E evidence for E2E-020");
+  });
+
+  it("rejects malformed supplied E2E evidence in allow-blocked tracking mode", () => {
+    const matrixPath = writePhaseMatrixFixture("P4", "partial-p4-malformed-e2e.json", p4RequiredE2e, {
+      "P4-001": {
+        status: "verified",
+        evidence: ["P4-001 domain templates verified by unit tests"],
+        tests: ["npm test -- packages/project-core/src/processTemplate.test.ts exit 0"],
+        cleanup: "No runtime cleanup",
+        blocker: null,
+        e2e_evidence: "bad"
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P4-001: e2e_evidence must be an array when supplied");
+  });
+
   it("accepts a complete P4 matrix only when every row is verified with phase 4 structured E2E evidence", () => {
     const checkedAt = "2026-05-15T02:13:52+07:00";
     const projectRoot = resolve(fixtureDir, "complete-p4-project-root");
@@ -821,6 +888,28 @@ describe("verify-requirements-matrix", () => {
     const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
       cwd: projectRoot,
       env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P4-010: final matrix row must be verified by running the verifier without --allow-blocked"
+    );
+  });
+
+  it("rejects verified P4-010 in allow-blocked mode even when E2E evidence is deferred", () => {
+    const matrixPath = writePhaseMatrixFixture("P4", "verified-p4-final-row-without-e2e.json", p4RequiredE2e, {
+      "P4-010": {
+        status: "verified",
+        evidence: ["P4-010 final row cannot use tracking-mode verification"],
+        tests: ["npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0"],
+        cleanup: "No runtime cleanup",
+        blocker: null
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
       encoding: "utf8"
     });
 

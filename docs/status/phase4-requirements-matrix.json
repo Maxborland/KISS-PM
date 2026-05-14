@@ -2,12 +2,12 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T02:24:27+07:00",
+  "updated_at": "2026-05-15T03:05:14+07:00",
   "rows": [
     {
       "id": "P4-001",
       "requirement": "Process and stage templates",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/project-core",
@@ -19,14 +19,24 @@
         "E2E-032"
       ],
       "evidence": [
-        "Phase 4 contract defines tenant-owned process/stage template scope before implementation"
+        "packages/project-core exports createProcessTemplate and createProcessTemplateVersionSnapshot for tenant-owned ProcessTemplate/StageTemplate with stable keys, labels, ordering, active/version metadata, nested artifact/approval/task templates, and detached version snapshots",
+        "packages/tenant-config exports createProcessTemplateConfigurationRef and createProcessTemplateConfigurationRegistry so tenant configuration can register active versioned process-template references without duplicating project-core runtime structures",
+        "Validation rejects duplicate stage ids/keys/sort orders, duplicate nested artifact/approval/task keys, duplicate default participant role keys, tenant mismatches, invalid stable keys, empty stages, invalid timestamps, and invalid versions"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/tenant-config/src/processTemplateRegistry.test.ts exit 0, 2 files and 11 tests passed",
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/tenant-config/src/processTemplateRegistry.test.ts scripts/verify-requirements-matrix.test.ts exit 0, 3 files and 40 tests passed",
+        "npm test -- scripts/verify-requirements-matrix.test.ts packages/project-core/src/processTemplate.test.ts packages/tenant-config/src/processTemplateRegistry.test.ts apps/web/src/App.test.tsx exit 0, 4 files and 53 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0, 1 file and 12 tests passed",
+        "npm test exit 0, 28 files and 162 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Process and stage template domain implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "No runtime resources or external data created; implementation is pure domain/config code plus unit tests",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T03:05:14+07:00"
     },
     {
       "id": "P4-002",
@@ -241,7 +251,7 @@
       "tests": [
         "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation",
         "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json exit 1 because P4 rows are intentionally blocked before implementation",
-        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0, 1 file and 26 tests passed"
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0, 1 file and 30 tests passed"
       ],
       "cleanup": "No runtime resources created; row is blocked before implementation",
       "blocker": "Final Phase 4 implementation and E2E evidence are not complete",

@@ -25,6 +25,72 @@ export type ProjectProcessTemplateDraft = TenantOwned & {
   updatedAt: string;
 };
 
+export type ArtifactTemplate = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  required: boolean;
+};
+
+export type ApprovalTemplate = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  approverRoleKey: string;
+  required: boolean;
+};
+
+export type StageTaskTemplate = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  defaultParticipantRoleKeys: string[];
+  required: boolean;
+};
+
+export type StageTemplate = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  version: number;
+  updatedAt: string;
+  requiredArtifactTemplates: ArtifactTemplate[];
+  approvalTemplates: ApprovalTemplate[];
+  taskTemplates: StageTaskTemplate[];
+};
+
+export type ProcessTemplate = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  active: boolean;
+  version: number;
+  updatedAt: string;
+  stages: StageTemplate[];
+};
+
+export type ArtifactTemplateSnapshot = Omit<ArtifactTemplate, "tenantId">;
+export type ApprovalTemplateSnapshot = Omit<ApprovalTemplate, "tenantId">;
+export type StageTaskTemplateSnapshot = Omit<StageTaskTemplate, "tenantId">;
+
+export type StageTemplateSnapshot = Omit<StageTemplate, "tenantId" | "requiredArtifactTemplates" | "approvalTemplates" | "taskTemplates"> & {
+  requiredArtifactTemplates: ArtifactTemplateSnapshot[];
+  approvalTemplates: ApprovalTemplateSnapshot[];
+  taskTemplates: StageTaskTemplateSnapshot[];
+};
+
+export type ProcessTemplateVersionSnapshot = TenantOwned & {
+  templateId: string;
+  key: string;
+  label: string;
+  version: number;
+  active: boolean;
+  updatedAt: string;
+  stageTemplates: StageTemplateSnapshot[];
+};
+
 export type ProjectDraftStatus = "draft";
 
 export type ProjectDraftSourceOpportunity = TenantOwned & {
@@ -131,7 +197,31 @@ function requireProbability(value: number | undefined, fieldName: string): numbe
 
 function requireValidTimestamp(value: string | undefined, fieldName: string): string {
   const timestamp = requireNonEmptyString(value, fieldName);
-  if (Number.isNaN(Date.parse(timestamp))) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.exec(
+    timestamp
+  );
+  if (match === null) {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} must be a valid timestamp`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  const isValidCalendarDate =
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day;
+
+  if (
+    !isValidCalendarDate ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    Number.isNaN(Date.parse(timestamp))
+  ) {
     throw new ProjectCoreModelError("validation_error", `${fieldName} must be a valid timestamp`);
   }
 
@@ -228,10 +318,173 @@ function cloneAssumptions(
   });
 }
 
+function assertTenantId(tenantId: TenantId, entityTenantId: TenantId, message: string): void {
+  if (entityTenantId !== tenantId) {
+    throw new ProjectCoreModelError("validation_error", message);
+  }
+}
+
 function assertTenant(tenantId: TenantId, entity: TenantOwned, fieldName: string): void {
   if (entity.tenantId !== tenantId) {
     throw new ProjectCoreModelError("validation_error", `${fieldName} tenant mismatch`);
   }
+}
+
+function assertUniqueFieldValues<T>(
+  items: T[],
+  getValue: (item: T) => string | number,
+  message: string
+): void {
+  const values = items.map(getValue);
+  if (new Set(values).size !== values.length) {
+    throw new ProjectCoreModelError("conflict", message);
+  }
+}
+
+function cloneArtifactTemplates(
+  tenantId: TenantId,
+  stageKey: string,
+  templates: ArtifactTemplate[] | undefined
+): ArtifactTemplate[] {
+  const cloned = requireArray(templates, "stageTemplate.requiredArtifactTemplates").map((rawTemplate) => {
+    const template = requireObject(rawTemplate, "stageTemplate.requiredArtifactTemplate");
+    const id = requireNonEmptyString(template.id, "stageTemplate.requiredArtifactTemplate.id");
+    const templateTenantId = requireNonEmptyString(template.tenantId, "stageTemplate.requiredArtifactTemplate.tenantId");
+    assertTenantId(tenantId, templateTenantId, `stageTemplate.requiredArtifactTemplate tenant mismatch: ${id}`);
+
+    return {
+      id,
+      tenantId,
+      key: requireSystemKey(template.key, "stageTemplate.requiredArtifactTemplate.key"),
+      label: requireNonEmptyString(template.label, "stageTemplate.requiredArtifactTemplate.label"),
+      required: requireBoolean(template.required, "stageTemplate.requiredArtifactTemplate.required")
+    };
+  });
+
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.id,
+    `stageTemplate.requiredArtifactTemplates ids must be unique: ${stageKey}`
+  );
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.key,
+    `stageTemplate.requiredArtifactTemplates keys must be unique: ${stageKey}`
+  );
+
+  return cloned;
+}
+
+function cloneApprovalTemplates(
+  tenantId: TenantId,
+  stageKey: string,
+  templates: ApprovalTemplate[] | undefined
+): ApprovalTemplate[] {
+  const cloned = requireArray(templates, "stageTemplate.approvalTemplates").map((rawTemplate) => {
+    const template = requireObject(rawTemplate, "stageTemplate.approvalTemplate");
+    const id = requireNonEmptyString(template.id, "stageTemplate.approvalTemplate.id");
+    const templateTenantId = requireNonEmptyString(template.tenantId, "stageTemplate.approvalTemplate.tenantId");
+    assertTenantId(tenantId, templateTenantId, `stageTemplate.approvalTemplate tenant mismatch: ${id}`);
+
+    return {
+      id,
+      tenantId,
+      key: requireSystemKey(template.key, "stageTemplate.approvalTemplate.key"),
+      label: requireNonEmptyString(template.label, "stageTemplate.approvalTemplate.label"),
+      approverRoleKey: requireSystemKey(
+        template.approverRoleKey,
+        "stageTemplate.approvalTemplate.approverRoleKey"
+      ),
+      required: requireBoolean(template.required, "stageTemplate.approvalTemplate.required")
+    };
+  });
+
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.id,
+    `stageTemplate.approvalTemplates ids must be unique: ${stageKey}`
+  );
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.key,
+    `stageTemplate.approvalTemplates keys must be unique: ${stageKey}`
+  );
+
+  return cloned;
+}
+
+function cloneStageTaskTemplates(
+  tenantId: TenantId,
+  stageKey: string,
+  templates: StageTaskTemplate[] | undefined
+): StageTaskTemplate[] {
+  const cloned = requireArray(templates, "stageTemplate.taskTemplates").map((rawTemplate) => {
+    const template = requireObject(rawTemplate, "stageTemplate.taskTemplate");
+    const id = requireNonEmptyString(template.id, "stageTemplate.taskTemplate.id");
+    const templateTenantId = requireNonEmptyString(template.tenantId, "stageTemplate.taskTemplate.tenantId");
+    assertTenantId(tenantId, templateTenantId, `stageTemplate.taskTemplate tenant mismatch: ${id}`);
+    const defaultParticipantRoleKeys = requireSystemKeyArray(
+      template.defaultParticipantRoleKeys,
+      "stageTemplate.taskTemplate.defaultParticipantRoleKeys",
+      true
+    );
+    assertUniqueKeys(defaultParticipantRoleKeys, "stageTemplate.taskTemplate default participant role keys must be unique");
+
+    return {
+      id,
+      tenantId,
+      key: requireSystemKey(template.key, "stageTemplate.taskTemplate.key"),
+      label: requireNonEmptyString(template.label, "stageTemplate.taskTemplate.label"),
+      defaultParticipantRoleKeys,
+      required: requireBoolean(template.required, "stageTemplate.taskTemplate.required")
+    };
+  });
+
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.id,
+    `stageTemplate.taskTemplates ids must be unique: ${stageKey}`
+  );
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.key,
+    `stageTemplate.taskTemplates keys must be unique: ${stageKey}`
+  );
+
+  return cloned;
+}
+
+function cloneStageTemplates(tenantId: TenantId, stages: StageTemplate[] | undefined): StageTemplate[] {
+  const cloned = requireArray(stages, "processTemplate.stages").map((rawStage) => {
+    const stage = requireObject(rawStage, "processTemplate.stageTemplate");
+    const id = requireNonEmptyString(stage.id, "processTemplate.stageTemplate.id");
+    const stageTenantId = requireNonEmptyString(stage.tenantId, "processTemplate.stageTemplate.tenantId");
+    assertTenantId(tenantId, stageTenantId, `processTemplate.stageTemplate tenant mismatch: ${id}`);
+    const key = requireSystemKey(stage.key, "processTemplate.stageTemplate.key");
+
+    return {
+      id,
+      tenantId,
+      key,
+      label: requireNonEmptyString(stage.label, "processTemplate.stageTemplate.label"),
+      sortOrder: requirePositiveInteger(stage.sortOrder, "processTemplate.stageTemplate.sortOrder"),
+      active: requireBoolean(stage.active, "processTemplate.stageTemplate.active"),
+      version: requirePositiveInteger(stage.version, "processTemplate.stageTemplate.version"),
+      updatedAt: requireValidTimestamp(stage.updatedAt, "processTemplate.stageTemplate.updatedAt"),
+      requiredArtifactTemplates: cloneArtifactTemplates(tenantId, key, stage.requiredArtifactTemplates),
+      approvalTemplates: cloneApprovalTemplates(tenantId, key, stage.approvalTemplates),
+      taskTemplates: cloneStageTaskTemplates(tenantId, key, stage.taskTemplates)
+    };
+  });
+
+  if (cloned.length === 0) {
+    throw new ProjectCoreModelError("validation_error", "processTemplate.stages must not be empty");
+  }
+  assertUniqueFieldValues(cloned, (stage) => stage.id, "processTemplate stage ids must be unique");
+  assertUniqueFieldValues(cloned, (stage) => stage.key, "processTemplate stage keys must be unique");
+  assertUniqueFieldValues(cloned, (stage) => stage.sortOrder, "processTemplate stage sort orders must be unique");
+
+  return [...cloned].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
 function cloneProjectDraftSourceOpportunity(
@@ -407,6 +660,73 @@ export function createProjectProcessTemplateDraft(input: {
     version: requirePositiveInteger(input.version, "projectProcessTemplate.version"),
     assumptions: cloneAssumptions(input.assumptions),
     updatedAt: requireValidTimestamp(input.updatedAt, "projectProcessTemplate.updatedAt")
+  };
+}
+
+export function createProcessTemplate(input: {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  active: boolean;
+  version: number;
+  updatedAt: string;
+  stages: StageTemplate[];
+}): ProcessTemplate {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+
+  return {
+    id: requireNonEmptyString(input.id, "processTemplate.id"),
+    tenantId,
+    key: requireSystemKey(input.key, "processTemplate.key"),
+    label: requireNonEmptyString(input.label, "processTemplate.label"),
+    active: requireBoolean(input.active, "processTemplate.active"),
+    version: requirePositiveInteger(input.version, "processTemplate.version"),
+    updatedAt: requireValidTimestamp(input.updatedAt, "processTemplate.updatedAt"),
+    stages: cloneStageTemplates(tenantId, input.stages)
+  };
+}
+
+export function createProcessTemplateVersionSnapshot(template: ProcessTemplate): ProcessTemplateVersionSnapshot {
+  const processTemplate = createProcessTemplate(template);
+
+  return {
+    tenantId: processTemplate.tenantId,
+    templateId: processTemplate.id,
+    key: processTemplate.key,
+    label: processTemplate.label,
+    version: processTemplate.version,
+    active: processTemplate.active,
+    updatedAt: processTemplate.updatedAt,
+    stageTemplates: processTemplate.stages.map((stage) => ({
+      id: stage.id,
+      key: stage.key,
+      label: stage.label,
+      sortOrder: stage.sortOrder,
+      active: stage.active,
+      version: stage.version,
+      updatedAt: stage.updatedAt,
+      requiredArtifactTemplates: stage.requiredArtifactTemplates.map((artifactTemplate) => ({
+        id: artifactTemplate.id,
+        key: artifactTemplate.key,
+        label: artifactTemplate.label,
+        required: artifactTemplate.required
+      })),
+      approvalTemplates: stage.approvalTemplates.map((approvalTemplate) => ({
+        id: approvalTemplate.id,
+        key: approvalTemplate.key,
+        label: approvalTemplate.label,
+        approverRoleKey: approvalTemplate.approverRoleKey,
+        required: approvalTemplate.required
+      })),
+      taskTemplates: stage.taskTemplates.map((taskTemplate) => ({
+        id: taskTemplate.id,
+        key: taskTemplate.key,
+        label: taskTemplate.label,
+        defaultParticipantRoleKeys: [...taskTemplate.defaultParticipantRoleKeys],
+        required: taskTemplate.required
+      }))
+    }))
   };
 }
 

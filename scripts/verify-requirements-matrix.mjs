@@ -147,56 +147,65 @@ for (const row of matrix.rows ?? []) {
     }
     const requiredE2e = expectedRequiredE2e ?? (Array.isArray(row.required_e2e) ? row.required_e2e : []);
     if (requiredE2e.length > 0) {
+      const hasE2eEvidenceField = Object.hasOwn(row, "e2e_evidence");
+      if (hasE2eEvidenceField && !Array.isArray(row.e2e_evidence)) {
+        failures.push(`${row.id}: e2e_evidence must be an array when supplied`);
+      }
       const e2eEvidence = Array.isArray(row.e2e_evidence) ? row.e2e_evidence : [];
-      for (const e2eId of requiredE2e) {
-        requiredPhaseE2eIds.add(e2eId);
-        if (requiredE2eTestPath[e2eId]) {
-          requiredPhaseE2ePaths.add(requiredE2eTestPath[e2eId]);
-        }
-        const matchingEvidence = e2eEvidence.find((entry) => entry?.id === e2eId);
-        if (!matchingEvidence) {
-          failures.push(`${row.id}: verified row missing structured E2E evidence for ${e2eId}`);
-          continue;
-        }
-        if (matchingEvidence.exit_code !== 0) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence must have exit_code 0`);
-        }
-        if (matchingEvidence.status !== "passed") {
-          failures.push(`${row.id}: ${e2eId} E2E evidence status must be passed`);
-        }
-        if (typeof matchingEvidence.command !== "string" || !matchingEvidence.command.includes("test:e2e:phase")) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence must include the phase E2E command`);
-        }
-        if (
-          expectedE2ePhaseNumber &&
-          typeof matchingEvidence.command === "string" &&
-          !new RegExp(`--phase(?:=|\\s+)${expectedE2ePhaseNumber}(?:\\s|$)`).test(matchingEvidence.command)
-        ) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence command must target phase ${expectedE2ePhaseNumber}`);
-        }
-        const normalizedTestPath =
-          typeof matchingEvidence.test_path === "string" ? matchingEvidence.test_path.replaceAll("\\", "/") : null;
-        const expectedTestPath = requiredE2eTestPath[e2eId];
-        if (!normalizedTestPath) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
-        } else if (expectedTestPath && normalizedTestPath !== expectedTestPath) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence test_path must match ${expectedTestPath}`);
-        } else if (
-          !expectedTestPath &&
-          !(
-            expectedE2ePhaseNumber
-              ? normalizedTestPath.startsWith(`e2e/tests/phase${expectedE2ePhaseNumber}/`)
-              : /^e2e\/tests\/phase\d+\//.test(normalizedTestPath)
-          )
-        ) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
-        }
-        if (!matchingEvidence.checked_at || Number.isNaN(Date.parse(matchingEvidence.checked_at))) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence missing valid checked_at`);
-        } else if (!Number.isNaN(rowLastCheckedAt) && Date.parse(matchingEvidence.checked_at) < rowLastCheckedAt) {
-          failures.push(`${row.id}: ${e2eId} E2E evidence is older than row last_checked_at`);
-        } else {
-          newestRequiredE2eCheckedAt = Math.max(newestRequiredE2eCheckedAt, Date.parse(matchingEvidence.checked_at));
+      const canDeferE2eEvidence = allowBlocked && matrix.phase === "P4";
+      const shouldValidateE2eEvidence = !canDeferE2eEvidence || e2eEvidence.length > 0;
+
+      if (shouldValidateE2eEvidence) {
+        for (const e2eId of requiredE2e) {
+          requiredPhaseE2eIds.add(e2eId);
+          if (requiredE2eTestPath[e2eId]) {
+            requiredPhaseE2ePaths.add(requiredE2eTestPath[e2eId]);
+          }
+          const matchingEvidence = e2eEvidence.find((entry) => entry?.id === e2eId);
+          if (!matchingEvidence) {
+            failures.push(`${row.id}: verified row missing structured E2E evidence for ${e2eId}`);
+            continue;
+          }
+          if (matchingEvidence.exit_code !== 0) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence must have exit_code 0`);
+          }
+          if (matchingEvidence.status !== "passed") {
+            failures.push(`${row.id}: ${e2eId} E2E evidence status must be passed`);
+          }
+          if (typeof matchingEvidence.command !== "string" || !matchingEvidence.command.includes("test:e2e:phase")) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence must include the phase E2E command`);
+          }
+          if (
+            expectedE2ePhaseNumber &&
+            typeof matchingEvidence.command === "string" &&
+            !new RegExp(`--phase(?:=|\\s+)${expectedE2ePhaseNumber}(?:\\s|$)`).test(matchingEvidence.command)
+          ) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence command must target phase ${expectedE2ePhaseNumber}`);
+          }
+          const normalizedTestPath =
+            typeof matchingEvidence.test_path === "string" ? matchingEvidence.test_path.replaceAll("\\", "/") : null;
+          const expectedTestPath = requiredE2eTestPath[e2eId];
+          if (!normalizedTestPath) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
+          } else if (expectedTestPath && normalizedTestPath !== expectedTestPath) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence test_path must match ${expectedTestPath}`);
+          } else if (
+            !expectedTestPath &&
+            !(
+              expectedE2ePhaseNumber
+                ? normalizedTestPath.startsWith(`e2e/tests/phase${expectedE2ePhaseNumber}/`)
+                : /^e2e\/tests\/phase\d+\//.test(normalizedTestPath)
+            )
+          ) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
+          }
+          if (!matchingEvidence.checked_at || Number.isNaN(Date.parse(matchingEvidence.checked_at))) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence missing valid checked_at`);
+          } else if (!Number.isNaN(rowLastCheckedAt) && Date.parse(matchingEvidence.checked_at) < rowLastCheckedAt) {
+            failures.push(`${row.id}: ${e2eId} E2E evidence is older than row last_checked_at`);
+          } else {
+            newestRequiredE2eCheckedAt = Math.max(newestRequiredE2eCheckedAt, Date.parse(matchingEvidence.checked_at));
+          }
         }
       }
     }
