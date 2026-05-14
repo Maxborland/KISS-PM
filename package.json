@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "test:integration": "vitest run apps/api/src/app.test.ts",
+    "test:integration": "vitest run apps/api/src",
     "test:e2e": "node scripts/run-e2e.mjs all",
     "test:e2e:smoke": "node scripts/run-e2e.mjs smoke",
     "test:e2e:critical": "node scripts/run-e2e.mjs critical",

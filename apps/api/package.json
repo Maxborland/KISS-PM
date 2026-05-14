@@ -9,7 +9,11 @@
     "test": "vitest run src/**/*.test.ts"
   },
   "dependencies": {
+    "@kiss-pm/access-control": "0.1.0",
     "@kiss-pm/domain-core": "0.1.0",
-    "hono": "^4.10.6"
+    "@kiss-pm/shared-test-fixtures": "0.1.0",
+    "@kiss-pm/tenant-config": "0.1.0",
+    "hono": "^4.10.6",
+    "zod": "^4.2.1"
   }
 }
