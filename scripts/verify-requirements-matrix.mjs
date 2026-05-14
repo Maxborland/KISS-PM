@@ -9,7 +9,9 @@ const failures = [];
 const requiredIdsByPhase = {
   P1: Array.from({ length: 10 }, (_, index) => `P1-${String(index + 1).padStart(3, "0")}`),
   "P2-contract": ["P2C-001", "P2C-002", "P2C-003"],
-  P2: Array.from({ length: 10 }, (_, index) => `P2-${String(index + 1).padStart(3, "0")}`)
+  P2: Array.from({ length: 10 }, (_, index) => `P2-${String(index + 1).padStart(3, "0")}`),
+  "P3-contract": ["P3C-001", "P3C-002", "P3C-003"],
+  P3: Array.from({ length: 10 }, (_, index) => `P3-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -23,7 +25,31 @@ const requiredE2eByPhaseRow = {
     "P2-008": ["E2E-011", "E2E-012", "E2E-013", "E2E-014"],
     "P2-009": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
     "P2-010": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"]
+  },
+  P3: {
+    "P3-001": ["E2E-020"],
+    "P3-002": ["E2E-021"],
+    "P3-003": ["E2E-020", "E2E-021"],
+    "P3-004": ["E2E-021", "E2E-022"],
+    "P3-005": ["E2E-022"],
+    "P3-006": ["E2E-022"],
+    "P3-007": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+    "P3-008": ["E2E-023", "E2E-024"],
+    "P3-009": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+    "P3-010": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"]
   }
+};
+const requiredE2eTestPath = {
+  "E2E-010": "e2e/tests/phase2/tenant-isolation.spec.ts",
+  "E2E-011": "e2e/tests/phase2/access-profile.spec.ts",
+  "E2E-012": "e2e/tests/phase2/read-only-permissions.spec.ts",
+  "E2E-013": "e2e/tests/phase2/tenant-labels.spec.ts",
+  "E2E-014": "e2e/tests/phase2/audit-basics.spec.ts",
+  "E2E-020": "e2e/tests/phase3/opportunity-create.spec.ts",
+  "E2E-021": "e2e/tests/phase3/intake-readiness.spec.ts",
+  "E2E-022": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+  "E2E-023": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
+  "E2E-024": "e2e/tests/phase3/project-draft-canonical.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -104,12 +130,19 @@ for (const row of matrix.rows ?? []) {
         ) {
           failures.push(`${row.id}: ${e2eId} E2E evidence command must target phase ${expectedE2ePhaseNumber}`);
         }
-        if (
-          typeof matchingEvidence.test_path !== "string" ||
+        const normalizedTestPath =
+          typeof matchingEvidence.test_path === "string" ? matchingEvidence.test_path.replaceAll("\\", "/") : null;
+        const expectedTestPath = requiredE2eTestPath[e2eId];
+        if (!normalizedTestPath) {
+          failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
+        } else if (expectedTestPath && normalizedTestPath !== expectedTestPath) {
+          failures.push(`${row.id}: ${e2eId} E2E evidence test_path must match ${expectedTestPath}`);
+        } else if (
+          !expectedTestPath &&
           !(
             expectedE2ePhaseNumber
-              ? matchingEvidence.test_path.replaceAll("\\", "/").startsWith(`e2e/tests/phase${expectedE2ePhaseNumber}/`)
-              : /^e2e\/tests\/phase\d+\//.test(matchingEvidence.test_path.replaceAll("\\", "/"))
+              ? normalizedTestPath.startsWith(`e2e/tests/phase${expectedE2ePhaseNumber}/`)
+              : /^e2e\/tests\/phase\d+\//.test(normalizedTestPath)
           )
         ) {
           failures.push(`${row.id}: ${e2eId} E2E evidence must include a phase E2E test_path`);
