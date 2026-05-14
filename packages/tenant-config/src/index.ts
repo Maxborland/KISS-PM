@@ -115,6 +115,22 @@ export type OpportunityIntakeRequirements = {
   trace: string[];
 };
 
+export type ProcessTemplateConfigurationRef = {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  version: number;
+  active: boolean;
+};
+
+export type ProcessTemplateConfigurationRegistry = {
+  tenantId: TenantId;
+  version: number;
+  processTemplates: ProcessTemplateConfigurationRef[];
+  updatedAt: string;
+};
+
 export type CustomFieldRegistry = {
   tenantId: TenantId;
   version: number;
@@ -198,7 +214,31 @@ function requireArray<T>(value: T[] | undefined, fieldName: string): T[] {
 
 function requireValidTimestamp(value: string | undefined, fieldName: string): string {
   const timestamp = requireNonEmptyString(value, fieldName);
-  if (Number.isNaN(Date.parse(timestamp))) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.exec(
+    timestamp
+  );
+  if (match === null) {
+    throw new TenantConfigModelError("validation_error", `${fieldName} must be a valid timestamp`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  const isValidCalendarDate =
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day;
+
+  if (
+    !isValidCalendarDate ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    Number.isNaN(Date.parse(timestamp))
+  ) {
     throw new TenantConfigModelError("validation_error", `${fieldName} must be a valid timestamp`);
   }
 
@@ -518,6 +558,66 @@ export function createCustomFieldDefinition(input: {
     ...(input.permissionRules !== undefined ? { permissionRules: clonePermissionRules(input.permissionRules) } : {}),
     bindingFlags: createBindingFlags(input.bindingFlags),
     updatedAt: requireValidTimestamp(input.updatedAt, "customField.updatedAt")
+  };
+}
+
+export function createProcessTemplateConfigurationRef(input: {
+  id: string;
+  tenantId: TenantId;
+  key: string;
+  label: string;
+  version: number;
+  active: boolean;
+}): ProcessTemplateConfigurationRef {
+  return {
+    id: requireNonEmptyString(input.id, "processTemplateConfiguration.id"),
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    key: requireSystemKey(input.key, "processTemplateConfiguration.key"),
+    label: requireNonEmptyString(input.label, "processTemplateConfiguration.label"),
+    version: requirePositiveInteger(input.version, "processTemplateConfiguration.version"),
+    active: requireBoolean(input.active, "processTemplateConfiguration.active")
+  };
+}
+
+export function createProcessTemplateConfigurationRegistry(input: {
+  tenantId: TenantId;
+  version: number;
+  processTemplates: ProcessTemplateConfigurationRef[];
+  updatedAt: string;
+}): ProcessTemplateConfigurationRegistry {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const processTemplates = requireArray(
+    input.processTemplates,
+    "processTemplateConfigurationRegistry.processTemplates"
+  ).map((template) => createProcessTemplateConfigurationRef(template));
+  const activeTemplateIds = new Set<string>();
+  const activeTemplateKeys = new Set<string>();
+
+  for (const template of processTemplates) {
+    if (template.tenantId !== tenantId) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `Process template configuration tenant mismatch: ${template.id}`
+      );
+    }
+
+    if (template.active) {
+      if (activeTemplateIds.has(template.id)) {
+        throw new TenantConfigModelError("conflict", `Duplicate active process template id: ${template.id}`);
+      }
+      if (activeTemplateKeys.has(template.key)) {
+        throw new TenantConfigModelError("conflict", `Duplicate active process template key: ${template.key}`);
+      }
+      activeTemplateIds.add(template.id);
+      activeTemplateKeys.add(template.key);
+    }
+  }
+
+  return {
+    tenantId,
+    version: requirePositiveInteger(input.version, "processTemplateConfigurationRegistry.version"),
+    processTemplates,
+    updatedAt: requireValidTimestamp(input.updatedAt, "processTemplateConfigurationRegistry.updatedAt")
   };
 }
 
