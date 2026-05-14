@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T14:00:11+07:00",
+  "updated_at": "2026-05-14T14:11:14+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -143,11 +143,28 @@
       "owner": "packages/domain-core, apps/api",
       "owned_scope": ["packages/domain-core", "apps/api"],
       "required_e2e": ["E2E-014"],
-      "evidence": [],
-      "tests": ["npm test", "npm run test:integration", "npm run test:e2e:phase -- --phase=2 must include E2E-014 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/domain-core/src/index.ts defines AuditTargetRef, AuditEvent, AuditEventDetails, AuditResult, createAuditTargetRef, and createAuditEvent",
+        "Audit events are tenant-owned, require actor, tenant, actionKey, target, result, timestamp, and correlationId, validate success/denied/failed results, validate timestamps, and clone details to protect append-oriented history from caller mutations",
+        "packages/domain-core/src/auditPrimitives.test.ts covers audit event creation, missing required fields, required actor correlationId, invalid results, detail cloning, and typed DomainInvariantError validation failures",
+        "apps/api/src/auditLog.ts defines a deterministic in-memory audit event store for Phase 2 service tests with append, duplicate-id rejection, tenant-scoped readback, insertion order preservation, and cloned read/write boundaries",
+        "apps/api/src/auditLog.test.ts covers tenant-scoped audit readback, append-only history isolation from caller mutations, duplicate audit IDs, and invalid tenant readback requests",
+        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/api"
+      ],
+      "tests": [
+        "npm test -- packages/domain-core/src/auditPrimitives.test.ts exit 0 (4 tests)",
+        "npm test -- apps/api/src/auditLog.test.ts exit 0 (3 tests)",
+        "npm install --package-lock-only --ignore-scripts exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (11 files, 50 tests)",
+        "npm run test:integration exit 0 (1 file, 1 test)",
+        "npm run test:e2e:smoke exit 0",
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+      ],
+      "cleanup": "No external writes or persistent runtime resources; in-memory audit event store only, deterministic tests reset per test instance",
+      "blocker": "Phase-exit verification for required E2E-014 remains blocked until later P2 API/UI/fixture/E2E rows add a Phase 2 state-changing action, audit readback endpoint, tenant-scoped audit UI/API proof, and e2e/tests/phase2/audit-basics.spec.ts. Current block provides audit primitives and service-level in-memory append/readback only. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
+      "last_checked_at": "2026-05-14T14:11:14+07:00"
     },
     {
       "id": "P2-007",
