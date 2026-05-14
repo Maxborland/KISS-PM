@@ -72,6 +72,59 @@ export type Opportunity = TenantOwned & {
   createdAt: string;
 };
 
+export type OpportunityReadinessBlockerCode =
+  | "account_or_contact_missing"
+  | "planned_dates_missing"
+  | "date_window_invalid"
+  | "category_missing"
+  | "typology_missing"
+  | "scope_hints_missing"
+  | "template_match_missing"
+  | "low_confidence";
+
+export type OpportunityReadinessBlockerSeverity = "blocking" | "warning";
+
+export type OpportunityReadinessNextAction =
+  | "collect_missing_data"
+  | "select_process_template"
+  | "improve_confidence"
+  | "run_feasibility";
+
+export type OpportunityReadinessBlocker = {
+  code: OpportunityReadinessBlockerCode;
+  severity: OpportunityReadinessBlockerSeverity;
+  message: string;
+  fieldRefs: string[];
+};
+
+export type OpportunityTemplateMatchRef = {
+  templateId: string;
+  confidence: number;
+};
+
+export type OpportunityReadinessInput = {
+  tenantId: TenantId;
+  opportunityId?: OpportunityId;
+  accountId?: AccountId;
+  contactIds?: ContactId[];
+  accountContactIntent?: "identified" | "intentionally_unknown";
+  plannedStartDate?: string;
+  desiredFinishDate?: string;
+  categoryKey?: string;
+  typologyKey?: string;
+  scopeHints?: OpportunityScopeHint[];
+  templateMatch?: OpportunityTemplateMatchRef;
+  minimumTemplateConfidence?: number;
+};
+
+export type OpportunityReadinessCheck = TenantOwned & {
+  opportunityId?: OpportunityId;
+  ready: boolean;
+  blockers: OpportunityReadinessBlocker[];
+  nextAction: OpportunityReadinessNextAction;
+  trace: string[];
+};
+
 export class CrmCoreModelError extends Error {
   constructor(
     readonly code: "validation_error" | "tenant_mismatch" | "conflict",
@@ -136,6 +189,21 @@ function requireSystemKey(value: string | undefined, fieldName: string): string 
   }
 
   return key;
+}
+
+function hasNonEmptyString(value: string | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isSystemKey(value: string | undefined): value is string {
+  return typeof value === "string" && /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(value);
+}
+
+function isValidIsoDate(value: string | undefined): value is string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function requireMoneyAmount(value: MoneyAmount | undefined): MoneyAmount {
@@ -204,10 +272,150 @@ function cloneCustomFieldRefs(customFieldRefs: OpportunityCustomFieldRef[] | und
     const fieldRef = requireObject(rawFieldRef, "opportunity.customFieldRef");
 
     return {
-    definitionId: requireNonEmptyString(fieldRef.definitionId, "opportunity.customFieldRef.definitionId"),
-    key: requireSystemKey(fieldRef.key, "opportunity.customFieldRef.key")
+      definitionId: requireNonEmptyString(fieldRef.definitionId, "opportunity.customFieldRef.definitionId"),
+      key: requireSystemKey(fieldRef.key, "opportunity.customFieldRef.key")
     };
   });
+}
+
+function createReadinessBlocker(
+  code: OpportunityReadinessBlockerCode,
+  message: string,
+  fieldRefs: string[]
+): OpportunityReadinessBlocker {
+  return {
+    code,
+    severity: "blocking",
+    message,
+    fieldRefs: [...fieldRefs]
+  };
+}
+
+function selectReadinessNextAction(blockers: OpportunityReadinessBlocker[]): OpportunityReadinessNextAction {
+  if (blockers.length === 0) return "run_feasibility";
+
+  const blockerCodes = new Set(blockers.map((blocker) => blocker.code));
+  const missingDataCodes: OpportunityReadinessBlockerCode[] = [
+    "account_or_contact_missing",
+    "planned_dates_missing",
+    "date_window_invalid",
+    "category_missing",
+    "typology_missing",
+    "scope_hints_missing"
+  ];
+
+  if (missingDataCodes.some((code) => blockerCodes.has(code))) return "collect_missing_data";
+  if (blockerCodes.has("template_match_missing")) return "select_process_template";
+  if (blockerCodes.has("low_confidence")) return "improve_confidence";
+
+  return "collect_missing_data";
+}
+
+function validateOptionalStringArray(value: string[] | undefined, fieldName: string): string[] {
+  return requireArray(value ?? [], fieldName).map((item) => requireNonEmptyString(item, `${fieldName}[]`));
+}
+
+export function evaluateOpportunityReadiness(input: OpportunityReadinessInput): OpportunityReadinessCheck {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const blockers: OpportunityReadinessBlocker[] = [];
+  const trace: string[] = [];
+  const contactIds = validateOptionalStringArray(input.contactIds, "readiness.contactIds");
+  const scopeHints = cloneScopeHints(input.scopeHints);
+
+  if (
+    !hasNonEmptyString(input.accountId) &&
+    contactIds.length === 0 &&
+    input.accountContactIntent !== "intentionally_unknown"
+  ) {
+    blockers.push(
+      createReadinessBlocker(
+        "account_or_contact_missing",
+        "Укажите клиента или контакт либо явно отметьте, что они пока неизвестны.",
+        ["accountId", "contactIds", "accountContactIntent"]
+      )
+    );
+  }
+
+  if (!hasNonEmptyString(input.plannedStartDate) || !hasNonEmptyString(input.desiredFinishDate)) {
+    blockers.push(
+      createReadinessBlocker("planned_dates_missing", "Укажите плановый старт и желаемую дату завершения.", [
+        "plannedStartDate",
+        "desiredFinishDate"
+      ])
+    );
+  } else if (!isValidIsoDate(input.plannedStartDate) || !isValidIsoDate(input.desiredFinishDate)) {
+    blockers.push(
+      createReadinessBlocker("planned_dates_missing", "Укажите плановые даты в формате ISO YYYY-MM-DD.", [
+        "plannedStartDate",
+        "desiredFinishDate"
+      ])
+    );
+  } else if (input.desiredFinishDate < input.plannedStartDate) {
+    blockers.push(
+      createReadinessBlocker(
+        "date_window_invalid",
+        "Желаемая дата завершения должна быть не раньше планового старта.",
+        ["plannedStartDate", "desiredFinishDate"]
+      )
+    );
+  }
+
+  if (!isSystemKey(input.categoryKey)) {
+    blockers.push(createReadinessBlocker("category_missing", "Выберите категорию возможности.", ["categoryKey"]));
+  }
+
+  if (!isSystemKey(input.typologyKey)) {
+    blockers.push(createReadinessBlocker("typology_missing", "Выберите типологию возможности.", ["typologyKey"]));
+  }
+
+  if (scopeHints.length === 0) {
+    blockers.push(
+      createReadinessBlocker("scope_hints_missing", "Добавьте хотя бы один признак объема работ.", ["scopeHints"])
+    );
+  }
+
+  if (input.templateMatch === undefined) {
+    blockers.push(
+      createReadinessBlocker("template_match_missing", "Подберите процессный шаблон для оценки возможности.", [
+        "templateMatch"
+      ])
+    );
+  } else {
+    const templateMatch = requireObject(input.templateMatch, "readiness.templateMatch");
+    if (!hasNonEmptyString(templateMatch.templateId)) {
+      blockers.push(
+        createReadinessBlocker("template_match_missing", "Подберите процессный шаблон для оценки возможности.", [
+          "templateMatch"
+        ])
+      );
+    } else {
+      const confidence = requireProbability(templateMatch.confidence);
+      const minimumConfidence = input.minimumTemplateConfidence ?? 0.5;
+      const requiredConfidence = requireProbability(minimumConfidence);
+      if (confidence < requiredConfidence) {
+        blockers.push(
+          createReadinessBlocker(
+            "low_confidence",
+            "Уточните данные возможности: уверенность подбора шаблона ниже допустимого порога.",
+            ["templateMatch.confidence"]
+          )
+        );
+      }
+    }
+  }
+
+  const nextAction = selectReadinessNextAction(blockers);
+  trace.push(blockers.length === 0 ? "readiness:ready" : `readiness:blockers:${blockers.length}`);
+  trace.push(`readiness:next_action:${nextAction}`);
+
+  return {
+    tenantId,
+    ...(input.opportunityId !== undefined ? { opportunityId: requireNonEmptyString(input.opportunityId, "opportunityId") } : {}),
+    ready: blockers.length === 0,
+    blockers,
+    nextAction,
+    trace
+  };
 }
 
 export function createAccount(input: {
