@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl } from "./helpers";
+import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl, resetPhase2Fixtures } from "./helpers";
 
 test("E2E-012 Read-only user can open Phase 2 surface but cannot mutate directly", async ({ page, request }) => {
+  await resetPhase2Fixtures(request);
   await openPhase2Surface(page, "readonly-observer-a");
 
   await expect(page.getByTestId("readonly-denial")).toContainText(/режим чтения/i);

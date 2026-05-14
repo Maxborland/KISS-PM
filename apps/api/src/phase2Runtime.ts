@@ -17,8 +17,16 @@ import {
   createAuditTargetRef
 } from "@kiss-pm/domain-core";
 import type { AuditEvent, Tenant, TenantId, TenantIsolationProbe } from "@kiss-pm/domain-core";
-import { getDemoTenants } from "@kiss-pm/shared-test-fixtures";
-import type { DemoTenantUser } from "@kiss-pm/shared-test-fixtures";
+import {
+  getPhase2FixtureSeed,
+  PHASE2_FIXTURE_TIMESTAMP
+} from "@kiss-pm/shared-test-fixtures";
+import type {
+  DemoTenantUser,
+  Phase2AccessProfileSeed,
+  Phase2PermissionKey,
+  Phase2TenantLabelSeed
+} from "@kiss-pm/shared-test-fixtures";
 import {
   createTenantLabelSet,
   updateTenantLabel
@@ -26,15 +34,6 @@ import {
 import type { TenantLabelSet } from "@kiss-pm/tenant-config";
 
 import { createInMemoryAuditEventStore } from "./auditLog";
-
-export type Phase2PermissionKey =
-  | "tenant.read"
-  | "access_profile.read"
-  | "access_profile.write"
-  | "tenant_labels.write"
-  | "permission.diagnostics.read"
-  | "tenant_probe.read"
-  | "audit.read";
 
 export type Phase2RuntimeSession = {
   tenant: Tenant;
@@ -45,7 +44,7 @@ export type Phase2RuntimeSession = {
 
 export type Phase2RuntimeState = ReturnType<typeof createPhase2RuntimeState>;
 
-const FIXED_TIMESTAMP = "2026-05-14T00:00:00.000Z";
+const FIXED_TIMESTAMP = PHASE2_FIXTURE_TIMESTAMP;
 
 const phase2PermissionCatalog = [
   createPermission({
@@ -98,17 +97,7 @@ function scopeRule(permissionKey: Phase2PermissionKey, scope: "tenant" | "all"):
   return createScopeRule({ permissionKey, scope });
 }
 
-function createProfile(input: {
-  id: string;
-  tenantId: TenantId;
-  systemKey: string;
-  label: string;
-  permissions: Phase2PermissionKey[];
-  scope: "tenant" | "all";
-  active?: boolean;
-  version?: number;
-  updatedAt?: string;
-}): AccessProfile {
+function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
   return createAccessProfile({
     id: input.id,
     tenantId: input.tenantId,
@@ -116,100 +105,18 @@ function createProfile(input: {
     label: input.label,
     permissions: input.permissions.map(permission),
     scopeRules: input.permissions.map((permissionKey) => scopeRule(permissionKey, input.scope)),
-    active: input.active ?? true,
-    version: input.version ?? 1,
-    updatedAt: input.updatedAt ?? FIXED_TIMESTAMP
+    active: input.active,
+    version: input.version,
+    updatedAt: input.updatedAt
   });
 }
 
-function createProfilesForTenantA(): AccessProfile[] {
-  return [
-    createProfile({
-      id: "profile-tenant-admin-a",
-      tenantId: "tenant-a",
-      systemKey: "tenant_admin",
-      label: "Администратор тенанта",
-      permissions: [
-        "tenant.read",
-        "access_profile.read",
-        "access_profile.write",
-        "tenant_labels.write",
-        "permission.diagnostics.read",
-        "tenant_probe.read",
-        "audit.read"
-      ],
-      scope: "all"
-    }),
-    createProfile({
-      id: "profile-project-manager-a",
-      tenantId: "tenant-a",
-      systemKey: "project_manager",
-      label: "Руководитель проекта",
-      permissions: ["tenant.read", "permission.diagnostics.read", "tenant_probe.read"],
-      scope: "tenant"
-    }),
-    createProfile({
-      id: "profile-resource-manager-a",
-      tenantId: "tenant-a",
-      systemKey: "resource_manager",
-      label: "Ресурсный менеджер",
-      permissions: ["tenant.read", "permission.diagnostics.read", "tenant_probe.read"],
-      scope: "tenant"
-    }),
-    createProfile({
-      id: "profile-executor-a",
-      tenantId: "tenant-a",
-      systemKey: "executor",
-      label: "Исполнитель",
-      permissions: ["tenant.read", "tenant_probe.read"],
-      scope: "tenant"
-    }),
-    createProfile({
-      id: "profile-readonly-observer-a",
-      tenantId: "tenant-a",
-      systemKey: "readonly_observer",
-      label: "Наблюдатель",
-      permissions: ["tenant.read", "tenant_probe.read", "audit.read"],
-      scope: "tenant"
-    })
-  ];
-}
-
-function createProfilesForTenantB(): AccessProfile[] {
-  return [
-    createProfile({
-      id: "profile-tenant-admin-b",
-      tenantId: "tenant-b",
-      systemKey: "tenant_admin",
-      label: "Администратор тенанта B",
-      permissions: [
-        "tenant.read",
-        "access_profile.read",
-        "access_profile.write",
-        "tenant_labels.write",
-        "permission.diagnostics.read",
-        "tenant_probe.read",
-        "audit.read"
-      ],
-      scope: "all"
-    }),
-    createProfile({
-      id: "profile-tenant-user-b",
-      tenantId: "tenant-b",
-      systemKey: "tenant_user",
-      label: "Пользователь тенанта B",
-      permissions: ["tenant.read", "tenant_probe.read"],
-      scope: "tenant"
-    })
-  ];
-}
-
-function createLabelSet(tenantId: TenantId, labels: Record<string, string>): TenantLabelSet {
+function createLabelSet(seed: Phase2TenantLabelSeed): TenantLabelSet {
   return createTenantLabelSet({
-    tenantId,
-    configurationVersion: 1,
-    labels,
-    updatedAt: FIXED_TIMESTAMP
+    tenantId: seed.tenantId,
+    configurationVersion: seed.configurationVersion,
+    labels: seed.labels,
+    updatedAt: seed.updatedAt
   });
 }
 
@@ -243,6 +150,7 @@ function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
 }
 
 export function createPhase2RuntimeState() {
+  const fixtureSeed = getPhase2FixtureSeed();
   const tenants = new Map<TenantId, Tenant>();
   const users = new Map<string, DemoTenantUser>();
   const probes = new Map<string, TenantIsolationProbe>();
@@ -251,7 +159,7 @@ export function createPhase2RuntimeState() {
   const auditStore = createInMemoryAuditEventStore();
   let auditCounter = 0;
 
-  for (const demoTenant of getDemoTenants()) {
+  for (const demoTenant of fixtureSeed.tenants) {
     tenants.set(demoTenant.id, {
       id: demoTenant.id,
       label: demoTenant.label,
@@ -263,36 +171,16 @@ export function createPhase2RuntimeState() {
     }
   }
 
-  profiles.set(
-    "tenant-a",
-    new Map(createProfilesForTenantA().map((profile) => [profile.id, profile]))
-  );
-  profiles.set(
-    "tenant-b",
-    new Map(createProfilesForTenantB().map((profile) => [profile.id, profile]))
-  );
+  for (const profileSeed of fixtureSeed.accessProfiles) {
+    const tenantProfiles = profiles.get(profileSeed.tenantId) ?? new Map<string, AccessProfile>();
+    const profile = createProfile(profileSeed);
+    tenantProfiles.set(profile.id, profile);
+    profiles.set(profileSeed.tenantId, tenantProfiles);
+  }
 
-  labelSets.set(
-    "tenant-a",
-    createLabelSet("tenant-a", {
-      "navigation.admin": "Администрирование",
-      "navigation.audit": "Журнал действий",
-      "role.tenant_admin": "Администратор",
-      "role.project_manager": "Руководитель проекта",
-      "role.resource_manager": "Ресурсный менеджер",
-      "role.executor": "Исполнитель",
-      "role.readonly_observer": "Наблюдатель"
-    })
-  );
-  labelSets.set(
-    "tenant-b",
-    createLabelSet("tenant-b", {
-      "navigation.admin": "Администрирование B",
-      "navigation.audit": "Журнал действий B",
-      "role.tenant_admin": "Администратор B",
-      "role.tenant_user": "Пользователь B"
-    })
-  );
+  for (const labelSetSeed of fixtureSeed.labelSets) {
+    labelSets.set(labelSetSeed.tenantId, createLabelSet(labelSetSeed));
+  }
 
   function nextAuditId(): string {
     auditCounter += 1;

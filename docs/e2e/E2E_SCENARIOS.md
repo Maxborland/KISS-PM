@@ -27,11 +27,11 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-010 | Tenant A user cannot see tenant B data | Tenant A user | Seed Tenant A/B | Cross-tenant URL/API/view attempt is denied or empty without leaking details | tenant, access-control | PRD 10.1, 10.2 | `e2e/tests/phase2/tenant-isolation.spec.ts` | planned |
-| E2E-011 | Admin can create or edit an access profile | Tenant admin | Seed Tenant A | Access profile change persists and affects later policy evaluation | access-control | PRD 10.2 | `e2e/tests/phase2/access-profile.spec.ts` | planned |
-| E2E-012 | Read-only user can open a page but cannot execute a mutation | Read-only observer | Seed Tenant A | UI blocks mutation and backend/action path denies direct attempt | access-control, audit | PRD 10.2 | `e2e/tests/phase2/read-only-permissions.spec.ts` | planned |
-| E2E-013 | Tenant label change is reflected in UI without code changes | Tenant admin | Seed Tenant A | Runtime UI uses updated tenant label after save/reload | tenant-config | PRD 10.1 | `e2e/tests/phase2/tenant-labels.spec.ts` | planned |
-| E2E-014 | Auditable action records actor, tenant, timestamp, and result | Tenant admin | Seed Tenant A | State-changing admin action creates audit evidence | audit, action-engine | PRD 10.2, 10.10 | `e2e/tests/phase2/audit-basics.spec.ts` | planned |
+| E2E-010 | Tenant A user cannot see tenant B data | Tenant A user | Seed Tenant A/B | Cross-tenant URL/API/view attempt is denied or empty without leaking details | tenant, access-control | PRD 10.1, 10.2 | `e2e/tests/phase2/tenant-isolation.spec.ts` | passing |
+| E2E-011 | Admin can create or edit an access profile | Tenant admin | Seed Tenant A | Access profile change persists and affects later policy evaluation | access-control | PRD 10.2 | `e2e/tests/phase2/access-profile.spec.ts` | passing |
+| E2E-012 | Read-only user can open a page but cannot execute a mutation | Read-only observer | Seed Tenant A | UI blocks mutation and backend/action path denies direct attempt | access-control, audit | PRD 10.2 | `e2e/tests/phase2/read-only-permissions.spec.ts` | passing |
+| E2E-013 | Tenant label change is reflected in UI without code changes | Tenant admin | Seed Tenant A | Runtime UI uses updated tenant label after save/reload | tenant-config | PRD 10.1 | `e2e/tests/phase2/tenant-labels.spec.ts` | passing |
+| E2E-014 | Auditable action records actor, tenant, timestamp, and result | Tenant admin | Seed Tenant A | State-changing admin action creates audit evidence | audit, action-engine | PRD 10.2, 10.10 | `e2e/tests/phase2/audit-basics.spec.ts` | passing |
 
 ## Phase 3 — CRM intake and opportunity-to-project
 

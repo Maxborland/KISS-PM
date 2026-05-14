@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T15:42:07+07:00",
+  "updated_at": "2026-05-14T16:05:46+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -268,15 +268,83 @@
     {
       "id": "P2-009",
       "requirement": "Deterministic Phase 2 fixtures",
-      "status": "blocked",
-      "owner": "packages/shared-test-fixtures, e2e",
-      "owned_scope": ["packages/shared-test-fixtures", "e2e"],
+      "status": "verified",
+      "owner": "packages/shared-test-fixtures, apps/api, e2e",
+      "owned_scope": ["packages/shared-test-fixtures", "apps/api/src/phase2Runtime.ts", "apps/api/src/server.ts", "e2e/tests/phase2", "playwright.config.ts", "docs/e2e/E2E_SCENARIOS.md"],
       "required_e2e": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
-      "evidence": [],
-      "tests": ["npm test", "npm run test:e2e:phase -- --phase=2 must include E2E-010..014 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/shared-test-fixtures/src/phase2Fixtures.ts defines a deterministic Phase 2 seed with fixed timestamp, Tenant A/B users, Tenant A/B private isolation probes, tenant label sets, tenant-owned access profile seeds, and an empty audit baseline",
+        "getPhase2FixtureSeed returns deep clones so scenario mutation cannot contaminate the next reset; getPhase2ProbePairForTenant derives own/foreign probe IDs from seeded tenants instead of hardcoding UI behavior",
+        "apps/api/src/phase2Runtime.ts now builds profiles and label sets from the shared Phase 2 fixture seed while keeping runtime mutations in isolated in-memory state",
+        "apps/api/src/server.ts enables POST /test-fixtures/reset only when KISS_PM_ALLOW_TEST_FIXTURE_RESET=true; playwright.config.ts sets that env only for E2E API webServer",
+        "e2e/tests/phase2/helpers.ts adds resetPhase2Fixtures and every Phase 2 scenario resets before execution; fixture-reset.spec.ts mutates profile, label, and audit state then resets and verifies label version, profile list, and audit log return to seed baseline",
+        "docs/e2e/E2E_SCENARIOS.md marks E2E-010 through E2E-014 as passing after Phase 2 acceptance tests",
+        "Code review found an Important direct-Playwright concurrency/config path risk; playwright.config.ts now sets workers: 1, e2e/tests/phase2/helpers.ts uses the config default API port, and the web server receives PW_API_PORT for direct Playwright runs",
+        "Code review Minor Tenant B reset readback gap was fixed in fixture-reset.spec.ts by verifying Tenant B current tenant labels and private probe after reset"
+      ],
+      "tests": [
+        "npm test -- packages/shared-test-fixtures/src/phase2Fixtures.test.ts first exited 1 because ./phase2Fixtures did not exist, proving the new seed tests were red",
+        "npm run test:e2e:phase -- --phase=2 first exited 1 because resetPhase2Fixtures was not exported, then exited 1 with test_mode_only 403 until E2E API server explicitly enabled fixture reset",
+        "npm test -- packages/shared-test-fixtures/src/phase2Fixtures.test.ts exit 0 (3 tests)",
+        "npm test -- apps/api/src/phase2Api.test.ts exit 0 (9 tests)",
+        "npm run typecheck first exited 1 on Phase2PermissionKey mutation test and labelSets inference, then exit 0 after type fixes",
+        "npm run lint exit 0",
+        "npm test exit 0 (13 files, 70 tests)",
+        "npm run test:integration exit 0 (3 files, 13 tests)",
+        "npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "npm run test:e2e:smoke exit 0 (6 passed)",
+        "npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "npm exec -- playwright test e2e/tests/phase2 first exited 1 because direct Playwright used config default API port while the helper targeted 4187, then exit 0 (7 passed, 1 worker) after helper/config env fixes",
+        "npm run test:e2e exit 0 (13 passed)",
+        "npm run typecheck exit 0 after review fixes",
+        "npm run lint exit 0 after review fixes",
+        "npm test exit 0 (13 files, 70 tests) after review fixes",
+        "npm run test:integration exit 0 (3 files, 13 tests) after review fixes",
+        "npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed) after review fixes",
+        "npm run test:e2e:smoke exit 0 (6 passed, 1 worker) after review fixes",
+        "npm run test:e2e:phase -- --phase=2 exit 0 (7 passed, 1 worker) after review fixes",
+        "npm run test:e2e exit 0 (13 passed, 1 worker) after review fixes"
+      ],
+      "e2e_evidence": [
+        {
+          "id": "E2E-010",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:05:46+07:00"
+        },
+        {
+          "id": "E2E-011",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/access-profile.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:05:46+07:00"
+        },
+        {
+          "id": "E2E-012",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:05:46+07:00"
+        },
+        {
+          "id": "E2E-013",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:05:46+07:00"
+        },
+        {
+          "id": "E2E-014",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:05:46+07:00"
+        }
+      ],
+      "cleanup": "Generated apps/web/dist from direct Vite build was removed after path verification. E2E fixture mutations are reset through POST /test-fixtures/reset before scenarios and verified by readback in fixture-reset.spec.ts for Tenant A and Tenant B. No external services, live data, or persistent runtime resources were used.",
+      "blocker": "None for P2-009; deterministic seed and reset/readback evidence are verified.",
+      "last_checked_at": "2026-05-14T16:05:46+07:00"
     },
     {
       "id": "P2-010",

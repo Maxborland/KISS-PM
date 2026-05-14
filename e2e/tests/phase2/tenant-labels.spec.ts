@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl } from "./helpers";
+import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl, resetPhase2Fixtures } from "./helpers";
 
 test("E2E-013 Tenant label change is reflected in UI without code changes and remains traceable", async ({
   page,
   request
 }) => {
+  await resetPhase2Fixtures(request);
   const currentBeforeResponse = await request.get(`${phase2ApiBaseUrl()}/tenants/current?testUser=tenant-admin-a`);
   await expect(currentBeforeResponse).toBeOK();
   const currentBeforeBody = (await currentBeforeResponse.json()) as {
