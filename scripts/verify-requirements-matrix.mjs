@@ -1,11 +1,22 @@
 import { readFileSync } from "node:fs";
 
-const matrixPath = process.argv[2] ?? "docs/status/phase1-requirements-matrix.json";
+const args = process.argv.slice(2);
+const allowBlocked = args.includes("--allow-blocked");
+const matrixPath = args.find((arg) => !arg.startsWith("--")) ?? "docs/status/phase1-requirements-matrix.json";
 
 const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
 const failures = [];
-const requiredIds = Array.from({ length: 10 }, (_, index) => `P1-${String(index + 1).padStart(3, "0")}`);
+const requiredIdsByPhase = {
+  P1: Array.from({ length: 10 }, (_, index) => `P1-${String(index + 1).padStart(3, "0")}`),
+  "P2-contract": ["P2C-001", "P2C-002", "P2C-003"],
+  P2: Array.from({ length: 10 }, (_, index) => `P2-${String(index + 1).padStart(3, "0")}`)
+};
+const requiredIds = requiredIdsByPhase[matrix.phase];
 const seenIds = new Set();
+
+if (!requiredIds) {
+  failures.push(`unsupported matrix phase: ${matrix.phase}`);
+}
 
 if (!Array.isArray(matrix.rows) || matrix.rows.length === 0) {
   failures.push("matrix.rows must be a non-empty array");
@@ -17,11 +28,14 @@ for (const row of matrix.rows ?? []) {
     failures.push(`${row.id}: duplicate row id`);
   }
   seenIds.add(row.id);
-  if (!requiredIds.includes(row.id)) {
-    failures.push(`${row.id}: unexpected row id for Phase 1 matrix`);
+  if (requiredIds && !requiredIds.includes(row.id)) {
+    failures.push(`${row.id}: unexpected row id for ${matrix.phase} matrix`);
   }
   if (row.status !== "verified" && row.status !== "blocked") {
     failures.push(`${row.id}: status must be verified or blocked, got ${row.status}`);
+  }
+  if (row.status === "blocked" && !allowBlocked) {
+    failures.push(`${row.id}: blocked row requires --allow-blocked and cannot pass phase-exit verification`);
   }
   if (row.status === "verified") {
     if (!Array.isArray(row.evidence) || row.evidence.length === 0) {
@@ -44,9 +58,9 @@ for (const row of matrix.rows ?? []) {
   }
 }
 
-for (const requiredId of requiredIds) {
+for (const requiredId of requiredIds ?? []) {
   if (!seenIds.has(requiredId)) {
-    failures.push(`${requiredId}: missing required Phase 1 row`);
+    failures.push(`${requiredId}: missing required ${matrix.phase} row`);
   }
 }
 
@@ -58,4 +72,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Requirements matrix verified: ${matrixPath}`);
+console.log(`Requirements matrix verified: ${matrixPath}${allowBlocked ? " (blocked rows allowed)" : ""}`);

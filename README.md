@@ -48,10 +48,20 @@ npm run lint
 npm test
 npm run test:integration
 npm run test:e2e:smoke
+npm run test:e2e:critical
+npm run test:e2e:permissions
 npm run verify:matrix
 ```
 
-Playwright smoke starts fresh API/web servers on isolated test ports `4183` and `5183`; local dev servers on `4173`/`5173` are not reused for phase-gate evidence.
+Playwright checks start fresh API/web servers on isolated test ports through `scripts/run-e2e.mjs`; local dev servers on `4173`/`5173` are not reused for phase-gate evidence. `test:e2e:permissions` currently runs the Phase 1 auth-guard permission smoke and must expand to Phase 2 E2E-010..014 when `e2e/tests/phase2` is implemented.
+
+For pre-implementation matrices that intentionally contain blocked rows, use:
+
+```bash
+npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json
+```
+
+The normal `npm run verify:matrix -- docs/status/phase2-requirements-matrix.json` command is the phase-exit gate and must fail until all Phase 2 rows are verified.
 
 Current Phase 1 E2E smoke scenarios:
 
