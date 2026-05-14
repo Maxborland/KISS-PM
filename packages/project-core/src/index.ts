@@ -153,6 +153,87 @@ export type ProjectDraft = TenantOwned & {
   correlationId: string;
 };
 
+export type ManagedProjectLifecycleStatus = "active" | "completed" | "cancelled";
+export type ProjectStageStatus = "pending" | "active" | "completed" | "cancelled";
+export type ProjectLifecycleTransition = "advance_stage" | "complete_project" | "cancel_project";
+
+export type ProjectStage = TenantOwned & {
+  id: string;
+  projectId: string;
+  templateId: string;
+  templateKey: string;
+  templateVersion: number;
+  label: string;
+  sortOrder: number;
+  status: ProjectStageStatus;
+  startedAt?: string;
+  completedAt?: string;
+};
+
+export type ProjectStageHistoryEntry = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  transition: "create_from_draft" | ProjectLifecycleTransition;
+  fromStatus: ProjectStageStatus | null;
+  toStatus: ProjectStageStatus;
+  actorId: string;
+  occurredAt: string;
+  correlationId: string;
+};
+
+export type ManagedProject = TenantOwned & {
+  id: string;
+  title: string;
+  lifecycleStatus: ManagedProjectLifecycleStatus;
+  currentStageId: string | null;
+  sourceDraftId: string;
+  sourceOpportunity: ProjectDraftSourceOpportunity;
+  processTemplateSnapshot: ProcessTemplateVersionSnapshot;
+  stages: ProjectStage[];
+  stageHistory: ProjectStageHistoryEntry[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  correlationId: string;
+};
+
+export type ProjectLifecycleTransitionCommand = {
+  tenantId: TenantId;
+  actorId: string;
+  occurredAt: string;
+  correlationId: string;
+  transition: ProjectLifecycleTransition;
+  currentStageId: string;
+};
+
+export type ProjectLifecycleTransitionErrorCode =
+  | "tenant_mismatch"
+  | "invalid_transition"
+  | "invalid_project_state"
+  | "project_not_active"
+  | "current_stage_missing"
+  | "stage_not_current"
+  | "transition_not_allowed"
+  | "transition_timestamp_invalid";
+
+export type ProjectLifecycleTransitionError = {
+  code: ProjectLifecycleTransitionErrorCode;
+  message: string;
+  details: Record<string, string | null>;
+};
+
+export type ProjectLifecycleTransitionResult =
+  | {
+      ok: true;
+      project: ManagedProject;
+    }
+  | {
+      ok: false;
+      project: ManagedProject;
+      error: ProjectLifecycleTransitionError;
+    };
+
 export class ProjectCoreModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
@@ -610,6 +691,300 @@ function cloneProjectDraftFeasibilitySnapshot(
   };
 }
 
+function cloneProjectStage(stage: ProjectStage): ProjectStage {
+  const cloned: ProjectStage = {
+    id: requireNonEmptyString(stage.id, "managedProject.stage.id"),
+    tenantId: requireNonEmptyString(stage.tenantId, "managedProject.stage.tenantId"),
+    projectId: requireNonEmptyString(stage.projectId, "managedProject.stage.projectId"),
+    templateId: requireNonEmptyString(stage.templateId, "managedProject.stage.templateId"),
+    templateKey: requireSystemKey(stage.templateKey, "managedProject.stage.templateKey"),
+    templateVersion: requirePositiveInteger(stage.templateVersion, "managedProject.stage.templateVersion"),
+    label: requireNonEmptyString(stage.label, "managedProject.stage.label"),
+    sortOrder: requirePositiveInteger(stage.sortOrder, "managedProject.stage.sortOrder"),
+    status: requireProjectStageStatus(stage.status, "managedProject.stage.status")
+  };
+
+  if (stage.startedAt !== undefined) {
+    cloned.startedAt = requireValidTimestamp(stage.startedAt, "managedProject.stage.startedAt");
+  }
+  if (stage.completedAt !== undefined) {
+    cloned.completedAt = requireValidTimestamp(stage.completedAt, "managedProject.stage.completedAt");
+  }
+
+  return cloned;
+}
+
+function cloneProjectStageHistoryEntry(entry: ProjectStageHistoryEntry): ProjectStageHistoryEntry {
+  return {
+    id: requireNonEmptyString(entry.id, "managedProject.stageHistory.id"),
+    tenantId: requireNonEmptyString(entry.tenantId, "managedProject.stageHistory.tenantId"),
+    projectId: requireNonEmptyString(entry.projectId, "managedProject.stageHistory.projectId"),
+    stageId: requireNonEmptyString(entry.stageId, "managedProject.stageHistory.stageId"),
+    transition: requireProjectStageHistoryTransition(entry.transition),
+    fromStatus:
+      entry.fromStatus === null ? null : requireProjectStageStatus(entry.fromStatus, "managedProject.stageHistory.fromStatus"),
+    toStatus: requireProjectStageStatus(entry.toStatus, "managedProject.stageHistory.toStatus"),
+    actorId: requireNonEmptyString(entry.actorId, "managedProject.stageHistory.actorId"),
+    occurredAt: requireValidTimestamp(entry.occurredAt, "managedProject.stageHistory.occurredAt"),
+    correlationId: requireNonEmptyString(entry.correlationId, "managedProject.stageHistory.correlationId")
+  };
+}
+
+function cloneManagedProject(project: ManagedProject): ManagedProject {
+  const managedProject = requireObject(project, "managedProject");
+  const tenantId = requireNonEmptyString(managedProject.tenantId, "managedProject.tenantId");
+  const id = requireNonEmptyString(managedProject.id, "managedProject.id");
+  const stages = requireArray(managedProject.stages, "managedProject.stages").map(cloneProjectStage);
+  const stageHistory = requireArray(managedProject.stageHistory, "managedProject.stageHistory").map(
+    cloneProjectStageHistoryEntry
+  );
+
+  for (const stage of stages) {
+    assertTenantId(tenantId, stage.tenantId, `managedProject stage tenant mismatch: ${stage.id}`);
+    if (stage.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject stage project mismatch: ${stage.id}`);
+    }
+  }
+  for (const entry of stageHistory) {
+    assertTenantId(tenantId, entry.tenantId, `managedProject stage history tenant mismatch: ${entry.id}`);
+    if (entry.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject stage history project mismatch: ${entry.id}`);
+    }
+  }
+
+  assertUniqueFieldValues(stages, (stage) => stage.id, "managedProject stage ids must be unique");
+  assertUniqueFieldValues(stages, (stage) => stage.sortOrder, "managedProject stage sort orders must be unique");
+
+  return {
+    id,
+    tenantId,
+    title: requireNonEmptyString(managedProject.title, "managedProject.title"),
+    lifecycleStatus: requireManagedProjectLifecycleStatus(
+      managedProject.lifecycleStatus,
+      "managedProject.lifecycleStatus"
+    ),
+    currentStageId:
+      managedProject.currentStageId === null
+        ? null
+        : requireNonEmptyString(managedProject.currentStageId, "managedProject.currentStageId"),
+    sourceDraftId: requireNonEmptyString(managedProject.sourceDraftId, "managedProject.sourceDraftId"),
+    sourceOpportunity: cloneProjectDraftSourceOpportunity(tenantId, managedProject.sourceOpportunity),
+    processTemplateSnapshot: cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot),
+    stages: [...stages].sort((left, right) => left.sortOrder - right.sortOrder),
+    stageHistory,
+    createdBy: requireNonEmptyString(managedProject.createdBy, "managedProject.createdBy"),
+    createdAt: requireValidTimestamp(managedProject.createdAt, "managedProject.createdAt"),
+    updatedAt: requireValidTimestamp(managedProject.updatedAt, "managedProject.updatedAt"),
+    correlationId: requireNonEmptyString(managedProject.correlationId, "managedProject.correlationId")
+  };
+}
+
+function validateProjectLifecycleState(project: ManagedProject): ProjectLifecycleTransitionError | null {
+  const activeStageIds = project.stages.filter((stage) => stage.status === "active").map((stage) => stage.id);
+  const currentStageIndex =
+    project.currentStageId === null ? -1 : project.stages.findIndex((stage) => stage.id === project.currentStageId);
+
+  if (project.lifecycleStatus === "active") {
+    const currentStageIsActive =
+      project.currentStageId !== null && activeStageIds.length === 1 && activeStageIds[0] === project.currentStageId;
+    if (!currentStageIsActive) {
+      return createTransitionError("invalid_project_state", "Project lifecycle state is internally inconsistent", {
+        lifecycleStatus: project.lifecycleStatus,
+        currentStageId: project.currentStageId,
+        activeStageIds: activeStageIds.join(",")
+      });
+    }
+    const blockingStageIds =
+      currentStageIndex < 0
+        ? []
+        : project.stages
+            .slice(0, currentStageIndex)
+            .filter((stage) => stage.status !== "completed")
+            .map((stage) => stage.id);
+    if (blockingStageIds.length > 0) {
+      return createTransitionError("invalid_project_state", "Project lifecycle state is internally inconsistent", {
+        lifecycleStatus: project.lifecycleStatus,
+        currentStageId: project.currentStageId,
+        activeStageIds: activeStageIds.join(","),
+        blockingStageIds: blockingStageIds.join(",")
+      });
+    }
+
+    return null;
+  }
+
+  if (project.currentStageId !== null || activeStageIds.length > 0) {
+    return createTransitionError("invalid_project_state", "Project lifecycle terminal state is internally inconsistent", {
+      lifecycleStatus: project.lifecycleStatus,
+      currentStageId: project.currentStageId,
+      activeStageIds: activeStageIds.join(",")
+    });
+  }
+
+  return null;
+}
+
+function cloneProcessTemplateVersionSnapshotForProject(
+  tenantId: TenantId,
+  snapshot: ProcessTemplateVersionSnapshot
+): ProcessTemplateVersionSnapshot {
+  const rawSnapshot = requireObject(snapshot, "managedProject.processTemplateSnapshot");
+  assertTenantId(tenantId, rawSnapshot.tenantId, "managedProject process template snapshot tenant mismatch");
+
+  return {
+    tenantId,
+    templateId: requireNonEmptyString(rawSnapshot.templateId, "managedProject.processTemplateSnapshot.templateId"),
+    key: requireSystemKey(rawSnapshot.key, "managedProject.processTemplateSnapshot.key"),
+    label: requireNonEmptyString(rawSnapshot.label, "managedProject.processTemplateSnapshot.label"),
+    version: requirePositiveInteger(rawSnapshot.version, "managedProject.processTemplateSnapshot.version"),
+    active: requireBoolean(rawSnapshot.active, "managedProject.processTemplateSnapshot.active"),
+    updatedAt: requireValidTimestamp(rawSnapshot.updatedAt, "managedProject.processTemplateSnapshot.updatedAt"),
+    stageTemplates: requireArray(rawSnapshot.stageTemplates, "managedProject.processTemplateSnapshot.stageTemplates").map(
+      (stage) => ({
+        id: requireNonEmptyString(stage.id, "managedProject.processTemplateSnapshot.stageTemplate.id"),
+        key: requireSystemKey(stage.key, "managedProject.processTemplateSnapshot.stageTemplate.key"),
+        label: requireNonEmptyString(stage.label, "managedProject.processTemplateSnapshot.stageTemplate.label"),
+        sortOrder: requirePositiveInteger(
+          stage.sortOrder,
+          "managedProject.processTemplateSnapshot.stageTemplate.sortOrder"
+        ),
+        active: requireBoolean(stage.active, "managedProject.processTemplateSnapshot.stageTemplate.active"),
+        version: requirePositiveInteger(stage.version, "managedProject.processTemplateSnapshot.stageTemplate.version"),
+        updatedAt: requireValidTimestamp(stage.updatedAt, "managedProject.processTemplateSnapshot.stageTemplate.updatedAt"),
+        requiredArtifactTemplates: requireArray(
+          stage.requiredArtifactTemplates,
+          "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplates"
+        ).map((artifactTemplate) => ({ ...artifactTemplate })),
+        approvalTemplates: requireArray(
+          stage.approvalTemplates,
+          "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplates"
+        ).map((approvalTemplate) => ({ ...approvalTemplate })),
+        taskTemplates: requireArray(
+          stage.taskTemplates,
+          "managedProject.processTemplateSnapshot.stageTemplate.taskTemplates"
+        ).map((rawTaskTemplate) => {
+          const taskTemplate = requireObject(
+            rawTaskTemplate,
+            "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate"
+          );
+
+          return {
+            id: requireNonEmptyString(taskTemplate.id, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.id"),
+            key: requireSystemKey(taskTemplate.key, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.key"),
+            label: requireNonEmptyString(
+              taskTemplate.label,
+              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.label"
+            ),
+            defaultParticipantRoleKeys: requireSystemKeyArray(
+              taskTemplate.defaultParticipantRoleKeys,
+              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.defaultParticipantRoleKeys",
+              true
+            ),
+            required: requireBoolean(
+              taskTemplate.required,
+              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.required"
+            )
+          };
+        })
+      })
+    )
+  };
+}
+
+function requireManagedProjectLifecycleStatus(
+  value: ManagedProjectLifecycleStatus | undefined,
+  fieldName: string
+): ManagedProjectLifecycleStatus {
+  if (value !== "active" && value !== "completed" && value !== "cancelled") {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+  }
+
+  return value;
+}
+
+function requireProjectStageStatus(value: ProjectStageStatus | undefined, fieldName: string): ProjectStageStatus {
+  if (value !== "pending" && value !== "active" && value !== "completed" && value !== "cancelled") {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+  }
+
+  return value;
+}
+
+function parseProjectLifecycleTransition(value: string | undefined): ProjectLifecycleTransition | null {
+  if (value === "advance_stage" || value === "complete_project" || value === "cancel_project") {
+    return value;
+  }
+
+  return null;
+}
+
+function requireProjectStageHistoryTransition(
+  value: ProjectStageHistoryEntry["transition"] | undefined
+): ProjectStageHistoryEntry["transition"] {
+  if (
+    value !== "create_from_draft" &&
+    value !== "advance_stage" &&
+    value !== "complete_project" &&
+    value !== "cancel_project"
+  ) {
+    throw new ProjectCoreModelError("validation_error", "managedProject.stageHistory.transition is invalid");
+  }
+
+  return value;
+}
+
+function createTransitionError(
+  code: ProjectLifecycleTransitionErrorCode,
+  message: string,
+  details: Record<string, string | null>
+): ProjectLifecycleTransitionError {
+  return { code, message, details };
+}
+
+function findCurrentStageIndex(project: ManagedProject): number {
+  if (project.currentStageId === null) {
+    return -1;
+  }
+
+  return project.stages.findIndex((stage) => stage.id === project.currentStageId);
+}
+
+function createStageHistoryEntry(input: {
+  project: ManagedProject;
+  stageId: string;
+  transition: ProjectStageHistoryEntry["transition"];
+  fromStatus: ProjectStageStatus | null;
+  toStatus: ProjectStageStatus;
+  actorId: string;
+  occurredAt: string;
+  correlationId: string;
+}): ProjectStageHistoryEntry {
+  const localStageId = input.stageId.startsWith(`${input.project.id}:`)
+    ? input.stageId.slice(input.project.id.length + 1)
+    : input.stageId;
+  const historyKey =
+    input.transition === "create_from_draft"
+      ? `created:${localStageId}`
+      : `${input.correlationId}:${input.stageId}:${input.toStatus}`;
+
+  return {
+    id: `${input.project.id}:history:${historyKey}`,
+    tenantId: input.project.tenantId,
+    projectId: input.project.id,
+    stageId: input.stageId,
+    transition: input.transition,
+    fromStatus: input.fromStatus,
+    toStatus: input.toStatus,
+    actorId: input.actorId,
+    occurredAt: input.occurredAt,
+    correlationId: input.correlationId
+  };
+}
+
+function timestampIsBefore(left: string, right: string): boolean {
+  return Date.parse(left) < Date.parse(right);
+}
+
 export function createProjectProcessTemplateDraft(input: {
   id: ProjectProcessTemplateId;
   tenantId: TenantId;
@@ -770,5 +1145,333 @@ export function createProjectDraftFromOpportunity(input: {
     createdBy: requireNonEmptyString(input.createdBy, "projectDraft.createdBy"),
     createdAt: requireValidTimestamp(input.createdAt, "projectDraft.createdAt"),
     correlationId: requireNonEmptyString(input.correlationId, "projectDraft.correlationId")
+  };
+}
+
+export function createManagedProjectFromDraft(input: {
+  id: string;
+  draft: ProjectDraft;
+  processTemplate: ProcessTemplate;
+  createdBy: string;
+  createdAt: string;
+  correlationId: string;
+}): ManagedProject {
+  const id = requireNonEmptyString(input.id, "managedProject.id");
+  const draft = createProjectDraftFromOpportunity(input.draft);
+  const processTemplate = createProcessTemplate(input.processTemplate);
+  const createdAt = requireValidTimestamp(input.createdAt, "managedProject.createdAt");
+
+  if (processTemplate.tenantId !== draft.tenantId) {
+    throw new ProjectCoreModelError("validation_error", "managedProject process template tenant mismatch");
+  }
+  if (!processTemplate.active) {
+    throw new ProjectCoreModelError("validation_error", "managedProject process template must be active");
+  }
+  if (
+    processTemplate.id !== draft.processTemplate.templateId ||
+    processTemplate.key !== draft.processTemplate.key ||
+    processTemplate.version !== draft.processTemplate.version
+  ) {
+    throw new ProjectCoreModelError("validation_error", "managedProject process template does not match draft snapshot");
+  }
+
+  const processTemplateSnapshot = createProcessTemplateVersionSnapshot(processTemplate);
+  const activeStageTemplates = processTemplateSnapshot.stageTemplates.filter((stageTemplate) => stageTemplate.active);
+  if (activeStageTemplates.length === 0) {
+    throw new ProjectCoreModelError("validation_error", "managedProject process template must have at least one active stage");
+  }
+
+  const stages = activeStageTemplates.map((stageTemplate, index): ProjectStage => {
+    const stageId = `${id}:${stageTemplate.id}`;
+
+    return {
+      id: stageId,
+      tenantId: draft.tenantId,
+      projectId: id,
+      templateId: stageTemplate.id,
+      templateKey: stageTemplate.key,
+      templateVersion: stageTemplate.version,
+      label: stageTemplate.label,
+      sortOrder: stageTemplate.sortOrder,
+      status: index === 0 ? "active" : "pending",
+      ...(index === 0 ? { startedAt: createdAt } : {})
+    };
+  });
+  const currentStage = stages[0];
+  if (currentStage === undefined) {
+    throw new ProjectCoreModelError("validation_error", "managedProject process template must have at least one active stage");
+  }
+  const createdBy = requireNonEmptyString(input.createdBy, "managedProject.createdBy");
+  const correlationId = requireNonEmptyString(input.correlationId, "managedProject.correlationId");
+  const projectBase: ManagedProject = {
+    id,
+    tenantId: draft.tenantId,
+    title: draft.title,
+    lifecycleStatus: "active",
+    currentStageId: currentStage.id,
+    sourceDraftId: draft.id,
+    sourceOpportunity: draft.sourceOpportunity,
+    processTemplateSnapshot,
+    stages,
+    stageHistory: [],
+    createdBy,
+    createdAt,
+    updatedAt: createdAt,
+    correlationId
+  };
+
+  return {
+    ...projectBase,
+    stageHistory: [
+      createStageHistoryEntry({
+        project: projectBase,
+        stageId: currentStage.id,
+        transition: "create_from_draft",
+        fromStatus: null,
+        toStatus: "active",
+        actorId: createdBy,
+        occurredAt: createdAt,
+        correlationId
+      })
+    ]
+  };
+}
+
+export function getAllowedProjectLifecycleTransitions(project: ManagedProject): ProjectLifecycleTransition[] {
+  const managedProject = cloneManagedProject(project);
+  if (validateProjectLifecycleState(managedProject) !== null) {
+    return [];
+  }
+  if (managedProject.lifecycleStatus !== "active") {
+    return [];
+  }
+
+  const currentStageIndex = findCurrentStageIndex(managedProject);
+  if (currentStageIndex < 0) {
+    return [];
+  }
+
+  const hasNextStage = managedProject.stages[currentStageIndex + 1] !== undefined;
+  return hasNextStage ? ["advance_stage", "cancel_project"] : ["complete_project", "cancel_project"];
+}
+
+export function advanceManagedProjectLifecycle(
+  project: ManagedProject,
+  command: ProjectLifecycleTransitionCommand
+): ProjectLifecycleTransitionResult {
+  const tenantId = requireNonEmptyString(command.tenantId, "projectLifecycle.tenantId");
+  const actorId = requireNonEmptyString(command.actorId, "projectLifecycle.actorId");
+  const occurredAt = requireValidTimestamp(command.occurredAt, "projectLifecycle.occurredAt");
+  const correlationId = requireNonEmptyString(command.correlationId, "projectLifecycle.correlationId");
+  const requestedCurrentStageId = requireNonEmptyString(command.currentStageId, "projectLifecycle.currentStageId");
+  const managedProject = cloneManagedProject(project);
+  const transition = parseProjectLifecycleTransition(command.transition);
+
+  if (tenantId !== managedProject.tenantId) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("tenant_mismatch", "Project lifecycle transition tenant does not match project", {
+        tenantId,
+        projectTenantId: managedProject.tenantId
+      })
+    };
+  }
+  if (transition === null) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("invalid_transition", "Project lifecycle transition command is invalid", {
+        transition: typeof command.transition === "string" ? command.transition : null,
+        lifecycleStatus: managedProject.lifecycleStatus,
+        currentStageId: managedProject.currentStageId
+      })
+    };
+  }
+  const projectStateError = validateProjectLifecycleState(managedProject);
+  if (projectStateError !== null) {
+    return {
+      ok: false,
+      project,
+      error: projectStateError
+    };
+  }
+  if (managedProject.lifecycleStatus !== "active") {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("project_not_active", "Project lifecycle transition requires an active project", {
+        transition,
+        lifecycleStatus: managedProject.lifecycleStatus,
+        currentStageId: managedProject.currentStageId
+      })
+    };
+  }
+
+  const currentStageIndex = findCurrentStageIndex(managedProject);
+  if (currentStageIndex < 0) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("current_stage_missing", "Project lifecycle current stage is missing", {
+        transition,
+        lifecycleStatus: managedProject.lifecycleStatus,
+        currentStageId: managedProject.currentStageId
+      })
+    };
+  }
+  const currentStage = managedProject.stages[currentStageIndex];
+  if (currentStage === undefined) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("current_stage_missing", "Project lifecycle current stage is missing", {
+        transition,
+        lifecycleStatus: managedProject.lifecycleStatus,
+        currentStageId: managedProject.currentStageId
+      })
+    };
+  }
+  if (requestedCurrentStageId !== currentStage.id) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError("stage_not_current", "Project lifecycle transition stage is not current", {
+        transition,
+        lifecycleStatus: managedProject.lifecycleStatus,
+        currentStageId: managedProject.currentStageId
+      })
+    };
+  }
+  if (
+    timestampIsBefore(occurredAt, managedProject.updatedAt) ||
+    (currentStage.startedAt !== undefined && timestampIsBefore(occurredAt, currentStage.startedAt))
+  ) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError(
+        "transition_timestamp_invalid",
+        "Project lifecycle transition timestamp cannot be earlier than current project or stage state",
+        {
+          occurredAt,
+          projectUpdatedAt: managedProject.updatedAt,
+          currentStageStartedAt: currentStage.startedAt ?? null
+        }
+      )
+    };
+  }
+
+  const allowedTransitions = getAllowedProjectLifecycleTransitions(managedProject);
+  if (!allowedTransitions.includes(transition)) {
+    return {
+      ok: false,
+      project,
+      error: createTransitionError(
+        "transition_not_allowed",
+        "Project lifecycle transition is not allowed from the current state",
+        {
+          transition,
+          lifecycleStatus: managedProject.lifecycleStatus,
+          currentStageId: managedProject.currentStageId
+        }
+      )
+    };
+  }
+
+  if (transition === "advance_stage") {
+    const nextStage = managedProject.stages[currentStageIndex + 1];
+    if (nextStage === undefined) {
+      return {
+        ok: false,
+        project,
+        error: createTransitionError(
+          "transition_not_allowed",
+          "Project lifecycle transition is not allowed from the current state",
+          {
+            transition,
+            lifecycleStatus: managedProject.lifecycleStatus,
+            currentStageId: managedProject.currentStageId
+          }
+        )
+      };
+    }
+
+    const nextProject: ManagedProject = {
+      ...managedProject,
+      currentStageId: nextStage.id,
+      updatedAt: occurredAt,
+      stages: managedProject.stages.map((stage) => {
+        if (stage.id === currentStage.id) {
+          return { ...stage, status: "completed", completedAt: occurredAt };
+        }
+        if (stage.id === nextStage.id) {
+          return { ...stage, status: "active", startedAt: occurredAt };
+        }
+        return { ...stage };
+      })
+    };
+
+    return {
+      ok: true,
+      project: {
+        ...nextProject,
+        stageHistory: [
+          ...nextProject.stageHistory,
+          createStageHistoryEntry({
+            project: nextProject,
+            stageId: currentStage.id,
+            transition,
+            fromStatus: "active",
+            toStatus: "completed",
+            actorId,
+            occurredAt,
+            correlationId
+          }),
+          createStageHistoryEntry({
+            project: nextProject,
+            stageId: nextStage.id,
+            transition,
+            fromStatus: "pending",
+            toStatus: "active",
+            actorId,
+            occurredAt,
+            correlationId
+          })
+        ]
+      }
+    };
+  }
+
+  const terminalStageStatus: ProjectStageStatus = transition === "complete_project" ? "completed" : "cancelled";
+  const terminalLifecycleStatus: ManagedProjectLifecycleStatus = transition === "complete_project" ? "completed" : "cancelled";
+  const nextProject: ManagedProject = {
+    ...managedProject,
+    lifecycleStatus: terminalLifecycleStatus,
+    currentStageId: null,
+    updatedAt: occurredAt,
+    stages: managedProject.stages.map((stage) =>
+      stage.id === currentStage.id ? { ...stage, status: terminalStageStatus, completedAt: occurredAt } : { ...stage }
+    )
+  };
+
+  return {
+    ok: true,
+    project: {
+      ...nextProject,
+      stageHistory: [
+        ...nextProject.stageHistory,
+        createStageHistoryEntry({
+          project: nextProject,
+          stageId: currentStage.id,
+          transition,
+          fromStatus: "active",
+          toStatus: terminalStageStatus,
+          actorId,
+          occurredAt,
+          correlationId
+        })
+      ]
+    }
   };
 }
