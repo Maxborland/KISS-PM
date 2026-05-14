@@ -182,6 +182,57 @@ export type ProjectStageHistoryEntry = TenantOwned & {
   correlationId: string;
 };
 
+export type ProjectArtifactStatus = "submitted" | "accepted" | "rejected";
+
+export type ProjectArtifact = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  templateId: string;
+  templateKey: string;
+  templateVersion: number;
+  label: string;
+  status: ProjectArtifactStatus;
+  evidenceRef?: string;
+  actorId: string;
+  occurredAt: string;
+};
+
+export type ApprovalRequestStatus = "requested" | "approved" | "rejected";
+
+export type ApprovalRequest = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  templateId: string;
+  templateKey: string;
+  templateVersion: number;
+  label: string;
+  approverRoleKey: string;
+  status: ApprovalRequestStatus;
+  requestedBy: string;
+  requestedAt: string;
+  decidedBy?: string;
+  decidedAt?: string;
+};
+
+export type StageGateBlockerCode = "missing_required_artifact" | "required_approval_not_approved";
+
+export type StageGateBlocker = {
+  code: StageGateBlockerCode;
+  message: string;
+  stageId: string;
+  templateId: string;
+  templateKey: string;
+  templateLabel: string;
+};
+
+export type StageGateEvaluation = {
+  ok: boolean;
+  stageId: string;
+  blockers: StageGateBlocker[];
+};
+
 export type ManagedProject = TenantOwned & {
   id: string;
   title: string;
@@ -192,6 +243,8 @@ export type ManagedProject = TenantOwned & {
   processTemplateSnapshot: ProcessTemplateVersionSnapshot;
   stages: ProjectStage[];
   stageHistory: ProjectStageHistoryEntry[];
+  artifacts: ProjectArtifact[];
+  approvalRequests: ApprovalRequest[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -215,12 +268,14 @@ export type ProjectLifecycleTransitionErrorCode =
   | "current_stage_missing"
   | "stage_not_current"
   | "transition_not_allowed"
+  | "stage_gate_blocked"
   | "transition_timestamp_invalid";
 
 export type ProjectLifecycleTransitionError = {
   code: ProjectLifecycleTransitionErrorCode;
   message: string;
   details: Record<string, string | null>;
+  blockers?: StageGateBlocker[];
 };
 
 export type ProjectLifecycleTransitionResult =
@@ -730,6 +785,70 @@ function cloneProjectStageHistoryEntry(entry: ProjectStageHistoryEntry): Project
   };
 }
 
+function requireProjectArtifactStatus(value: ProjectArtifactStatus | undefined): ProjectArtifactStatus {
+  if (value !== "submitted" && value !== "accepted" && value !== "rejected") {
+    throw new ProjectCoreModelError("validation_error", "projectArtifact.status is invalid");
+  }
+
+  return value;
+}
+
+function requireApprovalRequestStatus(value: ApprovalRequestStatus | undefined): ApprovalRequestStatus {
+  if (value !== "requested" && value !== "approved" && value !== "rejected") {
+    throw new ProjectCoreModelError("validation_error", "approvalRequest.status is invalid");
+  }
+
+  return value;
+}
+
+function cloneProjectArtifact(artifact: ProjectArtifact): ProjectArtifact {
+  const cloned: ProjectArtifact = {
+    id: requireNonEmptyString(artifact.id, "projectArtifact.id"),
+    tenantId: requireNonEmptyString(artifact.tenantId, "projectArtifact.tenantId"),
+    projectId: requireNonEmptyString(artifact.projectId, "projectArtifact.projectId"),
+    stageId: requireNonEmptyString(artifact.stageId, "projectArtifact.stageId"),
+    templateId: requireNonEmptyString(artifact.templateId, "projectArtifact.templateId"),
+    templateKey: requireSystemKey(artifact.templateKey, "projectArtifact.templateKey"),
+    templateVersion: requirePositiveInteger(artifact.templateVersion, "projectArtifact.templateVersion"),
+    label: requireNonEmptyString(artifact.label, "projectArtifact.label"),
+    status: requireProjectArtifactStatus(artifact.status),
+    actorId: requireNonEmptyString(artifact.actorId, "projectArtifact.actorId"),
+    occurredAt: requireValidTimestamp(artifact.occurredAt, "projectArtifact.occurredAt")
+  };
+
+  if (artifact.evidenceRef !== undefined) {
+    cloned.evidenceRef = requireNonEmptyString(artifact.evidenceRef, "projectArtifact.evidenceRef");
+  }
+
+  return cloned;
+}
+
+function cloneApprovalRequest(request: ApprovalRequest): ApprovalRequest {
+  const cloned: ApprovalRequest = {
+    id: requireNonEmptyString(request.id, "approvalRequest.id"),
+    tenantId: requireNonEmptyString(request.tenantId, "approvalRequest.tenantId"),
+    projectId: requireNonEmptyString(request.projectId, "approvalRequest.projectId"),
+    stageId: requireNonEmptyString(request.stageId, "approvalRequest.stageId"),
+    templateId: requireNonEmptyString(request.templateId, "approvalRequest.templateId"),
+    templateKey: requireSystemKey(request.templateKey, "approvalRequest.templateKey"),
+    templateVersion: requirePositiveInteger(request.templateVersion, "approvalRequest.templateVersion"),
+    label: requireNonEmptyString(request.label, "approvalRequest.label"),
+    approverRoleKey: requireSystemKey(request.approverRoleKey, "approvalRequest.approverRoleKey"),
+    status: requireApprovalRequestStatus(request.status),
+    requestedBy: requireNonEmptyString(request.requestedBy, "approvalRequest.requestedBy"),
+    requestedAt: requireValidTimestamp(request.requestedAt, "approvalRequest.requestedAt")
+  };
+
+  if (request.decidedBy !== undefined) {
+    cloned.decidedBy = requireNonEmptyString(request.decidedBy, "approvalRequest.decidedBy");
+  }
+  if (request.decidedAt !== undefined) {
+    cloned.decidedAt = requireValidTimestamp(request.decidedAt, "approvalRequest.decidedAt");
+  }
+
+  return cloned;
+}
+
 function cloneManagedProject(project: ManagedProject): ManagedProject {
   const managedProject = requireObject(project, "managedProject");
   const tenantId = requireNonEmptyString(managedProject.tenantId, "managedProject.tenantId");
@@ -737,6 +856,10 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
   const stages = requireArray(managedProject.stages, "managedProject.stages").map(cloneProjectStage);
   const stageHistory = requireArray(managedProject.stageHistory, "managedProject.stageHistory").map(
     cloneProjectStageHistoryEntry
+  );
+  const artifacts = requireArray(managedProject.artifacts, "managedProject.artifacts").map(cloneProjectArtifact);
+  const approvalRequests = requireArray(managedProject.approvalRequests, "managedProject.approvalRequests").map(
+    cloneApprovalRequest
   );
 
   for (const stage of stages) {
@@ -751,9 +874,26 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
       throw new ProjectCoreModelError("validation_error", `managedProject stage history project mismatch: ${entry.id}`);
     }
   }
+  for (const artifact of artifacts) {
+    assertTenantId(tenantId, artifact.tenantId, `managedProject artifact tenant mismatch: ${artifact.id}`);
+    if (artifact.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject artifact project mismatch: ${artifact.id}`);
+    }
+  }
+  for (const request of approvalRequests) {
+    assertTenantId(tenantId, request.tenantId, `managedProject approval request tenant mismatch: ${request.id}`);
+    if (request.projectId !== id) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        `managedProject approval request project mismatch: ${request.id}`
+      );
+    }
+  }
 
   assertUniqueFieldValues(stages, (stage) => stage.id, "managedProject stage ids must be unique");
   assertUniqueFieldValues(stages, (stage) => stage.sortOrder, "managedProject stage sort orders must be unique");
+  assertUniqueFieldValues(artifacts, (artifact) => artifact.id, "managedProject artifact ids must be unique");
+  assertUniqueFieldValues(approvalRequests, (request) => request.id, "managedProject approval request ids must be unique");
 
   return {
     id,
@@ -772,6 +912,8 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     processTemplateSnapshot: cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot),
     stages: [...stages].sort((left, right) => left.sortOrder - right.sortOrder),
     stageHistory,
+    artifacts,
+    approvalRequests,
     createdBy: requireNonEmptyString(managedProject.createdBy, "managedProject.createdBy"),
     createdAt: requireValidTimestamp(managedProject.createdAt, "managedProject.createdAt"),
     updatedAt: requireValidTimestamp(managedProject.updatedAt, "managedProject.updatedAt"),
@@ -854,11 +996,63 @@ function cloneProcessTemplateVersionSnapshotForProject(
         requiredArtifactTemplates: requireArray(
           stage.requiredArtifactTemplates,
           "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplates"
-        ).map((artifactTemplate) => ({ ...artifactTemplate })),
+        ).map((rawArtifactTemplate) => {
+          const artifactTemplate = requireObject(
+            rawArtifactTemplate,
+            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate"
+          );
+
+          return {
+            id: requireNonEmptyString(
+              artifactTemplate.id,
+              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.id"
+            ),
+            key: requireSystemKey(
+              artifactTemplate.key,
+              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.key"
+            ),
+            label: requireNonEmptyString(
+              artifactTemplate.label,
+              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.label"
+            ),
+            required: requireBoolean(
+              artifactTemplate.required,
+              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.required"
+            )
+          };
+        }),
         approvalTemplates: requireArray(
           stage.approvalTemplates,
           "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplates"
-        ).map((approvalTemplate) => ({ ...approvalTemplate })),
+        ).map((rawApprovalTemplate) => {
+          const approvalTemplate = requireObject(
+            rawApprovalTemplate,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate"
+          );
+
+          return {
+            id: requireNonEmptyString(
+              approvalTemplate.id,
+              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.id"
+            ),
+            key: requireSystemKey(
+              approvalTemplate.key,
+              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.key"
+            ),
+            label: requireNonEmptyString(
+              approvalTemplate.label,
+              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.label"
+            ),
+            approverRoleKey: requireSystemKey(
+              approvalTemplate.approverRoleKey,
+              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.approverRoleKey"
+            ),
+            required: requireBoolean(
+              approvalTemplate.required,
+              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.required"
+            )
+          };
+        }),
         taskTemplates: requireArray(
           stage.taskTemplates,
           "managedProject.processTemplateSnapshot.stageTemplate.taskTemplates"
@@ -936,9 +1130,10 @@ function requireProjectStageHistoryTransition(
 function createTransitionError(
   code: ProjectLifecycleTransitionErrorCode,
   message: string,
-  details: Record<string, string | null>
+  details: Record<string, string | null>,
+  blockers?: StageGateBlocker[]
 ): ProjectLifecycleTransitionError {
-  return { code, message, details };
+  return blockers === undefined ? { code, message, details } : { code, message, details, blockers };
 }
 
 function findCurrentStageIndex(project: ManagedProject): number {
@@ -983,6 +1178,99 @@ function createStageHistoryEntry(input: {
 
 function timestampIsBefore(left: string, right: string): boolean {
   return Date.parse(left) < Date.parse(right);
+}
+
+function findProjectStage(project: ManagedProject, stageId: string): ProjectStage {
+  const stage = project.stages.find((candidate) => candidate.id === stageId);
+  if (stage === undefined) {
+    throw new ProjectCoreModelError("validation_error", "projectStage not found");
+  }
+
+  return stage;
+}
+
+function findStageTemplateSnapshot(project: ManagedProject, stage: ProjectStage): StageTemplateSnapshot {
+  const stageTemplate = project.processTemplateSnapshot.stageTemplates.find(
+    (candidate) => candidate.id === stage.templateId && candidate.key === stage.templateKey
+  );
+  if (stageTemplate === undefined) {
+    throw new ProjectCoreModelError("validation_error", "projectStage template snapshot not found");
+  }
+
+  return stageTemplate;
+}
+
+function findArtifactTemplateSnapshot(
+  project: ManagedProject,
+  stageId: string,
+  templateId: string,
+  templateKey: string
+): ArtifactTemplateSnapshot {
+  const stage = findProjectStage(project, stageId);
+  const stageTemplate = findStageTemplateSnapshot(project, stage);
+  const artifactTemplate = stageTemplate.requiredArtifactTemplates.find(
+    (candidate) => candidate.id === templateId && candidate.key === templateKey
+  );
+  if (artifactTemplate === undefined) {
+    throw new ProjectCoreModelError("validation_error", "projectArtifact template is not valid for stage");
+  }
+
+  return artifactTemplate;
+}
+
+function findApprovalTemplateSnapshot(
+  project: ManagedProject,
+  stageId: string,
+  templateId: string,
+  templateKey: string
+): ApprovalTemplateSnapshot {
+  const stage = findProjectStage(project, stageId);
+  const stageTemplate = findStageTemplateSnapshot(project, stage);
+  const approvalTemplate = stageTemplate.approvalTemplates.find(
+    (candidate) => candidate.id === templateId && candidate.key === templateKey
+  );
+  if (approvalTemplate === undefined) {
+    throw new ProjectCoreModelError("validation_error", "approvalRequest template is not valid for stage");
+  }
+
+  return approvalTemplate;
+}
+
+function createStageGateBlocker(input: {
+  code: StageGateBlockerCode;
+  stageId: string;
+  templateId: string;
+  templateKey: string;
+  templateLabel: string;
+}): StageGateBlocker {
+  const prefix = input.code === "missing_required_artifact" ? "Требуется артефакт" : "Требуется согласование";
+
+  return {
+    code: input.code,
+    message: `${prefix}: ${input.templateLabel}`,
+    stageId: input.stageId,
+    templateId: input.templateId,
+    templateKey: input.templateKey,
+    templateLabel: input.templateLabel
+  };
+}
+
+function assertStageCanReceiveGateEvidence(project: ManagedProject, stage: ProjectStage, occurredAt: string, fieldName: string): void {
+  if (project.lifecycleStatus !== "active") {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} project must be active`);
+  }
+  if (stage.status !== "active") {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} stage must be active`);
+  }
+  if (
+    timestampIsBefore(occurredAt, project.updatedAt) ||
+    (stage.startedAt !== undefined && timestampIsBefore(occurredAt, stage.startedAt))
+  ) {
+    throw new ProjectCoreModelError(
+      "validation_error",
+      `${fieldName} timestamp cannot be earlier than project or stage state`
+    );
+  }
 }
 
 export function createProjectProcessTemplateDraft(input: {
@@ -1214,6 +1502,8 @@ export function createManagedProjectFromDraft(input: {
     processTemplateSnapshot,
     stages,
     stageHistory: [],
+    artifacts: [],
+    approvalRequests: [],
     createdBy,
     createdAt,
     updatedAt: createdAt,
@@ -1253,6 +1543,207 @@ export function getAllowedProjectLifecycleTransitions(project: ManagedProject): 
 
   const hasNextStage = managedProject.stages[currentStageIndex + 1] !== undefined;
   return hasNextStage ? ["advance_stage", "cancel_project"] : ["complete_project", "cancel_project"];
+}
+
+export function evaluateStageGate(project: ManagedProject, stageId: string): StageGateEvaluation {
+  const managedProject = cloneManagedProject(project);
+  const stage = findProjectStage(managedProject, requireNonEmptyString(stageId, "stageGate.stageId"));
+  const stageTemplate = findStageTemplateSnapshot(managedProject, stage);
+  const blockers: StageGateBlocker[] = [];
+
+  for (const artifactTemplate of stageTemplate.requiredArtifactTemplates.filter((template) => template.required)) {
+    const satisfied = managedProject.artifacts.some(
+      (artifact) =>
+        artifact.stageId === stage.id &&
+        artifact.templateId === artifactTemplate.id &&
+        artifact.templateKey === artifactTemplate.key &&
+        artifact.templateVersion === stage.templateVersion &&
+        artifact.status === "accepted"
+    );
+    if (!satisfied) {
+      blockers.push(
+        createStageGateBlocker({
+          code: "missing_required_artifact",
+          stageId: stage.id,
+          templateId: artifactTemplate.id,
+          templateKey: artifactTemplate.key,
+          templateLabel: artifactTemplate.label
+        })
+      );
+    }
+  }
+
+  for (const approvalTemplate of stageTemplate.approvalTemplates.filter((template) => template.required)) {
+    const satisfied = managedProject.approvalRequests.some(
+      (request) =>
+        request.stageId === stage.id &&
+        request.templateId === approvalTemplate.id &&
+        request.templateKey === approvalTemplate.key &&
+        request.templateVersion === stage.templateVersion &&
+        request.approverRoleKey === approvalTemplate.approverRoleKey &&
+        request.status === "approved"
+    );
+    if (!satisfied) {
+      blockers.push(
+        createStageGateBlocker({
+          code: "required_approval_not_approved",
+          stageId: stage.id,
+          templateId: approvalTemplate.id,
+          templateKey: approvalTemplate.key,
+          templateLabel: approvalTemplate.label
+        })
+      );
+    }
+  }
+
+  return {
+    ok: blockers.length === 0,
+    stageId: stage.id,
+    blockers
+  };
+}
+
+export function recordProjectArtifactEvidence(
+  project: ManagedProject,
+  input: {
+    id: string;
+    tenantId: TenantId;
+    stageId: string;
+    templateId: string;
+    templateKey: string;
+    status: ProjectArtifactStatus;
+    evidenceRef?: string;
+    actorId: string;
+    occurredAt: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "projectArtifact.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "projectArtifact tenant mismatch");
+  const stageId = requireNonEmptyString(input.stageId, "projectArtifact.stageId");
+  const templateId = requireNonEmptyString(input.templateId, "projectArtifact.templateId");
+  const templateKey = requireSystemKey(input.templateKey, "projectArtifact.templateKey");
+  const artifactTemplate = findArtifactTemplateSnapshot(managedProject, stageId, templateId, templateKey);
+  const stage = findProjectStage(managedProject, stageId);
+  const occurredAt = requireValidTimestamp(input.occurredAt, "projectArtifact.occurredAt");
+  assertStageCanReceiveGateEvidence(managedProject, stage, occurredAt, "projectArtifact");
+  const artifact: ProjectArtifact = {
+    id: requireNonEmptyString(input.id, "projectArtifact.id"),
+    tenantId,
+    projectId: managedProject.id,
+    stageId,
+    templateId: artifactTemplate.id,
+    templateKey: artifactTemplate.key,
+    templateVersion: stage.templateVersion,
+    label: artifactTemplate.label,
+    status: requireProjectArtifactStatus(input.status),
+    actorId: requireNonEmptyString(input.actorId, "projectArtifact.actorId"),
+    occurredAt,
+    ...(input.evidenceRef !== undefined
+      ? { evidenceRef: requireNonEmptyString(input.evidenceRef, "projectArtifact.evidenceRef") }
+      : {})
+  };
+
+  if (managedProject.artifacts.some((existing) => existing.id === artifact.id)) {
+    throw new ProjectCoreModelError("conflict", "projectArtifact id must be unique");
+  }
+
+  return {
+    ...managedProject,
+    updatedAt: artifact.occurredAt,
+    artifacts: [...managedProject.artifacts, artifact]
+  };
+}
+
+export function createStageApprovalRequest(
+  project: ManagedProject,
+  input: {
+    id: string;
+    tenantId: TenantId;
+    stageId: string;
+    templateId: string;
+    templateKey: string;
+    requestedBy: string;
+    requestedAt: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "approvalRequest.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "approvalRequest tenant mismatch");
+  const stageId = requireNonEmptyString(input.stageId, "approvalRequest.stageId");
+  const templateId = requireNonEmptyString(input.templateId, "approvalRequest.templateId");
+  const templateKey = requireSystemKey(input.templateKey, "approvalRequest.templateKey");
+  const approvalTemplate = findApprovalTemplateSnapshot(managedProject, stageId, templateId, templateKey);
+  const stage = findProjectStage(managedProject, stageId);
+  const requestedAt = requireValidTimestamp(input.requestedAt, "approvalRequest.requestedAt");
+  assertStageCanReceiveGateEvidence(managedProject, stage, requestedAt, "approvalRequest");
+  const request: ApprovalRequest = {
+    id: requireNonEmptyString(input.id, "approvalRequest.id"),
+    tenantId,
+    projectId: managedProject.id,
+    stageId,
+    templateId: approvalTemplate.id,
+    templateKey: approvalTemplate.key,
+    templateVersion: stage.templateVersion,
+    label: approvalTemplate.label,
+    approverRoleKey: approvalTemplate.approverRoleKey,
+    status: "requested",
+    requestedBy: requireNonEmptyString(input.requestedBy, "approvalRequest.requestedBy"),
+    requestedAt
+  };
+
+  if (managedProject.approvalRequests.some((existing) => existing.id === request.id)) {
+    throw new ProjectCoreModelError("conflict", "approvalRequest id must be unique");
+  }
+
+  return {
+    ...managedProject,
+    updatedAt: request.requestedAt,
+    approvalRequests: [...managedProject.approvalRequests, request]
+  };
+}
+
+export function approveStageApprovalRequest(
+  project: ManagedProject,
+  input: {
+    tenantId: TenantId;
+    approvalRequestId: string;
+    decidedBy: string;
+    decidedAt: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "approvalRequest.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "approvalRequest tenant mismatch");
+  const approvalRequestId = requireNonEmptyString(input.approvalRequestId, "approvalRequest.id");
+  const decidedAt = requireValidTimestamp(input.decidedAt, "approvalRequest.decidedAt");
+  const request = managedProject.approvalRequests.find((candidate) => candidate.id === approvalRequestId);
+  if (request === undefined) {
+    throw new ProjectCoreModelError("validation_error", "approvalRequest not found");
+  }
+  if (timestampIsBefore(decidedAt, request.requestedAt)) {
+    throw new ProjectCoreModelError(
+      "validation_error",
+      "approvalRequest decision timestamp cannot be earlier than request timestamp"
+    );
+  }
+  const stage = findProjectStage(managedProject, request.stageId);
+  assertStageCanReceiveGateEvidence(managedProject, stage, decidedAt, "approvalRequest");
+
+  return {
+    ...managedProject,
+    updatedAt: decidedAt,
+    approvalRequests: managedProject.approvalRequests.map((candidate) =>
+      candidate.id === approvalRequestId
+        ? {
+            ...candidate,
+            status: "approved",
+            decidedBy: requireNonEmptyString(input.decidedBy, "approvalRequest.decidedBy"),
+            decidedAt
+          }
+        : candidate
+    )
+  };
 }
 
 export function advanceManagedProjectLifecycle(
@@ -1361,7 +1852,6 @@ export function advanceManagedProjectLifecycle(
       )
     };
   }
-
   const allowedTransitions = getAllowedProjectLifecycleTransitions(managedProject);
   if (!allowedTransitions.includes(transition)) {
     return {
@@ -1377,6 +1867,26 @@ export function advanceManagedProjectLifecycle(
         }
       )
     };
+  }
+  if (transition === "advance_stage" || transition === "complete_project") {
+    const gateEvaluation = evaluateStageGate(managedProject, currentStage.id);
+    if (!gateEvaluation.ok) {
+      return {
+        ok: false,
+        project,
+        error: createTransitionError(
+          "stage_gate_blocked",
+          "Project stage gate blocks lifecycle transition",
+          {
+            transition,
+            lifecycleStatus: managedProject.lifecycleStatus,
+            currentStageId: managedProject.currentStageId,
+            blockerCodes: gateEvaluation.blockers.map((blocker) => blocker.code).join(",")
+          },
+          gateEvaluation.blockers
+        )
+      };
+    }
   }
 
   if (transition === "advance_stage") {
