@@ -50,10 +50,18 @@ npm run test:integration
 npm run test:e2e:smoke
 npm run test:e2e:critical
 npm run test:e2e:permissions
+npm run test:e2e:phase
 npm run verify:matrix
 ```
 
-Playwright checks start fresh API/web servers on isolated test ports through `scripts/run-e2e.mjs`; local dev servers on `4173`/`5173` are not reused for phase-gate evidence. `test:e2e:permissions` currently runs the Phase 1 auth-guard permission smoke and must expand to Phase 2 E2E-010..014 when `e2e/tests/phase2` is implemented.
+Playwright checks start fresh API/web servers on isolated test ports through `scripts/run-e2e.mjs`; local dev servers on `4173`/`5173` are not reused for phase-gate evidence. `test:e2e:phase` defaults to Phase 1 and accepts a phase selector:
+
+```bash
+npm run test:e2e:phase -- --phase=1
+npm run test:e2e:phase -- --phase=2
+```
+
+`test:e2e:permissions` currently runs the Phase 1 auth-guard permission smoke and must expand to Phase 2 E2E-010..014 when `e2e/tests/phase2` is implemented. At Phase 2 exit, `npm run test:e2e:phase -- --phase=2` must prove E2E-010 through E2E-014, and verified Phase 2 matrix rows must include structured `e2e_evidence` entries with the E2E ID, command, test path, exit code `0`, and checked timestamp.
 
 For pre-implementation matrices that intentionally contain blocked rows, use:
 

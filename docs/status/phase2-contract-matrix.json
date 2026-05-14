@@ -2,7 +2,7 @@
   "phase": "P2-contract",
   "name": "Phase 2 detail contract before implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T10:25:00+07:00",
+  "updated_at": "2026-05-14T11:02:07+07:00",
   "rows": [
     {
       "id": "P2C-001",
@@ -10,11 +10,11 @@
       "status": "verified",
       "owner": "codex",
       "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
-      "evidence": ["Phase 2 detail document defines objective, scope lock, functional scope, global and per-task non-scope, domain model, API/DTO/error contracts, UI surfaces, detailed E2E scenarios, tests, fixtures, exit gate, risks"],
-      "tests": ["manual review"],
+      "evidence": ["Phase 2 detail document defines objective, scope lock, functional scope, global and per-task non-scope, domain model, API/DTO/error contracts, UI surfaces, detailed E2E scenarios, tests, fixtures, exit gate, risks", "Tenant label and audit DTO contracts require previous/current configuration version and safe before/after details for traceability"],
+      "tests": ["manual review", "npm run typecheck exit 0", "npm run lint exit 0", "npm test exit 0", "npm run verify:matrix -- docs/status/phase2-contract-matrix.json exit 0"],
       "cleanup": "No runtime writes",
       "blocker": null,
-      "last_checked_at": "2026-05-14T10:12:00+07:00"
+      "last_checked_at": "2026-05-14T11:02:07+07:00"
     },
     {
       "id": "P2C-002",
@@ -22,11 +22,11 @@
       "status": "verified",
       "owner": "codex",
       "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
-      "evidence": ["Functional scope table defines P2-001 through P2-010 with owner/module, expected behavior, acceptance criteria, E2E references, verification, per-task non-scope, done evidence, and strict phase-exit matrix behavior"],
-      "tests": ["manual review"],
+      "evidence": ["Functional scope table defines P2-001 through P2-010 with owner/module, expected behavior, acceptance criteria, E2E references, verification, per-task non-scope, done evidence, and strict phase-exit matrix behavior", "P2 requirements matrix includes required_e2e IDs and verifier-owned expected IDs so verified rows cannot pass with generic smoke evidence or by deleting the field", "scripts/verify-requirements-matrix.test.ts covers missing required_e2e fields, planned prose that mentions E2E IDs, missing tests, and present structured E2E evidence"],
+      "tests": ["manual review", "npm run typecheck exit 0", "npm run lint exit 0", "npm test exit 0", "npm run verify:matrix -- docs/status/phase2-contract-matrix.json exit 0"],
       "cleanup": "No runtime writes",
       "blocker": null,
-      "last_checked_at": "2026-05-14T10:12:00+07:00"
+      "last_checked_at": "2026-05-14T11:02:07+07:00"
     },
     {
       "id": "P2C-003",
@@ -34,11 +34,11 @@
       "status": "verified",
       "owner": "codex",
       "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
-      "evidence": ["E2E-010 through E2E-014 are mapped to roles, fixtures, test paths, scenario steps, expected state/API/audit/reload proof, and fixture rules define Tenant A and Tenant B data"],
-      "tests": ["manual review"],
+      "evidence": ["E2E-010 through E2E-014 are mapped to roles, fixtures, test paths, scenario steps, expected state/API/audit/reload proof, and fixture rules define Tenant A and Tenant B data", "test:e2e:phase is routed through scripts/run-e2e.mjs phase and supports --phase=2 for the Phase 2 suite", "run-e2e rejects missing and invalid --phase values before Playwright starts"],
+      "tests": ["manual review", "npm run verify:matrix -- docs/status/phase2-contract-matrix.json exit 0", "npm run test:e2e:phase exit 0", "npm run test:e2e:phase -- --phase=1 exit 0", "npm run test:e2e:phase -- --phase 1 exit 0", "npm run test:e2e:phase -- --phase exits 1", "npm run test:e2e:phase -- --phase=abc exits 1"],
       "cleanup": "No runtime writes",
       "blocker": null,
-      "last_checked_at": "2026-05-14T10:12:00+07:00"
+      "last_checked_at": "2026-05-14T11:02:07+07:00"
     }
   ]
 }

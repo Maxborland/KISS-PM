@@ -36,13 +36,13 @@ Ordinary users should see clear Russian labels, allowed actions, and denial reas
 | P2-001 | `packages/domain-core` | Tenant and workspace primitives | Create tenant/workspace/user primitives with stable IDs and tenant ownership contracts | Tenant-owned primitives require `tenantId`; fixtures can create Tenant A and Tenant B deterministically | E2E-010 | `npm test`, `npm run typecheck` | No production auth, database schema, CRM/project entities, or UI builder | Unit test names, changed files, and passing command output recorded in `docs/status/phase2-requirements-matrix.json` |
 | P2-002 | `packages/access-control` | Access profile model | Implement `AccessProfile`, `Permission`, `ScopeRule`, and profile assignment model | Profiles are tenant-owned, versioned enough for diagnostics, and contain permission/scope rules | E2E-011 | `npm test`, access-control unit tests | No full admin builder, role hierarchy engine, or production identity provider | Unit test names, changed files, and passing command output recorded in matrix |
 | P2-003 | `packages/access-control` | Policy evaluator | Implement deterministic permission/scope evaluator with trace output | Allows/denies by permission, supported scope, tenant mismatch, and target ownership; returns safe trace/reason | E2E-010, E2E-012 | `npm test`, access-control unit tests | No team/department hierarchy resolution, CRM/project business permissions, or UI-only authorization | Unit and integration evidence recorded in matrix |
-| P2-004 | `packages/tenant-config`, `apps/web` | Tenant label configuration | Implement versioned tenant label set for roles, navigation placeholders, and runtime labels used by shell/demo views | Admin changes a label and runtime UI reads from tenant configuration, not hardcoded domain logic; previous label version remains traceable | E2E-013 | unit tests plus E2E | No full no-code process builder, localization marketplace, or template migration UI | Unit, API, and E2E evidence recorded in matrix |
+| P2-004 | `packages/tenant-config`, `apps/web` | Tenant label configuration | Implement versioned tenant label set for roles, navigation placeholders, and runtime labels used by shell/demo views | Admin changes a label and runtime UI reads from tenant configuration, not hardcoded domain logic; previous/current label configuration versions and changed key/value remain traceable in the API response and audit event | E2E-013 | unit tests plus E2E | No full no-code process builder, localization marketplace, or template migration UI | Unit, API, and E2E evidence recorded in matrix |
 | P2-005 | `packages/tenant-config` | Basic custom field registry | Implement metadata-only versioned `CustomFieldDefinition` registry for tenant-owned entity types | Supports key, label, target entity type, value type, required flag, active flag, version, validation rules, visibility rules, permission rules metadata, and filter/control-surface/KPI binding flags | N/A | unit tests | No runtime custom-field value storage, formula execution, builder UI, or data migration | Unit tests for valid definitions, duplicate keys, invalid target types, and version handling recorded in matrix |
 | P2-006 | `packages/domain-core`, `apps/api` | Audit event primitives | Implement append-oriented audit event model and service for Phase 2 admin/permission actions | Audit records actor, tenant, action key, target, result, timestamp, and correlation ID | E2E-014 | unit/integration tests plus E2E | No full action-engine implementation, notification dispatch, or external audit export | Unit/integration/E2E evidence recorded in matrix |
 | P2-007 | `apps/api` | API tenant/access endpoints | Add minimal API routes for tenant summary, access profiles, label update, permission diagnostics, tenant-isolation probe, and audit readback | Routes validate input, establish actor/tenant context, enforce policy server-side, return stable DTOs, and deny cross-tenant probe access | E2E-010..014 | integration tests plus E2E | No CRM/project APIs, production auth provider, real external integration, or unrestricted diagnostics | Integration test names, E2E IDs, and command output recorded in matrix |
 | P2-008 | `apps/web` | Web tenant/admin shell surfaces | Add minimal Russian admin/control placeholders for tenant labels, access profiles, permission diagnostics, isolation probe readback, and audit evidence | UI triggers real API mutations and refreshes state; read-only user cannot mutate; cross-tenant probe denial is visible without leaking private details | E2E-011..014 | component smoke plus E2E | No decorative dashboard, full builder, CRM/project workflow, or hidden-button-only permission proof | Component/E2E evidence and screenshots/traces on failure recorded in matrix |
 | P2-009 | `packages/shared-test-fixtures`, `e2e/` | Deterministic Phase 2 fixtures | Extend seeded tenants with admin, project manager, read-only observer, Tenant B private isolation probe data, labels, access profiles, and audit seed where needed | E2E reset/seed is deterministic and uses no live external service or customer data | E2E-010..014 | fixture tests plus E2E | No production data, random IDs, live external service, or fixture dependence on execution order | Fixture test evidence and reset/readback evidence recorded in matrix |
-| P2-010 | `docs/status`, `scripts` | Phase 2 verification matrix | Create/update machine-readable Phase 2 requirements matrix and ensure verifier rejects incomplete evidence at phase exit | Matrix rows P2-001..P2-010 exist before implementation; final phase exit requires every row to be `verified` with fresh evidence; verifier rejects blocked rows unless `--allow-blocked` is explicitly used for pre-implementation tracking | All Phase 2 | `npm run verify:matrix -- docs/status/phase2-requirements-matrix.json` | No prose-only completion, stale command evidence, skipped E2E, or unchecked cleanup | Passing matrix verifier output and final command log recorded in matrix |
+| P2-010 | `docs/status`, `scripts` | Phase 2 verification matrix | Create/update machine-readable Phase 2 requirements matrix and ensure verifier rejects incomplete evidence at phase exit | Matrix rows P2-001..P2-010 exist before implementation; final phase exit requires every row to be `verified` with fresh evidence; rows with mandatory E2E must include structured `e2e_evidence` entries with ID, command, test path, exit code 0, and timestamp; verifier rejects blocked rows unless `--allow-blocked` is explicitly used for pre-implementation tracking | All Phase 2 | `npm run verify:matrix -- docs/status/phase2-requirements-matrix.json` | No prose-only completion, stale command evidence, skipped E2E, or unchecked cleanup | Passing matrix verifier output and final command log recorded in matrix |
 
 ## 4. Non-scope
 
@@ -189,8 +189,12 @@ UpdateTenantLabelRequest
 TenantLabelSetDto
 - tenantId
 - configurationVersion
+- previousConfigurationVersion?: number
+- changedLabel?: { key, beforeLabel, afterLabel }
 - labels: Record<string, string>
 ```
+
+Label update responses must expose both the new configuration version and, for mutations, the previous configuration version plus the changed label key and before/after values. This is required so E2E-013 can prove label changes are data/configuration changes rather than hardcoded UI edits.
 
 #### Permission diagnostics request/response
 
@@ -234,7 +238,16 @@ AuditEventDto
 - result
 - timestamp
 - correlationId
+- details?: {
+    before?: Record<string, unknown>
+    after?: Record<string, unknown>
+    previousConfigurationVersion?: number
+    newConfigurationVersion?: number
+    changedLabel?: { key, beforeLabel, afterLabel }
+  }
 ```
+
+For tenant-label and access-profile mutations, `details` must include a safe before/after summary. For tenant-label mutations specifically, `details.previousConfigurationVersion`, `details.newConfigurationVersion`, and `details.changedLabel` are mandatory.
 
 DTO implementation rules:
 
@@ -305,7 +318,7 @@ No marketing page, decorative dashboard, full builder, or product workflow UI is
 1. Admin changes a tenant label.
 2. UI refreshes and shows the new label without code changes.
 3. Reload keeps the label.
-4. Previous configuration version remains traceable through API or audit evidence.
+4. Previous configuration version remains traceable through both the label update response and audit event details.
 
 `E2E-014` must prove:
 
@@ -374,6 +387,7 @@ Fixture reset rules:
 - [ ] Tenant isolation proven through API and UI/E2E.
 - [ ] Audit trail created for Phase 2 admin/permission actions.
 - [ ] Docs, E2E ledger, and Phase 2 requirements matrix updated.
+- [ ] Every verified P2 row with mandatory E2E includes structured `e2e_evidence` for its required E2E IDs.
 - [ ] No Phase 3+ product behavior implemented.
 
 ## 12. Risks and decisions

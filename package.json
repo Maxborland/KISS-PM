@@ -20,7 +20,7 @@
     "test:e2e:smoke": "node scripts/run-e2e.mjs smoke",
     "test:e2e:critical": "node scripts/run-e2e.mjs critical",
     "test:e2e:permissions": "node scripts/run-e2e.mjs permissions",
-    "test:e2e:phase": "playwright test",
+    "test:e2e:phase": "node scripts/run-e2e.mjs phase",
     "verify:matrix": "node scripts/verify-requirements-matrix.mjs"
   },
   "dependencies": {
