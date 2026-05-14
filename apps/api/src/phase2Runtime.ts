@@ -139,6 +139,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.readiness.run",
       "crm.template_match.run",
       "crm.feasibility.run",
+      "audit.read",
       "project_draft.read",
       "project_draft.create"
     ],
@@ -148,6 +149,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.readiness.run",
       "crm.template_match.run",
       "crm.feasibility.run",
+      "audit.read",
       "project_draft.read",
       "project_draft.create"
     ],

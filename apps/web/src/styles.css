@@ -171,7 +171,8 @@ nav a:focus-visible {
   line-height: 1.6;
 }
 
-.phase2-surface {
+.phase2-surface,
+.crm-intake-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -259,6 +260,12 @@ input {
   padding: 0 10px;
 }
 
+input:disabled,
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 button {
   align-items: center;
   border: 1px solid #2f6f4e;
@@ -273,6 +280,12 @@ button {
   justify-content: center;
   min-height: 38px;
   padding: 0 12px;
+}
+
+.secondary-button {
+  border-color: #b8c8bb;
+  background: #ffffff;
+  color: #2f4939;
 }
 
 button:focus-visible {
@@ -315,6 +328,104 @@ button:focus-visible {
   }
 
   .phase2-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crm-intake-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+}
+
+.crm-opportunity-form {
+  grid-row: span 3;
+}
+
+.split-fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opportunity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.opportunity-card {
+  align-items: start;
+  border-color: #d7dfd1;
+  background: #ffffff;
+  color: #17211b;
+  display: grid;
+  gap: 5px;
+  justify-content: stretch;
+  min-height: 58px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.opportunity-card:hover,
+.opportunity-card:focus-visible,
+.opportunity-card.selected {
+  border-color: #2f6f4e;
+  background: #edf5ea;
+}
+
+.opportunity-card span,
+.selected-title {
+  font-weight: 700;
+}
+
+.opportunity-card small {
+  color: #59675a;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.selected-opportunity-panel {
+  align-content: start;
+}
+
+.compact-facts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.compact-facts div {
+  border: 1px solid #e0e6dc;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.compact-facts dt {
+  color: #59675a;
+  font-size: 12px;
+  margin: 0 0 4px;
+}
+
+.compact-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1040px) {
+  .crm-intake-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-opportunity-form {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .split-fields,
+  .compact-facts {
     grid-template-columns: 1fr;
   }
 }

@@ -37,11 +37,11 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-020 | User creates an opportunity with required fields | CRM user | Seed Tenant A | Opportunity is saved and visible in CRM Intake Control | crm-core | PRD 10.3 | `e2e/tests/phase3/opportunity-create.spec.ts` | planned |
-| E2E-021 | Opportunity with missing fields shows readiness blockers | CRM user | Seed Tenant A | Missing data produces explainable blockers and allowed next action | crm-core, control-surfaces | PRD 10.3 | `e2e/tests/phase3/intake-readiness.spec.ts` | planned |
-| E2E-022 | User runs demand/capacity feasibility analysis | Resource manager | Seed Tenant A | Demand and capacity assessment appears with traceable assumptions | crm-core, resource-planning | PRD 10.3, 10.7 | `e2e/tests/phase3/feasibility-analysis.spec.ts` | planned |
-| E2E-023 | User creates a project draft from a qualified opportunity | Project manager | Seed Tenant A | Project draft is created, linked to opportunity, and audited | crm-core, project-core, action-engine | PRD 10.3, 10.4 | `e2e/tests/phase3/project-draft-from-opportunity.spec.ts` | planned |
-| E2E-024 | Created project draft remains valid without external CRM adapter | Project manager | Seed Tenant A | Disconnect/mock adapter state does not break canonical project draft | crm-core, integrations, project-core | PRD 10.3, 10.12 | `e2e/tests/phase3/project-draft-canonical.spec.ts` | planned |
+| E2E-020 | User creates an opportunity with required fields | CRM user | Seed Tenant A | Opportunity is saved and visible in CRM Intake Control | crm-core | PRD 10.3 | `e2e/tests/phase3/opportunity-create.spec.ts` | passing |
+| E2E-021 | Opportunity with missing fields shows readiness blockers | CRM user | Seed Tenant A | Missing data produces explainable blockers and allowed next action | crm-core, control-surfaces | PRD 10.3 | `e2e/tests/phase3/intake-readiness.spec.ts` | passing |
+| E2E-022 | User runs demand/capacity feasibility analysis | Resource manager | Seed Tenant A | Demand and capacity assessment appears with traceable assumptions | crm-core, resource-planning | PRD 10.3, 10.7 | `e2e/tests/phase3/feasibility-analysis.spec.ts` | passing |
+| E2E-023 | User creates a project draft from a qualified opportunity | Project manager | Seed Tenant A | Project draft is created, linked to opportunity, and audited | crm-core, project-core, action-engine | PRD 10.3, 10.4 | `e2e/tests/phase3/project-draft-from-opportunity.spec.ts` | passing |
+| E2E-024 | Created project draft remains valid without external CRM adapter | Project manager | Seed Tenant A | Disconnect/mock adapter state does not break canonical project draft | crm-core, integrations, project-core | PRD 10.3, 10.12 | `e2e/tests/phase3/project-draft-canonical.spec.ts` | passing |
 
 ## Phase 4 — Project lifecycle and work management
 

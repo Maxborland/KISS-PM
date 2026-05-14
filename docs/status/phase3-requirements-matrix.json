@@ -2,15 +2,20 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T00:56:59+07:00",
+  "updated_at": "2026-05-15T01:29:42+07:00",
   "rows": [
     {
       "id": "P3-001",
       "requirement": "CRM intake domain primitives",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/crm-core", "packages/domain-core"],
-      "required_e2e": ["E2E-020"],
+      "owned_scope": [
+        "packages/crm-core",
+        "packages/domain-core"
+      ],
+      "required_e2e": [
+        "E2E-020"
+      ],
       "evidence": [
         "packages/crm-core/src/index.ts implements tenant-owned Account, Contact, OpportunityStage, Opportunity, MoneyAmount, scope hints, custom-field metadata refs, manual source, tenant mismatch guards, stable system key validation, ISO date/date-window validation, probability validation, duplicate-contact rejection, active-stage validation, runtime array/object guards, and defensive copies",
         "packages/crm-core/src/intakePrimitives.test.ts covers tenant-owned primitive creation without Bitrix/AmoCRM coupling, cross-tenant reference rejection without leaking referenced details, stable key/date/probability validation, defensive copies, malformed runtime arrays/metadata, and missing or unvalidated stage refs"
@@ -32,16 +37,29 @@
         "npm run test:e2e:phase -- --phase=3 first exit 1 in sandbox because test-results/.last-run.json unlink was not permitted; escalated rerun exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created. npm install --package-lock-only --ignore-scripts updated package-lock only for the new workspace dependency. Test-results write failure was sandbox-local; escalated E2E blocker check completed without creating Phase 3 test artifacts.",
-      "blocker": "Domain primitive implementation evidence is complete, but this row still cannot be marked verified because required E2E-020 structured evidence does not exist until Phase 3 API/web E2E rows create e2e/tests/phase3/opportunity-create.spec.ts.",
-      "last_checked_at": "2026-05-14T18:50:28+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-020",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-002",
       "requirement": "Opportunity readiness checks",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/crm-core"],
-      "required_e2e": ["E2E-021"],
+      "owned_scope": [
+        "packages/crm-core"
+      ],
+      "required_e2e": [
+        "E2E-021"
+      ],
       "evidence": [
         "packages/crm-core/src/index.ts implements evaluateOpportunityReadiness with deterministic blocker order, stable blocker codes, Russian safe messages, fieldRefs, trace, stable category/typology system-key checks, and nextAction selection for missing data, missing template match, low confidence, and ready-for-feasibility states",
         "packages/crm-core/src/readiness.test.ts covers complete ready intake, incomplete intake blockers, intentionally unknown account/contact intent, low-confidence template match routing, empty template ids, and tenant-label category/typology rejection",
@@ -58,16 +76,31 @@
         "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created; P3-002 adds pure crm-core domain logic and unit tests only.",
-      "blocker": "Readiness domain implementation evidence is complete, but this row cannot be marked verified because required E2E-021 structured evidence does not exist until Phase 3 API/web E2E rows create e2e/tests/phase3/intake-readiness.spec.ts.",
-      "last_checked_at": "2026-05-14T19:03:01+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-003",
       "requirement": "Typology, category, custom-field intake metadata",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/crm-core", "packages/tenant-config"],
-      "required_e2e": ["E2E-020", "E2E-021"],
+      "owned_scope": [
+        "packages/crm-core",
+        "packages/tenant-config"
+      ],
+      "required_e2e": [
+        "E2E-020",
+        "E2E-021"
+      ],
       "evidence": [
         "packages/tenant-config/src/index.ts defines tenant-owned OpportunityCategoryDefinition, OpportunityTypologyDefinition, OpportunityIntakeTemplate, OpportunityIntakeMetadataRegistry, and OpportunityIntakeRequirements with stable system keys, active flags, versioning, labels, and deterministic trace output",
         "createOpportunityIntakeMetadataRegistry validates tenant ownership, duplicate category/typology/custom-field/template keys, opportunity-only custom-field targets, known category/typology references, active custom-field requirements, and finite Phase 3 standard intake field keys",
@@ -85,16 +118,38 @@
         "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created; P3-003 adds tenant-config domain metadata and unit tests only.",
-      "blocker": "Tenant-config implementation evidence is complete, but this row cannot be marked verified because required E2E-020/E2E-021 structured evidence does not exist until Phase 3 API/web E2E rows create opportunity-create and intake-readiness specs.",
-      "last_checked_at": "2026-05-14T19:13:46+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-020",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-004",
       "requirement": "Process-template matching draft",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/crm-core", "packages/project-core"],
-      "required_e2e": ["E2E-021", "E2E-022"],
+      "owned_scope": [
+        "packages/crm-core",
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-021",
+        "E2E-022"
+      ],
       "evidence": [
         "packages/project-core/src/index.ts defines tenant-owned ProjectProcessTemplateDraft with stable template/category/typology/scope keys, base confidence, priority, active flag, version, safe assumptions, and timestamp validation",
         "packages/crm-core/src/index.ts implements matchOpportunityToProcessTemplate with tenant isolation, active-template filtering, deterministic category/typology/required-scope matching, confidence calculation, priority/key tie-breaking, safe missing-template blocker, and traceable assumptions",
@@ -118,16 +173,37 @@
         "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created; P3-004 adds pure project-core/crm-core domain logic and unit tests only.",
-      "blocker": "Process-template matching implementation evidence is complete, but this row cannot be marked verified because required E2E-021/E2E-022 structured evidence does not exist until Phase 3 API/web E2E rows create intake-readiness and feasibility-analysis specs.",
-      "last_checked_at": "2026-05-14T19:33:40+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-005",
       "requirement": "Demand-estimation draft",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/crm-core", "packages/resource-planning"],
-      "required_e2e": ["E2E-022"],
+      "owned_scope": [
+        "packages/crm-core",
+        "packages/resource-planning"
+      ],
+      "required_e2e": [
+        "E2E-022"
+      ],
       "evidence": [
         "packages/resource-planning/src/index.ts defines DemandTemplateProfile, DemandTemplateRoleRule, DemandFormulaMetadata, DemandEstimate, StageRoleDemand, and ResourcePlanningModelError for deterministic Phase 3 demand estimation",
         "estimateDemandFromTemplateMatch produces sorted stage/role planned work, total planned work, scenario label, formula key/version/label, per-role confidence, source assumptions, top-level template-match assumptions, and trace output from a matched template plus opportunity scope hints",
@@ -154,16 +230,30 @@
         "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created; P3-005 adds pure resource-planning domain logic and unit tests only.",
-      "blocker": "Demand-estimation implementation evidence is complete, but this row cannot be marked verified because required E2E-022 structured evidence does not exist until Phase 3 API/web E2E rows create feasibility-analysis specs.",
-      "last_checked_at": "2026-05-14T20:03:36+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-006",
       "requirement": "Capacity-feasibility draft",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning", "packages/crm-core"],
-      "required_e2e": ["E2E-022"],
+      "owned_scope": [
+        "packages/resource-planning",
+        "packages/crm-core"
+      ],
+      "required_e2e": [
+        "E2E-022"
+      ],
       "evidence": [
         "packages/resource-planning/src/index.ts defines deterministic CapacityDateWindow, RoleCapacityBucket, ResourceReservation, RoleCapacityFeasibility, CapacityFeasibilityBlocker, and CapacityFeasibilityResult contracts for Phase 3 seeded capacity feasibility",
         "assessCapacityFeasibility compares a tenant/opportunity demand estimate against seeded role capacity buckets and active conflicting reservations for the expected date window, returning fit/overloaded status, severity, role gaps, blockers, conflicting reservations, assumptions, and trace",
@@ -191,16 +281,34 @@
         "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No runtime resources were created; P3-006 adds pure resource-planning domain logic and unit/integration tests only.",
-      "blocker": "Capacity-feasibility implementation evidence is complete, but this row cannot be marked verified because required E2E-022 structured evidence does not exist until Phase 3 API/web E2E rows create feasibility-analysis specs.",
-      "last_checked_at": "2026-05-14T20:38:08+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-007",
       "requirement": "CRM intake API endpoints",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["apps/api", "packages/crm-core"],
-      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+      "owned_scope": [
+        "apps/api",
+        "packages/crm-core"
+      ],
+      "required_e2e": [
+        "E2E-020",
+        "E2E-021",
+        "E2E-022",
+        "E2E-023",
+        "E2E-024"
+      ],
       "evidence": [
         "apps/api/src/app.ts exposes Phase 3 CRM intake routes for account/contact/opportunity create/read, readiness, template match, feasibility, and a permission-checked project-draft command entrypoint that returns safe 501 not_implemented until P3-008",
         "apps/api/src/app.ts validates CRM create and command payloads with strict Zod schemas, rejects unknown external CRM payload fields, rejects public client-provided ids, and returns stable DTOs without Bitrix/AmoCRM adapter fields",
@@ -234,16 +342,59 @@
         "Final blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No external resources or persistent databases were created. P3-007 uses per-app in-memory Phase 3 runtime state and resets it through /test-fixtures/reset in test mode. package-lock.json was synchronized with npm install --package-lock-only --ignore-scripts.",
-      "blocker": "API implementation evidence is complete, but this row cannot be marked verified because required E2E-020/E2E-021/E2E-022/E2E-023/E2E-024 structured evidence does not exist until P3-009 creates e2e/tests/phase3 opportunity-create, intake-readiness, feasibility-analysis, project-draft-from-opportunity, and project-draft-canonical specs. Fresh blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 with No tests found.",
-      "last_checked_at": "2026-05-14T21:00:57+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-020",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-023",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-024",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-008",
       "requirement": "Project draft creation from qualified opportunity",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/project-core", "packages/action-engine"],
-      "required_e2e": ["E2E-023", "E2E-024"],
+      "owned_scope": [
+        "packages/project-core",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-023",
+        "E2E-024"
+      ],
       "evidence": [
         "packages/project-core/src/index.ts defines ProjectDraft with tenant-owned source opportunity snapshot, process template snapshot, demand snapshot, feasibility snapshot, status draft, actor, createdAt, and correlationId",
         "packages/project-core/src/projectDraft.test.ts covers tenant-owned project draft creation from an opportunity and cross-tenant source snapshot rejection",
@@ -280,33 +431,137 @@
         "Final blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
       ],
       "cleanup": "No external resources or persistent databases were created. P3-008 stores project drafts/action executions only in per-app in-memory Phase 3 runtime state reset by /test-fixtures/reset in test mode. package-lock.json was synchronized with npm install --package-lock-only --ignore-scripts.",
-      "blocker": "Project draft creation implementation evidence is complete, but this row cannot be marked verified because required E2E-023/E2E-024 structured evidence does not exist until P3-009 creates e2e/tests/phase3/project-draft-from-opportunity.spec.ts and e2e/tests/phase3/project-draft-canonical.spec.ts. Fresh blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 with No tests found.",
-      "last_checked_at": "2026-05-15T00:56:59+07:00"
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:20:07+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-023",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-024",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-009",
       "requirement": "CRM Intake Control web surface and E2E suite",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["apps/web", "e2e/tests/phase3"],
-      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; requires Phase 3 API behavior",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "owned_scope": [
+        "apps/web",
+        "e2e/tests/phase3"
+      ],
+      "required_e2e": [
+        "E2E-020",
+        "E2E-021",
+        "E2E-022",
+        "E2E-023",
+        "E2E-024"
+      ],
+      "evidence": [
+        "apps/web/src/crmIntakeApiClient.ts adds typed Phase 3 browser client methods for opportunity list/create, readiness, feasibility, project draft command/readback, and opportunity audit evidence using the /api/api Vite proxy base path required by server /api routes",
+        "apps/web/src/CrmIntakeControlSurface.tsx adds a Russian guided CRM Intake Control surface with opportunity form/list/card, readiness blockers, feasibility demand/capacity summaries, project-draft action, permission-aware controls, API denial feedback, reload draft readback, and action/audit evidence display",
+        "apps/web/src/App.tsx wires CRM Intake Control into the authenticated shell while preserving Phase 2 admin surface tests and fixture auth behavior",
+        "apps/api/src/phase2Runtime.ts grants project_manager audit.read so the project draft control surface can show governed action evidence after creation",
+        "e2e/tests/phase3/*.spec.ts implements E2E-020..024 with UI actions, direct API/domain readback, reload persistence, unauthorized project-draft denial, and Tenant B hidden-data checks",
+        "docs/e2e/E2E_SCENARIOS.md marks E2E-020..024 passing after the exact Phase 3 Playwright command passed",
+        "Bug Hunt found one High audit-integrity issue: the UI briefly displayed command-response fallback as audit evidence when /api/audit readback failed or returned empty; Receiving Code Review fixed this by rendering only persisted audit readback in the audit list and showing an explicit not-confirmed state otherwise",
+        "Bug Hunt also found a Medium stale-audit race from global auditEvents state; Receiving Code Review fixed audit state by opportunityId so async readbacks cannot paint one opportunity audit under another selected card",
+        "Follow-up Bug Hunt and Requesting Code Review returned no remaining Critical/High/Important findings for the P3-009 audit fixes and current working tree"
+      ],
+      "tests": [
+        "npm test -- apps/web/src/CrmIntakeControlSurface.test.tsx apps/web/src/App.test.tsx exit 0 (2 files, 15 tests)",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run test:e2e:phase -- --phase=3 first sandbox run exit 1 because test-results/.last-run.json unlink was not permitted",
+        "npm run test:e2e:phase -- --phase=3 escalated first implementation run exit 1: E2E-021 nextAction expected old collect mapping and E2E-022/E2E-023 expected fit / none while seeded feasibility is fit / warning",
+        "npm test -- apps/web/src/CrmIntakeControlSurface.test.tsx exit 0 after nextAction mapping fix (1 file, 3 tests)",
+        "npm run test:e2e:phase -- --phase=3 escalated second run exit 1: E2E-023 revealed project_manager lacked audit.read and UI audit evidence could remain empty",
+        "npm run test:e2e:phase -- --phase=3 e2e/tests/phase3/project-draft-from-opportunity.spec.ts exit 0 (Playwright ran 5 Phase 3 tests, all passed)",
+        "npm run test:e2e:phase -- --phase=3 exit 0 (5 passed)",
+        "npm run test:integration exit 0 (5 files, 24 tests)",
+        "npm test -- apps/api/src/phase3ProjectDraftApi.test.ts apps/web/src/CrmIntakeControlSurface.test.tsx exit 0 after audit permission/evidence fixes (2 files, 7 tests)",
+        "npm test -- apps/web/src/CrmIntakeControlSurface.test.tsx exit 0 after Bug Hunt audit-readback fix (1 file, 4 tests)",
+        "npm run typecheck exit 0 after Bug Hunt audit-readback fix",
+        "npm run lint exit 0 after Bug Hunt audit-readback fix",
+        "npm run test:e2e:phase -- --phase=3 exit 0 after Bug Hunt audit-readback fix (5 passed)",
+        "npm run test:integration exit 0 after Bug Hunt audit-readback fix (5 files, 24 tests)",
+        "npm test exit 0 after Bug Hunt audit-readback fix (26 files, 133 tests)",
+        "Follow-up Bug Hunt review: no remaining Critical/High/Important findings for apps/web/src/CrmIntakeControlSurface.tsx and apps/web/src/CrmIntakeControlSurface.test.tsx",
+        "Follow-up Requesting Code Review: no remaining Critical/Important findings; git diff --check exit 0 in reviewer pass"
+      ],
+      "cleanup": "No external resources or persistent databases were created. Phase 3 E2E uses in-memory API state reset through /test-fixtures/reset before every scenario; Playwright artifacts remain under test-results for failed intermediate runs.",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T01:29:42+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-020",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-023",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        },
+        {
+          "id": "E2E-024",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T01:20:07+07:00"
+        }
+      ]
     },
     {
       "id": "P3-010",
       "requirement": "Phase 3 verification matrix",
       "status": "blocked",
       "owner": "codex",
-      "owned_scope": ["docs/status", "scripts"],
-      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-020",
+        "E2E-021",
+        "E2E-022",
+        "E2E-023",
+        "E2E-024"
+      ],
       "evidence": [
         "Initial matrix exists with all P3 rows blocked and exact required_e2e plus ledger test_path mapping owned by scripts/verify-requirements-matrix.mjs"
       ],
-      "tests": ["npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0", "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 because P3 rows are intentionally blocked before implementation"],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 because P3 rows are intentionally blocked before implementation"
+      ],
       "cleanup": "No runtime cleanup yet",
       "blocker": "Final Phase 3 implementation and E2E evidence are not complete",
       "last_checked_at": "2026-05-14T18:06:31+07:00"
