@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@kiss-pm/access-control": "0.1.0",
+    "@kiss-pm/action-engine": "0.1.0",
     "@kiss-pm/crm-core": "0.1.0",
     "@kiss-pm/domain-core": "0.1.0",
     "@kiss-pm/project-core": "0.1.0",

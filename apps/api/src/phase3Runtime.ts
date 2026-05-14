@@ -1,3 +1,5 @@
+import { ActionEngineModelError, executeCreateProjectDraftFromOpportunity } from "@kiss-pm/action-engine";
+import type { ActionExecutionLog } from "@kiss-pm/action-engine";
 import {
   createAccount as createCrmAccount,
   createContact as createCrmContact,
@@ -19,7 +21,7 @@ import type {
 } from "@kiss-pm/crm-core";
 import type { TenantId } from "@kiss-pm/domain-core";
 import { createProjectProcessTemplateDraft } from "@kiss-pm/project-core";
-import type { ProjectProcessTemplateDraft } from "@kiss-pm/project-core";
+import type { ProjectDraft, ProjectProcessTemplateDraft } from "@kiss-pm/project-core";
 import {
   assessCapacityFeasibility,
   createDemandTemplateProfile,
@@ -76,6 +78,17 @@ export type Phase3FeasibilityBundle = {
   feasibility: CapacityFeasibilityResult;
 };
 
+export type Phase3ProjectDraftCommandActor = {
+  actorId: string;
+  accessProfileId?: string;
+};
+
+export type Phase3ProjectDraftCommandResult = {
+  correlationId: string;
+  projectDraft: ProjectDraft;
+  actionExecution: ActionExecutionLog;
+};
+
 export type Phase3CrmRuntimeState = ReturnType<typeof createPhase3CrmRuntimeState>;
 
 function cloneAccount(account: Account): Account {
@@ -94,6 +107,40 @@ function cloneOpportunity(opportunity: Opportunity): Opportunity {
     customFieldRefs: opportunity.customFieldRefs.map((fieldRef) => ({ ...fieldRef })),
     expectedValue: { ...opportunity.expectedValue },
     source: { ...opportunity.source }
+  };
+}
+
+function cloneProjectDraft(projectDraft: ProjectDraft): ProjectDraft {
+  return {
+    ...projectDraft,
+    sourceOpportunity: {
+      ...projectDraft.sourceOpportunity,
+      contactIds: [...projectDraft.sourceOpportunity.contactIds]
+    },
+    processTemplate: {
+      ...projectDraft.processTemplate,
+      assumptions: projectDraft.processTemplate.assumptions.map((assumption) => ({ ...assumption }))
+    },
+    demand: {
+      ...projectDraft.demand,
+      stageRoleDemands: projectDraft.demand.stageRoleDemands.map((demand) => ({ ...demand }))
+    },
+    feasibility: {
+      ...projectDraft.feasibility,
+      expectedWindow: { ...projectDraft.feasibility.expectedWindow },
+      blockerCodes: [...projectDraft.feasibility.blockerCodes]
+    }
+  };
+}
+
+function cloneActionExecution(actionExecution: ActionExecutionLog): ActionExecutionLog {
+  return {
+    ...actionExecution,
+    source: { ...actionExecution.source },
+    ...(actionExecution.target !== undefined ? { target: { ...actionExecution.target } } : {}),
+    before: actionExecution.before === null ? null : structuredClone(actionExecution.before),
+    after: actionExecution.after === null ? null : structuredClone(actionExecution.after),
+    trace: [...actionExecution.trace]
   };
 }
 
@@ -259,6 +306,8 @@ export function createPhase3CrmRuntimeState() {
   const demandProfiles = new Map<TenantId, DemandTemplateProfile>();
   const capacityBuckets = new Map<TenantId, RoleCapacityBucket[]>();
   const reservations = new Map<TenantId, ResourceReservation[]>();
+  const projectDrafts = new Map<string, ProjectDraft>();
+  const actionExecutions = new Map<string, ActionExecutionLog>();
 
   function seedTenant(tenantId: TenantId, opportunityId: string, title: string): void {
     stages.set(tenantId, createStage(tenantId));
@@ -328,6 +377,13 @@ export function createPhase3CrmRuntimeState() {
     if (left !== undefined && right !== undefined) {
       throw Object.assign(new Error(message), { code: "validation_error" });
     }
+  }
+
+  function findProjectDraftByOpportunity(tenantId: TenantId, opportunityId: string): ProjectDraft | undefined {
+    return [...projectDrafts.values()].find(
+      (projectDraft) =>
+        projectDraft.tenantId === tenantId && projectDraft.sourceOpportunity.opportunityId === opportunityId
+    );
   }
 
   seedTenant("tenant-a", "opportunity-seed-ready", "Внедрение портала АКМЕ");
@@ -548,6 +604,106 @@ export function createPhase3CrmRuntimeState() {
         templateMatch,
         demandEstimate,
         feasibility
+      };
+    },
+
+    getProjectDraft(tenantId: TenantId, projectDraftId: string): ProjectDraft | undefined {
+      const projectDraft = projectDrafts.get(projectDraftId);
+      return projectDraft?.tenantId === tenantId ? cloneProjectDraft(projectDraft) : undefined;
+    },
+
+    listActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+      return [...actionExecutions.values()]
+        .filter((actionExecution) => actionExecution.tenantId === tenantId)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map(cloneActionExecution);
+    },
+
+    createProjectDraftFromOpportunity(
+      tenantId: TenantId,
+      opportunityId: string,
+      actor: Phase3ProjectDraftCommandActor
+    ): Phase3ProjectDraftCommandResult | undefined {
+      const opportunity = this.getOpportunity(tenantId, opportunityId);
+      if (opportunity === undefined) return undefined;
+      const readiness = this.evaluateReadiness(tenantId, opportunityId);
+      if (readiness === undefined) return undefined;
+      if (!readiness.ready) {
+        throw new ActionEngineModelError("precondition_failed", "Opportunity readiness is not complete");
+      }
+      const feasibilityBundle = this.runFeasibility(tenantId, opportunityId);
+      if (feasibilityBundle === undefined) return undefined;
+      const template = feasibilityBundle.templateMatch.template;
+      if (feasibilityBundle.templateMatch.matched !== true || template === undefined) {
+        return undefined;
+      }
+      const correlationId = `corr-project-draft-${opportunityId}`;
+      const result = executeCreateProjectDraftFromOpportunity({
+        actor: {
+          tenantId,
+          actorId: actor.actorId,
+          ...(actor.accessProfileId !== undefined ? { accessProfileId: actor.accessProfileId } : {}),
+          correlationId
+        },
+        requiredPermission: "project_draft.create",
+        now: PHASE3_TIMESTAMP,
+        readiness: {
+          ready: readiness.ready,
+          nextAction: readiness.nextAction,
+          trace: readiness.trace
+        },
+        sourceOpportunity: {
+          tenantId,
+          type: "crm_opportunity",
+          opportunityId: opportunity.id,
+          title: opportunity.title,
+          ...(opportunity.accountId !== undefined ? { accountId: opportunity.accountId } : {}),
+          contactIds: opportunity.contactIds,
+          plannedStartDate: opportunity.plannedStartDate,
+          desiredFinishDate: opportunity.desiredFinishDate
+        },
+        processTemplate: {
+          tenantId,
+          templateId: template.id,
+          key: template.key,
+          label: template.label,
+          version: template.version,
+          matchConfidence: feasibilityBundle.templateMatch.confidence,
+          assumptions: feasibilityBundle.templateMatch.assumptions
+        },
+        demand: {
+          tenantId,
+          totalPlannedWorkHours: feasibilityBundle.demandEstimate.totalPlannedWorkHours,
+          scenarioKey: feasibilityBundle.demandEstimate.scenario.key,
+          scenarioLabel: feasibilityBundle.demandEstimate.scenario.label,
+          formulaKey: feasibilityBundle.demandEstimate.formula.key,
+          formulaVersion: feasibilityBundle.demandEstimate.formula.version,
+          confidence: feasibilityBundle.demandEstimate.confidence,
+          stageRoleDemands: feasibilityBundle.demandEstimate.stageRoleDemands.map((demand) => ({
+            stageKey: demand.stageKey,
+            stageLabel: demand.stageLabel,
+            roleKey: demand.roleKey,
+            roleLabel: demand.roleLabel,
+            plannedWorkHours: demand.plannedWorkHours
+          }))
+        },
+        feasibility: {
+          tenantId,
+          status: feasibilityBundle.feasibility.status,
+          severity: feasibilityBundle.feasibility.severity,
+          expectedWindow: feasibilityBundle.feasibility.expectedWindow,
+          blockerCodes: feasibilityBundle.feasibility.blockers.map((blocker) => blocker.code)
+        },
+        existingDraft: findProjectDraftByOpportunity(tenantId, opportunityId)
+      });
+
+      projectDrafts.set(result.projectDraft.id, cloneProjectDraft(result.projectDraft));
+      actionExecutions.set(result.actionExecution.id, cloneActionExecution(result.actionExecution));
+
+      return {
+        correlationId,
+        projectDraft: cloneProjectDraft(result.projectDraft),
+        actionExecution: cloneActionExecution(result.actionExecution)
       };
     }
   };

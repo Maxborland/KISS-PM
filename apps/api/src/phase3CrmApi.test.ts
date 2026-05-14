@@ -364,7 +364,7 @@ describe("Phase 3 CRM intake API", () => {
     await expect(readJson(clientProvidedId)).resolves.toMatchObject({ code: "validation_error" });
   });
 
-  it("exposes a project-draft command entrypoint without implementing P3-008 behavior", async () => {
+  it("keeps the project-draft command entrypoint permission checked after P3-008 implementation", async () => {
     const app = createApiApp({ allowTestFixtureReset: true });
 
     const denied = await app.request(
@@ -377,10 +377,17 @@ describe("Phase 3 CRM intake API", () => {
       "/api/crm/opportunities/opportunity-seed-ready/project-draft?testUser=project-manager-a",
       jsonRequest({})
     );
-    expect(acceptedBoundary.status).toBe(501);
-    await expect(readJson(acceptedBoundary)).resolves.toEqual({
-      code: "not_implemented",
-      message: "Создание проектного черновика будет реализовано в P3-008"
+    expect(acceptedBoundary.status).toBe(201);
+    await expect(readJson(acceptedBoundary)).resolves.toMatchObject({
+      projectDraft: {
+        sourceOpportunity: {
+          opportunityId: "opportunity-seed-ready"
+        }
+      },
+      actionExecution: {
+        requiredPermission: "project_draft.create",
+        status: "succeeded"
+      }
     });
   });
 });
