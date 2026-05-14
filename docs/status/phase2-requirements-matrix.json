@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T14:32:15+07:00",
+  "updated_at": "2026-05-14T15:42:07+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -201,15 +201,69 @@
     {
       "id": "P2-008",
       "requirement": "Web tenant/admin shell surfaces",
-      "status": "blocked",
+      "status": "verified",
       "owner": "apps/web",
       "owned_scope": ["apps/web", "e2e/tests/phase2"],
       "required_e2e": ["E2E-011", "E2E-012", "E2E-013", "E2E-014"],
-      "evidence": [],
-      "tests": ["npm test", "npm run test:e2e:phase -- --phase=2 must include E2E-011..014 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "apps/web/src/App.tsx implements a minimal Russian Phase 2 admin surface inside the existing shell for access profiles, tenant label editing, permission diagnostics, tenant isolation probe readback, audit evidence, and read-only denial state",
+        "apps/web/src/phase2ApiClient.ts defines stable DTO/client methods for the P2 API routes and apps/web/vite.config.ts proxies /api to the local API server during dev and E2E",
+        "apps/web/src/App.test.tsx covers admin profile creation with audit refresh, tenant label mutation with runtime label refresh and audit trace, read-only mutation control denial, safe cross-tenant probe denial without Tenant B leakage, Tenant B own/foreign probe selection, and API load-error rendering",
+        "e2e/tests/phase2 implements E2E-010 through E2E-014 using real browser UI actions plus direct API readback for permissions, persisted/API state, audit, tenant isolation, and reload behavior",
+        "scripts/run-e2e.mjs serializes phase and all profiles while Phase 2 uses shared in-memory state, preventing false conflicts between mutable E2E scenarios",
+        "Rendered browser sanity via Playwright MCP opened http://127.0.0.1:5173/?testUser=tenant-admin-a with fixture auth; desktop and mobile snapshots were nonblank, showed the Phase 2 surface, had no framework overlay, and console output contained only React DevTools info",
+        "Bug Hunt and code-review loop completed for P2-008: Important findings around mutable full E2E parallelism, Tenant B probe selection, and async component evidence were fixed; Minor findings around in-flight duplicate mutation controls and Tenant B assertion race were fixed; no completed review left Critical or Important findings open"
+      ],
+      "tests": [
+        "npm test -- apps/web/src/App.test.tsx first exited 1 with four missing Phase 2 surface assertions before implementation, proving the new web tests were red",
+        "npm test -- apps/web/src/App.test.tsx after Bug Hunt load-error regression first exited 1 because the UI stayed on phase2-loading when current-tenant API failed, proving the finding was reproduced",
+        "npm run test:e2e:phase -- --phase=2 first exited 1 because parallel mutable scenarios caused E2E-013 label conflict, then exited 0 after serializing phase profile",
+        "npm run test:e2e first exited 1 because the all profile still ran mutable Phase 2 tests in parallel, then exited 0 after serializing all profile",
+        "npm test -- apps/web/src/App.test.tsx after in-flight mutation regression additions first exited 1 because the profile test expected fixture mutation from a deferred mock; fixed the assertion to verify completed status and single API call",
+        "npm test -- apps/web/src/App.test.tsx exit 0 (12 tests)",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run build exit 1 because the root package has no build script; direct web build used instead",
+        "npm exec -w @kiss-pm/web vite -- build exit 0 (34 modules transformed)",
+        "npm run test:integration exit 0 (3 files, 13 tests)",
+        "npm test exit 0 (12 files, 67 tests)",
+        "npm run test:e2e:smoke exit 0 (6 passed)",
+        "npm run test:e2e:phase -- --phase=2 exit 0 (6 passed)",
+        "npm run test:e2e exit 0 (12 passed)"
+      ],
+      "e2e_evidence": [
+        {
+          "id": "E2E-011",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/access-profile.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T15:30:23+07:00"
+        },
+        {
+          "id": "E2E-012",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T15:30:23+07:00"
+        },
+        {
+          "id": "E2E-013",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T15:30:23+07:00"
+        },
+        {
+          "id": "E2E-014",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T15:30:23+07:00"
+        }
+      ],
+      "cleanup": "Temporary browser validation dev servers on ports 4173 and 5173 were stopped; readback check returned dev-servers-stopped. Browser screenshots were removed from the workspace and are not committed. Generated apps/web/dist from direct Vite build was removed after path verification.",
+      "blocker": "None for P2-008; required E2E-011, E2E-012, E2E-013, and E2E-014 have structured passing evidence.",
+      "last_checked_at": "2026-05-14T15:42:07+07:00"
     },
     {
       "id": "P2-009",

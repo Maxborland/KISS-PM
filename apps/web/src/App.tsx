@@ -1,10 +1,22 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDemoTenantSummary, getDemoTenants } from "@kiss-pm/shared-test-fixtures";
 import { createTenantLabelSet, resolveTenantLabel } from "@kiss-pm/tenant-config";
 import type { TenantLabelSet } from "@kiss-pm/tenant-config";
 
+import { createPhase2ApiClient } from "./phase2ApiClient";
+import type {
+  AccessProfileDto,
+  AuditEventDto,
+  CurrentTenantDto,
+  Phase2ApiClient,
+  PolicyDiagnosticsDto,
+  TenantIsolationProbeDto
+} from "./phase2ApiClient";
+
 type AppProps = {
   testUser?: string;
   tenantLabelOverrides?: Record<string, string>;
+  apiClient?: Phase2ApiClient;
 };
 
 const shellLabelDefaults = {
@@ -32,7 +44,10 @@ const shellLabelDefaults = {
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
-  "shell.external_services_note": "Внешние сервисы не используются в smoke-режиме."
+  "shell.external_services_note": "Внешние сервисы не используются в smoke-режиме.",
+  "phase2.surface_title": "Администрирование доступа",
+  "phase2.surface_body": "Минимальная поверхность Фазы 2 для проверки прав, меток, изоляции и аудита.",
+  "phase2.readonly_notice": "Режим чтения: изменения профилей и меток недоступны."
 } satisfies Record<string, string>;
 
 const navigationLabelKeys = [
@@ -88,9 +103,358 @@ function createRuntimeLabelSet(
   });
 }
 
-export function App({ testUser, tenantLabelOverrides }: AppProps) {
+function createFallbackCurrentTenant(
+  fixtureSession: NonNullable<ReturnType<typeof resolveFixtureSession>>,
+  tenantLabelOverrides?: Record<string, string>
+): CurrentTenantDto {
+  const labelSet = createRuntimeLabelSet(fixtureSession.tenant, tenantLabelOverrides);
+
+  return {
+    tenant: {
+      id: fixtureSession.tenant.id,
+      label: fixtureSession.tenant.label,
+      configurationVersion: labelSet.configurationVersion
+    },
+    actor: {
+      id: fixtureSession.user.id,
+      displayName: fixtureSession.user.displayName,
+      ...(fixtureSession.user.accessProfileId ? { accessProfileId: fixtureSession.user.accessProfileId } : {})
+    },
+    labels: labelSet.labels,
+    permissions: ["tenant.read"]
+  };
+}
+
+function shouldUseDefaultPhase2ApiClient(): boolean {
+  return import.meta.env.MODE !== "test";
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Не удалось выполнить действие";
+}
+
+function hasPermission(currentTenant: CurrentTenantDto, permissionKey: string): boolean {
+  return currentTenant.permissions.includes(permissionKey);
+}
+
+function getPhase2ProbeIds(tenantId: string): { ownProbeId: string; foreignProbeId: string } {
+  if (tenantId === "tenant-b") {
+    return {
+      ownProbeId: "probe-b-private",
+      foreignProbeId: "probe-a-private"
+    };
+  }
+
+  return {
+    ownProbeId: "probe-a-private",
+    foreignProbeId: "probe-b-private"
+  };
+}
+
+function Phase2AdminSurface({
+  apiClient,
+  currentTenant,
+  testUser,
+  onCurrentTenantChange
+}: {
+  apiClient: Phase2ApiClient;
+  currentTenant: CurrentTenantDto;
+  testUser: string;
+  onCurrentTenantChange: (currentTenant: CurrentTenantDto) => void;
+}) {
+  const [profiles, setProfiles] = useState<AccessProfileDto[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([]);
+  const [labelValue, setLabelValue] = useState(currentTenant.labels["navigation.admin"] ?? "");
+  const [status, setStatus] = useState("Готово");
+  const [probeResult, setProbeResult] = useState<TenantIsolationProbeDto | string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<PolicyDiagnosticsDto | null>(null);
+  const [pendingAction, setPendingAction] = useState<"profile" | "label" | "ownProbe" | "foreignProbe" | null>(null);
+  const canReadProfiles = hasPermission(currentTenant, "access_profile.read");
+  const canWriteProfiles = hasPermission(currentTenant, "access_profile.write");
+  const canWriteLabels = hasPermission(currentTenant, "tenant_labels.write");
+  const canReadAudit = hasPermission(currentTenant, "audit.read");
+  const canReadDiagnostics = hasPermission(currentTenant, "permission.diagnostics.read");
+  const isReadonly = !canWriteProfiles && !canWriteLabels;
+  const { ownProbeId, foreignProbeId } = getPhase2ProbeIds(currentTenant.tenant.id);
+
+  const refreshAudit = useCallback(async () => {
+    if (!canReadAudit) {
+      setAuditEvents([]);
+      return;
+    }
+
+    setAuditEvents(await apiClient.listAuditEvents(testUser));
+  }, [apiClient, canReadAudit, testUser]);
+
+  const refreshProfiles = useCallback(async () => {
+    if (!canReadProfiles) {
+      setProfiles([]);
+      return;
+    }
+
+    setProfiles(await apiClient.listAccessProfiles(testUser));
+  }, [apiClient, canReadProfiles, testUser]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSurfaceData() {
+      try {
+        const [nextProfiles, nextAuditEvents] = await Promise.all([
+          canReadProfiles ? apiClient.listAccessProfiles(testUser) : Promise.resolve([]),
+          canReadAudit ? apiClient.listAuditEvents(testUser) : Promise.resolve([])
+        ]);
+        if (!cancelled) {
+          setProfiles(nextProfiles);
+          setAuditEvents(nextAuditEvents);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatus(getErrorMessage(error));
+        }
+      }
+    }
+
+    void loadSurfaceData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, canReadAudit, canReadProfiles, testUser]);
+
+  useEffect(() => {
+    setLabelValue(currentTenant.labels["navigation.admin"] ?? "");
+  }, [currentTenant.labels]);
+
+  async function createReviewerProfile() {
+    if (pendingAction !== null) return;
+
+    setPendingAction("profile");
+    setStatus("Сохранение профиля доступа");
+    try {
+      await apiClient.upsertAccessProfile(testUser, {
+        systemKey: "ui_reviewer",
+        label: "Ревизор доступа",
+        permissions: ["tenant.read", "audit.read"],
+        scopeRules: [
+          { permissionKey: "tenant.read", scope: "tenant" },
+          { permissionKey: "audit.read", scope: "tenant" }
+        ],
+        active: true
+      });
+      await refreshProfiles();
+      await refreshAudit();
+      setStatus("Профиль доступа сохранен");
+    } catch (error) {
+      setStatus(getErrorMessage(error));
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function saveTenantLabel() {
+    if (pendingAction !== null) return;
+
+    setPendingAction("label");
+    setStatus("Сохранение метки");
+    try {
+      await apiClient.updateTenantLabel(testUser, {
+        key: "navigation.admin",
+        label: labelValue,
+        expectedConfigurationVersion: currentTenant.tenant.configurationVersion
+      });
+      const nextCurrentTenant = await apiClient.getCurrentTenant(testUser);
+      onCurrentTenantChange(nextCurrentTenant);
+      await refreshAudit();
+      setStatus("Метка сохранена");
+    } catch (error) {
+      setStatus(getErrorMessage(error));
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function showOwnProbe() {
+    if (pendingAction !== null) return;
+
+    setPendingAction("ownProbe");
+    setStatus("Проверка своей пробы");
+    try {
+      setProbeResult(await apiClient.getIsolationProbe(testUser, ownProbeId));
+      setStatus("Проба доступна");
+    } catch (error) {
+      setProbeResult(getErrorMessage(error));
+      setStatus("Проба недоступна");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function checkForeignProbe() {
+    if (pendingAction !== null) return;
+
+    setPendingAction("foreignProbe");
+    setStatus("Проверка изоляции");
+    try {
+      if (canReadDiagnostics) {
+        setDiagnostics(
+          await apiClient.evaluatePermission(testUser, {
+            permissionKey: "tenant_probe.read",
+            targetEntityType: "tenantIsolationProbe",
+            targetEntityId: foreignProbeId,
+            requestedScope: "tenant"
+          })
+        );
+      }
+      await apiClient.getIsolationProbe(testUser, foreignProbeId);
+      setProbeResult("Проба доступна");
+    } catch (error) {
+      setProbeResult(getErrorMessage(error));
+    } finally {
+      setStatus("Проверка завершена");
+      setPendingAction(null);
+    }
+  }
+
+  return (
+    <section className="phase2-surface" data-testid="phase2-admin-surface">
+      <div className="surface-heading">
+        <div>
+          <h2>{currentTenant.labels["phase2.surface_title"] ?? shellLabelDefaults["phase2.surface_title"]}</h2>
+          <p>{currentTenant.labels["phase2.surface_body"] ?? shellLabelDefaults["phase2.surface_body"]}</p>
+        </div>
+        <p className="status-pill" data-testid="phase2-status">
+          {status}
+        </p>
+      </div>
+
+      {isReadonly ? (
+        <p className="readonly-notice" data-testid="readonly-denial">
+          {currentTenant.labels["phase2.readonly_notice"] ?? shellLabelDefaults["phase2.readonly_notice"]}
+        </p>
+      ) : null}
+
+      <div className="phase2-grid">
+        <section className="phase2-panel">
+          <h3>Профили доступа</h3>
+          <div className="compact-list" data-testid="access-profile-list">
+            {profiles.length > 0 ? profiles.map((profile) => <span key={profile.id}>{profile.label}</span>) : "Нет доступных профилей"}
+          </div>
+          {canWriteProfiles ? (
+            <button disabled={pendingAction !== null} type="button" onClick={() => void createReviewerProfile()}>
+              Создать профиль ревизора
+            </button>
+          ) : null}
+        </section>
+
+        <section className="phase2-panel">
+          <h3>Метки тенанта</h3>
+          <p data-testid="admin-navigation-label">{currentTenant.labels["navigation.admin"] ?? "Администрирование"}</p>
+          {canWriteLabels ? (
+            <label className="field-stack">
+              <span>Метка раздела администрирования</span>
+              <input
+                aria-label="Метка раздела администрирования"
+                onChange={(event) => setLabelValue(event.target.value)}
+                value={labelValue}
+              />
+              <button disabled={pendingAction !== null} type="button" onClick={() => void saveTenantLabel()}>
+                Сохранить метку
+              </button>
+            </label>
+          ) : null}
+        </section>
+
+        <section className="phase2-panel">
+          <h3>Проверка изоляции</h3>
+          <div className="button-row">
+            <button disabled={pendingAction !== null} type="button" onClick={() => void showOwnProbe()}>
+              Показать свою пробу
+            </button>
+            <button disabled={pendingAction !== null} type="button" onClick={() => void checkForeignProbe()}>
+              Проверить чужую пробу
+            </button>
+          </div>
+          <p data-testid="probe-result">
+            {typeof probeResult === "string"
+              ? probeResult
+              : probeResult
+                ? `${probeResult.tenantId}: ${probeResult.label}`
+                : "Проверка еще не запускалась"}
+          </p>
+          <p data-testid="permission-diagnostics">
+            {diagnostics ? diagnostics.reasonCode : "Диагностика еще не запускалась"}
+          </p>
+        </section>
+
+        <section className="phase2-panel">
+          <h3>{currentTenant.labels["navigation.audit"] ?? "Журнал действий"}</h3>
+          <div className="compact-list" data-testid="audit-events">
+            {auditEvents.length > 0
+              ? auditEvents.map((event) => (
+                  <span key={event.id}>
+                    {event.actionKey}: {event.actorId} - {event.target.entityId}
+                  </span>
+                ))
+              : "Пока нет событий"}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
   const runtimeUser = getRuntimeTestUser(testUser);
-  const fixtureSession = runtimeUser && isFixtureAuthEnabled() ? resolveFixtureSession(runtimeUser) : null;
+  const fixtureSession = useMemo(
+    () => (runtimeUser && isFixtureAuthEnabled() ? resolveFixtureSession(runtimeUser) : null),
+    [runtimeUser]
+  );
+  const phase2ApiClient = useMemo(
+    () => apiClient ?? (shouldUseDefaultPhase2ApiClient() ? createPhase2ApiClient() : null),
+    [apiClient]
+  );
+  const phase2Enabled = phase2ApiClient !== null;
+  const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
+    fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
+  );
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    if (!fixtureSession || !phase2ApiClient) {
+      if (fixtureSession) {
+        setCurrentTenant(createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides));
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const activeApiClient = phase2ApiClient;
+
+    async function loadCurrentTenant() {
+      try {
+        const nextCurrentTenant = await activeApiClient.getCurrentTenant(runtimeUser);
+        if (!cancelled) {
+          setCurrentTenant(nextCurrentTenant);
+          setLoadError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(getErrorMessage(error));
+        }
+      }
+    }
+
+    void loadCurrentTenant();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fixtureSession, phase2ApiClient, runtimeUser, tenantLabelOverrides]);
 
   if (!fixtureSession) {
     return (
@@ -104,7 +468,37 @@ export function App({ testUser, tenantLabelOverrides }: AppProps) {
     );
   }
 
-  const tenantLabelSet = createRuntimeLabelSet(fixtureSession.tenant, tenantLabelOverrides);
+  if (loadError) {
+    return (
+      <main className="auth-screen" data-testid="phase2-error">
+        <section className="auth-panel">
+          <h1>KISS PM</h1>
+          <p>{loadError}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!currentTenant) {
+    return (
+      <main className="auth-screen" data-testid="phase2-loading">
+        <section className="auth-panel">
+          <h1>KISS PM</h1>
+          <p>Загрузка данных тенанта</p>
+        </section>
+      </main>
+    );
+  }
+
+  const tenantLabelSet = createTenantLabelSet({
+    tenantId: currentTenant.tenant.id,
+    configurationVersion: currentTenant.tenant.configurationVersion,
+    labels: {
+      ...shellLabelDefaults,
+      ...currentTenant.labels
+    },
+    updatedAt: "2026-05-14T14:40:00+07:00"
+  });
   const roleLabel = resolveTenantLabel(tenantLabelSet, `role.${fixtureSession.user.roleKey}`);
 
   return (
@@ -157,6 +551,14 @@ export function App({ testUser, tenantLabelOverrides }: AppProps) {
             {resolveTenantLabel(tenantLabelSet, "shell.external_services_note")}
           </p>
         </section>
+        {phase2ApiClient ? (
+          <Phase2AdminSurface
+            apiClient={phase2ApiClient}
+            currentTenant={currentTenant}
+            onCurrentTenantChange={setCurrentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
       </main>
     </div>
   );

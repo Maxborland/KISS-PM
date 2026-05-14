@@ -171,6 +171,121 @@ nav a:focus-visible {
   line-height: 1.6;
 }
 
+.phase2-surface {
+  display: grid;
+  gap: 18px;
+  max-width: 1180px;
+}
+
+.surface-heading {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.surface-heading h2,
+.phase2-panel h3 {
+  margin: 0;
+}
+
+.surface-heading p {
+  color: #526052;
+  margin: 6px 0 0;
+}
+
+.status-pill {
+  border: 1px solid #b8c8bb;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2f4939;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.readonly-notice {
+  border: 1px solid #decf98;
+  border-radius: 8px;
+  background: #fff8d9;
+  color: #594714;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.phase2-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.phase2-panel {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.compact-list {
+  display: grid;
+  gap: 6px;
+  min-height: 42px;
+}
+
+.compact-list span {
+  overflow-wrap: anywhere;
+}
+
+.field-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.field-stack span {
+  color: #526052;
+  font-size: 13px;
+}
+
+input {
+  border: 1px solid #b8c8bb;
+  border-radius: 6px;
+  color: #17211b;
+  font: inherit;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+button {
+  align-items: center;
+  border: 1px solid #2f6f4e;
+  border-radius: 6px;
+  background: #2f6f4e;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+button:focus-visible {
+  outline: 3px solid rgba(47, 111, 78, 0.24);
+  outline-offset: 2px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -193,5 +308,13 @@ nav a:focus-visible {
 
   .user-stack {
     justify-items: start;
+  }
+
+  .surface-heading {
+    flex-direction: column;
+  }
+
+  .phase2-grid {
+    grid-template-columns: 1fr;
   }
 }
