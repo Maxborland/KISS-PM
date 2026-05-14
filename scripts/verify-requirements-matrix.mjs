@@ -13,7 +13,9 @@ const requiredIdsByPhase = {
   "P2-contract": ["P2C-001", "P2C-002", "P2C-003"],
   P2: Array.from({ length: 10 }, (_, index) => `P2-${String(index + 1).padStart(3, "0")}`),
   "P3-contract": ["P3C-001", "P3C-002", "P3C-003"],
-  P3: Array.from({ length: 10 }, (_, index) => `P3-${String(index + 1).padStart(3, "0")}`)
+  P3: Array.from({ length: 10 }, (_, index) => `P3-${String(index + 1).padStart(3, "0")}`),
+  "P4-contract": ["P4C-001", "P4C-002", "P4C-003"],
+  P4: Array.from({ length: 10 }, (_, index) => `P4-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -39,6 +41,18 @@ const requiredE2eByPhaseRow = {
     "P3-008": ["E2E-023", "E2E-024"],
     "P3-009": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
     "P3-010": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"]
+  },
+  P4: {
+    "P4-001": ["E2E-030", "E2E-031", "E2E-032"],
+    "P4-002": ["E2E-030", "E2E-031", "E2E-032"],
+    "P4-003": ["E2E-031", "E2E-032"],
+    "P4-004": ["E2E-030", "E2E-033", "E2E-034"],
+    "P4-005": ["E2E-033"],
+    "P4-006": ["E2E-034"],
+    "P4-007": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+    "P4-008": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+    "P4-009": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+    "P4-010": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"]
   }
 };
 const requiredE2eTestPath = {
@@ -51,7 +65,12 @@ const requiredE2eTestPath = {
   "E2E-021": "e2e/tests/phase3/intake-readiness.spec.ts",
   "E2E-022": "e2e/tests/phase3/feasibility-analysis.spec.ts",
   "E2E-023": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
-  "E2E-024": "e2e/tests/phase3/project-draft-canonical.spec.ts"
+  "E2E-024": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+  "E2E-030": "e2e/tests/phase4/project-from-template.spec.ts",
+  "E2E-031": "e2e/tests/phase4/stage-transition.spec.ts",
+  "E2E-032": "e2e/tests/phase4/stage-gate-block.spec.ts",
+  "E2E-033": "e2e/tests/phase4/my-tasks-relations.spec.ts",
+  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -181,8 +200,8 @@ for (const row of matrix.rows ?? []) {
         }
       }
     }
-    if (matrix.phase === "P3" && row.id === "P3-010" && allowBlocked) {
-      failures.push("P3-010: final matrix row must be verified by running the verifier without --allow-blocked");
+    if (isPhaseExitMatrix && row.id === `${matrix.phase}-010` && allowBlocked) {
+      failures.push(`${row.id}: final matrix row must be verified by running the verifier without --allow-blocked`);
     }
   }
   if (row.status === "blocked" && !row.blocker) {
@@ -230,6 +249,14 @@ if (isPhaseExitMatrix && !allowBlocked && newestRequiredE2eCheckedAt !== Number.
     for (const testPath of requiredPhaseE2ePaths) {
       if (!metadataTestPaths.has(testPath)) {
         failures.push(`${matrix.phase}: E2E run metadata missing ${testPath}`);
+      }
+      try {
+        const testPathStat = statSync(testPath);
+        if (!testPathStat.isFile()) {
+          failures.push(`${matrix.phase}: required E2E test path is not a file at ${testPath}`);
+        }
+      } catch {
+        failures.push(`${matrix.phase}: required E2E test file missing at ${testPath}`);
       }
     }
   } catch {

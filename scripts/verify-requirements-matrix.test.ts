@@ -30,6 +30,18 @@ const p3RequiredE2e = {
   "P3-009": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
   "P3-010": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"]
 };
+const p4RequiredE2e = {
+  "P4-001": ["E2E-030", "E2E-031", "E2E-032"],
+  "P4-002": ["E2E-030", "E2E-031", "E2E-032"],
+  "P4-003": ["E2E-031", "E2E-032"],
+  "P4-004": ["E2E-030", "E2E-033", "E2E-034"],
+  "P4-005": ["E2E-033"],
+  "P4-006": ["E2E-034"],
+  "P4-007": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+  "P4-008": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+  "P4-009": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
+  "P4-010": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"]
+};
 const e2eTestPaths = {
   "E2E-010": "e2e/tests/phase2/tenant-isolation.spec.ts",
   "E2E-011": "e2e/tests/phase2/access-profile.spec.ts",
@@ -40,7 +52,12 @@ const e2eTestPaths = {
   "E2E-021": "e2e/tests/phase3/intake-readiness.spec.ts",
   "E2E-022": "e2e/tests/phase3/feasibility-analysis.spec.ts",
   "E2E-023": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
-  "E2E-024": "e2e/tests/phase3/project-draft-canonical.spec.ts"
+  "E2E-024": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+  "E2E-030": "e2e/tests/phase4/project-from-template.spec.ts",
+  "E2E-031": "e2e/tests/phase4/stage-transition.spec.ts",
+  "E2E-032": "e2e/tests/phase4/stage-gate-block.spec.ts",
+  "E2E-033": "e2e/tests/phase4/my-tasks-relations.spec.ts",
+  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts"
 };
 
 function writeMatrixFixture(fileName: string, firstRow: Record<string, unknown>) {
@@ -147,7 +164,7 @@ function writeP2MatrixFixture(fileName: string, overrideById: Record<string, Rec
 }
 
 function writePhaseMatrixFixture(
-  phase: "P2" | "P3",
+  phase: "P2" | "P3" | "P4",
   fileName: string,
   requiredE2eById: Record<string, string[]>,
   overrideById: Record<string, Record<string, unknown>>
@@ -204,6 +221,37 @@ function completeP3Overrides(checkedAt: string) {
       }
     ])
   );
+}
+
+function completeP4Overrides(checkedAt: string) {
+  return Object.fromEntries(
+    Object.entries(p4RequiredE2e).map(([id, requiredE2e]) => [
+      id,
+      {
+        status: "verified",
+        evidence: [`${id} verified`],
+        tests: ["npm run test:e2e:phase -- --phase=4 exit 0"],
+        blocker: null,
+        e2e_evidence: requiredE2e.map((e2eId) => ({
+          id: e2eId,
+          command: "npm run test:e2e:phase -- --phase=4",
+          test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
+          exit_code: 0,
+          status: "passed",
+          checked_at: checkedAt
+        }))
+      }
+    ])
+  );
+}
+
+function writeRequiredE2eSpecFiles(projectRoot: string, e2eIds: string[]) {
+  for (const e2eId of e2eIds) {
+    const relativePath = e2eTestPaths[e2eId as keyof typeof e2eTestPaths];
+    const filePath = resolve(projectRoot, relativePath);
+    mkdirSync(resolve(filePath, ".."), { recursive: true });
+    writeFileSync(filePath, `// ${e2eId} fixture spec\n`);
+  }
 }
 
 describe("verify-requirements-matrix", () => {
@@ -633,6 +681,152 @@ describe("verify-requirements-matrix", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
       "P3-010: final matrix row must be verified by running the verifier without --allow-blocked"
+    );
+  });
+
+  it("accepts the initial blocked P4 matrix only with allow-blocked", () => {
+    const matrixPath = writePhaseMatrixFixture("P4", "blocked-p4-contract.json", p4RequiredE2e, {});
+
+    const blockedResult = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    const trackingResult = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(blockedResult.status).toBe(1);
+    expect(blockedResult.stderr).toContain("P4-001: blocked row requires --allow-blocked");
+    expect(trackingResult.status).toBe(0);
+    expect(trackingResult.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("rejects P4 rows whose required_e2e field does not match the phase contract", () => {
+    const matrixPath = writePhaseMatrixFixture("P4", "wrong-p4-required-e2e.json", p4RequiredE2e, {
+      "P4-008": {
+        required_e2e: ["E2E-030"]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P4-008: required_e2e must exactly match phase contract");
+  });
+
+  it("accepts a complete P4 matrix only when every row is verified with phase 4 structured E2E evidence", () => {
+    const checkedAt = "2026-05-15T02:13:52+07:00";
+    const projectRoot = resolve(fixtureDir, "complete-p4-project-root");
+    writeRequiredE2eSpecFiles(projectRoot, Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-03")));
+    const e2eRunMetadataPath = writeE2eRunMetadata("complete-p4-run-metadata.json", {
+      phase: "4",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase4/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-03")),
+      startedAt: "2026-05-14T19:10:00.000Z",
+      finishedAt: "2026-05-14T19:15:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P4",
+      "complete-p4-phase-exit.json",
+      p4RequiredE2e,
+      completeP4Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: projectRoot,
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("rejects P4 phase-exit matrices when runtime metadata comes from the wrong phase", () => {
+    const checkedAt = "2026-05-15T02:13:52+07:00";
+    const e2eRunMetadataPath = writeE2eRunMetadata("wrong-phase-p4-run-metadata.json", {
+      phase: "3",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase3/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-02"))
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P4",
+      "complete-p4-wrong-phase-runtime-artifact.json",
+      p4RequiredE2e,
+      completeP4Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P4: E2E run metadata must come from phase 4");
+    expect(result.stderr).toContain("P4: E2E run metadata missing E2E-030");
+    expect(result.stderr).toContain("P4: E2E run metadata missing e2e/tests/phase4/project-from-template.spec.ts");
+  });
+
+  it("rejects phase-exit matrices when a required E2E spec file is missing", () => {
+    const checkedAt = "2026-05-15T02:13:52+07:00";
+    const e2eRunMetadataPath = writeE2eRunMetadata("missing-spec-p4-run-metadata.json", {
+      phase: "4",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase4/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-03")),
+      startedAt: "2026-05-14T19:10:00.000Z",
+      finishedAt: "2026-05-14T19:15:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P4",
+      "complete-p4-missing-spec-file.json",
+      p4RequiredE2e,
+      completeP4Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P4: required E2E test file missing at e2e/tests/phase4/project-from-template.spec.ts"
+    );
+  });
+
+  it("rejects P4-010 phase-exit verification when the current verifier run still allows blocked rows", () => {
+    const checkedAt = "2026-05-15T02:13:52+07:00";
+    const projectRoot = resolve(fixtureDir, "allow-blocked-p4-project-root");
+    writeRequiredE2eSpecFiles(projectRoot, Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-03")));
+    const e2eRunMetadataPath = writeE2eRunMetadata("allow-blocked-p4-run-metadata.json", {
+      phase: "4",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase4/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-03")),
+      startedAt: "2026-05-14T19:10:00.000Z",
+      finishedAt: "2026-05-14T19:15:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P4",
+      "complete-p4-allow-blocked-final-gate.json",
+      p4RequiredE2e,
+      completeP4Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: projectRoot,
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P4-010: final matrix row must be verified by running the verifier without --allow-blocked"
     );
   });
 });

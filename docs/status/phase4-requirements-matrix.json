@@ -1,0 +1,251 @@
+{
+  "phase": "P4",
+  "name": "Phase 4 project lifecycle and work management requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-15T02:24:27+07:00",
+  "rows": [
+    {
+      "id": "P4-001",
+      "requirement": "Process and stage templates",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core",
+        "packages/tenant-config"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032"
+      ],
+      "evidence": [
+        "Phase 4 contract defines tenant-owned process/stage template scope before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Process and stage template domain implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-002",
+      "requirement": "Project lifecycle state machine",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core",
+        "packages/workflow-engine"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032"
+      ],
+      "evidence": [
+        "Phase 4 contract defines managed project lifecycle and transition scope before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Project lifecycle state machine implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-003",
+      "requirement": "Stage gates, artifacts, and approval basics",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core",
+        "packages/workflow-engine"
+      ],
+      "required_e2e": [
+        "E2E-031",
+        "E2E-032"
+      ],
+      "evidence": [
+        "Phase 4 contract defines artifact/approval gate basics before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Stage gate, artifact, and approval basics implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-004",
+      "requirement": "Canonical task model and task templates",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-033",
+        "E2E-034"
+      ],
+      "evidence": [
+        "Phase 4 contract defines canonical task identity and task-template scope before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Canonical task model implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-005",
+      "requirement": "Task participants and assignment roles",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core",
+        "packages/access-control"
+      ],
+      "required_e2e": [
+        "E2E-033"
+      ],
+      "evidence": [
+        "Phase 4 contract defines executor/co-executor/requester/controller/approver/observer task participant roles before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Task participant role implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-006",
+      "requirement": "Task comments and status history",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-034"
+      ],
+      "evidence": [
+        "Phase 4 contract defines append-only task comments and status history before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Task comments and status history implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-007",
+      "requirement": "Project lifecycle and work API endpoints",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "packages/project-core",
+        "packages/workflow-engine"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032",
+        "E2E-033",
+        "E2E-034"
+      ],
+      "evidence": [
+        "Phase 4 contract defines API routes, permissions, audit, and DTO scope before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Phase 4 API implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-008",
+      "requirement": "Project lifecycle, My Tasks, and Kanban UI surfaces",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032",
+        "E2E-033",
+        "E2E-034"
+      ],
+      "evidence": [
+        "Phase 4 contract defines Russian lifecycle, My Tasks, and Kanban UI surfaces before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Phase 4 UI implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-009",
+      "requirement": "Deterministic Phase 4 fixtures and E2E suite",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase4"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032",
+        "E2E-033",
+        "E2E-034"
+      ],
+      "evidence": [
+        "Phase 4 contract defines deterministic fixture and E2E suite scope before implementation"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Phase 4 fixtures and E2E suite implementation has not started",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    },
+    {
+      "id": "P4-010",
+      "requirement": "Phase 4 verification matrix",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032",
+        "E2E-033",
+        "E2E-034"
+      ],
+      "evidence": [
+        "Initial matrix exists with all P4 rows blocked and exact required_e2e plus ledger test_path mapping owned by scripts/verify-requirements-matrix.mjs"
+      ],
+      "tests": [
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json exit 1 because P4 rows are intentionally blocked before implementation",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0, 1 file and 26 tests passed"
+      ],
+      "cleanup": "No runtime resources created; row is blocked before implementation",
+      "blocker": "Final Phase 4 implementation and E2E evidence are not complete",
+      "last_checked_at": "2026-05-15T02:24:27+07:00"
+    }
+  ]
+}
