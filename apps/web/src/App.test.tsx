@@ -41,4 +41,30 @@ describe("KISS PM web shell", () => {
     expect(screen.getByTestId("tenant-indicator")).toHaveTextContent("Демо-тенант: Студия B");
     expect(screen.getByText("Тестовый пользователь: Администратор B")).toBeInTheDocument();
   });
+
+  it("reads shell labels from tenant configuration instead of fixed navigation text", () => {
+    render(
+      <App
+        testUser="project-manager-a"
+        tenantLabelOverrides={{
+          "navigation.projects": "Проектный контур",
+          "navigation.settings": "Администрирование",
+          "role.project_manager": "РП из конфигурации",
+          "shell.demo_tenant_prefix": "Рабочий тенант",
+          "shell.configuration_version_prefix": "Конфигурация",
+          "shell.primary_navigation_aria": "Навигация арендатора",
+          "shell.test_user_prefix": "Пользователь сессии"
+        }}
+      />
+    );
+
+    const navigation = screen.getByRole("navigation", { name: "Навигация арендатора" });
+    expect(within(navigation).getByText("Проектный контур")).toBeInTheDocument();
+    expect(within(navigation).getByText("Администрирование")).toBeInTheDocument();
+    expect(within(navigation).queryByText("Проекты")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tenant-indicator")).toHaveTextContent("Рабочий тенант: Студия A");
+    expect(screen.getByTestId("tenant-configuration-version")).toHaveTextContent("Конфигурация: 2");
+    expect(screen.getByText("Пользователь сессии: Руководитель проекта")).toBeInTheDocument();
+    expect(screen.getByTestId("runtime-role-label")).toHaveTextContent("РП из конфигурации");
+  });
 });
