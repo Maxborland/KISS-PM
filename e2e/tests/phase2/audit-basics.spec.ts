@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { getAuditEvents, openPhase2Surface } from "./helpers";
+import { getAuditEvents, openPhase2Surface, resetPhase2Fixtures } from "./helpers";
 
 test("E2E-014 Auditable Phase 2 action records actor, tenant, timestamp, result, and is tenant-scoped", async ({
   page,
   request
 }) => {
+  await resetPhase2Fixtures(request);
   await openPhase2Surface(page, "tenant-admin-a");
 
   await page.getByLabel("Метка раздела администрирования").fill("Аудит действий");

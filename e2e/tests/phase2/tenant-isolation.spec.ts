@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { openPhase2Surface, phase2ApiBaseUrl } from "./helpers";
+import { openPhase2Surface, phase2ApiBaseUrl, resetPhase2Fixtures } from "./helpers";
 
 test("E2E-010 Tenant A user cannot see Tenant B probe data through UI or direct API", async ({ page, request }) => {
+  await resetPhase2Fixtures(request);
   await openPhase2Surface(page, "project-manager-a");
 
   await page.getByRole("button", { name: "Показать свою пробу" }).click();
@@ -28,7 +29,8 @@ test("E2E-010 Tenant A user cannot see Tenant B probe data through UI or direct 
   await expect(page.getByTestId("probe-result")).toContainText("Объект не найден");
 });
 
-test("E2E-010 Tenant B user receives Tenant B own probe and safe Tenant A denial", async ({ page }) => {
+test("E2E-010 Tenant B user receives Tenant B own probe and safe Tenant A denial", async ({ page, request }) => {
+  await resetPhase2Fixtures(request);
   await openPhase2Surface(page, "tenant-admin-b");
 
   await page.getByRole("button", { name: "Показать свою пробу" }).click();

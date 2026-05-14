@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl } from "./helpers";
+import { getAuditEvents, openPhase2Surface, phase2ApiBaseUrl, resetPhase2Fixtures } from "./helpers";
 
 test("E2E-011 Admin can create an access profile through UI and audit readback", async ({ page, request }) => {
+  await resetPhase2Fixtures(request);
   await openPhase2Surface(page, "tenant-admin-a");
 
   await expect(page.getByTestId("access-profile-list")).toContainText("Администратор тенанта");

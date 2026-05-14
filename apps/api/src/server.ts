@@ -7,7 +7,9 @@ function readArg(name: string, fallback: string) {
 
 const hostname = readArg("--host", "127.0.0.1");
 const port = Number(readArg("--port", process.env.PORT ?? "4173"));
-const app = createApiApp();
+const app = createApiApp({
+  allowTestFixtureReset: process.env.KISS_PM_ALLOW_TEST_FIXTURE_RESET === "true"
+});
 
 Bun.serve({
   fetch: app.fetch,
@@ -16,4 +18,3 @@ Bun.serve({
 });
 
 console.log(`KISS PM API listening on http://${hostname}:${port}`);
-

@@ -6,6 +6,7 @@ const webPort = process.env.PW_WEB_PORT ?? "5183";
 export default defineConfig({
   testDir: "./e2e/tests",
   fullyParallel: false,
+  workers: 1,
   reporter: [["list"]],
   use: {
     baseURL: `http://127.0.0.1:${webPort}`,
@@ -16,6 +17,9 @@ export default defineConfig({
       command: `npm run dev:api -- --host 127.0.0.1 --port ${apiPort}`,
       url: `http://127.0.0.1:${apiPort}/health`,
       reuseExistingServer: false,
+      env: {
+        KISS_PM_ALLOW_TEST_FIXTURE_RESET: "true"
+      },
       timeout: 120000
     },
     {
@@ -23,6 +27,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${webPort}`,
       reuseExistingServer: false,
       env: {
+        PW_API_PORT: apiPort,
         VITE_KISS_PM_ALLOW_FIXTURE_AUTH: "true"
       },
       timeout: 120000
