@@ -19,6 +19,7 @@ type ApiErrorCode =
   | "validation_error"
   | "not_found"
   | "conflict"
+  | "precondition_failed"
   | "not_implemented"
   | "test_mode_only";
 
@@ -461,6 +462,48 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId
+      });
+      const targetType = context.req.query("targetType");
+      const targetId = context.req.query("targetId");
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter((event) => targetType === undefined || event.target.entityType === targetType)
+        .filter((event) => targetId === undefined || event.target.entityId === targetId)
+        .map(auditEventDto);
+
+      return context.json({ events });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectDraftId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectDraftId = context.req.param("projectDraftId");
+      assertAllowed(runtime, session, "project_draft.read", {
+        entityType: "projectDraft",
+        tenantId: session.user.tenantId,
+        entityId: projectDraftId
+      });
+
+      const projectDraft = phase3Runtime.getProjectDraft(session.user.tenantId, projectDraftId);
+      if (projectDraft === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json({ projectDraft: projectDraftDto(projectDraft) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/crm/accounts", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -708,10 +751,34 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       if (phase3Runtime.getOpportunity(session.user.tenantId, opportunityId) === undefined) {
         return context.json(errorDto("not_found", "Объект не найден"), 404);
       }
+      const result = phase3Runtime.createProjectDraftFromOpportunity(session.user.tenantId, opportunityId, {
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {})
+      });
+      if (result === undefined) {
+        return context.json(errorDto("validation_error", "Невозможно создать проектный черновик"), 400);
+      }
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: {
+          entityType: result.actionExecution.source.entityType,
+          entityId: result.actionExecution.source.entityId
+        },
+        correlationId: result.correlationId,
+        details: {
+          before: result.actionExecution.before ?? undefined,
+          after: result.actionExecution.after ?? undefined
+        }
+      });
 
       return context.json(
-        errorDto("not_implemented", "Создание проектного черновика будет реализовано в P3-008"),
-        501
+        {
+          correlationId: result.correlationId,
+          projectDraft: projectDraftDto(result.projectDraft),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        201
       );
     } catch (error) {
       return handleRouteError(context, error);
@@ -735,6 +802,18 @@ export type ApiApp = ReturnType<typeof createApiApp>;
 
 function hasModelErrorCode(error: Error): error is Error & { code: "validation_error" | "conflict" } {
   return "code" in error && (error.code === "validation_error" || error.code === "conflict");
+}
+
+function hasActionEngineErrorCode(
+  error: Error
+): error is Error & { code: "validation_error" | "conflict" | "precondition_failed" | "tenant_mismatch" } {
+  return (
+    "code" in error &&
+    (error.code === "validation_error" ||
+      error.code === "conflict" ||
+      error.code === "precondition_failed" ||
+      error.code === "tenant_mismatch")
+  );
 }
 
 function accountDto(account: {
@@ -813,6 +892,113 @@ function opportunityDto(opportunity: {
   };
 }
 
+function projectDraftDto(projectDraft: {
+  id: string;
+  tenantId: string;
+  title: string;
+  status: string;
+  sourceOpportunity: {
+    type: "crm_opportunity";
+    opportunityId: string;
+    title: string;
+    accountId?: string;
+    contactIds: string[];
+    plannedStartDate: string;
+    desiredFinishDate: string;
+  };
+  processTemplate: {
+    templateId: string;
+    key: string;
+    label: string;
+    version: number;
+    matchConfidence: number;
+    assumptions: Array<{ code: string; message: string }>;
+  };
+  demand: {
+    totalPlannedWorkHours: number;
+    scenarioKey: string;
+    scenarioLabel: string;
+    formulaKey: string;
+    formulaVersion: number;
+    confidence: number;
+    stageRoleDemands: Array<{
+      stageKey: string;
+      stageLabel: string;
+      roleKey: string;
+      roleLabel: string;
+      plannedWorkHours: number;
+    }>;
+  };
+  feasibility: {
+    status: string;
+    severity: string;
+    expectedWindow: { startDate: string; endDate: string };
+    blockerCodes: string[];
+  };
+  createdBy: string;
+  createdAt: string;
+  correlationId: string;
+}) {
+  return {
+    id: projectDraft.id,
+    tenantId: projectDraft.tenantId,
+    title: projectDraft.title,
+    status: projectDraft.status,
+    sourceOpportunity: {
+      ...projectDraft.sourceOpportunity,
+      contactIds: [...projectDraft.sourceOpportunity.contactIds]
+    },
+    processTemplate: {
+      ...projectDraft.processTemplate,
+      assumptions: projectDraft.processTemplate.assumptions.map((assumption) => ({ ...assumption }))
+    },
+    demand: {
+      ...projectDraft.demand,
+      stageRoleDemands: projectDraft.demand.stageRoleDemands.map((demand) => ({ ...demand }))
+    },
+    feasibility: {
+      ...projectDraft.feasibility,
+      expectedWindow: { ...projectDraft.feasibility.expectedWindow },
+      blockerCodes: [...projectDraft.feasibility.blockerCodes]
+    },
+    createdBy: projectDraft.createdBy,
+    createdAt: projectDraft.createdAt,
+    correlationId: projectDraft.correlationId
+  };
+}
+
+function actionExecutionDto(actionExecution: {
+  id: string;
+  tenantId: string;
+  actorId: string;
+  commandType: string;
+  requiredPermission: string;
+  status: string;
+  source: { entityType: string; entityId: string };
+  target?: { entityType: string; entityId: string };
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  timestamp: string;
+  correlationId: string;
+  trace: string[];
+}) {
+  return {
+    id: actionExecution.id,
+    tenantId: actionExecution.tenantId,
+    actorId: actionExecution.actorId,
+    commandType: actionExecution.commandType,
+    requiredPermission: actionExecution.requiredPermission,
+    status: actionExecution.status,
+    source: { ...actionExecution.source },
+    ...(actionExecution.target !== undefined ? { target: { ...actionExecution.target } } : {}),
+    before: actionExecution.before === null ? null : structuredClone(actionExecution.before),
+    after: actionExecution.after === null ? null : structuredClone(actionExecution.after),
+    timestamp: actionExecution.timestamp,
+    correlationId: actionExecution.correlationId,
+    trace: [...actionExecution.trace]
+  };
+}
+
 function handleRouteError(context: Context, error: unknown) {
   if (error instanceof z.ZodError || (error instanceof Error && error.message === "invalid_json")) {
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
@@ -852,6 +1038,20 @@ function handleRouteError(context: Context, error: unknown) {
   ) {
     const code = error.code === "conflict" ? "conflict" : "validation_error";
     return context.json(errorDto(code, "Некорректный запрос"), code === "conflict" ? 409 : 400);
+  }
+
+  if (error instanceof Error && error.name === "ActionEngineModelError" && hasActionEngineErrorCode(error)) {
+    if (error.code === "conflict") {
+      return context.json(errorDto("conflict", "Конфликт данных"), 409);
+    }
+    if (error.code === "precondition_failed") {
+      return context.json(errorDto("precondition_failed", "Условия действия не выполнены"), 409);
+    }
+    if (error.code === "tenant_mismatch") {
+      return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+    }
+
+    return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
   }
 
   if (typeof error === "object" && error !== null && "code" in error && error.code === "conflict") {

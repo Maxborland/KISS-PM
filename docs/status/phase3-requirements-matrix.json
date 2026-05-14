@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T20:38:08+07:00",
+  "updated_at": "2026-05-15T00:56:59+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -244,11 +244,44 @@
       "owner": "codex",
       "owned_scope": ["packages/project-core", "packages/action-engine"],
       "required_e2e": ["E2E-023", "E2E-024"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; requires readiness, feasibility, permissions, and audit/action integration",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/project-core/src/index.ts defines ProjectDraft with tenant-owned source opportunity snapshot, process template snapshot, demand snapshot, feasibility snapshot, status draft, actor, createdAt, and correlationId",
+        "packages/project-core/src/projectDraft.test.ts covers tenant-owned project draft creation from an opportunity and cross-tenant source snapshot rejection",
+        "packages/action-engine/src/index.ts implements executeCreateProjectDraftFromOpportunity as a governed command with required permission project_draft.create, readiness and feasibility preconditions, duplicate draft conflict detection, action execution source/target refs, before/after summary, actor, timestamp, trace, and correlationId",
+        "packages/action-engine/src/projectDraftCommand.test.ts covers successful command execution, before/after action evidence, immutable processTemplate snapshot with assumptions, readiness precondition failure, and overloaded feasibility precondition failure",
+        "apps/api/src/phase3Runtime.ts wires P3-007 readiness/template/demand/feasibility into P3-008 project draft command execution and stores cloned project draft/action execution results in the Phase 3 runtime",
+        "apps/api/src/app.ts changes POST /api/crm/opportunities/:opportunityId/project-draft from the P3-007 501 boundary to a 201 governed command response, adds GET /api/projects/:id, adds GET /api/audit?targetType=&targetId= filtered readback, and records audit target as the source opportunity while actionExecution.target remains the created projectDraft",
+        "apps/api/src/phase2Runtime.ts adds project_draft.read and preserves project_draft.create permissions for tenant-scoped profiles",
+        "apps/api/src/phase3ProjectDraftApi.test.ts covers authorized project draft creation, project readback, targeted opportunity audit readback with template assumptions, unauthorized denial, cross-tenant hidden denial, duplicate draft conflict, and readiness precondition failure",
+        "Bug Hunt found and fixed an Important audit traceability gap: audit readback now supports /api/audit filters and stores the source opportunity as the audit target instead of only the created draft target",
+        "Requesting Code Review found one Important gap: action/audit evidence did not durably record process template assumptions; Receiving Code Review fixed actionExecution.after.processTemplate to include templateId, key, version, matchConfidence, and assumptions, with command and API audit assertions",
+        "Second Requesting Code Review pass returned no remaining Critical/Important findings for the reviewed P3-008 project draft creation path"
+      ],
+      "tests": [
+        "npm test -- packages/project-core/src/projectDraft.test.ts exit 1 before implementation because createProjectDraftFromOpportunity was not implemented",
+        "npm test -- packages/action-engine/src/projectDraftCommand.test.ts exit 1 before implementation because executeCreateProjectDraftFromOpportunity was not implemented",
+        "npm test -- apps/api/src/phase3ProjectDraftApi.test.ts exit 1 before implementation because project-draft route returned 501 instead of 201",
+        "npm test -- packages/project-core/src/projectDraft.test.ts packages/action-engine/src/projectDraftCommand.test.ts exit 0 after package implementation (2 files, 4 tests)",
+        "npm run typecheck -w @kiss-pm/project-core exit 0",
+        "npm run typecheck -w @kiss-pm/action-engine exit 0",
+        "npm test -- apps/api/src/phase3ProjectDraftApi.test.ts apps/api/src/phase3CrmApi.test.ts exit 0 after API wiring (2 files, 10 tests)",
+        "npm run typecheck -w @kiss-pm/api exit 0",
+        "npm install --package-lock-only --ignore-scripts exit 0 with 0 vulnerabilities",
+        "npm test first full gate exit 1 because processTemplateDraft.test.ts expected the prior projectProcessTemplate.assumption error message; compatibility fix restored the message",
+        "npm test -- packages/project-core/src/processTemplateDraft.test.ts packages/project-core/src/projectDraft.test.ts packages/action-engine/src/projectDraftCommand.test.ts exit 0 after regression fix (3 files, 6 tests)",
+        "npm test -- apps/api/src/phase3ProjectDraftApi.test.ts apps/api/src/phase3CrmApi.test.ts exit 0 after Bug Hunt audit readback fix (2 files, 10 tests)",
+        "npm test -- apps/api/src/phase3ProjectDraftApi.test.ts apps/api/src/phase3CrmApi.test.ts exit 0 after precondition_failed handling fix (2 files, 11 tests)",
+        "npm test -- packages/action-engine/src/projectDraftCommand.test.ts apps/api/src/phase3ProjectDraftApi.test.ts exit 0 after Receiving Code Review fix (2 files, 6 tests)",
+        "Final gate: npm run typecheck exit 0",
+        "Final gate: npm run lint exit 0",
+        "Final gate: npm test exit 0 (25 files, 129 tests)",
+        "Final gate: npm run test:integration exit 0 (5 files, 24 tests)",
+        "Final gate: npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0",
+        "Final blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No external resources or persistent databases were created. P3-008 stores project drafts/action executions only in per-app in-memory Phase 3 runtime state reset by /test-fixtures/reset in test mode. package-lock.json was synchronized with npm install --package-lock-only --ignore-scripts.",
+      "blocker": "Project draft creation implementation evidence is complete, but this row cannot be marked verified because required E2E-023/E2E-024 structured evidence does not exist until P3-009 creates e2e/tests/phase3/project-draft-from-opportunity.spec.ts and e2e/tests/phase3/project-draft-canonical.spec.ts. Fresh blocker proof: npm run test:e2e:phase -- --phase=3 exit 1 with No tests found.",
+      "last_checked_at": "2026-05-15T00:56:59+07:00"
     },
     {
       "id": "P3-009",

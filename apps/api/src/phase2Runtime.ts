@@ -16,7 +16,7 @@ import {
   createAuditEvent,
   createAuditTargetRef
 } from "@kiss-pm/domain-core";
-import type { AuditEvent, Tenant, TenantId, TenantIsolationProbe } from "@kiss-pm/domain-core";
+import type { AuditEvent, CorrelationId, Tenant, TenantId, TenantIsolationProbe } from "@kiss-pm/domain-core";
 import {
   getPhase2FixtureSeed,
   PHASE2_FIXTURE_TIMESTAMP
@@ -110,6 +110,11 @@ const phase2PermissionCatalog = [
     key: "project_draft.create",
     description: "Create a project draft from a qualified opportunity",
     category: "project_intake"
+  }),
+  createPermission({
+    key: "project_draft.read",
+    description: "Read project drafts created from CRM intake",
+    category: "project_intake"
   })
 ] satisfies Permission[];
 
@@ -134,6 +139,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.readiness.run",
       "crm.template_match.run",
       "crm.feasibility.run",
+      "project_draft.read",
       "project_draft.create"
     ],
     project_manager: [
@@ -142,6 +148,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.readiness.run",
       "crm.template_match.run",
       "crm.feasibility.run",
+      "project_draft.read",
       "project_draft.create"
     ],
     resource_manager: [
@@ -150,8 +157,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run"
     ],
-    readonly_observer: ["crm.opportunity.read"],
-    tenant_user: ["crm.opportunity.read"]
+    readonly_observer: ["crm.opportunity.read", "project_draft.read"],
+    tenant_user: ["crm.opportunity.read", "project_draft.read"]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
 
@@ -338,6 +345,7 @@ export function createPhase2RuntimeState() {
       session: Phase2RuntimeSession;
       actionKey: string;
       target: { entityType: string; entityId: string };
+      correlationId?: CorrelationId;
       details?: AuditEvent["details"];
     }): AuditEvent {
       const auditId = nextAuditId();
@@ -349,7 +357,7 @@ export function createPhase2RuntimeState() {
             tenantId: input.session.user.tenantId,
             actorId: input.session.user.id,
             accessProfileId: input.session.user.accessProfileId,
-            correlationId: `corr-${auditId}`
+            correlationId: input.correlationId ?? `corr-${auditId}`
           }),
           actionKey: input.actionKey,
           target: createAuditTargetRef(input.target),
