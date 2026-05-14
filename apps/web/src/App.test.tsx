@@ -272,7 +272,7 @@ describe("KISS PM web shell", () => {
     expect(within(navigation).getByText("Настройки")).toBeInTheDocument();
 
     expect(screen.getByTestId("phase-scope-notice")).toHaveTextContent(
-      "Фаза 1: платформенный каркас без продуктовых сценариев"
+      "Фаза 3: CRM-приемка и путь от возможности к проектному черновику"
     );
   });
 

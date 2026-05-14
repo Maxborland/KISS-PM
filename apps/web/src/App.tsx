@@ -12,11 +12,13 @@ import type {
   PolicyDiagnosticsDto,
   TenantIsolationProbeDto
 } from "./phase2ApiClient";
+import { CrmIntakeControlSurface } from "./CrmIntakeControlSurface";
+import { createCrmIntakeApiClient, type CrmIntakeApiClient } from "./crmIntakeApiClient";
 
 type AppProps = {
   testUser?: string;
   tenantLabelOverrides?: Record<string, string>;
-  apiClient?: Phase2ApiClient;
+  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -40,7 +42,7 @@ const shellLabelDefaults = {
   "shell.configuration_version_prefix": "Версия конфигурации",
   "shell.primary_navigation_aria": "Основная навигация",
   "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 1: платформенный каркас без продуктовых сценариев",
+  "shell.phase_scope_notice": "Фаза 3: CRM-приемка и путь от возможности к проектному черновику",
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
@@ -127,6 +129,18 @@ function createFallbackCurrentTenant(
 
 function shouldUseDefaultPhase2ApiClient(): boolean {
   return import.meta.env.MODE !== "test";
+}
+
+function isCrmIntakeApiClient(apiClient: Partial<CrmIntakeApiClient> | null): apiClient is CrmIntakeApiClient {
+  return (
+    typeof apiClient?.listOpportunities === "function" &&
+    typeof apiClient.createOpportunity === "function" &&
+    typeof apiClient.runReadiness === "function" &&
+    typeof apiClient.runFeasibility === "function" &&
+    typeof apiClient.createProjectDraft === "function" &&
+    typeof apiClient.getProjectDraft === "function" &&
+    typeof apiClient.listOpportunityAuditEvents === "function"
+  );
 }
 
 function getErrorMessage(error: unknown): string {
@@ -418,6 +432,14 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
     () => apiClient ?? (shouldUseDefaultPhase2ApiClient() ? createPhase2ApiClient() : null),
     [apiClient]
   );
+  const crmIntakeApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isCrmIntakeApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createCrmIntakeApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
     fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
@@ -556,6 +578,13 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             apiClient={phase2ApiClient}
             currentTenant={currentTenant}
             onCurrentTenantChange={setCurrentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {crmIntakeApiClient ? (
+          <CrmIntakeControlSurface
+            apiClient={crmIntakeApiClient}
+            currentTenant={currentTenant}
             testUser={runtimeUser}
           />
         ) : null}
