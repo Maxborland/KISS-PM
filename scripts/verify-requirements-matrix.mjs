@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const allowBlocked = args.includes("--allow-blocked");
 const matrixPath = args.find((arg) => !arg.startsWith("--")) ?? "docs/status/phase1-requirements-matrix.json";
+const e2eRunMetadataPath =
+  process.env.KISS_PM_E2E_RUN_METADATA_PATH ?? "test-results/kiss-pm-e2e-last-run.json";
 
 const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
 const failures = [];
@@ -55,6 +57,10 @@ const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
 const seenIds = new Set();
 const expectedE2ePhaseNumber = matrix.phase?.match(/^P(\d+)$/)?.[1];
+const isPhaseExitMatrix = /^P\d+$/.test(matrix.phase ?? "");
+let newestRequiredE2eCheckedAt = Number.NEGATIVE_INFINITY;
+const requiredPhaseE2eIds = new Set();
+const requiredPhaseE2ePaths = new Set();
 
 function sameStringSet(actual, expected) {
   if (!Array.isArray(actual)) return false;
@@ -93,16 +99,28 @@ for (const row of matrix.rows ?? []) {
   }
   if (row.status === "verified") {
     const tests = Array.isArray(row.tests) ? row.tests : [];
+    const rowLastCheckedAt = row.last_checked_at ? Date.parse(row.last_checked_at) : Number.NaN;
 
     if (!Array.isArray(row.evidence) || row.evidence.length === 0) {
       failures.push(`${row.id}: verified row missing evidence`);
     }
+    if (
+      (typeof row.blocker === "string" && row.blocker.trim().length > 0) ||
+      (row.blocker !== null && row.blocker !== undefined && typeof row.blocker !== "string")
+    ) {
+      failures.push(`${row.id}: verified row must not retain blocker text`);
+    }
     if (!Array.isArray(row.tests) || row.tests.length === 0) {
       failures.push(`${row.id}: verified row missing tests`);
     }
+    if (typeof row.cleanup !== "string" || row.cleanup.trim().length === 0) {
+      failures.push(`${row.id}: verified row missing cleanup evidence`);
+    } else if (/no runtime cleanup yet/i.test(row.cleanup)) {
+      failures.push(`${row.id}: verified row cleanup evidence is still a placeholder`);
+    }
     if (!row.last_checked_at) {
       failures.push(`${row.id}: verified row missing last_checked_at`);
-    } else if (Number.isNaN(Date.parse(row.last_checked_at))) {
+    } else if (Number.isNaN(rowLastCheckedAt)) {
       failures.push(`${row.id}: last_checked_at is not a valid timestamp`);
     }
     if (!tests.some((test) => /exit 0|manual review/i.test(test))) {
@@ -112,6 +130,10 @@ for (const row of matrix.rows ?? []) {
     if (requiredE2e.length > 0) {
       const e2eEvidence = Array.isArray(row.e2e_evidence) ? row.e2e_evidence : [];
       for (const e2eId of requiredE2e) {
+        requiredPhaseE2eIds.add(e2eId);
+        if (requiredE2eTestPath[e2eId]) {
+          requiredPhaseE2ePaths.add(requiredE2eTestPath[e2eId]);
+        }
         const matchingEvidence = e2eEvidence.find((entry) => entry?.id === e2eId);
         if (!matchingEvidence) {
           failures.push(`${row.id}: verified row missing structured E2E evidence for ${e2eId}`);
@@ -119,6 +141,9 @@ for (const row of matrix.rows ?? []) {
         }
         if (matchingEvidence.exit_code !== 0) {
           failures.push(`${row.id}: ${e2eId} E2E evidence must have exit_code 0`);
+        }
+        if (matchingEvidence.status !== "passed") {
+          failures.push(`${row.id}: ${e2eId} E2E evidence status must be passed`);
         }
         if (typeof matchingEvidence.command !== "string" || !matchingEvidence.command.includes("test:e2e:phase")) {
           failures.push(`${row.id}: ${e2eId} E2E evidence must include the phase E2E command`);
@@ -149,8 +174,15 @@ for (const row of matrix.rows ?? []) {
         }
         if (!matchingEvidence.checked_at || Number.isNaN(Date.parse(matchingEvidence.checked_at))) {
           failures.push(`${row.id}: ${e2eId} E2E evidence missing valid checked_at`);
+        } else if (!Number.isNaN(rowLastCheckedAt) && Date.parse(matchingEvidence.checked_at) < rowLastCheckedAt) {
+          failures.push(`${row.id}: ${e2eId} E2E evidence is older than row last_checked_at`);
+        } else {
+          newestRequiredE2eCheckedAt = Math.max(newestRequiredE2eCheckedAt, Date.parse(matchingEvidence.checked_at));
         }
       }
+    }
+    if (matrix.phase === "P3" && row.id === "P3-010" && allowBlocked) {
+      failures.push("P3-010: final matrix row must be verified by running the verifier without --allow-blocked");
     }
   }
   if (row.status === "blocked" && !row.blocker) {
@@ -161,6 +193,47 @@ for (const row of matrix.rows ?? []) {
 for (const requiredId of requiredIds ?? []) {
   if (!seenIds.has(requiredId)) {
     failures.push(`${requiredId}: missing required ${matrix.phase} row`);
+  }
+}
+
+if (isPhaseExitMatrix && !allowBlocked && newestRequiredE2eCheckedAt !== Number.NEGATIVE_INFINITY) {
+  try {
+    const runMetadata = JSON.parse(readFileSync(e2eRunMetadataPath, "utf8"));
+    const runMetadataStat = statSync(e2eRunMetadataPath);
+    const metadataTestPaths = new Set(
+      Array.isArray(runMetadata.testPaths)
+        ? runMetadata.testPaths.map((testPath) => String(testPath).replaceAll("\\", "/"))
+        : []
+    );
+    const metadataE2eIds = new Set(Array.isArray(runMetadata.e2eIds) ? runMetadata.e2eIds.map(String) : []);
+
+    if (runMetadata.status !== "passed" || runMetadata.exitCode !== 0) {
+      failures.push(`${matrix.phase}: E2E run metadata status must be passed with exitCode 0`);
+    }
+    if (runMetadata.profile !== "phase" || String(runMetadata.phase) !== expectedE2ePhaseNumber) {
+      failures.push(`${matrix.phase}: E2E run metadata must come from phase ${expectedE2ePhaseNumber}`);
+    }
+    const finishedAt = Date.parse(runMetadata.finishedAt);
+    if (Number.isNaN(finishedAt)) {
+      failures.push(`${matrix.phase}: E2E run metadata missing valid finishedAt`);
+    } else if (finishedAt + 120_000 < newestRequiredE2eCheckedAt) {
+      failures.push(`${matrix.phase}: E2E run metadata finishedAt is older than recorded E2E evidence`);
+    }
+    if (runMetadataStat.mtimeMs + 120_000 < newestRequiredE2eCheckedAt) {
+      failures.push(`${matrix.phase}: E2E run metadata is older than recorded E2E evidence`);
+    }
+    for (const e2eId of requiredPhaseE2eIds) {
+      if (!metadataE2eIds.has(e2eId)) {
+        failures.push(`${matrix.phase}: E2E run metadata missing ${e2eId}`);
+      }
+    }
+    for (const testPath of requiredPhaseE2ePaths) {
+      if (!metadataTestPaths.has(testPath)) {
+        failures.push(`${matrix.phase}: E2E run metadata missing ${testPath}`);
+      }
+    }
+  } catch {
+    failures.push(`${matrix.phase}: missing readable E2E run metadata at ${e2eRunMetadataPath}`);
   }
 }
 

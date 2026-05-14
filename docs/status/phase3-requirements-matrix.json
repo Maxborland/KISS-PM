@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T01:29:42+07:00",
+  "updated_at": "2026-05-15T02:03:12+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -45,7 +45,8 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -84,7 +85,8 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -126,14 +128,16 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-021",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -181,14 +185,16 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-022",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -238,7 +244,8 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -289,7 +296,8 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -350,35 +358,40 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-021",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-022",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-023",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-024",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -439,14 +452,16 @@
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-024",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
@@ -500,49 +515,54 @@
       ],
       "cleanup": "No external resources or persistent databases were created. Phase 3 E2E uses in-memory API state reset through /test-fixtures/reset before every scenario; Playwright artifacts remain under test-results for failed intermediate runs.",
       "blocker": null,
-      "last_checked_at": "2026-05-15T01:29:42+07:00",
+      "last_checked_at": "2026-05-15T02:03:12+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-020",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-021",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-022",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-023",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         },
         {
           "id": "E2E-024",
           "command": "npm run test:e2e:phase -- --phase=3",
           "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-15T01:20:07+07:00"
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
         }
       ]
     },
     {
       "id": "P3-010",
       "requirement": "Phase 3 verification matrix",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -556,15 +576,74 @@
         "E2E-024"
       ],
       "evidence": [
-        "Initial matrix exists with all P3 rows blocked and exact required_e2e plus ledger test_path mapping owned by scripts/verify-requirements-matrix.mjs"
+        "docs/status/phase3-requirements-matrix.json contains P3-001..P3-010 with exact required_e2e mappings enforced by scripts/verify-requirements-matrix.mjs",
+        "P3-001..P3-009 are verified with structured E2E evidence for E2E-020..024, command names, test paths, exit_code 0, and valid checked_at timestamps",
+        "P3-010 fresh blocker proof before closure: npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 only because P3-010 was still blocked",
+        "After P3-010 matrix update, the final phase-exit verifier passes without --allow-blocked",
+        "Receiving Code Review and Bug Hunt fixed P3-010 matrix-gate gaps: verified rows reject blocker text and malformed blocker values, structured E2E evidence must include status passed plus checked_at not older than the verified row timestamp, final P3-010 gate must run without --allow-blocked, and phase-exit verification reads kiss-pm-e2e-last-run.json with profile, phase, E2E IDs, spec paths, and finishedAt instead of trusting only matrix prose",
+        "Final P3-010 local verification passed after verifier hardening: typecheck, lint, full unit/component suite, verifier unit suite, Phase 3 E2E suite, E2E metadata artifact readback, and non-allow-blocked matrix gate"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0",
-        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 because P3 rows are intentionally blocked before implementation"
+        "npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0 after P3-009 matrix update",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 before P3-010 closure because P3-010 was still blocked",
+        "npm run typecheck exit 0 from P3-009 final gate",
+        "npm run lint exit 0 from P3-009 final gate",
+        "npm test exit 0 from P3-009 final gate (26 files, 133 tests)",
+        "npm run test:integration exit 0 from P3-009 final gate (5 files, 24 tests)",
+        "npm run test:e2e:phase -- --phase=3 exit 0 from P3-009 final gate (5 passed)",
+        "npm run test:e2e:phase -- --phase=3 exit 0 after final P3-010 verifier hardening (5 passed)",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0 after final P3-010 verifier hardening (1 file, 20 tests)",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 0 after final P3-010 verifier hardening",
+        "npm run lint exit 0 after final P3-010 verifier hardening",
+        "git diff --check exit 0 after final P3-010 verifier hardening",
+        "npm run typecheck exit 0 after final P3-010 verifier hardening",
+        "npm test exit 0 after final P3-010 verifier hardening (26 files, 141 tests)"
       ],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Final Phase 3 implementation and E2E evidence are not complete",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "cleanup": "P3-010 created only local verification artifacts under test-results, including kiss-pm-e2e-last-run.json metadata for the latest Phase 3 E2E run. P3-009 E2E runtime state is reset by /test-fixtures/reset before each scenario.",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T02:03:12+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-020",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/opportunity-create.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
+        },
+        {
+          "id": "E2E-021",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/intake-readiness.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
+        },
+        {
+          "id": "E2E-022",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/feasibility-analysis.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
+        },
+        {
+          "id": "E2E-023",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-from-opportunity.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
+        },
+        {
+          "id": "E2E-024",
+          "command": "npm run test:e2e:phase -- --phase=3",
+          "test_path": "e2e/tests/phase3/project-draft-canonical.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-15T02:03:12+07:00",
+          "status": "passed"
+        }
+      ]
     }
   ]
 }
