@@ -2,20 +2,26 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T16:05:46+07:00",
+  "updated_at": "2026-05-14T16:10:47+07:00",
   "rows": [
     {
       "id": "P2-001",
       "requirement": "Tenant and workspace primitives",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/domain-core",
-      "owned_scope": ["packages/domain-core", "packages/shared-test-fixtures"],
-      "required_e2e": ["E2E-010"],
+      "owned_scope": [
+        "packages/domain-core",
+        "packages/shared-test-fixtures"
+      ],
+      "required_e2e": [
+        "E2E-010"
+      ],
       "evidence": [
         "packages/domain-core/src/index.ts defines Tenant, Workspace, TenantUser, TenantContext, ActorContext, TenantIsolationProbe, explicit tenant ownership factories, and tenant mismatch guard",
         "packages/domain-core/src/tenantPrimitives.test.ts covers missing tenant ownership, tenant mismatch without target label leakage, actor context, and empty optional diagnostic identifier rejection",
         "packages/shared-test-fixtures/src/demoTenants.ts creates deterministic Tenant A and Tenant B with tenant-owned workspaces, users, and private isolation probes",
-        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/shared-test-fixtures"
+        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/shared-test-fixtures",
+        "P2-010 phase-exit refresh verified P2-001 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/domain-core/src/tenantPrimitives.test.ts exit 0",
@@ -25,23 +31,47 @@
         "npm test exit 0 (5 files, 16 tests)",
         "npm install --package-lock-only --dry-run --ignore-scripts exit 0",
         "npm run test:e2e:smoke exit 0",
-        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No runtime writes or external resources; deterministic fixture data only",
-      "blocker": "Phase-exit verification for required E2E-010 is blocked until later P2 API/UI/phase2 E2E work creates e2e/tests/phase2/tenant-isolation.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T12:31:28+07:00"
+      "blocker": "None for P2-001; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-010",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-002",
       "requirement": "Access profile model",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/access-control",
-      "owned_scope": ["packages/access-control"],
-      "required_e2e": ["E2E-011"],
+      "owned_scope": [
+        "packages/access-control"
+      ],
+      "required_e2e": [
+        "E2E-011"
+      ],
       "evidence": [
         "packages/access-control/src/index.ts defines Permission, ScopeRule, AccessProfile, ProfileAssignment, model factories, tenant ownership validation, profile version validation, duplicate permission guard, scope-rule permission consistency guard, raw scope revalidation, and active flag runtime validation",
         "packages/access-control/src/accessProfile.test.ts covers tenant-owned versioned access profiles, invalid tenant/version inputs, duplicate permission keys, missing permission references, Phase 2-supported scope values, deserialized unsupported scopes, non-boolean active flags, profile assignments, and typed model errors",
-        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/access-control"
+        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/access-control",
+        "P2-010 phase-exit refresh verified P2-002 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/access-control/src/accessProfile.test.ts exit 0 (8 tests)",
@@ -50,23 +80,48 @@
         "npm test exit 0 (6 files, 24 tests)",
         "npm install --package-lock-only --dry-run --ignore-scripts exit 0",
         "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0",
-        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No runtime writes or external resources; pure domain model package only",
-      "blocker": "Phase-exit verification for required E2E-011 is blocked until later P2 API/UI/phase2 E2E work creates e2e/tests/phase2/access-profile.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T12:42:09+07:00"
+      "blocker": "None for P2-002; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-011",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/access-profile.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-003",
       "requirement": "Policy evaluator",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/access-control",
-      "owned_scope": ["packages/access-control"],
-      "required_e2e": ["E2E-010", "E2E-012"],
+      "owned_scope": [
+        "packages/access-control"
+      ],
+      "required_e2e": [
+        "E2E-010",
+        "E2E-012"
+      ],
       "evidence": [
         "packages/access-control/src/index.ts defines PolicyRequest, PolicyEvaluation, PolicyTargetRef, and deterministic evaluatePolicy with safe trace output",
         "Policy evaluator denies tenant mismatch before target identity appears in trace, denies unsupported requested scopes and raw stored unsupported scope rules with unsupported_scope, denies inactive profiles and missing permissions, and evaluates own/project/tenant/all scopes",
-        "packages/access-control/src/policyEvaluator.test.ts covers allow by tenant scope, missing permission, safe tenant mismatch, own/project/tenant/all scope behavior, own/project mismatch, unsupported department requested scope, unsupported raw stored team scope, inactive profile, and requested scope not granted"
+        "packages/access-control/src/policyEvaluator.test.ts covers allow by tenant scope, missing permission, safe tenant mismatch, own/project/tenant/all scope behavior, own/project mismatch, unsupported department requested scope, unsupported raw stored team scope, inactive profile, and requested scope not granted",
+        "P2-010 phase-exit refresh verified P2-003 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/access-control/src/policyEvaluator.test.ts exit 0 (8 tests)",
@@ -75,25 +130,57 @@
         "npm test exit 0 (7 files, 32 tests)",
         "npm run test:e2e:smoke exit 0",
         "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0",
-        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No runtime writes or external resources; pure deterministic policy evaluation only",
-      "blocker": "Phase-exit verification for required E2E-010 and E2E-012 is blocked until later P2 API/UI/phase2 E2E work creates e2e/tests/phase2/tenant-isolation.spec.ts and e2e/tests/phase2/read-only-permissions.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T12:59:23+07:00"
+      "blocker": "None for P2-003; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-010",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-012",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-004",
       "requirement": "Tenant label configuration",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/tenant-config, apps/web",
-      "owned_scope": ["packages/tenant-config", "apps/web"],
-      "required_e2e": ["E2E-013"],
+      "owned_scope": [
+        "packages/tenant-config",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-013"
+      ],
       "evidence": [
         "packages/tenant-config/src/index.ts defines TenantConfiguration, TenantLabelSet, TenantLabelChangeTrace, createTenantConfiguration, createTenantLabelSet, updateTenantLabel, and resolveTenantLabel",
         "Tenant label updates are immutable, reject stale expectedConfigurationVersion values, increment configurationVersion, and return previous/current configuration version plus changed key/before/after labels for later API/audit DTOs",
         "resolveTenantLabel requires configured runtime labels or an explicit fallback so internal label keys are not silently exposed to users",
         "apps/web/src/App.tsx reads navigation, role, shell prefix, aria, and shell placeholder labels from a TenantLabelSet; apps/web/src/App.test.tsx proves runtime label overrides change visible navigation, role, tenant/config/user prefixes, and navigation aria label without changing component text literals",
-        "package-lock.json records @kiss-pm/tenant-config workspace dependencies for @kiss-pm/web and @kiss-pm/domain-core for @kiss-pm/tenant-config"
+        "package-lock.json records @kiss-pm/tenant-config workspace dependencies for @kiss-pm/web and @kiss-pm/domain-core for @kiss-pm/tenant-config",
+        "P2-010 phase-exit refresh verified P2-004 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/tenant-config/src/tenantLabels.test.ts exit 0 (5 tests)",
@@ -103,18 +190,39 @@
         "npm run lint exit 0",
         "npm test exit 0 (8 files, 38 tests)",
         "npm run test:e2e:smoke exit 0",
-        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No runtime writes or external resources; package-lock workspace dependency update only",
-      "blocker": "Phase-exit verification for required E2E-013 remains blocked until later P2 API/audit/web/E2E rows add POST /admin/labels, audit event persistence, deterministic Phase 2 fixtures, and e2e/tests/phase2/tenant-labels.spec.ts. Current block provides domain trace payload and shell runtime-label read path but not the Phase 2 API/audit write flow. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T13:37:04+07:00"
+      "blocker": "None for P2-004; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-013",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-005",
       "requirement": "Basic custom field registry",
       "status": "verified",
       "owner": "packages/tenant-config",
-      "owned_scope": ["packages/tenant-config"],
+      "owned_scope": [
+        "packages/tenant-config"
+      ],
       "required_e2e": [],
       "evidence": [
         "packages/tenant-config/src/index.ts defines metadata-only CustomFieldDefinition, CustomFieldRegistry, CustomFieldBindingFlags, validation/visibility/permission metadata, supported target entity types, supported value types, and optimistic metadata update result",
@@ -122,7 +230,8 @@
         "createCustomFieldRegistry revalidates deserialized definitions, rejects cross-tenant definitions, rejects duplicate keys for the same target entity type, and allows the same key on different target entity types",
         "updateCustomFieldDefinitionMetadata rejects stale expectedVersion values, increments definition version, clones metadata, and does not mutate the input definition",
         "Validation-rule metadata accepts only string, number, boolean, homogeneous string arrays, or homogeneous number arrays, rejecting raw objects and mixed arrays from deserialized input",
-        "packages/tenant-config/src/customFields.test.ts covers valid definitions, duplicate keys, invalid target/value/version/tenant inputs, invalid raw validation metadata, metadata update version handling, and typed TenantConfigModelError failures"
+        "packages/tenant-config/src/customFields.test.ts covers valid definitions, duplicate keys, invalid target/value/version/tenant inputs, invalid raw validation metadata, metadata update version handling, and typed TenantConfigModelError failures",
+        "P2-010 phase-exit refresh verified P2-005 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/tenant-config/src/customFields.test.ts exit 0 (5 tests)",
@@ -130,26 +239,42 @@
         "npm run typecheck exit 0",
         "npm run lint exit 0",
         "npm test exit 0 (9 files, 43 tests)",
-        "npm run test:e2e:smoke exit 0"
+        "npm run test:e2e:smoke exit 0",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No runtime writes, external resources, UI, API, custom-field values, formula execution, or migrations; metadata-only tenant-config package changes",
-      "blocker": "None for P2-005; this row has no required E2E scenario.",
-      "last_checked_at": "2026-05-14T14:00:11+07:00"
+      "blocker": "None for P2-005; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00"
     },
     {
       "id": "P2-006",
       "requirement": "Audit event primitives",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/domain-core, apps/api",
-      "owned_scope": ["packages/domain-core", "apps/api"],
-      "required_e2e": ["E2E-014"],
+      "owned_scope": [
+        "packages/domain-core",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-014"
+      ],
       "evidence": [
         "packages/domain-core/src/index.ts defines AuditTargetRef, AuditEvent, AuditEventDetails, AuditResult, createAuditTargetRef, and createAuditEvent",
         "Audit events are tenant-owned, require actor, tenant, actionKey, target, result, timestamp, and correlationId, validate success/denied/failed results, validate timestamps, and clone details to protect append-oriented history from caller mutations",
         "packages/domain-core/src/auditPrimitives.test.ts covers audit event creation, missing required fields, required actor correlationId, invalid results, detail cloning, and typed DomainInvariantError validation failures",
         "apps/api/src/auditLog.ts defines a deterministic in-memory audit event store for Phase 2 service tests with append, duplicate-id rejection, tenant-scoped readback, insertion order preservation, and cloned read/write boundaries",
         "apps/api/src/auditLog.test.ts covers tenant-scoped audit readback, append-only history isolation from caller mutations, duplicate audit IDs, and invalid tenant readback requests",
-        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/api"
+        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/api",
+        "P2-010 phase-exit refresh verified P2-006 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/domain-core/src/auditPrimitives.test.ts exit 0 (4 tests)",
@@ -160,26 +285,54 @@
         "npm test exit 0 (11 files, 50 tests)",
         "npm run test:integration exit 0 (1 file, 1 test)",
         "npm run test:e2e:smoke exit 0",
-        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No external writes or persistent runtime resources; in-memory audit event store only, deterministic tests reset per test instance",
-      "blocker": "Phase-exit verification for required E2E-014 remains blocked until later P2 API/UI/fixture/E2E rows add a Phase 2 state-changing action, audit readback endpoint, tenant-scoped audit UI/API proof, and e2e/tests/phase2/audit-basics.spec.ts. Current block provides audit primitives and service-level in-memory append/readback only. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T14:11:14+07:00"
+      "blocker": "None for P2-006; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-014",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-007",
       "requirement": "API tenant/access endpoints",
-      "status": "blocked",
+      "status": "verified",
       "owner": "apps/api",
-      "owned_scope": ["apps/api"],
-      "required_e2e": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
+      "owned_scope": [
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-010",
+        "E2E-011",
+        "E2E-012",
+        "E2E-013",
+        "E2E-014"
+      ],
       "evidence": [
         "apps/api/src/app.ts implements GET /tenants/current, GET /admin/access-profiles, POST /admin/access-profiles, POST /admin/labels, POST /admin/permissions/evaluate, GET /tenant-isolation-probes/:probeId, GET /audit/events, and POST /test-fixtures/reset",
         "apps/api/src/app.ts validates POST bodies with Zod, establishes fixture actor/tenant context from testUser, applies server-side policy checks through @kiss-pm/access-control, returns stable DTO field names, and keeps fixture reset behind createApiApp({ allowTestFixtureReset: true })",
         "apps/api/src/phase2Runtime.ts creates deterministic Phase 2 in-memory runtime state from shared demo tenants, Phase 2 access profiles, runtime label sets, tenant isolation probes, and audit store",
         "Successful access profile upserts and tenant label updates append tenant-scoped audit events with actor, tenant, target, action key, timestamp, correlation ID, and before/after details",
         "apps/api/src/phase2Api.test.ts covers current tenant DTO, tenant-scoped profile list/upsert, label update version trace and stale conflict, read-only direct mutation denial with no success audit, safe tenant mismatch diagnostics, cross-tenant probe not_found without Tenant B private detail leakage, known diagnostic target-id resolution, unknown label-key and inherited label-key rejection before state/audit writes, and test fixture reset gating",
-        "package.json test:integration now runs apps/api/src so P2 API integration tests are part of the standard integration command; package-lock.json records @kiss-pm/api dependencies on access-control, tenant-config, shared-test-fixtures, domain-core, Hono, and Zod"
+        "package.json test:integration now runs apps/api/src so P2 API integration tests are part of the standard integration command; package-lock.json records @kiss-pm/api dependencies on access-control, tenant-config, shared-test-fixtures, domain-core, Hono, and Zod",
+        "P2-010 phase-exit refresh verified P2-007 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- apps/api/src/phase2Api.test.ts first exited 1 with 6 failing 404 assertions before implementation, proving the new route tests were red",
@@ -192,19 +345,74 @@
         "npm test exit 0 (12 files, 59 tests)",
         "npm run test:e2e:smoke exit 0 (6 passed)",
         "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
-        "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0"
+        "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "cleanup": "No external writes or persistent runtime resources; deterministic in-memory P2 runtime can be reset through test-mode-only POST /test-fixtures/reset and each createApiApp instance owns isolated runtime state",
-      "blocker": "Phase-exit verification for required E2E-010, E2E-011, E2E-012, E2E-013, and E2E-014 remains blocked until later P2 web/fixture/E2E rows add e2e/tests/phase2/tenant-isolation.spec.ts, access-profile.spec.ts, read-only-permissions.spec.ts, tenant-labels.spec.ts, and audit-basics.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
-      "last_checked_at": "2026-05-14T14:32:15+07:00"
+      "blocker": "None for P2-007; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-010",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-011",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/access-profile.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-012",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-013",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-014",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     },
     {
       "id": "P2-008",
       "requirement": "Web tenant/admin shell surfaces",
       "status": "verified",
       "owner": "apps/web",
-      "owned_scope": ["apps/web", "e2e/tests/phase2"],
-      "required_e2e": ["E2E-011", "E2E-012", "E2E-013", "E2E-014"],
+      "owned_scope": [
+        "apps/web",
+        "e2e/tests/phase2"
+      ],
+      "required_e2e": [
+        "E2E-011",
+        "E2E-012",
+        "E2E-013",
+        "E2E-014"
+      ],
       "evidence": [
         "apps/web/src/App.tsx implements a minimal Russian Phase 2 admin surface inside the existing shell for access profiles, tenant label editing, permission diagnostics, tenant isolation probe readback, audit evidence, and read-only denial state",
         "apps/web/src/phase2ApiClient.ts defines stable DTO/client methods for the P2 API routes and apps/web/vite.config.ts proxies /api to the local API server during dev and E2E",
@@ -212,7 +420,8 @@
         "e2e/tests/phase2 implements E2E-010 through E2E-014 using real browser UI actions plus direct API readback for permissions, persisted/API state, audit, tenant isolation, and reload behavior",
         "scripts/run-e2e.mjs serializes phase and all profiles while Phase 2 uses shared in-memory state, preventing false conflicts between mutable E2E scenarios",
         "Rendered browser sanity via Playwright MCP opened http://127.0.0.1:5173/?testUser=tenant-admin-a with fixture auth; desktop and mobile snapshots were nonblank, showed the Phase 2 surface, had no framework overlay, and console output contained only React DevTools info",
-        "Bug Hunt and code-review loop completed for P2-008: Important findings around mutable full E2E parallelism, Tenant B probe selection, and async component evidence were fixed; Minor findings around in-flight duplicate mutation controls and Tenant B assertion race were fixed; no completed review left Critical or Important findings open"
+        "Bug Hunt and code-review loop completed for P2-008: Important findings around mutable full E2E parallelism, Tenant B probe selection, and async component evidence were fixed; Minor findings around in-flight duplicate mutation controls and Tenant B assertion race were fixed; no completed review left Critical or Important findings open",
+        "P2-010 phase-exit refresh verified P2-008 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- apps/web/src/App.test.tsx first exited 1 with four missing Phase 2 surface assertions before implementation, proving the new web tests were red",
@@ -229,7 +438,17 @@
         "npm test exit 0 (12 files, 67 tests)",
         "npm run test:e2e:smoke exit 0 (6 passed)",
         "npm run test:e2e:phase -- --phase=2 exit 0 (6 passed)",
-        "npm run test:e2e exit 0 (12 passed)"
+        "npm run test:e2e exit 0 (12 passed)",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "e2e_evidence": [
         {
@@ -237,41 +456,54 @@
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/access-profile.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T15:30:23+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-012",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T15:30:23+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-013",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T15:30:23+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-014",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T15:30:23+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         }
       ],
       "cleanup": "Temporary browser validation dev servers on ports 4173 and 5173 were stopped; readback check returned dev-servers-stopped. Browser screenshots were removed from the workspace and are not committed. Generated apps/web/dist from direct Vite build was removed after path verification.",
-      "blocker": "None for P2-008; required E2E-011, E2E-012, E2E-013, and E2E-014 have structured passing evidence.",
-      "last_checked_at": "2026-05-14T15:42:07+07:00"
+      "blocker": "None for P2-008; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00"
     },
     {
       "id": "P2-009",
       "requirement": "Deterministic Phase 2 fixtures",
       "status": "verified",
       "owner": "packages/shared-test-fixtures, apps/api, e2e",
-      "owned_scope": ["packages/shared-test-fixtures", "apps/api/src/phase2Runtime.ts", "apps/api/src/server.ts", "e2e/tests/phase2", "playwright.config.ts", "docs/e2e/E2E_SCENARIOS.md"],
-      "required_e2e": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "apps/api/src/phase2Runtime.ts",
+        "apps/api/src/server.ts",
+        "e2e/tests/phase2",
+        "playwright.config.ts",
+        "docs/e2e/E2E_SCENARIOS.md"
+      ],
+      "required_e2e": [
+        "E2E-010",
+        "E2E-011",
+        "E2E-012",
+        "E2E-013",
+        "E2E-014"
+      ],
       "evidence": [
         "packages/shared-test-fixtures/src/phase2Fixtures.ts defines a deterministic Phase 2 seed with fixed timestamp, Tenant A/B users, Tenant A/B private isolation probes, tenant label sets, tenant-owned access profile seeds, and an empty audit baseline",
         "getPhase2FixtureSeed returns deep clones so scenario mutation cannot contaminate the next reset; getPhase2ProbePairForTenant derives own/foreign probe IDs from seeded tenants instead of hardcoding UI behavior",
@@ -280,7 +512,8 @@
         "e2e/tests/phase2/helpers.ts adds resetPhase2Fixtures and every Phase 2 scenario resets before execution; fixture-reset.spec.ts mutates profile, label, and audit state then resets and verifies label version, profile list, and audit log return to seed baseline",
         "docs/e2e/E2E_SCENARIOS.md marks E2E-010 through E2E-014 as passing after Phase 2 acceptance tests",
         "Code review found an Important direct-Playwright concurrency/config path risk; playwright.config.ts now sets workers: 1, e2e/tests/phase2/helpers.ts uses the config default API port, and the web server receives PW_API_PORT for direct Playwright runs",
-        "Code review Minor Tenant B reset readback gap was fixed in fixture-reset.spec.ts by verifying Tenant B current tenant labels and private probe after reset"
+        "Code review Minor Tenant B reset readback gap was fixed in fixture-reset.spec.ts by verifying Tenant B current tenant labels and private probe after reset",
+        "P2-010 phase-exit refresh verified P2-009 against the final Phase 2 gate with no remaining blocked status."
       ],
       "tests": [
         "npm test -- packages/shared-test-fixtures/src/phase2Fixtures.test.ts first exited 1 because ./phase2Fixtures did not exist, proving the new seed tests were red",
@@ -303,7 +536,17 @@
         "npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed) after review fixes",
         "npm run test:e2e:smoke exit 0 (6 passed, 1 worker) after review fixes",
         "npm run test:e2e:phase -- --phase=2 exit 0 (7 passed, 1 worker) after review fixes",
-        "npm run test:e2e exit 0 (13 passed, 1 worker) after review fixes"
+        "npm run test:e2e exit 0 (13 passed, 1 worker) after review fixes",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0"
       ],
       "e2e_evidence": [
         {
@@ -311,53 +554,121 @@
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T16:05:46+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-011",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/access-profile.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T16:05:46+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-012",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T16:05:46+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-013",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T16:05:46+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         },
         {
           "id": "E2E-014",
           "command": "npm run test:e2e:phase -- --phase=2",
           "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
           "exit_code": 0,
-          "checked_at": "2026-05-14T16:05:46+07:00"
+          "checked_at": "2026-05-14T16:10:47+07:00"
         }
       ],
       "cleanup": "Generated apps/web/dist from direct Vite build was removed after path verification. E2E fixture mutations are reset through POST /test-fixtures/reset before scenarios and verified by readback in fixture-reset.spec.ts for Tenant A and Tenant B. No external services, live data, or persistent runtime resources were used.",
-      "blocker": "None for P2-009; deterministic seed and reset/readback evidence are verified.",
-      "last_checked_at": "2026-05-14T16:05:46+07:00"
+      "blocker": "None for P2-009; Phase 2 final gate has fresh structured evidence.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00"
     },
     {
       "id": "P2-010",
       "requirement": "Phase 2 verification matrix",
-      "status": "blocked",
+      "status": "verified",
       "owner": "docs/status, scripts",
-      "owned_scope": ["docs/status/phase2-requirements-matrix.json", "scripts/verify-requirements-matrix.mjs"],
-      "required_e2e": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
-      "evidence": ["Initial P2 matrix rows exist in blocked state before implementation", "Verified rows with required_e2e must include structured e2e_evidence entries before the matrix gate can pass", "scripts/verify-requirements-matrix.test.ts covers missing required_e2e fields, planned prose that mentions E2E IDs, Phase 1 artifact misuse, missing tests, and present structured E2E evidence"],
-      "tests": ["npm run verify:matrix -- docs/status/phase2-requirements-matrix.json must fail while rows are blocked; npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json validates pre-implementation structure; final verified evidence must include structured e2e_evidence for E2E-010..014", "npm test exit 0"],
+      "owned_scope": [
+        "docs/status/phase2-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs"
+      ],
+      "required_e2e": [
+        "E2E-010",
+        "E2E-011",
+        "E2E-012",
+        "E2E-013",
+        "E2E-014"
+      ],
+      "evidence": [
+        "Initial P2 matrix rows exist in blocked state before implementation",
+        "Verified rows with required_e2e must include structured e2e_evidence entries before the matrix gate can pass",
+        "scripts/verify-requirements-matrix.test.ts covers missing required_e2e fields, planned prose that mentions E2E IDs, Phase 1 artifact misuse, missing tests, and present structured E2E evidence",
+        "P2-010 phase-exit refresh verified P2-010 against the final Phase 2 gate with no remaining blocked status.",
+        "scripts/verify-requirements-matrix.test.ts now covers blocked P2 phase-exit rejection and acceptance of a complete all-verified P2 matrix with structured E2E evidence",
+        "docs/status/phase2-requirements-matrix.json has rows P2-001 through P2-010 verified with required_e2e matching the Phase 2 contract",
+        "Final matrix verification is run without --allow-blocked so stale blockers cannot pass phase exit"
+      ],
+      "tests": [
+        "npm run verify:matrix -- docs/status/phase2-requirements-matrix.json must fail while rows are blocked; npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json validates pre-implementation structure; final verified evidence must include structured e2e_evidence for E2E-010..014",
+        "npm test exit 0",
+        "P2-010 phase-exit refresh: npm run typecheck exit 0",
+        "P2-010 phase-exit refresh: npm run lint exit 0",
+        "P2-010 phase-exit refresh: npm test exit 0 (13 files, 72 tests)",
+        "P2-010 phase-exit refresh: npm run test:integration exit 0 (3 files, 13 tests)",
+        "P2-010 phase-exit refresh: npm exec -w @kiss-pm/web vite -- build exit 0 (35 modules transformed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:smoke first exited 1 because direct Playwright used port 4183 in parallel; sequential rerun exit 0 (6 passed)",
+        "P2-010 phase-exit refresh: npm run test:e2e:phase -- --phase=2 exit 0 (7 passed)",
+        "P2-010 phase-exit refresh: npm exec -- playwright test e2e/tests/phase2 exit 0 (7 passed, direct config path)",
+        "P2-010 phase-exit refresh: npm run test:e2e exit 0 (13 passed)",
+        "P2-010 phase-exit refresh: npm run verify:matrix -- docs/status/phase2-requirements-matrix.json exit 0",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0 (8 tests)"
+      ],
       "cleanup": "No runtime cleanup",
-      "blocker": "Implementation evidence has not been added yet.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "blocker": "None; final phase-exit matrix gate passes without --allow-blocked.",
+      "last_checked_at": "2026-05-14T16:10:47+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-010",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-isolation.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-011",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/access-profile.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-012",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/read-only-permissions.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-013",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/tenant-labels.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        },
+        {
+          "id": "E2E-014",
+          "command": "npm run test:e2e:phase -- --phase=2",
+          "test_path": "e2e/tests/phase2/audit-basics.spec.ts",
+          "exit_code": 0,
+          "checked_at": "2026-05-14T16:10:47+07:00"
+        }
+      ]
     }
   ]
 }
