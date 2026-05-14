@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T13:37:04+07:00",
+  "updated_at": "2026-05-14T14:00:11+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -112,15 +112,29 @@
     {
       "id": "P2-005",
       "requirement": "Basic custom field registry",
-      "status": "blocked",
+      "status": "verified",
       "owner": "packages/tenant-config",
       "owned_scope": ["packages/tenant-config"],
       "required_e2e": [],
-      "evidence": [],
-      "tests": ["npm test"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/tenant-config/src/index.ts defines metadata-only CustomFieldDefinition, CustomFieldRegistry, CustomFieldBindingFlags, validation/visibility/permission metadata, supported target entity types, supported value types, and optimistic metadata update result",
+        "Custom field definitions are tenant-owned, versioned, use stable keys, preserve valueType/target/key during metadata updates, and reject unsupported target entity types and value types",
+        "createCustomFieldRegistry revalidates deserialized definitions, rejects cross-tenant definitions, rejects duplicate keys for the same target entity type, and allows the same key on different target entity types",
+        "updateCustomFieldDefinitionMetadata rejects stale expectedVersion values, increments definition version, clones metadata, and does not mutate the input definition",
+        "Validation-rule metadata accepts only string, number, boolean, homogeneous string arrays, or homogeneous number arrays, rejecting raw objects and mixed arrays from deserialized input",
+        "packages/tenant-config/src/customFields.test.ts covers valid definitions, duplicate keys, invalid target/value/version/tenant inputs, invalid raw validation metadata, metadata update version handling, and typed TenantConfigModelError failures"
+      ],
+      "tests": [
+        "npm test -- packages/tenant-config/src/customFields.test.ts exit 0 (5 tests)",
+        "npm test -- packages/tenant-config/src/tenantLabels.test.ts exit 0 (5 tests)",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (9 files, 43 tests)",
+        "npm run test:e2e:smoke exit 0"
+      ],
+      "cleanup": "No runtime writes, external resources, UI, API, custom-field values, formula execution, or migrations; metadata-only tenant-config package changes",
+      "blocker": "None for P2-005; this row has no required E2E scenario.",
+      "last_checked_at": "2026-05-14T14:00:11+07:00"
     },
     {
       "id": "P2-006",

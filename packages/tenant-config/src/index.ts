@@ -2,6 +2,57 @@ import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 
 export type TenantConfigurationStatus = "draft" | "active" | "archived";
 
+export type CustomFieldTargetEntityType = "opportunity" | "project" | "task" | "tenant_user" | "workspace";
+
+export type CustomFieldValueType = "text" | "number" | "date" | "boolean" | "single_select" | "multi_select";
+
+export type CustomFieldMetadataValue = string | number | boolean | string[] | number[];
+
+export type CustomFieldBindingFlags = {
+  usableInFilters: boolean;
+  usableInControlSurfaces: boolean;
+  usableInKpiSourceBindings: boolean;
+};
+
+export type CustomFieldVisibilityRule = {
+  surfaceKey: string;
+  visible: boolean;
+};
+
+export type CustomFieldPermissionRules = {
+  readPermissionKey?: string;
+  writePermissionKey?: string;
+};
+
+export type CustomFieldDefinition = {
+  id: string;
+  tenantId: TenantId;
+  targetEntityType: CustomFieldTargetEntityType;
+  key: string;
+  label: string;
+  valueType: CustomFieldValueType;
+  required: boolean;
+  active: boolean;
+  version: number;
+  validationRules?: Record<string, CustomFieldMetadataValue>;
+  visibilityRules?: CustomFieldVisibilityRule[];
+  permissionRules?: CustomFieldPermissionRules;
+  bindingFlags: CustomFieldBindingFlags;
+  updatedAt: string;
+};
+
+export type CustomFieldRegistry = {
+  tenantId: TenantId;
+  version: number;
+  definitions: CustomFieldDefinition[];
+  updatedAt: string;
+};
+
+export type CustomFieldDefinitionUpdateResult = {
+  previousVersion: number;
+  definition: CustomFieldDefinition;
+};
+
 export type TenantConfiguration = {
   id: string;
   tenantId: TenantId;
@@ -80,6 +131,140 @@ function requireValidStatus(value: TenantConfigurationStatus | undefined): Tenan
   return value;
 }
 
+function requireBoolean(value: boolean | undefined, fieldName: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new TenantConfigModelError("validation_error", `${fieldName} must be a boolean`);
+  }
+
+  return value;
+}
+
+function requireSystemKey(value: string | undefined, fieldName: string): string {
+  const key = requireNonEmptyString(value, fieldName);
+
+  if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(key)) {
+    throw new TenantConfigModelError("validation_error", `${fieldName} must be a stable system key`);
+  }
+
+  return key;
+}
+
+function requireMetadataKey(value: string | undefined, fieldName: string): string {
+  const key = requireNonEmptyString(value, fieldName);
+
+  if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(key)) {
+    throw new TenantConfigModelError("validation_error", `${fieldName} must be a metadata key`);
+  }
+
+  return key;
+}
+
+function requireCustomFieldTargetEntityType(value: string | undefined): CustomFieldTargetEntityType {
+  if (
+    value !== "opportunity" &&
+    value !== "project" &&
+    value !== "task" &&
+    value !== "tenant_user" &&
+    value !== "workspace"
+  ) {
+    throw new TenantConfigModelError("validation_error", `Unsupported custom field target entity type: ${value}`);
+  }
+
+  return value;
+}
+
+function requireCustomFieldValueType(value: string | undefined): CustomFieldValueType {
+  if (
+    value !== "text" &&
+    value !== "number" &&
+    value !== "date" &&
+    value !== "boolean" &&
+    value !== "single_select" &&
+    value !== "multi_select"
+  ) {
+    throw new TenantConfigModelError("validation_error", `Unsupported custom field value type: ${value}`);
+  }
+
+  return value;
+}
+
+function cloneMetadataValue(value: CustomFieldMetadataValue): CustomFieldMetadataValue {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new TenantConfigModelError(
+      "validation_error",
+      "customField.validationRuleValue must be a scalar or homogeneous array"
+    );
+  }
+
+  if (value.every((item): item is string => typeof item === "string")) {
+    return [...value];
+  }
+
+  if (value.every((item): item is number => typeof item === "number")) {
+    return [...value];
+  }
+
+  throw new TenantConfigModelError("validation_error", "customField.validationRuleValue array must not mix value types");
+}
+
+function cloneValidationRules(
+  rules: Record<string, CustomFieldMetadataValue> | undefined
+): Record<string, CustomFieldMetadataValue> | undefined {
+  if (rules === undefined) return undefined;
+
+  const cloned: Record<string, CustomFieldMetadataValue> = {};
+  for (const [key, value] of Object.entries(rules)) {
+    cloned[requireMetadataKey(key, "customField.validationRuleKey")] = cloneMetadataValue(value);
+  }
+
+  return cloned;
+}
+
+function cloneVisibilityRules(rules: CustomFieldVisibilityRule[] | undefined): CustomFieldVisibilityRule[] | undefined {
+  if (rules === undefined) return undefined;
+
+  return rules.map((rule) => ({
+    surfaceKey: requireSystemKey(rule.surfaceKey, "customField.visibilityRule.surfaceKey"),
+    visible: requireBoolean(rule.visible, "customField.visibilityRule.visible")
+  }));
+}
+
+function clonePermissionRules(rules: CustomFieldPermissionRules | undefined): CustomFieldPermissionRules | undefined {
+  if (rules === undefined) return undefined;
+
+  return {
+    ...(rules.readPermissionKey !== undefined
+      ? { readPermissionKey: requireSystemKey(rules.readPermissionKey, "customField.permissionRules.readPermissionKey") }
+      : {}),
+    ...(rules.writePermissionKey !== undefined
+      ? {
+          writePermissionKey: requireSystemKey(
+            rules.writePermissionKey,
+            "customField.permissionRules.writePermissionKey"
+          )
+        }
+      : {})
+  };
+}
+
+function createBindingFlags(input: CustomFieldBindingFlags): CustomFieldBindingFlags {
+  return {
+    usableInFilters: requireBoolean(input.usableInFilters, "customField.bindingFlags.usableInFilters"),
+    usableInControlSurfaces: requireBoolean(
+      input.usableInControlSurfaces,
+      "customField.bindingFlags.usableInControlSurfaces"
+    ),
+    usableInKpiSourceBindings: requireBoolean(
+      input.usableInKpiSourceBindings,
+      "customField.bindingFlags.usableInKpiSourceBindings"
+    )
+  };
+}
+
 function normalizeLabels(labels: Record<string, string>): Record<string, string> {
   const normalized: Record<string, string> = {};
 
@@ -115,6 +300,133 @@ export function createTenantConfiguration(input: {
     ...(input.activatedAt !== undefined
       ? { activatedAt: requireValidTimestamp(input.activatedAt, "tenantConfiguration.activatedAt") }
       : {})
+  };
+}
+
+export function createCustomFieldDefinition(input: {
+  id: string;
+  tenantId: TenantId;
+  targetEntityType: string;
+  key: string;
+  label: string;
+  valueType: string;
+  required: boolean;
+  active: boolean;
+  version: number;
+  validationRules?: Record<string, CustomFieldMetadataValue>;
+  visibilityRules?: CustomFieldVisibilityRule[];
+  permissionRules?: CustomFieldPermissionRules;
+  bindingFlags: CustomFieldBindingFlags;
+  updatedAt: string;
+}): CustomFieldDefinition {
+  return {
+    id: requireNonEmptyString(input.id, "customField.id"),
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    targetEntityType: requireCustomFieldTargetEntityType(input.targetEntityType),
+    key: requireSystemKey(input.key, "customField.key"),
+    label: requireNonEmptyString(input.label, "customField.label"),
+    valueType: requireCustomFieldValueType(input.valueType),
+    required: requireBoolean(input.required, "customField.required"),
+    active: requireBoolean(input.active, "customField.active"),
+    version: requirePositiveInteger(input.version, "customField.version"),
+    ...(input.validationRules !== undefined ? { validationRules: cloneValidationRules(input.validationRules) } : {}),
+    ...(input.visibilityRules !== undefined ? { visibilityRules: cloneVisibilityRules(input.visibilityRules) } : {}),
+    ...(input.permissionRules !== undefined ? { permissionRules: clonePermissionRules(input.permissionRules) } : {}),
+    bindingFlags: createBindingFlags(input.bindingFlags),
+    updatedAt: requireValidTimestamp(input.updatedAt, "customField.updatedAt")
+  };
+}
+
+export function createCustomFieldRegistry(input: {
+  tenantId: TenantId;
+  version: number;
+  definitions: CustomFieldDefinition[];
+  updatedAt: string;
+}): CustomFieldRegistry {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const definitions = input.definitions.map((definition) =>
+    createCustomFieldDefinition({
+      ...definition,
+      ...(definition.validationRules !== undefined ? { validationRules: definition.validationRules } : {}),
+      ...(definition.visibilityRules !== undefined ? { visibilityRules: definition.visibilityRules } : {}),
+      ...(definition.permissionRules !== undefined ? { permissionRules: definition.permissionRules } : {})
+    })
+  );
+  const seenTargetKeys = new Set<string>();
+
+  for (const definition of definitions) {
+    if (definition.tenantId !== tenantId) {
+      throw new TenantConfigModelError("validation_error", `Custom field definition tenant mismatch: ${definition.id}`);
+    }
+
+    const targetKey = `${definition.targetEntityType}:${definition.key}`;
+    if (seenTargetKeys.has(targetKey)) {
+      throw new TenantConfigModelError(
+        "conflict",
+        `Duplicate custom field key for ${definition.targetEntityType}: ${definition.key}`
+      );
+    }
+    seenTargetKeys.add(targetKey);
+  }
+
+  return {
+    tenantId,
+    version: requirePositiveInteger(input.version, "customFieldRegistry.version"),
+    definitions,
+    updatedAt: requireValidTimestamp(input.updatedAt, "customFieldRegistry.updatedAt")
+  };
+}
+
+export function updateCustomFieldDefinitionMetadata(
+  current: CustomFieldDefinition,
+  input: {
+    expectedVersion: number;
+    label?: string;
+    required?: boolean;
+    active?: boolean;
+    validationRules?: Record<string, CustomFieldMetadataValue>;
+    visibilityRules?: CustomFieldVisibilityRule[];
+    permissionRules?: CustomFieldPermissionRules;
+    bindingFlags?: CustomFieldBindingFlags;
+    updatedAt: string;
+  }
+): CustomFieldDefinitionUpdateResult {
+  const currentVersion = requirePositiveInteger(current.version, "customField.version");
+  const expectedVersion = requirePositiveInteger(input.expectedVersion, "expectedVersion");
+
+  if (expectedVersion !== currentVersion) {
+    throw new TenantConfigModelError(
+      "conflict",
+      `Custom field definition version conflict: expected ${expectedVersion}, current ${currentVersion}`
+    );
+  }
+
+  return {
+    previousVersion: currentVersion,
+    definition: createCustomFieldDefinition({
+      ...current,
+      label: input.label ?? current.label,
+      required: input.required ?? current.required,
+      active: input.active ?? current.active,
+      version: currentVersion + 1,
+      ...(input.validationRules !== undefined
+        ? { validationRules: input.validationRules }
+        : current.validationRules !== undefined
+          ? { validationRules: current.validationRules }
+          : {}),
+      ...(input.visibilityRules !== undefined
+        ? { visibilityRules: input.visibilityRules }
+        : current.visibilityRules !== undefined
+          ? { visibilityRules: current.visibilityRules }
+          : {}),
+      ...(input.permissionRules !== undefined
+        ? { permissionRules: input.permissionRules }
+        : current.permissionRules !== undefined
+          ? { permissionRules: current.permissionRules }
+          : {}),
+      bindingFlags: input.bindingFlags ?? current.bindingFlags,
+      updatedAt: input.updatedAt
+    })
   };
 }
 
