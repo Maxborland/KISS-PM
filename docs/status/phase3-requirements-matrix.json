@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T18:50:28+07:00",
+  "updated_at": "2026-05-14T19:03:01+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -42,11 +42,24 @@
       "owner": "codex",
       "owned_scope": ["packages/crm-core"],
       "required_e2e": ["E2E-021"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; depends on P3-001 domain primitives",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/crm-core/src/index.ts implements evaluateOpportunityReadiness with deterministic blocker order, stable blocker codes, Russian safe messages, fieldRefs, trace, stable category/typology system-key checks, and nextAction selection for missing data, missing template match, low confidence, and ready-for-feasibility states",
+        "packages/crm-core/src/readiness.test.ts covers complete ready intake, incomplete intake blockers, intentionally unknown account/contact intent, low-confidence template match routing, empty template ids, and tenant-label category/typology rejection",
+        "Bug Hunt found and fixed two important edge cases: empty template id no longer throws, and tenant-label category/typology values no longer pass as stable keys; external Requesting Code Review returned no Critical/Important findings"
+      ],
+      "tests": [
+        "npm test -- packages/crm-core/src/readiness.test.ts first exit 1 with evaluateOpportunityReadiness not implemented",
+        "npm test -- packages/crm-core/src/readiness.test.ts exit 1 during Bug Hunt for empty template id throwing and tenant-label category/typology being accepted",
+        "npm test -- packages/crm-core/src/readiness.test.ts exit 0 (6 passed)",
+        "npm run typecheck -w @kiss-pm/crm-core exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (15 files, 87 tests)",
+        "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No runtime resources were created; P3-002 adds pure crm-core domain logic and unit tests only.",
+      "blocker": "Readiness domain implementation evidence is complete, but this row cannot be marked verified because required E2E-021 structured evidence does not exist until Phase 3 API/web E2E rows create e2e/tests/phase3/intake-readiness.spec.ts.",
+      "last_checked_at": "2026-05-14T19:03:01+07:00"
     },
     {
       "id": "P3-003",
