@@ -24,7 +24,6 @@ import {
 import type {
   DemoTenantUser,
   Phase2AccessProfileSeed,
-  Phase2PermissionKey,
   Phase2TenantLabelSeed
 } from "@kiss-pm/shared-test-fixtures";
 import {
@@ -81,6 +80,36 @@ const phase2PermissionCatalog = [
     key: "audit.read",
     description: "Read tenant audit events",
     category: "audit"
+  }),
+  createPermission({
+    key: "crm.opportunity.read",
+    description: "Read CRM intake opportunities",
+    category: "crm_intake"
+  }),
+  createPermission({
+    key: "crm.opportunity.write",
+    description: "Create CRM intake opportunities",
+    category: "crm_intake"
+  }),
+  createPermission({
+    key: "crm.readiness.run",
+    description: "Run opportunity readiness checks",
+    category: "crm_intake"
+  }),
+  createPermission({
+    key: "crm.template_match.run",
+    description: "Run opportunity process-template matching",
+    category: "crm_intake"
+  }),
+  createPermission({
+    key: "crm.feasibility.run",
+    description: "Run opportunity demand/capacity feasibility",
+    category: "crm_intake"
+  }),
+  createPermission({
+    key: "project_draft.create",
+    description: "Create a project draft from a qualified opportunity",
+    category: "project_intake"
   })
 ] satisfies Permission[];
 
@@ -93,18 +122,46 @@ function permission(key: string): Permission {
   return found;
 }
 
-function scopeRule(permissionKey: Phase2PermissionKey, scope: "tenant" | "all"): ScopeRule {
+function scopeRule(permissionKey: string, scope: "tenant" | "all"): ScopeRule {
   return createScopeRule({ permissionKey, scope });
 }
 
 function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
+  const supplementalPermissionsByProfile: Record<string, string[]> = {
+    tenant_admin: [
+      "crm.opportunity.read",
+      "crm.opportunity.write",
+      "crm.readiness.run",
+      "crm.template_match.run",
+      "crm.feasibility.run",
+      "project_draft.create"
+    ],
+    project_manager: [
+      "crm.opportunity.read",
+      "crm.opportunity.write",
+      "crm.readiness.run",
+      "crm.template_match.run",
+      "crm.feasibility.run",
+      "project_draft.create"
+    ],
+    resource_manager: [
+      "crm.opportunity.read",
+      "crm.readiness.run",
+      "crm.template_match.run",
+      "crm.feasibility.run"
+    ],
+    readonly_observer: ["crm.opportunity.read"],
+    tenant_user: ["crm.opportunity.read"]
+  };
+  const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
+
   return createAccessProfile({
     id: input.id,
     tenantId: input.tenantId,
     systemKey: input.systemKey,
     label: input.label,
-    permissions: input.permissions.map(permission),
-    scopeRules: input.permissions.map((permissionKey) => scopeRule(permissionKey, input.scope)),
+    permissions: permissionKeys.map(permission),
+    scopeRules: permissionKeys.map((permissionKey) => scopeRule(permissionKey, input.scope)),
     active: input.active,
     version: input.version,
     updatedAt: input.updatedAt
