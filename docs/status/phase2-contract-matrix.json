@@ -1,0 +1,44 @@
+{
+  "phase": "P2-contract",
+  "name": "Phase 2 detail contract before implementation",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-14T10:25:00+07:00",
+  "rows": [
+    {
+      "id": "P2C-001",
+      "requirement": "Create Phase 2 detail document before implementation",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
+      "evidence": ["Phase 2 detail document defines objective, scope lock, functional scope, global and per-task non-scope, domain model, API/DTO/error contracts, UI surfaces, detailed E2E scenarios, tests, fixtures, exit gate, risks"],
+      "tests": ["manual review"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T10:12:00+07:00"
+    },
+    {
+      "id": "P2C-002",
+      "requirement": "Define finite closed implementation tasks for P2",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
+      "evidence": ["Functional scope table defines P2-001 through P2-010 with owner/module, expected behavior, acceptance criteria, E2E references, verification, per-task non-scope, done evidence, and strict phase-exit matrix behavior"],
+      "tests": ["manual review"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T10:12:00+07:00"
+    },
+    {
+      "id": "P2C-003",
+      "requirement": "Define mandatory E2E matrix and fixtures for P2",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_2_SAAS_TENANT_CORE_ACCESS_CONTROL.md"],
+      "evidence": ["E2E-010 through E2E-014 are mapped to roles, fixtures, test paths, scenario steps, expected state/API/audit/reload proof, and fixture rules define Tenant A and Tenant B data"],
+      "tests": ["manual review"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T10:12:00+07:00"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "phase": "P2",
+  "name": "SaaS tenant core and access control implementation",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-14T10:18:00+07:00",
+  "rows": [
+    {
+      "id": "P2-001",
+      "requirement": "Tenant and workspace primitives",
+      "status": "blocked",
+      "owner": "packages/domain-core",
+      "owned_scope": ["packages/domain-core", "packages/shared-test-fixtures"],
+      "evidence": [],
+      "tests": ["npm test", "npm run typecheck"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started; this matrix row exists so the verifier can reject unverified Phase 2 work until fresh evidence is added.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-002",
+      "requirement": "Access profile model",
+      "status": "blocked",
+      "owner": "packages/access-control",
+      "owned_scope": ["packages/access-control"],
+      "evidence": [],
+      "tests": ["npm test"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-003",
+      "requirement": "Policy evaluator",
+      "status": "blocked",
+      "owner": "packages/access-control",
+      "owned_scope": ["packages/access-control"],
+      "evidence": [],
+      "tests": ["npm test"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-004",
+      "requirement": "Tenant label configuration",
+      "status": "blocked",
+      "owner": "packages/tenant-config, apps/web",
+      "owned_scope": ["packages/tenant-config", "apps/web"],
+      "evidence": [],
+      "tests": ["npm test", "npm run test:e2e:smoke"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-005",
+      "requirement": "Basic custom field registry",
+      "status": "blocked",
+      "owner": "packages/tenant-config",
+      "owned_scope": ["packages/tenant-config"],
+      "evidence": [],
+      "tests": ["npm test"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-006",
+      "requirement": "Audit event primitives",
+      "status": "blocked",
+      "owner": "packages/domain-core, apps/api",
+      "owned_scope": ["packages/domain-core", "apps/api"],
+      "evidence": [],
+      "tests": ["npm test", "npm run test:integration"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-007",
+      "requirement": "API tenant/access endpoints",
+      "status": "blocked",
+      "owner": "apps/api",
+      "owned_scope": ["apps/api"],
+      "evidence": [],
+      "tests": ["npm run test:integration", "npm run test:e2e:smoke"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-008",
+      "requirement": "Web tenant/admin shell surfaces",
+      "status": "blocked",
+      "owner": "apps/web",
+      "owned_scope": ["apps/web", "e2e/tests/phase2"],
+      "evidence": [],
+      "tests": ["npm test", "npm run test:e2e:smoke"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-009",
+      "requirement": "Deterministic Phase 2 fixtures",
+      "status": "blocked",
+      "owner": "packages/shared-test-fixtures, e2e",
+      "owned_scope": ["packages/shared-test-fixtures", "e2e"],
+      "evidence": [],
+      "tests": ["npm test", "npm run test:e2e:smoke"],
+      "cleanup": "No implementation started yet",
+      "blocker": "Implementation has not started.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    },
+    {
+      "id": "P2-010",
+      "requirement": "Phase 2 verification matrix",
+      "status": "blocked",
+      "owner": "docs/status, scripts",
+      "owned_scope": ["docs/status/phase2-requirements-matrix.json", "scripts/verify-requirements-matrix.mjs"],
+      "evidence": ["Initial P2 matrix rows exist in blocked state before implementation"],
+      "tests": ["npm run verify:matrix -- docs/status/phase2-requirements-matrix.json must fail while rows are blocked; npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json validates pre-implementation structure"],
+      "cleanup": "No runtime cleanup",
+      "blocker": "Implementation evidence has not been added yet.",
+      "last_checked_at": "2026-05-14T10:18:00+07:00"
+    }
+  ]
+}
