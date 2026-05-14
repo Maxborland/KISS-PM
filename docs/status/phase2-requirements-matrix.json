@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T11:02:07+07:00",
+  "updated_at": "2026-05-14T12:31:28+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -11,11 +11,25 @@
       "owner": "packages/domain-core",
       "owned_scope": ["packages/domain-core", "packages/shared-test-fixtures"],
       "required_e2e": ["E2E-010"],
-      "evidence": [],
-      "tests": ["npm test", "npm run typecheck", "npm run test:e2e:phase -- --phase=2 must include E2E-010 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started; this matrix row exists so the verifier can reject unverified Phase 2 work until fresh evidence is added.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/domain-core/src/index.ts defines Tenant, Workspace, TenantUser, TenantContext, ActorContext, TenantIsolationProbe, explicit tenant ownership factories, and tenant mismatch guard",
+        "packages/domain-core/src/tenantPrimitives.test.ts covers missing tenant ownership, tenant mismatch without target label leakage, actor context, and empty optional diagnostic identifier rejection",
+        "packages/shared-test-fixtures/src/demoTenants.ts creates deterministic Tenant A and Tenant B with tenant-owned workspaces, users, and private isolation probes",
+        "package-lock.json records @kiss-pm/domain-core as a workspace dependency for @kiss-pm/shared-test-fixtures"
+      ],
+      "tests": [
+        "npm test -- packages/domain-core/src/tenantPrimitives.test.ts exit 0",
+        "npm test -- packages/shared-test-fixtures/src/demoTenants.test.ts exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (5 files, 16 tests)",
+        "npm install --package-lock-only --dry-run --ignore-scripts exit 0",
+        "npm run test:e2e:smoke exit 0",
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+      ],
+      "cleanup": "No runtime writes or external resources; deterministic fixture data only",
+      "blocker": "Phase-exit verification for required E2E-010 is blocked until later P2 API/UI/phase2 E2E work creates e2e/tests/phase2/tenant-isolation.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
+      "last_checked_at": "2026-05-14T12:31:28+07:00"
     },
     {
       "id": "P2-002",
