@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T19:03:01+07:00",
+  "updated_at": "2026-05-14T19:13:46+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -68,11 +68,25 @@
       "owner": "codex",
       "owned_scope": ["packages/crm-core", "packages/tenant-config"],
       "required_e2e": ["E2E-020", "E2E-021"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; tenant-config intake metadata must be added",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/tenant-config/src/index.ts defines tenant-owned OpportunityCategoryDefinition, OpportunityTypologyDefinition, OpportunityIntakeTemplate, OpportunityIntakeMetadataRegistry, and OpportunityIntakeRequirements with stable system keys, active flags, versioning, labels, and deterministic trace output",
+        "createOpportunityIntakeMetadataRegistry validates tenant ownership, duplicate category/typology/custom-field/template keys, opportunity-only custom-field targets, known category/typology references, active custom-field requirements, and finite Phase 3 standard intake field keys",
+        "resolveOpportunityIntakeRequirements returns category/typology labels and required standard/custom intake fields from tenant configuration/templates, not from crm-core hardcoded company terms",
+        "Bug Hunt found and fixed ambiguous active template pairs plus active templates referencing inactive category/typology metadata; external Requesting Code Review returned no Critical/Important findings"
+      ],
+      "tests": [
+        "npm test -- packages/tenant-config/src/opportunityIntakeMetadata.test.ts first exit 1 with createOpportunityCategoryDefinition not implemented",
+        "npm test -- packages/tenant-config/src/opportunityIntakeMetadata.test.ts exit 1 during Bug Hunt for duplicate active template pair not rejected",
+        "npm test -- packages/tenant-config/src/opportunityIntakeMetadata.test.ts exit 0 (5 passed)",
+        "npm run typecheck -w @kiss-pm/tenant-config exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (16 files, 92 tests)",
+        "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No runtime resources were created; P3-003 adds tenant-config domain metadata and unit tests only.",
+      "blocker": "Tenant-config implementation evidence is complete, but this row cannot be marked verified because required E2E-020/E2E-021 structured evidence does not exist until Phase 3 API/web E2E rows create opportunity-create and intake-readiness specs.",
+      "last_checked_at": "2026-05-14T19:13:46+07:00"
     },
     {
       "id": "P3-004",
