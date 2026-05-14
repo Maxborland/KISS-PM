@@ -1,4 +1,5 @@
 import type { TenantId, TenantOwned } from "@kiss-pm/domain-core";
+import type { ProjectProcessTemplateDraft } from "@kiss-pm/project-core";
 
 export const packageName = "@kiss-pm/crm-core";
 
@@ -125,6 +126,35 @@ export type OpportunityReadinessCheck = TenantOwned & {
   trace: string[];
 };
 
+export type ProcessTemplateMatchBlockerCode = "process_template_missing";
+
+export type ProcessTemplateMatchBlocker = {
+  code: ProcessTemplateMatchBlockerCode;
+  severity: "blocking";
+  message: string;
+  fieldRefs: string[];
+};
+
+export type ProcessTemplateMatchAssumption = {
+  code: string;
+  message: string;
+};
+
+export type ProcessTemplateMatchResult = TenantOwned & {
+  opportunityId: OpportunityId;
+  matched: boolean;
+  template?: {
+    id: string;
+    key: string;
+    label: string;
+    version: number;
+  };
+  confidence: number;
+  assumptions: ProcessTemplateMatchAssumption[];
+  blockers: ProcessTemplateMatchBlocker[];
+  trace: string[];
+};
+
 export class CrmCoreModelError extends Error {
   constructor(
     readonly code: "validation_error" | "tenant_mismatch" | "conflict",
@@ -220,12 +250,16 @@ function requireMoneyAmount(value: MoneyAmount | undefined): MoneyAmount {
   };
 }
 
-function requireProbability(value: number | undefined): number {
+function requireProbabilityValue(value: number | undefined, fieldName: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
-    throw new CrmCoreModelError("validation_error", "opportunity.probability must be between 0 and 1");
+    throw new CrmCoreModelError("validation_error", `${fieldName} must be between 0 and 1`);
   }
 
   return value;
+}
+
+function requireProbability(value: number | undefined): number {
+  return requireProbabilityValue(value, "opportunity.probability");
 }
 
 function requireArray<T>(value: T[] | undefined, fieldName: string): T[] {
@@ -313,6 +347,223 @@ function selectReadinessNextAction(blockers: OpportunityReadinessBlocker[]): Opp
 
 function validateOptionalStringArray(value: string[] | undefined, fieldName: string): string[] {
   return requireArray(value ?? [], fieldName).map((item) => requireNonEmptyString(item, `${fieldName}[]`));
+}
+
+function validateSystemKeyArray(value: string[] | undefined, fieldName: string): string[] {
+  return requireArray(value, fieldName).map((item) => requireSystemKey(item, `${fieldName}[]`));
+}
+
+function assertUniqueTemplateKeys(keys: string[], message: string): void {
+  if (new Set(keys).size !== keys.length) {
+    throw new CrmCoreModelError("conflict", message);
+  }
+}
+
+function roundConfidence(value: number): number {
+  return Math.round(Math.min(1, value) * 100) / 100;
+}
+
+function cloneTemplateMatchScopeHints(scopeHints: OpportunityScopeHint[] | undefined): OpportunityScopeHint[] {
+  return requireArray(scopeHints, "templateMatch.opportunity.scopeHints").map((rawHint) => {
+    const hint = requireObject(rawHint, "templateMatch.opportunity.scopeHint");
+    const value = hint.value;
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new CrmCoreModelError("validation_error", "templateMatch.opportunity.scopeHint.value is invalid");
+    }
+
+    return {
+      key: requireSystemKey(hint.key, "templateMatch.opportunity.scopeHint.key"),
+      label: requireNonEmptyString(hint.label, "templateMatch.opportunity.scopeHint.label"),
+      value
+    };
+  });
+}
+
+function cloneProcessTemplateMatchAssumptions(
+  assumptions: ProjectProcessTemplateDraft["assumptions"] | undefined
+): ProjectProcessTemplateDraft["assumptions"] {
+  return requireArray(assumptions, "templateMatch.template.assumptions").map((rawAssumption) => {
+    const assumption = requireObject(rawAssumption, "templateMatch.template.assumption");
+
+    return {
+      code: requireSystemKey(assumption.code, "templateMatch.template.assumption.code"),
+      message: requireNonEmptyString(assumption.message, "templateMatch.template.assumption.message")
+    };
+  });
+}
+
+function validateProcessTemplateDraft(template: ProjectProcessTemplateDraft): ProjectProcessTemplateDraft {
+  const safeTemplate = requireObject(template, "templateMatch.template");
+  const categoryKeys = validateSystemKeyArray(safeTemplate.categoryKeys, "templateMatch.template.categoryKeys");
+  const typologyKeys = validateSystemKeyArray(safeTemplate.typologyKeys, "templateMatch.template.typologyKeys");
+  const requiredScopeHintKeys = validateSystemKeyArray(
+    safeTemplate.requiredScopeHintKeys,
+    "templateMatch.template.requiredScopeHintKeys"
+  );
+  const optionalScopeHintKeys = validateSystemKeyArray(
+    safeTemplate.optionalScopeHintKeys,
+    "templateMatch.template.optionalScopeHintKeys"
+  );
+  assertUniqueTemplateKeys(categoryKeys, "templateMatch.template category keys must be unique");
+  assertUniqueTemplateKeys(typologyKeys, "templateMatch.template typology keys must be unique");
+  assertUniqueTemplateKeys(
+    [...requiredScopeHintKeys, ...optionalScopeHintKeys],
+    "templateMatch.template scope hint keys must be unique"
+  );
+
+  return {
+    id: requireNonEmptyString(safeTemplate.id, "templateMatch.template.id"),
+    tenantId: requireNonEmptyString(safeTemplate.tenantId, "templateMatch.template.tenantId"),
+    key: requireSystemKey(safeTemplate.key, "templateMatch.template.key"),
+    label: requireNonEmptyString(safeTemplate.label, "templateMatch.template.label"),
+    categoryKeys,
+    typologyKeys,
+    requiredScopeHintKeys,
+    optionalScopeHintKeys,
+    baseConfidence: requireProbabilityValue(safeTemplate.baseConfidence, "templateMatch.template.baseConfidence"),
+    priority: requirePositiveInteger(safeTemplate.priority, "templateMatch.template.priority"),
+    active: requireBoolean(safeTemplate.active, "templateMatch.template.active"),
+    version: requirePositiveInteger(safeTemplate.version, "templateMatch.template.version"),
+    assumptions: cloneProcessTemplateMatchAssumptions(safeTemplate.assumptions),
+    updatedAt: requireValidTimestamp(safeTemplate.updatedAt, "templateMatch.template.updatedAt")
+  };
+}
+
+function getMatchedScopeHintKeys(opportunityScopeHints: OpportunityScopeHint[], templateScopeHintKeys: string[]): string[] {
+  const opportunityScopeHintKeys = new Set(opportunityScopeHints.map((hint) => hint.key));
+  return templateScopeHintKeys.filter((key) => opportunityScopeHintKeys.has(key));
+}
+
+function createMissingProcessTemplateBlocker(): ProcessTemplateMatchBlocker {
+  return {
+    code: "process_template_missing",
+    severity: "blocking",
+    message: "Подберите процессный шаблон для категории и типологии возможности.",
+    fieldRefs: ["categoryKey", "typologyKey", "scopeHints"]
+  };
+}
+
+function createMatchedScopeAssumption(
+  code: string,
+  label: string,
+  matchedScopeHintKeys: string[]
+): ProcessTemplateMatchAssumption | undefined {
+  if (matchedScopeHintKeys.length === 0) return undefined;
+
+  return {
+    code,
+    message: `${label}: ${matchedScopeHintKeys.join(", ")}.`
+  };
+}
+
+function calculateTemplateConfidence(
+  template: ProjectProcessTemplateDraft,
+  matchedRequiredScopeHintKeys: string[],
+  matchedOptionalScopeHintKeys: string[]
+): number {
+  let confidence = template.baseConfidence;
+  if (template.requiredScopeHintKeys.length > 0 && matchedRequiredScopeHintKeys.length === template.requiredScopeHintKeys.length) {
+    confidence += 0.2;
+  }
+  if (matchedOptionalScopeHintKeys.length > 0) {
+    confidence += 0.1;
+  }
+
+  return roundConfidence(confidence);
+}
+
+export function matchOpportunityToProcessTemplate(input: {
+  opportunity: Opportunity;
+  templates: ProjectProcessTemplateDraft[];
+}): ProcessTemplateMatchResult {
+  const opportunity = requireObject(input.opportunity, "templateMatch.opportunity");
+  const tenantId = requireNonEmptyString(opportunity.tenantId, "templateMatch.opportunity.tenantId");
+  const opportunityScopeHints = cloneTemplateMatchScopeHints(opportunity.scopeHints);
+  const templates = requireArray(input.templates, "templateMatch.templates");
+
+  type Candidate = {
+    template: ProjectProcessTemplateDraft;
+    confidence: number;
+    matchedRequiredScopeHintKeys: string[];
+    matchedOptionalScopeHintKeys: string[];
+  };
+
+  const candidates: Candidate[] = [];
+  for (const template of templates) {
+    const safeTemplate = validateProcessTemplateDraft(template);
+    if (safeTemplate.tenantId !== tenantId) {
+      throw new CrmCoreModelError("tenant_mismatch", "Process template tenant mismatch");
+    }
+    if (!safeTemplate.active) continue;
+    if (!safeTemplate.categoryKeys.includes(opportunity.categoryKey)) continue;
+    if (!safeTemplate.typologyKeys.includes(opportunity.typologyKey)) continue;
+
+    const matchedRequiredScopeHintKeys = getMatchedScopeHintKeys(opportunityScopeHints, safeTemplate.requiredScopeHintKeys);
+    if (matchedRequiredScopeHintKeys.length !== safeTemplate.requiredScopeHintKeys.length) continue;
+
+    const matchedOptionalScopeHintKeys = getMatchedScopeHintKeys(opportunityScopeHints, safeTemplate.optionalScopeHintKeys);
+    candidates.push({
+      template: safeTemplate,
+      confidence: calculateTemplateConfidence(safeTemplate, matchedRequiredScopeHintKeys, matchedOptionalScopeHintKeys),
+      matchedRequiredScopeHintKeys,
+      matchedOptionalScopeHintKeys
+    });
+  }
+
+  candidates.sort((left, right) => {
+    if (right.confidence !== left.confidence) return right.confidence - left.confidence;
+    if (left.template.priority !== right.template.priority) return left.template.priority - right.template.priority;
+    return left.template.key.localeCompare(right.template.key);
+  });
+  const selected = candidates[0];
+
+  if (selected === undefined) {
+    return {
+      tenantId,
+      opportunityId: requireNonEmptyString(opportunity.id, "templateMatch.opportunity.id"),
+      matched: false,
+      confidence: 0,
+      assumptions: [],
+      blockers: [createMissingProcessTemplateBlocker()],
+      trace: ["process_template_match:candidates:0", "process_template_match:missing"]
+    };
+  }
+
+  const requiredScopeAssumption = createMatchedScopeAssumption(
+    "required_scope_hints_matched",
+    "Обязательные признаки объема работ совпали",
+    selected.matchedRequiredScopeHintKeys
+  );
+  const optionalScopeAssumption = createMatchedScopeAssumption(
+    "optional_scope_hints_matched",
+    "Дополнительные признаки объема работ совпали",
+    selected.matchedOptionalScopeHintKeys
+  );
+  const assumptions = [
+    ...selected.template.assumptions.map((assumption) => ({ ...assumption })),
+    ...(requiredScopeAssumption !== undefined ? [requiredScopeAssumption] : []),
+    ...(optionalScopeAssumption !== undefined ? [optionalScopeAssumption] : [])
+  ];
+
+  return {
+    tenantId,
+    opportunityId: requireNonEmptyString(opportunity.id, "templateMatch.opportunity.id"),
+    matched: true,
+    template: {
+      id: selected.template.id,
+      key: selected.template.key,
+      label: selected.template.label,
+      version: selected.template.version
+    },
+    confidence: selected.confidence,
+    assumptions,
+    blockers: [],
+    trace: [
+      `process_template_match:candidates:${candidates.length}`,
+      `process_template_match:selected:${selected.template.key}`,
+      `process_template_match:confidence:${selected.confidence}`
+    ]
+  };
 }
 
 export function evaluateOpportunityReadiness(input: OpportunityReadinessInput): OpportunityReadinessCheck {

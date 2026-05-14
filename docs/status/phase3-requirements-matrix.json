@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T19:13:46+07:00",
+  "updated_at": "2026-05-14T19:33:40+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -95,11 +95,31 @@
       "owner": "codex",
       "owned_scope": ["packages/crm-core", "packages/project-core"],
       "required_e2e": ["E2E-021", "E2E-022"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; requires opportunity and intake metadata model",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/project-core/src/index.ts defines tenant-owned ProjectProcessTemplateDraft with stable template/category/typology/scope keys, base confidence, priority, active flag, version, safe assumptions, and timestamp validation",
+        "packages/crm-core/src/index.ts implements matchOpportunityToProcessTemplate with tenant isolation, active-template filtering, deterministic category/typology/required-scope matching, confidence calculation, priority/key tie-breaking, safe missing-template blocker, and traceable assumptions",
+        "packages/project-core/package.json, packages/crm-core/package.json, and package-lock.json record workspace dependencies for project-core/domain-core and crm-core/project-core",
+        "Bug Hunt found and fixed malformed template/assumption runtime guards and empty category/typology template configuration acceptance",
+        "Requesting Code Review found an Important confidence double-counting risk from duplicate required/optional scope keys in bypassed templates; Receiving Code Review fix rejects duplicate category/typology/scope key sets in matcher revalidation; second review pass returned no remaining Critical/Important findings"
+      ],
+      "tests": [
+        "npm test -- packages/project-core/src/processTemplateDraft.test.ts first exit 1 with createProjectProcessTemplateDraft not implemented",
+        "npm test -- packages/crm-core/src/templateMatch.test.ts first exit 1 with createProjectProcessTemplateDraft not implemented",
+        "npm test -- packages/project-core/src/processTemplateDraft.test.ts exit 1 during Bug Hunt for empty category keys being accepted",
+        "npm test -- packages/crm-core/src/templateMatch.test.ts exit 1 during Bug Hunt for malformed template refs throwing TypeError",
+        "npm test -- packages/project-core/src/processTemplateDraft.test.ts exit 0 (2 passed)",
+        "npm test -- packages/crm-core/src/templateMatch.test.ts exit 1 during code review fix for duplicate scope/category key set acceptance",
+        "npm test -- packages/crm-core/src/templateMatch.test.ts exit 0 (5 passed)",
+        "npm run typecheck -w @kiss-pm/project-core exit 0",
+        "npm run typecheck -w @kiss-pm/crm-core exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (18 files, 99 tests)",
+        "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No runtime resources were created; P3-004 adds pure project-core/crm-core domain logic and unit tests only.",
+      "blocker": "Process-template matching implementation evidence is complete, but this row cannot be marked verified because required E2E-021/E2E-022 structured evidence does not exist until Phase 3 API/web E2E rows create intake-readiness and feasibility-analysis specs.",
+      "last_checked_at": "2026-05-14T19:33:40+07:00"
     },
     {
       "id": "P3-005",
