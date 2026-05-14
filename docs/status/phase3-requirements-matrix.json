@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T19:33:40+07:00",
+  "updated_at": "2026-05-14T20:03:36+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -128,11 +128,34 @@
       "owner": "codex",
       "owned_scope": ["packages/crm-core", "packages/resource-planning"],
       "required_e2e": ["E2E-022"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; requires template-match assumptions",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/resource-planning/src/index.ts defines DemandTemplateProfile, DemandTemplateRoleRule, DemandFormulaMetadata, DemandEstimate, StageRoleDemand, and ResourcePlanningModelError for deterministic Phase 3 demand estimation",
+        "estimateDemandFromTemplateMatch produces sorted stage/role planned work, total planned work, scenario label, formula key/version/label, per-role confidence, source assumptions, top-level template-match assumptions, and trace output from a matched template plus opportunity scope hints",
+        "Demand formula uses finite deterministic baseWorkHours plus numeric scopeHintDriver hoursPerUnit inputs; nonnumeric driven scope hints, unmatched template results, tenant mismatches, and template/profile version drift are rejected with typed errors",
+        "Receiving Code Review fixed an Important template-match provenance gap: DemandTemplateMatchInput now carries tenantId and opportunityId, and estimateDemandFromTemplateMatch rejects template-match tenant/opportunity mismatches before using match assumptions",
+        "Second Receiving Code Review fixed an Important source-data provenance gap: DemandScopeHint is now tenant/opportunity-owned and scope-hint tenant/opportunity mismatches are rejected before formula evaluation",
+        "packages/resource-planning/package.json and package-lock.json record @kiss-pm/domain-core as a workspace dependency",
+        "Bug Hunt found and fixed silent demand undercount risks: missing driven scope hints and negative numeric scope hints now fail with typed validation errors instead of producing misleading planned work",
+        "Bug Hunt after review fix added a top-level demandEstimate object guard so malformed callers receive ResourcePlanningModelError instead of a TypeError",
+        "Final Receiving Code Review fixed an Important formula overflow gap: derived driver contribution, role planned work, and total planned work are now finite-checked before returning an estimate",
+        "Final Requesting Code Review pass returned no remaining Critical/Important findings for P3-005"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts first exit 1 with createDemandTemplateProfile not implemented",
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts exit 1 during Bug Hunt for missing/negative scope driver validation and null profile TypeError",
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts exit 1 in sandbox with esbuild spawn EPERM, escalated rerun exit 1 during code review fix because template-match provenance from another tenant/opportunity was not rejected",
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts exit 1 during second code review fix because scope hints from another tenant/opportunity were not rejected",
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts exit 1 during final code review fix because formula overflow could return infinite planned work",
+        "npm test -- packages/resource-planning/src/demandEstimate.test.ts exit 0 after code review and Bug Hunt fixes (7 passed)",
+        "npm run typecheck -w @kiss-pm/resource-planning exit 0 after code review and Bug Hunt fixes",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (19 files, 106 tests)",
+        "npm run test:e2e:phase -- --phase=3 exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No runtime resources were created; P3-005 adds pure resource-planning domain logic and unit tests only.",
+      "blocker": "Demand-estimation implementation evidence is complete, but this row cannot be marked verified because required E2E-022 structured evidence does not exist until Phase 3 API/web E2E rows create feasibility-analysis specs.",
+      "last_checked_at": "2026-05-14T20:03:36+07:00"
     },
     {
       "id": "P3-006",
