@@ -1,0 +1,140 @@
+{
+  "phase": "P3",
+  "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-14T18:06:31+07:00",
+  "rows": [
+    {
+      "id": "P3-001",
+      "requirement": "CRM intake domain primitives",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/crm-core", "packages/domain-core"],
+      "required_e2e": ["E2E-020"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; Phase 3 contract gate is the current block",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-002",
+      "requirement": "Opportunity readiness checks",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/crm-core"],
+      "required_e2e": ["E2E-021"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; depends on P3-001 domain primitives",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-003",
+      "requirement": "Typology, category, custom-field intake metadata",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/crm-core", "packages/tenant-config"],
+      "required_e2e": ["E2E-020", "E2E-021"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; tenant-config intake metadata must be added",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-004",
+      "requirement": "Process-template matching draft",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/crm-core", "packages/project-core"],
+      "required_e2e": ["E2E-021", "E2E-022"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; requires opportunity and intake metadata model",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-005",
+      "requirement": "Demand-estimation draft",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/crm-core", "packages/resource-planning"],
+      "required_e2e": ["E2E-022"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; requires template-match assumptions",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-006",
+      "requirement": "Capacity-feasibility draft",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/resource-planning", "packages/crm-core"],
+      "required_e2e": ["E2E-022"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; requires deterministic seeded capacity fixtures",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-007",
+      "requirement": "CRM intake API endpoints",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["apps/api", "packages/crm-core"],
+      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; API contract must follow completed domain primitives and services",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-008",
+      "requirement": "Project draft creation from qualified opportunity",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["packages/project-core", "packages/action-engine"],
+      "required_e2e": ["E2E-023", "E2E-024"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; requires readiness, feasibility, permissions, and audit/action integration",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-009",
+      "requirement": "CRM Intake Control web surface and E2E suite",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["apps/web", "e2e/tests/phase3"],
+      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Implementation not started; requires Phase 3 API behavior",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3-010",
+      "requirement": "Phase 3 verification matrix",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": ["docs/status", "scripts"],
+      "required_e2e": ["E2E-020", "E2E-021", "E2E-022", "E2E-023", "E2E-024"],
+      "evidence": [
+        "Initial matrix exists with all P3 rows blocked and exact required_e2e plus ledger test_path mapping owned by scripts/verify-requirements-matrix.mjs"
+      ],
+      "tests": ["npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0", "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json exit 1 because P3 rows are intentionally blocked before implementation"],
+      "cleanup": "No runtime cleanup yet",
+      "blocker": "Final Phase 3 implementation and E2E evidence are not complete",
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    }
+  ]
+}

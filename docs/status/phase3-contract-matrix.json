@@ -1,0 +1,53 @@
+{
+  "phase": "P3-contract",
+  "name": "Phase 3 detail contract before implementation",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-14T18:06:31+07:00",
+  "rows": [
+    {
+      "id": "P3C-001",
+      "requirement": "Create Phase 3 detail document before implementation",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_3_CRM_INTAKE_OPPORTUNITY_TO_PROJECT.md"],
+      "evidence": [
+        "Phase 3 detail document defines objective, scope lock, functional scope, non-scope, domain model, API contracts, UI surfaces, E2E scenarios, tests, fixtures, exit gate, risks, and decisions",
+        "Scope is frozen around CRM intake, readiness, feasibility, and audited project draft creation without external CRM adapter dependency"
+      ],
+      "tests": ["manual review", "npm run typecheck exit 0", "npm run lint exit 0", "npm test exit 0 (76 passed)", "npm run verify:matrix -- docs/status/phase3-contract-matrix.json exit 0"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3C-002",
+      "requirement": "Define finite closed implementation tasks for P3",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_3_CRM_INTAKE_OPPORTUNITY_TO_PROJECT.md", "docs/status/phase3-requirements-matrix.json"],
+      "evidence": [
+        "Functional scope table defines P3-001 through P3-010 with owner/module, expected behavior, acceptance criteria, E2E references, verification, task non-scope, and done evidence",
+        "Phase 3 requirements matrix pre-creates every P3 row as blocked until implementation provides fresh command evidence"
+      ],
+      "tests": ["manual review", "npm run typecheck exit 0", "npm run lint exit 0", "npm test exit 0 (76 passed)", "npm run verify:matrix -- docs/status/phase3-contract-matrix.json exit 0", "npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    },
+    {
+      "id": "P3C-003",
+      "requirement": "Define mandatory E2E matrix and fixtures for P3",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": ["docs/phases/PHASE_3_CRM_INTAKE_OPPORTUNITY_TO_PROJECT.md", "docs/e2e/E2E_SCENARIOS.md", "scripts/verify-requirements-matrix.mjs"],
+      "evidence": [
+        "E2E-020 through E2E-024 are mapped to Phase 3 roles, fixtures, test paths, expected results, and required assertion pattern",
+        "Verifier owns the exact required_e2e contract and ledger test_path contract for P3-001 through P3-010 so final phase exit cannot pass with deleted, prose-only, or arbitrary phase3 E2E references"
+      ],
+      "tests": ["manual review", "npm test -- scripts/verify-requirements-matrix.test.ts exit 0 (12 passed)", "npm test exit 0 (76 passed)", "npm run verify:matrix -- docs/status/phase3-contract-matrix.json exit 0", "npm run verify:matrix -- --allow-blocked docs/status/phase3-requirements-matrix.json exit 0"],
+      "cleanup": "No runtime writes",
+      "blocker": null,
+      "last_checked_at": "2026-05-14T18:06:31+07:00"
+    }
+  ]
+}
