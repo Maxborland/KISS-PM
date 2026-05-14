@@ -9,7 +9,7 @@
     "test": "vitest run src/**/*.test.ts"
   },
   "dependencies": {
+    "@kiss-pm/domain-core": "0.1.0",
     "hono": "^4.10.6"
   }
 }
-
