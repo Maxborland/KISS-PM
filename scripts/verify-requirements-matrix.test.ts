@@ -137,6 +137,18 @@ describe("verify-requirements-matrix", () => {
     expect(result.stderr).toContain("P2-007: required_e2e must exactly match phase contract");
   });
 
+  it("rejects blocked P2 rows at phase exit without allow-blocked", () => {
+    const matrixPath = writeP2MatrixFixture("blocked-phase-exit.json", {});
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P2-001: blocked row requires --allow-blocked");
+  });
+
   it("rejects P2 structured E2E evidence that points to Phase 1", () => {
     const matrixPath = writeP2MatrixFixture("phase1-e2e-evidence.json", {
       "P2-001": {
@@ -196,6 +208,39 @@ describe("verify-requirements-matrix", () => {
         }
       ]
     });
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("accepts a complete P2 matrix only when every row is verified with required structured E2E evidence", () => {
+    const checkedAt = "2026-05-14T16:10:00+07:00";
+    const matrixPath = writeP2MatrixFixture(
+      "complete-p2-phase-exit.json",
+      Object.fromEntries(
+        Object.entries(p2RequiredE2e).map(([id, requiredE2e]) => [
+          id,
+          {
+            status: "verified",
+            evidence: [`${id} verified`],
+            tests: ["npm run test:e2e:phase -- --phase=2 exit 0"],
+            blocker: "None",
+            e2e_evidence: requiredE2e.map((e2eId) => ({
+              id: e2eId,
+              command: "npm run test:e2e:phase -- --phase=2",
+              test_path: `e2e/tests/phase2/${e2eId.toLowerCase()}.spec.ts`,
+              exit_code: 0,
+              checked_at: checkedAt
+            }))
+          }
+        ])
+      )
+    );
 
     const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
       cwd: resolve("."),
