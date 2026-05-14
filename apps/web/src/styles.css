@@ -142,6 +142,17 @@ nav a:focus-visible {
   padding: 8px 12px;
 }
 
+.user-stack {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.role-chip {
+  color: #526052;
+  font-size: 12px;
+}
+
 .empty-state {
   max-width: 760px;
   border: 1px solid #d7dfd1;
@@ -179,5 +190,8 @@ nav a:focus-visible {
     align-items: flex-start;
     flex-direction: column;
   }
-}
 
+  .user-stack {
+    justify-items: start;
+  }
+}

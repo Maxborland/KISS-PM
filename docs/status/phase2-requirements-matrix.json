@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T12:59:23+07:00",
+  "updated_at": "2026-05-14T13:37:04+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -88,11 +88,26 @@
       "owner": "packages/tenant-config, apps/web",
       "owned_scope": ["packages/tenant-config", "apps/web"],
       "required_e2e": ["E2E-013"],
-      "evidence": [],
-      "tests": ["npm test", "npm run test:e2e:phase -- --phase=2 must include E2E-013 with previous/current configuration version evidence at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/tenant-config/src/index.ts defines TenantConfiguration, TenantLabelSet, TenantLabelChangeTrace, createTenantConfiguration, createTenantLabelSet, updateTenantLabel, and resolveTenantLabel",
+        "Tenant label updates are immutable, reject stale expectedConfigurationVersion values, increment configurationVersion, and return previous/current configuration version plus changed key/before/after labels for later API/audit DTOs",
+        "resolveTenantLabel requires configured runtime labels or an explicit fallback so internal label keys are not silently exposed to users",
+        "apps/web/src/App.tsx reads navigation, role, shell prefix, aria, and shell placeholder labels from a TenantLabelSet; apps/web/src/App.test.tsx proves runtime label overrides change visible navigation, role, tenant/config/user prefixes, and navigation aria label without changing component text literals",
+        "package-lock.json records @kiss-pm/tenant-config workspace dependencies for @kiss-pm/web and @kiss-pm/domain-core for @kiss-pm/tenant-config"
+      ],
+      "tests": [
+        "npm test -- packages/tenant-config/src/tenantLabels.test.ts exit 0 (5 tests)",
+        "npm test -- apps/web/src/App.test.tsx exit 0 (4 tests)",
+        "npm install --package-lock-only --ignore-scripts exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (8 files, 38 tests)",
+        "npm run test:e2e:smoke exit 0",
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+      ],
+      "cleanup": "No runtime writes or external resources; package-lock workspace dependency update only",
+      "blocker": "Phase-exit verification for required E2E-013 remains blocked until later P2 API/audit/web/E2E rows add POST /admin/labels, audit event persistence, deterministic Phase 2 fixtures, and e2e/tests/phase2/tenant-labels.spec.ts. Current block provides domain trace payload and shell runtime-label read path but not the Phase 2 API/audit write flow. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
+      "last_checked_at": "2026-05-14T13:37:04+07:00"
     },
     {
       "id": "P2-005",
