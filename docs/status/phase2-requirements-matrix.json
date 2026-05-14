@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T12:42:09+07:00",
+  "updated_at": "2026-05-14T12:59:23+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -63,11 +63,23 @@
       "owner": "packages/access-control",
       "owned_scope": ["packages/access-control"],
       "required_e2e": ["E2E-010", "E2E-012"],
-      "evidence": [],
-      "tests": ["npm test", "npm run test:e2e:phase -- --phase=2 must include E2E-010 and E2E-012 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "packages/access-control/src/index.ts defines PolicyRequest, PolicyEvaluation, PolicyTargetRef, and deterministic evaluatePolicy with safe trace output",
+        "Policy evaluator denies tenant mismatch before target identity appears in trace, denies unsupported requested scopes and raw stored unsupported scope rules with unsupported_scope, denies inactive profiles and missing permissions, and evaluates own/project/tenant/all scopes",
+        "packages/access-control/src/policyEvaluator.test.ts covers allow by tenant scope, missing permission, safe tenant mismatch, own/project/tenant/all scope behavior, own/project mismatch, unsupported department requested scope, unsupported raw stored team scope, inactive profile, and requested scope not granted"
+      ],
+      "tests": [
+        "npm test -- packages/access-control/src/policyEvaluator.test.ts exit 0 (8 tests)",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (7 files, 32 tests)",
+        "npm run test:e2e:smoke exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet"
+      ],
+      "cleanup": "No runtime writes or external resources; pure deterministic policy evaluation only",
+      "blocker": "Phase-exit verification for required E2E-010 and E2E-012 is blocked until later P2 API/UI/phase2 E2E work creates e2e/tests/phase2/tenant-isolation.spec.ts and e2e/tests/phase2/read-only-permissions.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
+      "last_checked_at": "2026-05-14T12:59:23+07:00"
     },
     {
       "id": "P2-004",

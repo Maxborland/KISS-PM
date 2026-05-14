@@ -34,6 +34,45 @@ export type ProfileAssignment = {
   assignedAt: string;
 };
 
+export type PolicyTargetRef = {
+  entityType: string;
+  tenantId: TenantId;
+  entityId?: string;
+  ownerId?: TenantUserId;
+  projectId?: string;
+};
+
+export type PolicyRequest = {
+  actor: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+  };
+  profile: AccessProfile;
+  permissionKey: string;
+  target: PolicyTargetRef;
+  requestedScope?: string;
+  contextRefs?: {
+    projectIds?: string[];
+  };
+};
+
+export type PolicyEvaluation = {
+  allowed: boolean;
+  reasonCode:
+    | "allowed"
+    | "profile_tenant_mismatch"
+    | "tenant_mismatch"
+    | "unsupported_scope"
+    | "profile_inactive"
+    | "permission_missing"
+    | "scope_not_granted"
+    | "owner_mismatch"
+    | "project_scope_unavailable"
+    | "project_scope_mismatch";
+  scope?: AccessScope | string;
+  trace: string[];
+};
+
 export class AccessControlModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
@@ -170,4 +209,132 @@ export function createProfileAssignment(input: {
     accessProfileId: requireNonEmptyString(input.accessProfileId, "accessProfileId"),
     assignedAt: requireValidTimestamp(input.assignedAt, "assignedAt")
   };
+}
+
+function isSupportedScope(scope: string): scope is AccessScope {
+  return ["own", "project", "tenant", "all"].includes(scope);
+}
+
+function deny(
+  reasonCode: PolicyEvaluation["reasonCode"],
+  trace: string[],
+  scope?: AccessScope | string
+): PolicyEvaluation {
+  return {
+    allowed: false,
+    reasonCode,
+    ...(scope ? { scope } : {}),
+    trace
+  };
+}
+
+function allow(scope: AccessScope, trace: string[]): PolicyEvaluation {
+  return {
+    allowed: true,
+    reasonCode: "allowed",
+    scope,
+    trace
+  };
+}
+
+function evaluateScopeRule(request: PolicyRequest, rule: ScopeRule, trace: string[]): PolicyEvaluation {
+  const scope = rule.scope as string;
+  trace.push(`policy:scope_rule scope=${scope}`);
+
+  if (!isSupportedScope(scope)) {
+    trace.push(`policy:unsupported_scope scope=${scope}`);
+    return deny("unsupported_scope", trace, scope);
+  }
+
+  if (scope === "all" || scope === "tenant") {
+    trace.push(`policy:allowed scope=${scope}`);
+    return allow(scope, trace);
+  }
+
+  if (scope === "own") {
+    if (request.target.ownerId && request.target.ownerId === request.actor.actorId) {
+      trace.push("policy:allowed scope=own");
+      return allow("own", trace);
+    }
+
+    trace.push("policy:owner_mismatch");
+    return deny("owner_mismatch", trace, "own");
+  }
+
+  if (!request.target.projectId) {
+    trace.push("policy:project_scope_unavailable");
+    return deny("project_scope_unavailable", trace, "project");
+  }
+
+  if (request.contextRefs?.projectIds?.includes(request.target.projectId)) {
+    trace.push("policy:allowed scope=project");
+    return allow("project", trace);
+  }
+
+  trace.push("policy:project_scope_mismatch");
+  return deny("project_scope_mismatch", trace, "project");
+}
+
+export function evaluatePolicy(request: PolicyRequest): PolicyEvaluation {
+  const permissionKey = requireNonEmptyString(request.permissionKey, "permissionKey");
+  const actorTenantId = requireNonEmptyString(request.actor.tenantId, "actor.tenantId");
+  const actorId = requireNonEmptyString(request.actor.actorId, "actor.actorId");
+  const targetTenantId = requireNonEmptyString(request.target.tenantId, "target.tenantId");
+  const targetType = requireNonEmptyString(request.target.entityType, "target.entityType");
+  const trace = [`policy:start tenant=${actorTenantId} actor=${actorId} permission=${permissionKey} targetType=${targetType}`];
+
+  if (request.profile.tenantId !== actorTenantId) {
+    trace.push("policy:profile_tenant_mismatch");
+    return deny("profile_tenant_mismatch", trace);
+  }
+
+  if (targetTenantId !== actorTenantId) {
+    trace.push("policy:tenant_mismatch");
+    return deny("tenant_mismatch", trace);
+  }
+
+  trace.push("policy:tenant_match");
+
+  if (request.requestedScope !== undefined) {
+    const requestedScope = requireNonEmptyString(request.requestedScope, "requestedScope");
+    if (!isSupportedScope(requestedScope)) {
+      trace.push(`policy:unsupported_scope scope=${requestedScope}`);
+      return deny("unsupported_scope", trace, requestedScope);
+    }
+  }
+
+  if (!request.profile.active) {
+    trace.push(`policy:profile_inactive version=${request.profile.version}`);
+    return deny("profile_inactive", trace);
+  }
+
+  trace.push(`policy:profile_active version=${request.profile.version}`);
+
+  if (!request.profile.permissions.includes(permissionKey)) {
+    trace.push("policy:permission_missing");
+    return deny("permission_missing", trace);
+  }
+
+  trace.push("policy:permission_present");
+
+  const matchingScopeRules = request.profile.scopeRules.filter((rule) => {
+    if (rule.permissionKey !== permissionKey) return false;
+    return request.requestedScope === undefined || rule.scope === request.requestedScope;
+  });
+
+  if (matchingScopeRules.length === 0) {
+    trace.push("policy:scope_not_granted");
+    return deny("scope_not_granted", trace, request.requestedScope);
+  }
+
+  let lastDenied: PolicyEvaluation | undefined;
+  for (const rule of matchingScopeRules) {
+    const evaluation = evaluateScopeRule(request, rule, [...trace]);
+    if (evaluation.allowed) {
+      return evaluation;
+    }
+    lastDenied = evaluation;
+  }
+
+  return lastDenied ?? deny("scope_not_granted", trace, request.requestedScope);
 }
