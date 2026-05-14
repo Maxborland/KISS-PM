@@ -2,7 +2,7 @@
   "phase": "P2",
   "name": "SaaS tenant core and access control implementation",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T14:11:14+07:00",
+  "updated_at": "2026-05-14T14:32:15+07:00",
   "rows": [
     {
       "id": "P2-001",
@@ -173,11 +173,30 @@
       "owner": "apps/api",
       "owned_scope": ["apps/api"],
       "required_e2e": ["E2E-010", "E2E-011", "E2E-012", "E2E-013", "E2E-014"],
-      "evidence": [],
-      "tests": ["npm run test:integration", "npm run test:e2e:phase -- --phase=2 must include E2E-010..014 at phase exit"],
-      "cleanup": "No implementation started yet",
-      "blocker": "Implementation has not started.",
-      "last_checked_at": "2026-05-14T10:18:00+07:00"
+      "evidence": [
+        "apps/api/src/app.ts implements GET /tenants/current, GET /admin/access-profiles, POST /admin/access-profiles, POST /admin/labels, POST /admin/permissions/evaluate, GET /tenant-isolation-probes/:probeId, GET /audit/events, and POST /test-fixtures/reset",
+        "apps/api/src/app.ts validates POST bodies with Zod, establishes fixture actor/tenant context from testUser, applies server-side policy checks through @kiss-pm/access-control, returns stable DTO field names, and keeps fixture reset behind createApiApp({ allowTestFixtureReset: true })",
+        "apps/api/src/phase2Runtime.ts creates deterministic Phase 2 in-memory runtime state from shared demo tenants, Phase 2 access profiles, runtime label sets, tenant isolation probes, and audit store",
+        "Successful access profile upserts and tenant label updates append tenant-scoped audit events with actor, tenant, target, action key, timestamp, correlation ID, and before/after details",
+        "apps/api/src/phase2Api.test.ts covers current tenant DTO, tenant-scoped profile list/upsert, label update version trace and stale conflict, read-only direct mutation denial with no success audit, safe tenant mismatch diagnostics, cross-tenant probe not_found without Tenant B private detail leakage, known diagnostic target-id resolution, unknown label-key and inherited label-key rejection before state/audit writes, and test fixture reset gating",
+        "package.json test:integration now runs apps/api/src so P2 API integration tests are part of the standard integration command; package-lock.json records @kiss-pm/api dependencies on access-control, tenant-config, shared-test-fixtures, domain-core, Hono, and Zod"
+      ],
+      "tests": [
+        "npm test -- apps/api/src/phase2Api.test.ts first exited 1 with 6 failing 404 assertions before implementation, proving the new route tests were red",
+        "npm test -- apps/api/src/phase2Api.test.ts after review regression additions first exited 1 with 2 failing assertions for unknown label partial write and targetEntityId diagnostics, proving both review findings were reproduced",
+        "npm test -- apps/api/src/phase2Api.test.ts after second review inherited-key regression first exited 1 with one failing assertion for toString label key mutating state, proving the review finding was reproduced",
+        "npm test -- apps/api/src/phase2Api.test.ts exit 0 (9 tests)",
+        "npm run test:integration exit 0 (3 files, 13 tests)",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0 (12 files, 59 tests)",
+        "npm run test:e2e:smoke exit 0 (6 passed)",
+        "npm run test:e2e:phase -- --phase=2 exits 1 because e2e/tests/phase2 is not implemented yet",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json exit 0"
+      ],
+      "cleanup": "No external writes or persistent runtime resources; deterministic in-memory P2 runtime can be reset through test-mode-only POST /test-fixtures/reset and each createApiApp instance owns isolated runtime state",
+      "blocker": "Phase-exit verification for required E2E-010, E2E-011, E2E-012, E2E-013, and E2E-014 remains blocked until later P2 web/fixture/E2E rows add e2e/tests/phase2/tenant-isolation.spec.ts, access-profile.spec.ts, read-only-permissions.spec.ts, tenant-labels.spec.ts, and audit-basics.spec.ts. Fresh proof: npm run test:e2e:phase -- --phase=2 exits 1 with 'No tests found'.",
+      "last_checked_at": "2026-05-14T14:32:15+07:00"
     },
     {
       "id": "P2-008",
