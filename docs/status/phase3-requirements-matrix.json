@@ -2,7 +2,7 @@
   "phase": "P3",
   "name": "Phase 3 CRM intake and opportunity-to-project requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-14T18:06:31+07:00",
+  "updated_at": "2026-05-14T18:50:28+07:00",
   "rows": [
     {
       "id": "P3-001",
@@ -11,11 +11,29 @@
       "owner": "codex",
       "owned_scope": ["packages/crm-core", "packages/domain-core"],
       "required_e2e": ["E2E-020"],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet",
-      "blocker": "Implementation not started; Phase 3 contract gate is the current block",
-      "last_checked_at": "2026-05-14T18:06:31+07:00"
+      "evidence": [
+        "packages/crm-core/src/index.ts implements tenant-owned Account, Contact, OpportunityStage, Opportunity, MoneyAmount, scope hints, custom-field metadata refs, manual source, tenant mismatch guards, stable system key validation, ISO date/date-window validation, probability validation, duplicate-contact rejection, active-stage validation, runtime array/object guards, and defensive copies",
+        "packages/crm-core/src/intakePrimitives.test.ts covers tenant-owned primitive creation without Bitrix/AmoCRM coupling, cross-tenant reference rejection without leaking referenced details, stable key/date/probability validation, defensive copies, malformed runtime arrays/metadata, and missing or unvalidated stage refs"
+      ],
+      "tests": [
+        "npm test -- packages/crm-core/src/intakePrimitives.test.ts first exit 1 with createAccount/createOpportunityStage not implemented",
+        "npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 0 (4 passed)",
+        "Bug Hunt regression: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 1 because malformed contacts crashed with TypeError before runtime array guard",
+        "Bug Hunt fix verification: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 0 (5 passed)",
+        "Code review regression: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 1 because missing stage crashed with TypeError before runtime object guard",
+        "Code review fix verification: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 0 (5 passed)",
+        "Second review regression: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 1 because malformed truthy stage.active was accepted before strict boolean validation",
+        "Second review fix verification: npm test -- packages/crm-core/src/intakePrimitives.test.ts exit 0 (5 passed)",
+        "npm run typecheck -w @kiss-pm/crm-core exit 0",
+        "npm ls @kiss-pm/domain-core -w @kiss-pm/crm-core exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test first exit 1 because apps/web/src/App.test.tsx label update did not find expected text; targeted rerun of apps/web/src/App.test.tsx exit 0 (12 passed), full rerun exit 0 (14 files, 80 tests), final rerun after review fixes exit 0 (14 files, 81 tests)",
+        "npm run test:e2e:phase -- --phase=3 first exit 1 in sandbox because test-results/.last-run.json unlink was not permitted; escalated rerun exit 1 because e2e/tests/phase3 has no tests yet"
+      ],
+      "cleanup": "No runtime resources were created. npm install --package-lock-only --ignore-scripts updated package-lock only for the new workspace dependency. Test-results write failure was sandbox-local; escalated E2E blocker check completed without creating Phase 3 test artifacts.",
+      "blocker": "Domain primitive implementation evidence is complete, but this row still cannot be marked verified because required E2E-020 structured evidence does not exist until Phase 3 API/web E2E rows create e2e/tests/phase3/opportunity-create.spec.ts.",
+      "last_checked_at": "2026-05-14T18:50:28+07:00"
     },
     {
       "id": "P3-002",
