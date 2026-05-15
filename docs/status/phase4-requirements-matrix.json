@@ -2,7 +2,7 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T10:56:37+07:00",
+  "updated_at": "2026-05-15T14:08:00+07:00",
   "rows": [
     {
       "id": "P4-001",
@@ -257,7 +257,9 @@
       "status": "blocked",
       "owner": "codex",
       "owned_scope": [
-        "apps/web"
+        "apps/web",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/artifacts/p4-008-project-work-smoke-reviewfix.png"
       ],
       "required_e2e": [
         "E2E-030",
@@ -267,14 +269,35 @@
         "E2E-034"
       ],
       "evidence": [
-        "Phase 4 contract defines Russian lifecycle, My Tasks, and Kanban UI surfaces before implementation"
+        "apps/web exports phase4ProjectWorkApiClient with stable DTOs and real API calls for project creation from template, project readback, stage transitions, artifact/approval evidence, project task list/create, task status/comments, My Tasks, Kanban, and target audit readback",
+        "apps/web ProjectWorkControlSurface adds Russian guided lifecycle, stage gate, project tasks, My Tasks, controlled tasks, Kanban, and task audit surfaces; UI actions call the Phase 4 API client instead of mutating business state locally",
+        "Review fixes verified: UI no longer switches task status/comment commands to a hardcoded executor actor; managers see the task as a controller, executor My Tasks are covered with an executor session, and task status/comment commands use the logged-in testUser",
+        "Review fixes verified: audit readback is permission-gated and degrades independently from work queues, lifecycle stage statuses render in Russian, stale stage-gate blockers clear after artifact/approval evidence, and task comments require API readback before the UI reports success",
+        "Review fixes verified: existing project-draft conflict retry no longer fetches /projects/project-draft-* and instead returns the deterministic draft id/status so createProjectFromTemplate can proceed",
+        "Component coverage proves the same canonical task id appears across project task list, executor My Tasks, controlled tasks, and Kanban; status movement refreshes project/queue/audit projections for the acted-on task id instead of the first projected task",
+        "Denied state is visible for read-only project creation attempts without calling ensureProjectDraft first, so the component proves the governed create-project command boundary instead of an earlier draft-create denial; reload readback uses getProject/listProjectTasks/getKanbanProject so project/task state is not accepted from local component memory",
+        "Playwright browser smoke against local API/Web dev servers after review fixes proved the live UI flow: create managed project, create task-phase4-kickoff, keep manager My Tasks empty, show the task in controlled tasks and Kanban, move it to in_progress as project-manager-a, read task.status.change audit with actor project-manager-a, show missing gate blockers, record accepted artifact and approved approval, advance stage, then reload and retain project/task/Kanban/audit state. Screenshot artifact: docs/status/artifacts/p4-008-project-work-smoke-reviewfix.png",
+        "Executor browser smoke currently reaches a fixture permission limit: executor-a cannot read the default project surface in the live shell, so executor My Tasks remains component-covered until deterministic Phase 4 fixtures/E2E are implemented in P4-009",
+        "P4-008 intentionally provides component and browser-smoke UI evidence; structured Phase 4 E2E specs E2E-030..034 remain P4-009/P4-010 scope before phase-exit verification can pass without --allow-blocked"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- apps/web/src/ProjectWorkControlSurface.test.tsx initial RED exit 1 after escalation, failed because ./ProjectWorkControlSurface did not exist before implementation",
+        "npm test -- apps/web/src/ProjectWorkControlSurface.test.tsx exit 0, 1 file and 6 tests passed after actor/denial/audit/stage-label/comment/conflict-retry review fixes",
+        "npm test -- apps/web/src exit 0, 3 files and 22 tests passed after updating the Phase 4 shell notice expectation",
+        "npm run typecheck exit 0 after review fixes",
+        "npm run lint exit 0 after review fixes",
+        "npm test -- apps packages scripts/verify-requirements-matrix.test.ts exit 0, 38 files and 212 tests passed",
+        "Browser smoke via Playwright MCP on http://127.0.0.1:5175/?testUser=project-manager-a with API http://127.0.0.1:4174 exit 0 by tool execution after fixture reset: project creation, task creation, Russian stage labels, manager-controlled task readback, Kanban status change by project-manager-a, task.status.change audit actor project-manager-a, gate block, blocker cleanup after evidence, artifact/approval evidence, stage transition, and reload readback observed in snapshots",
+        "Browser console produced expected network entries while proving missing project readback and stage-gate denial paths; final reload snapshot and console error check showed persisted state without new functional errors",
+        "Browser executor smoke on http://127.0.0.1:5175/?testUser=executor-a observed a fixture permission denial for project read; this is recorded as P4-009 fixture/E2E scope, with executor My Tasks covered by component test until deterministic browser fixtures exist",
+        "Bug Hunt final re-check found no remaining Critical or Important findings after the conflict retry fix; code review re-check passed with no Critical or Important blockers",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json exit 1 expected because P4-001..P4-007 structured E2E evidence is deferred and P4-008/P4-009/P4-010 remain blocked",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Phase 4 UI implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "Local dev API/Web servers were started only for browser smoke against in-memory fixture state; no external services or production data were used. Screenshot artifact retained under docs/status/artifacts/p4-008-project-work-smoke-reviewfix.png.",
+      "blocker": "Implementation and browser smoke are complete, but P4-008 acceptance remains blocked until P4-009 deterministic fixtures and P4-010 phase verification provide structured E2E-030..034 evidence, including live executor My Tasks coverage currently limited by fixture permissions.",
+      "last_checked_at": "2026-05-15T14:08:00+07:00"
     },
     {
       "id": "P4-009",

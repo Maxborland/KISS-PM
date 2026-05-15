@@ -172,7 +172,8 @@ nav a:focus-visible {
 }
 
 .phase2-surface,
-.crm-intake-surface {
+.crm-intake-surface,
+.project-work-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -338,6 +339,90 @@ button:focus-visible {
   grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
 }
 
+.project-work-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.project-lifecycle-panel,
+.kanban-panel {
+  grid-column: 1 / -1;
+}
+
+.stage-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage-step {
+  border: 1px solid #d7dfd1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #59675a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.stage-step.active {
+  border-color: #2f6f4e;
+  background: #eaf1e7;
+  color: #2f4939;
+}
+
+.stage-step.completed {
+  border-color: #7aa4aa;
+  background: #edf6f7;
+  color: #27535a;
+}
+
+.kanban-board {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  overflow-x: auto;
+}
+
+.kanban-column {
+  align-content: start;
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  background: #fafbf8;
+  display: grid;
+  gap: 8px;
+  min-height: 160px;
+  padding: 10px;
+}
+
+.kanban-column h4 {
+  color: #29362d;
+  font-size: 13px;
+  margin: 0;
+}
+
+.kanban-task {
+  border: 1px solid #d7dfd1;
+  border-radius: 6px;
+  background: #ffffff;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.kanban-task span {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.kanban-task small,
+.empty-column {
+  color: #59675a;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .crm-opportunity-form {
   grid-row: span 3;
 }
@@ -414,12 +499,17 @@ button:focus-visible {
 }
 
 @media (max-width: 1040px) {
-  .crm-intake-layout {
+  .crm-intake-layout,
+  .project-work-layout {
     grid-template-columns: 1fr;
   }
 
   .crm-opportunity-form {
     grid-row: auto;
+  }
+
+  .kanban-board {
+    grid-template-columns: repeat(5, minmax(170px, 1fr));
   }
 }
 
