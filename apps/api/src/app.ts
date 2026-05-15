@@ -12,6 +12,7 @@ import type {
 } from "./phase3Runtime";
 import { createPhase4RuntimeState } from "./phase4Runtime";
 import type { Phase4CreateTaskParticipantInput } from "./phase4Runtime";
+import { createPhase5RuntimeState } from "./phase5Runtime";
 import type {
   ApprovalRequest,
   ManagedProject,
@@ -25,6 +26,7 @@ import type {
   TaskParticipantRole,
   TaskStatusHistoryEntry
 } from "@kiss-pm/project-core";
+import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
 
 type ApiErrorCode =
   | "unauthenticated"
@@ -205,6 +207,48 @@ const taskCreateSchema = z
   })
   .strict();
 
+const scheduleDateSchema = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const scheduleTaskCreateSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    stageId: z.string().trim().min(1),
+    taskTemplateId: z.string().trim().min(1),
+    taskTemplateKey: z.string().trim().min(1),
+    status: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"]).optional(),
+    plannedStartDate: scheduleDateSchema,
+    plannedFinishDate: scheduleDateSchema,
+    plannedWorkHours: z.number().min(0),
+    progressPercent: z.number().min(0).max(100),
+    participants: z.array(taskParticipantCreateSchema).optional()
+  })
+  .strict();
+
+const scheduleTaskUpdateSchema = z
+  .object({
+    plannedStartDate: scheduleDateSchema.optional(),
+    plannedFinishDate: scheduleDateSchema.optional(),
+    plannedWorkHours: z.number().min(0).optional(),
+    progressPercent: z.number().min(0).max(100).optional()
+  })
+  .strict()
+  .refine((input) => Object.keys(input).length > 0);
+
+const scheduleDependencyCreateSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    predecessorTaskId: z.string().trim().min(1),
+    successorTaskId: z.string().trim().min(1),
+    type: z.literal("finish_to_start")
+  })
+  .strict();
+
+const scheduleBaselineCaptureSchema = z
+  .object({
+    id: z.string().trim().min(1).optional()
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -355,6 +399,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let runtime = createPhase2RuntimeState();
   let phase3Runtime = createPhase3CrmRuntimeState();
   let phase4Runtime = createPhase4RuntimeState();
+  let phase5Runtime = createPhase5RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -627,6 +672,327 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       });
 
       return context.json({ project: projectDto(project) }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/schedule", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.read", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+
+      const snapshot = phase5Runtime.getSchedule(project);
+
+      return context.json(scheduleSnapshotDto(snapshot));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/schedule/tasks", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = scheduleTaskCreateSchema.parse(await parseJson(context));
+      const taskId = body.id ?? `${projectId}:schedule-task:${project.tasks.length + 1}`;
+      const scheduleFields = phase5Runtime.prepareTaskScheduleFields(project, taskId, {
+        plannedStartDate: body.plannedStartDate,
+        plannedFinishDate: body.plannedFinishDate,
+        plannedWorkHours: body.plannedWorkHours,
+        progressPercent: body.progressPercent
+      });
+      const participants: Phase4CreateTaskParticipantInput[] | undefined =
+        body.participants === undefined
+          ? undefined
+          : body.participants.map((participant) => ({
+              ...(participant.id !== undefined ? { id: participant.id } : {}),
+              userId: participant.userId,
+              role: participant.role
+            }));
+      assertTenantUsersExist(runtime, session, participants);
+      const result = phase4Runtime.createTask({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        projectId,
+        id: taskId,
+        stageId: body.stageId,
+        taskTemplateId: body.taskTemplateId,
+        taskTemplateKey: body.taskTemplateKey,
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        dueDate: scheduleFields.plannedFinishDate,
+        plannedWorkHours: scheduleFields.plannedWorkHours,
+        ...(participants !== undefined ? { participants } : {})
+      });
+      const snapshot = phase5Runtime.setTaskScheduleFields(result.project, result.task.id, scheduleFields);
+      const actionExecution = phase5Runtime.recordActionExecution({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        projectId,
+        commandType: "schedule.task.create",
+        requiredPermission: "task.write",
+        source: { entityType: "project", entityId: projectId },
+        target: { entityType: "task", entityId: result.task.id },
+        before: null,
+        after: { task: taskDto(result.task), scheduleFields },
+        trace: ["schedule:permission task.write allowed", "schedule:canonical task created"]
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: actionExecution.commandType,
+        target: { entityType: "task", entityId: result.task.id },
+        correlationId: actionExecution.correlationId,
+        details: {
+          before: undefined,
+          after: { task: taskDto(result.task), scheduleFields, actionExecution: actionExecutionDto(actionExecution) }
+        }
+      });
+
+      return context.json(
+        {
+          task: taskDto(result.task),
+          participants: result.participants.map(taskParticipantDto),
+          ...scheduleSnapshotDto(snapshot),
+          actionExecution: actionExecutionDto(actionExecution)
+        },
+        201
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.patch("/api/projects/:projectId/schedule/tasks/:taskId", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const taskId = context.req.param("taskId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined || !project.tasks.some((task) => task.id === taskId)) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = scheduleTaskUpdateSchema.parse(await parseJson(context));
+      const beforeFields = phase5Runtime.readTaskScheduleFields(project, taskId);
+      const scheduleFields = phase5Runtime.prepareTaskSchedulePatch(project, taskId, body);
+      const result = phase4Runtime.updateTaskPlanningFields({
+        tenantId: session.user.tenantId,
+        projectId,
+        taskId,
+        dueDate: scheduleFields.plannedFinishDate,
+        plannedWorkHours: scheduleFields.plannedWorkHours,
+        actorId: session.user.id
+      });
+      const snapshot = phase5Runtime.setTaskScheduleFields(result.project, taskId, scheduleFields);
+      const actionExecution = phase5Runtime.recordActionExecution({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        projectId,
+        commandType: "schedule.task.update",
+        requiredPermission: "task.write",
+        source: { entityType: "project", entityId: projectId },
+        target: { entityType: "task", entityId: taskId },
+        before: { task: taskDto(project.tasks.find((task) => task.id === taskId) as Task), scheduleFields: beforeFields ?? null },
+        after: { task: taskDto(result.task), scheduleFields },
+        trace: ["schedule:permission task.write allowed", "schedule:task schedule fields updated"]
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: actionExecution.commandType,
+        target: { entityType: "task", entityId: taskId },
+        correlationId: actionExecution.correlationId,
+        details: {
+          before: { scheduleFields: beforeFields ?? null },
+          after: { task: taskDto(result.task), scheduleFields, actionExecution: actionExecutionDto(actionExecution) }
+        }
+      });
+
+      return context.json({
+        task: taskDto(result.task),
+        ...scheduleSnapshotDto(snapshot),
+        actionExecution: actionExecutionDto(actionExecution)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/schedule/dependencies", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = scheduleDependencyCreateSchema.parse(await parseJson(context));
+      try {
+        const result = phase5Runtime.createDependency(project, {
+          id: body.id ?? `dependency-${body.predecessorTaskId}-${body.successorTaskId}`,
+          predecessorTaskId: body.predecessorTaskId,
+          successorTaskId: body.successorTaskId,
+          type: body.type as DependencyType
+        });
+        const actionExecution = phase5Runtime.recordActionExecution({
+          tenantId: session.user.tenantId,
+          actorId: session.user.id,
+          ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+          projectId,
+          commandType: "schedule.dependency.create",
+          requiredPermission: "task.write",
+          source: { entityType: "project", entityId: projectId },
+          target: { entityType: "scheduleDependency", entityId: result.dependency.id },
+          before: null,
+          after: { dependency: result.dependency },
+          trace: ["schedule:permission task.write allowed", "schedule:finish-to-start dependency stored"]
+        });
+        runtime.appendAuditEvent({
+          session,
+          actionKey: actionExecution.commandType,
+          target: { entityType: "scheduleDependency", entityId: result.dependency.id },
+          correlationId: actionExecution.correlationId,
+          details: {
+            before: undefined,
+            after: { dependency: result.dependency, actionExecution: actionExecutionDto(actionExecution) }
+          }
+        });
+
+        return context.json(
+          {
+            dependency: result.dependency,
+            ...scheduleSnapshotDto(result.snapshot),
+            actionExecution: actionExecutionDto(actionExecution)
+          },
+          201
+        );
+      } catch (error) {
+        if (isSchedulePreconditionError(error)) {
+          return context.json(
+            {
+              ...errorDto("precondition_failed", "Команда расписания заблокирована"),
+              validationIssues: error.validationIssues.map(scheduleValidationIssueDto)
+            },
+            409
+          );
+        }
+        throw error;
+      }
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/schedule/baseline", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = scheduleBaselineCaptureSchema.parse(await parseJson(context));
+      const snapshot = phase5Runtime.captureBaseline(project, {
+        id: body.id ?? `baseline-${projectId}-draft`,
+        actorId: session.user.id
+      });
+      if (snapshot.baseline === undefined) {
+        throw Object.assign(new Error("baseline capture failed"), { code: "validation_error" });
+      }
+      const actionExecution = phase5Runtime.recordActionExecution({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        projectId,
+        commandType: "schedule.baseline.capture",
+        requiredPermission: "task.write",
+        source: { entityType: "project", entityId: projectId },
+        target: { entityType: "scheduleBaseline", entityId: snapshot.baseline.id },
+        before: null,
+        after: { baseline: scheduleBaselineDto(snapshot.baseline) },
+        trace: ["schedule:permission task.write allowed", "schedule:draft baseline captured"]
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: actionExecution.commandType,
+        target: { entityType: "scheduleBaseline", entityId: snapshot.baseline.id },
+        correlationId: actionExecution.correlationId,
+        details: {
+          before: undefined,
+          after: { baseline: scheduleBaselineDto(snapshot.baseline), actionExecution: actionExecutionDto(actionExecution) }
+        }
+      });
+
+      return context.json(
+        {
+          ...scheduleSnapshotDto(snapshot),
+          baseline: scheduleBaselineDto(snapshot.baseline),
+          actionExecution: actionExecutionDto(actionExecution)
+        },
+        201
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/schedule/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const actionExecutions = phase5Runtime.listActionExecutions(session.user.tenantId, projectId);
+      const actionCorrelationIds = new Set(actionExecutions.map((actionExecution) => actionExecution.correlationId));
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter((event) => actionCorrelationIds.has(event.correlationId))
+        .map(auditEventDto);
+
+      return context.json({
+        events,
+        actionExecutions: actionExecutions.map(actionExecutionDto)
+      });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -1299,6 +1665,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     runtime = createPhase2RuntimeState();
     phase3Runtime = createPhase3CrmRuntimeState();
     phase4Runtime = createPhase4RuntimeState();
+    phase5Runtime = createPhase5RuntimeState();
     return context.json({ status: "reset" });
   });
 
@@ -1320,6 +1687,19 @@ function hasActionEngineErrorCode(
       error.code === "conflict" ||
       error.code === "precondition_failed" ||
       error.code === "tenant_mismatch")
+  );
+}
+
+function isSchedulePreconditionError(error: unknown): error is Error & {
+  code: "precondition_failed";
+  validationIssues: ScheduleValidationIssue[];
+} {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    error.code === "precondition_failed" &&
+    "validationIssues" in error &&
+    Array.isArray(error.validationIssues)
   );
 }
 
@@ -1506,6 +1886,73 @@ function actionExecutionDto(actionExecution: {
   };
 }
 
+function scheduleValidationIssueDto(issue: ScheduleValidationIssue) {
+  return {
+    code: issue.code,
+    severity: issue.severity,
+    message: issue.message,
+    ...(issue.nodeId !== undefined ? { nodeId: issue.nodeId } : {}),
+    ...(issue.dependencyId !== undefined ? { dependencyId: issue.dependencyId } : {}),
+    fieldRefs: [...issue.fieldRefs]
+  };
+}
+
+function schedulePlanDto(plan: SchedulePlan) {
+  return {
+    id: plan.id,
+    tenantId: plan.tenantId,
+    projectId: plan.projectId,
+    version: plan.version,
+    ...(plan.baselineId !== undefined ? { baselineId: plan.baselineId } : {}),
+    status: plan.status,
+    wbsNodes: plan.wbsNodes.map((node) => ({
+      id: node.id,
+      tenantId: node.tenantId,
+      projectId: node.projectId,
+      ...(node.parentId !== undefined ? { parentId: node.parentId } : {}),
+      ...(node.taskId !== undefined ? { taskId: node.taskId } : {}),
+      ...(node.stageId !== undefined ? { stageId: node.stageId } : {}),
+      sortOrder: node.sortOrder,
+      ...(node.schedule !== undefined
+        ? {
+            schedule: {
+              ...(node.schedule.plannedStartDate !== undefined ? { plannedStartDate: node.schedule.plannedStartDate } : {}),
+              ...(node.schedule.plannedFinishDate !== undefined ? { plannedFinishDate: node.schedule.plannedFinishDate } : {}),
+              ...(node.schedule.durationDays !== undefined ? { durationDays: node.schedule.durationDays } : {})
+            }
+          }
+        : {}),
+      ...(node.plannedWorkHours !== undefined ? { plannedWorkHours: node.plannedWorkHours } : {}),
+      ...(node.progressPercent !== undefined ? { progressPercent: node.progressPercent } : {})
+    })),
+    dependencies: plan.dependencies.map((dependency) => ({ ...dependency }))
+  };
+}
+
+function scheduleBaselineDto(baseline: ScheduleBaselineSnapshot) {
+  return {
+    id: baseline.id,
+    tenantId: baseline.tenantId,
+    projectId: baseline.projectId,
+    schedulePlanId: baseline.schedulePlanId,
+    createdBy: baseline.createdBy,
+    createdAt: baseline.createdAt,
+    taskBaselineValues: baseline.taskBaselineValues.map((value) => ({ ...value }))
+  };
+}
+
+function scheduleSnapshotDto(snapshot: {
+  schedulePlan: SchedulePlan;
+  validationIssues: ScheduleValidationIssue[];
+  baseline?: ScheduleBaselineSnapshot;
+}) {
+  return {
+    schedulePlan: schedulePlanDto(snapshot.schedulePlan),
+    validationIssues: snapshot.validationIssues.map(scheduleValidationIssueDto),
+    ...(snapshot.baseline !== undefined ? { baseline: scheduleBaselineDto(snapshot.baseline) } : {})
+  };
+}
+
 function stageDto(stage: ProjectStage) {
   return {
     id: stage.id,
@@ -1683,7 +2130,8 @@ function handleRouteError(context: Context, error: unknown) {
     error instanceof Error &&
     (error.name === "CrmCoreModelError" ||
       error.name === "ProjectCoreModelError" ||
-      error.name === "ResourcePlanningModelError") &&
+      error.name === "ResourcePlanningModelError" ||
+      error.name === "SchedulingEngineModelError") &&
     hasModelErrorCode(error)
   ) {
     const code = error.code === "conflict" ? "conflict" : "validation_error";
