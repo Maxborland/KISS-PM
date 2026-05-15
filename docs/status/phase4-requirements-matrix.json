@@ -2,7 +2,7 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T05:50:00+07:00",
+  "updated_at": "2026-05-15T07:35:41+07:00",
   "rows": [
     {
       "id": "P4-001",
@@ -112,7 +112,7 @@
     {
       "id": "P4-004",
       "requirement": "Canonical task model and task templates",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/project-core"
@@ -123,14 +123,23 @@
         "E2E-034"
       ],
       "evidence": [
-        "Phase 4 contract defines canonical task identity and task-template scope before implementation"
+        "packages/project-core exports Task, TaskStatus, TaskSourceTemplateSnapshot, createTaskFromStageTaskTemplate, and listProjectTasks for one canonical tenant/project/stage-owned task model",
+        "createTaskFromStageTaskTemplate creates immutable ManagedProject.tasks entries from StageTaskTemplate snapshots with dueDate, plannedWorkHours, status, sourceTemplate process/stage/task template version trace, createdBy/createdAt/updatedAt/correlationId, and no Kanban/Gantt-specific task ids",
+        "listProjectTasks returns cloned canonical tasks so view projections cannot mutate ManagedProject.tasks or create view-specific task copies",
+        "Bug Hunt and code review findings were fixed: persisted task sourceTemplate must match process/stage/task snapshot versions, task updatedAt cannot precede createdAt, stage template snapshot lookup includes version, and persisted taskTemplate snapshots reject duplicate ids/keys/default participant role keys"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- packages/project-core/src/taskModel.test.ts exit 0, 1 file and 8 tests passed",
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/project-core/src/projectLifecycle.test.ts packages/project-core/src/stageGate.test.ts packages/project-core/src/taskModel.test.ts packages/workflow-engine/src/projectLifecycleWorkflow.test.ts packages/workflow-engine/src/stageGateWorkflow.test.ts exit 0, 6 files and 31 tests passed",
+        "npm test exit 0, 33 files and 187 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Canonical task model implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "No runtime resources or external data created; implementation is pure domain code plus unit tests. Temporary P4-004 agent-bus claim/session/lock removed after commit.",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T07:35:41+07:00"
     },
     {
       "id": "P4-005",
