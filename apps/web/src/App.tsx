@@ -14,11 +14,13 @@ import type {
 } from "./phase2ApiClient";
 import { CrmIntakeControlSurface } from "./CrmIntakeControlSurface";
 import { createCrmIntakeApiClient, type CrmIntakeApiClient } from "./crmIntakeApiClient";
+import { ProjectWorkControlSurface } from "./ProjectWorkControlSurface";
+import { createPhase4ProjectWorkApiClient, type Phase4ProjectWorkApiClient } from "./phase4ProjectWorkApiClient";
 
 type AppProps = {
   testUser?: string;
   tenantLabelOverrides?: Record<string, string>;
-  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient>;
+  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient> & Partial<Phase4ProjectWorkApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -42,7 +44,7 @@ const shellLabelDefaults = {
   "shell.configuration_version_prefix": "Версия конфигурации",
   "shell.primary_navigation_aria": "Основная навигация",
   "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 3: CRM-приемка и путь от возможности к проектному черновику",
+  "shell.phase_scope_notice": "Фаза 4: проектный жизненный цикл, задачи, мои очереди и Kanban",
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
@@ -140,6 +142,26 @@ function isCrmIntakeApiClient(apiClient: Partial<CrmIntakeApiClient> | null): ap
     typeof apiClient.createProjectDraft === "function" &&
     typeof apiClient.getProjectDraft === "function" &&
     typeof apiClient.listOpportunityAuditEvents === "function"
+  );
+}
+
+function isPhase4ProjectWorkApiClient(
+  apiClient: Partial<Phase4ProjectWorkApiClient> | null
+): apiClient is Phase4ProjectWorkApiClient {
+  return (
+    typeof apiClient?.ensureProjectDraft === "function" &&
+    typeof apiClient.createProjectFromTemplate === "function" &&
+    typeof apiClient.getProject === "function" &&
+    typeof apiClient.transitionProjectStage === "function" &&
+    typeof apiClient.recordArtifact === "function" &&
+    typeof apiClient.recordApproval === "function" &&
+    typeof apiClient.listProjectTasks === "function" &&
+    typeof apiClient.createProjectTask === "function" &&
+    typeof apiClient.changeTaskStatus === "function" &&
+    typeof apiClient.addTaskComment === "function" &&
+    typeof apiClient.listMyTasks === "function" &&
+    typeof apiClient.getKanbanProject === "function" &&
+    typeof apiClient.listAuditEventsForTarget === "function"
   );
 }
 
@@ -440,6 +462,14 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createCrmIntakeApiClient() : null;
   }, [apiClient]);
+  const projectWorkApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isPhase4ProjectWorkApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createPhase4ProjectWorkApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
     fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
@@ -584,6 +614,13 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {crmIntakeApiClient ? (
           <CrmIntakeControlSurface
             apiClient={crmIntakeApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {projectWorkApiClient ? (
+          <ProjectWorkControlSurface
+            apiClient={projectWorkApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />
