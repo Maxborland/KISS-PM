@@ -216,6 +216,37 @@ export type ApprovalRequest = TenantOwned & {
   decidedAt?: string;
 };
 
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+
+export type TaskSourceTemplateSnapshot = {
+  type: "stage_task_template";
+  processTemplateId: string;
+  processTemplateVersion: number;
+  stageTemplateId: string;
+  stageTemplateKey: string;
+  stageTemplateVersion: number;
+  taskTemplateId: string;
+  taskTemplateKey: string;
+  taskTemplateLabel: string;
+  required: boolean;
+  defaultParticipantRoleKeys: string[];
+};
+
+export type Task = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  title: string;
+  status: TaskStatus;
+  dueDate: string;
+  plannedWorkHours: number;
+  sourceTemplate: TaskSourceTemplateSnapshot;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  correlationId: string;
+};
+
 export type StageGateBlockerCode = "missing_required_artifact" | "required_approval_not_approved";
 
 export type StageGateBlocker = {
@@ -243,6 +274,7 @@ export type ManagedProject = TenantOwned & {
   processTemplateSnapshot: ProcessTemplateVersionSnapshot;
   stages: ProjectStage[];
   stageHistory: ProjectStageHistoryEntry[];
+  tasks: Task[];
   artifacts: ProjectArtifact[];
   approvalRequests: ApprovalRequest[];
   createdBy: string;
@@ -477,6 +509,10 @@ function assertUniqueFieldValues<T>(
   }
 }
 
+function stringArraysEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 function cloneArtifactTemplates(
   tenantId: TenantId,
   stageKey: string,
@@ -585,6 +621,56 @@ function cloneStageTaskTemplates(
     cloned,
     (template) => template.key,
     `stageTemplate.taskTemplates keys must be unique: ${stageKey}`
+  );
+
+  return cloned;
+}
+
+function cloneStageTaskTemplateSnapshotsForProject(
+  templates: StageTaskTemplateSnapshot[] | undefined
+): StageTaskTemplateSnapshot[] {
+  const cloned = requireArray(
+    templates,
+    "managedProject.processTemplateSnapshot.stageTemplate.taskTemplates"
+  ).map((rawTaskTemplate) => {
+    const taskTemplate = requireObject(
+      rawTaskTemplate,
+      "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate"
+    );
+    const defaultParticipantRoleKeys = requireSystemKeyArray(
+      taskTemplate.defaultParticipantRoleKeys,
+      "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.defaultParticipantRoleKeys",
+      true
+    );
+    assertUniqueKeys(
+      defaultParticipantRoleKeys,
+      "managedProject process template snapshot stage task template default participant role keys must be unique"
+    );
+
+    return {
+      id: requireNonEmptyString(taskTemplate.id, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.id"),
+      key: requireSystemKey(taskTemplate.key, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.key"),
+      label: requireNonEmptyString(
+        taskTemplate.label,
+        "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.label"
+      ),
+      defaultParticipantRoleKeys,
+      required: requireBoolean(
+        taskTemplate.required,
+        "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.required"
+      )
+    };
+  });
+
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.id,
+    "managedProject process template snapshot stage task template ids must be unique"
+  );
+  assertUniqueFieldValues(
+    cloned,
+    (template) => template.key,
+    "managedProject process template snapshot stage task template keys must be unique"
   );
 
   return cloned;
@@ -849,6 +935,61 @@ function cloneApprovalRequest(request: ApprovalRequest): ApprovalRequest {
   return cloned;
 }
 
+function cloneTaskSourceTemplateSnapshot(sourceTemplate: TaskSourceTemplateSnapshot): TaskSourceTemplateSnapshot {
+  const source = requireObject(sourceTemplate, "task.sourceTemplate");
+  if (source.type !== "stage_task_template") {
+    throw new ProjectCoreModelError("validation_error", "task.sourceTemplate.type is invalid");
+  }
+  const defaultParticipantRoleKeys = requireSystemKeyArray(
+    source.defaultParticipantRoleKeys,
+    "task.sourceTemplate.defaultParticipantRoleKeys",
+    true
+  );
+  assertUniqueKeys(defaultParticipantRoleKeys, "task.sourceTemplate default participant role keys must be unique");
+
+  return {
+    type: "stage_task_template",
+    processTemplateId: requireNonEmptyString(source.processTemplateId, "task.sourceTemplate.processTemplateId"),
+    processTemplateVersion: requirePositiveInteger(
+      source.processTemplateVersion,
+      "task.sourceTemplate.processTemplateVersion"
+    ),
+    stageTemplateId: requireNonEmptyString(source.stageTemplateId, "task.sourceTemplate.stageTemplateId"),
+    stageTemplateKey: requireSystemKey(source.stageTemplateKey, "task.sourceTemplate.stageTemplateKey"),
+    stageTemplateVersion: requirePositiveInteger(source.stageTemplateVersion, "task.sourceTemplate.stageTemplateVersion"),
+    taskTemplateId: requireNonEmptyString(source.taskTemplateId, "task.sourceTemplate.taskTemplateId"),
+    taskTemplateKey: requireSystemKey(source.taskTemplateKey, "task.sourceTemplate.taskTemplateKey"),
+    taskTemplateLabel: requireNonEmptyString(source.taskTemplateLabel, "task.sourceTemplate.taskTemplateLabel"),
+    required: requireBoolean(source.required, "task.sourceTemplate.required"),
+    defaultParticipantRoleKeys
+  };
+}
+
+function cloneTask(task: Task): Task {
+  const rawTask = requireObject(task, "task");
+  const createdAt = requireValidTimestamp(rawTask.createdAt, "task.createdAt");
+  const updatedAt = requireValidTimestamp(rawTask.updatedAt, "task.updatedAt");
+  if (timestampIsBefore(updatedAt, createdAt)) {
+    throw new ProjectCoreModelError("validation_error", "task.updatedAt cannot be earlier than task.createdAt");
+  }
+
+  return {
+    id: requireNonEmptyString(rawTask.id, "task.id"),
+    tenantId: requireNonEmptyString(rawTask.tenantId, "task.tenantId"),
+    projectId: requireNonEmptyString(rawTask.projectId, "task.projectId"),
+    stageId: requireNonEmptyString(rawTask.stageId, "task.stageId"),
+    title: requireNonEmptyString(rawTask.title, "task.title"),
+    status: requireTaskStatus(rawTask.status, "task.status"),
+    dueDate: requireDateOnly(rawTask.dueDate, "task.dueDate"),
+    plannedWorkHours: requireNonNegativeNumber(rawTask.plannedWorkHours, "task.plannedWorkHours"),
+    sourceTemplate: cloneTaskSourceTemplateSnapshot(rawTask.sourceTemplate),
+    createdBy: requireNonEmptyString(rawTask.createdBy, "task.createdBy"),
+    createdAt,
+    updatedAt,
+    correlationId: requireNonEmptyString(rawTask.correlationId, "task.correlationId")
+  };
+}
+
 function cloneManagedProject(project: ManagedProject): ManagedProject {
   const managedProject = requireObject(project, "managedProject");
   const tenantId = requireNonEmptyString(managedProject.tenantId, "managedProject.tenantId");
@@ -861,11 +1002,23 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
   const approvalRequests = requireArray(managedProject.approvalRequests, "managedProject.approvalRequests").map(
     cloneApprovalRequest
   );
+  const tasks = requireArray(managedProject.tasks, "managedProject.tasks").map(cloneTask);
+  const processTemplateSnapshot = cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot);
 
   for (const stage of stages) {
     assertTenantId(tenantId, stage.tenantId, `managedProject stage tenant mismatch: ${stage.id}`);
     if (stage.projectId !== id) {
       throw new ProjectCoreModelError("validation_error", `managedProject stage project mismatch: ${stage.id}`);
+    }
+    if (
+      !processTemplateSnapshot.stageTemplates.some(
+        (stageTemplate) =>
+          stageTemplate.id === stage.templateId &&
+          stageTemplate.key === stage.templateKey &&
+          stageTemplate.version === stage.templateVersion
+      )
+    ) {
+      throw new ProjectCoreModelError("validation_error", `managedProject stage template snapshot mismatch: ${stage.id}`);
     }
   }
   for (const entry of stageHistory) {
@@ -889,9 +1042,49 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
       );
     }
   }
+  for (const task of tasks) {
+    assertTenantId(tenantId, task.tenantId, `managedProject task tenant mismatch: ${task.id}`);
+    if (task.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject task project mismatch: ${task.id}`);
+    }
+    if (!stages.some((stage) => stage.id === task.stageId)) {
+      throw new ProjectCoreModelError("validation_error", `managedProject task stage mismatch: ${task.id}`);
+    }
+    const stage = stages.find((candidate) => candidate.id === task.stageId);
+    const stageTemplate =
+      stage === undefined
+        ? undefined
+        : processTemplateSnapshot.stageTemplates.find(
+            (candidate) =>
+              candidate.id === stage.templateId &&
+              candidate.key === stage.templateKey &&
+              candidate.version === stage.templateVersion
+          );
+    const taskTemplate = stageTemplate?.taskTemplates.find(
+      (candidate) => candidate.id === task.sourceTemplate.taskTemplateId && candidate.key === task.sourceTemplate.taskTemplateKey
+    );
+    const sourceTemplateMatches =
+      task.sourceTemplate.processTemplateId === processTemplateSnapshot.templateId &&
+      task.sourceTemplate.processTemplateVersion === processTemplateSnapshot.version &&
+      task.sourceTemplate.stageTemplateId === stageTemplate?.id &&
+      task.sourceTemplate.stageTemplateKey === stageTemplate?.key &&
+      task.sourceTemplate.stageTemplateVersion === stageTemplate?.version &&
+      task.sourceTemplate.taskTemplateId === taskTemplate?.id &&
+      task.sourceTemplate.taskTemplateKey === taskTemplate?.key &&
+      task.sourceTemplate.taskTemplateLabel === taskTemplate?.label &&
+      task.sourceTemplate.required === taskTemplate?.required &&
+      stringArraysEqual(task.sourceTemplate.defaultParticipantRoleKeys, taskTemplate?.defaultParticipantRoleKeys ?? []);
+    if (!sourceTemplateMatches) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        `managedProject task source template mismatch: ${task.id}`
+      );
+    }
+  }
 
   assertUniqueFieldValues(stages, (stage) => stage.id, "managedProject stage ids must be unique");
   assertUniqueFieldValues(stages, (stage) => stage.sortOrder, "managedProject stage sort orders must be unique");
+  assertUniqueFieldValues(tasks, (task) => task.id, "managedProject task ids must be unique");
   assertUniqueFieldValues(artifacts, (artifact) => artifact.id, "managedProject artifact ids must be unique");
   assertUniqueFieldValues(approvalRequests, (request) => request.id, "managedProject approval request ids must be unique");
 
@@ -909,9 +1102,10 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
         : requireNonEmptyString(managedProject.currentStageId, "managedProject.currentStageId"),
     sourceDraftId: requireNonEmptyString(managedProject.sourceDraftId, "managedProject.sourceDraftId"),
     sourceOpportunity: cloneProjectDraftSourceOpportunity(tenantId, managedProject.sourceOpportunity),
-    processTemplateSnapshot: cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot),
+    processTemplateSnapshot,
     stages: [...stages].sort((left, right) => left.sortOrder - right.sortOrder),
     stageHistory,
+    tasks,
     artifacts,
     approvalRequests,
     createdBy: requireNonEmptyString(managedProject.createdBy, "managedProject.createdBy"),
@@ -972,6 +1166,91 @@ function cloneProcessTemplateVersionSnapshotForProject(
 ): ProcessTemplateVersionSnapshot {
   const rawSnapshot = requireObject(snapshot, "managedProject.processTemplateSnapshot");
   assertTenantId(tenantId, rawSnapshot.tenantId, "managedProject process template snapshot tenant mismatch");
+  const stageTemplates = requireArray(rawSnapshot.stageTemplates, "managedProject.processTemplateSnapshot.stageTemplates").map(
+    (stage) => ({
+      id: requireNonEmptyString(stage.id, "managedProject.processTemplateSnapshot.stageTemplate.id"),
+      key: requireSystemKey(stage.key, "managedProject.processTemplateSnapshot.stageTemplate.key"),
+      label: requireNonEmptyString(stage.label, "managedProject.processTemplateSnapshot.stageTemplate.label"),
+      sortOrder: requirePositiveInteger(
+        stage.sortOrder,
+        "managedProject.processTemplateSnapshot.stageTemplate.sortOrder"
+      ),
+      active: requireBoolean(stage.active, "managedProject.processTemplateSnapshot.stageTemplate.active"),
+      version: requirePositiveInteger(stage.version, "managedProject.processTemplateSnapshot.stageTemplate.version"),
+      updatedAt: requireValidTimestamp(stage.updatedAt, "managedProject.processTemplateSnapshot.stageTemplate.updatedAt"),
+      requiredArtifactTemplates: requireArray(
+        stage.requiredArtifactTemplates,
+        "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplates"
+      ).map((rawArtifactTemplate) => {
+        const artifactTemplate = requireObject(
+          rawArtifactTemplate,
+          "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate"
+        );
+
+        return {
+          id: requireNonEmptyString(
+            artifactTemplate.id,
+            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.id"
+          ),
+          key: requireSystemKey(
+            artifactTemplate.key,
+            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.key"
+          ),
+          label: requireNonEmptyString(
+            artifactTemplate.label,
+            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.label"
+          ),
+          required: requireBoolean(
+            artifactTemplate.required,
+            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.required"
+          )
+        };
+      }),
+      approvalTemplates: requireArray(
+        stage.approvalTemplates,
+        "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplates"
+      ).map((rawApprovalTemplate) => {
+        const approvalTemplate = requireObject(
+          rawApprovalTemplate,
+          "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate"
+        );
+
+        return {
+          id: requireNonEmptyString(
+            approvalTemplate.id,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.id"
+          ),
+          key: requireSystemKey(
+            approvalTemplate.key,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.key"
+          ),
+          label: requireNonEmptyString(
+            approvalTemplate.label,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.label"
+          ),
+          approverRoleKey: requireSystemKey(
+            approvalTemplate.approverRoleKey,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.approverRoleKey"
+          ),
+          required: requireBoolean(
+            approvalTemplate.required,
+            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.required"
+          )
+        };
+      }),
+      taskTemplates: cloneStageTaskTemplateSnapshotsForProject(stage.taskTemplates)
+    })
+  );
+  assertUniqueFieldValues(
+    stageTemplates,
+    (stage) => stage.id,
+    "managedProject process template snapshot stage ids must be unique"
+  );
+  assertUniqueFieldValues(
+    stageTemplates,
+    (stage) => stage.key,
+    "managedProject process template snapshot stage keys must be unique"
+  );
 
   return {
     tenantId,
@@ -981,107 +1260,7 @@ function cloneProcessTemplateVersionSnapshotForProject(
     version: requirePositiveInteger(rawSnapshot.version, "managedProject.processTemplateSnapshot.version"),
     active: requireBoolean(rawSnapshot.active, "managedProject.processTemplateSnapshot.active"),
     updatedAt: requireValidTimestamp(rawSnapshot.updatedAt, "managedProject.processTemplateSnapshot.updatedAt"),
-    stageTemplates: requireArray(rawSnapshot.stageTemplates, "managedProject.processTemplateSnapshot.stageTemplates").map(
-      (stage) => ({
-        id: requireNonEmptyString(stage.id, "managedProject.processTemplateSnapshot.stageTemplate.id"),
-        key: requireSystemKey(stage.key, "managedProject.processTemplateSnapshot.stageTemplate.key"),
-        label: requireNonEmptyString(stage.label, "managedProject.processTemplateSnapshot.stageTemplate.label"),
-        sortOrder: requirePositiveInteger(
-          stage.sortOrder,
-          "managedProject.processTemplateSnapshot.stageTemplate.sortOrder"
-        ),
-        active: requireBoolean(stage.active, "managedProject.processTemplateSnapshot.stageTemplate.active"),
-        version: requirePositiveInteger(stage.version, "managedProject.processTemplateSnapshot.stageTemplate.version"),
-        updatedAt: requireValidTimestamp(stage.updatedAt, "managedProject.processTemplateSnapshot.stageTemplate.updatedAt"),
-        requiredArtifactTemplates: requireArray(
-          stage.requiredArtifactTemplates,
-          "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplates"
-        ).map((rawArtifactTemplate) => {
-          const artifactTemplate = requireObject(
-            rawArtifactTemplate,
-            "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate"
-          );
-
-          return {
-            id: requireNonEmptyString(
-              artifactTemplate.id,
-              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.id"
-            ),
-            key: requireSystemKey(
-              artifactTemplate.key,
-              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.key"
-            ),
-            label: requireNonEmptyString(
-              artifactTemplate.label,
-              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.label"
-            ),
-            required: requireBoolean(
-              artifactTemplate.required,
-              "managedProject.processTemplateSnapshot.stageTemplate.requiredArtifactTemplate.required"
-            )
-          };
-        }),
-        approvalTemplates: requireArray(
-          stage.approvalTemplates,
-          "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplates"
-        ).map((rawApprovalTemplate) => {
-          const approvalTemplate = requireObject(
-            rawApprovalTemplate,
-            "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate"
-          );
-
-          return {
-            id: requireNonEmptyString(
-              approvalTemplate.id,
-              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.id"
-            ),
-            key: requireSystemKey(
-              approvalTemplate.key,
-              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.key"
-            ),
-            label: requireNonEmptyString(
-              approvalTemplate.label,
-              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.label"
-            ),
-            approverRoleKey: requireSystemKey(
-              approvalTemplate.approverRoleKey,
-              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.approverRoleKey"
-            ),
-            required: requireBoolean(
-              approvalTemplate.required,
-              "managedProject.processTemplateSnapshot.stageTemplate.approvalTemplate.required"
-            )
-          };
-        }),
-        taskTemplates: requireArray(
-          stage.taskTemplates,
-          "managedProject.processTemplateSnapshot.stageTemplate.taskTemplates"
-        ).map((rawTaskTemplate) => {
-          const taskTemplate = requireObject(
-            rawTaskTemplate,
-            "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate"
-          );
-
-          return {
-            id: requireNonEmptyString(taskTemplate.id, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.id"),
-            key: requireSystemKey(taskTemplate.key, "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.key"),
-            label: requireNonEmptyString(
-              taskTemplate.label,
-              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.label"
-            ),
-            defaultParticipantRoleKeys: requireSystemKeyArray(
-              taskTemplate.defaultParticipantRoleKeys,
-              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.defaultParticipantRoleKeys",
-              true
-            ),
-            required: requireBoolean(
-              taskTemplate.required,
-              "managedProject.processTemplateSnapshot.stageTemplate.taskTemplate.required"
-            )
-          };
-        })
-      })
-    )
+    stageTemplates
   };
 }
 
@@ -1098,6 +1277,20 @@ function requireManagedProjectLifecycleStatus(
 
 function requireProjectStageStatus(value: ProjectStageStatus | undefined, fieldName: string): ProjectStageStatus {
   if (value !== "pending" && value !== "active" && value !== "completed" && value !== "cancelled") {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+  }
+
+  return value;
+}
+
+function requireTaskStatus(value: TaskStatus | undefined, fieldName: string): TaskStatus {
+  if (
+    value !== "todo" &&
+    value !== "in_progress" &&
+    value !== "blocked" &&
+    value !== "done" &&
+    value !== "cancelled"
+  ) {
     throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
   }
 
@@ -1191,7 +1384,10 @@ function findProjectStage(project: ManagedProject, stageId: string): ProjectStag
 
 function findStageTemplateSnapshot(project: ManagedProject, stage: ProjectStage): StageTemplateSnapshot {
   const stageTemplate = project.processTemplateSnapshot.stageTemplates.find(
-    (candidate) => candidate.id === stage.templateId && candidate.key === stage.templateKey
+    (candidate) =>
+      candidate.id === stage.templateId &&
+      candidate.key === stage.templateKey &&
+      candidate.version === stage.templateVersion
   );
   if (stageTemplate === undefined) {
     throw new ProjectCoreModelError("validation_error", "projectStage template snapshot not found");
@@ -1234,6 +1430,24 @@ function findApprovalTemplateSnapshot(
   }
 
   return approvalTemplate;
+}
+
+function findStageTaskTemplateSnapshot(
+  project: ManagedProject,
+  stageId: string,
+  templateId: string,
+  templateKey: string
+): StageTaskTemplateSnapshot {
+  const stage = findProjectStage(project, stageId);
+  const stageTemplate = findStageTemplateSnapshot(project, stage);
+  const taskTemplate = stageTemplate.taskTemplates.find(
+    (candidate) => candidate.id === templateId && candidate.key === templateKey
+  );
+  if (taskTemplate === undefined) {
+    throw new ProjectCoreModelError("validation_error", "task template is not valid for stage");
+  }
+
+  return taskTemplate;
 }
 
 function createStageGateBlocker(input: {
@@ -1502,6 +1716,7 @@ export function createManagedProjectFromDraft(input: {
     processTemplateSnapshot,
     stages,
     stageHistory: [],
+    tasks: [],
     artifacts: [],
     approvalRequests: [],
     createdBy,
@@ -1600,6 +1815,89 @@ export function evaluateStageGate(project: ManagedProject, stageId: string): Sta
     ok: blockers.length === 0,
     stageId: stage.id,
     blockers
+  };
+}
+
+export function listProjectTasks(project: ManagedProject): Task[] {
+  return cloneManagedProject(project).tasks.map(cloneTask);
+}
+
+export function createTaskFromStageTaskTemplate(
+  project: ManagedProject,
+  input: {
+    id: string;
+    tenantId: TenantId;
+    stageId: string;
+    taskTemplateId: string;
+    taskTemplateKey: string;
+    status?: TaskStatus;
+    dueDate: string;
+    plannedWorkHours: number;
+    actorId: string;
+    createdAt: string;
+    correlationId: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "task.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "task tenant mismatch");
+  if (managedProject.lifecycleStatus !== "active") {
+    throw new ProjectCoreModelError("validation_error", "task project must be active");
+  }
+
+  const stageId = requireNonEmptyString(input.stageId, "task.stageId");
+  const stage = findProjectStage(managedProject, stageId);
+  if (stage.status === "completed" || stage.status === "cancelled") {
+    throw new ProjectCoreModelError("validation_error", "task stage must be open");
+  }
+  const taskTemplateId = requireNonEmptyString(input.taskTemplateId, "task.taskTemplateId");
+  const taskTemplateKey = requireSystemKey(input.taskTemplateKey, "task.taskTemplateKey");
+  const stageTemplate = findStageTemplateSnapshot(managedProject, stage);
+  const taskTemplate = findStageTaskTemplateSnapshot(managedProject, stageId, taskTemplateId, taskTemplateKey);
+  const createdAt = requireValidTimestamp(input.createdAt, "task.createdAt");
+  if (
+    timestampIsBefore(createdAt, managedProject.updatedAt) ||
+    (stage.startedAt !== undefined && timestampIsBefore(createdAt, stage.startedAt))
+  ) {
+    throw new ProjectCoreModelError("validation_error", "task createdAt cannot be earlier than current project or stage state");
+  }
+
+  const task: Task = {
+    id: requireNonEmptyString(input.id, "task.id"),
+    tenantId,
+    projectId: managedProject.id,
+    stageId: stage.id,
+    title: taskTemplate.label,
+    status: requireTaskStatus(input.status ?? "todo", "task.status"),
+    dueDate: requireDateOnly(input.dueDate, "task.dueDate"),
+    plannedWorkHours: requireNonNegativeNumber(input.plannedWorkHours, "task.plannedWorkHours"),
+    sourceTemplate: {
+      type: "stage_task_template",
+      processTemplateId: managedProject.processTemplateSnapshot.templateId,
+      processTemplateVersion: managedProject.processTemplateSnapshot.version,
+      stageTemplateId: stageTemplate.id,
+      stageTemplateKey: stageTemplate.key,
+      stageTemplateVersion: stageTemplate.version,
+      taskTemplateId: taskTemplate.id,
+      taskTemplateKey: taskTemplate.key,
+      taskTemplateLabel: taskTemplate.label,
+      required: taskTemplate.required,
+      defaultParticipantRoleKeys: [...taskTemplate.defaultParticipantRoleKeys]
+    },
+    createdBy: requireNonEmptyString(input.actorId, "task.actorId"),
+    createdAt,
+    updatedAt: createdAt,
+    correlationId: requireNonEmptyString(input.correlationId, "task.correlationId")
+  };
+
+  if (managedProject.tasks.some((existing) => existing.id === task.id)) {
+    throw new ProjectCoreModelError("conflict", "task id must be unique");
+  }
+
+  return {
+    ...managedProject,
+    updatedAt: createdAt,
+    tasks: [...managedProject.tasks, task]
   };
 }
 
