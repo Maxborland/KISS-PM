@@ -2,7 +2,7 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T09:41:07+07:00",
+  "updated_at": "2026-05-15T10:56:37+07:00",
   "rows": [
     {
       "id": "P4-001",
@@ -212,7 +212,7 @@
     {
       "id": "P4-007",
       "requirement": "Project lifecycle and work API endpoints",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
@@ -227,14 +227,29 @@
         "E2E-034"
       ],
       "evidence": [
-        "Phase 4 contract defines API routes, permissions, audit, and DTO scope before implementation"
+        "apps/api exports Phase 4 in-memory runtime and routes for POST /api/projects/from-template, GET /api/projects/:id, stage transition, artifact evidence, approval evidence, project task create/list, task status, task comments, GET /api/my/tasks, GET /api/kanban/projects/:projectId, and existing GET /api/audit target filtering",
+        "P4-007 DTO schemas validate project/template/task/status/comment/participant request shapes at the API boundary with stable English response fields and Russian-safe error messages",
+        "State-changing routes enforce server-side tenant/session permissions, write audit events for managed-project creation, lifecycle transitions, artifact/approval evidence, task creation, task status changes, and task comments, and preserve canonical project/task IDs across project, My Tasks, and Kanban projections",
+        "Review fixes verified: project storage is tenant-scoped so equal projectId values do not leak across tenants, bare /api/tasks/:taskId routes are protected by tenant-wide task ID uniqueness, task status writes require executor/co_executor relation for non-manager/admin users, and task participant userIds must exist inside the actor tenant",
+        "P4-007 intentionally provides API integration coverage only; UI and real browser E2E evidence for E2E-030..034 remain P4-008/P4-009/P4-010 scope"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- apps/api/src/phase4ProjectWorkApi.test.ts initial RED exit 1 after escalation, 3 tests failed because POST /api/projects/from-template returned 404 before implementation",
+        "npm test -- apps/api/src/phase4ProjectWorkApi.test.ts exit 0, 1 file and 3 tests passed after implementation and review fixes",
+        "npm run test:integration exit 0, 6 files and 27 tests passed",
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/project-core/src/projectLifecycle.test.ts packages/project-core/src/stageGate.test.ts packages/project-core/src/taskModel.test.ts packages/project-core/src/taskParticipants.test.ts packages/project-core/src/taskActivity.test.ts packages/access-control/src/accessProfile.test.ts packages/access-control/src/policyEvaluator.test.ts packages/access-control/src/taskParticipantPolicy.test.ts packages/workflow-engine/src/projectLifecycleWorkflow.test.ts packages/workflow-engine/src/stageGateWorkflow.test.ts apps/api/src/phase4ProjectWorkApi.test.ts exit 0, 12 files and 66 tests passed",
+        "npm test -- apps packages scripts/verify-requirements-matrix.test.ts exit 0, 37 files and 206 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "Bug Hunt found High/Medium issues for bare taskId ambiguity, cross-tenant projectId conflict leak, and cross-tenant participant userId acceptance; code review found Important/Medium equivalents plus observer-role status-write authorization. All were fixed and covered by regression assertions",
+        "Code review re-check found no remaining runtime/API Critical/Important/Medium defects; remaining Medium was this stale matrix row and was corrected",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 after matrix update",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json exit 1 expected because structured E2E evidence is deferred and P4-008..P4-010 remain blocked",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Phase 4 API implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "No external runtime resources or production data created; Phase 4 API state is in-memory fixture runtime reset by /test-fixtures/reset in test mode",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T10:56:37+07:00"
     },
     {
       "id": "P4-008",
