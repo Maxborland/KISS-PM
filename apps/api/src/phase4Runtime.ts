@@ -13,7 +13,8 @@ import {
   listTaskParticipants,
   listTaskStatusHistory,
   listTasksByParticipant,
-  recordProjectArtifactEvidence
+  recordProjectArtifactEvidence,
+  updateTaskPlanningFields
 } from "@kiss-pm/project-core";
 import type {
   ManagedProject,
@@ -65,6 +66,11 @@ export type Phase4CreateTaskResult = {
   project: ManagedProject;
   task: Task;
   participants: TaskParticipant[];
+};
+
+export type Phase4UpdateTaskPlanningFieldsResult = {
+  project: ManagedProject;
+  task: Task;
 };
 
 export type Phase4MyTaskProjection = Task & {
@@ -401,6 +407,38 @@ export function createPhase4RuntimeState() {
       }
 
       return listProjectTasks(project);
+    },
+
+    updateTaskPlanningFields(input: {
+      tenantId: TenantId;
+      projectId: string;
+      taskId: string;
+      dueDate?: string;
+      plannedWorkHours?: number;
+      actorId: TenantUserId;
+    }): Phase4UpdateTaskPlanningFieldsResult {
+      const project = getTenantProject(input.tenantId, input.projectId);
+      if (project === undefined) {
+        throw Object.assign(new Error("project not found"), { code: "not_found" });
+      }
+      if (!project.tasks.some((task) => task.id === input.taskId)) {
+        throw Object.assign(new Error("task not found"), { code: "not_found" });
+      }
+      const nextProject = updateTaskPlanningFields(project, {
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+        ...(input.plannedWorkHours !== undefined ? { plannedWorkHours: input.plannedWorkHours } : {}),
+        actorId: input.actorId,
+        updatedAt: now(),
+        correlationId: `corr-task-planning-${input.taskId}`
+      });
+      const storedProject = setProject(nextProject);
+
+      return {
+        project: storedProject,
+        task: readTask(storedProject, input.taskId)
+      };
     },
 
     changeTaskStatus(input: {

@@ -104,7 +104,7 @@ function assertTenant(tenantId: TenantId, entity: TenantOwned, fieldName: string
   }
 }
 
-function createActionExecutionLog(input: {
+export function createActionExecutionLog(input: {
   actor: ActorContext;
   commandType: string;
   requiredPermission: string;

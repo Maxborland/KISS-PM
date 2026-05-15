@@ -2284,6 +2284,55 @@ export function createTaskFromStageTaskTemplate(
   };
 }
 
+export function updateTaskPlanningFields(
+  project: ManagedProject,
+  input: {
+    tenantId: TenantId;
+    taskId: string;
+    dueDate?: string;
+    plannedWorkHours?: number;
+    actorId: string;
+    updatedAt: string;
+    correlationId: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "task.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "task tenant mismatch");
+  if (managedProject.lifecycleStatus !== "active") {
+    throw new ProjectCoreModelError("validation_error", "task project must be active");
+  }
+
+  const taskId = requireNonEmptyString(input.taskId, "task.id");
+  const task = findTask(managedProject, taskId);
+  const stage = findProjectStage(managedProject, task.stageId);
+  if (stage.status === "completed" || stage.status === "cancelled") {
+    throw new ProjectCoreModelError("validation_error", "task stage must be open");
+  }
+
+  const updatedAt = requireValidTimestamp(input.updatedAt, "task.updatedAt");
+  if (timestampIsBefore(updatedAt, managedProject.updatedAt) || timestampIsBefore(updatedAt, task.createdAt)) {
+    throw new ProjectCoreModelError("validation_error", "task updatedAt cannot be earlier than current project or task state");
+  }
+
+  const nextTask: Task = {
+    ...task,
+    ...(input.dueDate !== undefined ? { dueDate: requireDateOnly(input.dueDate, "task.dueDate") } : {}),
+    ...(input.plannedWorkHours !== undefined
+      ? { plannedWorkHours: requireNonNegativeNumber(input.plannedWorkHours, "task.plannedWorkHours") }
+      : {}),
+    updatedAt,
+    correlationId: requireNonEmptyString(input.correlationId, "task.correlationId")
+  };
+  requireNonEmptyString(input.actorId, "task.actorId");
+
+  return {
+    ...managedProject,
+    updatedAt,
+    tasks: managedProject.tasks.map((candidate) => (candidate.id === taskId ? nextTask : candidate))
+  };
+}
+
 export function addTaskParticipant(
   project: ManagedProject,
   input: {
