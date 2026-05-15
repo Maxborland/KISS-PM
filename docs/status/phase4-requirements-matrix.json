@@ -2,7 +2,7 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T09:15:54+07:00",
+  "updated_at": "2026-05-15T09:41:07+07:00",
   "rows": [
     {
       "id": "P4-001",
@@ -178,7 +178,7 @@
     {
       "id": "P4-006",
       "requirement": "Task comments and status history",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/project-core"
@@ -187,14 +187,27 @@
         "E2E-034"
       ],
       "evidence": [
-        "Phase 4 contract defines append-only task comments and status history before implementation"
+        "packages/project-core exports TaskComment, TaskStatusHistoryEntry, addTaskComment, changeTaskStatus, listTaskComments, and listTaskStatusHistory for append-only task activity",
+        "addTaskComment appends tenant/project/stage/task-owned comments with authorId, createdAt, body, and correlationId; it updates project.updatedAt without mutating canonical task status or task.updatedAt",
+        "changeTaskStatus updates the canonical Task.status and task.updatedAt while appending TaskStatusHistoryEntry with fromStatus, toStatus, actorId, changedAt, and correlationId",
+        "Readback helpers filter by tenant/task/author/actor and return cloned comments/status history so projections cannot mutate project state",
+        "Bug Hunt and code review findings were fixed: persisted comments and status history reject malformed tenant/project/task/stage links, duplicate ids, stale/future timestamps, non-changing status entries, broken status chains, final status mismatch, and reordered append-only logs both within one task and across tasks",
+        "apps/api task comment/status routes remain P4-007 scope; P4-006 includes project-core domain evidence only"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- packages/project-core/src/taskActivity.test.ts exit 0, 1 file and 8 tests passed after review fixes",
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/project-core/src/projectLifecycle.test.ts packages/project-core/src/stageGate.test.ts packages/project-core/src/taskModel.test.ts packages/project-core/src/taskParticipants.test.ts packages/project-core/src/taskActivity.test.ts packages/workflow-engine/src/projectLifecycleWorkflow.test.ts packages/workflow-engine/src/stageGateWorkflow.test.ts exit 0, 8 files and 45 tests passed",
+        "npm test -- apps packages scripts/verify-requirements-matrix.test.ts exit 0, 36 files and 203 tests passed",
+        "npm test exit 1 because unrelated untracked scripts/agent-bus-status.test.ts fails before collecting tests with TypeError: The URL must be of scheme file; P4-006 files are not involved and the file is outside this block's write scope",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0",
+        "Test-Path for P4-006 agent-bus claim/session/lock exit 0 and returned False for all three paths after cleanup",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Task comments and status history implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "No runtime resources or external data created; implementation is pure project-core domain code plus unit tests. Temporary P4-006 agent-bus claim/session/lock removed before commit.",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T09:41:07+07:00"
     },
     {
       "id": "P4-007",

@@ -261,6 +261,29 @@ export type TaskParticipant = TenantOwned & {
   correlationId: string;
 };
 
+export type TaskComment = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  taskId: string;
+  body: string;
+  authorId: TenantUserId;
+  createdAt: string;
+  correlationId: string;
+};
+
+export type TaskStatusHistoryEntry = TenantOwned & {
+  id: string;
+  projectId: string;
+  stageId: string;
+  taskId: string;
+  fromStatus: TaskStatus;
+  toStatus: TaskStatus;
+  actorId: TenantUserId;
+  changedAt: string;
+  correlationId: string;
+};
+
 export type StageGateBlockerCode = "missing_required_artifact" | "required_approval_not_approved";
 
 export type StageGateBlocker = {
@@ -290,6 +313,8 @@ export type ManagedProject = TenantOwned & {
   stageHistory: ProjectStageHistoryEntry[];
   tasks: Task[];
   taskParticipants: TaskParticipant[];
+  taskComments: TaskComment[];
+  taskStatusHistory: TaskStatusHistoryEntry[];
   artifacts: ProjectArtifact[];
   approvalRequests: ApprovalRequest[];
   createdBy: string;
@@ -1022,6 +1047,39 @@ function cloneTaskParticipant(participant: TaskParticipant): TaskParticipant {
   };
 }
 
+function cloneTaskComment(comment: TaskComment): TaskComment {
+  const rawComment = requireObject(comment, "taskComment");
+
+  return {
+    id: requireNonEmptyString(rawComment.id, "taskComment.id"),
+    tenantId: requireNonEmptyString(rawComment.tenantId, "taskComment.tenantId"),
+    projectId: requireNonEmptyString(rawComment.projectId, "taskComment.projectId"),
+    stageId: requireNonEmptyString(rawComment.stageId, "taskComment.stageId"),
+    taskId: requireNonEmptyString(rawComment.taskId, "taskComment.taskId"),
+    body: requireNonEmptyString(rawComment.body, "taskComment.body"),
+    authorId: requireNonEmptyString(rawComment.authorId, "taskComment.authorId"),
+    createdAt: requireValidTimestamp(rawComment.createdAt, "taskComment.createdAt"),
+    correlationId: requireNonEmptyString(rawComment.correlationId, "taskComment.correlationId")
+  };
+}
+
+function cloneTaskStatusHistoryEntry(entry: TaskStatusHistoryEntry): TaskStatusHistoryEntry {
+  const rawEntry = requireObject(entry, "taskStatusHistory");
+
+  return {
+    id: requireNonEmptyString(rawEntry.id, "taskStatusHistory.id"),
+    tenantId: requireNonEmptyString(rawEntry.tenantId, "taskStatusHistory.tenantId"),
+    projectId: requireNonEmptyString(rawEntry.projectId, "taskStatusHistory.projectId"),
+    stageId: requireNonEmptyString(rawEntry.stageId, "taskStatusHistory.stageId"),
+    taskId: requireNonEmptyString(rawEntry.taskId, "taskStatusHistory.taskId"),
+    fromStatus: requireTaskStatus(rawEntry.fromStatus, "taskStatusHistory.fromStatus"),
+    toStatus: requireTaskStatus(rawEntry.toStatus, "taskStatusHistory.toStatus"),
+    actorId: requireNonEmptyString(rawEntry.actorId, "taskStatusHistory.actorId"),
+    changedAt: requireValidTimestamp(rawEntry.changedAt, "taskStatusHistory.changedAt"),
+    correlationId: requireNonEmptyString(rawEntry.correlationId, "taskStatusHistory.correlationId")
+  };
+}
+
 function cloneManagedProject(project: ManagedProject): ManagedProject {
   const managedProject = requireObject(project, "managedProject");
   const tenantId = requireNonEmptyString(managedProject.tenantId, "managedProject.tenantId");
@@ -1044,6 +1102,11 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     managedProject.taskParticipants,
     "managedProject.taskParticipants"
   ).map(cloneTaskParticipant);
+  const taskComments = requireArray(managedProject.taskComments, "managedProject.taskComments").map(cloneTaskComment);
+  const taskStatusHistory = requireArray(
+    managedProject.taskStatusHistory,
+    "managedProject.taskStatusHistory"
+  ).map(cloneTaskStatusHistoryEntry);
   const processTemplateSnapshot = cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot);
 
   for (const stage of stages) {
@@ -1156,6 +1219,101 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
       );
     }
   }
+  let previousTaskCommentCreatedAt: string | undefined;
+  for (const comment of taskComments) {
+    assertTenantId(tenantId, comment.tenantId, `managedProject task comment tenant mismatch: ${comment.id}`);
+    if (comment.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject task comment project mismatch: ${comment.id}`);
+    }
+    const task = tasks.find((candidate) => candidate.id === comment.taskId);
+    if (task === undefined) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task comment task mismatch");
+    }
+    if (comment.stageId !== task.stageId) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task comment stage mismatch");
+    }
+    if (timestampIsBefore(comment.createdAt, task.createdAt)) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        "managedProject task comment createdAt cannot be earlier than task.createdAt"
+      );
+    }
+    if (timestampIsBefore(updatedAt, comment.createdAt)) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        "managedProject task comment createdAt cannot be later than project.updatedAt"
+      );
+    }
+    if (previousTaskCommentCreatedAt !== undefined && timestampIsBefore(comment.createdAt, previousTaskCommentCreatedAt)) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task comments are not append-only");
+    }
+    previousTaskCommentCreatedAt = comment.createdAt;
+  }
+  const taskStatusHistoriesByTaskId = new Map<string, TaskStatusHistoryEntry[]>();
+  let previousTaskStatusHistoryChangedAt: string | undefined;
+  for (const entry of taskStatusHistory) {
+    assertTenantId(tenantId, entry.tenantId, `managedProject task status history tenant mismatch: ${entry.id}`);
+    if (entry.projectId !== id) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        `managedProject task status history project mismatch: ${entry.id}`
+      );
+    }
+    const task = tasks.find((candidate) => candidate.id === entry.taskId);
+    if (task === undefined) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history task mismatch");
+    }
+    if (entry.stageId !== task.stageId) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history stage mismatch");
+    }
+    if (entry.fromStatus === entry.toStatus) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history must change status");
+    }
+    if (timestampIsBefore(entry.changedAt, task.createdAt)) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        "managedProject task status history changedAt cannot be earlier than task.createdAt"
+      );
+    }
+    if (timestampIsBefore(task.updatedAt, entry.changedAt)) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        "managedProject task status history changedAt cannot be later than task.updatedAt"
+      );
+    }
+    if (
+      previousTaskStatusHistoryChangedAt !== undefined &&
+      timestampIsBefore(entry.changedAt, previousTaskStatusHistoryChangedAt)
+    ) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history is not append-only");
+    }
+    previousTaskStatusHistoryChangedAt = entry.changedAt;
+    const entries = taskStatusHistoriesByTaskId.get(entry.taskId) ?? [];
+    entries.push(entry);
+    taskStatusHistoriesByTaskId.set(entry.taskId, entries);
+  }
+  for (const [taskId, entries] of taskStatusHistoriesByTaskId) {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    if (task === undefined) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history task mismatch");
+    }
+    let expectedFromStatus = entries[0]?.fromStatus;
+    let previousChangedAt = entries[0]?.changedAt;
+    for (const entry of entries) {
+      if (expectedFromStatus !== undefined && entry.fromStatus !== expectedFromStatus) {
+        throw new ProjectCoreModelError("validation_error", "managedProject task status history chain mismatch");
+      }
+      if (previousChangedAt !== undefined && timestampIsBefore(entry.changedAt, previousChangedAt)) {
+        throw new ProjectCoreModelError("validation_error", "managedProject task status history is not append-only");
+      }
+      expectedFromStatus = entry.toStatus;
+      previousChangedAt = entry.changedAt;
+    }
+    const lastEntry = entries[entries.length - 1];
+    if (lastEntry !== undefined && lastEntry.toStatus !== task.status) {
+      throw new ProjectCoreModelError("validation_error", "managedProject task status history final status mismatch");
+    }
+  }
 
   assertUniqueFieldValues(stages, (stage) => stage.id, "managedProject stage ids must be unique");
   assertUniqueFieldValues(stages, (stage) => stage.sortOrder, "managedProject stage sort orders must be unique");
@@ -1169,6 +1327,12 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     taskParticipants,
     (participant) => taskParticipantAssignmentKey(participant),
     "managedProject task participant assignments must be unique per task, role, and user"
+  );
+  assertUniqueFieldValues(taskComments, (comment) => comment.id, "managedProject task comment ids must be unique");
+  assertUniqueFieldValues(
+    taskStatusHistory,
+    (entry) => entry.id,
+    "managedProject task status history ids must be unique"
   );
   assertUniqueFieldValues(artifacts, (artifact) => artifact.id, "managedProject artifact ids must be unique");
   assertUniqueFieldValues(approvalRequests, (request) => request.id, "managedProject approval request ids must be unique");
@@ -1192,6 +1356,8 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     stageHistory,
     tasks,
     taskParticipants,
+    taskComments,
+    taskStatusHistory,
     artifacts,
     approvalRequests,
     createdBy: requireNonEmptyString(managedProject.createdBy, "managedProject.createdBy"),
@@ -1835,6 +2001,8 @@ export function createManagedProjectFromDraft(input: {
     stageHistory: [],
     tasks: [],
     taskParticipants: [],
+    taskComments: [],
+    taskStatusHistory: [],
     artifacts: [],
     approvalRequests: [],
     createdBy,
@@ -1990,6 +2158,53 @@ export function listTasksByParticipant(
   return managedProject.tasks.filter((task) => participantTaskIds.has(task.id)).map(cloneTask);
 }
 
+export function listTaskComments(
+  project: ManagedProject,
+  input: {
+    tenantId?: TenantId;
+    taskId?: string;
+    authorId?: TenantUserId;
+  } = {}
+): TaskComment[] {
+  const managedProject = cloneManagedProject(project);
+  if (input.tenantId !== undefined) {
+    const tenantId = requireNonEmptyString(input.tenantId, "taskComment.tenantId");
+    assertTenantId(tenantId, managedProject.tenantId, "taskComment tenant mismatch");
+  }
+  const taskId = input.taskId === undefined ? undefined : requireNonEmptyString(input.taskId, "taskComment.taskId");
+  const authorId =
+    input.authorId === undefined ? undefined : requireNonEmptyString(input.authorId, "taskComment.authorId");
+
+  return managedProject.taskComments
+    .filter((comment) => taskId === undefined || comment.taskId === taskId)
+    .filter((comment) => authorId === undefined || comment.authorId === authorId)
+    .map(cloneTaskComment);
+}
+
+export function listTaskStatusHistory(
+  project: ManagedProject,
+  input: {
+    tenantId?: TenantId;
+    taskId?: string;
+    actorId?: TenantUserId;
+  } = {}
+): TaskStatusHistoryEntry[] {
+  const managedProject = cloneManagedProject(project);
+  if (input.tenantId !== undefined) {
+    const tenantId = requireNonEmptyString(input.tenantId, "taskStatusHistory.tenantId");
+    assertTenantId(tenantId, managedProject.tenantId, "taskStatusHistory tenant mismatch");
+  }
+  const taskId =
+    input.taskId === undefined ? undefined : requireNonEmptyString(input.taskId, "taskStatusHistory.taskId");
+  const actorId =
+    input.actorId === undefined ? undefined : requireNonEmptyString(input.actorId, "taskStatusHistory.actorId");
+
+  return managedProject.taskStatusHistory
+    .filter((entry) => taskId === undefined || entry.taskId === taskId)
+    .filter((entry) => actorId === undefined || entry.actorId === actorId)
+    .map(cloneTaskStatusHistoryEntry);
+}
+
 export function createTaskFromStageTaskTemplate(
   project: ManagedProject,
   input: {
@@ -2129,6 +2344,122 @@ export function addTaskParticipant(
     ...managedProject,
     updatedAt: addedAt,
     taskParticipants: [...managedProject.taskParticipants, participant]
+  };
+}
+
+export function addTaskComment(
+  project: ManagedProject,
+  input: {
+    id: string;
+    tenantId: TenantId;
+    taskId: string;
+    body: string;
+    authorId: TenantUserId;
+    createdAt: string;
+    correlationId: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "taskComment.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "taskComment tenant mismatch");
+  if (managedProject.lifecycleStatus !== "active") {
+    throw new ProjectCoreModelError("validation_error", "taskComment project must be active");
+  }
+  const task = findTask(managedProject, requireNonEmptyString(input.taskId, "taskComment.taskId"));
+  const stage = findProjectStage(managedProject, task.stageId);
+  if (stage.status === "completed" || stage.status === "cancelled") {
+    throw new ProjectCoreModelError("validation_error", "taskComment stage must be open");
+  }
+  const createdAt = requireValidTimestamp(input.createdAt, "taskComment.createdAt");
+  if (timestampIsBefore(createdAt, managedProject.updatedAt) || timestampIsBefore(createdAt, task.createdAt)) {
+    throw new ProjectCoreModelError(
+      "validation_error",
+      "taskComment createdAt cannot be earlier than current project or task state"
+    );
+  }
+
+  const comment: TaskComment = {
+    id: requireNonEmptyString(input.id, "taskComment.id"),
+    tenantId,
+    projectId: managedProject.id,
+    stageId: task.stageId,
+    taskId: task.id,
+    body: requireNonEmptyString(input.body, "taskComment.body"),
+    authorId: requireNonEmptyString(input.authorId, "taskComment.authorId"),
+    createdAt,
+    correlationId: requireNonEmptyString(input.correlationId, "taskComment.correlationId")
+  };
+
+  if (managedProject.taskComments.some((existing) => existing.id === comment.id)) {
+    throw new ProjectCoreModelError("conflict", "task comment id must be unique");
+  }
+
+  return {
+    ...managedProject,
+    updatedAt: createdAt,
+    taskComments: [...managedProject.taskComments, comment]
+  };
+}
+
+export function changeTaskStatus(
+  project: ManagedProject,
+  input: {
+    id: string;
+    tenantId: TenantId;
+    taskId: string;
+    toStatus: TaskStatus;
+    actorId: TenantUserId;
+    changedAt: string;
+    correlationId: string;
+  }
+): ManagedProject {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(input.tenantId, "taskStatusHistory.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "taskStatusHistory tenant mismatch");
+  if (managedProject.lifecycleStatus !== "active") {
+    throw new ProjectCoreModelError("validation_error", "taskStatusHistory project must be active");
+  }
+  const task = findTask(managedProject, requireNonEmptyString(input.taskId, "taskStatusHistory.taskId"));
+  const stage = findProjectStage(managedProject, task.stageId);
+  if (stage.status === "completed" || stage.status === "cancelled") {
+    throw new ProjectCoreModelError("validation_error", "taskStatusHistory stage must be open");
+  }
+  const toStatus = requireTaskStatus(input.toStatus, "task.status");
+  if (task.status === toStatus) {
+    throw new ProjectCoreModelError("validation_error", "task status transition must change status");
+  }
+  const changedAt = requireValidTimestamp(input.changedAt, "taskStatusHistory.changedAt");
+  if (timestampIsBefore(changedAt, managedProject.updatedAt) || timestampIsBefore(changedAt, task.updatedAt)) {
+    throw new ProjectCoreModelError(
+      "validation_error",
+      "taskStatusHistory changedAt cannot be earlier than current project or task state"
+    );
+  }
+
+  const entry: TaskStatusHistoryEntry = {
+    id: requireNonEmptyString(input.id, "taskStatusHistory.id"),
+    tenantId,
+    projectId: managedProject.id,
+    stageId: task.stageId,
+    taskId: task.id,
+    fromStatus: task.status,
+    toStatus,
+    actorId: requireNonEmptyString(input.actorId, "taskStatusHistory.actorId"),
+    changedAt,
+    correlationId: requireNonEmptyString(input.correlationId, "taskStatusHistory.correlationId")
+  };
+
+  if (managedProject.taskStatusHistory.some((existing) => existing.id === entry.id)) {
+    throw new ProjectCoreModelError("conflict", "task status history id must be unique");
+  }
+
+  return {
+    ...managedProject,
+    updatedAt: changedAt,
+    tasks: managedProject.tasks.map((candidate) =>
+      candidate.id === task.id ? { ...candidate, status: toStatus, updatedAt: changedAt } : candidate
+    ),
+    taskStatusHistory: [...managedProject.taskStatusHistory, entry]
   };
 }
 
