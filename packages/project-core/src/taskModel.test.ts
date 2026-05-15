@@ -359,6 +359,13 @@ describe("canonical task model", () => {
         tasks: [{ ...task, updatedAt: "2026-05-15T05:56:59+07:00" }]
       })
     ).toThrow("task.updatedAt cannot be earlier than task.createdAt");
+
+    expect(() =>
+      listProjectTasks({
+        ...project,
+        updatedAt: "2026-05-15T05:56:30+07:00"
+      })
+    ).toThrow("managedProject task updatedAt cannot be later than project.updatedAt");
   });
 
   it("rejects ambiguous persisted stage template snapshots before task creation", () => {

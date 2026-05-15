@@ -73,6 +73,18 @@ export type PolicyEvaluation = {
   trace: string[];
 };
 
+export const TASK_PARTICIPANT_READ_PERMISSION: Permission = {
+  key: "task_participant.read",
+  description: "Read task participant relation",
+  category: "task_work_management"
+};
+
+export const TASK_PARTICIPANT_MANAGE_PERMISSION: Permission = {
+  key: "task_participant.manage",
+  description: "Manage task participant relation",
+  category: "task_work_management"
+};
+
 export class AccessControlModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
@@ -208,6 +220,21 @@ export function createProfileAssignment(input: {
     userId: requireNonEmptyString(input.userId, "userId"),
     accessProfileId: requireNonEmptyString(input.accessProfileId, "accessProfileId"),
     assignedAt: requireValidTimestamp(input.assignedAt, "assignedAt")
+  };
+}
+
+export function createTaskParticipantPolicyTarget(input: {
+  tenantId: TenantId;
+  taskId: string;
+  projectId: string;
+  userId: TenantUserId;
+}): PolicyTargetRef {
+  return {
+    entityType: "taskParticipant",
+    tenantId: requireNonEmptyString(input.tenantId, "taskParticipant.tenantId"),
+    entityId: requireNonEmptyString(input.taskId, "taskParticipant.taskId"),
+    ownerId: requireNonEmptyString(input.userId, "taskParticipant.userId"),
+    projectId: requireNonEmptyString(input.projectId, "taskParticipant.projectId")
   };
 }
 
