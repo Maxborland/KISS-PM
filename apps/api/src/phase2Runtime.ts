@@ -115,6 +115,51 @@ const phase2PermissionCatalog = [
     key: "project_draft.read",
     description: "Read project drafts created from CRM intake",
     category: "project_intake"
+  }),
+  createPermission({
+    key: "project.create_from_template",
+    description: "Create managed projects from project drafts and process templates",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "project.read",
+    description: "Read managed projects and lifecycle state",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "project.lifecycle.transition",
+    description: "Move managed project stages through governed lifecycle transitions",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "project.artifact.write",
+    description: "Record project stage artifact evidence",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "project.approval.write",
+    description: "Record project stage approval evidence",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "task.read",
+    description: "Read canonical project tasks and task projections",
+    category: "task_work_management"
+  }),
+  createPermission({
+    key: "task.write",
+    description: "Create canonical project tasks and participant relations",
+    category: "task_work_management"
+  }),
+  createPermission({
+    key: "task.status.write",
+    description: "Change canonical task status",
+    category: "task_work_management"
+  }),
+  createPermission({
+    key: "task.comment.write",
+    description: "Append canonical task comments",
+    category: "task_work_management"
   })
 ] satisfies Permission[];
 
@@ -141,7 +186,16 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.feasibility.run",
       "audit.read",
       "project_draft.read",
-      "project_draft.create"
+      "project_draft.create",
+      "project.create_from_template",
+      "project.read",
+      "project.lifecycle.transition",
+      "project.artifact.write",
+      "project.approval.write",
+      "task.read",
+      "task.write",
+      "task.status.write",
+      "task.comment.write"
     ],
     project_manager: [
       "crm.opportunity.read",
@@ -151,16 +205,28 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.feasibility.run",
       "audit.read",
       "project_draft.read",
-      "project_draft.create"
+      "project_draft.create",
+      "project.create_from_template",
+      "project.read",
+      "project.lifecycle.transition",
+      "project.artifact.write",
+      "project.approval.write",
+      "task.read",
+      "task.write",
+      "task.status.write",
+      "task.comment.write"
     ],
     resource_manager: [
       "crm.opportunity.read",
       "crm.readiness.run",
       "crm.template_match.run",
-      "crm.feasibility.run"
+      "crm.feasibility.run",
+      "project.read",
+      "task.read"
     ],
-    readonly_observer: ["crm.opportunity.read", "project_draft.read"],
-    tenant_user: ["crm.opportunity.read", "project_draft.read"]
+    executor: ["project.read", "task.read", "task.status.write", "task.comment.write"],
+    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read"],
+    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read"]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
 

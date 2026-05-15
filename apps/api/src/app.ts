@@ -10,6 +10,21 @@ import type {
   Phase3ContactCreateInput,
   Phase3OpportunityCreateInput
 } from "./phase3Runtime";
+import { createPhase4RuntimeState } from "./phase4Runtime";
+import type { Phase4CreateTaskParticipantInput } from "./phase4Runtime";
+import type {
+  ApprovalRequest,
+  ManagedProject,
+  ProjectArtifact,
+  ProjectLifecycleTransitionError,
+  ProjectStage,
+  StageGateBlocker,
+  Task,
+  TaskComment,
+  TaskParticipant,
+  TaskParticipantRole,
+  TaskStatusHistoryEntry
+} from "@kiss-pm/project-core";
 
 type ApiErrorCode =
   | "unauthenticated"
@@ -137,6 +152,71 @@ const createOpportunitySchema = z
     }
   });
 
+const projectFromTemplateSchema = z
+  .object({
+    projectDraftId: z.string().trim().min(1),
+    projectId: z.string().trim().min(1).optional()
+  })
+  .strict();
+
+const lifecycleTransitionSchema = z
+  .object({
+    transition: z.enum(["advance_stage", "complete_project", "cancel_project"])
+  })
+  .strict();
+
+const artifactEvidenceSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    templateId: z.string().trim().min(1),
+    templateKey: z.string().trim().min(1),
+    status: z.enum(["submitted", "accepted", "rejected"]),
+    evidenceRef: z.string().trim().min(1).optional()
+  })
+  .strict();
+
+const approvalEvidenceSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    templateId: z.string().trim().min(1),
+    templateKey: z.string().trim().min(1),
+    decision: z.enum(["approved"]).optional()
+  })
+  .strict();
+
+const taskParticipantCreateSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    userId: z.string().trim().min(1),
+    role: z.enum(["executor", "co_executor", "requester", "controller", "approver", "observer"])
+  })
+  .strict();
+
+const taskCreateSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    stageId: z.string().trim().min(1),
+    taskTemplateId: z.string().trim().min(1),
+    taskTemplateKey: z.string().trim().min(1),
+    status: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"]).optional(),
+    dueDate: z.string().trim().min(1),
+    plannedWorkHours: z.number().min(0),
+    participants: z.array(taskParticipantCreateSchema).optional()
+  })
+  .strict();
+
+const taskStatusUpdateSchema = z
+  .object({
+    toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
+  })
+  .strict();
+
+const taskCommentCreateSchema = z
+  .object({
+    body: z.string().trim().min(1)
+  })
+  .strict();
+
 function errorDto(code: ApiErrorCode, message: string) {
   return { code, message };
 }
@@ -238,10 +318,43 @@ function assertAllowed(
   return evaluation;
 }
 
+function assertTaskActionRelation(
+  session: Phase2RuntimeSession,
+  project: ManagedProject,
+  taskId: string,
+  allowedRoles?: TaskParticipantRole[]
+): void {
+  if (session.profile.systemKey === "tenant_admin" || session.profile.systemKey === "project_manager") {
+    return;
+  }
+  const isRelatedToTask = project.taskParticipants.some(
+    (participant) =>
+      participant.taskId === taskId &&
+      participant.userId === session.user.id &&
+      (allowedRoles === undefined || allowedRoles.includes(participant.role))
+  );
+  if (!isRelatedToTask) {
+    throw Object.assign(new Error("permission_denied"), { code: "permission_denied", status: 403 });
+  }
+}
+
+function assertTenantUsersExist(
+  runtime: Phase2RuntimeState,
+  session: Phase2RuntimeSession,
+  participants: Phase4CreateTaskParticipantInput[] | undefined
+): void {
+  for (const participant of participants ?? []) {
+    if (runtime.users.get(participant.userId)?.tenantId !== session.user.tenantId) {
+      throw Object.assign(new Error("validation_error"), { code: "validation_error" });
+    }
+  }
+}
+
 export function createApiApp(options: CreateApiAppOptions = {}) {
   const app = new Hono();
   let runtime = createPhase2RuntimeState();
   let phase3Runtime = createPhase3CrmRuntimeState();
+  let phase4Runtime = createPhase4RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -483,22 +596,415 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
-  app.get("/api/projects/:projectDraftId", (context) => {
+  app.post("/api/projects/from-template", async (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
-      const projectDraftId = context.req.param("projectDraftId");
+      assertAllowed(runtime, session, "project.create_from_template", {
+        entityType: "project",
+        tenantId: session.user.tenantId
+      });
+
+      const body = projectFromTemplateSchema.parse(await parseJson(context));
+      const projectDraft = phase3Runtime.getProjectDraft(session.user.tenantId, body.projectDraftId);
+      if (projectDraft === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const project = phase4Runtime.createManagedProjectFromTemplate({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        projectDraft,
+        ...(body.projectId !== undefined ? { projectId: body.projectId } : {})
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "project.create_from_template",
+        target: { entityType: "project", entityId: project.id },
+        correlationId: project.correlationId,
+        details: {
+          before: { state: "not_created" },
+          after: projectDto(project)
+        }
+      });
+
+      return context.json({ project: projectDto(project) }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project !== undefined) {
+        assertAllowed(runtime, session, "project.read", {
+          entityType: "project",
+          tenantId: session.user.tenantId,
+          entityId: projectId
+        });
+
+        return context.json({ project: projectDto(project) });
+      }
+
       assertAllowed(runtime, session, "project_draft.read", {
         entityType: "projectDraft",
         tenantId: session.user.tenantId,
-        entityId: projectDraftId
+        entityId: projectId
       });
 
-      const projectDraft = phase3Runtime.getProjectDraft(session.user.tenantId, projectDraftId);
+      const projectDraft = phase3Runtime.getProjectDraft(session.user.tenantId, projectId);
       if (projectDraft === undefined) {
         return context.json(errorDto("not_found", "Объект не найден"), 404);
       }
 
       return context.json({ projectDraft: projectDraftDto(projectDraft) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/stages/:stageId/transition", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const stageId = context.req.param("stageId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.lifecycle.transition", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = lifecycleTransitionSchema.parse(await parseJson(context));
+      const result = phase4Runtime.transitionProjectStage(
+        session.user.tenantId,
+        projectId,
+        stageId,
+        body.transition,
+        session.user.id
+      );
+      if (!result.ok) {
+        return context.json(
+          {
+            ...errorDto("precondition_failed", "Условия перехода не выполнены"),
+            transitionError: transitionErrorDto(result.error)
+          },
+          409
+        );
+      }
+      runtime.appendAuditEvent({
+        session,
+        actionKey: `project.lifecycle.${body.transition}`,
+        target: { entityType: "project", entityId: projectId },
+        correlationId: `corr-api-project-transition-${projectId}-${body.transition}`,
+        details: {
+          before: projectDto(project),
+          after: projectDto(result.project)
+        }
+      });
+
+      return context.json({ project: projectDto(result.project) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/stages/:stageId/artifacts", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const stageId = context.req.param("stageId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.artifact.write", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = artifactEvidenceSchema.parse(await parseJson(context));
+      const nextProject = phase4Runtime.recordArtifact({
+        tenantId: session.user.tenantId,
+        projectId,
+        stageId,
+        ...(body.id !== undefined ? { id: body.id } : {}),
+        templateId: body.templateId,
+        templateKey: body.templateKey,
+        status: body.status,
+        ...(body.evidenceRef !== undefined ? { evidenceRef: body.evidenceRef } : {}),
+        actorId: session.user.id
+      });
+      const artifact = latestById(nextProject.artifacts, body.id);
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "project.artifact.record",
+        target: { entityType: "stage", entityId: stageId },
+        details: {
+          before: projectDto(project),
+          after: projectDto(nextProject)
+        }
+      });
+
+      return context.json({ artifact: artifact === undefined ? null : projectArtifactDto(artifact), project: projectDto(nextProject) }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/stages/:stageId/approvals", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const stageId = context.req.param("stageId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.approval.write", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = approvalEvidenceSchema.parse(await parseJson(context));
+      const nextProject = phase4Runtime.recordApproval({
+        tenantId: session.user.tenantId,
+        projectId,
+        stageId,
+        ...(body.id !== undefined ? { id: body.id } : {}),
+        templateId: body.templateId,
+        templateKey: body.templateKey,
+        ...(body.decision !== undefined ? { decision: body.decision } : {}),
+        actorId: session.user.id
+      });
+      const approval = latestById(nextProject.approvalRequests, body.id);
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "project.approval.record",
+        target: { entityType: "stage", entityId: stageId },
+        details: {
+          before: projectDto(project),
+          after: projectDto(nextProject)
+        }
+      });
+
+      return context.json(
+        { approval: approval === undefined ? null : approvalRequestDto(approval), project: projectDto(nextProject) },
+        201
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/tasks", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.read", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+
+      return context.json({ tasks: phase4Runtime.listProjectTasks(session.user.tenantId, projectId).map(taskDto) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/tasks", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = taskCreateSchema.parse(await parseJson(context));
+      const participants: Phase4CreateTaskParticipantInput[] | undefined =
+        body.participants === undefined
+          ? undefined
+          : body.participants.map((participant) => ({
+              ...(participant.id !== undefined ? { id: participant.id } : {}),
+              userId: participant.userId,
+              role: participant.role
+            }));
+      assertTenantUsersExist(runtime, session, participants);
+      const result = phase4Runtime.createTask({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        projectId,
+        ...(body.id !== undefined ? { id: body.id } : {}),
+        stageId: body.stageId,
+        taskTemplateId: body.taskTemplateId,
+        taskTemplateKey: body.taskTemplateKey,
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        dueDate: body.dueDate,
+        plannedWorkHours: body.plannedWorkHours,
+        ...(participants !== undefined ? { participants } : {})
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "task.create",
+        target: { entityType: "task", entityId: result.task.id },
+        correlationId: result.task.correlationId,
+        details: {
+          before: { state: "not_created" },
+          after: {
+            task: taskDto(result.task),
+            participants: result.participants.map(taskParticipantDto)
+          }
+        }
+      });
+
+      return context.json(
+        {
+          task: taskDto(result.task),
+          participants: result.participants.map(taskParticipantDto),
+          project: projectDto(result.project)
+        },
+        201
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.patch("/api/tasks/:taskId/status", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const taskId = context.req.param("taskId");
+      const project = phase4Runtime.getTaskProject(session.user.tenantId, taskId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.status.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: taskId
+      });
+      assertTaskActionRelation(session, project, taskId, ["executor", "co_executor"]);
+      const body = taskStatusUpdateSchema.parse(await parseJson(context));
+      const beforeTask = project.tasks.find((task) => task.id === taskId);
+      const nextProject = phase4Runtime.changeTaskStatus({
+        tenantId: session.user.tenantId,
+        taskId,
+        toStatus: body.toStatus,
+        actorId: session.user.id
+      });
+      const afterTask = nextProject.tasks.find((task) => task.id === taskId);
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "task.status.change",
+        target: { entityType: "task", entityId: taskId },
+        correlationId: `corr-api-task-status-${taskId}`,
+        details: {
+          before: beforeTask === undefined ? { state: "missing" } : taskDto(beforeTask),
+          after: afterTask === undefined ? { state: "missing" } : taskDto(afterTask)
+        }
+      });
+
+      return context.json({
+        task: afterTask === undefined ? null : taskDto(afterTask),
+        statusHistory: phase4Runtime.listTaskStatusHistory(session.user.tenantId, taskId).map(taskStatusHistoryDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tasks/:taskId/comments", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const taskId = context.req.param("taskId");
+      const project = phase4Runtime.getTaskProject(session.user.tenantId, taskId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.comment.write", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: taskId
+      });
+      assertTaskActionRelation(session, project, taskId);
+      const body = taskCommentCreateSchema.parse(await parseJson(context));
+      phase4Runtime.addTaskComment({
+        tenantId: session.user.tenantId,
+        taskId,
+        body: body.body,
+        authorId: session.user.id
+      });
+      const comments = phase4Runtime.listTaskComments(session.user.tenantId, taskId);
+      const comment = comments[comments.length - 1];
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "task.comment.add",
+        target: { entityType: "task", entityId: taskId },
+        correlationId: comment?.correlationId,
+        details: {
+          before: { state: "not_created" },
+          after: comment === undefined ? { state: "missing" } : taskCommentDto(comment)
+        }
+      });
+
+      return context.json({ comment: comment === undefined ? null : taskCommentDto(comment) }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/my/tasks", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "task.read", {
+        entityType: "task",
+        tenantId: session.user.tenantId
+      });
+      const roles = parseTaskParticipantRoles(context.req.query("roles"));
+
+      return context.json({
+        tasks: phase4Runtime.listMyTasks(session.user.tenantId, session.user.id, roles).map(myTaskDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kanban/projects/:projectId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "task.read", {
+        entityType: "task",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const kanban = phase4Runtime.getKanbanProject(session.user.tenantId, projectId);
+
+      return context.json({
+        projectId: kanban.projectId,
+        columns: kanban.columns.map((column) => ({
+          status: column.status,
+          tasks: column.tasks.map(taskDto)
+        }))
+      });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -792,6 +1298,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
     runtime = createPhase2RuntimeState();
     phase3Runtime = createPhase3CrmRuntimeState();
+    phase4Runtime = createPhase4RuntimeState();
     return context.json({ status: "reset" });
   });
 
@@ -999,6 +1506,149 @@ function actionExecutionDto(actionExecution: {
   };
 }
 
+function stageDto(stage: ProjectStage) {
+  return {
+    id: stage.id,
+    tenantId: stage.tenantId,
+    projectId: stage.projectId,
+    templateId: stage.templateId,
+    templateKey: stage.templateKey,
+    templateVersion: stage.templateVersion,
+    label: stage.label,
+    sortOrder: stage.sortOrder,
+    status: stage.status,
+    ...(stage.startedAt !== undefined ? { startedAt: stage.startedAt } : {}),
+    ...(stage.completedAt !== undefined ? { completedAt: stage.completedAt } : {})
+  };
+}
+
+function projectDto(project: ManagedProject) {
+  return {
+    id: project.id,
+    tenantId: project.tenantId,
+    title: project.title,
+    lifecycleStatus: project.lifecycleStatus,
+    currentStageId: project.currentStageId,
+    sourceDraftId: project.sourceDraftId,
+    sourceOpportunity: {
+      ...project.sourceOpportunity,
+      contactIds: [...project.sourceOpportunity.contactIds]
+    },
+    processTemplateSnapshot: {
+      templateId: project.processTemplateSnapshot.templateId,
+      key: project.processTemplateSnapshot.key,
+      label: project.processTemplateSnapshot.label,
+      version: project.processTemplateSnapshot.version,
+      active: project.processTemplateSnapshot.active,
+      updatedAt: project.processTemplateSnapshot.updatedAt,
+      stageTemplates: project.processTemplateSnapshot.stageTemplates.map((stageTemplate) => ({
+        ...stageTemplate,
+        requiredArtifactTemplates: stageTemplate.requiredArtifactTemplates.map((template) => ({ ...template })),
+        approvalTemplates: stageTemplate.approvalTemplates.map((template) => ({ ...template })),
+        taskTemplates: stageTemplate.taskTemplates.map((template) => ({
+          ...template,
+          defaultParticipantRoleKeys: [...template.defaultParticipantRoleKeys]
+        }))
+      }))
+    },
+    stages: project.stages.map(stageDto),
+    stageHistory: project.stageHistory.map((entry) => ({ ...entry })),
+    tasks: project.tasks.map(taskDto),
+    taskParticipants: project.taskParticipants.map(taskParticipantDto),
+    taskComments: project.taskComments.map(taskCommentDto),
+    taskStatusHistory: project.taskStatusHistory.map(taskStatusHistoryDto),
+    artifacts: project.artifacts.map(projectArtifactDto),
+    approvalRequests: project.approvalRequests.map(approvalRequestDto),
+    createdBy: project.createdBy,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    correlationId: project.correlationId
+  };
+}
+
+function taskDto(task: Task) {
+  return {
+    id: task.id,
+    tenantId: task.tenantId,
+    projectId: task.projectId,
+    stageId: task.stageId,
+    title: task.title,
+    status: task.status,
+    dueDate: task.dueDate,
+    plannedWorkHours: task.plannedWorkHours,
+    sourceTemplate: {
+      ...task.sourceTemplate,
+      defaultParticipantRoleKeys: [...task.sourceTemplate.defaultParticipantRoleKeys]
+    },
+    createdBy: task.createdBy,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    correlationId: task.correlationId
+  };
+}
+
+function myTaskDto(task: Task & { relationRoles: TaskParticipantRole[] }) {
+  return {
+    ...taskDto(task),
+    relationRoles: [...task.relationRoles]
+  };
+}
+
+function taskParticipantDto(participant: TaskParticipant) {
+  return { ...participant };
+}
+
+function taskCommentDto(comment: TaskComment) {
+  return { ...comment };
+}
+
+function taskStatusHistoryDto(entry: TaskStatusHistoryEntry) {
+  return { ...entry };
+}
+
+function projectArtifactDto(artifact: ProjectArtifact) {
+  return { ...artifact };
+}
+
+function approvalRequestDto(request: ApprovalRequest) {
+  return { ...request };
+}
+
+function stageGateBlockerDto(blocker: StageGateBlocker) {
+  return { ...blocker };
+}
+
+function transitionErrorDto(error: ProjectLifecycleTransitionError) {
+  return {
+    code: error.code,
+    message: error.message,
+    details: { ...error.details },
+    ...(error.blockers !== undefined ? { blockers: error.blockers.map(stageGateBlockerDto) } : {})
+  };
+}
+
+function latestById<T extends { id: string }>(items: T[], id: string | undefined): T | undefined {
+  if (id !== undefined) {
+    return items.find((item) => item.id === id);
+  }
+
+  return items[items.length - 1];
+}
+
+function parseTaskParticipantRoles(rawRoles: string | undefined): TaskParticipantRole[] | undefined {
+  if (rawRoles === undefined || rawRoles.trim().length === 0) {
+    return undefined;
+  }
+  const roles = rawRoles.split(",").map((role) => role.trim());
+  for (const role of roles) {
+    if (!["executor", "co_executor", "requester", "controller", "approver", "observer"].includes(role)) {
+      throw Object.assign(new Error("validation_error"), { code: "validation_error" });
+    }
+  }
+
+  return roles as TaskParticipantRole[];
+}
+
 function handleRouteError(context: Context, error: unknown) {
   if (error instanceof z.ZodError || (error instanceof Error && error.message === "invalid_json")) {
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
@@ -1056,6 +1706,15 @@ function handleRouteError(context: Context, error: unknown) {
 
   if (typeof error === "object" && error !== null && "code" in error && error.code === "conflict") {
     return context.json(errorDto("conflict", "Конфликт данных"), 409);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "not_found") {
+    return context.json(errorDto("not_found", "Объект не найден"), 404);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "tenant_mismatch") {
+    return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "validation_error") {
+    return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
   }
 
   return context.json(errorDto("validation_error", "Не удалось обработать запрос"), 400);
