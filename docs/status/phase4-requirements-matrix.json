@@ -2,7 +2,7 @@
   "phase": "P4",
   "name": "Phase 4 project lifecycle and work management requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-15T07:35:41+07:00",
+  "updated_at": "2026-05-15T09:15:54+07:00",
   "rows": [
     {
       "id": "P4-001",
@@ -144,7 +144,7 @@
     {
       "id": "P4-005",
       "requirement": "Task participants and assignment roles",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/project-core",
@@ -154,14 +154,26 @@
         "E2E-033"
       ],
       "evidence": [
-        "Phase 4 contract defines executor/co-executor/requester/controller/approver/observer task participant roles before implementation"
+        "packages/project-core exports TaskParticipantRole, TaskParticipant, addTaskParticipant, listTaskParticipants, and listTasksByParticipant for role-based task participation over the canonical Task model",
+        "Task participants are tenant/project/stage/task-owned relations, not alternate task entities; addTaskParticipant is immutable and deduplicates assignments by taskId, role, and userId while allowing one user to hold multiple roles",
+        "Relation queries filter by tenant, task, user, and participant roles, return cloned participant/task data, and support executor, co_executor, requester, controller, approver, and observer roles",
+        "packages/access-control exports TASK_PARTICIPANT_READ_PERMISSION, TASK_PARTICIPANT_MANAGE_PERMISSION, and createTaskParticipantPolicyTarget so own-scope and project-scope participant access can be evaluated by the existing policy evaluator",
+        "Bug Hunt and code review findings were fixed: relation projections are cloned, malformed persisted participants are rejected before query, task/participant timestamps cannot exceed project.updatedAt, and project.updatedAt cannot precede project.createdAt",
+        "apps/api task participant routes remain P4-007 scope; P4-005 includes domain/access-control package integration evidence only"
       ],
       "tests": [
-        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0 before implementation"
+        "npm test -- packages/project-core/src/taskParticipants.test.ts packages/access-control/src/taskParticipantPolicy.test.ts exit 0, 2 files and 7 tests passed before review fixes",
+        "npm test -- packages/project-core/src/taskParticipants.test.ts packages/project-core/src/taskModel.test.ts exit 0, 2 files and 14 tests passed after chronology review fix",
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/project-core/src/projectLifecycle.test.ts packages/project-core/src/stageGate.test.ts packages/project-core/src/taskModel.test.ts packages/project-core/src/taskParticipants.test.ts packages/access-control/src/accessProfile.test.ts packages/access-control/src/policyEvaluator.test.ts packages/access-control/src/taskParticipantPolicy.test.ts packages/workflow-engine/src/projectLifecycleWorkflow.test.ts packages/workflow-engine/src/stageGateWorkflow.test.ts exit 0, 10 files and 55 tests passed",
+        "npm test exit 0, 35 files and 195 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime resources created; row is blocked before implementation",
-      "blocker": "Task participant role implementation has not started",
-      "last_checked_at": "2026-05-15T02:24:27+07:00"
+      "cleanup": "No runtime resources or external data created; implementation is pure domain/access-control code plus unit/package integration tests. Temporary P4-005 agent-bus claim/session/lock removed after commit.",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T09:15:54+07:00"
     },
     {
       "id": "P4-006",
