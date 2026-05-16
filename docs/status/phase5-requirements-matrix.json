@@ -2,7 +2,7 @@
   "phase": "P5",
   "name": "Phase 5 scheduling and Gantt foundation requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T09:17:19+07:00",
+  "updated_at": "2026-05-16T12:27:00+07:00",
   "rows": [
     {
       "id": "P5-001",
@@ -21,7 +21,7 @@
       ],
       "evidence": [
         "Schedule primitives implementation exists in packages/scheduling-engine/src/index.ts with tenant/project scoped SchedulePlan, WbsNode, ScheduleDependency, ScheduleDateRange, ScheduleValidationIssue, and ScheduleBaselineSnapshot value objects",
-        "P5-001 remains blocked for phase-exit verification until mandatory Phase 5 E2E evidence E2E-040..E2E-044 exists",
+        "Mandatory Phase 5 E2E evidence E2E-040..E2E-044 now exists for P5-001 phase-exit verification",
         "Structured Phase 5 E2E evidence E2E-040..044 now exercises the scheduling primitives through UI/API/domain readback."
       ],
       "tests": [
@@ -191,7 +191,7 @@
         "validateSchedulePlan now runs structural dependency validation before planned-field issue collection, so mixed-invalid plans cannot hide dependency cycles or malformed dependency endpoints",
         "Successor-before-predecessor schedule conflicts remain typed ScheduleValidationIssue entries with code finish_to_start_conflict; no automatic date propagation or auto-rescheduling is introduced",
         "Bug Hunt found no Critical or Important issues after review fix; requested code review found one Medium issue about mixed-invalid validation hiding structural dependency errors, fixed with assertScheduleDependencyStructure and a regression test",
-        "P5-004 remains blocked for phase-exit verification until mandatory Phase 5 E2E evidence E2E-043 exists",
+        "Mandatory Phase 5 E2E evidence E2E-043 now exists for P5-004 phase-exit verification",
         "Structured Phase 5 E2E evidence E2E-043 now proves Finish-to-Start dependency persistence and typed conflict blocker behavior without partial mutation."
       ],
       "tests": [
@@ -382,7 +382,7 @@
         "Browser smoke via in-app Browser against local Vite+API (success: DOM checks passed, screenshot captured)",
         "npm run test:e2e:phase -- --phase=5 exit 0; E2E-040..044 passed; metadata test-results/kiss-pm-e2e-last-run.json"
       ],
-      "cleanup": "No runtime cleanup required for P5-007; dev servers used only for local smoke. Matrix row remains blocked until structured E2E-040 exists in P5-009.",
+      "cleanup": "No runtime cleanup required for P5-007; dev servers used only for local smoke. Structured E2E-040 evidence exists in the Phase 5 matrix.",
       "blocker": null,
       "last_checked_at": "2026-05-16T02:17:19.278Z",
       "e2e_evidence": [
@@ -568,7 +568,7 @@
     {
       "id": "P5-010",
       "requirement": "Phase 5 verification matrix",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -581,11 +581,71 @@
         "E2E-043",
         "E2E-044"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "No runtime cleanup yet; row blocked before implementation",
-      "blocker": "P5-010 final roll-up waits for P5-001..P5-009 implementation and structured E2E evidence",
-      "last_checked_at": "2026-05-15T16:35:00+07:00"
+      "evidence": [
+        "Phase 5 final gate ran from clean worktree C:\\tmp\\kiss-pm-worktrees\\p5-010-exit-gate on branch codex/p5-010-exit-gate after P5-009 integration commit b2c79eb.",
+        "Mandatory Phase 5 E2E scenarios E2E-040..044 passed through npm run test:e2e:phase -- --phase=5 with metadata at test-results/kiss-pm-e2e-last-run.json.",
+        "Strict Phase 5 matrix verifier passes without --allow-blocked after this row update."
+      ],
+      "tests": [
+        "npm run test:e2e:phase -- --phase=5 exit 0; E2E-040..044 passed",
+        "npm run test:integration exit 0; 7 files and 33 tests passed",
+        "npm test -- packages/scheduling-engine packages/shared-test-fixtures scripts/verify-requirements-matrix.test.ts scripts/agent-bus-status.test.ts exit 0; 7 files and 70 tests passed",
+        "node --test scripts/agent-bus-guard.test.mjs scripts/agent-bus-orchestration-check.test.mjs exit 0; 5 tests passed",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json exit 0",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json exit 0"
+      ],
+      "cleanup": "Phase 5 E2E fixture reset is deterministic and per-test; no live external services or production data used. Playwright test-results metadata retained as phase-exit evidence.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T05:26:09.488Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-040",
+          "command": "npm run test:e2e:phase -- --phase=5",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase5/open-gantt.spec.ts",
+          "checked_at": "2026-05-16T05:26:09.488Z",
+          "metadata_path": "test-results/kiss-pm-e2e-last-run.json"
+        },
+        {
+          "id": "E2E-041",
+          "command": "npm run test:e2e:phase -- --phase=5",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase5/gantt-task-cross-view.spec.ts",
+          "checked_at": "2026-05-16T05:26:09.488Z",
+          "metadata_path": "test-results/kiss-pm-e2e-last-run.json"
+        },
+        {
+          "id": "E2E-042",
+          "command": "npm run test:e2e:phase -- --phase=5",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase5/gantt-date-persist.spec.ts",
+          "checked_at": "2026-05-16T05:26:09.488Z",
+          "metadata_path": "test-results/kiss-pm-e2e-last-run.json"
+        },
+        {
+          "id": "E2E-043",
+          "command": "npm run test:e2e:phase -- --phase=5",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase5/gantt-dependency.spec.ts",
+          "checked_at": "2026-05-16T05:26:09.488Z",
+          "metadata_path": "test-results/kiss-pm-e2e-last-run.json"
+        },
+        {
+          "id": "E2E-044",
+          "command": "npm run test:e2e:phase -- --phase=5",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase5/baseline-stability.spec.ts",
+          "checked_at": "2026-05-16T05:26:09.488Z",
+          "metadata_path": "test-results/kiss-pm-e2e-last-run.json"
+        }
+      ]
     }
   ]
 }

@@ -954,7 +954,7 @@
     {
       "id": "P5-010",
       "title": "Phase 5 verification matrix and exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "high",
       "phase": "P5",
       "depends_on": [
@@ -987,7 +987,7 @@
         "node scripts/agent-bus-guard.mjs --task P5-010 --once",
         "git diff --check -- docs/status scripts docs/e2e .agent-bus"
       ],
-      "notes": "Unblocked by P5-009 E2E evidence. Run final strict Phase 5 matrix/exit verification without weakening verifier rules."
+      "notes": "Completed by Block Lead on 2026-05-16 in clean worktree C:\\tmp\\kiss-pm-worktrees\\p5-010-exit-gate. Phase 5 requirements matrix passes strict verification without --allow-blocked after E2E-040..044, integration, unit/verifier, typecheck, lint, guard, and review fixes."
     },
     {
       "id": "DOC-TENANT-CUSTOMIZATION-001",

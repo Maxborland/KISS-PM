@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T12:20:00+07:00
+Updated: 2026-05-16T12:28:00+07:00
 
 - Phase 4 P4-001..P4-010 are completed and verified on branch codex/p4-009-e2e-suite.
 - P5-000 Phase 5 scheduling/Gantt contract is completed on branch codex/p5-contract, commit 42b31b9.
@@ -16,4 +16,5 @@ Updated: 2026-05-16T12:20:00+07:00
 - P5-007 Gantt UI MVP and entrypoint is implemented at web/UI level by Block Lead. The Russian Gantt workspace reads the P5-006 schedule API/read model, shows WBS/stage/task rows, planned schedule fields, baseline values, validation warnings, loading/empty/denied/error states, project-surface entrypoint, portfolio/project-id entry panel, and audit/action evidence labels. Bug Hunt and requested code review Critical/Important findings are resolved. Its Phase 5 matrix row remains blocked until E2E-040 evidence exists.
 - P5-008 Gantt task creation and inline schedule edits is implemented at web/UI level by Block Lead. Gantt command controls call the P5-006 API for canonical task creation, planned date/work/progress edits, Finish-to-Start dependency creation, and baseline draft capture; command results reload schedule/audit from API readback. Browser smoke verified same-project entrypoint refresh, two Gantt-created tasks, FS dependency, baseline capture, inline edit persistence, separate baseline/live values, and no new console errors after reload. Its Phase 5 matrix row remains blocked until E2E-041..044 evidence exists.
 - P5-009 deterministic Phase 5 fixtures and E2E suite is implemented by Block Lead. `packages/shared-test-fixtures/src/phase5Fixtures.ts` defines stable Phase 5 project/task/dependency/baseline IDs, and `e2e/tests/phase5/*` implements E2E-040..044. Review fixes added backend read-only denial proof, Tenant B private schedule isolation, reload/audit assertions, and an honest My Tasks participant-assignment boundary. Follow-up integration on branch `codex/p5-010-exit-gate` committed the previously dirty P5 scheduling foundation, Phase 5 brief/contract matrix, matrix verifier support, and agent-bus guard artifacts needed by a clean P5-010 gate.
-- Next recommended step: run P5-010 final Phase 5 verification matrix and exit gate from `C:\tmp\kiss-pm-worktrees\p5-010-exit-gate`; the previous clean-worktree blocker about missing scheduling-engine exports has been removed by the P5-009 integration commit.
+- P5-010 final Phase 5 verification matrix and exit gate is completed in clean worktree `C:\tmp\kiss-pm-worktrees\p5-010-exit-gate`. Strict `npm run verify:matrix -- docs/status/phase5-requirements-matrix.json` passes without `--allow-blocked`; E2E-040..044, API integration, unit/verifier tests, typecheck, lint, guard, and review fixes passed.
+- Next recommended step: Phase 6 planning/resource-capacity phase kickoff only after branch `codex/p5-010-exit-gate` is merged or otherwise integrated.
