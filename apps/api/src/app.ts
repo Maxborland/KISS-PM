@@ -13,6 +13,8 @@ import type {
 import { createPhase4RuntimeState } from "./phase4Runtime";
 import type { Phase4CreateTaskParticipantInput } from "./phase4Runtime";
 import { createPhase5RuntimeState } from "./phase5Runtime";
+import { createPhase6RuntimeState } from "./phase6Runtime";
+import type { ResourceResolutionCommand } from "./phase6Runtime";
 import type {
   ApprovalRequest,
   ManagedProject,
@@ -37,6 +39,7 @@ type ApiErrorCode =
   | "not_found"
   | "conflict"
   | "precondition_failed"
+  | "stale_preview"
   | "not_implemented"
   | "test_mode_only";
 
@@ -249,6 +252,40 @@ const scheduleBaselineCaptureSchema = z
   })
   .strict();
 
+const resourceReservationCreateSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    sourceType: z.enum(["opportunity", "project", "stage"]),
+    sourceId: z.string().trim().min(1),
+    resourceProfileId: z.string().trim().min(1).optional(),
+    roleKey: z.string().trim().min(1),
+    roleLabel: z.string().trim().min(1),
+    periodStart: scheduleDateSchema,
+    periodEnd: scheduleDateSchema,
+    reservedHours: z.number().min(0),
+    sourceLabel: z.string().trim().min(1)
+  })
+  .strict();
+
+const resourceResolutionPreviewSchema = z
+  .object({
+    actionKey: z.enum(["shift_work", "split_work", "reassign_resource", "reserve_capacity", "accept_risk", "escalate"]),
+    assignmentId: z.string().trim().min(1).optional(),
+    reservationId: z.string().trim().min(1).optional(),
+    targetResourceProfileId: z.string().trim().min(1).optional(),
+    shiftDays: z.number().int().positive().optional(),
+    splitHours: z.number().positive().optional(),
+    reservedHours: z.number().positive().optional(),
+    reason: z.string().trim().min(1)
+  })
+  .strict();
+
+const resourceResolutionApplySchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -400,6 +437,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase3Runtime = createPhase3CrmRuntimeState();
   let phase4Runtime = createPhase4RuntimeState();
   let phase5Runtime = createPhase5RuntimeState();
+  let phase6Runtime = createPhase6RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -987,6 +1025,179 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       const events = runtime.auditStore
         .listByTenant(session.user.tenantId)
         .filter((event) => actionCorrelationIds.has(event.correlationId))
+        .map(auditEventDto);
+
+      return context.json({
+        events,
+        actionExecutions: actionExecutions.map(actionExecutionDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/resources/load", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "resource.read", {
+        entityType: "resourceLoadBucket",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json(phase6Runtime.getProjection(session.user.tenantId));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/resources/load/:bucketId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "resource.read", {
+        entityType: "resourceLoadBucket",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("bucketId")
+      });
+      const bucket = phase6Runtime.getLoadBucket(session.user.tenantId, context.req.param("bucketId"));
+      if (bucket === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json({ bucket });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/resources/overloads/:overloadId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const overloadId = context.req.param("overloadId");
+      assertAllowed(runtime, session, "resource.read", {
+        entityType: "resourceOverload",
+        tenantId: session.user.tenantId,
+        entityId: overloadId
+      });
+      const detail = phase6Runtime.getOverloadDetail(session.user.tenantId, overloadId);
+      if (detail === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json(detail);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/resources/reservations", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "resource.write", {
+        entityType: "resourceReservation",
+        tenantId: session.user.tenantId
+      });
+      const body = resourceReservationCreateSchema.parse(await parseJson(context));
+      const before = phase6Runtime.getProjection(session.user.tenantId);
+      const reservation = phase6Runtime.createReservation(session.user.tenantId, body);
+      const after = phase6Runtime.getProjection(session.user.tenantId);
+      runtime.appendAuditEvent({
+        session,
+        actionKey: "resource_reservation.create",
+        target: { entityType: "resourceReservation", entityId: reservation.id },
+        details: {
+          before: { loadBuckets: before.loadBuckets },
+          after: { reservation, loadBuckets: after.loadBuckets }
+        }
+      });
+
+      return context.json({ reservation, readback: after }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/resources/overloads/:overloadId/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const overloadId = context.req.param("overloadId");
+      assertAllowed(runtime, session, "resource.write", {
+        entityType: "resourceOverload",
+        tenantId: session.user.tenantId,
+        entityId: overloadId
+      });
+      const body = resourceResolutionPreviewSchema.parse(await parseJson(context));
+      const preview = phase6Runtime.previewResolution(
+        session.user.tenantId,
+        session.user.id,
+        overloadId,
+        body as ResourceResolutionCommand
+      );
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/resources/overloads/:overloadId/apply", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const overloadId = context.req.param("overloadId");
+      assertAllowed(runtime, session, "resource.write", {
+        entityType: "resourceOverload",
+        tenantId: session.user.tenantId,
+        entityId: overloadId
+      });
+      const body = resourceResolutionApplySchema.parse(await parseJson(context));
+      const result = phase6Runtime.applyResolution({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        overloadId,
+        previewId: body.previewId
+      });
+      const readback = phase6Runtime.getProjection(session.user.tenantId);
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: result.actionExecution.target ?? result.actionExecution.source,
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { loadBuckets: result.beforeLoadBuckets },
+          after: {
+            loadBuckets: result.afterLoadBuckets,
+            overloadStatus: result.overloadStatus,
+            actionExecution: actionExecutionDto(result.actionExecution)
+          }
+        }
+      });
+
+      return context.json({
+        result: {
+          ...result,
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/resources/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId
+      });
+      const actionExecutions = phase6Runtime.listActionExecutions(session.user.tenantId);
+      const actionCorrelationIds = new Set(actionExecutions.map((actionExecution) => actionExecution.correlationId));
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter(
+          (event) => actionCorrelationIds.has(event.correlationId) || event.actionKey.startsWith("resource_reservation.")
+        )
         .map(auditEventDto);
 
       return context.json({
@@ -1666,6 +1877,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase3Runtime = createPhase3CrmRuntimeState();
     phase4Runtime = createPhase4RuntimeState();
     phase5Runtime = createPhase5RuntimeState();
+    phase6Runtime = createPhase6RuntimeState();
     return context.json({ status: "reset" });
   });
 
@@ -2160,6 +2372,12 @@ function handleRouteError(context: Context, error: unknown) {
   }
   if (typeof error === "object" && error !== null && "code" in error && error.code === "tenant_mismatch") {
     return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "precondition_failed") {
+    return context.json(errorDto("precondition_failed", "Условия действия не выполнены"), 409);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "stale_preview") {
+    return context.json(errorDto("stale_preview", "Предпросмотр устарел"), 409);
   }
   if (typeof error === "object" && error !== null && "code" in error && error.code === "validation_error") {
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);

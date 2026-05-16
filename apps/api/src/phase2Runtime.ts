@@ -160,6 +160,16 @@ const phase2PermissionCatalog = [
     key: "task.comment.write",
     description: "Append canonical task comments",
     category: "task_work_management"
+  }),
+  createPermission({
+    key: "resource.read",
+    description: "Read resource planning load, reservations, and overloads",
+    category: "resource_planning"
+  }),
+  createPermission({
+    key: "resource.write",
+    description: "Create reservations and apply governed resource resolution commands",
+    category: "resource_planning"
   })
 ] satisfies Permission[];
 
@@ -195,7 +205,9 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "task.read",
       "task.write",
       "task.status.write",
-      "task.comment.write"
+      "task.comment.write",
+      "resource.read",
+      "resource.write"
     ],
     project_manager: [
       "crm.opportunity.read",
@@ -214,7 +226,9 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "task.read",
       "task.write",
       "task.status.write",
-      "task.comment.write"
+      "task.comment.write",
+      "resource.read",
+      "resource.write"
     ],
     resource_manager: [
       "crm.opportunity.read",
@@ -222,11 +236,14 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run",
       "project.read",
-      "task.read"
+      "task.read",
+      "resource.read",
+      "resource.write",
+      "audit.read"
     ],
     executor: ["project.read", "task.read", "task.status.write", "task.comment.write"],
-    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read"],
-    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read"]
+    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read"],
+    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read"]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
 
