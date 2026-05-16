@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T06:11:45.0000000+07:00
+Updated: 2026-05-17T06:28:18.5585015+07:00
 
 - Phase 11 Integrations and Migration has an accepted closed contract and initial tracking matrix:
   - `P11-000-integrations-migration-phase-contract`
@@ -11,9 +11,11 @@ Updated: 2026-05-17T06:11:45.0000000+07:00
 - Accepted P11 implementation blocks:
   - `P11-000-integrations-migration-phase-contract`
   - `P11-001-integration-adapter-foundation-external-mapping`
+  - `P11-002-mock-adapter-canonical-import-preview`
 - `P11-001` implemented the integration adapter/domain foundation in `packages/integrations` and P11 integration permission constants in `packages/access-control`. It defines tenant-owned adapter definitions, connections, external payload envelopes, ExternalMapping, deterministic mapping/idempotency keys, typed adapter failures, sync audit events, defensive cloning, and secret-looking redaction for mapping diagnostics and audit details. Matrix row P11-001 remains blocked only for later E2E-100/E2E-101/E2E-104 evidence.
+- `P11-002` implemented non-mutating mock adapter canonical import preview in `packages/integrations`. It returns validation reports, create/update/skip/error counts, affected canonical refs, mapping previews, and canonical opportunity/project/task preview DTOs compatible with `crm-core` and `project-core`. Canonical IDs are deterministic hash-based IDs and do not expose external IDs. Matrix row P11-002 remains blocked only for later E2E-100 evidence.
 - P11 scope is frozen around external systems as adapters, ExternalMapping/idempotency, mock adapter import preview/apply, migration validation reports, safe failure diagnostics, Integration Admin Diagnostics UI, imported-project continuity without live adapter dependency, deterministic fixtures, and strict matrix exit.
-- Next recommended step: claim `P11-002-mock-adapter-canonical-import-preview` and implement the non-mutating mock adapter import preview before apply/API/UI/E2E work.
+- Next recommended step: claim `P11-003-idempotent-import-apply-mapping-persistence` and implement idempotent import apply plus mapping persistence before UI/E2E work.
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.
