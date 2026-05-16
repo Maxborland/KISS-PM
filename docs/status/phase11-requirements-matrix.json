@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T05:55:38.9918634+07:00",
+  "updated_at": "2026-05-17T06:10:03.3842976+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -19,14 +19,28 @@
         "E2E-104"
       ],
       "evidence": [
-        "Phase 11 contract defines adapter foundation, ExternalMapping, idempotency, permissions, and E2E expectations before implementation."
+        "Phase 11 contract defines adapter foundation, ExternalMapping, idempotency, permissions, and E2E expectations before implementation.",
+        "packages/integrations/src/index.ts implements tenant-owned IntegrationAdapterDefinition, IntegrationConnection, ExternalPayloadEnvelope, ExternalMapping, ExternalMappingDiagnostic, AdapterFailure, SyncAuditEvent, deterministic mapping keys, deterministic import idempotency keys, typed validation errors, defensive payload/metadata cloning, and secret-looking diagnostic/audit-detail redaction.",
+        "packages/integrations/src/integrationAdapterFoundation.test.ts proves adapter/connection validation, payload immutability, tenant-scoped mapping/idempotency keys, diagnostics and sync-audit redaction, typed adapter failure/audit event creation, and invalid input typed errors.",
+        "packages/access-control/src/index.ts defines P11 integration permissions: integration.read, integration.preview, integration.apply, integration.mapping.read, integration.audit.read, and integration.admin.",
+        "packages/access-control/src/accessProfile.test.ts proves the P11 integration permissions compose into a tenant-scoped integration admin access profile."
       ],
       "tests": [
-        "Pending P11-001 implementation: expected unit tests under packages/integrations and access-control permission tests."
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 1 RED: P11 adapter foundation functions were missing before implementation",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 1 RED: P11 integration permission constants were missing before implementation",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 0: 1 file, 6 tests passed",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 1 RED during bug-hunt: sync audit details were cloned but not redacted before diagnostic/API use",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 0 after audit-detail redaction fix: 1 file, 7 tests passed",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 0: 1 file, 10 tests passed",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts packages/access-control/src/accessProfile.test.ts exit 0: 2 files, 16 tests passed",
+        "npm test -- packages/integrations packages/access-control exit 0: 4 files, 27 tests passed",
+        "npm test exit 0: 94 files, 540 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must prove deterministic fixture reset for mappings, idempotency state, sync audit, and adapter mode.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-001 implementation has not started; this contract block only defines required adapter/mapping scope and verifier tracking.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11-001 is pure domain/access-control code with no runtime state. Phase cleanup remains blocked for this row until P11-009 E2E-100/E2E-101/E2E-104 proves fixture reset/readback for mappings, idempotency state, sync audit, and adapter mode.",
+      "blocker": "2026-05-17T06:10:03.3842976+07:00: P11-001 domain/access-control implementation is complete, but the row remains blocked for strict phase exit until required E2E-100, E2E-101, and E2E-104 structured evidence exists.",
+      "last_checked_at": "2026-05-17T06:10:03.3842976+07:00",
       "e2e_evidence": []
     },
     {

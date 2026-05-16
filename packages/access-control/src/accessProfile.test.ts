@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   AccessControlModelError,
+  INTEGRATION_ADMIN_PERMISSION,
+  INTEGRATION_APPLY_PERMISSION,
+  INTEGRATION_AUDIT_READ_PERMISSION,
+  INTEGRATION_MAPPING_READ_PERMISSION,
+  INTEGRATION_PREVIEW_PERMISSION,
+  INTEGRATION_READ_PERMISSION,
   TENANT_CONFIG_IMPORT_PERMISSION,
   TENANT_CONFIG_READ_PERMISSION,
   TENANT_CONFIG_WRITE_PERMISSION,
@@ -80,6 +86,43 @@ describe("access profile model", () => {
       "tenant.config.read",
       "tenant.config.write",
       "tenant.config.import"
+    ]);
+  });
+
+  it("supports integration permissions for P11 adapter imports and diagnostics", () => {
+    const profile = createAccessProfile({
+      id: "integration-admin-profile",
+      tenantId: "tenant-a",
+      systemKey: "integration_admin",
+      label: "Integration admin",
+      permissions: [
+        INTEGRATION_READ_PERMISSION,
+        INTEGRATION_PREVIEW_PERMISSION,
+        INTEGRATION_APPLY_PERMISSION,
+        INTEGRATION_MAPPING_READ_PERMISSION,
+        INTEGRATION_AUDIT_READ_PERMISSION,
+        INTEGRATION_ADMIN_PERMISSION
+      ],
+      scopeRules: [
+        createScopeRule({ permissionKey: INTEGRATION_READ_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: INTEGRATION_PREVIEW_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: INTEGRATION_APPLY_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: INTEGRATION_MAPPING_READ_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: INTEGRATION_AUDIT_READ_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: INTEGRATION_ADMIN_PERMISSION.key, scope: "tenant" })
+      ],
+      active: true,
+      version: 1,
+      updatedAt: "2026-05-17T06:20:00+07:00"
+    });
+
+    expect(profile.permissions).toEqual([
+      "integration.read",
+      "integration.preview",
+      "integration.apply",
+      "integration.mapping.read",
+      "integration.audit.read",
+      "integration.admin"
     ]);
   });
 

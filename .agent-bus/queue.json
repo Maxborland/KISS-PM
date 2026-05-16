@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T06:00:02.0000000+07:00",
+  "updated_at": "2026-05-17T06:11:45.0000000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -4924,7 +4924,7 @@
         "P11-001"
       ],
       "title": "Implement integration adapter foundation and ExternalMapping model",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P11",
       "depends_on": [
@@ -4969,7 +4969,77 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable Phase 11 block. Implement only adapter/domain foundation, ExternalMapping/idempotency primitives, and integration permission constants. Keep API/UI/E2E rows blocked until their own blocks."
+      "notes": "Accepted 2026-05-17T06:11:45.0000000+07:00. Implemented P11 adapter/domain foundation, ExternalMapping/idempotency primitives, safe diagnostics/audit-detail redaction, typed adapter failures/sync audit events, and integration permission constants. Matrix row P11-001 remains blocked only for later E2E-100/E2E-101/E2E-104 evidence.",
+      "completed_at": "2026-05-17T06:11:45.0000000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-001-integration-adapter-foundation-external-mapping --once exit 0 at startup",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 1 RED: P11 adapter foundation functions were missing before implementation",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 1 RED: P11 integration permission constants were missing before implementation",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 1 RED during bug-hunt: sync audit details were not redacted",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 0: 1 file, 10 tests passed",
+        "npm test -- packages/integrations packages/access-control exit 0: 4 files, 27 tests passed",
+        "npm test exit 0: 94 files, 540 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P11-002-mock-adapter-canonical-import-preview",
+      "aliases": [
+        "P11-002"
+      ],
+      "title": "Implement mock adapter canonical import preview",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P11",
+      "depends_on": [
+        "P11-001-integration-adapter-foundation-external-mapping"
+      ],
+      "write_scope": [
+        "packages/integrations/**",
+        "packages/crm-core/**",
+        "packages/project-core/**",
+        "docs/status/phase11-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P11-002-mock-adapter-canonical-import-preview.claim.json",
+        ".agent-bus/sessions/P11-002-mock-adapter-canonical-import-preview.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-002-mock-adapter-canonical-import-preview --once",
+        "npm test -- packages/integrations packages/crm-core packages/project-core",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable Phase 11 block. Implement non-mutating mock adapter import preview only. Keep apply/API/UI/E2E rows blocked until their own blocks."
     }
   ]
 }
