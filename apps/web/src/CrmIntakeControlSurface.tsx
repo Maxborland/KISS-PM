@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
@@ -74,19 +75,22 @@ function renderNextAction(nextAction: string): string {
   return labels[nextAction] ?? nextAction;
 }
 
+const crmQueryKeys = {
+  opportunities: (testUser: string) => ["crm-intake", testUser, "opportunities"] as const,
+  readiness: (testUser: string, opportunityId: string) => ["crm-intake", testUser, "readiness", opportunityId] as const,
+  feasibility: (testUser: string, opportunityId: string) => ["crm-intake", testUser, "feasibility", opportunityId] as const,
+  draft: (testUser: string, opportunityId: string) => ["crm-intake", testUser, "project-draft", opportunityId] as const,
+  audit: (testUser: string, opportunityId: string) => ["crm-intake", testUser, "audit", opportunityId] as const
+};
+
 export function CrmIntakeControlSurface({
   apiClient,
   currentTenant,
   testUser
 }: CrmIntakeControlSurfaceProps) {
-  const [opportunities, setOpportunities] = useState<OpportunityDto[]>([]);
+  const queryClient = useQueryClient();
   const [selectedOpportunityId, setSelectedOpportunityId] = useState("");
   const [formState, setFormState] = useState<OpportunityFormState>(defaultFormState);
-  const [readinessByOpportunityId, setReadinessByOpportunityId] = useState<Record<string, OpportunityReadinessDto>>({});
-  const [feasibilityByOpportunityId, setFeasibilityByOpportunityId] = useState<Record<string, FeasibilityBundleDto>>({});
-  const [draftByOpportunityId, setDraftByOpportunityId] = useState<Record<string, ProjectDraftDto>>({});
-  const [auditEventsByOpportunityId, setAuditEventsByOpportunityId] = useState<Record<string, AuditEventDto[]>>({});
-  const [auditReadbackStatusByOpportunityId, setAuditReadbackStatusByOpportunityId] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("Готово");
   const [pendingAction, setPendingAction] = useState<
     "load" | "create" | "createIncomplete" | "readiness" | "feasibility" | "draft" | null
@@ -95,93 +99,100 @@ export function CrmIntakeControlSurface({
   const canRunReadiness = hasPermission(currentTenant, "crm.readiness.run");
   const canRunFeasibility = hasPermission(currentTenant, "crm.feasibility.run");
   const canCreateDraft = hasPermission(currentTenant, "project_draft.create");
+  const opportunitiesQuery = useQuery({
+    queryKey: crmQueryKeys.opportunities(testUser),
+    queryFn: () => apiClient.listOpportunities(testUser)
+  });
+  const opportunities = opportunitiesQuery.data ?? [];
   const selectedOpportunity = useMemo(
     () => opportunities.find((opportunity) => opportunity.id === selectedOpportunityId) ?? opportunities[0],
     [opportunities, selectedOpportunityId]
   );
-  const selectedReadiness = selectedOpportunity ? readinessByOpportunityId[selectedOpportunity.id] : undefined;
-  const selectedFeasibility = selectedOpportunity ? feasibilityByOpportunityId[selectedOpportunity.id] : undefined;
-  const selectedDraft = selectedOpportunity ? draftByOpportunityId[selectedOpportunity.id] : undefined;
-  const selectedAuditEvents = selectedOpportunity ? auditEventsByOpportunityId[selectedOpportunity.id] ?? [] : [];
-  const selectedAuditReadbackStatus = selectedOpportunity
-    ? auditReadbackStatusByOpportunityId[selectedOpportunity.id] ?? "Аудит по возможности пуст"
-    : "Аудит по возможности пуст";
-
-  const loadOpportunityAudit = useCallback(
-    async (opportunityId: string) => {
+  const selectedOpportunityQueryId = selectedOpportunity?.id ?? "";
+  const readinessQuery = useQuery<OpportunityReadinessDto | undefined>({
+    queryKey: crmQueryKeys.readiness(testUser, selectedOpportunityQueryId),
+    queryFn: async () => undefined,
+    enabled: false
+  });
+  const feasibilityQuery = useQuery<FeasibilityBundleDto | undefined>({
+    queryKey: crmQueryKeys.feasibility(testUser, selectedOpportunityQueryId),
+    queryFn: async () => undefined,
+    enabled: false
+  });
+  const draftQuery = useQuery<ProjectDraftDto | null>({
+    queryKey: crmQueryKeys.draft(testUser, selectedOpportunityQueryId),
+    queryFn: async () => {
+      if (!selectedOpportunity) return null;
       try {
-        const events = await apiClient.listOpportunityAuditEvents(testUser, opportunityId);
-        setAuditEventsByOpportunityId((current) => ({
-          ...current,
-          [opportunityId]: events
-        }));
-        setAuditReadbackStatusByOpportunityId((current) => ({
-          ...current,
-          [opportunityId]: events.length > 0 ? "Аудит подтвержден" : "Аудит по возможности пуст"
-        }));
-      } catch (error) {
-        setAuditEventsByOpportunityId((current) => ({
-          ...current,
-          [opportunityId]: []
-        }));
-        setAuditReadbackStatusByOpportunityId((current) => ({
-          ...current,
-          [opportunityId]: `Аудит не подтвержден: ${getErrorMessage(error)}`
-        }));
+        return await apiClient.getProjectDraft(testUser, projectDraftIdForOpportunity(selectedOpportunity.id));
+      } catch {
+        return null;
       }
     },
-    [apiClient, testUser]
-  );
+    enabled: selectedOpportunity !== undefined
+  });
+  const auditQuery = useQuery<AuditEventDto[]>({
+    queryKey: crmQueryKeys.audit(testUser, selectedOpportunityQueryId),
+    queryFn: () => (selectedOpportunity ? apiClient.listOpportunityAuditEvents(testUser, selectedOpportunity.id) : []),
+    enabled: selectedOpportunity !== undefined
+  });
+  const selectedReadiness = readinessQuery.data;
+  const selectedFeasibility = feasibilityQuery.data;
+  const selectedDraft = draftQuery.data ?? undefined;
+  const selectedAuditEvents = auditQuery.data ?? [];
+  const selectedAuditReadbackStatus =
+    auditQuery.isError ? `Аудит не подтвержден: ${getErrorMessage(auditQuery.error)}` : "Аудит по возможности пуст";
 
-  const loadKnownProjectDrafts = useCallback(
-    async (nextOpportunities: OpportunityDto[]) => {
-      const readbacks = await Promise.allSettled(
-        nextOpportunities.map(async (opportunity) => ({
-          opportunityId: opportunity.id,
-          projectDraft: await apiClient.getProjectDraft(testUser, projectDraftIdForOpportunity(opportunity.id))
-        }))
-      );
-      const nextDrafts: Record<string, ProjectDraftDto> = {};
-      for (const readback of readbacks) {
-        if (readback.status === "fulfilled") {
-          nextDrafts[readback.value.opportunityId] = readback.value.projectDraft;
-        }
-      }
-      setDraftByOpportunityId(nextDrafts);
-    },
-    [apiClient, testUser]
-  );
+  const createOpportunityMutation = useMutation({
+    mutationFn: (request: Parameters<CrmIntakeApiClient["createOpportunity"]>[1]) =>
+      apiClient.createOpportunity(testUser, request),
+    onSuccess: async (opportunity) => {
+      await queryClient.invalidateQueries({ queryKey: crmQueryKeys.opportunities(testUser) });
+      setSelectedOpportunityId(opportunity.id);
+    }
+  });
+  const readinessMutation = useMutation({
+    mutationFn: (opportunityId: string) => apiClient.runReadiness(testUser, opportunityId),
+    onSuccess: (result, opportunityId) => {
+      queryClient.setQueryData(crmQueryKeys.readiness(testUser, opportunityId), result.readiness);
+    }
+  });
+  const feasibilityMutation = useMutation({
+    mutationFn: (opportunityId: string) => apiClient.runFeasibility(testUser, opportunityId),
+    onSuccess: (result, opportunityId) => {
+      queryClient.setQueryData(crmQueryKeys.feasibility(testUser, opportunityId), result);
+    }
+  });
+  const createDraftMutation = useMutation({
+    mutationFn: (opportunityId: string) => apiClient.createProjectDraft(testUser, opportunityId),
+    onSuccess: async (result, opportunityId) => {
+      queryClient.setQueryData(crmQueryKeys.draft(testUser, opportunityId), result.projectDraft);
+      await queryClient.invalidateQueries({ queryKey: crmQueryKeys.audit(testUser, opportunityId) });
+    }
+  });
 
-  const refreshOpportunities = useCallback(async () => {
-    setPendingAction("load");
-    try {
-      const nextOpportunities = await apiClient.listOpportunities(testUser);
-      setOpportunities(nextOpportunities);
+  useEffect(() => {
+    if (opportunitiesQuery.isFetching && opportunitiesQuery.data === undefined) {
+      setPendingAction("load");
+      return;
+    }
+    if (opportunitiesQuery.isError) {
+      setPendingAction(null);
+      setStatus(getErrorMessage(opportunitiesQuery.error));
+      return;
+    }
+    if (opportunitiesQuery.isSuccess) {
+      setPendingAction((current) => (current === "load" ? null : current));
+      setStatus((current) => (current === "Готово" || current === "Создание возможности" ? "CRM-приемка загружена" : current));
       setSelectedOpportunityId((currentSelectedId) => {
-        if (nextOpportunities.some((opportunity) => opportunity.id === currentSelectedId)) {
+        if (opportunities.some((opportunity) => opportunity.id === currentSelectedId)) {
           return currentSelectedId;
         }
 
-        return nextOpportunities[0]?.id ?? "";
+        return opportunities[0]?.id ?? "";
       });
-      await loadKnownProjectDrafts(nextOpportunities);
-      setStatus("CRM-приемка загружена");
-    } catch (error) {
-      setStatus(getErrorMessage(error));
-    } finally {
-      setPendingAction(null);
     }
-  }, [apiClient, loadKnownProjectDrafts, testUser]);
-
-  useEffect(() => {
-    void refreshOpportunities();
-  }, [refreshOpportunities]);
-
-  useEffect(() => {
-    if (selectedOpportunity) {
-      void loadOpportunityAudit(selectedOpportunity.id);
-    }
-  }, [loadOpportunityAudit, selectedOpportunity]);
+  }, [opportunities, opportunitiesQuery.data, opportunitiesQuery.error, opportunitiesQuery.isError, opportunitiesQuery.isFetching, opportunitiesQuery.isSuccess]);
 
   function updateFormField(field: keyof OpportunityFormState, value: string) {
     setFormState((current) => ({
@@ -195,7 +206,7 @@ export function CrmIntakeControlSurface({
     setPendingAction("create");
     setStatus("Создание возможности");
     try {
-      const opportunity = await apiClient.createOpportunity(testUser, {
+      const opportunity = await createOpportunityMutation.mutateAsync({
         title: formState.title,
         account: {
           displayName: formState.accountDisplayName
@@ -230,10 +241,7 @@ export function CrmIntakeControlSurface({
         ],
         customFieldRefs: []
       });
-      const nextOpportunities = await apiClient.listOpportunities(testUser);
-      setOpportunities(nextOpportunities);
       setSelectedOpportunityId(opportunity.id);
-      await loadKnownProjectDrafts(nextOpportunities);
       setStatus("Возможность создана");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -247,7 +255,7 @@ export function CrmIntakeControlSurface({
     setPendingAction("createIncomplete");
     setStatus("Создание возможности с блокерами");
     try {
-      const opportunity = await apiClient.createOpportunity(testUser, {
+      const opportunity = await createOpportunityMutation.mutateAsync({
         title: "Неполная возможность для приемки",
         plannedStartDate: "2026-06-01",
         desiredFinishDate: "2026-06-30",
@@ -261,8 +269,6 @@ export function CrmIntakeControlSurface({
         scopeHints: [],
         customFieldRefs: []
       });
-      const nextOpportunities = await apiClient.listOpportunities(testUser);
-      setOpportunities(nextOpportunities);
       setSelectedOpportunityId(opportunity.id);
       setStatus("Возможность с блокерами создана");
     } catch (error) {
@@ -277,11 +283,7 @@ export function CrmIntakeControlSurface({
     setPendingAction("readiness");
     setStatus("Проверка готовности");
     try {
-      const result = await apiClient.runReadiness(testUser, selectedOpportunity.id);
-      setReadinessByOpportunityId((current) => ({
-        ...current,
-        [selectedOpportunity.id]: result.readiness
-      }));
+      const result = await readinessMutation.mutateAsync(selectedOpportunity.id);
       setStatus(result.readiness.ready ? "Готово к оценке реализуемости" : "Есть блокеры приемки");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -295,11 +297,7 @@ export function CrmIntakeControlSurface({
     setPendingAction("feasibility");
     setStatus("Расчет реализуемости");
     try {
-      const result = await apiClient.runFeasibility(testUser, selectedOpportunity.id);
-      setFeasibilityByOpportunityId((current) => ({
-        ...current,
-        [selectedOpportunity.id]: result
-      }));
+      const result = await feasibilityMutation.mutateAsync(selectedOpportunity.id);
       setStatus(result.feasibility.status === "fit" ? "Ресурсная оценка подходит" : "Есть перегрузка ресурсов");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -313,12 +311,7 @@ export function CrmIntakeControlSurface({
     setPendingAction("draft");
     setStatus("Создание проектного черновика");
     try {
-      const result = await apiClient.createProjectDraft(testUser, selectedOpportunity.id);
-      setDraftByOpportunityId((current) => ({
-        ...current,
-        [selectedOpportunity.id]: result.projectDraft
-      }));
-      await loadOpportunityAudit(selectedOpportunity.id);
+      await createDraftMutation.mutateAsync(selectedOpportunity.id);
       setStatus("Проектный черновик создан");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -454,8 +447,10 @@ export function CrmIntakeControlSurface({
         <section className="phase2-panel">
           <h3>Возможности</h3>
           <div className="opportunity-list" data-testid="opportunity-list">
-            {opportunities.length > 0
-              ? opportunities.map((opportunity) => (
+            {opportunitiesQuery.isFetching && opportunitiesQuery.data === undefined
+              ? "Загрузка возможностей"
+              : opportunities.length > 0
+                ? opportunities.map((opportunity) => (
                   <button
                     className={opportunity.id === selectedOpportunity?.id ? "opportunity-card selected" : "opportunity-card"}
                     key={opportunity.id}
@@ -467,8 +462,8 @@ export function CrmIntakeControlSurface({
                       {opportunity.plannedStartDate} - {opportunity.desiredFinishDate} · {formatMoney(opportunity)}
                     </small>
                   </button>
-                ))
-              : "Возможностей пока нет"}
+                  ))
+                : "Возможностей пока нет"}
           </div>
         </section>
 

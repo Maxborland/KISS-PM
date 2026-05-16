@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CrmIntakeControlSurface } from "./CrmIntakeControlSurface";
 import type { CrmIntakeApiClient, FeasibilityBundleDto, OpportunityDto, ProjectDraftDto } from "./crmIntakeApiClient";
 import type { CurrentTenantDto } from "./phase2ApiClient";
+import { withTestQueryClient } from "./testQueryClient";
 
 const seedOpportunity: OpportunityDto = {
   id: "opportunity-seed-ready",
@@ -244,12 +245,14 @@ describe("CRM Intake Control surface", () => {
         : []
     );
 
-    render(
+    render(withTestQueryClient(
       <CrmIntakeControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
     expect(await screen.findByTestId("crm-intake-surface")).toBeInTheDocument();
-    expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Создать возможность" }));
     await waitFor(() => {
@@ -303,11 +306,13 @@ describe("CRM Intake Control surface", () => {
       }
     });
 
-    render(
+    render(withTestQueryClient(
       <CrmIntakeControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
-    expect(await screen.findByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Проверить готовность" }));
 
     expect(await screen.findByTestId("readiness-next-action")).toHaveTextContent("Заполнить недостающие данные");
@@ -320,15 +325,17 @@ describe("CRM Intake Control surface", () => {
       Object.assign(new Error("Доступ запрещен"), { code: "permission_denied" })
     );
 
-    render(
+    render(withTestQueryClient(
       <CrmIntakeControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant(["tenant.read", "crm.opportunity.read", "project_draft.read"])}
         testUser="readonly-observer-a"
       />
-    );
+    ));
 
-    expect(await screen.findByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Проверить запрет создания черновика" }));
 
     expect(await screen.findByTestId("crm-intake-status")).toHaveTextContent("Доступ запрещен");
@@ -341,11 +348,13 @@ describe("CRM Intake Control surface", () => {
       Object.assign(new Error("Доступ запрещен"), { code: "permission_denied" })
     );
 
-    render(
+    render(withTestQueryClient(
       <CrmIntakeControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
-    expect(await screen.findByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Создать проектный черновик" }));
 
     expect(await screen.findByTestId("project-draft-result")).toHaveTextContent("project-draft-opportunity-seed-ready");
