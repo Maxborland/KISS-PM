@@ -2,7 +2,7 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T02:13:25.8730399+07:00",
+  "updated_at": "2026-05-17T02:27:23.0476262+07:00",
   "rows": [
     {
       "id": "P10-001",
@@ -18,14 +18,28 @@
         "E2E-095"
       ],
       "evidence": [
-        "P10 contract defines the TenantConfiguration root/version lifecycle and exit criteria before implementation."
+        "P10 contract defines the TenantConfiguration root/version lifecycle and exit criteria before implementation.",
+        "packages/tenant-config/src/index.ts now extends TenantConfiguration with version refs for process templates, access profiles, KPI definitions, control surfaces, action definitions, custom fields, saved views, and feature flags.",
+        "packages/tenant-config/src/index.ts implements previewTenantConfigurationPublish and publishTenantConfigurationPreview. Preview is non-mutating; publish archives the previous active version, activates the draft, requires auditEventId, validates stale preview/tenant mismatch, and returns audit evidence.",
+        "packages/tenant-config/src/tenantConfigurationVersion.test.ts proves non-mutating preview, publish with audit evidence, stale preview rejection, draft-ref change after preview rejection, tenant mismatch rejection, missing audit rejection, duplicate ref rejection, and source immutability.",
+        "packages/access-control/src/index.ts adds P10 tenant configuration permission constants for read/write/export/import; packages/access-control/src/accessProfile.test.ts proves they compose into an access profile."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config packages/access-control"
+        "npm test -- packages/tenant-config/src/tenantConfigurationVersion.test.ts exit 1 RED: preview/publish lifecycle functions were missing and duplicate refs were not rejected before implementation",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 1 RED: tenant configuration permission constants were missing before implementation",
+        "npm test -- packages/tenant-config/src/tenantConfigurationVersion.test.ts exit 0: 1 file, 4 tests passed after review fix for draft-ref changes after preview",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 0: 1 file, 9 tests passed",
+        "npm test -- packages/tenant-config packages/access-control exit 1 RED: tenantLabels test still expected the pre-P10 minimal TenantConfiguration shape",
+        "npm test -- packages/tenant-config packages/access-control exit 0: 8 files, 45 tests passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 70 files, 450 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 deterministic reset must prove config-version cleanup/readback before verification.",
-      "blocker": "Blocked until P10-001 implementation adds TenantConfiguration version lifecycle domain code, tests, runtime readback, and E2E-090/E2E-095 evidence.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "Domain-only P10-001 changes are pure deterministic in-memory functions with no runtime state to clean up. Phase row remains blocked until later API/UI/E2E fixture reset proves configuration-version cleanup/readback for E2E-090 and E2E-095.",
+      "blocker": "Domain foundation is implemented and package tests pass, but P10-001 remains blocked for phase verification until API/UI runtime readback and E2E-090/E2E-095 evidence prove labels/runtime stability through the browser and fixture cleanup.",
+      "last_checked_at": "2026-05-17T02:27:23.0476262+07:00",
       "e2e_evidence": []
     },
     {

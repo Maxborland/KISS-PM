@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   AccessControlModelError,
+  TENANT_CONFIG_IMPORT_PERMISSION,
+  TENANT_CONFIG_READ_PERMISSION,
+  TENANT_CONFIG_WRITE_PERMISSION,
   createAccessProfile,
   createPermission,
   createProfileAssignment,
@@ -50,6 +53,34 @@ describe("access profile model", () => {
       version: 3,
       updatedAt: "2026-05-14T12:40:00+07:00"
     });
+  });
+
+  it("supports tenant configuration permissions for P10 builders", () => {
+    const profile = createAccessProfile({
+      id: "tenant-admin-profile",
+      tenantId: "tenant-a",
+      systemKey: "tenant_admin",
+      label: "Tenant admin",
+      permissions: [
+        TENANT_CONFIG_READ_PERMISSION,
+        TENANT_CONFIG_WRITE_PERMISSION,
+        TENANT_CONFIG_IMPORT_PERMISSION
+      ],
+      scopeRules: [
+        createScopeRule({ permissionKey: TENANT_CONFIG_READ_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: TENANT_CONFIG_WRITE_PERMISSION.key, scope: "tenant" }),
+        createScopeRule({ permissionKey: TENANT_CONFIG_IMPORT_PERMISSION.key, scope: "tenant" })
+      ],
+      active: true,
+      version: 1,
+      updatedAt: "2026-05-17T02:30:00+07:00"
+    });
+
+    expect(profile.permissions).toEqual([
+      "tenant.config.read",
+      "tenant.config.write",
+      "tenant.config.import"
+    ]);
   });
 
   it("rejects missing tenant ownership and invalid profile version", () => {

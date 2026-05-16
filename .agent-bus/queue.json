@@ -4145,7 +4145,7 @@
         "P10-001"
       ],
       "title": "Implement TenantConfiguration root, versions, and publish lifecycle",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P10",
       "depends_on": [
@@ -4190,7 +4190,75 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P10 runnable block. Implement versioned TenantConfiguration domain foundation and publish lifecycle before API/UI builders."
+      "notes": "Accepted 2026-05-17T02:27:23.0476262+07:00. Implemented TenantConfiguration version refs, publish preview/apply lifecycle, stale preview/audit/tenant mismatch guards, immutable readback, and P10 tenant config permission constants. Matrix P10-001 remains blocked only for later API/UI/E2E-090/E2E-095 evidence.",
+      "completed_at": "2026-05-17T02:27:23.0476262+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-001-tenant-configuration-version-foundation --once exit 0 at startup",
+        "npm test -- packages/tenant-config/src/tenantConfigurationVersion.test.ts exit 1 RED: preview/publish lifecycle functions were missing and duplicate refs were not rejected before implementation",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 1 RED: tenant configuration permission constants were missing before implementation",
+        "npm test -- packages/tenant-config/src/tenantConfigurationVersion.test.ts exit 0: 1 file, 4 tests passed after stale draft-ref review fix",
+        "npm test -- packages/access-control/src/accessProfile.test.ts exit 0: 1 file, 9 tests passed",
+        "npm test -- packages/tenant-config packages/access-control exit 0: 8 files, 45 tests passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 70 files, 450 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P10-002-label-stage-role-builder-runtime-projection",
+      "aliases": [
+        "P10-002"
+      ],
+      "title": "Implement role/label/stage builder and runtime label projection",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-001-tenant-configuration-version-foundation"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-002-label-stage-role-builder-runtime-projection.claim.json",
+        ".agent-bus/sessions/P10-002-label-stage-role-builder-runtime-projection.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-002-label-stage-role-builder-runtime-projection --once",
+        "npm test -- packages/tenant-config apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P10 runnable block. Implement label/stage/role builder API/UI/runtime projection, but keep E2E-090 for later P10-009 unless explicitly in scope."
     }
   ]
 }

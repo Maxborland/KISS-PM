@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T02:16:51.6578373+07:00
+Updated: 2026-05-17T02:27:23.0476262+07:00
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.
@@ -39,4 +39,8 @@ Updated: 2026-05-17T02:16:51.6578373+07:00
   - matrix: `docs/status/phase10-requirements-matrix.json`
   - verifier support recognizes P10-001..P10-010 and E2E-090..095 paths.
 - P10 implementation is not accepted yet. `docs/status/phase10-requirements-matrix.json` passes only with `--allow-blocked`; strict verification is expected to fail until P10-001..P10-010 and E2E-090..095 are implemented.
-- Next recommended step: claim `P10-001-tenant-configuration-version-foundation` and implement the TenantConfiguration root/version lifecycle in `packages/tenant-config` before API/UI builders.
+- P10 accepted implementation blocks:
+  - `P10-000-no-code-tenant-customization-phase-contract`
+  - `P10-001-tenant-configuration-version-foundation`
+- `P10-001` implemented TenantConfiguration version refs, publish preview/apply lifecycle, stale preview/audit/tenant mismatch guards, immutable readback, and P10 tenant configuration permission constants. `docs/status/phase10-requirements-matrix.json` keeps P10-001 blocked only for later API/UI/E2E-090/E2E-095 evidence.
+- Next recommended step: claim `P10-002-label-stage-role-builder-runtime-projection` and implement the label/stage/role builder API/UI/runtime projection.
