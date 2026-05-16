@@ -442,9 +442,15 @@ describe("Project Work Control surface", () => {
 
   it("drives lifecycle gates, task creation, controlled tasks, Kanban, and audit readback for the current manager", async () => {
     const apiClient = createApiClient();
+    const onOpenGanttProject = vi.fn();
 
     render(
-      <ProjectWorkControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
+      <ProjectWorkControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        onOpenGanttProject={onOpenGanttProject}
+        testUser="project-manager-a"
+      />
     );
 
     expect(await screen.findByTestId("project-work-surface")).toBeInTheDocument();
@@ -452,6 +458,8 @@ describe("Project Work Control surface", () => {
 
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     expect(screen.getByTestId("stage-progress")).toHaveTextContent("Инициация");
+    fireEvent.click(screen.getByRole("button", { name: "Открыть Гантт проекта" }));
+    expect(onOpenGanttProject).toHaveBeenCalledWith(projectId);
 
     fireEvent.click(screen.getByRole("button", { name: "Создать стартовую задачу" }));
     expect(await screen.findByTestId("project-task-list")).toHaveTextContent(taskId);
