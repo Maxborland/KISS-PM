@@ -16,13 +16,49 @@ function jsonRequest(body: unknown, method = "POST"): RequestInit {
   };
 }
 
-async function createClosableProject(app: ReturnType<typeof createApiApp>, projectId = "project-phase9-close-a") {
+async function createOpportunityForClosure(app: ReturnType<typeof createApiApp>, desiredFinishDate = "2026-06-30") {
+  const opportunity = await app.request(
+    "/api/crm/opportunities?testUser=project-manager-a",
+    jsonRequest({
+      title: `P9 retrospective source ${desiredFinishDate}`,
+      account: {
+        displayName: `P9 account ${desiredFinishDate}`
+      },
+      contacts: [
+        {
+          displayName: "P9 contact",
+          email: "p9-contact@example.test"
+        }
+      ],
+      plannedStartDate: "2026-04-01",
+      desiredFinishDate,
+      expectedValue: { amount: 1_500_000, currency: "RUB" },
+      probability: 0.8,
+      categoryKey: "implementation",
+      typologyKey: "integration_heavy",
+      scopeHints: [{ key: "modules_count", label: "Модули", value: 5 }]
+    })
+  );
+  expect(opportunity.status).toBe(201);
+  const opportunityBody = (await readJson(opportunity)) as { opportunity: { id: string } };
+
+  return opportunityBody.opportunity.id;
+}
+
+async function createClosableProject(
+  app: ReturnType<typeof createApiApp>,
+  projectId = "project-phase9-close-a",
+  opportunityId = "opportunity-seed-ready"
+) {
   const draft = await app.request(
-    "/api/crm/opportunities/opportunity-seed-ready/project-draft?testUser=project-manager-a",
+    `/api/crm/opportunities/${opportunityId}/project-draft?testUser=project-manager-a`,
     jsonRequest({})
   );
-  expect(draft.status).toBe(201);
-  const draftBody = (await readJson(draft)) as { projectDraft: { id: string } };
+  expect([201, 409]).toContain(draft.status);
+  const draftBody =
+    draft.status === 201
+      ? ((await readJson(draft)) as { projectDraft: { id: string } })
+      : { projectDraft: { id: `project-draft-${opportunityId}` } };
 
   const created = await app.request(
     "/api/projects/from-template?testUser=project-manager-a",
@@ -80,6 +116,43 @@ async function createClosableProject(app: ReturnType<typeof createApiApp>, proje
   expect(done.status).toBe(200);
 
   return projectId;
+}
+
+async function closeProjectForRetrospectives(
+  app: ReturnType<typeof createApiApp>,
+  input: { projectId: string; desiredFinishDate?: string; lessonId: string; lessonSeverity?: "positive" | "attention" | "critical" }
+) {
+  const opportunityId =
+    input.desiredFinishDate === undefined
+      ? "opportunity-seed-ready"
+      : await createOpportunityForClosure(app, input.desiredFinishDate);
+  const projectId = await createClosableProject(app, input.projectId, opportunityId);
+  const closureData = {
+    ...completeClosureData,
+    lessonsLearned: [
+      {
+        id: input.lessonId,
+        categoryKey: "process",
+        summary: "Поздний старт приемки повторяется в закрытых проектах.",
+        recommendation: "Добавить раннюю приемку в будущий шаблон.",
+        severity: input.lessonSeverity ?? "attention"
+      }
+    ]
+  };
+
+  const preview = await app.request(
+    `/api/projects/${projectId}/closure/preview?testUser=project-manager-a`,
+    jsonRequest({ closureData })
+  );
+  expect(preview.status).toBe(200);
+  const previewBody = (await readJson(preview)) as { preview: { id: string } };
+  const apply = await app.request(
+    `/api/projects/${projectId}/closure/apply?testUser=project-manager-a`,
+    jsonRequest({ previewId: previewBody.preview.id })
+  );
+  expect(apply.status).toBe(200);
+
+  return (await readJson(apply)) as { result: { snapshotId: string } };
 }
 
 const completeClosureData = {
@@ -188,6 +261,153 @@ describe("Phase 9 closure and snapshot API", () => {
         })
       ]
     });
+  });
+
+  it("returns closed portfolio read model with snapshot metrics, allowed actions, filters, and pagination", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const first = await closeProjectForRetrospectives(app, {
+      projectId: "project-phase9-portfolio-a",
+      lessonId: "lesson-portfolio-a"
+    });
+    await closeProjectForRetrospectives(app, {
+      projectId: "project-phase9-portfolio-b",
+      lessonId: "lesson-portfolio-b"
+    });
+
+    const response = await app.request("/api/retrospectives/closed-portfolio?testUser=tenant-admin-a&limit=1&offset=0");
+    expect(response.status).toBe(200);
+    const body = (await readJson(response)) as {
+      rows: Array<{
+        entityId: string;
+        fieldValues: Record<string, unknown>;
+        actions: Array<{ actionDefinitionKey: string; available: boolean; mutationUrl?: string }>;
+      }>;
+      pagination: { offset: number; limit: number; total: number };
+      summary: { totalSnapshots: number; trendSignalCount: number };
+    };
+    expect(body.pagination).toEqual({ offset: 0, limit: 1, total: 2 });
+    expect(body.summary).toMatchObject({ totalSnapshots: 2, trendSignalCount: expect.any(Number) });
+    expect(body.rows).toHaveLength(1);
+    expect(body.rows[0]).toMatchObject({
+      entityId: first.result.snapshotId,
+      fieldValues: {
+        project_title: expect.any(String),
+        planned_work_hours: 20,
+        snapshot_id: first.result.snapshotId
+      }
+    });
+    expect(body.rows[0]!.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ actionDefinitionKey: "template_improvement.prepare", available: true })
+      ])
+    );
+    expect(body.rows[0]!.actions.some((action) => "mutationUrl" in action)).toBe(false);
+
+    const readOnly = await app.request("/api/retrospectives/closed-portfolio?testUser=readonly-observer-a");
+    expect(readOnly.status).toBe(200);
+    const readOnlyBody = (await readJson(readOnly)) as {
+      rows: Array<{ actions: Array<{ actionDefinitionKey: string; available: boolean; unavailableReason?: string; mutationUrl?: string }> }>;
+    };
+    expect(readOnlyBody.rows[0]!.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionDefinitionKey: "template_improvement.prepare",
+          available: false,
+          unavailableReason: "permission_denied"
+        })
+      ])
+    );
+    expect(readOnlyBody.rows[0]!.actions.some((action) => "mutationUrl" in action)).toBe(false);
+
+    const invalidPagination = await app.request("/api/retrospectives/closed-portfolio?testUser=tenant-admin-a&limit=0");
+    expect(invalidPagination.status).toBe(400);
+    await expect(readJson(invalidPagination)).resolves.toMatchObject({ code: "validation_error" });
+
+    const filtered = await app.request(
+      "/api/retrospectives/closed-portfolio?testUser=tenant-admin-a&templateId=process-template-integrations-tenant-a"
+    );
+    expect(filtered.status).toBe(200);
+    await expect(readJson(filtered)).resolves.toMatchObject({
+      pagination: { total: 2 },
+      filters: { templateId: "process-template-integrations-tenant-a" }
+    });
+
+    const emptyFiltered = await app.request(
+      "/api/retrospectives/closed-portfolio?testUser=tenant-admin-a&templateId=missing-template"
+    );
+    expect(emptyFiltered.status).toBe(200);
+    await expect(readJson(emptyFiltered)).resolves.toMatchObject({
+      rows: [],
+      pagination: { total: 0 },
+      summary: { totalSnapshots: 0 }
+    });
+  });
+
+  it("returns trend and insight readback while preserving tenant isolation and backend mutation denial", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    await closeProjectForRetrospectives(app, {
+      projectId: "project-phase9-trends-a",
+      lessonId: "lesson-trend-a"
+    });
+    await closeProjectForRetrospectives(app, {
+      projectId: "project-phase9-trends-b",
+      lessonId: "lesson-trend-b"
+    });
+
+    const trends = await app.request("/api/retrospectives/trends?testUser=tenant-admin-a&groupBy=template");
+    expect(trends.status).toBe(200);
+    const trendsBody = (await readJson(trends)) as {
+      trends: Array<{ id: string; trendKey: string; sourceSnapshotIds: string[]; sourceMetricIds: string[] }>;
+      insights: Array<{ id: string; sourceTrendId: string; sourceSnapshotIds: string[]; sourceLessonIds: string[] }>;
+    };
+    expect(trendsBody.trends).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          trendKey: "schedule_delay",
+          sourceSnapshotIds: expect.arrayContaining([expect.stringContaining("project-phase9-trends-a")]),
+          sourceMetricIds: expect.arrayContaining([expect.stringContaining("schedule_days")])
+        })
+      ])
+    );
+    expect(trendsBody.insights).toEqual([
+      expect.objectContaining({
+        sourceTrendId: trendsBody.trends[0]!.id,
+        sourceSnapshotIds: expect.arrayContaining([expect.stringContaining("project-phase9-trends-a")]),
+        sourceLessonIds: expect.arrayContaining([expect.stringContaining("lesson-trend-a")])
+      })
+    ]);
+
+    const insightId = trendsBody.insights[0]!.id;
+    const insight = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(insight.status).toBe(200);
+    await expect(readJson(insight)).resolves.toMatchObject({
+      insight: {
+        id: insightId,
+        status: "open",
+        sourceTrendId: trendsBody.trends[0]!.id,
+        sourceLessons: expect.arrayContaining([expect.objectContaining({ summary: expect.stringContaining("Поздний старт") })])
+      },
+      allowedActions: [
+        expect.objectContaining({
+          actionDefinitionKey: "template_improvement.apply",
+          available: true,
+          dryRunRequired: true
+        })
+      ]
+    });
+
+    const tenantBDenied = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-b`);
+    expect(tenantBDenied.status).toBe(404);
+    expect(await tenantBDenied.text()).not.toContain(insightId);
+
+    const readOnlyMutation = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=readonly-observer-a`,
+      jsonRequest({ previewId: "preview-p9-readonly" })
+    );
+    expect(readOnlyMutation.status).toBe(403);
+    const stillOpen = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(stillOpen.status).toBe(200);
+    await expect(readJson(stillOpen)).resolves.toMatchObject({ insight: { status: "open" } });
   });
 
   it("requires preview before apply and denies read-only or cross-tenant mutation without partial closure", async () => {

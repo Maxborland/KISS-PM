@@ -469,6 +469,22 @@ const closureApplySchema = z
   })
   .strict();
 
+const retrospectivePaginationQuerySchema = z
+  .object({
+    offset: z.coerce.number().int().min(0).default(0),
+    limit: z.coerce.number().int().min(1).max(50).default(25),
+    templateId: z.string().trim().min(1).optional(),
+    clientId: z.string().trim().min(1).optional(),
+    period: z.string().trim().regex(/^\d{4}-\d{2}$/).optional()
+  })
+  .strict();
+
+const retrospectiveTrendsQuerySchema = retrospectivePaginationQuerySchema
+  .extend({
+    groupBy: z.enum(["project_type", "template", "client", "period"]).default("template")
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -1394,6 +1410,109 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   app.all("/api/retrospectives/snapshots/:snapshotId", (context) =>
     context.json(errorDto("precondition_failed", "Закрытые снимки неизменяемы"), 405)
   );
+
+  app.get("/api/retrospectives/closed-portfolio", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const query = retrospectivePaginationQuerySchema.parse({
+        offset: context.req.query("offset"),
+        limit: context.req.query("limit"),
+        templateId: context.req.query("templateId"),
+        clientId: context.req.query("clientId"),
+        period: context.req.query("period")
+      });
+      assertAllowed(runtime, session, "retrospective.read", {
+        entityType: "closedProjectSnapshot",
+        tenantId: session.user.tenantId
+      });
+      const readModel = phase9Runtime.buildClosedPortfolioReadModel(session.user.tenantId, {
+        actorPermissionKeys: session.profile.permissions,
+        offset: query.offset,
+        limit: query.limit,
+        filters: {
+          ...(query.templateId !== undefined ? { templateId: query.templateId } : {}),
+          ...(query.clientId !== undefined ? { clientId: query.clientId } : {}),
+          ...(query.period !== undefined ? { period: query.period } : {})
+        }
+      });
+
+      return context.json(readModel);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/retrospectives/trends", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const query = retrospectiveTrendsQuerySchema.parse({
+        offset: context.req.query("offset"),
+        limit: context.req.query("limit"),
+        groupBy: context.req.query("groupBy"),
+        templateId: context.req.query("templateId"),
+        clientId: context.req.query("clientId"),
+        period: context.req.query("period")
+      });
+      assertAllowed(runtime, session, "retrospective.read", {
+        entityType: "retrospectiveTrend",
+        tenantId: session.user.tenantId
+      });
+      const readModel = phase9Runtime.listTrendReadModels(session.user.tenantId, {
+        groupBy: query.groupBy,
+        offset: query.offset,
+        limit: query.limit,
+        filters: {
+          ...(query.templateId !== undefined ? { templateId: query.templateId } : {}),
+          ...(query.clientId !== undefined ? { clientId: query.clientId } : {}),
+          ...(query.period !== undefined ? { period: query.period } : {})
+        }
+      });
+
+      return context.json(readModel);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/retrospectives/insights/:insightId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const insightId = context.req.param("insightId");
+      assertAllowed(runtime, session, "retrospective.read", {
+        entityType: "retrospectiveInsight",
+        tenantId: session.user.tenantId,
+        entityId: insightId
+      });
+      const readModel = phase9Runtime.getInsightReadModel(session.user.tenantId, insightId, session.profile.permissions);
+      if (readModel === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json(readModel);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/retrospectives/insights/:insightId/template-improvement/apply", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const insightId = context.req.param("insightId");
+      const readModel = phase9Runtime.getInsightReadModel(session.user.tenantId, insightId, session.profile.permissions);
+      if (readModel === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "retrospective.improvement.write", {
+        entityType: "retrospectiveInsight",
+        tenantId: session.user.tenantId,
+        entityId: insightId
+      });
+
+      return context.json(errorDto("not_implemented", "Действие еще не подключено к доменной команде"), 501);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
 
   app.get("/api/retrospectives/audit", (context) => {
     try {

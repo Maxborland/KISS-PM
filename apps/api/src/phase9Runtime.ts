@@ -1,15 +1,26 @@
 import { createActionExecutionLog } from "@kiss-pm/action-engine";
 import type { ActionExecutionLog } from "@kiss-pm/action-engine";
+import {
+  createControlSurfaceDefinition,
+  createControlSurfaceReadModel
+} from "@kiss-pm/control-surfaces";
+import type { ControlSurfaceReadAction, ControlSurfaceReadModel } from "@kiss-pm/control-surfaces";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 import {
+  buildRetrospectiveTrends,
   createClosedProjectSnapshot,
+  createRetrospectiveInsights,
+  readRetrospectiveInsight,
   readClosedProjectSnapshot
 } from "../../../packages/retrospectives/src/index";
 import type {
   ClosedProjectKpiSummary,
   ClosedProjectResourceSummary,
   ClosedProjectScheduleSummary,
-  ClosedProjectSnapshot
+  ClosedProjectSnapshot,
+  RetrospectiveInsight,
+  RetrospectiveTrend,
+  RetrospectiveTrendGroupBy
 } from "../../../packages/retrospectives/src/index";
 import { evaluateProjectClosureReadiness } from "@kiss-pm/project-core";
 import type {
@@ -23,7 +34,8 @@ import type {
 
 import type { Phase4RuntimeState } from "./phase4Runtime";
 
-const PHASE9_TIMESTAMP_START = Date.parse("2026-05-17T00:00:00.000Z");
+const PHASE9_TIMESTAMP_START = Date.parse("2026-07-15T00:00:00.000Z");
+const PHASE9_RETROSPECTIVE_GENERATED_AT = "2026-07-15T00:00:00.000Z";
 
 export type Phase9RuntimeState = ReturnType<typeof createPhase9RuntimeState>;
 
@@ -58,8 +70,32 @@ type Phase9TenantState = {
   version: number;
 };
 
+export type Phase9ClosedPortfolioReadModel = ControlSurfaceReadModel & {
+  summary: {
+    totalSnapshots: number;
+    trendSignalCount: number;
+    openInsightCount: number;
+  };
+  filters: Phase9RetrospectiveFilters;
+};
+
+export type Phase9RetrospectiveFilters = {
+  templateId?: string;
+  clientId?: string;
+  period?: string;
+};
+
 function clone<T>(value: T): T {
   return structuredClone(value) as T;
+}
+
+function daysBetweenInclusive(startDate: string | undefined, finishDate: string | undefined): number | null {
+  if (startDate === undefined || finishDate === undefined) return null;
+  const start = Date.parse(`${startDate}T00:00:00.000Z`);
+  const finish = Date.parse(`${finishDate}T00:00:00.000Z`);
+  if (Number.isNaN(start) || Number.isNaN(finish)) return null;
+
+  return Math.floor((finish - start) / 86_400_000) + 1;
 }
 
 function preconditionFailed(message: string): Error & { code: "precondition_failed" } {
@@ -168,6 +204,184 @@ function kpiSummaryForClosure(decision: ProjectClosureDecision): ClosedProjectKp
   ];
 }
 
+function closedPortfolioDefinition(tenantId: TenantId) {
+  return createControlSurfaceDefinition({
+    id: `surface-p9-closed-portfolio-${tenantId}`,
+    tenantId,
+    key: "retrospectives.closed_portfolio",
+    label: "Закрытый портфель",
+    version: 1,
+    status: "active",
+    surfaceType: "portfolio",
+    dataSource: {
+      type: "composite",
+      key: "closed_project_snapshots",
+      entityTypes: ["project", "control_signal"],
+      traceKeys: ["snapshot.id", "retrospectiveTrend.id", "retrospectiveInsight.id"]
+    },
+    view: {
+      id: `view-p9-closed-portfolio-${tenantId}`,
+      tenantId,
+      surfaceDefinitionId: `surface-p9-closed-portfolio-${tenantId}`,
+      key: "default",
+      label: "Закрытый портфель",
+      viewType: "hybrid",
+      version: 1,
+      fields: [
+        {
+          id: "field-snapshot-id",
+          key: "snapshot_id",
+          label: "Снимок",
+          entityType: "project",
+          valueType: "text",
+          visible: true,
+          sortable: true,
+          filterable: true
+        },
+        {
+          id: "field-project-title",
+          key: "project_title",
+          label: "Проект",
+          entityType: "project",
+          valueType: "text",
+          visible: true,
+          sortable: true,
+          filterable: true
+        },
+        {
+          id: "field-closed-at",
+          key: "closed_at",
+          label: "Закрыт",
+          entityType: "project",
+          valueType: "date",
+          visible: true,
+          sortable: true,
+          filterable: true
+        },
+        {
+          id: "field-planned-work",
+          key: "planned_work_hours",
+          label: "План, ч",
+          entityType: "project",
+          valueType: "number",
+          visible: true,
+          sortable: true,
+          filterable: false
+        },
+        {
+          id: "field-actual-work",
+          key: "actual_work_hours",
+          label: "Факт, ч",
+          entityType: "project",
+          valueType: "number",
+          visible: true,
+          sortable: true,
+          filterable: false
+        },
+        {
+          id: "field-severity",
+          key: "severity",
+          label: "Сигнал",
+          entityType: "control_signal",
+          valueType: "severity",
+          visible: true,
+          sortable: true,
+          filterable: true
+        }
+      ],
+      widgets: [
+        {
+          id: "widget-critical-trends",
+          key: "critical_trend_count",
+          label: "Критичные тренды",
+          widgetType: "severity_summary",
+          sourceFieldKey: "severity",
+          severity: "critical"
+        },
+        {
+          id: "widget-attention-trends",
+          key: "attention_trend_count",
+          label: "Требуют внимания",
+          widgetType: "severity_summary",
+          sourceFieldKey: "severity",
+          severity: "attention"
+        }
+      ],
+      actionSlots: [
+        {
+          id: "slot-template-improvement",
+          key: "prepare_template_improvement",
+          label: "Подготовить улучшение шаблона",
+          actionDefinitionKey: "template_improvement.prepare",
+          slotType: "row",
+          targetEntityType: "project",
+          requiredPermission: "retrospective.improvement.write",
+          dryRunRequired: true
+        }
+      ],
+      drilldowns: [
+        {
+          id: "drilldown-snapshot",
+          key: "open_snapshot",
+          label: "Открыть снимок",
+          targetSurfaceKey: "retrospectives.snapshot",
+          targetEntityType: "project",
+          routeTemplate: "/retrospectives/snapshots/:snapshotId",
+          requiredPermission: "retrospective.read"
+        }
+      ],
+      savedViews: [
+        {
+          id: "saved-attention",
+          key: "attention_required",
+          label: "Сигналы",
+          ownerType: "tenant",
+          filterKeys: ["severity"],
+          sortKeys: ["closed_at"]
+        }
+      ],
+      permissionRequirements: {
+        read: "retrospective.read",
+        actions: ["retrospective.improvement.write"],
+        audit: "audit.read"
+      }
+    },
+    updatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT
+  });
+}
+
+function actionForInsight(allowed: boolean): ControlSurfaceReadAction {
+  return {
+    key: "apply_template_improvement",
+    label: "Улучшить шаблон",
+    actionDefinitionKey: "template_improvement.apply",
+    slotType: "primary",
+    targetEntityType: "control_signal",
+    dryRunRequired: true,
+    available: allowed,
+    ...(!allowed ? { unavailableReason: "permission_denied" as const } : {})
+  };
+}
+
+function filterSnapshots(
+  snapshots: readonly ClosedProjectSnapshot[],
+  filters: Phase9RetrospectiveFilters | undefined
+): ClosedProjectSnapshot[] {
+  return snapshots.filter((snapshot) => {
+    if (filters?.templateId !== undefined && snapshot.project.processTemplate.templateId !== filters.templateId) {
+      return false;
+    }
+    if (filters?.clientId !== undefined && snapshot.project.sourceOpportunity.accountId !== filters.clientId) {
+      return false;
+    }
+    if (filters?.period !== undefined && snapshot.closure.closedAt.slice(0, 7) !== filters.period) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function snapshotSummary(project: ManagedProject, closureData: ClosureData) {
   return {
     projectId: project.id,
@@ -224,6 +438,146 @@ export function createPhase9RuntimeState() {
   function getSnapshot(tenantId: TenantId, snapshotId: string): ClosedProjectSnapshot | undefined {
     const snapshot = getState(tenantId).snapshots.find((candidate) => candidate.id === snapshotId);
     return snapshot === undefined ? undefined : readClosedProjectSnapshot(snapshot);
+  }
+
+  function listTrendReadModels(
+    tenantId: TenantId,
+    input: {
+      groupBy: RetrospectiveTrendGroupBy;
+      offset: number;
+      limit: number;
+      filters?: Phase9RetrospectiveFilters;
+    }
+  ): {
+    trends: RetrospectiveTrend[];
+    insights: RetrospectiveInsight[];
+    pagination: { offset: number; limit: number; total: number };
+  } {
+    const snapshots = filterSnapshots(listSnapshots(tenantId), input.filters);
+    const trends = buildRetrospectiveTrends({ tenantId, snapshots, groupBy: input.groupBy });
+    const insights = createRetrospectiveInsights({
+      tenantId,
+      generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
+      trends,
+      snapshots
+    });
+    const pagedTrends = trends.slice(input.offset, input.offset + input.limit);
+    const trendIds = new Set(pagedTrends.map((trend) => trend.id));
+
+    return {
+      trends: clone(pagedTrends),
+      insights: insights.filter((insight) => trendIds.has(insight.sourceTrendId)).map(readRetrospectiveInsight),
+      pagination: { offset: input.offset, limit: input.limit, total: trends.length }
+    };
+  }
+
+  function getInsight(tenantId: TenantId, insightId: string): RetrospectiveInsight | undefined {
+    const snapshots = listSnapshots(tenantId);
+    const trends = (["template", "project_type", "client", "period"] as const).flatMap((groupBy) =>
+      buildRetrospectiveTrends({ tenantId, snapshots, groupBy })
+    );
+    const insight = createRetrospectiveInsights({
+      tenantId,
+      generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
+      trends,
+      snapshots
+    }).find((candidate) => candidate.id === insightId);
+
+    return insight === undefined ? undefined : readRetrospectiveInsight(insight);
+  }
+
+  function getInsightReadModel(
+    tenantId: TenantId,
+    insightId: string,
+    actorPermissionKeys: readonly string[]
+  ): { insight: RetrospectiveInsight; allowedActions: ControlSurfaceReadAction[] } | undefined {
+    const insight = getInsight(tenantId, insightId);
+    if (insight === undefined) return undefined;
+
+    return {
+      insight,
+      allowedActions: [actionForInsight(actorPermissionKeys.includes("retrospective.improvement.write"))]
+    };
+  }
+
+  function buildClosedPortfolioReadModel(
+    tenantId: TenantId,
+    input: {
+      actorPermissionKeys: readonly string[];
+      offset: number;
+      limit: number;
+      filters?: Phase9RetrospectiveFilters;
+    }
+  ): Phase9ClosedPortfolioReadModel {
+    const snapshots = filterSnapshots(listSnapshots(tenantId), input.filters).sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+    const trends = buildRetrospectiveTrends({ tenantId, snapshots, groupBy: "template" });
+    const insights = createRetrospectiveInsights({
+      tenantId,
+      generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
+      trends,
+      snapshots
+    });
+    const trendsBySnapshotId = new Map<string, RetrospectiveTrend[]>();
+    for (const trend of trends) {
+      for (const snapshotId of trend.sourceSnapshotIds) {
+        const current = trendsBySnapshotId.get(snapshotId) ?? [];
+        trendsBySnapshotId.set(snapshotId, [...current, trend]);
+      }
+    }
+    const insightSnapshotIds = new Set(insights.flatMap((insight) => insight.sourceSnapshotIds));
+    const records = snapshots.map((snapshot) => {
+      const snapshotTrends = trendsBySnapshotId.get(snapshot.id) ?? [];
+      const strongestTrend = snapshotTrends.find((trend) => trend.severity === "critical") ?? snapshotTrends[0];
+      const plannedDays = daysBetweenInclusive(snapshot.scheduleSummary.plannedStartDate, snapshot.scheduleSummary.plannedFinishDate);
+      const actualDays = daysBetweenInclusive(snapshot.scheduleSummary.plannedStartDate, snapshot.scheduleSummary.actualFinishDate);
+
+      return {
+        id: `closed-portfolio-row-${snapshot.id}`,
+        tenantId,
+        entityType: "project" as const,
+        entityId: snapshot.id,
+        label: snapshot.project.title,
+        severity: strongestTrend?.severity ?? "none",
+        explanation:
+          strongestTrend === undefined
+            ? "Закрытый проект сохранен без ретроспективного сигнала."
+            : `Найден повторяющийся тренд ${strongestTrend.trendKey} по ${strongestTrend.occurrenceCount} снимкам.`,
+        sourceRefs: [
+          { entityType: "project" as const, entityId: snapshot.projectId },
+          ...(strongestTrend !== undefined ? [{ entityType: "control_signal" as const, entityId: strongestTrend.id }] : [])
+        ],
+        fieldValues: {
+          snapshot_id: snapshot.id,
+          project_title: snapshot.project.title,
+          closed_at: snapshot.closure.closedAt,
+          planned_work_hours: snapshot.resourceSummary.plannedWorkHours,
+          actual_work_hours: snapshot.resourceSummary.actualWorkHours,
+          severity: strongestTrend?.severity ?? "none",
+          schedule_variance_days:
+            plannedDays === null || actualDays === null ? null : Math.round((actualDays - plannedDays) * 100) / 100
+        },
+        recommendedActionKeys: insightSnapshotIds.has(snapshot.id) ? ["template_improvement.prepare"] : [],
+        drilldownParams: { snapshotId: snapshot.id },
+        policyContext: { projectId: snapshot.projectId }
+      };
+    });
+
+    const readModel = createControlSurfaceReadModel({
+      definition: closedPortfolioDefinition(tenantId),
+      records,
+      actorPermissionKeys: input.actorPermissionKeys,
+      page: { offset: input.offset, limit: input.limit }
+    });
+
+    return {
+      ...readModel,
+      summary: {
+        totalSnapshots: snapshots.length,
+        trendSignalCount: trends.length,
+        openInsightCount: insights.filter((insight) => insight.status === "open").length
+      },
+      filters: clone(input.filters ?? {})
+    };
   }
 
   function readClosure(project: ManagedProject) {
@@ -391,6 +745,10 @@ export function createPhase9RuntimeState() {
     applyClosure,
     listSnapshots,
     getSnapshot,
+    buildClosedPortfolioReadModel,
+    listTrendReadModels,
+    getInsight,
+    getInsightReadModel,
     listActionExecutions
   };
 }
