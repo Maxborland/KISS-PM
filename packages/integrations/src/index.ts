@@ -22,13 +22,19 @@ export type ExternalMappingSyncStatus = "previewed" | "synced" | "skipped" | "fa
 export type ImportOperation = "import_preview" | "import_apply";
 export type SyncAuditCommand = "import_preview" | "import_apply" | "mapping_diagnostic" | "adapter_health_check";
 export type SyncAuditResult = "success" | "denied" | "failed";
+export type RetryBackoffStrategy = "fixed" | "linear" | "exponential";
+export type AdapterHealthState = "healthy" | "degraded" | "failed" | "rate_limited" | "unavailable" | "disabled";
 export type AdapterFailureCode =
   | "adapter_unavailable"
   | "adapter_rate_limited"
   | "adapter_failure"
   | "invalid_payload"
+  | "tenant_mismatch"
   | "mapping_conflict"
-  | "idempotency_conflict";
+  | "idempotency_conflict"
+  | "import_preview_required"
+  | "stale_preview"
+  | "partial_import_rejected";
 
 export type JsonRecord = Record<string, unknown>;
 
@@ -101,6 +107,28 @@ export type AdapterFailure = {
   retryable: boolean;
   occurredAt: string;
   retryAfterSeconds?: number;
+};
+
+export type RetryPolicy = {
+  maxAttempts: number;
+  backoff: RetryBackoffStrategy;
+  retryableFailureCodes: AdapterFailureCode[];
+};
+
+export type RateLimitPolicy = {
+  windowSeconds: number;
+  maxRequests: number;
+  retryAfterSeconds?: number;
+};
+
+export type AdapterHealthStatus = TenantOwned & {
+  adapterId: string;
+  connectionId: string;
+  status: AdapterHealthState;
+  checkedAt: string;
+  failure?: AdapterFailure;
+  retryPolicy?: RetryPolicy;
+  rateLimitPolicy?: RateLimitPolicy;
 };
 
 export type SyncAuditEvent = TenantOwned & {
@@ -357,7 +385,13 @@ export class IntegrationDomainError extends Error {
       | "tenant_mismatch"
       | "import_preview_required"
       | "stale_preview"
-      | "idempotency_conflict",
+      | "idempotency_conflict"
+      | "adapter_unavailable"
+      | "adapter_rate_limited"
+      | "adapter_failure"
+      | "invalid_payload"
+      | "mapping_conflict"
+      | "partial_import_rejected",
     message: string
   ) {
     super(message);
@@ -399,13 +433,26 @@ const supportedAuditCommands = new Set<SyncAuditCommand>([
   "adapter_health_check"
 ]);
 const supportedAuditResults = new Set<SyncAuditResult>(["success", "denied", "failed"]);
+const supportedRetryBackoffs = new Set<RetryBackoffStrategy>(["fixed", "linear", "exponential"]);
+const supportedAdapterHealthStates = new Set<AdapterHealthState>([
+  "healthy",
+  "degraded",
+  "failed",
+  "rate_limited",
+  "unavailable",
+  "disabled"
+]);
 const supportedFailureCodes = new Set<AdapterFailureCode>([
   "adapter_unavailable",
   "adapter_rate_limited",
   "adapter_failure",
   "invalid_payload",
+  "tenant_mismatch",
   "mapping_conflict",
-  "idempotency_conflict"
+  "idempotency_conflict",
+  "import_preview_required",
+  "stale_preview",
+  "partial_import_rejected"
 ]);
 
 function requireNonEmptyString(value: string | undefined, fieldName: string): string {
@@ -489,6 +536,10 @@ function redactSecrets(value: unknown, keyHint = ""): unknown {
   }
 
   return value;
+}
+
+function redactSecretText(value: string): string {
+  return value.replace(/(secret|token|password|credential|api[_-]?key)[=: -]*[A-Za-z0-9._-]+/gi, "$1=[redacted]");
 }
 
 function stableIdSegment(parts: string[]): string {
@@ -730,12 +781,71 @@ export function createAdapterFailure(input: {
 }): AdapterFailure {
   return {
     code: requireSupported(input.code, "adapterFailure.code", supportedFailureCodes),
-    message: requireNonEmptyString(input.message, "adapterFailure.message"),
+    message: redactSecretText(requireNonEmptyString(input.message, "adapterFailure.message")),
     retryable: requireBoolean(input.retryable, "adapterFailure.retryable"),
     occurredAt: requireValidTimestamp(input.occurredAt, "adapterFailure.occurredAt"),
     ...(input.retryAfterSeconds !== undefined
       ? { retryAfterSeconds: requirePositiveInteger(input.retryAfterSeconds, "retryAfterSeconds") }
       : {})
+  };
+}
+
+export function createRetryPolicy(input: {
+  maxAttempts: number;
+  backoff: RetryBackoffStrategy;
+  retryableFailureCodes: AdapterFailureCode[];
+}): RetryPolicy {
+  if (!Array.isArray(input.retryableFailureCodes) || input.retryableFailureCodes.length === 0) {
+    throw new IntegrationDomainError("validation_error", "retryPolicy.retryableFailureCodes must be a non-empty array");
+  }
+  const seen = new Set<AdapterFailureCode>();
+  return {
+    maxAttempts: requirePositiveInteger(input.maxAttempts, "retryPolicy.maxAttempts"),
+    backoff: requireSupported(input.backoff, "retryPolicy.backoff", supportedRetryBackoffs),
+    retryableFailureCodes: input.retryableFailureCodes.map((code) => {
+      const supported = requireSupported(code, "retryPolicy.retryableFailureCode", supportedFailureCodes);
+      if (seen.has(supported)) {
+        throw new IntegrationDomainError("conflict", `Duplicate retryable failure code: ${supported}`);
+      }
+      seen.add(supported);
+      return supported;
+    })
+  };
+}
+
+export function createRateLimitPolicy(input: {
+  windowSeconds: number;
+  maxRequests: number;
+  retryAfterSeconds?: number;
+}): RateLimitPolicy {
+  return {
+    windowSeconds: requirePositiveInteger(input.windowSeconds, "rateLimitPolicy.windowSeconds"),
+    maxRequests: requirePositiveInteger(input.maxRequests, "rateLimitPolicy.maxRequests"),
+    ...(input.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: requirePositiveInteger(input.retryAfterSeconds, "rateLimitPolicy.retryAfterSeconds") }
+      : {})
+  };
+}
+
+export function createAdapterHealthStatus(input: {
+  tenantId: TenantId;
+  adapterId: string;
+  connectionId: string;
+  status: AdapterHealthState;
+  checkedAt: string;
+  failure?: AdapterFailure;
+  retryPolicy?: RetryPolicy;
+  rateLimitPolicy?: RateLimitPolicy;
+}): AdapterHealthStatus {
+  return {
+    tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
+    adapterId: requireNonEmptyString(input.adapterId, "adapterHealth.adapterId"),
+    connectionId: requireNonEmptyString(input.connectionId, "adapterHealth.connectionId"),
+    status: requireSupported(input.status, "adapterHealth.status", supportedAdapterHealthStates),
+    checkedAt: requireValidTimestamp(input.checkedAt, "adapterHealth.checkedAt"),
+    ...(input.failure !== undefined ? { failure: createAdapterFailure(input.failure) } : {}),
+    ...(input.retryPolicy !== undefined ? { retryPolicy: createRetryPolicy(input.retryPolicy) } : {}),
+    ...(input.rateLimitPolicy !== undefined ? { rateLimitPolicy: createRateLimitPolicy(input.rateLimitPolicy) } : {})
   };
 }
 

@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T06:40:35.6768743+07:00",
+  "updated_at": "2026-05-17T06:53:26.8856702+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -130,14 +130,28 @@
         "E2E-104"
       ],
       "evidence": [
-        "Phase 11 contract requires structured adapter failures, rate-limit/retry metadata, safe diagnostics, and no partial canonical mutation."
+        "Phase 11 contract requires structured adapter failures, rate-limit/retry metadata, safe diagnostics, and no partial canonical mutation.",
+        "packages/integrations/src/index.ts implements RetryPolicy, RateLimitPolicy, AdapterHealthStatus, expanded AdapterFailureCode support for preview/apply preconditions, positive-integer validation for retry/rate-limit settings, duplicate retryable-code rejection, and failure-message secret redaction.",
+        "apps/api/src/phase11Runtime.ts implements tenant-scoped connection failure modes, rate-limited preview failure audit with retryAfterSeconds metadata, invalid-payload preview diagnostics, failed apply audit for stale/cross-tenant/domain precondition rejections, no partial batch/mapping writes on failure, failure-mode recovery, reset cleanup, and protection against overwriting successful audit evidence when a failed apply reuses an audit id."
       ],
       "tests": [
-        "Pending P11-004 implementation: expected failure-mode domain/API tests and audit readback tests."
+        "npm test -- apps/api/src/phase11Runtime.test.ts exit 1 RED: setConnectionFailureMode was missing and failed preview/apply did not write audit diagnostics",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 1 RED: RetryPolicy, RateLimitPolicy, and AdapterHealthStatus creators were missing",
+        "npm test -- apps/api/src/phase11Runtime.test.ts exit 1 RED during bug-hunt: failed apply with a reused audit id overwrote existing successful audit evidence",
+        "npm test -- packages/integrations/src/integrationAdapterFoundation.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/api/src/phase11Runtime.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- packages/integrations apps/api/src/phase11Runtime.test.ts exit 0: 4 files, 23 tests passed",
+        "npm test exit 0: 97 files, 556 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 expected: P11 rows remain blocked until later implementation and E2E-100..104 evidence exist",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P11-004-sync-audit-retry-rate-limit-safe-failure-model --once exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must reset adapter failure modes, retry counters, sync audit events, and failed import batches.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-004 implementation has not started; failure diagnostics and retry/rate-limit model are contract-only.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11-004 runtime state is in-memory and reset() clears previews, batches, mappings, sync audit events, tenant versions, and connection failure modes. Strict cleanup/readback remains blocked until P11-009 wires deterministic API fixtures and E2E-102/E2E-104 reset proof.",
+      "blocker": "2026-05-17T06:53:26.8856702+07:00: P11-004 domain/runtime implementation is complete, but the row remains blocked for strict phase exit until required E2E-102 and E2E-104 structured evidence exists.",
+      "last_checked_at": "2026-05-17T06:53:26.8856702+07:00",
       "e2e_evidence": []
     },
     {
