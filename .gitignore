@@ -2,8 +2,26 @@ node_modules/
 dist/
 coverage/
 playwright-report/
-test-results/
+/test-results/
 .playwright-mcp/
+.worktrees/
 *.tsbuildinfo
 .env
 
+# Agent coordination runtime files. Durable .agent-bus docs/templates stay tracked.
+.agent-bus/sessions/*
+!.agent-bus/sessions/.gitkeep
+.agent-bus/claims/*
+!.agent-bus/claims/.gitkeep
+!.agent-bus/claims/EXAMPLE.claim.json.template
+.agent-bus/locks/*
+!.agent-bus/locks/.gitkeep
+.agent-bus/scratch/*
+!.agent-bus/scratch/.gitkeep
+.agent-bus/events/*.jsonl
+.agent-bus/orchestration/runs/*
+!.agent-bus/orchestration/runs/.gitkeep
+.agent-bus/artifacts/test-results/*
+!.agent-bus/artifacts/test-results/.gitkeep
+.agent-bus/artifacts/screenshots/*
+!.agent-bus/artifacts/screenshots/.gitkeep
