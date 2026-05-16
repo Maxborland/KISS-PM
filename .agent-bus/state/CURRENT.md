@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T02:04:53.0450145+07:00
+Updated: 2026-05-17T02:16:51.6578373+07:00
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.
@@ -33,4 +33,10 @@ Updated: 2026-05-17T02:04:53.0450145+07:00
 - `P9-010` closed the strict Phase 9 exit gate. `node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json` passes without `--allow-blocked`.
 - Phase 9 E2E ids follow `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`: P9 owns E2E-080..083. Older screen-catalog references to P9 E2E-090..092 are stale because Phase 10 owns E2E-090..095.
 - Release 2 is not ready. P10-P12 remain not accepted as implemented product phases until their implementation, executable suites, and strict matrices pass.
-- Next recommended step: claim `P10-000-no-code-tenant-customization-phase-contract` and create the Phase 10 closed contract plus initial requirements matrix.
+- Phase 10 No-code Tenant Customization has an accepted closed contract and initial tracking matrix:
+  - `P10-000-no-code-tenant-customization-phase-contract`
+  - contract: `docs/phases/PHASE_10_NO_CODE_TENANT_CUSTOMIZATION.md`
+  - matrix: `docs/status/phase10-requirements-matrix.json`
+  - verifier support recognizes P10-001..P10-010 and E2E-090..095 paths.
+- P10 implementation is not accepted yet. `docs/status/phase10-requirements-matrix.json` passes only with `--allow-blocked`; strict verification is expected to fail until P10-001..P10-010 and E2E-090..095 are implemented.
+- Next recommended step: claim `P10-001-tenant-configuration-version-foundation` and implement the TenantConfiguration root/version lifecycle in `packages/tenant-config` before API/UI builders.
