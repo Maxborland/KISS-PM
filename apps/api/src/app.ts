@@ -22,6 +22,7 @@ import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import {
   actionConfigurationPublishAuditDto,
   buildRuntimeLabelProjection,
+  configurationImportAuditDto,
   controlSurfaceLayoutPublishAuditDto,
   createPhase10RuntimeState,
   customFieldPublishAuditDto,
@@ -52,7 +53,8 @@ import type {
 } from "@kiss-pm/project-core";
 import type { ProjectClosureBlockerOverride } from "@kiss-pm/project-core";
 import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
-import type { CustomFieldDefinition, CustomFieldRegistry } from "@kiss-pm/tenant-config";
+import { createConfigurationImportPackageWithChecksum, previewConfigurationImport } from "@kiss-pm/tenant-config";
+import type { ConfigurationExportPackage, CustomFieldDefinition, CustomFieldRegistry } from "@kiss-pm/tenant-config";
 
 type ApiErrorCode =
   | "unauthenticated"
@@ -576,6 +578,68 @@ const actionConfigurationPublishSchema = z
   })
   .strict();
 
+const configurationExportActionFormFieldSchema = z
+  .object({
+    fieldKey: z.string().trim().min(1),
+    label: z.string().trim().min(1).optional(),
+    defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional()
+  })
+  .strict();
+
+const configurationExportActionConfigSchema = z
+  .object({
+    actionKey: z.string().trim().min(1),
+    enabled: z.boolean(),
+    formFields: z.array(configurationExportActionFormFieldSchema)
+  })
+  .strict();
+
+const configurationImportPackageSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    tenantId: z.string().trim().min(1),
+    configurationVersion: z.number().int().positive(),
+    exportedAt: z.string().trim().min(1),
+    checksum: z.string().trim().min(1),
+    labelSet: z
+      .object({
+        tenantId: z.string().trim().min(1),
+        configurationVersion: z.number().int().positive(),
+        labels: z.record(z.string(), z.string().trim().min(1)),
+        updatedAt: z.string().trim().min(1)
+      })
+      .strict(),
+    customFieldRegistry: z
+      .object({
+        tenantId: z.string().trim().min(1),
+        version: z.number().int().positive(),
+        definitions: z.array(z.unknown()),
+        updatedAt: z.string().trim().min(1)
+      })
+      .passthrough(),
+    actionConfiguration: z
+      .object({
+        tenantId: z.string().trim().min(1),
+        version: z.number().int().positive(),
+        actionConfigs: z.array(configurationExportActionConfigSchema),
+        updatedAt: z.string().trim().min(1)
+      })
+      .strict()
+  })
+  .strict();
+
+const configurationImportPreviewSchema = z
+  .object({
+    package: configurationImportPackageSchema
+  })
+  .strict();
+
+const configurationImportApplySchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
 const kpiDefinitionVersionCommandSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
@@ -885,6 +949,271 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       service: "kiss-pm-api"
     })
   );
+
+  function currentConfigurationVersion(session: Phase2RuntimeSession): number {
+    return Math.max(
+      session.labelSet.configurationVersion,
+      phase10Runtime.getCustomFieldRegistry(session.user.tenantId).version,
+      phase10Runtime.getActionConfiguration(session.user.tenantId).version
+    );
+  }
+
+  function buildConfigurationExportPackage(session: Phase2RuntimeSession): ConfigurationExportPackage {
+    const actionConfiguration = phase10Runtime.getActionConfiguration(session.user.tenantId);
+    return createConfigurationImportPackageWithChecksum({
+      schemaVersion: 1,
+      tenantId: session.user.tenantId,
+      configurationVersion: currentConfigurationVersion(session),
+      exportedAt: runtime.now(),
+      labelSet: session.labelSet,
+      customFieldRegistry: phase10Runtime.getCustomFieldRegistry(session.user.tenantId),
+      actionConfiguration: {
+        tenantId: actionConfiguration.tenantId,
+        version: actionConfiguration.version,
+        actionConfigs: actionConfiguration.actionConfigs.map((entry) => ({
+          actionKey: entry.actionKey,
+          enabled: entry.enabled,
+          formFields: entry.formFields.map((field) => ({
+            fieldKey: field.fieldKey,
+            ...(field.label !== undefined ? { label: field.label } : {}),
+            ...(field.defaultValue !== undefined ? { defaultValue: field.defaultValue } : {})
+          }))
+        })),
+        updatedAt: actionConfiguration.updatedAt
+      }
+    });
+  }
+
+  function configurationOverview(session: Phase2RuntimeSession) {
+    const customFieldRegistry = phase10Runtime.getCustomFieldRegistry(session.user.tenantId);
+    const actionConfiguration = phase10Runtime.getActionConfiguration(session.user.tenantId);
+    return {
+      active: {
+        tenantId: session.user.tenantId,
+        configurationVersion: currentConfigurationVersion(session),
+        labelSetVersion: session.labelSet.configurationVersion,
+        customFieldRegistryVersion: customFieldRegistry.version,
+        actionConfigurationVersion: actionConfiguration.version
+      },
+      validation: {
+        canPublish: true,
+        issues: []
+      },
+      runtimeSurfaces: ["tenant.labels", "portfolio.control", "tenant.custom_fields", "tenant.action_config"],
+      versions: {
+        labelSet: [{ version: session.labelSet.configurationVersion, updatedAt: session.labelSet.updatedAt }],
+        customFieldRegistry: [{ version: customFieldRegistry.version, updatedAt: customFieldRegistry.updatedAt }],
+        actionConfiguration: [
+          ...phase10Runtime.listPreviousActionConfigurations(session.user.tenantId).map((entry) => ({
+            version: entry.version,
+            updatedAt: entry.updatedAt
+          })),
+          { version: actionConfiguration.version, updatedAt: actionConfiguration.updatedAt }
+        ]
+      }
+    };
+  }
+
+  function appendConfigurationImportAudit(session: Phase2RuntimeSession, result: ReturnType<typeof phase10Runtime.applyConfigurationPackageImport>) {
+    runtime.appendAuditEvent({
+      session,
+      id: result.audit.auditEventId,
+      actionKey: result.audit.commandType,
+      target: { entityType: "tenantConfiguration", entityId: session.user.tenantId },
+      correlationId: result.actionExecution.correlationId,
+      details: {
+        before: { configurationVersion: result.audit.beforeVersion },
+        after: { configurationVersion: result.audit.afterVersion, importedChecksum: result.audit.importedChecksum }
+      }
+    });
+  }
+
+  app.get("/api/tenant/configuration", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json(configurationOverview(session));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/tenant/configuration/versions", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ versions: configurationOverview(session).versions });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/configuration/validate", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = await parseJson(context);
+      const incomingPackage =
+        typeof body === "object" && body !== null && "package" in body
+          ? (configurationImportPackageSchema.parse((body as { package: unknown }).package) as ConfigurationExportPackage)
+          : buildConfigurationExportPackage(session);
+      const preview = previewConfigurationImport(buildConfigurationExportPackage(session), incomingPackage, {
+        id: `validation-config-import-${session.user.tenantId}`,
+        actorId: session.user.id,
+        createdAt: runtime.now()
+      });
+
+      return context.json({
+        validation: {
+          canPublish: preview.canApply,
+          issues: preview.validationIssues
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/configuration/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = configurationImportPreviewSchema.parse(await parseJson(context));
+      const preview = phase10Runtime.previewConfigurationPackageImport({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        currentPackage: buildConfigurationExportPackage(session),
+        incomingPackage: body.package as ConfigurationExportPackage
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/configuration/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "tenant.config.import", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = configurationImportApplySchema.parse(await parseJson(context));
+      const result = phase10Runtime.applyConfigurationPackageImport({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        currentPackage: buildConfigurationExportPackage(session),
+        previewId: body.previewId,
+        auditEventId: `audit-config-import-${session.user.tenantId}-${currentConfigurationVersion(session) + 1}`
+      });
+      runtime.replaceLabelSet(result.importedPackage.labelSet);
+      appendConfigurationImportAudit(session, result);
+      const refreshedSession = requireSession(runtime, context.req.query("testUser"));
+
+      return context.json({
+        result: {
+          importedPackage: result.importedPackage,
+          audit: configurationImportAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: configurationOverview(refreshedSession)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/tenant/configuration/export", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.export", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ package: buildConfigurationExportPackage(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/configuration/import/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.import", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = configurationImportPreviewSchema.parse(await parseJson(context));
+      const preview = phase10Runtime.previewConfigurationPackageImport({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        currentPackage: buildConfigurationExportPackage(session),
+        incomingPackage: body.package as ConfigurationExportPackage
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/configuration/import/apply", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "tenant.config.import", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = configurationImportApplySchema.parse(await parseJson(context));
+      const result = phase10Runtime.applyConfigurationPackageImport({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        currentPackage: buildConfigurationExportPackage(session),
+        previewId: body.previewId,
+        auditEventId: `audit-config-import-${session.user.tenantId}-${currentConfigurationVersion(session) + 1}`
+      });
+      runtime.replaceLabelSet(result.importedPackage.labelSet);
+      appendConfigurationImportAudit(session, result);
+      const refreshedSession = requireSession(runtime, context.req.query("testUser"));
+
+      return context.json({
+        result: {
+          importedPackage: result.importedPackage,
+          audit: configurationImportAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: configurationOverview(refreshedSession)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
 
   app.get("/tenants/current", (context) => {
     try {
@@ -1678,7 +2007,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId),
           ...phase10Runtime.listKpiThresholdActionExecutions(session.user.tenantId),
           ...phase10Runtime.listLayoutActionExecutions(session.user.tenantId),
-          ...phase10Runtime.listActionConfigurationActionExecutions(session.user.tenantId)
+          ...phase10Runtime.listActionConfigurationActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listConfigurationImportActionExecutions(session.user.tenantId)
         ].map(actionExecutionDto)
       });
     } catch (error) {
