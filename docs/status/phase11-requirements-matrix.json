@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T06:28:18.5585015+07:00",
+  "updated_at": "2026-05-17T06:40:35.6768743+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -90,14 +90,30 @@
         "E2E-104"
       ],
       "evidence": [
-        "Phase 11 contract requires repeated imports to reuse tenant-scoped mappings and avoid duplicate canonical records."
+        "Phase 11 contract requires repeated imports to reuse tenant-scoped mappings and avoid duplicate canonical records.",
+        "packages/integrations/src/index.ts implements applyMockAdapterImportPreview with confirmation-required apply, tenant mismatch guard, blocking-preview rejection, idempotent replay by tenant-scoped idempotency key, ExternalMapping persistence DTOs, ImportBatch DTOs, canonical entity refs, SyncAuditEvent evidence, and duplicate batch/audit id conflict validation.",
+        "apps/api/src/phase11Runtime.ts implements an in-memory Phase 11 application runtime for preview/apply/readback with tenant-scoped preview storage, tenant-scoped stale-preview versions, tenant-scoped batch/audit storage keys, mapping readback, import batch readback, sync audit readback, and reset support for future API/fixture wiring.",
+        "Self bug-hunt fixes in scope: canonical project draft ids no longer expose external project ids; previews for one tenant no longer stale previews for another tenant; same batch/audit ids in different tenants do not overwrite each other."
       ],
       "tests": [
-        "Pending P11-003 implementation: expected idempotency and mapping persistence unit/API tests."
+        "npm test -- packages/integrations/src/mockAdapterImportApply.test.ts exit 1 RED: applyMockAdapterImportPreview was missing before implementation",
+        "npm test -- apps/api/src/phase11Runtime.test.ts exit 1 RED: Phase 11 runtime module was missing before implementation",
+        "npm test -- packages/integrations/src/mockAdapterImportPreview.test.ts exit 1 RED during bug-hunt: project draft canonical id exposed external project id",
+        "npm test -- apps/api/src/phase11Runtime.test.ts exit 1 RED during bug-hunt: Tenant B preview incorrectly made Tenant A preview stale",
+        "npm test -- packages/integrations/src/mockAdapterImportApply.test.ts exit 1 RED during code review: duplicate batch/audit ids with a new idempotency key were accepted",
+        "npm test -- packages/integrations/src/mockAdapterImportPreview.test.ts packages/integrations/src/mockAdapterImportApply.test.ts apps/api/src/phase11Runtime.test.ts exit 0: 3 files, 11 tests passed",
+        "npm test -- packages/integrations apps/api/src/phase11Runtime.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test exit 0: 97 files, 551 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 expected: P11 rows remain blocked until later implementation and E2E-100..104 evidence exist",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P11-003-idempotent-import-apply-mapping-persistence --once exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must reset import batches, idempotency keys, mappings, and canonical readbacks.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-003 implementation has not started; no idempotent apply command or mapping readback exists yet.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11-003 domain/app runtime state is in-memory and exposes reset() for future fixture cleanup. Strict cleanup/readback evidence remains blocked until P11-009 wires deterministic API fixtures and E2E-101/E2E-104 reset proof.",
+      "blocker": "2026-05-17T06:40:35.6768743+07:00: P11-003 domain/runtime implementation is complete, but the row remains blocked for strict phase exit until required E2E-101 and E2E-104 structured evidence exists.",
+      "last_checked_at": "2026-05-17T06:40:35.6768743+07:00",
       "e2e_evidence": []
     },
     {

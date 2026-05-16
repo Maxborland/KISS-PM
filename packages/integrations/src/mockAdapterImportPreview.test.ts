@@ -145,6 +145,8 @@ describe("mock adapter canonical import preview", () => {
 
     expect(opportunity.id).toMatch(/^imported-opportunity-/);
     expect(opportunity.id).not.toContain("mock-opp-100");
+    expect(draft.id).toMatch(/^imported-draft-/);
+    expect(draft.id).not.toContain("mock-project-100");
     expect(draft.sourceOpportunity.opportunityId).toBe(opportunity.id);
     expect(draft.demand.totalPlannedWorkHours).toBe(204);
   });
