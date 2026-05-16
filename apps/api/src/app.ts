@@ -15,6 +15,13 @@ import type { Phase4CreateTaskParticipantInput } from "./phase4Runtime";
 import { createPhase5RuntimeState } from "./phase5Runtime";
 import { createPhase6RuntimeState } from "./phase6Runtime";
 import type { ResourceResolutionCommand } from "./phase6Runtime";
+import { createPhase7RuntimeState } from "./phase7Runtime";
+import type {
+  KpiDefinitionBundle,
+  KpiDefinitionConfigInput,
+  KpiDefinitionPreviewInput,
+  KpiEvaluationRunInput
+} from "./phase7Runtime";
 import type {
   ApprovalRequest,
   ManagedProject,
@@ -286,6 +293,100 @@ const resourceResolutionApplySchema = z
   })
   .strict();
 
+const kpiSourceBindingSchema = z
+  .object({
+    key: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+    sourceType: z.enum(["crm", "project", "schedule", "resource", "worklog", "task", "kpi"]),
+    sourceField: z.string().trim().min(1),
+    valueType: z.literal("number")
+  })
+  .strict();
+
+const kpiThresholdConditionSchema = z.union([
+  z.object({ operator: z.enum(["gt", "gte", "lt", "lte", "eq"]), value: z.number() }).strict(),
+  z.object({ operator: z.literal("between"), min: z.number(), max: z.number(), inclusive: z.boolean().optional() }).strict()
+]);
+
+const kpiThresholdRuleSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    severity: z.enum(["attention", "warning", "critical"]),
+    condition: kpiThresholdConditionSchema,
+    explanation: z.string().trim().min(1),
+    recommendedActionKeys: z.array(z.string().trim().min(1))
+  })
+  .strict();
+
+const kpiDefinitionConfigSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    systemKey: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+    entityType: z.enum(["opportunity", "project", "project_stage", "task", "resource"]),
+    ownerRoleKey: z.string().trim().min(1),
+    unit: z.string().trim().min(1),
+    evaluationCadence: z.enum(["daily", "weekly", "monthly", "manual"]),
+    formula: z
+      .object({
+        id: z.string().trim().min(1),
+        expression: z.string().trim().min(1),
+        sourceBindings: z.array(kpiSourceBindingSchema).min(1)
+      })
+      .strict(),
+    thresholdRuleSet: z
+      .object({
+        id: z.string().trim().min(1),
+        rules: z.array(kpiThresholdRuleSchema).min(1)
+      })
+      .strict()
+  })
+  .strict();
+
+const kpiDefinitionPreviewSchema = kpiDefinitionConfigSchema
+  .extend({
+    sampleValues: z.record(z.string(), z.number())
+  })
+  .strict();
+
+const kpiDefinitionVersionCommandSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    reason: z.string().trim().min(1).optional()
+  })
+  .strict();
+
+const kpiSourceValueSchema = z
+  .object({
+    tenantId: z.string().trim().min(1),
+    bindingKey: z.string().trim().min(1),
+    value: z.number(),
+    sourceEntityType: z.enum(["opportunity", "project", "project_stage", "task", "resource"]),
+    sourceEntityId: z.string().trim().min(1),
+    sourceField: z.string().trim().min(1),
+    observedAt: z.string().trim().min(1)
+  })
+  .strict();
+
+const kpiEvaluationRunSchema = z
+  .object({
+    definitionId: z.string().trim().min(1),
+    entity: z
+      .object({
+        type: z.enum(["opportunity", "project", "project_stage", "task", "resource"]),
+        id: z.string().trim().min(1)
+      })
+      .strict(),
+    period: z
+      .object({
+        start: scheduleDateSchema,
+        end: scheduleDateSchema
+      })
+      .strict(),
+    sourceValues: z.array(kpiSourceValueSchema).optional()
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -438,6 +539,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase4Runtime = createPhase4RuntimeState();
   let phase5Runtime = createPhase5RuntimeState();
   let phase6Runtime = createPhase6RuntimeState();
+  let phase7Runtime = createPhase7RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -1209,6 +1311,286 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/kpi/definitions", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({
+        definitions: phase7Runtime.listDefinitions(session.user.tenantId).map(kpiDefinitionListDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/kpi/definitions/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId
+      });
+      const body = kpiDefinitionPreviewSchema.parse(await parseJson(context)) as KpiDefinitionPreviewInput;
+      const preview = phase7Runtime.previewDefinition(session.user.tenantId, body);
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/kpi/definitions", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId
+      });
+      const body = kpiDefinitionConfigSchema.parse(await parseJson(context)) as KpiDefinitionConfigInput;
+      const result = phase7Runtime.createDefinition({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        config: body
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: result.actionExecution.target ?? result.actionExecution.source,
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: result.actionExecution.before ?? undefined,
+          after: result.actionExecution.after ?? undefined
+        }
+      });
+
+      return context.json(
+        {
+          definition: result.definition.definition,
+          formula: result.definition.formula,
+          thresholdRuleSet: result.definition.thresholdRuleSet,
+          result: { actionExecution: actionExecutionDto(result.actionExecution) },
+          readback: { definitions: phase7Runtime.listDefinitions(session.user.tenantId).map(kpiDefinitionListDto) }
+        },
+        201
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kpi/definitions/:definitionId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const definitionId = context.req.param("definitionId");
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId,
+        entityId: definitionId
+      });
+      const bundle = phase7Runtime.getBundle(session.user.tenantId, definitionId);
+      if (bundle === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json(bundle);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/kpi/definitions/:definitionId/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const definitionId = context.req.param("definitionId");
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId,
+        entityId: definitionId
+      });
+      const body = kpiDefinitionVersionCommandSchema.parse(await parseJson(context));
+      const result = phase7Runtime.publishDefinition({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        definitionId,
+        expectedVersion: body.expectedVersion,
+        ...(body.reason !== undefined ? { reason: body.reason } : {})
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: result.actionExecution.target ?? result.actionExecution.source,
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: result.actionExecution.before ?? undefined,
+          after: result.actionExecution.after ?? undefined
+        }
+      });
+
+      return context.json({
+        result: { actionExecution: actionExecutionDto(result.actionExecution) },
+        readback: result.definition
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/kpi/definitions/:definitionId/retire", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const definitionId = context.req.param("definitionId");
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiDefinition",
+        tenantId: session.user.tenantId,
+        entityId: definitionId
+      });
+      const body = kpiDefinitionVersionCommandSchema.parse(await parseJson(context));
+      const result = phase7Runtime.retireDefinition({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        definitionId,
+        expectedVersion: body.expectedVersion,
+        ...(body.reason !== undefined ? { reason: body.reason } : {})
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: result.actionExecution.target ?? result.actionExecution.source,
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: result.actionExecution.before ?? undefined,
+          after: result.actionExecution.after ?? undefined
+        }
+      });
+
+      return context.json({
+        result: { actionExecution: actionExecutionDto(result.actionExecution) },
+        readback: result.definition
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/kpi/evaluations/run", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "kpi.evaluate:execute", {
+        entityType: "kpiEvaluation",
+        tenantId: session.user.tenantId
+      });
+      const body = kpiEvaluationRunSchema.parse(await parseJson(context)) as KpiEvaluationRunInput;
+      const result = phase7Runtime.runEvaluation({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        command: body
+      });
+      runtime.appendAuditEvent({
+        session,
+        actionKey: result.actionExecution.commandType,
+        target: result.actionExecution.target ?? result.actionExecution.source,
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: result.actionExecution.before ?? undefined,
+          after: result.actionExecution.after ?? undefined
+        }
+      });
+
+      return context.json({
+        evaluation: result.evaluation,
+        signal: result.signal,
+        actionExecution: actionExecutionDto(result.actionExecution)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kpi/evaluations/:evaluationId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const evaluationId = context.req.param("evaluationId");
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiEvaluation",
+        tenantId: session.user.tenantId,
+        entityId: evaluationId
+      });
+      const evaluation = phase7Runtime.getEvaluation(session.user.tenantId, evaluationId);
+      if (evaluation === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json({ evaluation });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kpi/deviations", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiDeviation",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ signals: phase7Runtime.listSignals(session.user.tenantId) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kpi/deviations/:signalId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const signalId = context.req.param("signalId");
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiDeviation",
+        tenantId: session.user.tenantId,
+        entityId: signalId
+      });
+      const detail = phase7Runtime.getSignalDetail(session.user.tenantId, signalId);
+      if (detail === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json(detail);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/kpi/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId
+      });
+      const actionExecutions = phase7Runtime.listActionExecutions(session.user.tenantId);
+      const actionCorrelationIds = new Set(actionExecutions.map((actionExecution) => actionExecution.correlationId));
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter((event) => actionCorrelationIds.has(event.correlationId))
+        .map(auditEventDto);
+
+      return context.json({
+        events,
+        actionExecutions: actionExecutions.map(actionExecutionDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/projects/:projectId", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -1878,6 +2260,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase4Runtime = createPhase4RuntimeState();
     phase5Runtime = createPhase5RuntimeState();
     phase6Runtime = createPhase6RuntimeState();
+    phase7Runtime = createPhase7RuntimeState();
     return context.json({ status: "reset" });
   });
 
@@ -2095,6 +2478,14 @@ function actionExecutionDto(actionExecution: {
     timestamp: actionExecution.timestamp,
     correlationId: actionExecution.correlationId,
     trace: [...actionExecution.trace]
+  };
+}
+
+function kpiDefinitionListDto(bundle: KpiDefinitionBundle) {
+  return {
+    ...bundle.definition,
+    formula: bundle.formula,
+    thresholdRuleSet: bundle.thresholdRuleSet
   };
 }
 
@@ -2336,6 +2727,14 @@ function handleRouteError(context: Context, error: unknown) {
       errorDto(code, code === "conflict" ? "Конфликт версии профиля доступа" : "Некорректный запрос"),
       code === "conflict" ? 409 : 400
     );
+  }
+
+  if (error instanceof Error && error.name === "KpiEngineError") {
+    if ("code" in error && error.code === "tenant_mismatch") {
+      return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+    }
+
+    return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
   }
 
   if (

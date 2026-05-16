@@ -170,6 +170,21 @@ const phase2PermissionCatalog = [
     key: "resource.write",
     description: "Create reservations and apply governed resource resolution commands",
     category: "resource_planning"
+  }),
+  createPermission({
+    key: "kpi:read",
+    description: "Read KPI definitions, evaluations, deviations, and traces",
+    category: "kpi_control"
+  }),
+  createPermission({
+    key: "kpi.config:write",
+    description: "Create, publish, and retire KPI definitions and threshold versions",
+    category: "kpi_control"
+  }),
+  createPermission({
+    key: "kpi.evaluate:execute",
+    description: "Run governed KPI evaluations and signal projection commands",
+    category: "kpi_control"
   })
 ] satisfies Permission[];
 
@@ -207,7 +222,10 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "task.status.write",
       "task.comment.write",
       "resource.read",
-      "resource.write"
+      "resource.write",
+      "kpi:read",
+      "kpi.config:write",
+      "kpi.evaluate:execute"
     ],
     project_manager: [
       "crm.opportunity.read",
@@ -228,7 +246,9 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "task.status.write",
       "task.comment.write",
       "resource.read",
-      "resource.write"
+      "resource.write",
+      "kpi:read",
+      "kpi.evaluate:execute"
     ],
     resource_manager: [
       "crm.opportunity.read",
@@ -239,11 +259,13 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "task.read",
       "resource.read",
       "resource.write",
-      "audit.read"
+      "audit.read",
+      "kpi:read",
+      "kpi.evaluate:execute"
     ],
     executor: ["project.read", "task.read", "task.status.write", "task.comment.write"],
-    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read"],
-    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read"]
+    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read", "kpi:read"],
+    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read", "kpi:read"]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
 

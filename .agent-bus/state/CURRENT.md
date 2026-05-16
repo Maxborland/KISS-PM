@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T18:54:50+07:00
+Updated: 2026-05-16T19:10:30+07:00
+
+- P7-006 KPI API and governed commands completed with verdict `accepted` for the API block; handoff: `.agent-bus/handoff/2026-05-16-p7-006-kpi-api-governed-commands.md`.
+- `apps/api/src/phase7Runtime.ts` now provides deterministic tenant-scoped KPI definitions, formula/threshold bundles, seeded evaluations/control signals, non-mutating definition preview, governed create/publish/retire commands, governed evaluation execution, source-entity precondition checks, and action execution readback.
+- `apps/api/src/app.ts` exposes P7 KPI routes for definitions, preview/create/publish/retire, evaluation run/readback, deviation readback, and audit. Backend permissions are enforced with `kpi:read`, `kpi.config:write`, `kpi.evaluate:execute`, and `audit.read`; P7 permissions are seeded in the Phase 2 runtime profiles.
+- Fresh P7-006 evidence: `npm test -- apps/api/src/phase7KpiApi.test.ts` passes with 5 tests; `npm test -- packages/kpi-engine`, `npm run test:integration`, `npm test`, `npm run typecheck`, `npm run lint`, `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json`, `git diff --check`, and agent-bus guard pass. Strict P7 matrix remains blocked as expected until UI/E2E/exit rows are implemented.
+- Bug Hunt / requested code review found one Important issue in scope: explicit KPI `sourceValues` could be used for a different entity than the evaluation target. It is fixed in `phase7Runtime.runEvaluation` and covered by `apps/api/src/phase7KpiApi.test.ts`.
+- Next recommended step: claim `P7-007-kpi-definition-admin-ui` and implement the KPI Definition Admin UI surface against the accepted P7 API. Do not mark Phase 7 accepted until E2E-060..064 and P7-010 pass.
 
 - P7-001 KPI domain safe formula foundation completed with verdict `accepted` for the domain-only block; handoff: `.agent-bus/handoff/2026-05-16-p7-001-kpi-domain-safe-formula-foundation.md`.
 - `packages/kpi-engine` now defines tenant-owned versioned KPI definitions, constrained formula definitions, threshold rule sets, source binding/evaluation trace, threshold severity mapping, KPI evaluations, and KPI control signal/upsert primitives.

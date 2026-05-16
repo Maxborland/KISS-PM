@@ -2,7 +2,7 @@
   "phase": "P7",
   "name": "Phase 7 KPI engine and control signals requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T11:54:27.719Z",
+  "updated_at": "2026-05-16T12:09:45.265Z",
   "rows": [
     {
       "id": "P7-001",
@@ -171,11 +171,23 @@
         "E2E-063",
         "E2E-064"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "P7 API routes, command guards, audit readback, and direct API denial tests have not been implemented yet.",
-      "last_checked_at": null,
+      "evidence": [
+        "apps/api/src/phase7Runtime.ts provides deterministic tenant-scoped KPI definitions, source values, evaluations, control signals, non-mutating definition preview, governed create/publish/retire commands, governed evaluation execution, and action execution readback.",
+        "apps/api/src/app.ts exposes P7 KPI API routes for definitions, preview/create/publish/retire, evaluation run/readback, deviations/readback, and audit while using backend permissions kpi:read, kpi.config:write, kpi.evaluate:execute, and audit.read.",
+        "apps/api/src/phase7KpiApi.test.ts proves deterministic read models, tenant isolation, dry-run preview without mutation, governed config commands with audit/action evidence, evaluation readback, deviation projection, read-only denial, cross-tenant denial without leaked ids, version conflicts, invalid formula rejection, and source-entity precondition rejection without partial mutation."
+      ],
+      "tests": [
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 1 file, 6 tests passed",
+        "npm test exit 0: 51 files, 315 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "P7 API/runtime state is deterministic in-memory per createApiApp instance; denied, invalid, preview-only, and source-entity mismatch paths are tested to leave no audit/action records or created KPI definitions. No browser, persisted database, external service, or generated fixture state is created in this block.",
+      "blocker": "API/governed-command evidence exists for P7-006, but the row remains blocked until P7 UI and executable E2E-060/E2E-063/E2E-064 prove the same flows through the user control surfaces.",
+      "last_checked_at": "2026-05-16T12:09:45.265Z",
       "e2e_evidence": []
     },
     {
