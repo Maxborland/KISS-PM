@@ -2,204 +2,565 @@
   "phase": "P6",
   "name": "Phase 6 resource planning and conflict resolution requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T15:56:00+07:00",
+  "updated_at": "2026-05-16T10:16:53.667Z",
   "rows": [
     {
       "id": "P6-001",
       "requirement": "Resource profiles and capacity calendars",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning"],
-      "required_e2e": ["E2E-050", "E2E-051"],
+      "owned_scope": [
+        "packages/resource-planning"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051"
+      ],
       "evidence": [
         "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers resource profile/calendar validation and capacity bucket derivation",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
-        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0: 14 files, 92 tests passed"
+        "apps/api/src/phase6Runtime.ts seeds Tenant A resource profiles, calendars, and reduced-capacity exception into deterministic resource load readback",
+        "e2e/tests/phase6/resource-load.spec.ts proves resource profiles, calendars, exceptions, load bucket values, and visible UI bucket for Анна Архитектор",
+        "e2e/tests/phase6/overload-detection.spec.ts proves the same resource/capacity data produces a reproducible overload signal"
       ],
       "tests": [
-        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
-        "npm test -- packages/resource-planning exit 0",
-        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0"
+        "npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
-      "blocker": "Domain/unit foundation implemented; row remains blocked until Phase 6 API/UI/E2E-050..051 evidence proves resource load through user-facing flows.",
-      "last_checked_at": "2026-05-16T15:23:15+07:00"
+      "cleanup": "Phase 6 fixtures are deterministic in-memory state; /test-fixtures/reset recreates Phase 6 runtime, and E2E-054 verifies reset restores load 50 ч/critical and clears action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-002",
       "requirement": "Availability exceptions",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning"],
-      "required_e2e": ["E2E-050", "E2E-051"],
+      "owned_scope": [
+        "packages/resource-planning"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051"
+      ],
       "evidence": [
-        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers absence/reduced-capacity exceptions and rejects invalid absence capacity",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers reduced-capacity availability exceptions",
+        "apps/api/src/phase6Runtime.ts seeds reduced-architect-a-2026-06-03 into Tenant A capacity calculation",
+        "e2e/tests/phase6/resource-load.spec.ts proves the API read model includes reduced-architect-a-2026-06-03 and visible bucket capacity is 36 ч",
+        "e2e/tests/phase6/overload-detection.spec.ts proves the exception-driven capacity produces the critical overload signal"
       ],
       "tests": [
-        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
-        "npm test -- packages/resource-planning exit 0"
+        "npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
-      "blocker": "Domain/unit availability exceptions implemented; row remains blocked until API/UI/E2E-050..051 evidence proves exceptions affect visible resource load.",
-      "last_checked_at": "2026-05-16T15:23:15+07:00"
+      "cleanup": "Availability exceptions are seeded in in-memory Phase 6 runtime and recreated by /test-fixtures/reset; E2E-054 verifies reset restores deterministic capacity/load state.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-003",
       "requirement": "Assignment load buckets from canonical tasks",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning", "packages/project-core", "packages/scheduling-engine"],
-      "required_e2e": ["E2E-050"],
+      "owned_scope": [
+        "packages/resource-planning",
+        "packages/project-core",
+        "packages/scheduling-engine"
+      ],
+      "required_e2e": [
+        "E2E-050"
+      ],
       "evidence": [
-        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers ResourceAssignment tied to project/task/participant schedule fields and ResourceLoadBucket calculation",
-        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0: 14 files, 92 tests passed"
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers ResourceAssignment tied to project/task/participant schedule fields and load bucket calculation",
+        "apps/api/src/phase6Runtime.ts seeds assignment-design-architect-a from project-alpha-a/task-design-a as the canonical assignment contribution",
+        "e2e/tests/phase6/resource-load.spec.ts proves assignment-design-architect-a appears in API readback and UI bucket shows assigned 42 ч"
       ],
       "tests": [
-        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
-        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0"
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
-      "blocker": "Domain/unit assignment load buckets implemented; row remains blocked until API/UI/E2E-050 evidence proves canonical task assignment readback through the app.",
-      "last_checked_at": "2026-05-16T15:23:15+07:00"
+      "cleanup": "Assignment fixture is deterministic in-memory state; E2E-054 verifies /test-fixtures/reset restores the original assignment load after apply shifts it out of the overloaded period.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-004",
       "requirement": "Reservations from CRM and project draft/active project",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning", "packages/crm-core", "packages/project-core"],
-      "required_e2e": ["E2E-050", "E2E-051"],
+      "owned_scope": [
+        "packages/resource-planning",
+        "packages/crm-core",
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051"
+      ],
       "evidence": [
         "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers resource-profile-scoped active reservations contributing to load buckets",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+        "apps/api/src/phase6Runtime.ts seeds reservation-draft-architect-a from project-draft-alpha-a as active reservation load",
+        "e2e/tests/phase6/resource-load.spec.ts proves reservation-draft-architect-a appears in API readback and UI bucket shows reserved 8 ч",
+        "e2e/tests/phase6/overload-detection.spec.ts proves reservation contribution is included in the overload affected entities"
       ],
       "tests": [
-        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
-        "npm test -- packages/resource-planning exit 0"
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
-      "blocker": "Domain/unit reservation load model implemented; row remains blocked until CRM/project draft/active-project API and E2E-050..051 evidence exists.",
-      "last_checked_at": "2026-05-16T15:23:15+07:00"
+      "cleanup": "Reservation fixture is deterministic in-memory state; E2E-054 verifies reset restores reservation load and clears action evidence.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-005",
       "requirement": "Overload detection and conflict severity",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/resource-planning"],
-      "required_e2e": ["E2E-051"],
+      "owned_scope": [
+        "packages/resource-planning"
+      ],
+      "required_e2e": [
+        "E2E-051"
+      ],
       "evidence": [
         "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers warning/critical severity, overloadHours, sourceRefs, affected tasks/projects, recommended actions, and tenant mismatch rejection",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+        "apps/api/src/phase6ResourcePlanningApi.test.ts covers deterministic critical overload detail with affected assignment/reservation entities",
+        "e2e/tests/phase6/overload-detection.spec.ts proves critical overload id, 14 ч overload, explanation, affected assignment/reservation, and recommendation are visible and reproducible through UI/API"
       ],
       "tests": [
-        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
-        "npm test -- packages/resource-planning exit 0"
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
-      "blocker": "Domain/unit overload detection implemented; row remains blocked until E2E-051 proves visible overload detection through Resource Load Control/API.",
-      "last_checked_at": "2026-05-16T15:23:15+07:00"
+      "cleanup": "Overload detection is derived from deterministic in-memory load; E2E-054 verifies reset restores the open critical overload after apply resolves it.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-006",
       "requirement": "Resource planning API and governed commands",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["apps/api", "packages/resource-planning", "packages/action-engine"],
-      "required_e2e": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+      "owned_scope": [
+        "apps/api",
+        "packages/resource-planning",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051",
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
       "evidence": [
         "apps/api/src/phase6Runtime.ts implements deterministic Phase 6 resource load read model, overload detail, reservation mutation, non-mutating resolution preview, guarded apply command, stale preview rejection, and action execution readback",
         "apps/api/src/app.ts exposes GET /api/resources/load, GET /api/resources/load/:bucketId, GET /api/resources/overloads/:overloadId, POST /api/resources/reservations, POST /api/resources/overloads/:overloadId/preview, POST /api/resources/overloads/:overloadId/apply, and GET /api/resources/audit",
-        "apps/api/src/phase6ResourcePlanningApi.test.ts covers deterministic buckets, overload severity/affected entities, dry-run no mutation, apply readback, audit/action evidence, unauthorized apply denial, tenant isolation, stale preview, and invalid preconditions"
+        "apps/api/src/phase6ResourcePlanningApi.test.ts covers deterministic buckets, overload severity/affected entities, dry-run no mutation, apply readback, audit/action evidence, unauthorized apply denial, tenant isolation, stale preview, and invalid preconditions",
+        "e2e/tests/phase6/*.spec.ts prove API routes through browser flow plus direct API readback, permission denial, audit/action evidence, reload persistence, and cleanup/reset"
       ],
       "tests": [
         "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
-        "npm run test:integration exit 0: 8 files, 38 tests passed",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
-        "npm run typecheck exit 0",
-        "npm run lint exit 0",
-        "npm test exit 0: 46 files, 277 tests passed"
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
       ],
-      "cleanup": "API runtime uses deterministic in-memory test state; allowTestFixtureReset recreates Phase 6 runtime and preview/apply tests prove no mutation before apply and no partial mutation on stale/invalid commands",
-      "blocker": "API/integration implementation is complete for this block, but P6-006 remains blocked for strict phase exit until UI and E2E-050..055 provide structured write-flow evidence.",
-      "last_checked_at": "2026-05-16T15:42:48+07:00"
+      "cleanup": "API runtime uses deterministic in-memory test state; E2E-053 proves preview does not mutate or write audit, E2E-054 proves apply mutates via command path and reset restores original load/audit state.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-052",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-052 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-053",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-053 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-054",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-054 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-055",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-resolution-permissions.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-055 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-007",
       "requirement": "Resource Load Control surface",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["apps/web"],
-      "required_e2e": ["E2E-050", "E2E-051", "E2E-052"],
+      "owned_scope": [
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051",
+        "E2E-052"
+      ],
       "evidence": [
-        "apps/web/src/resourcePlanningApiClient.ts implements the Phase 6 web API client for resource load, overload detail, reservation, preview, apply, and audit routes",
+        "apps/web/src/resourcePlanningApiClient.ts implements the Phase 6 web API client for resource load, overload detail, reservation, preview, apply, and audit routes and now matches API loadPercent DTO",
         "apps/web/src/ResourceLoadControlSurface.tsx implements a Russian Resource Load Control management surface with load buckets, overload signal, affected assignments/reservations, primary preview action, reservation action, audit panel, loading/empty/error/permission states, and API readback refresh",
-        "apps/web/src/ResourceLoadControlSurface.test.tsx covers load rendering, loading/empty/error/denied states, preview without mutation, apply readback/audit evidence, read-only command denial, stale preview recovery, and reload/refetch clearing local preview state"
+        "apps/web/src/ResourceLoadControlSurface.test.tsx covers load rendering, loading/empty/error/denied states, preview without mutation, apply readback/audit evidence, read-only command denial, stale preview recovery, and reload/refetch clearing local preview state",
+        "E2E-050..052 prove the browser surface renders load buckets, overload signal, and starts governed preview from the control surface"
       ],
       "tests": [
         "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
-        "npm test -- apps/web/src/App.test.tsx exit 0: 12 tests passed",
-        "npm test -- apps/web/src exit 0: 5 files, 38 tests passed",
         "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
-        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
-        "npm run test:integration exit 0: 8 files, 38 tests passed",
-        "npm test exit 0: 47 files, 284 tests passed",
-        "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed"
       ],
-      "cleanup": "UI component tests use isolated mock API clients and no persisted browser/server state; preview test proves no apply call before confirmation and reload/refetch test proves local preview state is cleared from API readback.",
-      "blocker": "Resource Load Control UI implementation is present and component-tested, but P6-007 remains blocked until executable E2E-050..052 prove the UI flow through the app/browser/API/audit/reload contract.",
-      "last_checked_at": "2026-05-16T15:56:00+07:00"
+      "cleanup": "UI component tests use isolated mock clients; browser E2E uses /test-fixtures/reset and E2E-054 proves reset/readback after mutation. No local-only mutation evidence accepted.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-052",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-052 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-008",
       "requirement": "Overload resolution dry-run and apply flow",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["apps/web", "apps/api", "packages/resource-planning", "packages/action-engine"],
-      "required_e2e": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+      "owned_scope": [
+        "apps/web",
+        "apps/api",
+        "packages/resource-planning",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
       "evidence": [
         "apps/api/src/phase6Runtime.ts and apps/api/src/phase6ResourcePlanningApi.test.ts provide API-level dry-run/apply support for shift_work, reserve_capacity preview, permission checks, stale preview rejection, and action/audit readback",
         "apps/web/src/ResourceLoadControlSurface.tsx exposes the recommended overload resolution flow with dry-run preview, confirmation, stale-preview recovery, refreshed resource load readback, and visible action/audit evidence",
-        "apps/web/src/ResourceLoadControlSurface.test.tsx proves preview does not mutate, apply uses previewId, apply refreshes getResourceLoad/getResourceAudit readback, read-only users have no preview/apply controls, stale preview can be recovered by refetching, and reload clears local preview state"
+        "e2e/tests/phase6/overload-resolution-entry.spec.ts proves entry from the Resource Load Control surface into preview flow",
+        "e2e/tests/phase6/resolution-dry-run.spec.ts proves before/after preview does not mutate API state or audit",
+        "e2e/tests/phase6/resolution-apply-audit.spec.ts proves apply changes load, writes action/audit evidence, refreshes projection, survives reload, and reset cleans state",
+        "e2e/tests/phase6/resource-resolution-permissions.spec.ts proves read-only UI denial and direct backend denial for read-only and cross-tenant users"
       ],
       "tests": [
         "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
         "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
-        "npm test -- apps/web/src exit 0: 5 files, 38 tests passed",
-        "npm run test:integration exit 0: 8 files, 38 tests passed",
-        "npm test exit 0: 47 files, 284 tests passed"
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed"
       ],
-      "cleanup": "API-level preview/apply state is in-memory and reset with createApiApp/test fixture reset; UI tests use isolated mock clients and prove local preview state is discarded on refetch. E2E cleanup proof remains pending.",
-      "blocker": "API and UI dry-run/apply command paths exist, but P6-008 remains blocked until E2E-052..055 prove full browser write-flow evidence with backend denial, audit, reload, and cleanup.",
-      "last_checked_at": "2026-05-16T15:56:00+07:00"
+      "cleanup": "E2E-053 proves dry-run has no mutation/audit; E2E-054 applies then calls /test-fixtures/reset and verifies load returns to 50 ч/critical and action executions are empty.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-052",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-052 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-053",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-053 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-054",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-054 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-055",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-resolution-permissions.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-055 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-009",
       "requirement": "Deterministic Phase 6 fixtures and E2E-050..055",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
-      "owned_scope": ["packages/shared-test-fixtures", "e2e/tests/phase6", "docs/e2e/E2E_SCENARIOS.md"],
-      "required_e2e": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/shared-test-fixtures", "planned: npm run test:e2e:phase -- --phase=6"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; deterministic fixtures and E2E-050..055 are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase6",
+        "docs/e2e/E2E_SCENARIOS.md"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051",
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
+      "evidence": [
+        "packages/shared-test-fixtures/src/phase6Fixtures.ts defines deterministic Tenant A/Tenant B resource, load bucket, overload, and E2E ids for Phase 6",
+        "packages/shared-test-fixtures/src/phase6Fixtures.test.ts proves stable identifiers and defensive copies",
+        "e2e/tests/phase6/resource-load.spec.ts implements E2E-050 UI/API deterministic load proof",
+        "e2e/tests/phase6/overload-detection.spec.ts implements E2E-051 reproducible overload proof",
+        "e2e/tests/phase6/overload-resolution-entry.spec.ts implements E2E-052 control-surface resolution entry proof",
+        "e2e/tests/phase6/resolution-dry-run.spec.ts implements E2E-053 no-mutation preview proof",
+        "e2e/tests/phase6/resolution-apply-audit.spec.ts implements E2E-054 apply/audit/readback/reload/reset proof",
+        "e2e/tests/phase6/resource-resolution-permissions.spec.ts implements E2E-055 UI and direct backend permission/tenant-isolation denial proof"
+      ],
+      "tests": [
+        "npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed"
+      ],
+      "cleanup": "All E2E specs start from /test-fixtures/reset. E2E-053 proves preview leaves API bucket at 50 ч/critical and audit empty; E2E-054 proves apply changes load to 8 ч/none, reload preserves readback, then reset restores 50 ч/critical and clears action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:16:53.667Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-050 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-051 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-052",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-052 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-053",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-053 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-054",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-054 passed in Phase 6 Playwright run with UI/API readback coverage"
+        },
+        {
+          "id": "E2E-055",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-resolution-permissions.spec.ts",
+          "checked_at": "2026-05-16T10:16:53.667Z",
+          "notes": "E2E-055 passed in Phase 6 Playwright run with UI/API readback coverage"
+        }
+      ]
     },
     {
       "id": "P6-010",
       "requirement": "Phase 6 verification matrix and exit gate",
       "status": "blocked",
       "owner": "codex",
-      "owned_scope": ["docs/status", "scripts"],
-      "required_e2e": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-050",
+        "E2E-051",
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
       "evidence": [],
-      "tests": ["planned: npm run verify:matrix -- docs/status/phase6-requirements-matrix.json"],
+      "tests": [
+        "planned: npm run verify:matrix -- docs/status/phase6-requirements-matrix.json"
+      ],
       "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 exit gate is blocked until all P6 rows have implementation, fresh tests, structured E2E evidence, and cleanup/reset proof.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "blocker": "Final P6 phase-exit row intentionally remains blocked for P6-010 until strict verifier, full verification command set, review loop, and gate report are run after E2E evidence is integrated.",
+      "last_checked_at": "2026-05-16T10:16:53.667Z"
     }
   ]
 }

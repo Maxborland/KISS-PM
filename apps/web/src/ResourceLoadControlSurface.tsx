@@ -115,7 +115,7 @@ function BucketCard({ bucket, resourceProfiles }: { bucket: ResourceLoadBucketDt
       </dl>
       <p className="resource-severity-row">
         <span className={`signal-severity-badge severity-${bucket.severity}`}>{resourceSeverityLabel(bucket.severity)}</span>
-        <span>{bucket.utilizationPercent}%</span>
+        <span>{bucket.loadPercent}%</span>
       </p>
     </article>
   );

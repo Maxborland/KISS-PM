@@ -142,8 +142,7 @@ function createProjection(overloaded = true): ResourceLoadProjectionDto {
         assignedHours: overloaded ? 42 : 0,
         reservedHours: 8,
         totalLoadHours: overloaded ? 50 : 8,
-        utilizationPercent: overloaded ? 139 : 22,
-        overloadHours: overloaded ? 14 : 0,
+        loadPercent: overloaded ? 139 : 22,
         severity: overloaded ? "critical" : "none",
         sourceRefs: ["assignment:assignment-design-architect-a", "reservation:reservation-draft-architect-a"]
       }

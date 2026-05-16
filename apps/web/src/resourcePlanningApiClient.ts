@@ -90,8 +90,7 @@ export type ResourceLoadBucketDto = CapacityPeriodBucketDto & {
   assignedHours: number;
   reservedHours: number;
   totalLoadHours: number;
-  utilizationPercent: number;
-  overloadHours: number;
+  loadPercent: number;
   severity: ResourceSeverityDto;
   sourceRefs: string[];
 };

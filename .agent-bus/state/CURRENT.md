@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T16:54:33+07:00
+Updated: 2026-05-16T17:22:00+07:00
+
+- P6-009 deterministic Phase 6 fixtures and E2E-050..055 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-009-deterministic-phase6-fixtures-e2e.md`.
+- `packages/shared-test-fixtures/src/phase6Fixtures.ts` now defines stable Tenant A/Tenant B resource planning fixture ids for resource profiles, load bucket, overload, assignment, reservation, permissions, and E2E ids.
+- `e2e/tests/phase6/` now contains executable E2E-050..055 proving deterministic load, overload detection, control-surface resolution entry, dry-run no mutation, apply/readback/audit/reload/reset, and UI plus direct API permission/tenant isolation denial.
+- A narrow P6 UI DTO fix was made in `apps/web/src/resourcePlanningApiClient.ts` and `apps/web/src/ResourceLoadControlSurface.tsx`: resource buckets now use API/domain `loadPercent` instead of stale `utilizationPercent`, preventing browser readback from rendering `undefined%`.
+- Fresh P6-009 evidence: `npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts`, `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- packages/resource-planning`, P6 phase E2E, matrix verifier with `--allow-blocked`, `npm run typecheck`, `npm run lint`, `git diff --check`, and agent-bus guard all pass. Strict P6 matrix remains intentionally blocked only at P6-010.
+- Next recommended step: claim `P6-010-phase6-verification-matrix-exit-gate`, run the final P6 gate/review loop, and only then mark P6 exit accepted. Do not call Release 2 ready after P6.
 
 - FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query-review-fixes.md`.
 - Bug Hunt findings from the TanStack Query migration are fixed: P3/P4/P5 write flows now fail closed when required API readback/refetch fails, CRM draft readback only swallows expected `not_found`, and Gantt clears stale command success when an external project open/refresh changes props.

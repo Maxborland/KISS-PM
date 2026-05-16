@@ -67,12 +67,12 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-050 | Assigned work creates visible load in resource planning | Resource manager | Seed Tenant A | Task assignments produce period load buckets | resource-planning, project-core | PRD 10.7 | `e2e/tests/phase6/resource-load.spec.ts` | planned |
-| E2E-051 | Overload is detected for a user/period | Resource manager | Seed Tenant A | Overcapacity bucket creates overload/control signal | resource-planning, kpi-engine | PRD 10.7 | `e2e/tests/phase6/overload-detection.spec.ts` | planned |
-| E2E-052 | User opens overload from control surface into resolution flow | Resource manager | Seed Tenant A | Resource Load Control drills into affected work and actions | resource-planning, control-surfaces | PRD 10.7, 10.9 | `e2e/tests/phase6/overload-resolution-entry.spec.ts` | planned |
-| E2E-053 | User previews shift/split/reassign before applying | Resource manager | Seed Tenant A | Dry-run shows before/after load and blockers | resource-planning, action-engine | PRD 10.7, 10.10 | `e2e/tests/phase6/resolution-dry-run.spec.ts` | planned |
-| E2E-054 | Applied resolution changes plan/load and records audit | Resource manager | Seed Tenant A | Confirmed action updates state and audit/action logs | resource-planning, scheduling-engine, audit | PRD 10.7, 10.10 | `e2e/tests/phase6/resolution-apply-audit.spec.ts` | planned |
-| E2E-055 | Unauthorized user cannot resolve conflict | Read-only observer | Seed Tenant A | Resolution action is denied even if attempted directly | access-control, action-engine | PRD 10.2, 10.7 | `e2e/tests/phase6/resource-resolution-permissions.spec.ts` | planned |
+| E2E-050 | Assigned work creates visible load in resource planning | Resource manager | Seed Tenant A | Task assignments produce period load buckets | resource-planning, project-core | PRD 10.7 | `e2e/tests/phase6/resource-load.spec.ts` | passing |
+| E2E-051 | Overload is detected for a user/period | Resource manager | Seed Tenant A | Overcapacity bucket creates overload/control signal | resource-planning, kpi-engine | PRD 10.7 | `e2e/tests/phase6/overload-detection.spec.ts` | passing |
+| E2E-052 | User opens overload from control surface into resolution flow | Resource manager | Seed Tenant A | Resource Load Control drills into affected work and actions | resource-planning, control-surfaces | PRD 10.7, 10.9 | `e2e/tests/phase6/overload-resolution-entry.spec.ts` | passing |
+| E2E-053 | User previews shift/split/reassign before applying | Resource manager | Seed Tenant A | Dry-run shows before/after load and blockers | resource-planning, action-engine | PRD 10.7, 10.10 | `e2e/tests/phase6/resolution-dry-run.spec.ts` | passing |
+| E2E-054 | Applied resolution changes plan/load and records audit | Resource manager | Seed Tenant A | Confirmed action updates state and audit/action logs | resource-planning, scheduling-engine, audit | PRD 10.7, 10.10 | `e2e/tests/phase6/resolution-apply-audit.spec.ts` | passing |
+| E2E-055 | Unauthorized user cannot resolve conflict | Read-only observer | Seed Tenant A | Resolution action is denied even if attempted directly | access-control, action-engine | PRD 10.2, 10.7 | `e2e/tests/phase6/resource-resolution-permissions.spec.ts` | passing |
 
 ## Phase 7 — KPI engine and control signals
 
