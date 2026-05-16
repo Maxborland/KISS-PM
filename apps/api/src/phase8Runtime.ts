@@ -5,6 +5,7 @@ import {
   type ActionExecutionLog
 } from "@kiss-pm/action-engine";
 import {
+  bindCustomProjectFieldsToControlSurfaceDefinition,
   createControlSurfaceDefinition,
   createControlSurfaceReadModel,
   type ControlSurfaceActionSlot,
@@ -14,6 +15,8 @@ import {
   type ControlSurfaceSourceRecord
 } from "@kiss-pm/control-surfaces";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
+import type { CustomFieldDefinition } from "@kiss-pm/tenant-config";
+import type { ManagedProject } from "@kiss-pm/project-core";
 
 import type { Phase4RuntimeState } from "./phase4Runtime";
 import type { Phase6RuntimeState } from "./phase6Runtime";
@@ -28,6 +31,8 @@ type BuildReadModelInput = {
   actorPermissionKeys: readonly string[];
   phase6Runtime: Phase6RuntimeState;
   phase7Runtime: Phase7RuntimeState;
+  customFields?: CustomFieldDefinition[];
+  projects?: ManagedProject[];
   page?: { offset: number; limit: number };
   isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
@@ -698,6 +703,62 @@ function resourceRows(tenantId: TenantId, phase6Runtime: Phase6RuntimeState): Co
   });
 }
 
+function projectCustomFieldRows(tenantId: TenantId, projects: ManagedProject[] | undefined): ControlSurfaceSourceRecord[] {
+  if (projects === undefined) return [];
+
+  return projects
+    .filter((project) => project.tenantId === tenantId && project.customFieldValues.length > 0)
+    .map((project) => ({
+      id: `row-project-custom-fields-${project.id}`,
+      tenantId,
+      entityType: "project",
+      entityId: project.id,
+      label: project.title,
+      severity: "attention" as const,
+      explanation: "Проект с пользовательскими полями тенанта",
+      sourceRefs: [{ entityType: "project" as const, entityId: project.id }],
+      fieldValues: {
+        project_label: project.title,
+        signal_label: "Пользовательские поля проекта",
+        severity: "attention" as const
+      },
+      recommendedActionKeys: [],
+      drilldownParams: { projectId: project.id },
+      policyContext: { projectId: project.id }
+    }));
+}
+
+function addProjectCustomFieldValues(
+  records: ControlSurfaceSourceRecord[],
+  projects: ManagedProject[] | undefined
+): ControlSurfaceSourceRecord[] {
+  if (projects === undefined || projects.length === 0) return records;
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+
+  return records.map((record) => {
+    const projectId =
+      record.policyContext?.projectId ??
+      record.sourceRefs.find((sourceRef) => sourceRef.entityType === "project")?.entityId ??
+      (record.entityType === "project" ? record.entityId : undefined);
+    const project = projectId === undefined ? undefined : projectById.get(projectId);
+    if (project === undefined || project.customFieldValues.length === 0) return record;
+    const customFieldValues = Object.fromEntries(
+      project.customFieldValues.map((valueRecord) => [
+        `custom.${valueRecord.fieldKey}`,
+        Array.isArray(valueRecord.value) ? valueRecord.value.join(", ") : valueRecord.value
+      ])
+    );
+
+    return {
+      ...record,
+      fieldValues: {
+        ...record.fieldValues,
+        ...customFieldValues
+      }
+    };
+  });
+}
+
 export function createPhase8RuntimeState() {
   const actionStates = new Map<string, Phase8TenantActionState>();
 
@@ -724,22 +785,34 @@ export function createPhase8RuntimeState() {
   }
 
   function buildReadModel(input: BuildReadModelInput): ControlSurfaceReadModel {
-    const definition = getSurface(input.tenantId, input.surfaceId);
-    if (definition === undefined) {
+    const baseDefinition = getSurface(input.tenantId, input.surfaceId);
+    if (baseDefinition === undefined) {
       throw notFound("control surface not found");
     }
-
-    return createControlSurfaceReadModel({
-      definition,
-      records: [
+    const definition =
+      input.customFields !== undefined && input.customFields.length > 0
+        ? bindCustomProjectFieldsToControlSurfaceDefinition(baseDefinition, {
+            customFields: input.customFields,
+            updatedAt: "2026-08-01T00:00:00.000Z"
+          })
+        : baseDefinition;
+    const records = addProjectCustomFieldValues(
+      [
         ...kpiRows(
           input.tenantId,
           input.phase7Runtime,
           actionState(input.tenantId).correctiveLinks,
           actionState(input.tenantId).signalActionLinks
         ),
-        ...resourceRows(input.tenantId, input.phase6Runtime)
+        ...resourceRows(input.tenantId, input.phase6Runtime),
+        ...projectCustomFieldRows(input.tenantId, input.projects)
       ],
+      input.projects
+    );
+
+    return createControlSurfaceReadModel({
+      definition,
+      records,
       actorPermissionKeys: input.actorPermissionKeys,
       page: input.page ?? { offset: 0, limit: 50 },
       ...(input.isActionAllowed !== undefined ? { isActionAllowed: input.isActionAllowed } : {}),

@@ -200,6 +200,20 @@ export type ControlSurfaceReadModelInput = {
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
 };
 
+export type ControlSurfaceCustomProjectFieldDefinition = TenantOwned & {
+  id: string;
+  targetEntityType: string;
+  key: string;
+  label: string;
+  valueType: "text" | "number" | "date" | "boolean" | "single_select" | "multi_select";
+  active: boolean;
+  visibilityRules?: Array<{ surfaceKey: string; visible: boolean }>;
+  bindingFlags: {
+    usableInFilters: boolean;
+    usableInControlSurfaces: boolean;
+  };
+};
+
 export class ControlSurfaceModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict" | "tenant_mismatch",
@@ -385,6 +399,21 @@ function createField(input: ControlSurfaceFieldDefinition): ControlSurfaceFieldD
   };
 }
 
+function customFieldValueType(valueType: ControlSurfaceCustomProjectFieldDefinition["valueType"]): ControlSurfaceFieldValueType {
+  switch (valueType) {
+    case "number":
+      return "number";
+    case "date":
+      return "date";
+    case "boolean":
+      return "boolean";
+    case "text":
+    case "single_select":
+    case "multi_select":
+      return "text";
+  }
+}
+
 function createWidget(input: ControlSurfaceWidgetDefinition): ControlSurfaceWidgetDefinition {
   return {
     id: requireNonEmptyString(input.id, "widget.id"),
@@ -526,6 +555,67 @@ export function validateControlSurfaceDefinition(input: ControlSurfaceDefinition
     }
     throw error;
   }
+}
+
+export function bindCustomProjectFieldsToControlSurfaceDefinition(
+  input: ControlSurfaceDefinition,
+  options: {
+    customFields: ControlSurfaceCustomProjectFieldDefinition[];
+    updatedAt: string;
+  }
+): ControlSurfaceDefinition {
+  const definition = createControlSurfaceDefinition(input);
+  const updatedAt = requireValidTimestamp(options.updatedAt, "customFieldBinding.updatedAt");
+  const existingFieldKeys = new Set(definition.view.fields.map((field) => field.key));
+  const customFields = requireArray(options.customFields, "customFieldBinding.customFields");
+  const addedFields: ControlSurfaceFieldDefinition[] = [];
+
+  for (const field of customFields) {
+    assertTenantId(definition.tenantId, field.tenantId, "custom field tenant mismatch");
+    if (field.targetEntityType !== "project") {
+      throw new ControlSurfaceModelError("validation_error", "custom field must target project");
+    }
+    if (!field.active || !field.bindingFlags.usableInControlSurfaces) {
+      continue;
+    }
+    const visibleOnSurface =
+      field.visibilityRules?.some((rule) => rule.surfaceKey === definition.key && rule.visible) ?? false;
+    if (!visibleOnSurface) {
+      continue;
+    }
+    const fieldKey = `custom.${requireNonEmptyString(field.key, "customField.key")}`;
+    if (existingFieldKeys.has(fieldKey)) {
+      continue;
+    }
+    addedFields.push(
+      createField({
+        id: `custom-field-${field.id}`,
+        key: fieldKey,
+        label: requireNonEmptyString(field.label, "customField.label"),
+        entityType: "project",
+        valueType: customFieldValueType(field.valueType),
+        visible: true,
+        sortable: false,
+        filterable: field.bindingFlags.usableInFilters
+      })
+    );
+    existingFieldKeys.add(fieldKey);
+  }
+
+  if (addedFields.length === 0) {
+    return definition;
+  }
+
+  return createControlSurfaceDefinition({
+    ...definition,
+    version: definition.version + 1,
+    updatedAt,
+    view: {
+      ...definition.view,
+      version: definition.view.version + 1,
+      fields: [...definition.view.fields, ...addedFields]
+    }
+  });
 }
 
 export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInput): ControlSurfaceReadModel {

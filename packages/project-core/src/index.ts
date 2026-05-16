@@ -267,6 +267,61 @@ export type ProjectStageHistoryEntry = TenantOwned & {
   correlationId: string;
 };
 
+export type CustomFieldDefinitionSnapshot = TenantOwned & {
+  id: string;
+  targetEntityType: "opportunity" | "project" | "task" | "tenant_user" | "workspace";
+  key: string;
+  label: string;
+  valueType: "text" | "number" | "date" | "boolean" | "single_select" | "multi_select";
+  required: boolean;
+  active: boolean;
+  version: number;
+  validationRules?: Record<string, string | number | boolean | string[] | number[]>;
+  visibilityRules?: Array<{ surfaceKey: string; visible: boolean }>;
+  permissionRules?: {
+    readPermissionKey?: string;
+    writePermissionKey?: string;
+  };
+  bindingFlags: {
+    usableInFilters: boolean;
+    usableInControlSurfaces: boolean;
+    usableInKpiSourceBindings: boolean;
+  };
+  updatedAt: string;
+};
+
+const customFieldTargetEntityTypes = new Set<CustomFieldDefinitionSnapshot["targetEntityType"]>([
+  "opportunity",
+  "project",
+  "task",
+  "tenant_user",
+  "workspace"
+]);
+const customFieldValueTypes = new Set<CustomFieldDefinitionSnapshot["valueType"]>([
+  "text",
+  "number",
+  "date",
+  "boolean",
+  "single_select",
+  "multi_select"
+]);
+
+export type ProjectCustomFieldValue = string | number | boolean | string[] | null;
+
+export type ProjectCustomFieldValueRecord = TenantOwned & {
+  id: string;
+  projectId: string;
+  definitionId: string;
+  definitionVersion: number;
+  fieldKey: string;
+  valueType: CustomFieldDefinitionSnapshot["valueType"];
+  value: ProjectCustomFieldValue;
+  updatedBy: TenantUserId;
+  updatedAt: string;
+  correlationId: string;
+  auditEventId?: string;
+};
+
 export type ProjectArtifactStatus = "submitted" | "accepted" | "rejected";
 
 export type ProjectArtifact = TenantOwned & {
@@ -402,6 +457,7 @@ export type ManagedProject = TenantOwned & {
   taskStatusHistory: TaskStatusHistoryEntry[];
   artifacts: ProjectArtifact[];
   approvalRequests: ApprovalRequest[];
+  customFieldValues: ProjectCustomFieldValueRecord[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1389,6 +1445,27 @@ function cloneClosureData(closureData: ClosureData): ClosureData {
   };
 }
 
+function cloneProjectCustomFieldValueRecord(record: ProjectCustomFieldValueRecord): ProjectCustomFieldValueRecord {
+  const valueRecord = requireObject(record, "projectCustomFieldValue");
+
+  return {
+    id: requireNonEmptyString(valueRecord.id, "projectCustomFieldValue.id"),
+    tenantId: requireNonEmptyString(valueRecord.tenantId, "projectCustomFieldValue.tenantId"),
+    projectId: requireNonEmptyString(valueRecord.projectId, "projectCustomFieldValue.projectId"),
+    definitionId: requireNonEmptyString(valueRecord.definitionId, "projectCustomFieldValue.definitionId"),
+    definitionVersion: requirePositiveInteger(valueRecord.definitionVersion, "projectCustomFieldValue.definitionVersion"),
+    fieldKey: requireSystemKey(valueRecord.fieldKey, "projectCustomFieldValue.fieldKey"),
+    valueType: valueRecord.valueType,
+    value: structuredClone(valueRecord.value),
+    updatedBy: requireNonEmptyString(valueRecord.updatedBy, "projectCustomFieldValue.updatedBy"),
+    updatedAt: requireValidTimestamp(valueRecord.updatedAt, "projectCustomFieldValue.updatedAt"),
+    correlationId: requireNonEmptyString(valueRecord.correlationId, "projectCustomFieldValue.correlationId"),
+    ...(valueRecord.auditEventId !== undefined
+      ? { auditEventId: requireNonEmptyString(valueRecord.auditEventId, "projectCustomFieldValue.auditEventId") }
+      : {})
+  };
+}
+
 function cloneManagedProject(project: ManagedProject): ManagedProject {
   const managedProject = requireObject(project, "managedProject");
   const tenantId = requireNonEmptyString(managedProject.tenantId, "managedProject.tenantId");
@@ -1417,6 +1494,10 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     "managedProject.taskStatusHistory"
   ).map(cloneTaskStatusHistoryEntry);
   const processTemplateSnapshot = cloneProcessTemplateVersionSnapshotForProject(tenantId, managedProject.processTemplateSnapshot);
+  const customFieldValues = requireArray(
+    managedProject.customFieldValues ?? [],
+    "managedProject.customFieldValues"
+  ).map(cloneProjectCustomFieldValueRecord);
 
   for (const stage of stages) {
     assertTenantId(tenantId, stage.tenantId, `managedProject stage tenant mismatch: ${stage.id}`);
@@ -1645,6 +1726,23 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
   );
   assertUniqueFieldValues(artifacts, (artifact) => artifact.id, "managedProject artifact ids must be unique");
   assertUniqueFieldValues(approvalRequests, (request) => request.id, "managedProject approval request ids must be unique");
+  assertUniqueFieldValues(
+    customFieldValues,
+    (record) => record.fieldKey,
+    "managedProject custom field values must be unique per field key"
+  );
+  for (const record of customFieldValues) {
+    assertTenantId(tenantId, record.tenantId, `managedProject custom field value tenant mismatch: ${record.id}`);
+    if (record.projectId !== id) {
+      throw new ProjectCoreModelError("validation_error", `managedProject custom field value project mismatch: ${record.id}`);
+    }
+    if (timestampIsBefore(updatedAt, record.updatedAt)) {
+      throw new ProjectCoreModelError(
+        "validation_error",
+        "managedProject custom field value updatedAt cannot be later than project.updatedAt"
+      );
+    }
+  }
 
   return {
     id,
@@ -1669,6 +1767,7 @@ function cloneManagedProject(project: ManagedProject): ManagedProject {
     taskStatusHistory,
     artifacts,
     approvalRequests,
+    customFieldValues,
     createdBy: requireNonEmptyString(managedProject.createdBy, "managedProject.createdBy"),
     createdAt,
     updatedAt,
@@ -2667,6 +2766,7 @@ export function createManagedProjectFromDraft(input: {
     taskStatusHistory: [],
     artifacts: [],
     approvalRequests: [],
+    customFieldValues: [],
     createdBy,
     createdAt,
     updatedAt: createdAt,
@@ -2687,6 +2787,149 @@ export function createManagedProjectFromDraft(input: {
         correlationId
       })
     ]
+  };
+}
+
+function cloneCustomFieldDefinitionSnapshot(definition: CustomFieldDefinitionSnapshot): CustomFieldDefinitionSnapshot {
+  if (!customFieldTargetEntityTypes.has(definition.targetEntityType)) {
+    throw new ProjectCoreModelError("validation_error", "customFieldDefinition.targetEntityType is invalid");
+  }
+  if (!customFieldValueTypes.has(definition.valueType)) {
+    throw new ProjectCoreModelError("validation_error", "customFieldDefinition.valueType is invalid");
+  }
+
+  return {
+    id: requireNonEmptyString(definition.id, "customFieldDefinition.id"),
+    tenantId: requireNonEmptyString(definition.tenantId, "tenantId"),
+    targetEntityType: definition.targetEntityType,
+    key: requireSystemKey(definition.key, "customFieldDefinition.key"),
+    label: requireNonEmptyString(definition.label, "customFieldDefinition.label"),
+    valueType: definition.valueType,
+    required: requireBoolean(definition.required, "customFieldDefinition.required"),
+    active: requireBoolean(definition.active, "customFieldDefinition.active"),
+    version: requirePositiveInteger(definition.version, "customFieldDefinition.version"),
+    ...(definition.validationRules !== undefined ? { validationRules: structuredClone(definition.validationRules) } : {}),
+    ...(definition.visibilityRules !== undefined ? { visibilityRules: structuredClone(definition.visibilityRules) } : {}),
+    ...(definition.permissionRules !== undefined ? { permissionRules: structuredClone(definition.permissionRules) } : {}),
+    bindingFlags: {
+      usableInFilters: requireBoolean(definition.bindingFlags.usableInFilters, "customFieldDefinition.bindingFlags.usableInFilters"),
+      usableInControlSurfaces: requireBoolean(
+        definition.bindingFlags.usableInControlSurfaces,
+        "customFieldDefinition.bindingFlags.usableInControlSurfaces"
+      ),
+      usableInKpiSourceBindings: requireBoolean(
+        definition.bindingFlags.usableInKpiSourceBindings,
+        "customFieldDefinition.bindingFlags.usableInKpiSourceBindings"
+      )
+    },
+    updatedAt: requireValidTimestamp(definition.updatedAt, "customFieldDefinition.updatedAt")
+  };
+}
+
+function validateProjectCustomFieldValue(
+  definition: CustomFieldDefinitionSnapshot,
+  value: ProjectCustomFieldValue
+): ProjectCustomFieldValue {
+  if (value === null) {
+    if (definition.required) {
+      throw new ProjectCoreModelError("validation_error", "project custom field value is required");
+    }
+    return null;
+  }
+  switch (definition.valueType) {
+    case "text":
+      return requireNonEmptyString(value as string | undefined, "projectCustomField.value");
+    case "number":
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new ProjectCoreModelError("validation_error", "project custom field value must be a number");
+      }
+      return value;
+    case "date":
+      return requireDateOnly(value as string | undefined, "projectCustomField.value");
+    case "boolean":
+      return requireBoolean(value as boolean | undefined, "projectCustomField.value");
+    case "single_select": {
+      const option = requireSystemKey(value as string | undefined, "projectCustomField.value");
+      const options = definition.validationRules?.["options"];
+      if (!Array.isArray(options) || !options.every((item): item is string => typeof item === "string")) {
+        throw new ProjectCoreModelError("validation_error", "project custom field options are not configured");
+      }
+      if (!options.includes(option)) {
+        throw new ProjectCoreModelError("validation_error", `project custom field value is not an allowed option: ${option}`);
+      }
+      return option;
+    }
+    case "multi_select": {
+      const values = requireArray(value as string[] | undefined, "projectCustomField.value").map((item) =>
+        requireSystemKey(item, "projectCustomField.value")
+      );
+      const options = definition.validationRules?.["options"];
+      if (!Array.isArray(options) || !options.every((item): item is string => typeof item === "string")) {
+        throw new ProjectCoreModelError("validation_error", "project custom field options are not configured");
+      }
+      for (const option of values) {
+        if (!options.includes(option)) {
+          throw new ProjectCoreModelError("validation_error", `project custom field value is not an allowed option: ${option}`);
+        }
+      }
+      return values;
+    }
+  }
+}
+
+export function listProjectCustomFieldValues(project: ManagedProject): ProjectCustomFieldValueRecord[] {
+  return cloneManagedProject(project).customFieldValues.map((record) => ({ ...record, value: structuredClone(record.value) }));
+}
+
+export function setProjectCustomFieldValue(
+  project: ManagedProject,
+  input: {
+    definition: CustomFieldDefinitionSnapshot;
+    value: ProjectCustomFieldValue;
+    actorId: TenantUserId;
+    occurredAt: string;
+    correlationId: string;
+    auditEventId?: string;
+  }
+): { project: ManagedProject; valueRecord: ProjectCustomFieldValueRecord } {
+  const currentProject = cloneManagedProject(project);
+  const definition = cloneCustomFieldDefinitionSnapshot(input.definition);
+  if (definition.tenantId !== currentProject.tenantId) {
+    throw new ProjectCoreModelError("validation_error", "project custom field tenant mismatch");
+  }
+  if (definition.targetEntityType !== "project") {
+    throw new ProjectCoreModelError("validation_error", "project custom field definition must target project");
+  }
+  if (!definition.active) {
+    throw new ProjectCoreModelError("validation_error", "project custom field definition must be active");
+  }
+  const updatedAt = requireValidTimestamp(input.occurredAt, "projectCustomField.updatedAt");
+  const fieldKey = requireSystemKey(definition.key, "projectCustomField.fieldKey");
+  const value = validateProjectCustomFieldValue(definition, input.value);
+  const valueRecord: ProjectCustomFieldValueRecord = {
+    id: `${currentProject.id}:custom-field:${fieldKey}`,
+    tenantId: currentProject.tenantId,
+    projectId: currentProject.id,
+    definitionId: definition.id,
+    definitionVersion: definition.version,
+    fieldKey,
+    valueType: definition.valueType,
+    value,
+    updatedBy: requireNonEmptyString(input.actorId, "projectCustomField.updatedBy"),
+    updatedAt,
+    correlationId: requireNonEmptyString(input.correlationId, "projectCustomField.correlationId"),
+    ...(input.auditEventId !== undefined ? { auditEventId: requireNonEmptyString(input.auditEventId, "projectCustomField.auditEventId") } : {})
+  };
+  const nextValues = currentProject.customFieldValues.filter((record) => record.fieldKey !== fieldKey).concat(valueRecord);
+  const nextProject = cloneManagedProject({
+    ...currentProject,
+    customFieldValues: nextValues,
+    updatedAt
+  });
+
+  return {
+    project: nextProject,
+    valueRecord: { ...valueRecord, value: structuredClone(valueRecord.value) }
   };
 }
 

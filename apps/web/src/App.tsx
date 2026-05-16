@@ -37,6 +37,8 @@ import {
   createProcessTemplateBuilderApiClient,
   type ProcessTemplateBuilderApiClient
 } from "./processTemplateBuilderApiClient";
+import { CustomFieldBuilderSurface } from "./CustomFieldBuilderSurface";
+import { createCustomFieldBuilderApiClient, type CustomFieldBuilderApiClient } from "./customFieldBuilderApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -53,7 +55,8 @@ type AppProps = {
     Partial<RetrospectiveApiClient> &
     Partial<ProjectClosureApiClient> &
     Partial<TenantLabelsApiClient> &
-    Partial<ProcessTemplateBuilderApiClient>;
+    Partial<ProcessTemplateBuilderApiClient> &
+    Partial<CustomFieldBuilderApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -290,6 +293,19 @@ function isProcessTemplateBuilderApiClient(
     typeof apiClient?.getProcessTemplates === "function" &&
     typeof apiClient.previewProcessTemplate === "function" &&
     typeof apiClient.publishProcessTemplate === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isCustomFieldBuilderApiClient(
+  apiClient: Partial<CustomFieldBuilderApiClient> | null
+): apiClient is CustomFieldBuilderApiClient {
+  return (
+    typeof apiClient?.getCustomFieldRegistry === "function" &&
+    typeof apiClient.previewCustomField === "function" &&
+    typeof apiClient.publishCustomField === "function" &&
+    typeof apiClient.setProjectCustomFieldValue === "function" &&
+    typeof apiClient.getPortfolioSurfaceView === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -671,6 +687,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createProcessTemplateBuilderApiClient() : null;
   }, [apiClient]);
+  const customFieldBuilderApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isCustomFieldBuilderApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createCustomFieldBuilderApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -846,6 +870,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {processTemplateBuilderApiClient ? (
           <ProcessTemplateBuilderSurface
             apiClient={processTemplateBuilderApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {customFieldBuilderApiClient ? (
+          <CustomFieldBuilderSurface
+            apiClient={customFieldBuilderApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

@@ -15,6 +15,7 @@ import {
   listTaskStatusHistory,
   listTasksByParticipant,
   recordProjectArtifactEvidence,
+  setProjectCustomFieldValue,
   updateTaskPlanningFields
 } from "@kiss-pm/project-core";
 import type {
@@ -22,6 +23,9 @@ import type {
   ClosureData,
   ManagedProject,
   ProcessTemplate,
+  CustomFieldDefinitionSnapshot,
+  ProjectCustomFieldValue,
+  ProjectCustomFieldValueRecord,
   ProjectClosureBlockerOverride,
   ProjectClosureResult,
   ProjectArtifactStatus,
@@ -77,6 +81,11 @@ export type Phase4CreateTaskResult = {
 export type Phase4UpdateTaskPlanningFieldsResult = {
   project: ManagedProject;
   task: Task;
+};
+
+export type Phase4SetProjectCustomFieldValueResult = {
+  project: ManagedProject;
+  valueRecord: ProjectCustomFieldValueRecord;
 };
 
 export type Phase4MyTaskProjection = Task & {
@@ -270,6 +279,12 @@ export function createPhase4RuntimeState() {
 
     getProject: getTenantProject,
 
+    listProjects(tenantId: TenantId): ManagedProject[] {
+      return [...projects.values()]
+        .filter((project) => project.tenantId === tenantId)
+        .map((project) => cloneManagedProject(project));
+    },
+
     getProcessTemplate,
 
     replaceProcessTemplate(template: ProcessTemplate): ProcessTemplate {
@@ -288,6 +303,32 @@ export function createPhase4RuntimeState() {
       }
 
       return [...versions].sort((left, right) => left - right);
+    },
+
+    setProjectCustomFieldValue(input: {
+      tenantId: TenantId;
+      projectId: string;
+      definition: CustomFieldDefinitionSnapshot;
+      value: ProjectCustomFieldValue;
+      actorId: TenantUserId;
+      auditEventId: string;
+      correlationId: string;
+    }): Phase4SetProjectCustomFieldValueResult {
+      const project = getTenantProject(input.tenantId, input.projectId);
+      if (project === undefined) {
+        throw Object.assign(new Error("project not found"), { code: "not_found" });
+      }
+      const result = setProjectCustomFieldValue(project, {
+        definition: input.definition,
+        value: input.value,
+        actorId: input.actorId,
+        occurredAt: now(),
+        correlationId: input.correlationId,
+        auditEventId: input.auditEventId
+      });
+      setProject(result.project);
+
+      return result;
     },
 
     closeProjectWithClosure(input: {

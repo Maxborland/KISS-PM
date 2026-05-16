@@ -22,6 +22,7 @@ import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import {
   buildRuntimeLabelProjection,
   createPhase10RuntimeState,
+  customFieldPublishAuditDto,
   processTemplatePublishAuditDto,
   tenantLabelPublishAuditDto
 } from "./phase10Runtime";
@@ -35,6 +36,7 @@ import type {
   ApprovalRequest,
   ManagedProject,
   ProcessTemplate,
+  ProjectCustomFieldValue,
   ProjectArtifact,
   ProjectLifecycleTransitionError,
   ProjectStage,
@@ -47,6 +49,7 @@ import type {
 } from "@kiss-pm/project-core";
 import type { ProjectClosureBlockerOverride } from "@kiss-pm/project-core";
 import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
+import type { CustomFieldDefinition, CustomFieldRegistry } from "@kiss-pm/tenant-config";
 
 type ApiErrorCode =
   | "unauthenticated"
@@ -152,6 +155,71 @@ const processTemplatePublishSchema = z
   .object({
     templateId: z.string().trim().min(1),
     previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const customFieldMetadataValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z.array(z.number())
+]);
+
+const customFieldDraftSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    targetEntityType: z.string().trim().min(1),
+    key: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+    valueType: z.string().trim().min(1),
+    required: z.boolean(),
+    active: z.boolean(),
+    validationRules: z.record(z.string().trim().min(1), customFieldMetadataValueSchema).optional(),
+    visibilityRules: z
+      .array(
+        z
+          .object({
+            surfaceKey: z.string().trim().min(1),
+            visible: z.boolean()
+          })
+          .strict()
+      )
+      .optional(),
+    permissionRules: z
+      .object({
+        readPermissionKey: z.string().trim().min(1).optional(),
+        writePermissionKey: z.string().trim().min(1).optional()
+      })
+      .strict()
+      .optional(),
+    bindingFlags: z
+      .object({
+        usableInFilters: z.boolean(),
+        usableInControlSurfaces: z.boolean(),
+        usableInKpiSourceBindings: z.boolean()
+      })
+      .strict()
+  })
+  .strict();
+
+const customFieldPreviewSchema = z
+  .object({
+    expectedRegistryVersion: z.number().int().positive(),
+    draft: customFieldDraftSchema,
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const customFieldPublishSchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const projectCustomFieldValueSchema = z
+  .object({
+    value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()])
   })
   .strict();
 
@@ -663,7 +731,7 @@ function assertAllowed(
   runtime: Phase2RuntimeState,
   session: Phase2RuntimeSession,
   permissionKey: string,
-  target: { entityType: string; tenantId: string; entityId?: string },
+  target: { entityType: string; tenantId: string; entityId?: string; ownerId?: string },
   requestedScope?: string,
   contextRefs?: { projectIds?: string[] }
 ) {
@@ -985,6 +1053,97 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/tenant/custom-fields", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "customFieldDefinition",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({
+        registry: customFieldRegistryDto(phase10Runtime.getCustomFieldRegistry(session.user.tenantId))
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/custom-fields/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "customFieldDefinition",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "custom_field.write", {
+        entityType: "customFieldDefinition",
+        tenantId: session.user.tenantId
+      });
+
+      const body = customFieldPreviewSchema.parse(await parseJson(context));
+      const preview = phase10Runtime.previewCustomField({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        expectedRegistryVersion: body.expectedRegistryVersion,
+        draft: body.draft,
+        affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/custom-fields/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "customFieldDefinition",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "custom_field.write", {
+        entityType: "customFieldDefinition",
+        tenantId: session.user.tenantId
+      });
+
+      const body = customFieldPublishSchema.parse(await parseJson(context));
+      const auditEventId = `audit-p10-custom-field-${session.user.tenantId}-${phase10Runtime.getCustomFieldRegistry(session.user.tenantId).version + 1}`;
+      const result = phase10Runtime.publishCustomField({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        accessProfileId: session.user.accessProfileId,
+        previewId: body.previewId,
+        auditEventId
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "customFieldDefinition", entityId: result.audit.definitionId },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { registryVersion: result.audit.beforeRegistryVersion },
+          after: { registryVersion: result.audit.afterRegistryVersion }
+        }
+      });
+
+      return context.json({
+        result: {
+          registry: customFieldRegistryDto(result.registry),
+          audit: customFieldPublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          registry: customFieldRegistryDto(phase10Runtime.getCustomFieldRegistry(session.user.tenantId))
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -997,7 +1156,9 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         events: runtime.auditStore.listByTenant(session.user.tenantId).map(auditEventDto),
         actionExecutions: [
           ...phase10Runtime.listLabelActionExecutions(session.user.tenantId),
-          ...phase10Runtime.listProcessTemplateActionExecutions(session.user.tenantId)
+          ...phase10Runtime.listProcessTemplateActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listCustomFieldActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId)
         ].map(actionExecutionDto)
       });
     } catch (error) {
@@ -2456,6 +2617,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         actorPermissionKeys: session.profile.permissions,
         phase6Runtime,
         phase7Runtime,
+        customFields: phase10Runtime.getCustomFieldRegistry(session.user.tenantId).definitions,
+        projects: phase4Runtime.listProjects(session.user.tenantId),
         page: {
           offset: Number(context.req.query("offset") ?? 0),
           limit: Number(context.req.query("limit") ?? 50)
@@ -2695,6 +2858,78 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       }
 
       return context.json({ projectDraft: projectDraftDto(projectDraft) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.put("/api/projects/:projectId/custom-fields/:fieldKey", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const fieldKey = context.req.param("fieldKey");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const registry = phase10Runtime.getCustomFieldRegistry(session.user.tenantId);
+      const definition = registry.definitions.find(
+        (candidate) => candidate.targetEntityType === "project" && candidate.key === fieldKey
+      );
+      if (definition === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const requiredPermission = definition.permissionRules?.writePermissionKey ?? "custom_field.write";
+      assertAllowed(runtime, session, requiredPermission, {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId,
+        ownerId: project.createdBy
+      });
+      const body = projectCustomFieldValueSchema.parse(await parseJson(context));
+      const previousValue = project.customFieldValues.find((record) => record.fieldKey === fieldKey)?.value ?? null;
+      const auditEventId = `audit-project-custom-field-${session.user.tenantId}-${projectId}-${fieldKey}`;
+      const result = phase4Runtime.setProjectCustomFieldValue({
+        tenantId: session.user.tenantId,
+        projectId,
+        definition,
+        value: body.value as ProjectCustomFieldValue,
+        actorId: session.user.id,
+        auditEventId,
+        correlationId: `corr-project-custom-field-${projectId}-${fieldKey}`
+      });
+      const actionExecution = phase10Runtime.recordProjectCustomFieldValueAction({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        accessProfileId: session.user.accessProfileId,
+        projectId,
+        fieldKey,
+        requiredPermission,
+        beforeValue: previousValue,
+        afterValue: result.valueRecord.value,
+        auditEventId
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: auditEventId,
+        actionKey: "project.custom_field.set",
+        target: { entityType: "project", entityId: projectId },
+        correlationId: actionExecution.correlationId,
+        details: {
+          before: { fieldKey, value: previousValue },
+          after: { fieldKey, value: result.valueRecord.value }
+        }
+      });
+
+      return context.json({
+        result: {
+          valueRecord: projectCustomFieldValueDto(result.valueRecord),
+          actionExecution: actionExecutionDto(actionExecution)
+        },
+        readback: {
+          project: projectDto(result.project)
+        }
+      });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -3567,6 +3802,34 @@ function processTemplateDto(template: ProcessTemplate) {
   };
 }
 
+function customFieldDefinitionDto(definition: CustomFieldDefinition) {
+  return {
+    id: definition.id,
+    tenantId: definition.tenantId,
+    targetEntityType: definition.targetEntityType,
+    key: definition.key,
+    label: definition.label,
+    valueType: definition.valueType,
+    required: definition.required,
+    active: definition.active,
+    version: definition.version,
+    ...(definition.validationRules !== undefined ? { validationRules: structuredClone(definition.validationRules) } : {}),
+    ...(definition.visibilityRules !== undefined ? { visibilityRules: definition.visibilityRules.map((rule) => ({ ...rule })) } : {}),
+    ...(definition.permissionRules !== undefined ? { permissionRules: { ...definition.permissionRules } } : {}),
+    bindingFlags: { ...definition.bindingFlags },
+    updatedAt: definition.updatedAt
+  };
+}
+
+function customFieldRegistryDto(registry: CustomFieldRegistry) {
+  return {
+    tenantId: registry.tenantId,
+    version: registry.version,
+    definitions: registry.definitions.map(customFieldDefinitionDto),
+    updatedAt: registry.updatedAt
+  };
+}
+
 function actionExecutionDto(actionExecution: {
   id: string;
   tenantId: string;
@@ -3735,6 +3998,7 @@ function projectDto(project: ManagedProject) {
     taskParticipants: project.taskParticipants.map(taskParticipantDto),
     taskComments: project.taskComments.map(taskCommentDto),
     taskStatusHistory: project.taskStatusHistory.map(taskStatusHistoryDto),
+    customFieldValues: project.customFieldValues.map(projectCustomFieldValueDto),
     artifacts: project.artifacts.map(projectArtifactDto),
     approvalRequests: project.approvalRequests.map(approvalRequestDto),
     createdBy: project.createdBy,
@@ -3743,6 +4007,38 @@ function projectDto(project: ManagedProject) {
     correlationId: project.correlationId
   };
 }
+
+function projectCustomFieldValueDto(valueRecord: ProjectCustomFieldValueRecordLike) {
+  return {
+    id: valueRecord.id,
+    tenantId: valueRecord.tenantId,
+    projectId: valueRecord.projectId,
+    definitionId: valueRecord.definitionId,
+    definitionVersion: valueRecord.definitionVersion,
+    fieldKey: valueRecord.fieldKey,
+    valueType: valueRecord.valueType,
+    value: structuredClone(valueRecord.value),
+    updatedBy: valueRecord.updatedBy,
+    updatedAt: valueRecord.updatedAt,
+    correlationId: valueRecord.correlationId,
+    ...(valueRecord.auditEventId !== undefined ? { auditEventId: valueRecord.auditEventId } : {})
+  };
+}
+
+type ProjectCustomFieldValueRecordLike = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  definitionId: string;
+  definitionVersion: number;
+  fieldKey: string;
+  valueType: string;
+  value: ProjectCustomFieldValue;
+  updatedBy: string;
+  updatedAt: string;
+  correlationId: string;
+  auditEventId?: string;
+};
 
 function taskDto(task: Task) {
   return {

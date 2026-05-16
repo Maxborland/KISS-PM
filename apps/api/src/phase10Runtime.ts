@@ -13,11 +13,19 @@ import type {
   ProcessTemplatePublishResult
 } from "@kiss-pm/project-core";
 import {
+  createCustomFieldRegistry,
   createTenantLabelSet,
+  publishCustomFieldDefinitionPreview,
   publishTenantLabelSetPreview,
+  previewCustomFieldDefinitionPublish,
   previewTenantLabelSetPublish
 } from "@kiss-pm/tenant-config";
 import type {
+  CustomFieldDefinitionDraft,
+  CustomFieldDefinitionPublishAudit,
+  CustomFieldDefinitionPublishPreview,
+  CustomFieldDefinitionPublishResult,
+  CustomFieldRegistry,
   TenantLabelSet,
   TenantLabelSetPublishAudit,
   TenantLabelSetPublishPreview,
@@ -31,6 +39,10 @@ type Phase10TenantState = {
   labelActionExecutions: ActionExecutionLog[];
   processTemplatePreviews: Map<string, ProcessTemplatePublishPreview>;
   processTemplateActionExecutions: ActionExecutionLog[];
+  customFieldRegistry: CustomFieldRegistry;
+  customFieldPreviews: Map<string, CustomFieldDefinitionPublishPreview>;
+  customFieldActionExecutions: ActionExecutionLog[];
+  customFieldValueActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -59,7 +71,16 @@ export function createPhase10RuntimeState() {
       labelPreviews: new Map<string, TenantLabelSetPublishPreview>(),
       labelActionExecutions: [],
       processTemplatePreviews: new Map<string, ProcessTemplatePublishPreview>(),
-      processTemplateActionExecutions: []
+      processTemplateActionExecutions: [],
+      customFieldRegistry: createCustomFieldRegistry({
+        tenantId,
+        version: 1,
+        definitions: [],
+        updatedAt: new Date(PHASE10_TIMESTAMP_START).toISOString()
+      }),
+      customFieldPreviews: new Map<string, CustomFieldDefinitionPublishPreview>(),
+      customFieldActionExecutions: [],
+      customFieldValueActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -227,6 +248,132 @@ export function createPhase10RuntimeState() {
     return getState(tenantId).processTemplateActionExecutions.map((entry) => clone(entry));
   }
 
+  function getCustomFieldRegistry(tenantId: TenantId): CustomFieldRegistry {
+    return createCustomFieldRegistry(getState(tenantId).customFieldRegistry);
+  }
+
+  function previewCustomField(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    expectedRegistryVersion: number;
+    draft: CustomFieldDefinitionDraft;
+    affectedRuntimeSurfaces: string[];
+  }): CustomFieldDefinitionPublishPreview {
+    const state = getState(input.tenantId);
+    const preview = previewCustomFieldDefinitionPublish(state.customFieldRegistry, {
+      id: `preview-custom-field-${input.tenantId}-${state.customFieldRegistry.version}-${state.customFieldPreviews.size + 1}`,
+      actorId: input.actorId,
+      expectedRegistryVersion: input.expectedRegistryVersion,
+      draft: input.draft,
+      affectedRuntimeSurfaces: input.affectedRuntimeSurfaces,
+      createdAt: now()
+    });
+    state.customFieldPreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function publishCustomField(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    previewId: string;
+    auditEventId: string;
+  }): CustomFieldDefinitionPublishResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.tenantId);
+    const preview = state.customFieldPreviews.get(input.previewId);
+    if (preview === undefined) {
+      throw stalePreview("custom field preview is missing or stale");
+    }
+    if (preview.actorId !== input.actorId) {
+      throw stalePreview("custom field preview is stale");
+    }
+    const result = publishCustomFieldDefinitionPreview(state.customFieldRegistry, {
+      preview,
+      expectedRegistryVersion: state.customFieldRegistry.version,
+      auditEventId: input.auditEventId,
+      publishedAt: now()
+    });
+    state.customFieldRegistry = createCustomFieldRegistry(result.registry);
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `custom-field-${input.tenantId}-${preview.definition.id}-${preview.before.registryVersion}`
+      },
+      commandType: "custom_field.publish",
+      requiredPermission: "custom_field.write",
+      status: "succeeded",
+      source: { entityType: "customFieldDefinition", entityId: preview.definition.id },
+      target: { entityType: "customFieldDefinition", entityId: preview.definition.id },
+      before: {
+        registryVersion: preview.before.registryVersion,
+        definitionCount: preview.before.definitionCount,
+        preview
+      },
+      after: {
+        registryVersion: result.registry.version,
+        definitionCount: result.registry.definitions.length,
+        fieldKey: preview.definition.key
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission custom_field.write allowed"],
+      preconditionTrace: ["precondition:dry-run preview confirmed", "precondition:control surface binding validated"],
+      trace: ["custom_field:preview confirmed", "custom_field:registry published"]
+    });
+    state.customFieldActionExecutions = [...state.customFieldActionExecutions, actionExecution];
+    state.customFieldPreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function listCustomFieldActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).customFieldActionExecutions.map((entry) => clone(entry));
+  }
+
+  function recordProjectCustomFieldValueAction(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    projectId: string;
+    fieldKey: string;
+    requiredPermission?: string;
+    beforeValue: unknown;
+    afterValue: unknown;
+    auditEventId: string;
+  }): ActionExecutionLog {
+    const state = getState(input.tenantId);
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `project-custom-field-${input.tenantId}-${input.projectId}-${input.fieldKey}`
+      },
+      commandType: "project.custom_field.set",
+      requiredPermission: input.requiredPermission ?? "custom_field.write",
+      status: "succeeded",
+      source: { entityType: "project", entityId: input.projectId },
+      target: { entityType: "customFieldValue", entityId: `${input.projectId}:${input.fieldKey}` },
+      before: { value: input.beforeValue },
+      after: { value: input.afterValue },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: [`policy:permission ${input.requiredPermission ?? "custom_field.write"} allowed`],
+      preconditionTrace: ["precondition:custom field definition is active", "precondition:value validation passed"],
+      trace: ["project_custom_field:value stored", "control_surface:projection refresh required"]
+    });
+    state.customFieldValueActionExecutions = [...state.customFieldValueActionExecutions, actionExecution];
+
+    return clone(actionExecution);
+  }
+
+  function listCustomFieldValueActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).customFieldValueActionExecutions.map((entry) => clone(entry));
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -239,7 +386,13 @@ export function createPhase10RuntimeState() {
     listLabelActionExecutions,
     previewProcessTemplate,
     publishProcessTemplate,
-    listProcessTemplateActionExecutions
+    listProcessTemplateActionExecutions,
+    getCustomFieldRegistry,
+    previewCustomField,
+    publishCustomField,
+    listCustomFieldActionExecutions,
+    recordProjectCustomFieldValueAction,
+    listCustomFieldValueActionExecutions
   };
 }
 
@@ -291,5 +444,9 @@ export function tenantLabelPublishAuditDto(audit: TenantLabelSetPublishAudit) {
 }
 
 export function processTemplatePublishAuditDto(audit: ProcessTemplatePublishAudit) {
+  return { ...audit };
+}
+
+export function customFieldPublishAuditDto(audit: CustomFieldDefinitionPublishAudit) {
   return { ...audit };
 }

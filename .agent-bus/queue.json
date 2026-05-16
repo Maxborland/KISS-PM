@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T01:16:26.7081566+07:00",
+  "updated_at": "2026-05-17T03:41:31.8468551+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -4358,7 +4358,7 @@
         "P10-004"
       ],
       "title": "Implement custom field builder and control-surface binding",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P10",
       "depends_on": [
@@ -4405,7 +4405,76 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P10 runnable block. Implement tenant-scoped custom field builder with typed validation, publish preview/apply, project value read/write, control-surface projection binding, permission checks, audit/action evidence, and API/UI readback. Keep browser E2E-091 proof for P10-009 unless explicitly in scope."
+      "notes": "Accepted 2026-05-17T03:41:31.8468551+07:00. Implemented tenant-scoped custom field builder domain helpers, typed project custom-field values, control-surface binding, governed P10 custom-field API/readback/audit routes, per-definition write permission enforcement, and CustomFieldBuilderSurface UI. Tests prove non-mutating preview, publish/action/audit evidence, project value write, portfolio control readback, read-only/direct API denial, Tenant B no-leak denial, invalid definition/value rejection, malformed snapshot rejection, UI readback after publish/value write, read-only state, API error, and stale-preview recovery. Matrix P10-004 remains blocked only for later P10-009 E2E-091 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T03:41:31.8468551+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-004-custom-field-builder-control-surface-binding --once exit 0 at startup",
+        "npm test -- apps/api/src/phase10CustomFieldsApi.test.ts exit 0: 1 file, 4 tests passed after review fixes",
+        "npm test -- apps/web/src/CustomFieldBuilderSurface.test.tsx exit 0: 1 file, 4 tests passed after review fixes",
+        "npm test -- packages/tenant-config packages/project-core packages/control-surfaces exit 0: 21 files, 106 tests passed",
+        "npm test -- apps/web/src exit 0: 14 files, 102 tests passed",
+        "npm run test:integration exit 0: 15 files, 83 tests passed",
+        "npm test exit 0: 81 files, 490 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P10-005-kpi-threshold-builder-future-evaluation-impact",
+      "aliases": [
+        "P10-005"
+      ],
+      "title": "Implement KPI threshold builder and future evaluation impact",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-004-custom-field-builder-control-surface-binding"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "packages/kpi-engine/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-005-kpi-threshold-builder-future-evaluation-impact.claim.json",
+        ".agent-bus/sessions/P10-005-kpi-threshold-builder-future-evaluation-impact.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-005-kpi-threshold-builder-future-evaluation-impact --once",
+        "npm test -- packages/tenant-config packages/kpi-engine apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P10 runnable block. Implement KPI threshold builder with preview/publish, future evaluation impact, historical evaluation stability, permission checks, audit/action evidence, API/UI readback. Keep browser E2E-092/E2E-094 proof for P10-009 unless explicitly in scope."
     }
   ]
 }

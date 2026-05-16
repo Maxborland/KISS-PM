@@ -2,7 +2,7 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T02:27:23.0476262+07:00",
+  "updated_at": "2026-05-17T03:41:31.8468551+07:00",
   "rows": [
     {
       "id": "P10-001",
@@ -139,14 +139,34 @@
         "E2E-091"
       ],
       "evidence": [
-        "P10 contract defines custom field builder, validation, runtime value, and control-surface binding before implementation."
+        "P10 contract defines custom field builder, validation, runtime value, and control-surface binding before implementation.",
+        "packages/tenant-config/src/index.ts implements previewCustomFieldDefinitionPublish and publishCustomFieldDefinitionPreview. Preview is non-mutating, supports project custom fields only for this MVP, validates select options, required control-surface bindings, duplicate target/key, stale previews, and emits publish audit data.",
+        "packages/project-core/src/index.ts adds tenant-scoped typed project custom-field values on ManagedProject plus setProjectCustomFieldValue/listProjectCustomFieldValues. Tests prove typed select validation, tenant/target guard, source immutability, deterministic replacement, and audit/correlation metadata.",
+        "packages/control-surfaces/src/index.ts adds bindCustomProjectFieldsToControlSurfaceDefinition so active project custom fields become visible control-surface fields only when binding flags and visibility rules allow the target surface.",
+        "apps/api/src/phase10Runtime.ts, apps/api/src/phase4Runtime.ts, apps/api/src/phase8Runtime.ts, and apps/api/src/app.ts expose GET /api/tenant/custom-fields, POST /api/tenant/custom-fields/preview, POST /api/tenant/custom-fields/publish, PUT /api/projects/:projectId/custom-fields/:fieldKey, portfolio control readback with custom project values, and configuration audit/action evidence.",
+        "apps/api/src/phase10CustomFieldsApi.test.ts proves registry read model, preview without mutation, governed publish, project value write, portfolio control readback, configuration audit/action evidence, read-only direct API denial, Tenant B publish/value no-leak denial, per-definition write permission enforcement, invalid definition rejection, invalid value rejection, and no partial mutation.",
+        "apps/web/src/CustomFieldBuilderSurface.tsx and apps/web/src/customFieldBuilderApiClient.ts implement the Russian custom-field builder control surface with TanStack Query server state, preview-before-publish, publish readback, project value write, portfolio-surface readback, audit/result evidence, read-only state, API error state, and stale-preview recovery."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config packages/project-core packages/control-surfaces apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/tenant-config/src/customFieldBuilder.test.ts exit 1 RED: previewCustomFieldDefinitionPublish and publishCustomFieldDefinitionPreview were missing before implementation",
+        "npm test -- packages/project-core/src/projectCustomFieldValues.test.ts exit 1 RED: setProjectCustomFieldValue and listProjectCustomFieldValues were missing before implementation",
+        "npm test -- packages/control-surfaces/src/customFieldBinding.test.ts exit 1 RED: bindCustomProjectFieldsToControlSurfaceDefinition was missing before implementation",
+        "npm test -- apps/api/src/phase10CustomFieldsApi.test.ts exit 1 RED: /api/tenant/custom-fields and project custom-field value routes were missing before implementation",
+        "npm test -- apps/api/src/phase10CustomFieldsApi.test.ts exit 0: 1 file, 4 tests passed",
+        "npm test -- apps/web/src/CustomFieldBuilderSurface.test.tsx exit 1 RED: CustomFieldBuilderSurface and customFieldBuilderApiClient were missing before implementation",
+        "npm test -- apps/web/src/CustomFieldBuilderSurface.test.tsx exit 0: 1 file, 4 tests passed",
+        "npm test -- packages/tenant-config/src/customFieldBuilder.test.ts packages/project-core/src/projectCustomFieldValues.test.ts packages/control-surfaces/src/customFieldBinding.test.ts exit 0: 3 files, 8 tests passed",
+        "npm test -- apps/web/src exit 0: 14 files, 102 tests passed",
+        "npm test -- packages/tenant-config packages/project-core packages/control-surfaces exit 0: 21 files, 106 tests passed",
+        "npm run test:integration exit 0: 15 files, 83 tests passed",
+        "npm test exit 0: 81 files, 490 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore custom field definitions, values, and control-surface projections before verification.",
-      "blocker": "Blocked until P10-004 implementation adds custom-field domain/API/UI behavior and E2E-091 proves field use in a control surface with readback/reload/cleanup.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime custom-field registry, previews, project values, portfolio readback, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 4, Phase 8, and Phase 10 runtimes, restoring custom-field definitions, values, and control-surface projections. Browser-level reload/reset readback remains to be proven by P10-009 E2E-091.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-004 remains blocked for strict phase verification until P10-009 E2E-091 proves custom field use in a control surface through browser reload, direct backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T03:41:31.8468551+07:00",
       "e2e_evidence": []
     },
     {
