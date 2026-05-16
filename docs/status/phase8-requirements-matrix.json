@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T21:22:28.000+07:00",
+  "updated_at": "2026-05-16T21:31:23.2267101+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -83,14 +83,23 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires ActionDefinition, command binding registry, ActionExecutionLog, permission/precondition traces, input summary, audit ids, and source surface refs."
+        "packages/action-engine/src/index.ts implements ActionDefinition, ActionInputSchema, ActionCommandBinding, ActionAuditPolicy, ActionSourceSurfaceRef, and createActionDefinition/validateActionDefinition.",
+        "packages/action-engine/src/index.ts implements createActionCommandBindingRegistry with resolve-by-handler, resolve-by-command-type, duplicate rejection, and definition-vs-registry validation.",
+        "packages/action-engine/src/index.ts extends ActionExecutionLog with sourceSurface, inputSummary, auditEventIds, permissionTrace, and preconditionTrace while preserving legacy P3/P5/P6/P7 callers.",
+        "P8 source-surface logs require permissionTrace, require preconditionTrace for succeeded/failed logs, and require auditEventIds for state-changing succeeded logs even when before is null and after is material.",
+        "executeCreateProjectDraftFromOpportunity now emits deterministic auditEventIds plus permission/precondition traces for its in-package governed command compatibility path.",
+        "packages/action-engine/src/actionDefinition.test.ts verifies definition creation, duplicate input-field rejection, dry-run policy for risk.accept, verifier-style diagnostics, registry resolution/validation, source-surface log evidence, and strict denial/state-change guards."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- packages/action-engine/src/actionDefinition.test.ts exit 1 RED: missing createActionDefinition/validateActionDefinition and P8 log evidence guards",
+        "npm test -- packages/action-engine/src/actionDefinition.test.ts packages/action-engine/src/projectDraftCommand.test.ts exit 0: 2 files, 8 tests passed",
+        "npm test -- packages/action-engine apps/api/src/phase5ScheduleApi.test.ts apps/api/src/phase6ResourcePlanningApi.test.ts apps/api/src/phase7KpiApi.test.ts exit 0: 5 files, 25 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until action execution fixtures and cleanup/readback exist.",
-      "blocker": "P8-003 implementation has not started. Need action-engine foundation, unit/API tests, E2E-071..075 evidence, audit/action log proof, and no-mutation denial tests.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-003 adds pure action-engine definitions/log validation and no runtime/external state. Action execution fixture cleanup/readback remains pending for P8-009 E2E.",
+      "blocker": "P8-003 action-engine foundation is implemented and package/regression tested, but row remains blocked for phase-exit verification until API execution bindings and E2E-071..075 prove audit/action logs, direct denial, reload, and cleanup/readback.",
+      "last_checked_at": "2026-05-16T21:31:23.2267101+07:00",
       "e2e_evidence": []
     },
     {
