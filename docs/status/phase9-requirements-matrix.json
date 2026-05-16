@@ -167,11 +167,25 @@
         "E2E-082",
         "E2E-083"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Insight handled-state and audit/reset cleanup must be proven before verification.",
-      "blocker": "P9 lessons/insight model is not implemented yet; no governed retrospective action can be linked to insights.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "packages/retrospectives/src/index.ts implements RetrospectiveInsight, RetrospectiveInsightSourceLesson, readRetrospectiveInsight, createRetrospectiveInsights, and markRetrospectiveInsightHandled.",
+        "Insights derive from tenant-scoped RetrospectiveTrend plus ClosedProjectSnapshot lessons, preserve sourceTrendId/sourceSnapshotIds/sourceMetricIds/sourceLessonIds/sourceLessons, and return cloned stable readback.",
+        "Handled state requires governed template_improvement.apply action evidence with actionExecutionId, auditEventId, actor, timestamp, and matching tenant; already-handled insights cannot be handled again.",
+        "Review fixes prevent weak insights without actionable severity and reject trends without source snapshot/metric trace before returning insight data."
+      ],
+      "tests": [
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 1 RED: RetrospectiveInsight functions were missing before implementation",
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 1 RED during review: weak insights without actionable severity/source trace were accepted",
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/retrospectives packages/action-engine exit 0: 5 files, 21 tests passed",
+        "npm run test:integration exit 0: 12 files, 68 tests passed",
+        "npm test exit 0: 66 files, 423 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "P9-005 is pure deterministic domain logic with no runtime persistence. Tests prove insight readback is cloned/stable after source snapshots/trends are mutated; full API/browser reset cleanup remains blocked until P9-009 E2E-082/E2E-083.",
+      "blocker": "P9 insight domain foundation is implemented, but P9-005 cannot be verified until closed portfolio/trends API/UI and executable E2E-082/E2E-083 prove insight readback, handled-state audit/action evidence, reload persistence, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T00:52:54.1130250+07:00",
       "e2e_evidence": []
     },
     {

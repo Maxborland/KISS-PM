@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T00:43:38.8195149+07:00",
+  "updated_at": "2026-05-17T00:52:54.1130250+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3673,7 +3673,7 @@
         "P9-005"
       ],
       "title": "Implement lessons learned and retrospective insight model",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3717,7 +3717,74 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Implement RetrospectiveInsight source snapshot/trend trace and governed handled-state domain model. Do not implement API/UI/E2E or full template-improvement apply flow in this block unless required by a domain blocker."
+      "notes": "Accepted 2026-05-17T00:52:54.1130250+07:00. Implemented RetrospectiveInsight source snapshot/trend/lesson trace and governed handled-state domain model. Insights derive from tenant-scoped trends and snapshots, return cloned stable readback, reject cross-tenant and weak/no-source inputs, and require template_improvement.apply actionExecutionId/auditEventId evidence to mark handled. Matrix row remains blocked only for later API/UI/E2E-082/E2E-083 reload/readback/cleanup evidence.",
+      "completed_at": "2026-05-17T00:52:54.1130250+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-005-retrospective-insight-model --once exit 0 at startup",
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 1 RED: RetrospectiveInsight functions were missing before implementation",
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 1 RED during review: weak insights without actionable severity/source trace were accepted",
+        "npm test -- packages/retrospectives/src/retrospectiveInsight.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/retrospectives packages/action-engine exit 0: 5 files, 21 tests passed",
+        "npm run test:integration exit 0: 12 files, 68 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 66 files, 423 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P9-006-closed-portfolio-trends-api-read-models",
+      "aliases": [
+        "P9-006"
+      ],
+      "title": "Implement closed portfolio and trends API read models",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-005-retrospective-insight-model"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "packages/control-surfaces/**",
+        "packages/retrospectives/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-006-closed-portfolio-trends-api-read-models.claim.json",
+        ".agent-bus/sessions/P9-006-closed-portfolio-trends-api-read-models.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-006-closed-portfolio-trends-api-read-models --once",
+        "npm test -- apps/api/src/*phase9*.test.ts packages/retrospectives packages/control-surfaces",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Expose closed portfolio/trends read models through API with permission states, tenant isolation, trend/insight readback, pagination/filter basics, and no mutation URLs for read-only users. Do not implement web UI/E2E in this block."
     }
   ]
 }

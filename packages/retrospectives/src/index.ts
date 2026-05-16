@@ -127,6 +127,41 @@ export type RetrospectiveTrend = {
   readonly sourceMetricIds: readonly string[];
 };
 
+export type RetrospectiveInsightStatus = "open" | "handled";
+
+export type RetrospectiveInsightSourceLesson = {
+  readonly id: string;
+  readonly snapshotId: string;
+  readonly categoryKey: string;
+  readonly summary: string;
+  readonly recommendation?: string;
+  readonly severity: ProjectClosureDecision["closureData"]["lessonsLearned"][number]["severity"];
+};
+
+export type RetrospectiveInsightHandledByAction = {
+  readonly commandType: "template_improvement.apply";
+  readonly actionExecutionId: string;
+  readonly auditEventId: string;
+};
+
+export type RetrospectiveInsight = {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly status: RetrospectiveInsightStatus;
+  readonly title: string;
+  readonly recommendation: string;
+  readonly severity: RetrospectiveSeverity;
+  readonly sourceTrendId: string;
+  readonly sourceSnapshotIds: readonly string[];
+  readonly sourceMetricIds: readonly string[];
+  readonly sourceLessonIds: readonly string[];
+  readonly sourceLessons: readonly RetrospectiveInsightSourceLesson[];
+  readonly generatedAt: string;
+  readonly handledBy?: string;
+  readonly handledAt?: string;
+  readonly handledByAction?: RetrospectiveInsightHandledByAction;
+};
+
 export class RetrospectiveModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
@@ -256,6 +291,19 @@ function maxSeverity(severities: readonly RetrospectiveSeverity[]): Retrospectiv
   );
 }
 
+function lessonSeverityToRetrospectiveSeverity(
+  severity: ProjectClosureDecision["closureData"]["lessonsLearned"][number]["severity"]
+): RetrospectiveSeverity {
+  switch (severity) {
+    case "critical":
+      return "critical";
+    case "attention":
+      return "attention";
+    case "positive":
+      return "none";
+  }
+}
+
 function metricToTrendKey(metricKey: PlanFactMetricKey): RetrospectiveTrendKey {
   switch (metricKey) {
     case "work_hours":
@@ -303,6 +351,40 @@ function requireTrendGroupBy(value: RetrospectiveTrendGroupBy): RetrospectiveTre
   }
 
   throw new RetrospectiveModelError("validation_error", "retrospectiveTrend.groupBy is invalid");
+}
+
+function insightTitleForTrend(trend: RetrospectiveTrend): string {
+  switch (trend.trendKey) {
+    case "work_variance":
+      return `Recurring work variance for ${trend.groupBy.replace("_", " ")} ${trend.groupKey}`;
+    case "schedule_delay":
+      return `Recurring schedule delay for ${trend.groupBy.replace("_", " ")} ${trend.groupKey}`;
+    case "overload":
+      return `Recurring resource overload for ${trend.groupBy.replace("_", " ")} ${trend.groupKey}`;
+    case "kpi_drift":
+      return `Recurring KPI drift for ${trend.groupBy.replace("_", " ")} ${trend.groupKey}`;
+  }
+}
+
+function defaultRecommendationForTrend(trend: RetrospectiveTrend): string {
+  switch (trend.trendKey) {
+    case "work_variance":
+      return "Проверить шаблон трудозатрат и обновить будущие плановые оценки.";
+    case "schedule_delay":
+      return "Проверить календарь и зависимости шаблона для будущих проектов.";
+    case "overload":
+      return "Проверить ресурсные роли и резерв мощности в шаблоне.";
+    case "kpi_drift":
+      return "Проверить KPI-пороги и управляющие действия для будущих проектов.";
+  }
+}
+
+function requireInsightActionCommand(commandType: string): "template_improvement.apply" {
+  if (commandType !== "template_improvement.apply") {
+    throw new RetrospectiveModelError("validation_error", "retrospectiveInsight.commandType is invalid");
+  }
+
+  return commandType;
 }
 
 function countOpenTasks(tasks: readonly Task[]): number {
@@ -597,4 +679,128 @@ export function buildRetrospectiveTrends(input: {
         sourceMetricIds: group.metrics.map((metric) => metric.id).sort()
       });
     });
+}
+
+export function createRetrospectiveInsights(input: {
+  tenantId: string;
+  generatedAt: string;
+  trends: readonly RetrospectiveTrend[];
+  snapshots: readonly ClosedProjectSnapshot[];
+}): RetrospectiveInsight[] {
+  const tenantId = requireNonEmptyString(input.tenantId, "retrospectiveInsight.tenantId");
+  const generatedAt = requireValidTimestamp(input.generatedAt, "retrospectiveInsight.generatedAt");
+  const trends = cloneJson(input.trends);
+  const snapshots = cloneJson(input.snapshots);
+  const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
+
+  for (const snapshot of snapshots) {
+    if (snapshot.tenantId !== tenantId) {
+      throw new RetrospectiveModelError("validation_error", "retrospective insight snapshot tenant mismatch");
+    }
+  }
+
+  return trends
+    .flatMap((trend) => {
+      if (trend.tenantId !== tenantId) {
+        throw new RetrospectiveModelError("validation_error", "retrospective insight trend tenant mismatch");
+      }
+      if (trend.sourceSnapshotIds.length === 0) {
+        throw new RetrospectiveModelError("validation_error", "retrospectiveInsight.sourceSnapshotIds must not be empty");
+      }
+      if (trend.sourceMetricIds.length === 0) {
+        throw new RetrospectiveModelError("validation_error", "retrospectiveInsight.sourceMetricIds must not be empty");
+      }
+      const sourceSnapshots = trend.sourceSnapshotIds.map((snapshotId) => {
+        const snapshot = snapshotsById.get(snapshotId);
+        if (snapshot === undefined) {
+          throw new RetrospectiveModelError("validation_error", `retrospective insight source snapshot missing: ${snapshotId}`);
+        }
+        if (snapshot.tenantId !== tenantId) {
+          throw new RetrospectiveModelError("validation_error", "retrospective insight source snapshot tenant mismatch");
+        }
+
+        return snapshot;
+      });
+      const sourceLessons = sourceSnapshots.flatMap((snapshot) =>
+        snapshot.closure.lessonsLearned.map((lesson) => ({
+          id: `${snapshot.id}:${lesson.id}`,
+          snapshotId: snapshot.id,
+          categoryKey: lesson.categoryKey,
+          summary: lesson.summary,
+          ...(lesson.recommendation !== undefined ? { recommendation: lesson.recommendation } : {}),
+          severity: lesson.severity
+        }))
+      );
+      const recommendation =
+        sourceLessons.find((lesson) => lesson.recommendation !== undefined)?.recommendation ??
+        defaultRecommendationForTrend(trend);
+      const severity = maxSeverity([
+        trend.severity,
+        ...sourceLessons.map((lesson) => lessonSeverityToRetrospectiveSeverity(lesson.severity))
+      ]);
+      if (severity === "none") {
+        return [];
+      }
+
+      return [cloneJson({
+        id: `insight-${trend.id}`,
+        tenantId,
+        status: "open" as const,
+        title: insightTitleForTrend(trend),
+        recommendation,
+        severity,
+        sourceTrendId: trend.id,
+        sourceSnapshotIds: Array.from(new Set(trend.sourceSnapshotIds)).sort(),
+        sourceMetricIds: Array.from(new Set(trend.sourceMetricIds)).sort(),
+        sourceLessonIds: sourceLessons.map((lesson) => lesson.id).sort(),
+        sourceLessons: sourceLessons.sort((a, b) => a.id.localeCompare(b.id)),
+        generatedAt
+      })];
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+export function readRetrospectiveInsight(insight: RetrospectiveInsight): RetrospectiveInsight {
+  return cloneJson(insight);
+}
+
+export function markRetrospectiveInsightHandled(
+  insightInput: RetrospectiveInsight,
+  action: {
+    tenantId: string;
+    actorId: string;
+    handledAt: string;
+    commandType: string;
+    actionExecutionId: string;
+    auditEventId: string;
+  }
+): RetrospectiveInsight {
+  const insight = cloneJson(insightInput);
+  const tenantId = requireNonEmptyString(action.tenantId, "retrospectiveInsight.action.tenantId");
+  if (insight.tenantId !== tenantId) {
+    throw new RetrospectiveModelError("validation_error", "retrospective insight action tenant mismatch");
+  }
+  if (insight.status !== "open") {
+    throw new RetrospectiveModelError("conflict", "retrospective insight already handled");
+  }
+  const actorId = requireNonEmptyString(action.actorId, "retrospectiveInsight.action.actorId");
+  const handledAt = requireValidTimestamp(action.handledAt, "retrospectiveInsight.action.handledAt");
+  const commandType = requireInsightActionCommand(action.commandType);
+  const actionExecutionId = requireNonEmptyString(
+    action.actionExecutionId,
+    "retrospectiveInsight.action.actionExecutionId"
+  );
+  const auditEventId = requireNonEmptyString(action.auditEventId, "retrospectiveInsight.action.auditEventId");
+
+  return cloneJson({
+    ...insight,
+    status: "handled" as const,
+    handledBy: actorId,
+    handledAt,
+    handledByAction: {
+      commandType,
+      actionExecutionId,
+      auditEventId
+    }
+  });
 }
