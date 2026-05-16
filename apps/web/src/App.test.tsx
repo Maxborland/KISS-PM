@@ -272,7 +272,7 @@ describe("KISS PM web shell", () => {
     expect(within(navigation).getByText("Настройки")).toBeInTheDocument();
 
     expect(screen.getByTestId("phase-scope-notice")).toHaveTextContent(
-      "Фаза 4: проектный жизненный цикл, задачи, мои очереди и Kanban"
+      "Фаза 6: ресурсная нагрузка, перегрузки и управляемые команды"
     );
   });
 

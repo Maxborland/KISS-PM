@@ -2,7 +2,7 @@
   "phase": "P6",
   "name": "Phase 6 resource planning and conflict resolution requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T15:23:15+07:00",
+  "updated_at": "2026-05-16T15:56:00+07:00",
   "rows": [
     {
       "id": "P6-001",
@@ -132,11 +132,25 @@
       "owner": "codex",
       "owned_scope": ["apps/web"],
       "required_e2e": ["E2E-050", "E2E-051", "E2E-052"],
-      "evidence": [],
-      "tests": ["planned: npm test -- apps/web/src"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; Russian Resource Load Control UI is missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "apps/web/src/resourcePlanningApiClient.ts implements the Phase 6 web API client for resource load, overload detail, reservation, preview, apply, and audit routes",
+        "apps/web/src/ResourceLoadControlSurface.tsx implements a Russian Resource Load Control management surface with load buckets, overload signal, affected assignments/reservations, primary preview action, reservation action, audit panel, loading/empty/error/permission states, and API readback refresh",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx covers load rendering, loading/empty/error/denied states, preview without mutation, apply readback/audit evidence, read-only command denial, stale preview recovery, and reload/refetch clearing local preview state"
+      ],
+      "tests": [
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 12 tests passed",
+        "npm test -- apps/web/src exit 0: 5 files, 38 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 47 files, 284 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "UI component tests use isolated mock API clients and no persisted browser/server state; preview test proves no apply call before confirmation and reload/refetch test proves local preview state is cleared from API readback.",
+      "blocker": "Resource Load Control UI implementation is present and component-tested, but P6-007 remains blocked until executable E2E-050..052 prove the UI flow through the app/browser/API/audit/reload contract.",
+      "last_checked_at": "2026-05-16T15:56:00+07:00"
     },
     {
       "id": "P6-008",
@@ -146,15 +160,20 @@
       "owned_scope": ["apps/web", "apps/api", "packages/resource-planning", "packages/action-engine"],
       "required_e2e": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
       "evidence": [
-        "apps/api/src/phase6Runtime.ts and apps/api/src/phase6ResourcePlanningApi.test.ts provide API-level dry-run/apply support for shift_work, reserve_capacity preview, permission checks, stale preview rejection, and action/audit readback"
+        "apps/api/src/phase6Runtime.ts and apps/api/src/phase6ResourcePlanningApi.test.ts provide API-level dry-run/apply support for shift_work, reserve_capacity preview, permission checks, stale preview rejection, and action/audit readback",
+        "apps/web/src/ResourceLoadControlSurface.tsx exposes the recommended overload resolution flow with dry-run preview, confirmation, stale-preview recovery, refreshed resource load readback, and visible action/audit evidence",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx proves preview does not mutate, apply uses previewId, apply refreshes getResourceLoad/getResourceAudit readback, read-only users have no preview/apply controls, stale preview can be recovered by refetching, and reload clears local preview state"
       ],
       "tests": [
         "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
-        "npm run test:integration exit 0: 8 files, 38 tests passed"
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/web/src exit 0: 5 files, 38 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 47 files, 284 tests passed"
       ],
-      "cleanup": "API-level preview/apply state is in-memory and reset with createApiApp/test fixture reset; UI and E2E cleanup proof remains pending.",
-      "blocker": "API dry-run/apply command path exists, but P6-008 remains blocked until Resource Load Control UI and E2E-052..055 prove full user write-flow evidence.",
-      "last_checked_at": "2026-05-16T15:42:48+07:00"
+      "cleanup": "API-level preview/apply state is in-memory and reset with createApiApp/test fixture reset; UI tests use isolated mock clients and prove local preview state is discarded on refetch. E2E cleanup proof remains pending.",
+      "blocker": "API and UI dry-run/apply command paths exist, but P6-008 remains blocked until E2E-052..055 prove full browser write-flow evidence with backend denial, audit, reload, and cleanup.",
+      "last_checked_at": "2026-05-16T15:56:00+07:00"
     },
     {
       "id": "P6-009",

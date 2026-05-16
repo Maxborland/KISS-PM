@@ -174,7 +174,8 @@ nav a:focus-visible {
 .phase2-surface,
 .crm-intake-surface,
 .project-work-surface,
-.gantt-surface {
+.gantt-surface,
+.resource-load-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -376,6 +377,113 @@ button:focus-visible {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(560px, 1.1fr) minmax(360px, 0.9fr);
+}
+
+.resource-load-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(560px, 1.1fr) minmax(340px, 0.9fr);
+}
+
+.resource-overview-panel {
+  min-width: 0;
+}
+
+.resource-heatmap {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.resource-bucket-card {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.resource-bucket-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.resource-bucket-card span,
+.resource-bucket-card dd {
+  overflow-wrap: anywhere;
+}
+
+.resource-bucket-card > div:first-child span {
+  color: #59675a;
+  font-size: 12px;
+}
+
+.resource-severity-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.signal-severity-badge {
+  border: 1px solid #b8c8bb;
+  border-radius: 999px;
+  background: #f2f5ef;
+  color: #29362d;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.severity-critical {
+  border-color: #c85d5d;
+  background: #fff1f1;
+  color: #7a1e1e;
+}
+
+.severity-warning {
+  border-color: #d39148;
+  background: #fff6e7;
+  color: #6a430c;
+}
+
+.severity-watch {
+  border-color: #7aa4aa;
+  background: #edf6f7;
+  color: #27535a;
+}
+
+.severity-none {
+  border-color: #7ca982;
+  background: #edf7ef;
+  color: #24542d;
+}
+
+.resource-command-panel {
+  align-items: start;
+}
+
+.preview-panel {
+  border-color: #7aa4aa;
+  background: #f7fbfb;
+}
+
+.preview-facts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.preview-facts span {
+  border: 1px solid #d7dfd1;
+  border-radius: 6px;
+  background: #ffffff;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
 }
 
 .gantt-table-panel,
@@ -627,7 +735,8 @@ button:focus-visible {
 @media (max-width: 1040px) {
   .crm-intake-layout,
   .project-work-layout,
-  .gantt-layout {
+  .gantt-layout,
+  .resource-load-layout {
     grid-template-columns: 1fr;
   }
 
@@ -643,7 +752,8 @@ button:focus-visible {
 @media (max-width: 560px) {
   .split-fields,
   .compact-facts,
-  .gantt-entry-panel {
+  .gantt-entry-panel,
+  .preview-facts {
     grid-template-columns: 1fr;
   }
 }

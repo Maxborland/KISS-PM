@@ -1742,7 +1742,7 @@
         "P6-007"
       ],
       "title": "Implement Phase 6 Resource Load Control surface",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P6",
       "depends_on": [
@@ -1778,7 +1778,71 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json",
         "git diff --check -- apps/web docs/status/phase6-requirements-matrix.json .agent-bus"
       ],
-      "notes": "Next P6 implementation block after API. Build Russian Resource Load Control UI against the P6 API read model with permission/denied states and resolution entry, but keep E2E rows blocked until P6-009."
+      "notes": "Completed on 2026-05-16. Implemented Russian Resource Load Control UI, P6 web API client, preview/apply/audit/readback flow, permission/error states, and component tests. Matrix rows remain blocked until E2E-050..055.",
+      "completed_at": "2026-05-16T15:58:00+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 12 tests passed",
+        "npm test -- apps/web/src exit 0: 5 files, 38 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 47 files, 284 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 1: expected blocked P6 rows until E2E",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P6-009-deterministic-phase6-fixtures-e2e",
+      "aliases": [
+        "P6-009"
+      ],
+      "title": "Implement deterministic Phase 6 fixtures and E2E-050..055",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "P6-007-resource-load-control-surface"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase6/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/status/phase6-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/P6-009-deterministic-phase6-fixtures-e2e.claim.json",
+        ".agent-bus/sessions/P6-009-deterministic-phase6-fixtures-e2e.md",
+        ".agent-bus/handoff/2026-05-16-p6-009-deterministic-phase6-fixtures-e2e.md",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts",
+        "packages/resource-planning/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-009-deterministic-phase6-fixtures-e2e --once",
+        "npm test -- packages/shared-test-fixtures",
+        "npm run test:e2e:phase -- --phase 6",
+        "npm run verify:matrix -- docs/status/phase6-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check -- packages/shared-test-fixtures e2e/tests/phase6 docs/e2e/E2E_SCENARIOS.md docs/status/phase6-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Next P6 block. Wire executable E2E-050..055 over the accepted P6 API and Resource Load Control UI, including UI+API readback, backend denial, audit, reload persistence, and cleanup/reset evidence."
     }
   ]
 }

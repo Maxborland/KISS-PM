@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T15:42:48+07:00
+Updated: 2026-05-16T15:58:00+07:00
+
+- P6-007 Resource Load Control surface completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p6-007-resource-load-control-surface.md`.
+- `apps/web/src/resourcePlanningApiClient.ts` now exposes the Phase 6 web API client for resource load, load bucket, overload detail, reservation, preview, apply, and audit routes.
+- `apps/web/src/ResourceLoadControlSurface.tsx` renders the Russian Resource Load Control management surface with load buckets, overload/control signal details, affected assignments/reservations, primary dry-run preview action, apply command, reservation action, permission/error states, audit/action evidence, and API readback refresh.
+- Fresh P6-007 evidence: `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx` passes with 7 tests; `npm test -- apps/web/src/App.test.tsx` passes with 12 tests; `npm test -- apps/web/src` passes with 5 files / 38 tests; `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts` passes with 5 tests; `npm test -- packages/resource-planning` passes with 4 files / 20 tests; `npm run test:integration` passes with 8 files / 38 tests; `npm test` passes with 47 files / 284 tests; `npm run typecheck` and `npm run lint` pass; `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json` and `git diff --check` pass. Strict matrix without `--allow-blocked` still fails as expected because P6 E2E/phase-exit rows remain blocked.
+- `docs/status/phase6-requirements-matrix.json` records UI evidence for P6-007/P6-008 but keeps rows blocked until E2E-050..055 prove browser/API/audit/reload/cleanup evidence.
+- Next recommended step: claim `P6-009-deterministic-phase6-fixtures-e2e` and implement deterministic Phase 6 fixtures plus executable E2E-050..055.
 
 - P6-006 resource planning API governed commands completed with verdict `accepted` for the API block; handoff: `.agent-bus/handoff/2026-05-16-p6-006-resource-planning-api-governed-commands.md`.
 - `apps/api/src/phase6Runtime.ts` now provides deterministic in-memory resource profiles, capacity calendars, availability exceptions, assignments, reservations, load buckets, overloads, non-mutating resolution previews, governed apply commands, stale preview rejection, and action execution readback.
