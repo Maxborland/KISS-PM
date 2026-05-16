@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:09:12.233Z",
+  "updated_at": "2026-05-16T13:20:53.029Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2502,7 +2502,7 @@
         "P7-010"
       ],
       "title": "Phase 7 verification matrix and exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P7",
       "depends_on": [
@@ -2547,7 +2547,72 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable P7 block. Convert P7-010 from blocked to verified only after fresh strict phase gate, full verification, review loop, state/handoff, and no unresolved Critical/Important findings."
+      "notes": "Completed strict Phase 7 verification matrix and exit gate. docs/status/phase7-requirements-matrix.json now has P7-001..P7-010 verified with fresh E2E-060..064 evidence and passes strict verifier without --allow-blocked. Review loop closed in-scope findings. Phase 7 is accepted, but Release 2 is not ready until P12.",
+      "completed_at": "2026-05-16T13:20:53.029Z",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-010-phase7-verification-matrix-exit-gate --once exit 0 at startup",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0 before final gate update",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json exit 1 before final gate update: expected P7-010 blocked",
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 5 files, 10 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 2 files, 18 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 54 files, 337 tests passed",
+        "cmd /c \"set PW_API_PORT=5197&& set PW_WEB_PORT=6197&& npm run test:e2e:phase -- --phase 7\" exit 0: 5 tests passed, E2E-060..064",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json exit 0 after matrix update",
+        "Bug Hunt self-review exit 0 equivalent: no Critical/Important/Medium in-scope P7 matrix/verifier defects found",
+        "Requested code review: one Important coordination finding fixed; one Medium docs/e2e ledger status sync recorded as out-of-scope follow-up task",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P7-010-phase7-verification-matrix-exit-gate --once exit 0 before handoff"
+      ]
+    },
+    {
+      "id": "P7-DOC-011-e2e-ledger-status-sync",
+      "aliases": [
+        "P7-DOC-011"
+      ],
+      "title": "Sync Phase 7 E2E scenario ledger statuses after accepted gate",
+      "status": "runnable",
+      "priority": "medium",
+      "phase": "P7",
+      "depends_on": [
+        "P7-010-phase7-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/e2e/E2E_SCENARIOS.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-DOC-011-e2e-ledger-status-sync.claim.json",
+        ".agent-bus/sessions/P7-DOC-011-e2e-ledger-status-sync.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-DOC-011-e2e-ledger-status-sync --once",
+        "rg -n \"E2E-060|E2E-061|E2E-062|E2E-063|E2E-064\" docs/e2e/E2E_SCENARIOS.md",
+        "git diff --check"
+      ],
+      "notes": "Follow-up from P7-010 review: docs/e2e/E2E_SCENARIOS.md still labels E2E-060..064 as planned while matrix/E2E evidence proves they pass. Kept out of P7-010 because docs/e2e was not in that task write_scope."
     }
   ]
 }
