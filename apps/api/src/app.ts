@@ -1820,6 +1820,14 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
               tenantId: targetPolicyContext.tenantId,
               ...(targetPolicyContext.projectId !== undefined ? { projectId: targetPolicyContext.projectId } : {})
             }, undefined, targetPolicyContext.contextRefs)
+          : actionDefinition.key === "accept_risk" && targetPolicyContext !== undefined
+            ? assertAllowed(runtime, session, "control.action:write", {
+                entityType: targetPolicyContext.entityType,
+                tenantId: targetPolicyContext.tenantId,
+                entityId: targetPolicyContext.entityId,
+                ...(targetPolicyContext.ownerId !== undefined ? { ownerId: targetPolicyContext.ownerId } : {}),
+                ...(targetPolicyContext.projectId !== undefined ? { projectId: targetPolicyContext.projectId } : {})
+              }, undefined, targetPolicyContext.contextRefs)
           : undefined;
       const result = phase8Runtime.executeAction({
         tenantId: session.user.tenantId,

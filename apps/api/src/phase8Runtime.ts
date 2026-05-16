@@ -61,6 +61,17 @@ type Phase8TenantActionState = {
   previews: Map<string, Phase8ActionPreview>;
   actionExecutions: ActionExecutionLog[];
   correctiveLinks: Map<string, { taskId: string; actionExecutionId: string }>;
+  signalActionLinks: Map<
+    string,
+    {
+      status: "risk_accepted" | "escalated" | "explanation_requested";
+      actionExecutionId: string;
+      reason: string;
+      expiresAt?: string;
+      escalationLevel?: string;
+      requestedFrom?: string;
+    }
+  >;
   version: number;
 };
 
@@ -102,6 +113,9 @@ function requireActionInput(definition: ActionDefinition, input: Record<string, 
     if (field.valueType === "text" || field.valueType === "date" || field.valueType === "severity" || field.valueType === "entity_ref") {
       if (typeof value !== "string" || value.trim().length === 0) {
         throw preconditionFailed(`action input field must be a string: ${field.key}`, "validation_error");
+      }
+      if (field.valueType === "date" && Number.isNaN(Date.parse(value))) {
+        throw preconditionFailed(`action input field must be a valid date: ${field.key}`, "validation_error");
       }
     } else if (field.valueType === "number") {
       if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -153,6 +167,10 @@ function resourceCommandFromInput(definition: ActionDefinition, input: Record<st
 
 function isResourceResolutionAction(key: string): boolean {
   return key === "shift_work" || key === "split_work" || key === "reassign_resource" || key === "accept_resource_overload";
+}
+
+function isSignalAction(key: string): boolean {
+  return key === "accept_risk" || key === "escalate" || key === "request_explanation";
 }
 
 function requirePreviewAfterString(preview: Phase8ActionPreview, key: string): string {
@@ -216,6 +234,62 @@ function actionDefinitions(tenantId: TenantId): ActionDefinition[] {
         fields: [
           { key: "reason", label: "Причина", valueType: "text", required: true, summary: true },
           { key: "expiresAt", label: "Действует до", valueType: "date", required: false, summary: true }
+        ]
+      },
+      auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
+      createdAt: "2026-05-16T14:20:00.000Z",
+      updatedAt: "2026-05-16T14:20:00.000Z"
+    }),
+    createActionDefinition({
+      id: "action-escalate-signal",
+      tenantId,
+      key: "escalate",
+      label: "Эскалировать",
+      description: "Фиксирует эскалацию контрольного сигнала с причиной",
+      version: 1,
+      status: "active",
+      targetEntityType: "kpi_signal",
+      sourceSurfaceKey: "portfolio.control",
+      commandBinding: {
+        commandType: "signal.escalate",
+        handlerKey: "control_signal.escalate",
+        targetEntityType: "kpi_signal",
+        resultEntityType: "action_execution"
+      },
+      requiredPermission: "control.action:write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true },
+          { key: "escalationLevel", label: "Уровень", valueType: "text", required: true, summary: true }
+        ]
+      },
+      auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
+      createdAt: "2026-05-16T14:20:00.000Z",
+      updatedAt: "2026-05-16T14:20:00.000Z"
+    }),
+    createActionDefinition({
+      id: "action-request-explanation",
+      tenantId,
+      key: "request_explanation",
+      label: "Запросить объяснение",
+      description: "Фиксирует запрос объяснения по контрольному сигналу",
+      version: 1,
+      status: "active",
+      targetEntityType: "kpi_signal",
+      sourceSurfaceKey: "portfolio.control",
+      commandBinding: {
+        commandType: "signal.request_explanation",
+        handlerKey: "control_signal.request_explanation",
+        targetEntityType: "kpi_signal",
+        resultEntityType: "action_execution"
+      },
+      requiredPermission: "control.action:write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true },
+          { key: "requestedFrom", label: "Ответственный", valueType: "text", required: true, summary: true }
         ]
       },
       auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
@@ -446,6 +520,26 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
           dryRunRequired: true
         },
         {
+          id: "portfolio-action-escalate",
+          key: "escalate",
+          label: "Эскалировать",
+          actionDefinitionKey: "escalate",
+          slotType: "row",
+          targetEntityType: "control_signal",
+          requiredPermission: "control.action:write",
+          dryRunRequired: true
+        },
+        {
+          id: "portfolio-action-request-explanation",
+          key: "request_explanation",
+          label: "Запросить объяснение",
+          actionDefinitionKey: "request_explanation",
+          slotType: "row",
+          targetEntityType: "control_signal",
+          requiredPermission: "control.action:write",
+          dryRunRequired: true
+        },
+        {
           id: "portfolio-action-resource-shift",
           key: "shift_work",
           label: "Сдвинуть работу",
@@ -511,19 +605,34 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
 function kpiRows(
   tenantId: TenantId,
   phase7Runtime: Phase7RuntimeState,
-  correctiveLinks: Map<string, { taskId: string; actionExecutionId: string }>
+  correctiveLinks: Map<string, { taskId: string; actionExecutionId: string }>,
+  signalActionLinks: Phase8TenantActionState["signalActionLinks"]
 ): ControlSurfaceSourceRecord[] {
   return phase7Runtime.listSignals(tenantId).map((signal) => {
     const correctiveLink = correctiveLinks.get(signal.id);
+    const signalActionLink = signalActionLinks.get(signal.id);
     const recommendedActionKeys =
-      correctiveLink === undefined
+      signalActionLink !== undefined
+        ? []
+        : correctiveLink === undefined
         ? [...new Set([...signal.recommendedActionKeys, "accept_risk"])]
         : [...new Set(signal.recommendedActionKeys.filter((key) => key !== "create_corrective_action").concat("accept_risk"))];
     const sourceRefs: ControlSurfaceSourceRecord["sourceRefs"] = [
       { entityType: "project", entityId: signal.entityId },
       { entityType: "kpi_signal", entityId: signal.id },
-      ...(correctiveLink !== undefined ? [{ entityType: "task" as const, entityId: correctiveLink.taskId }] : [])
+      ...(correctiveLink !== undefined ? [{ entityType: "task" as const, entityId: correctiveLink.taskId }] : []),
+      ...(signalActionLink !== undefined
+        ? [{ entityType: "action_execution" as const, entityId: signalActionLink.actionExecutionId }]
+        : [])
     ];
+    const handledLabel =
+      signalActionLink?.status === "risk_accepted"
+        ? `Риск принят: ${signalActionLink.reason}`
+        : signalActionLink?.status === "escalated"
+          ? `Эскалация создана: ${signalActionLink.reason}`
+          : signalActionLink?.status === "explanation_requested"
+            ? `Запрошено объяснение: ${signalActionLink.reason}`
+            : undefined;
 
     return {
       id: `row-kpi-${signal.id}`,
@@ -531,17 +640,21 @@ function kpiRows(
       entityType: "kpi_signal",
       entityId: signal.id,
       label: signal.explanation,
-      severity: correctiveLink === undefined ? signal.severity : "attention",
+      severity: correctiveLink === undefined && signalActionLink === undefined ? signal.severity : "attention",
       explanation:
-        correctiveLink === undefined
+        signalActionLink !== undefined
+          ? `${signal.explanation}. ${handledLabel}`
+          : correctiveLink === undefined
           ? signal.explanation
           : `${signal.explanation}. Корректирующая задача создана: ${correctiveLink.taskId}`,
       sourceRefs,
       fieldValues: {
         project_label: signal.entityId,
-        signal_label: correctiveLink === undefined ? signal.explanation : `Корректирующая задача: ${correctiveLink.taskId}`,
-        severity: correctiveLink === undefined ? signal.severity : "attention",
-        ...(correctiveLink !== undefined ? { corrective_task_id: correctiveLink.taskId } : {})
+        signal_label:
+          handledLabel ?? (correctiveLink === undefined ? signal.explanation : `Корректирующая задача: ${correctiveLink.taskId}`),
+        severity: correctiveLink === undefined && signalActionLink === undefined ? signal.severity : "attention",
+        ...(correctiveLink !== undefined ? { corrective_task_id: correctiveLink.taskId } : {}),
+        ...(signalActionLink !== undefined ? { signal_action_status: signalActionLink.status } : {})
       },
       recommendedActionKeys,
       drilldownParams: { projectId: signal.entityId },
@@ -595,6 +708,7 @@ export function createPhase8RuntimeState() {
       previews: new Map(),
       actionExecutions: [],
       correctiveLinks: new Map(),
+      signalActionLinks: new Map(),
       version: 1
     };
     actionStates.set(tenantId, next);
@@ -618,7 +732,12 @@ export function createPhase8RuntimeState() {
     return createControlSurfaceReadModel({
       definition,
       records: [
-        ...kpiRows(input.tenantId, input.phase7Runtime, actionState(input.tenantId).correctiveLinks),
+        ...kpiRows(
+          input.tenantId,
+          input.phase7Runtime,
+          actionState(input.tenantId).correctiveLinks,
+          actionState(input.tenantId).signalActionLinks
+        ),
         ...resourceRows(input.tenantId, input.phase6Runtime)
       ],
       actorPermissionKeys: input.actorPermissionKeys,
@@ -650,7 +769,8 @@ export function createPhase8RuntimeState() {
   }
 
   function sourceRecords(tenantId: TenantId, phase6Runtime: Phase6RuntimeState, phase7Runtime: Phase7RuntimeState) {
-    return [...kpiRows(tenantId, phase7Runtime, actionState(tenantId).correctiveLinks), ...resourceRows(tenantId, phase6Runtime)];
+    const state = actionState(tenantId);
+    return [...kpiRows(tenantId, phase7Runtime, state.correctiveLinks, state.signalActionLinks), ...resourceRows(tenantId, phase6Runtime)];
   }
 
   function findTargetRecord(input: {
@@ -704,6 +824,9 @@ export function createPhase8RuntimeState() {
     const definition = getActionDefinition(input.tenantId, input.actionDefinitionId);
     const record = findTargetRecord({ ...input, target: input.target });
     requireActionInput(definition, input.commandInput);
+    if (definition.key === "request_explanation" && requireStringInput(input.commandInput, "requestedFrom") !== input.actorId) {
+      throw preconditionFailed("request explanation assignee must be the current actor", "validation_error");
+    }
     if (!record.recommendedActionKeys.includes(definition.key)) {
       throw preconditionFailed("action is not recommended for target");
     }
@@ -936,6 +1059,82 @@ export function createPhase8RuntimeState() {
       state.previews.delete(preview.id);
       return clone(execution);
     }
+    if (isSignalAction(definition.key)) {
+      if (record.entityType !== "kpi_signal") {
+        throw preconditionFailed("signal action target must be a KPI signal", "precondition_failed");
+      }
+      if (preview === undefined) {
+        throw preconditionFailed("signal action preview is required", "dry_run_required");
+      }
+      if (state.signalActionLinks.has(record.entityId)) {
+        throw preconditionFailed("signal already has a handled management action", "precondition_failed");
+      }
+      const reason = requireStringInput(commandInput, "reason");
+      const actionStatus =
+        definition.key === "accept_risk"
+          ? "risk_accepted"
+          : definition.key === "escalate"
+            ? "escalated"
+            : "explanation_requested";
+      const inputSummary: Record<string, unknown> = { reason };
+      if (definition.key === "accept_risk" && typeof commandInput.expiresAt === "string") {
+        inputSummary.expiresAt = commandInput.expiresAt;
+      }
+      if (definition.key === "escalate") {
+        inputSummary.escalationLevel = requireStringInput(commandInput, "escalationLevel");
+      }
+      if (definition.key === "request_explanation") {
+        inputSummary.requestedFrom = requireStringInput(commandInput, "requestedFrom");
+        if (inputSummary.requestedFrom !== input.actorId) {
+          throw preconditionFailed("request explanation assignee must be the current actor", "validation_error");
+        }
+      }
+      const correlationId = `p8-${definition.key}-${toStableIdPart(record.entityId)}-${state.version}`;
+      const execution: ActionExecutionLog = {
+        id: `action-${correlationId}`,
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        commandType: definition.commandBinding.commandType,
+        requiredPermission: definition.requiredPermission,
+        status: "succeeded",
+        source: { entityType: record.entityType, entityId: record.entityId },
+        target: { entityType: record.entityType, entityId: record.entityId },
+        before: { signal: { id: record.entityId, status: "open", severity: record.severity } },
+        after: {
+          signal: {
+            id: record.entityId,
+            status: actionStatus,
+            reason,
+            ...(inputSummary.expiresAt !== undefined ? { expiresAt: inputSummary.expiresAt } : {}),
+            ...(inputSummary.escalationLevel !== undefined ? { escalationLevel: inputSummary.escalationLevel } : {}),
+            ...(inputSummary.requestedFrom !== undefined ? { requestedFrom: inputSummary.requestedFrom } : {})
+          }
+        },
+        timestamp: "2026-05-16T15:10:00.000Z",
+        correlationId,
+        sourceSurface: {
+          surfaceId: target.surfaceId,
+          surfaceKey: target.surfaceKey,
+          rowId: target.rowId,
+          actionSlotKey: definition.key
+        },
+        inputSummary,
+        permissionTrace: [...input.permissionTrace],
+        preconditionTrace: [
+          "target:kpi_signal",
+          `signal:${record.entityId}`,
+          `action:${definition.key}`,
+          "reason:present"
+        ],
+        trace: [
+          "control_action:preview confirmed",
+          `control_action:${definition.commandBinding.commandType} recorded`,
+          "control_action:portfolio projection should refetch"
+        ]
+      };
+      state.previews.delete(preview.id);
+      return clone(execution);
+    }
     throw notImplemented(`Action binding is not implemented yet: ${definition.commandBinding.commandType}`);
   }
 
@@ -966,6 +1165,28 @@ export function createPhase8RuntimeState() {
     state.actionExecutions.push(clone(next));
     if (next.commandType === "corrective_task.create" && next.target?.entityType === "task") {
       state.correctiveLinks.set(next.source.entityId, { taskId: next.target.entityId, actionExecutionId: next.id });
+    }
+    if (
+      next.commandType === "risk.accept" ||
+      next.commandType === "signal.escalate" ||
+      next.commandType === "signal.request_explanation"
+    ) {
+      const reason = next.inputSummary?.reason;
+      if (typeof reason === "string") {
+        state.signalActionLinks.set(next.source.entityId, {
+          status:
+            next.commandType === "risk.accept"
+              ? "risk_accepted"
+              : next.commandType === "signal.escalate"
+                ? "escalated"
+                : "explanation_requested",
+          actionExecutionId: next.id,
+          reason,
+          ...(typeof next.inputSummary?.expiresAt === "string" ? { expiresAt: next.inputSummary.expiresAt } : {}),
+          ...(typeof next.inputSummary?.escalationLevel === "string" ? { escalationLevel: next.inputSummary.escalationLevel } : {}),
+          ...(typeof next.inputSummary?.requestedFrom === "string" ? { requestedFrom: next.inputSummary.requestedFrom } : {})
+        });
+      }
     }
     state.version += 1;
     return clone(next);

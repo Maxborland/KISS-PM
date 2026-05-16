@@ -99,6 +99,24 @@ function defaultRows(): ControlSurfaceReadModelDto["rows"] {
           targetEntityType: "control_signal",
           dryRunRequired: true,
           available: true
+        },
+        {
+          key: "escalate",
+          label: "Эскалировать",
+          actionDefinitionKey: "escalate",
+          slotType: "row",
+          targetEntityType: "control_signal",
+          dryRunRequired: true,
+          available: true
+        },
+        {
+          key: "request_explanation",
+          label: "Запросить объяснение",
+          actionDefinitionKey: "request_explanation",
+          slotType: "row",
+          targetEntityType: "control_signal",
+          dryRunRequired: true,
+          available: true
         }
       ]
     },
@@ -183,6 +201,38 @@ function createActions(): PortfolioActionDefinitionDto[] {
       dryRunRequired: true,
       inputSchema: { fields: [{ key: "reason", label: "Причина", valueType: "text", required: true, summary: true }] },
       commandType: "risk.accept"
+    },
+    {
+      id: "action-escalate-signal",
+      key: "escalate",
+      label: "Эскалировать",
+      description: "Фиксирует эскалацию",
+      targetEntityType: "kpi_signal",
+      requiredPermission: "control.action:write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true },
+          { key: "escalationLevel", label: "Уровень", valueType: "text", required: true, summary: true }
+        ]
+      },
+      commandType: "signal.escalate"
+    },
+    {
+      id: "action-request-explanation",
+      key: "request_explanation",
+      label: "Запросить объяснение",
+      description: "Фиксирует запрос объяснения",
+      targetEntityType: "kpi_signal",
+      requiredPermission: "control.action:write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true },
+          { key: "requestedFrom", label: "Ответственный", valueType: "text", required: true, summary: true }
+        ]
+      },
+      commandType: "signal.request_explanation"
     },
     {
       id: "action-shift-resource-work",
@@ -377,6 +427,54 @@ describe("PortfolioControlSurface", () => {
           assignmentId: "assignment-design-architect-a",
           targetResourceProfileId: "resource-engineer-a"
         })
+      })
+    );
+  });
+
+  it("builds governed risk, escalation, and explanation inputs explicitly", async () => {
+    const apiClient = createApiClient();
+    renderSurface(apiClient);
+    await screen.findByTestId("portfolio-control-detail");
+
+    fireEvent.click(screen.getByRole("button", { name: "Принять риск" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(1));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-accept-risk",
+      expect.objectContaining({
+        input: {
+          reason: "Контролируемый риск до перепланирования",
+          expiresAt: "2026-06-30"
+        }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Эскалировать" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(2));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-escalate-signal",
+      expect.objectContaining({
+        input: {
+          reason: "Нужно решение управляющего комитета",
+          escalationLevel: "steering_committee"
+        }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Запросить объяснение" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(3));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-request-explanation",
+      expect.objectContaining({
+        input: {
+          reason: "Нужен комментарий по отклонению",
+          requestedFrom: "tenant-admin-a"
+        }
       })
     );
   });
