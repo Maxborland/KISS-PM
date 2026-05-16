@@ -22,7 +22,8 @@ const requiredIdsByPhase = {
   P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`),
   P8: Array.from({ length: 10 }, (_, index) => `P8-${String(index + 1).padStart(3, "0")}`),
   P9: Array.from({ length: 10 }, (_, index) => `P9-${String(index + 1).padStart(3, "0")}`),
-  P10: Array.from({ length: 10 }, (_, index) => `P10-${String(index + 1).padStart(3, "0")}`)
+  P10: Array.from({ length: 10 }, (_, index) => `P10-${String(index + 1).padStart(3, "0")}`),
+  P11: Array.from({ length: 10 }, (_, index) => `P11-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -132,6 +133,18 @@ const requiredE2eByPhaseRow = {
     "P10-008": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"],
     "P10-009": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"],
     "P10-010": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"]
+  },
+  P11: {
+    "P11-001": ["E2E-100", "E2E-101", "E2E-104"],
+    "P11-002": ["E2E-100"],
+    "P11-003": ["E2E-101", "E2E-104"],
+    "P11-004": ["E2E-102", "E2E-104"],
+    "P11-005": ["E2E-100", "E2E-102"],
+    "P11-006": ["E2E-100", "E2E-101", "E2E-102", "E2E-104"],
+    "P11-007": ["E2E-102", "E2E-104"],
+    "P11-008": ["E2E-103"],
+    "P11-009": ["E2E-100", "E2E-101", "E2E-102", "E2E-103", "E2E-104"],
+    "P11-010": ["E2E-100", "E2E-101", "E2E-102", "E2E-103", "E2E-104"]
   }
 };
 const requiredE2eTestPath = {
@@ -181,7 +194,12 @@ const requiredE2eTestPath = {
   "E2E-092": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
   "E2E-093": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
   "E2E-094": "e2e/tests/phase10/config-validation.spec.ts",
-  "E2E-095": "e2e/tests/phase10/config-regression.spec.ts"
+  "E2E-095": "e2e/tests/phase10/config-regression.spec.ts",
+  "E2E-100": "e2e/tests/phase11/adapter-import.spec.ts",
+  "E2E-101": "e2e/tests/phase11/adapter-idempotency.spec.ts",
+  "E2E-102": "e2e/tests/phase11/adapter-failure.spec.ts",
+  "E2E-103": "e2e/tests/phase11/imported-project-canonical.spec.ts",
+  "E2E-104": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -280,7 +298,7 @@ for (const row of matrix.rows ?? []) {
       failures.push(`${row.id}: verified row missing cleanup evidence`);
     } else if (
       /no runtime cleanup yet/i.test(row.cleanup) ||
-      (["P8", "P9", "P10"].includes(matrix.phase) &&
+      (["P8", "P9", "P10", "P11"].includes(matrix.phase) &&
         /^(no runtime cleanup|no runtime state exists yet)/i.test(row.cleanup.trim()))
     ) {
       failures.push(`${row.id}: verified row cleanup evidence is still a placeholder`);
@@ -365,7 +383,7 @@ for (const row of matrix.rows ?? []) {
     if (!row.blocker) {
       failures.push(`${row.id}: blocked row missing blocker`);
     }
-    if (["P9", "P10"].includes(matrix.phase)) {
+    if (["P9", "P10", "P11"].includes(matrix.phase)) {
       if (typeof row.blocker !== "string" || row.blocker.trim().length < 20) {
         failures.push(`${row.id}: blocked row requires a fresh, specific blocker reason`);
       }
