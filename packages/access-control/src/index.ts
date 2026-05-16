@@ -85,6 +85,30 @@ export const TASK_PARTICIPANT_MANAGE_PERMISSION: Permission = {
   category: "task_work_management"
 };
 
+export const TENANT_CONFIG_READ_PERMISSION: Permission = {
+  key: "tenant.config.read",
+  description: "Read tenant configuration",
+  category: "tenant_configuration"
+};
+
+export const TENANT_CONFIG_WRITE_PERMISSION: Permission = {
+  key: "tenant.config.write",
+  description: "Preview and publish tenant configuration",
+  category: "tenant_configuration"
+};
+
+export const TENANT_CONFIG_EXPORT_PERMISSION: Permission = {
+  key: "tenant.config.export",
+  description: "Export tenant configuration",
+  category: "tenant_configuration"
+};
+
+export const TENANT_CONFIG_IMPORT_PERMISSION: Permission = {
+  key: "tenant.config.import",
+  description: "Import tenant configuration",
+  category: "tenant_configuration"
+};
+
 export class AccessControlModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",

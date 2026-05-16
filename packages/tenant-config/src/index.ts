@@ -192,10 +192,82 @@ export type TenantConfiguration = {
   tenantId: TenantId;
   version: number;
   labelSetVersion: number;
+  processTemplateVersions: TenantConfigurationVersionRef[];
+  accessProfileVersions: TenantConfigurationVersionRef[];
+  kpiDefinitionVersions: TenantConfigurationVersionRef[];
+  controlSurfaceVersions: TenantConfigurationVersionRef[];
+  actionDefinitionVersions: TenantConfigurationVersionRef[];
+  customFieldDefinitionVersions: TenantConfigurationVersionRef[];
+  savedViewVersions: TenantConfigurationVersionRef[];
+  featureFlagVersions: TenantConfigurationVersionRef[];
   status: TenantConfigurationStatus;
   createdBy: TenantUserId;
   createdAt: string;
   activatedAt?: string;
+};
+
+export type TenantConfigurationVersionRef = {
+  id: string;
+  version: number;
+};
+
+export type TenantConfigurationAffectedRefKind =
+  | "label_set"
+  | "process_template"
+  | "access_profile"
+  | "kpi_definition"
+  | "control_surface"
+  | "action_definition"
+  | "custom_field_definition"
+  | "saved_view"
+  | "feature_flag";
+
+export type TenantConfigurationAffectedRef = {
+  kind: TenantConfigurationAffectedRefKind;
+  id?: string;
+  beforeVersion?: number;
+  afterVersion?: number;
+};
+
+export type TenantConfigurationValidationIssue = {
+  code: string;
+  severity: "error" | "warning";
+  path: string;
+  message: string;
+};
+
+export type TenantConfigurationPublishPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  mutatesState: false;
+  before: {
+    activeVersion: number;
+    labelSetVersion: number;
+  };
+  after: {
+    activeVersion: number;
+    labelSetVersion: number;
+  };
+  affectedRefs: TenantConfigurationAffectedRef[];
+  validationIssues: TenantConfigurationValidationIssue[];
+  createdAt: string;
+};
+
+export type TenantConfigurationPublishAudit = {
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  auditEventId: string;
+  commandType: "tenant_configuration.publish";
+  beforeVersion: number;
+  afterVersion: number;
+  publishedAt: string;
+};
+
+export type TenantConfigurationPublishResult = {
+  previousActive: TenantConfiguration;
+  published: TenantConfiguration;
+  audit: TenantConfigurationPublishAudit;
 };
 
 export type TenantLabelSet = {
@@ -491,27 +563,284 @@ function normalizeLabels(labels: Record<string, string>): Record<string, string>
   return normalized;
 }
 
+function cloneConfigurationRefs(
+  refs: TenantConfigurationVersionRef[] | undefined,
+  fieldName: string
+): TenantConfigurationVersionRef[] {
+  if (refs === undefined) return [];
+
+  const cloned = requireArray(refs, `tenantConfiguration.${fieldName}`).map((ref) => ({
+    id: requireNonEmptyString(ref.id, `tenantConfiguration.${fieldName}.id`),
+    version: requirePositiveInteger(ref.version, `tenantConfiguration.${fieldName}.version`)
+  }));
+  const seenIds = new Set<string>();
+
+  for (const ref of cloned) {
+    if (seenIds.has(ref.id)) {
+      throw new TenantConfigModelError("conflict", `Duplicate tenant configuration ${fieldName} ref: ${ref.id}`);
+    }
+    seenIds.add(ref.id);
+  }
+
+  return cloned;
+}
+
+function cloneTenantConfiguration(configuration: TenantConfiguration): TenantConfiguration {
+  return createTenantConfiguration({
+    ...configuration,
+    processTemplateVersions: configuration.processTemplateVersions,
+    accessProfileVersions: configuration.accessProfileVersions,
+    kpiDefinitionVersions: configuration.kpiDefinitionVersions,
+    controlSurfaceVersions: configuration.controlSurfaceVersions,
+    actionDefinitionVersions: configuration.actionDefinitionVersions,
+    customFieldDefinitionVersions: configuration.customFieldDefinitionVersions,
+    savedViewVersions: configuration.savedViewVersions,
+    featureFlagVersions: configuration.featureFlagVersions
+  });
+}
+
+function ensureConfigurationStatus(configuration: TenantConfiguration, status: TenantConfigurationStatus, fieldName: string) {
+  if (configuration.status !== status) {
+    throw new TenantConfigModelError(
+      "validation_error",
+      `${fieldName} must be ${status}, got ${configuration.status}`
+    );
+  }
+}
+
+function createAffectedRefsForCollection(
+  kind: TenantConfigurationAffectedRefKind,
+  beforeRefs: TenantConfigurationVersionRef[],
+  afterRefs: TenantConfigurationVersionRef[]
+): TenantConfigurationAffectedRef[] {
+  const affectedRefs: TenantConfigurationAffectedRef[] = [];
+  const beforeById = new Map(beforeRefs.map((ref) => [ref.id, ref.version]));
+  const afterById = new Map(afterRefs.map((ref) => [ref.id, ref.version]));
+  const allIds = [...new Set([...beforeById.keys(), ...afterById.keys()])].sort();
+
+  for (const id of allIds) {
+    const beforeVersion = beforeById.get(id);
+    const afterVersion = afterById.get(id);
+    if (beforeVersion !== afterVersion) {
+      affectedRefs.push({
+        kind,
+        id,
+        ...(beforeVersion !== undefined ? { beforeVersion } : {}),
+        ...(afterVersion !== undefined ? { afterVersion } : {})
+      });
+    }
+  }
+
+  return affectedRefs;
+}
+
+function createAffectedRefs(
+  activeConfiguration: TenantConfiguration,
+  draftConfiguration: TenantConfiguration
+): TenantConfigurationAffectedRef[] {
+  const affectedRefs: TenantConfigurationAffectedRef[] = [];
+
+  if (activeConfiguration.labelSetVersion !== draftConfiguration.labelSetVersion) {
+    affectedRefs.push({
+      kind: "label_set",
+      beforeVersion: activeConfiguration.labelSetVersion,
+      afterVersion: draftConfiguration.labelSetVersion
+    });
+  }
+
+  return [
+    ...affectedRefs,
+    ...createAffectedRefsForCollection(
+      "process_template",
+      activeConfiguration.processTemplateVersions,
+      draftConfiguration.processTemplateVersions
+    ),
+    ...createAffectedRefsForCollection(
+      "access_profile",
+      activeConfiguration.accessProfileVersions,
+      draftConfiguration.accessProfileVersions
+    ),
+    ...createAffectedRefsForCollection(
+      "kpi_definition",
+      activeConfiguration.kpiDefinitionVersions,
+      draftConfiguration.kpiDefinitionVersions
+    ),
+    ...createAffectedRefsForCollection(
+      "control_surface",
+      activeConfiguration.controlSurfaceVersions,
+      draftConfiguration.controlSurfaceVersions
+    ),
+    ...createAffectedRefsForCollection(
+      "action_definition",
+      activeConfiguration.actionDefinitionVersions,
+      draftConfiguration.actionDefinitionVersions
+    ),
+    ...createAffectedRefsForCollection(
+      "custom_field_definition",
+      activeConfiguration.customFieldDefinitionVersions,
+      draftConfiguration.customFieldDefinitionVersions
+    ),
+    ...createAffectedRefsForCollection("saved_view", activeConfiguration.savedViewVersions, draftConfiguration.savedViewVersions),
+    ...createAffectedRefsForCollection(
+      "feature_flag",
+      activeConfiguration.featureFlagVersions,
+      draftConfiguration.featureFlagVersions
+    )
+  ];
+}
+
+function sameAffectedRefs(left: TenantConfigurationAffectedRef[], right: TenantConfigurationAffectedRef[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function createTenantConfiguration(input: {
   id: string;
   tenantId: TenantId;
   version: number;
   labelSetVersion: number;
   status: TenantConfigurationStatus;
+  processTemplateVersions?: TenantConfigurationVersionRef[];
+  accessProfileVersions?: TenantConfigurationVersionRef[];
+  kpiDefinitionVersions?: TenantConfigurationVersionRef[];
+  controlSurfaceVersions?: TenantConfigurationVersionRef[];
+  actionDefinitionVersions?: TenantConfigurationVersionRef[];
+  customFieldDefinitionVersions?: TenantConfigurationVersionRef[];
+  savedViewVersions?: TenantConfigurationVersionRef[];
+  featureFlagVersions?: TenantConfigurationVersionRef[];
   createdBy: TenantUserId;
   createdAt: string;
   activatedAt?: string;
 }): TenantConfiguration {
+  const status = requireValidStatus(input.status);
+
   return {
     id: requireNonEmptyString(input.id, "tenantConfiguration.id"),
     tenantId: requireNonEmptyString(input.tenantId, "tenantId"),
     version: requirePositiveInteger(input.version, "tenantConfiguration.version"),
     labelSetVersion: requirePositiveInteger(input.labelSetVersion, "tenantConfiguration.labelSetVersion"),
-    status: requireValidStatus(input.status),
+    processTemplateVersions: cloneConfigurationRefs(input.processTemplateVersions, "processTemplateVersions"),
+    accessProfileVersions: cloneConfigurationRefs(input.accessProfileVersions, "accessProfileVersions"),
+    kpiDefinitionVersions: cloneConfigurationRefs(input.kpiDefinitionVersions, "kpiDefinitionVersions"),
+    controlSurfaceVersions: cloneConfigurationRefs(input.controlSurfaceVersions, "controlSurfaceVersions"),
+    actionDefinitionVersions: cloneConfigurationRefs(input.actionDefinitionVersions, "actionDefinitionVersions"),
+    customFieldDefinitionVersions: cloneConfigurationRefs(
+      input.customFieldDefinitionVersions,
+      "customFieldDefinitionVersions"
+    ),
+    savedViewVersions: cloneConfigurationRefs(input.savedViewVersions, "savedViewVersions"),
+    featureFlagVersions: cloneConfigurationRefs(input.featureFlagVersions, "featureFlagVersions"),
+    status,
     createdBy: requireNonEmptyString(input.createdBy, "tenantConfiguration.createdBy"),
     createdAt: requireValidTimestamp(input.createdAt, "tenantConfiguration.createdAt"),
     ...(input.activatedAt !== undefined
       ? { activatedAt: requireValidTimestamp(input.activatedAt, "tenantConfiguration.activatedAt") }
       : {})
+  };
+}
+
+export function previewTenantConfigurationPublish(
+  activeConfigurationInput: TenantConfiguration,
+  draftConfigurationInput: TenantConfiguration,
+  input: {
+    id: string;
+    actorId: TenantUserId;
+    createdAt: string;
+  }
+): TenantConfigurationPublishPreview {
+  const activeConfiguration = cloneTenantConfiguration(activeConfigurationInput);
+  const draftConfiguration = cloneTenantConfiguration(draftConfigurationInput);
+
+  ensureConfigurationStatus(activeConfiguration, "active", "activeConfiguration");
+  ensureConfigurationStatus(draftConfiguration, "draft", "draftConfiguration");
+  if (activeConfiguration.tenantId !== draftConfiguration.tenantId) {
+    throw new TenantConfigModelError("validation_error", "Tenant configuration publish tenant mismatch");
+  }
+  if (draftConfiguration.version <= activeConfiguration.version) {
+    throw new TenantConfigModelError(
+      "conflict",
+      "Tenant configuration draft version must be newer than active version"
+    );
+  }
+
+  return {
+    id: requireNonEmptyString(input.id, "tenantConfigurationPublishPreview.id"),
+    tenantId: activeConfiguration.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "tenantConfigurationPublishPreview.actorId"),
+    mutatesState: false,
+    before: {
+      activeVersion: activeConfiguration.version,
+      labelSetVersion: activeConfiguration.labelSetVersion
+    },
+    after: {
+      activeVersion: draftConfiguration.version,
+      labelSetVersion: draftConfiguration.labelSetVersion
+    },
+    affectedRefs: createAffectedRefs(activeConfiguration, draftConfiguration),
+    validationIssues: [],
+    createdAt: requireValidTimestamp(input.createdAt, "tenantConfigurationPublishPreview.createdAt")
+  };
+}
+
+export function publishTenantConfigurationPreview(
+  activeConfigurationInput: TenantConfiguration,
+  draftConfigurationInput: TenantConfiguration,
+  input: {
+    preview: TenantConfigurationPublishPreview;
+    expectedActiveVersion: number;
+    expectedDraftVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): TenantConfigurationPublishResult {
+  const activeConfiguration = cloneTenantConfiguration(activeConfigurationInput);
+  const draftConfiguration = cloneTenantConfiguration(draftConfigurationInput);
+  const preview = previewTenantConfigurationPublish(activeConfiguration, draftConfiguration, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    createdAt: input.preview.createdAt
+  });
+  const expectedActiveVersion = requirePositiveInteger(
+    input.expectedActiveVersion,
+    "tenantConfigurationPublish.expectedActiveVersion"
+  );
+  const expectedDraftVersion = requirePositiveInteger(
+    input.expectedDraftVersion,
+    "tenantConfigurationPublish.expectedDraftVersion"
+  );
+
+  if (
+    expectedActiveVersion !== preview.before.activeVersion ||
+    expectedDraftVersion !== preview.after.activeVersion ||
+    input.preview.tenantId !== preview.tenantId ||
+    input.preview.before.activeVersion !== preview.before.activeVersion ||
+    input.preview.after.activeVersion !== preview.after.activeVersion ||
+    !sameAffectedRefs(input.preview.affectedRefs, preview.affectedRefs)
+  ) {
+    throw new TenantConfigModelError("conflict", "Tenant configuration publish preview is stale");
+  }
+
+  const publishedAt = requireValidTimestamp(input.publishedAt, "tenantConfigurationPublish.publishedAt");
+  const auditEventId = requireNonEmptyString(input.auditEventId, "tenantConfigurationPublish.auditEventId");
+
+  return {
+    previousActive: {
+      ...activeConfiguration,
+      status: "archived"
+    },
+    published: {
+      ...draftConfiguration,
+      status: "active",
+      activatedAt: publishedAt
+    },
+    audit: {
+      tenantId: preview.tenantId,
+      actorId: preview.actorId,
+      auditEventId,
+      commandType: "tenant_configuration.publish",
+      beforeVersion: preview.before.activeVersion,
+      afterVersion: preview.after.activeVersion,
+      publishedAt
+    }
   };
 }
 
