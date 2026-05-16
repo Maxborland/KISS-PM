@@ -54,6 +54,11 @@ import {
   createActionConfigurationApiClient,
   type ActionConfigurationApiClient
 } from "./actionConfigurationApiClient";
+import { ConfigurationOverviewSurface } from "./ConfigurationOverviewSurface";
+import {
+  createConfigurationOverviewApiClient,
+  type ConfigurationOverviewApiClient
+} from "./configurationOverviewApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -74,7 +79,8 @@ type AppProps = {
     Partial<CustomFieldBuilderApiClient> &
     Partial<KpiThresholdBuilderApiClient> &
     Partial<SavedViewLayoutBuilderApiClient> &
-    Partial<ActionConfigurationApiClient>;
+    Partial<ActionConfigurationApiClient> &
+    Partial<ConfigurationOverviewApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -357,6 +363,19 @@ function isActionConfigurationApiClient(
     typeof apiClient?.getActionConfigs === "function" &&
     typeof apiClient.previewActionConfigs === "function" &&
     typeof apiClient.publishActionConfigs === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isConfigurationOverviewApiClient(
+  apiClient: Partial<ConfigurationOverviewApiClient> | null
+): apiClient is ConfigurationOverviewApiClient {
+  return (
+    typeof apiClient?.getConfiguration === "function" &&
+    typeof apiClient.validateConfiguration === "function" &&
+    typeof apiClient.exportConfiguration === "function" &&
+    typeof apiClient.previewImport === "function" &&
+    typeof apiClient.applyImport === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -770,6 +789,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createActionConfigurationApiClient() : null;
   }, [apiClient]);
+  const configurationOverviewApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isConfigurationOverviewApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createConfigurationOverviewApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -973,6 +1000,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {actionConfigurationApiClient ? (
           <ActionConfigurationSurface
             apiClient={actionConfigurationApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {configurationOverviewApiClient ? (
+          <ConfigurationOverviewSurface
+            apiClient={configurationOverviewApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

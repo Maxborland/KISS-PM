@@ -282,6 +282,85 @@ export type TenantConfigurationValidationIssue = {
   severity: "error" | "warning";
   path: string;
   message: string;
+  affectedRuntimeSurface?: string;
+  recoveryText?: string;
+};
+
+export type ConfigurationExportActionConfig = {
+  actionKey: string;
+  enabled: boolean;
+  formFields: Array<{
+    fieldKey: string;
+    label?: string;
+    defaultValue?: string | number | boolean;
+  }>;
+};
+
+export type ConfigurationExportActionConfiguration = {
+  tenantId: TenantId;
+  version: number;
+  actionConfigs: ConfigurationExportActionConfig[];
+  updatedAt: string;
+};
+
+export type ConfigurationExportPackage = {
+  schemaVersion: 1;
+  tenantId: TenantId;
+  configurationVersion: number;
+  exportedAt: string;
+  checksum: string;
+  labelSet: TenantLabelSet;
+  customFieldRegistry: CustomFieldRegistry;
+  actionConfiguration: ConfigurationExportActionConfiguration;
+};
+
+export type ConfigurationImportDiffKind = "label_set" | "custom_field_registry" | "action_configuration";
+
+export type ConfigurationImportDiff = {
+  kind: ConfigurationImportDiffKind;
+  path: string;
+  beforeVersion: number;
+  afterVersion: number;
+};
+
+export type ConfigurationImportPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  mutatesState: false;
+  canApply: boolean;
+  checksum: string;
+  before: {
+    configurationVersion: number;
+    labelSetVersion: number;
+    customFieldRegistryVersion: number;
+    actionConfigurationVersion: number;
+  };
+  after: {
+    configurationVersion: number;
+    labelSetVersion: number;
+    customFieldRegistryVersion: number;
+    actionConfigurationVersion: number;
+  };
+  diffs: ConfigurationImportDiff[];
+  validationIssues: TenantConfigurationValidationIssue[];
+  createdAt: string;
+};
+
+export type ConfigurationImportAudit = {
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  auditEventId: string;
+  commandType: "tenant_configuration.import_apply";
+  beforeVersion: number;
+  afterVersion: number;
+  importedChecksum: string;
+  appliedAt: string;
+};
+
+export type ConfigurationImportApplyResult = {
+  importedPackage: ConfigurationExportPackage;
+  audit: ConfigurationImportAudit;
 };
 
 export type TenantConfigurationPublishPreview = {
@@ -802,6 +881,293 @@ function createAffectedRefs(
 
 function sameAffectedRefs(left: TenantConfigurationAffectedRef[], right: TenantConfigurationAffectedRef[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
+}
+
+function configurationChecksumPayload(input: Omit<ConfigurationExportPackage, "checksum">): Omit<ConfigurationExportPackage, "checksum"> {
+  return {
+    schemaVersion: input.schemaVersion,
+    tenantId: requireNonEmptyString(input.tenantId, "configurationExport.tenantId"),
+    configurationVersion: requirePositiveInteger(input.configurationVersion, "configurationExport.configurationVersion"),
+    exportedAt: requireValidTimestamp(input.exportedAt, "configurationExport.exportedAt"),
+    labelSet: createTenantLabelSet(input.labelSet),
+    customFieldRegistry: createCustomFieldRegistry(input.customFieldRegistry),
+    actionConfiguration: createConfigurationExportActionConfiguration(input.actionConfiguration)
+  };
+}
+
+function checksumForPayload(payload: Omit<ConfigurationExportPackage, "checksum">): string {
+  const text = stableStringify(payload);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `cfg-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function withoutChecksum(input: ConfigurationExportPackage): Omit<ConfigurationExportPackage, "checksum"> {
+  const payload = { ...input } as Partial<ConfigurationExportPackage>;
+  delete payload.checksum;
+
+  return payload as Omit<ConfigurationExportPackage, "checksum">;
+}
+
+function createConfigurationExportActionConfiguration(
+  input: ConfigurationExportActionConfiguration
+): ConfigurationExportActionConfiguration {
+  const actionConfigs = requireArray(input.actionConfigs, "configurationExport.actionConfiguration.actionConfigs").map(
+    (entry) => {
+      const formFields = requireArray(entry.formFields, "configurationExport.actionConfiguration.formFields").map(
+        (field) => ({
+          fieldKey: requireSystemKey(field.fieldKey, "configurationExport.actionConfiguration.formField.fieldKey"),
+          ...(field.label !== undefined
+            ? { label: requireNonEmptyString(field.label, "configurationExport.actionConfiguration.formField.label") }
+            : {}),
+          ...(field.defaultValue !== undefined ? { defaultValue: field.defaultValue } : {})
+        })
+      );
+      if (new Set(formFields.map((field) => field.fieldKey)).size !== formFields.length) {
+        throw new TenantConfigModelError("conflict", `Duplicate action form field key: ${entry.actionKey}`);
+      }
+
+      return {
+        actionKey: requireSystemKey(entry.actionKey, "configurationExport.actionConfiguration.actionKey"),
+        enabled: requireBoolean(entry.enabled, "configurationExport.actionConfiguration.enabled"),
+        formFields
+      };
+    }
+  );
+  if (new Set(actionConfigs.map((entry) => entry.actionKey)).size !== actionConfigs.length) {
+    throw new TenantConfigModelError("conflict", "Duplicate action configuration key");
+  }
+
+  return {
+    tenantId: requireNonEmptyString(input.tenantId, "configurationExport.actionConfiguration.tenantId"),
+    version: requirePositiveInteger(input.version, "configurationExport.actionConfiguration.version"),
+    actionConfigs,
+    updatedAt: requireValidTimestamp(input.updatedAt, "configurationExport.actionConfiguration.updatedAt")
+  };
+}
+
+function issue(input: TenantConfigurationValidationIssue): TenantConfigurationValidationIssue {
+  return {
+    code: requireNonEmptyString(input.code, "configurationValidationIssue.code"),
+    severity: input.severity === "warning" ? "warning" : "error",
+    path: requireNonEmptyString(input.path, "configurationValidationIssue.path"),
+    message: requireNonEmptyString(input.message, "configurationValidationIssue.message"),
+    ...(input.affectedRuntimeSurface !== undefined
+      ? {
+          affectedRuntimeSurface: requireSystemKey(
+            input.affectedRuntimeSurface,
+            "configurationValidationIssue.affectedRuntimeSurface"
+          )
+        }
+      : {}),
+    ...(input.recoveryText !== undefined
+      ? { recoveryText: requireNonEmptyString(input.recoveryText, "configurationValidationIssue.recoveryText") }
+      : {})
+  };
+}
+
+function validateImportPackage(
+  current: ConfigurationExportPackage,
+  incoming: ConfigurationExportPackage
+): TenantConfigurationValidationIssue[] {
+  const issues: TenantConfigurationValidationIssue[] = [];
+  if (incoming.schemaVersion !== 1) {
+    issues.push(
+      issue({
+        code: "configuration_validation_failed",
+        severity: "error",
+        path: "schemaVersion",
+        message: "Unsupported configuration package schema version",
+        recoveryText: "Экспортируйте пакет из текущей версии KISS PM."
+      })
+    );
+  }
+  const payload = withoutChecksum(incoming);
+  if (checksumForPayload(configurationChecksumPayload(payload)) !== incoming.checksum) {
+    issues.push(
+      issue({
+        code: "import_checksum_mismatch",
+        severity: "error",
+        path: "checksum",
+        message: "Configuration import package checksum mismatch",
+        recoveryText: "Повторите экспорт и загрузите пакет без ручных изменений checksum."
+      })
+    );
+  }
+  const tenantIds = [
+    incoming.tenantId,
+    incoming.labelSet.tenantId,
+    incoming.customFieldRegistry.tenantId,
+    incoming.actionConfiguration.tenantId
+  ];
+  if (tenantIds.some((tenantId) => tenantId !== current.tenantId)) {
+    issues.push(
+      issue({
+        code: "tenant_mismatch",
+        severity: "error",
+        path: "tenantId",
+        message: "Configuration import package belongs to another tenant",
+        recoveryText: "Загрузите пакет, экспортированный из этого же тенанта."
+      })
+    );
+  }
+  if (incoming.configurationVersion < current.configurationVersion) {
+    issues.push(
+      issue({
+        code: "import_conflict",
+        severity: "warning",
+        path: "configurationVersion",
+        message: "Configuration package version is not newer than the active version",
+        recoveryText: "Продолжайте только если нужен безопасный повторный импорт."
+      })
+    );
+  }
+
+  return issues;
+}
+
+function diffVersion(
+  kind: ConfigurationImportDiffKind,
+  path: string,
+  beforeVersion: number,
+  afterVersion: number
+): ConfigurationImportDiff[] {
+  return beforeVersion === afterVersion ? [] : [{ kind, path, beforeVersion, afterVersion }];
+}
+
+export function createConfigurationImportPackageWithChecksum(
+  input: Omit<ConfigurationExportPackage, "checksum"> | ConfigurationExportPackage
+): ConfigurationExportPackage {
+  const candidate =
+    "checksum" in input ? withoutChecksum(input as ConfigurationExportPackage) : (input as Omit<ConfigurationExportPackage, "checksum">);
+  const payload = configurationChecksumPayload(candidate);
+
+  return {
+    ...payload,
+    checksum: checksumForPayload(payload)
+  };
+}
+
+export function createConfigurationExportPackage(input: Omit<ConfigurationExportPackage, "checksum">): ConfigurationExportPackage {
+  return createConfigurationImportPackageWithChecksum(input);
+}
+
+export function previewConfigurationImport(
+  currentInput: ConfigurationExportPackage,
+  incomingInput: ConfigurationExportPackage,
+  input: {
+    id: string;
+    actorId: TenantUserId;
+    createdAt: string;
+  }
+): ConfigurationImportPreview {
+  const current = createConfigurationImportPackageWithChecksum(currentInput);
+  const incoming = { ...incomingInput };
+  const validationIssues = validateImportPackage(current, incoming);
+  const diffs = [
+    ...diffVersion(
+      "label_set",
+      "labelSet.configurationVersion",
+      current.labelSet.configurationVersion,
+      incoming.labelSet.configurationVersion
+    ),
+    ...diffVersion(
+      "custom_field_registry",
+      "customFieldRegistry.version",
+      current.customFieldRegistry.version,
+      incoming.customFieldRegistry.version
+    ),
+    ...diffVersion(
+      "action_configuration",
+      "actionConfiguration.version",
+      current.actionConfiguration.version,
+      incoming.actionConfiguration.version
+    )
+  ];
+  const errorCount = validationIssues.filter((entry) => entry.severity === "error").length;
+
+  return {
+    id: requireNonEmptyString(input.id, "configurationImportPreview.id"),
+    tenantId: current.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "configurationImportPreview.actorId"),
+    mutatesState: false,
+    canApply: errorCount === 0,
+    checksum: requireNonEmptyString(incoming.checksum, "configurationImportPreview.checksum"),
+    before: {
+      configurationVersion: current.configurationVersion,
+      labelSetVersion: current.labelSet.configurationVersion,
+      customFieldRegistryVersion: current.customFieldRegistry.version,
+      actionConfigurationVersion: current.actionConfiguration.version
+    },
+    after: {
+      configurationVersion: incoming.configurationVersion,
+      labelSetVersion: incoming.labelSet.configurationVersion,
+      customFieldRegistryVersion: incoming.customFieldRegistry.version,
+      actionConfigurationVersion: incoming.actionConfiguration.version
+    },
+    diffs,
+    validationIssues,
+    createdAt: requireValidTimestamp(input.createdAt, "configurationImportPreview.createdAt")
+  };
+}
+
+export function applyConfigurationImportPreview(
+  currentInput: ConfigurationExportPackage,
+  input: {
+    preview: ConfigurationImportPreview;
+    incomingPackage: ConfigurationExportPackage;
+    auditEventId: string;
+    appliedAt: string;
+  }
+): ConfigurationImportApplyResult {
+  const current = createConfigurationImportPackageWithChecksum(currentInput);
+  const recomputedPreview = previewConfigurationImport(current, input.incomingPackage, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    createdAt: input.preview.createdAt
+  });
+  if (!input.preview.canApply || input.preview.validationIssues.some((entry) => entry.severity === "error")) {
+    throw new TenantConfigModelError("conflict", "configuration import preview has validation errors");
+  }
+  if (JSON.stringify(input.preview) !== JSON.stringify(recomputedPreview)) {
+    throw new TenantConfigModelError("conflict", "configuration import preview is stale");
+  }
+
+  const importedPackage = createConfigurationImportPackageWithChecksum(input.incomingPackage);
+  const appliedAt = requireValidTimestamp(input.appliedAt, "configurationImportApply.appliedAt");
+
+  return {
+    importedPackage,
+    audit: {
+      tenantId: current.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireNonEmptyString(input.auditEventId, "configurationImportApply.auditEventId"),
+      commandType: "tenant_configuration.import_apply",
+      beforeVersion: current.configurationVersion,
+      afterVersion: importedPackage.configurationVersion,
+      importedChecksum: importedPackage.checksum,
+      appliedAt
+    }
+  };
 }
 
 export function createTenantConfiguration(input: {

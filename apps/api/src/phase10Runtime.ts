@@ -48,13 +48,19 @@ import type {
 } from "@kiss-pm/project-core";
 import {
   createCustomFieldRegistry,
+  applyConfigurationImportPreview,
+  createConfigurationImportPackageWithChecksum,
   createTenantLabelSet,
   publishCustomFieldDefinitionPreview,
   publishTenantLabelSetPreview,
+  previewConfigurationImport,
   previewCustomFieldDefinitionPublish,
   previewTenantLabelSetPublish
 } from "@kiss-pm/tenant-config";
 import type {
+  ConfigurationExportPackage,
+  ConfigurationImportApplyResult,
+  ConfigurationImportPreview,
   CustomFieldDefinitionDraft,
   CustomFieldDefinitionPublishAudit,
   CustomFieldDefinitionPublishPreview,
@@ -87,6 +93,15 @@ type Phase10TenantState = {
   actionConfigurationPrevious: ActionConfigurationSet[];
   actionConfigurationPreviews: Map<string, ActionConfigurationPublishPreview>;
   actionConfigurationActionExecutions: ActionExecutionLog[];
+  configurationImportPreviews: Map<
+    string,
+    {
+      preview: ConfigurationImportPreview;
+      incomingPackage: ConfigurationExportPackage;
+    }
+  >;
+  configurationImportPreviewCounter: number;
+  configurationImportActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -139,7 +154,10 @@ export function createPhase10RuntimeState() {
       }),
       actionConfigurationPrevious: [],
       actionConfigurationPreviews: new Map<string, ActionConfigurationPublishPreview>(),
-      actionConfigurationActionExecutions: []
+      actionConfigurationActionExecutions: [],
+      configurationImportPreviews: new Map(),
+      configurationImportPreviewCounter: 0,
+      configurationImportActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -742,6 +760,106 @@ export function createPhase10RuntimeState() {
     return config?.formFields.map((field) => clone(field)) ?? [];
   }
 
+  function replaceCustomFieldRegistry(registry: CustomFieldRegistry): CustomFieldRegistry {
+    const stored = createCustomFieldRegistry(registry);
+    getState(stored.tenantId).customFieldRegistry = stored;
+
+    return createCustomFieldRegistry(stored);
+  }
+
+  function replaceActionConfiguration(configuration: ActionConfigurationSet): ActionConfigurationSet {
+    const stored = createActionConfigurationSet(configuration);
+    getState(stored.tenantId).actionConfiguration = stored;
+
+    return createActionConfigurationSet(stored);
+  }
+
+  function previewConfigurationPackageImport(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    currentPackage: ConfigurationExportPackage;
+    incomingPackage: ConfigurationExportPackage;
+  }): ConfigurationImportPreview {
+    const state = getState(input.tenantId);
+    state.configurationImportPreviewCounter += 1;
+    const preview = previewConfigurationImport(input.currentPackage, input.incomingPackage, {
+      id: `preview-config-import-${input.tenantId}-${state.configurationImportPreviewCounter}`,
+      actorId: input.actorId,
+      createdAt: now()
+    });
+    state.configurationImportPreviews.clear();
+    state.configurationImportPreviews.set(preview.id, {
+      preview: clone(preview),
+      incomingPackage: createConfigurationImportPackageWithChecksum(input.incomingPackage)
+    });
+
+    return clone(preview);
+  }
+
+  function applyConfigurationPackageImport(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    currentPackage: ConfigurationExportPackage;
+    previewId: string;
+    auditEventId: string;
+  }): ConfigurationImportApplyResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.tenantId);
+    const stored = state.configurationImportPreviews.get(input.previewId);
+    if (stored === undefined) {
+      throw stalePreview("configuration import preview is missing or stale");
+    }
+    if (stored.preview.actorId !== input.actorId) {
+      throw stalePreview("configuration import preview is stale");
+    }
+    const result = applyConfigurationImportPreview(input.currentPackage, {
+      preview: stored.preview,
+      incomingPackage: stored.incomingPackage,
+      auditEventId: input.auditEventId,
+      appliedAt: now()
+    });
+    state.customFieldRegistry = createCustomFieldRegistry(result.importedPackage.customFieldRegistry);
+    state.actionConfigurationPrevious = [
+      ...state.actionConfigurationPrevious,
+      createActionConfigurationSet(state.actionConfiguration)
+    ];
+    state.actionConfiguration = createActionConfigurationSet(result.importedPackage.actionConfiguration);
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `configuration-import-${input.tenantId}-${result.audit.beforeVersion}-${result.audit.afterVersion}`
+      },
+      commandType: "tenant_configuration.import_apply",
+      requiredPermission: "tenant.config.import",
+      status: "succeeded",
+      source: { entityType: "tenantConfiguration", entityId: input.tenantId },
+      target: { entityType: "tenantConfiguration", entityId: input.tenantId },
+      before: {
+        configurationVersion: result.audit.beforeVersion,
+        preview: stored.preview
+      },
+      after: {
+        configurationVersion: result.audit.afterVersion,
+        importedChecksum: result.audit.importedChecksum
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission tenant.config.import allowed"],
+      preconditionTrace: ["precondition:import preview confirmed", "precondition:configuration checksum validated"],
+      trace: ["tenant_configuration:import applied", "tenant_configuration:runtime projections refreshed"]
+    });
+    state.configurationImportActionExecutions = [...state.configurationImportActionExecutions, actionExecution];
+    state.configurationImportPreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function listConfigurationImportActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).configurationImportActionExecutions.map((entry) => clone(entry));
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -778,8 +896,17 @@ export function createPhase10RuntimeState() {
     getActionConfigurationPreview,
     listActionConfigurationActionExecutions,
     isActionEnabled,
-    getActionFormFields
+    getActionFormFields,
+    replaceCustomFieldRegistry,
+    replaceActionConfiguration,
+    previewConfigurationPackageImport,
+    applyConfigurationPackageImport,
+    listConfigurationImportActionExecutions
   };
+}
+
+export function configurationImportAuditDto(audit: ConfigurationImportApplyResult["audit"]) {
+  return { ...audit };
 }
 
 export function buildRuntimeLabelProjection(labelSet: TenantLabelSet) {

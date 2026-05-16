@@ -2,7 +2,7 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T04:42:55.9899525+07:00",
+  "updated_at": "2026-05-17T05:08:31.3726613+07:00",
   "rows": [
     {
       "id": "P10-001",
@@ -320,14 +320,32 @@
         "E2E-095"
       ],
       "evidence": [
-        "P10 contract defines preview/validate/publish/export/import APIs, permission checks, and audit requirements before implementation."
+        "P10 contract defines preview/validate/publish/export/import APIs, permission checks, and audit requirements before implementation.",
+        "packages/tenant-config/src/index.ts implements ConfigurationExportPackage, checksum generation/validation, ConfigurationImportPreview, validation issues with recovery text, non-mutating import preview, stale/invalid preview rejection, tenant mismatch detection, checksum mismatch detection, and import apply audit metadata.",
+        "apps/api/src/phase10Runtime.ts and apps/api/src/app.ts expose GET /api/tenant/configuration, GET /api/tenant/configuration/versions, POST /api/tenant/configuration/validate, POST /api/tenant/configuration/preview, POST /api/tenant/configuration/publish, GET /api/tenant/configuration/export, POST /api/tenant/configuration/import/preview, and POST /api/tenant/configuration/import/apply.",
+        "apps/api/src/phase10ConfigurationApi.test.ts proves overview/read model, pure validation without consuming preview tokens, tenant-safe export with checksum, import preview without mutation, import apply with label/action runtime readback, audit/action evidence, read-only export denial, cross-tenant import denial without leakage, checksum mismatch validation, stale preview rejection, and no partial write.",
+        "apps/web/src/ConfigurationOverviewSurface.tsx and apps/web/src/configurationOverviewApiClient.ts implement the Russian configuration overview surface with TanStack Query server state, active version readback, validation summary, export/import JSON controls, preview-before-apply, API refetch/readback, audit/result evidence, read-only state, API error state, and recoverable validation errors.",
+        "apps/web/src/ConfigurationOverviewSurface.test.tsx proves the surface loads active configuration, handles API error, exports, previews import without applied success state, applies only through API readback, shows audit/action evidence, blocks read-only mutation, shows validation errors, disables apply on invalid preview, and refreshes from API."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/tenant-config/src/configurationExportImport.test.ts exit 1 RED: configuration export/import helpers were missing before implementation",
+        "npm test -- apps/api/src/phase10ConfigurationApi.test.ts exit 1 RED: /api/tenant/configuration and import/export routes were missing before implementation",
+        "npm test -- apps/web/src/ConfigurationOverviewSurface.test.tsx exit 1 RED: ConfigurationOverviewSurface and configurationOverviewApiClient were missing before implementation",
+        "npm test -- apps/api/src/phase10ConfigurationApi.test.ts exit 1 RED after bug-hunt: validate consumed existing import preview token before pure-validation fix",
+        "npm test -- packages/tenant-config/src/configurationExportImport.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10ConfigurationApi.test.ts exit 0: 1 file, 4 tests passed",
+        "npm test -- apps/web/src/ConfigurationOverviewSurface.test.tsx exit 0: 1 file, 3 tests passed",
+        "npm test -- packages/tenant-config apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/api/src/phase10CustomFieldsApi.test.ts apps/api/src/phase10KpiThresholdsApi.test.ts apps/api/src/phase10SavedViewsApi.test.ts apps/api/src/phase10ActionConfigsApi.test.ts apps/api/src/phase10ConfigurationApi.test.ts exit 0: 15 files, 56 tests passed",
+        "npm test -- apps/web/src exit 0: 18 files, 115 tests passed",
+        "npm run test:integration exit 0: 19 files, 94 tests passed",
+        "npm test exit 0: 92 files, 525 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore preview tokens, import previews, configuration versions, and audit/action evidence before verification.",
-      "blocker": "Blocked until P10-008 implementation adds validation/preview/publish/export/import API/UI support and E2E-090..095 prove permission, audit, readback, reload, and cleanup.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime configuration import previews, imported label/action/custom-field config state, export packages, validation results, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 2 and Phase 10 runtimes, restoring label sets, custom-field registry, action configuration, import previews, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-090..095.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-008 remains blocked for strict phase verification until P10-009 E2E-090..095 prove browser reload persistence, validation/export/import flows, backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T05:08:31.3726613+07:00",
       "e2e_evidence": []
     },
     {
