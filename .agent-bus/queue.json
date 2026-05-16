@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T21:31:51.000+07:00",
+  "updated_at": "2026-05-16T21:46:31.000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2907,7 +2907,7 @@
         "P8-004"
       ],
       "title": "Implement governed action execution API and dry-run preview",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -2955,7 +2955,76 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P8 runnable block. Implement preview/execute/audit API/runtime for governed actions; keep web UI, fixtures, and E2E for later blocks."
+      "notes": "Completed P8-004 governed action API foundation. apps/api now exposes action list, preview, execute, execution readback, and audit routes; preview validates target/input/permission and does not mutate; execute rechecks stored preview target permission, rejects missing/stale previews, and returns not_implemented for domain bindings until P8-006/P8-007/P8-008 to avoid fake success logs. Matrix row remains blocked for real domain binding and E2E evidence.",
+      "completed_at": "2026-05-16T21:46:31.000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-004-governed-action-execution-api-dry-run-preview --once exit 0 at startup",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED: P8 action routes returned 404 before implementation",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- packages/action-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 4 files, 21 tests passed",
+        "npm run test:integration exit 0: 11 files, 57 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 59 files, 374 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-005-portfolio-control-surface-mvp",
+      "aliases": [
+        "P8-005"
+      ],
+      "title": "Implement Portfolio Control surface MVP",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-004-governed-action-execution-api-dry-run-preview"
+      ],
+      "write_scope": [
+        "apps/web/src/**",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-005-portfolio-control-surface-mvp.claim.json",
+        ".agent-bus/sessions/P8-005-portfolio-control-surface-mvp.md"
+      ],
+      "forbidden": [
+        "apps/api/src/app.ts",
+        "apps/api/src/phase8Runtime.ts",
+        "packages/action-engine/**",
+        "packages/control-surfaces/**",
+        "packages/kpi-engine/**",
+        "packages/resource-planning/**",
+        "packages/project-core/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-005-portfolio-control-surface-mvp --once",
+        "npm test -- apps/web/src",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P8 runnable block. Implement Portfolio Control web surface against existing P8 read/action APIs; keep domain command binding implementations and E2E fixtures for later blocks."
     }
   ]
 }

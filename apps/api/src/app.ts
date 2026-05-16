@@ -47,6 +47,7 @@ type ApiErrorCode =
   | "not_found"
   | "conflict"
   | "precondition_failed"
+  | "dry_run_required"
   | "stale_preview"
   | "not_implemented"
   | "test_mode_only";
@@ -388,6 +389,31 @@ const kpiEvaluationRunSchema = z
   })
   .strict();
 
+const controlActionTargetSchema = z
+  .object({
+    surfaceId: z.string().trim().min(1),
+    surfaceKey: z.string().trim().min(1),
+    rowId: z.string().trim().min(1),
+    entityType: z.string().trim().min(1),
+    entityId: z.string().trim().min(1)
+  })
+  .strict();
+
+const controlActionPreviewSchema = z
+  .object({
+    target: controlActionTargetSchema,
+    input: z.record(z.string(), z.unknown()).optional()
+  })
+  .strict();
+
+const controlActionExecuteSchema = z
+  .object({
+    previewId: z.string().trim().min(1).optional(),
+    target: controlActionTargetSchema.optional(),
+    input: z.record(z.string(), z.unknown()).optional()
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -484,13 +510,15 @@ function assertAllowed(
   session: Phase2RuntimeSession,
   permissionKey: string,
   target: { entityType: string; tenantId: string; entityId?: string },
-  requestedScope?: string
+  requestedScope?: string,
+  contextRefs?: { projectIds?: string[] }
 ) {
   const evaluation = runtime.evaluatePolicy({
     session,
     permissionKey,
     target,
-    ...(requestedScope !== undefined ? { requestedScope } : {})
+    ...(requestedScope !== undefined ? { requestedScope } : {}),
+    ...(contextRefs !== undefined ? { contextRefs } : {})
   });
 
   if (!evaluation.allowed) {
@@ -1689,6 +1717,149 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/control/surfaces/:surfaceId/actions", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("surfaceId")
+      });
+      return context.json({
+        actions: phase8Runtime.listActionDefinitions(session.user.tenantId, context.req.param("surfaceId")).map((definition) => ({
+          id: definition.id,
+          key: definition.key,
+          label: definition.label,
+          description: definition.description,
+          version: definition.version,
+          targetEntityType: definition.targetEntityType,
+          commandType: definition.commandBinding.commandType,
+          requiredPermission: definition.requiredPermission,
+          dryRunRequired: definition.dryRunRequired,
+          inputSchema: definition.inputSchema
+        }))
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/control/actions/:actionDefinitionId/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
+      const body = controlActionPreviewSchema.parse(await parseJson(context));
+      const policyContext = phase8Runtime.getActionTargetPolicyContext({
+        tenantId: session.user.tenantId,
+        target: body.target,
+        phase6Runtime,
+        phase7Runtime
+      });
+      assertAllowed(runtime, session, actionDefinition.requiredPermission, {
+        entityType: policyContext.entityType,
+        tenantId: policyContext.tenantId,
+        entityId: policyContext.entityId,
+        ...(policyContext.ownerId !== undefined ? { ownerId: policyContext.ownerId } : {}),
+        ...(policyContext.projectId !== undefined ? { projectId: policyContext.projectId } : {})
+      }, undefined, policyContext.contextRefs);
+      const preview = phase8Runtime.previewAction({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        actionDefinitionId: actionDefinition.id,
+        target: body.target,
+        commandInput: body.input ?? {},
+        phase6Runtime,
+        phase7Runtime
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/control/actions/:actionDefinitionId/execute", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
+      const body = controlActionExecuteSchema.parse(await parseJson(context));
+      const previewForPolicy =
+        body.previewId !== undefined ? phase8Runtime.getActionPreview(session.user.tenantId, body.previewId) : undefined;
+      const targetForPolicy = previewForPolicy?.target ?? body.target;
+      const targetPolicyContext =
+        targetForPolicy !== undefined
+          ? phase8Runtime.getActionTargetPolicyContext({
+              tenantId: session.user.tenantId,
+              target: targetForPolicy,
+              phase6Runtime,
+              phase7Runtime
+            })
+          : undefined;
+      const permissionEvaluation =
+        targetPolicyContext !== undefined
+          ? assertAllowed(runtime, session, actionDefinition.requiredPermission, {
+              entityType: targetPolicyContext.entityType,
+              tenantId: targetPolicyContext.tenantId,
+              entityId: targetPolicyContext.entityId,
+              ...(targetPolicyContext.ownerId !== undefined ? { ownerId: targetPolicyContext.ownerId } : {}),
+              ...(targetPolicyContext.projectId !== undefined ? { projectId: targetPolicyContext.projectId } : {})
+            }, undefined, targetPolicyContext.contextRefs)
+          : assertAllowed(runtime, session, actionDefinition.requiredPermission, {
+              entityType: actionDefinition.targetEntityType,
+              tenantId: session.user.tenantId
+            });
+      const result = phase8Runtime.executeAction({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        accessProfileId: session.user.accessProfileId,
+        actionDefinitionId: actionDefinition.id,
+        ...(body.target !== undefined ? { target: body.target } : {}),
+        ...(body.input !== undefined ? { commandInput: body.input } : {}),
+        ...(body.previewId !== undefined ? { previewId: body.previewId } : {}),
+        phase6Runtime,
+        phase7Runtime,
+        permissionTrace: permissionEvaluation.trace
+      });
+
+      return context.json({ result });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/control/actions/:executionId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "actionExecution",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("executionId")
+      });
+      const actionExecution = phase8Runtime.getActionExecution(session.user.tenantId, context.req.param("executionId"));
+      if (actionExecution === undefined) {
+        throw Object.assign(new Error("action execution not found"), { code: "not_found" });
+      }
+
+      return context.json({ actionExecution });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/control/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "actionExecution",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ actionExecutions: phase8Runtime.listActionExecutions(session.user.tenantId) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/projects/:projectId", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -2874,8 +3045,14 @@ function handleRouteError(context: Context, error: unknown) {
   if (typeof error === "object" && error !== null && "code" in error && error.code === "precondition_failed") {
     return context.json(errorDto("precondition_failed", "Условия действия не выполнены"), 409);
   }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "dry_run_required") {
+    return context.json(errorDto("dry_run_required", "Требуется предварительный просмотр"), 409);
+  }
   if (typeof error === "object" && error !== null && "code" in error && error.code === "stale_preview") {
     return context.json(errorDto("stale_preview", "Предпросмотр устарел"), 409);
+  }
+  if (typeof error === "object" && error !== null && "code" in error && error.code === "not_implemented") {
+    return context.json(errorDto("not_implemented", "Действие еще не подключено к доменной команде"), 501);
   }
   if (typeof error === "object" && error !== null && "code" in error && error.code === "validation_error") {
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);

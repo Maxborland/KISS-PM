@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T21:31:23.2267101+07:00",
+  "updated_at": "2026-05-16T21:45:59.9284450+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -117,14 +117,23 @@
         "E2E-074"
       ],
       "evidence": [
-        "Phase 8 contract requires action preview/execute/audit routes, stale preview handling, permission guard, precondition validation, and no mutation during denied/invalid preview."
+        "apps/api/src/app.ts exposes GET /api/control/surfaces/:surfaceId/actions, POST /api/control/actions/:actionDefinitionId/preview, POST /api/control/actions/:actionDefinitionId/execute, GET /api/control/actions/:executionId, and GET /api/control/audit.",
+        "apps/api/src/phase8Runtime.ts provides deterministic action definitions, preview tokens, target lookup from P8 read rows, strict input-schema validation, stale-preview/dry-run-required errors, audit readback storage, and tenant-scoped action state.",
+        "Preview validates the actual target row and backend permission scope using the same row policy context as the read model, returns mutatesState=false, and does not create action/audit evidence.",
+        "Execute rechecks permission against the stored preview target, rejects missing/stale previews, and returns not_implemented for domain command bindings until P8-006/P8-007/P8-008 wire canonical task/resource/risk mutations; this prevents fake-success action logs.",
+        "apps/api/src/phase8ActionExecutionApi.test.ts verifies action listing without execute URLs, dry-run no mutation, not_implemented instead of fake domain execution, read-only direct API denial, required input validation, stale preview handling, execute permission recheck against stored preview targets, tenant isolation, and unknown action 404."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED: P8 action list/preview/execute/audit routes returned 404 before implementation",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- packages/action-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 4 files, 21 tests passed",
+        "npm run test:integration exit 0: 11 files, 57 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until API write-flow cleanup/readback exists.",
-      "blocker": "P8-004 implementation has not started. Need action API/runtime, direct API denial tests, dry-run no-mutation tests, E2E-072/E2E-073/E2E-074 evidence, and audit proof.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-004 action previews/executions are deterministic in-memory tenant state recreated by /test-fixtures/reset. Preview no-mutation and empty audit after denied/not-implemented execution are API-tested; E2E cleanup/readback remains pending for P8-009.",
+      "blocker": "P8-004 API foundation is implemented and tested, but row remains blocked for phase-exit verification because domain command bindings intentionally return not_implemented until P8-006/P8-007/P8-008, and E2E-072/E2E-073/E2E-074 evidence is still missing.",
+      "last_checked_at": "2026-05-16T21:45:59.9284450+07:00",
       "e2e_evidence": []
     },
     {
