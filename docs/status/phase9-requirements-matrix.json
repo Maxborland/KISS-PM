@@ -201,11 +201,27 @@
       "required_e2e": [
         "E2E-082"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. API readback and permission cleanup evidence must be added before verification.",
-      "blocker": "P9 closed portfolio/trends API does not exist yet; E2E-082 is still planned.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "apps/api/src/phase9Runtime.ts builds closed portfolio read models from tenant-scoped ClosedProjectSnapshot records using packages/control-surfaces createControlSurfaceReadModel.",
+        "GET /api/retrospectives/closed-portfolio returns snapshot rows, plan/fact fields, trend summary counts, allowed action states, pagination, and filter readback for templateId/clientId/period.",
+        "GET /api/retrospectives/trends returns deterministic RetrospectiveTrend read models and derived RetrospectiveInsight records from closed snapshots only.",
+        "GET /api/retrospectives/insights/:insightId returns source trend/snapshot/lesson trace and allowed template-improvement action metadata without mutation URLs.",
+        "Read-only users can read closed portfolio/trend/insight data but receive unavailable action states and direct backend denial for template-improvement mutation attempts.",
+        "Tenant B receives not_found/no-leak for Tenant A retrospective insight ids."
+      ],
+      "tests": [
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED: /api/retrospectives/closed-portfolio and /api/retrospectives/trends returned 404 before P9-006 implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/retrospectives packages/control-surfaces exit 0: 5 files, 26 tests passed",
+        "npm run test:integration exit 0: 12 files, 70 tests passed",
+        "npm test exit 0: 66 files, 425 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 1 before review fix: unused calculatePlanFactMetrics import",
+        "npm run lint exit 0 after review fix"
+      ],
+      "cleanup": "P9-006 uses deterministic in-memory API runtime state. API tests create isolated app instances, prove denied read-only mutation leaves insight status open, prove Tenant B cannot read Tenant A insight ids, and rely on test-only reset/runtime isolation. Full browser reload/reset cleanup remains blocked until P9-009 E2E-082.",
+      "blocker": "Closed portfolio/trends API read models are implemented, but P9-006 remains blocked until P9 closed portfolio UI and executable E2E-082 prove browser readback, reload persistence, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T01:07:11.3735029+07:00",
       "e2e_evidence": []
     },
     {

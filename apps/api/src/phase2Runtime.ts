@@ -222,6 +222,11 @@ const phase2PermissionCatalog = [
     category: "retrospectives"
   }),
   createPermission({
+    key: "retrospective.improvement.write",
+    description: "Preview and execute governed template-improvement actions from retrospective insights",
+    category: "retrospectives"
+  }),
+  createPermission({
     key: "schedule:read",
     description: "Open schedule and Gantt drilldowns from control surfaces",
     category: "scheduling"
@@ -273,6 +278,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "risk:accept",
       "retrospective.read",
       "retrospective.write",
+      "retrospective.improvement.write",
       "schedule:read"
     ],
     project_manager: [
@@ -303,6 +309,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "control.action:write",
       "retrospective.read",
       "retrospective.write",
+      "retrospective.improvement.write",
       "schedule:read"
     ],
     resource_manager: [

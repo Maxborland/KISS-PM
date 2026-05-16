@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T00:52:54.1130250+07:00",
+  "updated_at": "2026-05-17T01:07:11.3735029+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3739,7 +3739,7 @@
         "P9-006"
       ],
       "title": "Implement closed portfolio and trends API read models",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3784,7 +3784,72 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Expose closed portfolio/trends read models through API with permission states, tenant isolation, trend/insight readback, pagination/filter basics, and no mutation URLs for read-only users. Do not implement web UI/E2E in this block."
+      "notes": "Accepted 2026-05-17T01:07:11.3735029+07:00. Exposed closed portfolio/trends/insight read models through API with permission states, tenant isolation, trend/insight readback, pagination/filter basics, no mutation URLs for read-only users, and direct read-only backend mutation denial. Matrix row remains blocked only for later UI/E2E-082 browser readback/reload/cleanup evidence.",
+      "completed_at": "2026-05-17T01:07:11.3735029+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-006-closed-portfolio-trends-api-read-models --once exit 0 at startup",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED: /api/retrospectives/closed-portfolio and /api/retrospectives/trends returned 404 before implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/retrospectives packages/control-surfaces exit 0: 5 files, 26 tests passed",
+        "npm run test:integration exit 0: 12 files, 70 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 1 before review fix: unused calculatePlanFactMetrics import",
+        "npm run lint exit 0 after review fix",
+        "npm test exit 0: 66 files, 425 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P9-007-closed-portfolio-retrospective-trends-ui",
+      "aliases": [
+        "P9-007"
+      ],
+      "title": "Implement closed portfolio and retrospective trends UI",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-006-closed-portfolio-trends-api-read-models"
+      ],
+      "write_scope": [
+        "apps/web/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-007-closed-portfolio-retrospective-trends-ui.claim.json",
+        ".agent-bus/sessions/P9-007-closed-portfolio-retrospective-trends-ui.md"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-007-closed-portfolio-retrospective-trends-ui --once",
+        "npm test -- apps/web/src",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Implement closed portfolio/trends management UI over the accepted P9-006 API with loading/empty/error/denied states, stable snapshot metrics, trend explanation, one clear next action entry, API readback, and reload persistence. Do not implement E2E fixtures in this block unless explicitly reached."
     }
   ]
 }
