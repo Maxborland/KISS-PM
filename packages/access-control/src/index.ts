@@ -109,6 +109,42 @@ export const TENANT_CONFIG_IMPORT_PERMISSION: Permission = {
   category: "tenant_configuration"
 };
 
+export const INTEGRATION_READ_PERMISSION: Permission = {
+  key: "integration.read",
+  description: "Read integration adapters and connections",
+  category: "integrations"
+};
+
+export const INTEGRATION_PREVIEW_PERMISSION: Permission = {
+  key: "integration.preview",
+  description: "Preview external imports without mutation",
+  category: "integrations"
+};
+
+export const INTEGRATION_APPLY_PERMISSION: Permission = {
+  key: "integration.apply",
+  description: "Apply governed external imports",
+  category: "integrations"
+};
+
+export const INTEGRATION_MAPPING_READ_PERMISSION: Permission = {
+  key: "integration.mapping.read",
+  description: "Read external mapping diagnostics",
+  category: "integrations"
+};
+
+export const INTEGRATION_AUDIT_READ_PERMISSION: Permission = {
+  key: "integration.audit.read",
+  description: "Read integration sync audit events",
+  category: "integrations"
+};
+
+export const INTEGRATION_ADMIN_PERMISSION: Permission = {
+  key: "integration.admin",
+  description: "Administer integration adapter diagnostics",
+  category: "integrations"
+};
+
 export class AccessControlModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
