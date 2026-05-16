@@ -534,6 +534,7 @@ export function createPhase9RuntimeState() {
       insight,
       allowedActions: [
         actionForInsight(
+          insight.status === "open" &&
           actorPermissionKeys.includes("retrospective.improvement.write") &&
             actorPermissionKeys.includes("tenant.config.write")
         )
