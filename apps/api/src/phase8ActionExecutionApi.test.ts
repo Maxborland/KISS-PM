@@ -30,6 +30,14 @@ const resourceTarget = {
   entityId: "overload:resource-architect-a:2026-06-01:2026-06-05"
 };
 
+const warningTarget = {
+  surfaceId: "portfolio-control",
+  surfaceKey: "portfolio.control",
+  rowId: "row-kpi-signal-kpi-schedule-variance-a-warning",
+  entityType: "kpi_signal",
+  entityId: "signal-kpi-schedule-variance-a-warning"
+};
+
 async function createDraft(app: ReturnType<typeof createApiApp>, testUser = "project-manager-a") {
   const response = await app.request(
     `/api/crm/opportunities/opportunity-seed-ready/project-draft?testUser=${testUser}`,
@@ -76,6 +84,20 @@ describe("Phase 8 governed action execution API", () => {
           dryRunRequired: true
         }),
         expect.objectContaining({
+          id: "action-escalate-signal",
+          key: "escalate",
+          commandType: "signal.escalate",
+          requiredPermission: "control.action:write",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
+          id: "action-request-explanation",
+          key: "request_explanation",
+          commandType: "signal.request_explanation",
+          requiredPermission: "control.action:write",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
           id: "action-reassign-resource",
           key: "reassign_resource",
           requiredPermission: "resource.write",
@@ -104,7 +126,7 @@ describe("Phase 8 governed action execution API", () => {
     expect(text).not.toContain("/execute");
   });
 
-  it("previews dry-run actions without mutation and does not fake domain execution before bindings exist", async () => {
+  it("accepts KPI risk with mandatory reason, audit evidence, and portfolio readback", async () => {
     const app = createApiApp({ allowTestFixtureReset: true });
 
     const auditBefore = await app.request("/api/control/audit?testUser=tenant-admin-a");
@@ -132,12 +154,40 @@ describe("Phase 8 governed action execution API", () => {
       "/api/control/actions/action-accept-risk/execute?testUser=tenant-admin-a",
       jsonRequest({ previewId: previewBody.preview.id })
     );
-    expect(execute.status).toBe(501);
-    await expect(readJson(execute)).resolves.toMatchObject({ code: "not_implemented" });
+    expect(execute.status).toBe(200);
+    const executeBody = (await readJson(execute)) as { result: { id: string; correlationId: string } };
 
     const auditAfterExecute = await app.request("/api/control/audit?testUser=tenant-admin-a");
     expect(auditAfterExecute.status).toBe(200);
-    await expect(readJson(auditAfterExecute)).resolves.toMatchObject({ actionExecutions: [] });
+    await expect(readJson(auditAfterExecute)).resolves.toMatchObject({
+      actionExecutions: [
+        expect.objectContaining({
+          id: executeBody.result.id,
+          commandType: "risk.accept",
+          source: { entityType: "kpi_signal", entityId: target.entityId },
+          target: { entityType: "kpi_signal", entityId: target.entityId },
+          inputSummary: {
+            reason: "Контролируемый риск до перепланирования",
+            expiresAt: "2026-06-30"
+          },
+          auditEventIds: expect.arrayContaining([expect.stringContaining("audit-")])
+        })
+      ]
+    });
+
+    const view = await app.request("/api/control/surfaces/portfolio-control/view?testUser=tenant-admin-a");
+    expect(view.status).toBe(200);
+    await expect(readJson(view)).resolves.toMatchObject({
+      rows: expect.arrayContaining([
+        expect.objectContaining({
+          id: target.rowId,
+          explanation: expect.stringContaining("Риск принят"),
+          actions: expect.arrayContaining([
+            expect.objectContaining({ key: "accept_risk", available: false, unavailableReason: "not_recommended" })
+          ])
+        })
+      ])
+    });
   });
 
   it("denies direct preview for users without action permission and does not create audit evidence", async () => {
@@ -175,11 +225,11 @@ describe("Phase 8 governed action execution API", () => {
       "/api/control/actions/action-accept-risk/execute?testUser=tenant-admin-a",
       jsonRequest({ previewId: previewBody.preview.id })
     );
-    expect(firstExecute.status).toBe(501);
+    expect(firstExecute.status).toBe(200);
 
     const secondExecute = await app.request(
       "/api/control/actions/action-accept-risk/execute?testUser=tenant-admin-a",
-      jsonRequest({ previewId: "missing-preview" })
+      jsonRequest({ previewId: previewBody.preview.id })
     );
     expect(secondExecute.status).toBe(409);
     await expect(readJson(secondExecute)).resolves.toMatchObject({ code: "stale_preview" });
@@ -194,6 +244,36 @@ describe("Phase 8 governed action execution API", () => {
     );
     expect(response.status).toBe(400);
     await expect(readJson(response)).resolves.toMatchObject({ code: "validation_error" });
+    const audit = await app.request("/api/control/audit?testUser=tenant-admin-a");
+    await expect(readJson(audit)).resolves.toMatchObject({ actionExecutions: [] });
+  });
+
+  it("rejects malformed risk expiry and cross-actor explanation targets without partial mutation", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const malformedExpiry = await app.request(
+      "/api/control/actions/action-accept-risk/preview?testUser=tenant-admin-a",
+      jsonRequest({ target, input: { reason: "Дата должна валидироваться", expiresAt: "not-a-date" } })
+    );
+    expect(malformedExpiry.status).toBe(400);
+    await expect(readJson(malformedExpiry)).resolves.toMatchObject({ code: "validation_error" });
+
+    const invalidRequestedFrom = await app.request(
+      "/api/control/actions/action-request-explanation/preview?testUser=tenant-admin-b",
+      jsonRequest({
+        target: {
+          surfaceId: "portfolio-control",
+          surfaceKey: "portfolio.control",
+          rowId: "row-kpi-signal-kpi-private-b-warning",
+          entityType: "kpi_signal",
+          entityId: "signal-kpi-private-b-warning"
+        },
+        input: { reason: "Нельзя ссылаться на пользователя другого tenant", requestedFrom: "project-manager-a" }
+      })
+    );
+    expect(invalidRequestedFrom.status).toBe(400);
+    await expect(readJson(invalidRequestedFrom)).resolves.toMatchObject({ code: "validation_error" });
+
     const audit = await app.request("/api/control/audit?testUser=tenant-admin-a");
     await expect(readJson(audit)).resolves.toMatchObject({ actionExecutions: [] });
   });
@@ -236,6 +316,54 @@ describe("Phase 8 governed action execution API", () => {
       })
     });
     expect(updateResponse.status).toBe(200);
+
+    const execute = await app.request(
+      "/api/control/actions/action-accept-risk/execute?testUser=tenant-admin-a",
+      jsonRequest({ previewId: previewBody.preview.id })
+    );
+    expect(execute.status).toBe(403);
+    const audit = await app.request("/api/control/audit?testUser=tenant-admin-a");
+    await expect(readJson(audit)).resolves.toMatchObject({ actionExecutions: [] });
+  });
+
+  it("requires generic control.action:write in addition to risk:accept when accepting risk", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const profilesResponse = await app.request("/admin/access-profiles?testUser=tenant-admin-a");
+    const profilesBody = (await readJson(profilesResponse)) as {
+      profiles: Array<{
+        id: string;
+        version: number;
+        systemKey: string;
+        label: string;
+        permissions: string[];
+        scopeRules: Array<{ permissionKey: string; scope: string }>;
+        active: boolean;
+      }>;
+    };
+    const tenantAdminProfile = profilesBody.profiles.find((profile) => profile.systemKey === "tenant_admin")!;
+    const updateResponse = await app.request("/admin/access-profiles?testUser=tenant-admin-a", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: tenantAdminProfile.id,
+        version: tenantAdminProfile.version,
+        systemKey: tenantAdminProfile.systemKey,
+        label: tenantAdminProfile.label,
+        permissions: tenantAdminProfile.permissions,
+        scopeRules: tenantAdminProfile.scopeRules.map((rule) =>
+          rule.permissionKey === "control.action:write" ? { ...rule, scope: "own" } : rule
+        ),
+        active: tenantAdminProfile.active
+      })
+    });
+    expect(updateResponse.status).toBe(200);
+
+    const preview = await app.request(
+      "/api/control/actions/action-accept-risk/preview?testUser=tenant-admin-a",
+      jsonRequest({ target, input: { reason: "risk:accept есть, control.action:write запрещен" } })
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = (await readJson(preview)) as { preview: { id: string } };
 
     const execute = await app.request(
       "/api/control/actions/action-accept-risk/execute?testUser=tenant-admin-a",
@@ -651,6 +779,79 @@ describe("Phase 8 governed action execution API", () => {
     expect(riskView.status).toBe(200);
     await expect(readJson(riskView)).resolves.toMatchObject({
       rows: expect.not.arrayContaining([expect.objectContaining({ id: "row-resource-overload-resource-architect-a" })])
+    });
+  });
+
+  it("creates escalation and request-explanation action records with audit and refreshed signal status", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const escalationPreview = await app.request(
+      "/api/control/actions/action-escalate-signal/preview?testUser=project-manager-a",
+      jsonRequest({
+        target,
+        input: { reason: "Нужно решение управляющего комитета", escalationLevel: "steering_committee" }
+      })
+    );
+    expect(escalationPreview.status).toBe(200);
+    const escalationPreviewBody = (await readJson(escalationPreview)) as { preview: { id: string } };
+    const escalationExecute = await app.request(
+      "/api/control/actions/action-escalate-signal/execute?testUser=project-manager-a",
+      jsonRequest({ previewId: escalationPreviewBody.preview.id })
+    );
+    expect(escalationExecute.status).toBe(200);
+    await expect(readJson(escalationExecute)).resolves.toMatchObject({
+      result: {
+        commandType: "signal.escalate",
+        inputSummary: {
+          reason: "Нужно решение управляющего комитета",
+          escalationLevel: "steering_committee"
+        }
+      }
+    });
+
+    const explanationPreview = await app.request(
+      "/api/control/actions/action-request-explanation/preview?testUser=project-manager-a",
+      jsonRequest({
+        target: warningTarget,
+        input: { reason: "Нужен комментарий по росту фактических часов", requestedFrom: "project-manager-a" }
+      })
+    );
+    expect(explanationPreview.status).toBe(200);
+    const explanationPreviewBody = (await readJson(explanationPreview)) as { preview: { id: string } };
+    const explanationExecute = await app.request(
+      "/api/control/actions/action-request-explanation/execute?testUser=project-manager-a",
+      jsonRequest({ previewId: explanationPreviewBody.preview.id })
+    );
+    expect(explanationExecute.status).toBe(200);
+    await expect(readJson(explanationExecute)).resolves.toMatchObject({
+      result: {
+        commandType: "signal.request_explanation",
+        inputSummary: {
+          reason: "Нужен комментарий по росту фактических часов",
+          requestedFrom: "project-manager-a"
+        }
+      }
+    });
+
+    const audit = await app.request("/api/control/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.toMatchObject({
+      actionExecutions: expect.arrayContaining([
+        expect.objectContaining({ commandType: "signal.escalate", source: { entityType: "kpi_signal", entityId: target.entityId } }),
+        expect.objectContaining({
+          commandType: "signal.request_explanation",
+          source: { entityType: "kpi_signal", entityId: warningTarget.entityId }
+        })
+      ])
+    });
+
+    const view = await app.request("/api/control/surfaces/portfolio-control/view?testUser=project-manager-a");
+    expect(view.status).toBe(200);
+    await expect(readJson(view)).resolves.toMatchObject({
+      rows: expect.arrayContaining([
+        expect.objectContaining({ id: target.rowId, explanation: expect.stringContaining("Эскалация создана") }),
+        expect.objectContaining({ id: warningTarget.rowId, explanation: expect.stringContaining("Запрошено объяснение") })
+      ])
     });
   });
 });

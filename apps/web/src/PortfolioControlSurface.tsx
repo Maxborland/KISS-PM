@@ -65,11 +65,29 @@ function rowStringField(row: ControlSurfaceReadRowDto | undefined, key: string):
   return typeof value === "string" ? value : "";
 }
 
-function createInputForAction(action: PortfolioActionDefinitionDto, row?: ControlSurfaceReadRowDto): Record<string, unknown> {
+function createInputForAction(
+  action: PortfolioActionDefinitionDto,
+  row: ControlSurfaceReadRowDto | undefined,
+  currentTenant: CurrentTenantDto
+): Record<string, unknown> {
   if (action.key === "accept_risk") {
     return {
       reason: "Контролируемый риск до перепланирования",
       expiresAt: "2026-06-30"
+    };
+  }
+
+  if (action.key === "escalate") {
+    return {
+      reason: "Нужно решение управляющего комитета",
+      escalationLevel: "steering_committee"
+    };
+  }
+
+  if (action.key === "request_explanation") {
+    return {
+      reason: "Нужен комментарий по отклонению",
+      requestedFrom: currentTenant.actor.id
     };
   }
 
@@ -261,7 +279,7 @@ export function PortfolioControlSurface({
           entityType: row.entityType,
           entityId: row.entityId
         },
-        input: createInputForAction(actionDefinition, row)
+        input: createInputForAction(actionDefinition, row, currentTenant)
       })
   });
   const executeMutation = useMutation({

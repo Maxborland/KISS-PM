@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T22:56:16.0862985+07:00",
+  "updated_at": "2026-05-16T23:15:32.9030048+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -269,14 +269,28 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires accepted-risk/deviation action with mandatory reason, escalation/request-explanation records, backend permission guard, audit, and refreshed signal status."
+        "Phase 8 contract requires accepted-risk/deviation action with mandatory reason, escalation/request-explanation records, backend permission guard, audit, and refreshed signal status.",
+        "apps/api/src/phase8Runtime.ts now defines governed P8 action definitions for accept_risk, escalate, and request_explanation with required reason fields, dry-run policy, command bindings, permission requirements, and source-surface audit policy.",
+        "apps/api/src/phase8Runtime.ts executes signal actions only after preview, validates the stored target row, rejects duplicate handled-signal actions, creates action execution records with reason/expiry/escalation/request summaries, and updates the P8 signal action readback only after attachAuditEvent receives a real audit event id.",
+        "apps/api/src/app.ts enforces the generic control.action:write backend guard in addition to risk:accept before accepted-risk execute, preventing risk-only profiles from applying a governed management action.",
+        "Portfolio read models now show handled KPI signal status for accepted risk, escalation, or requested explanation, remove further recommended actions for handled signals, and preserve action_execution source refs for audit traceability.",
+        "apps/web/src/PortfolioControlSurface.tsx builds explicit Russian/default inputs for accept_risk, escalate, and request_explanation instead of schema-label fallback values, and request-explanation uses the current actor id to avoid cross-tenant hardcoded assignee evidence.",
+        "Review hardening fixed P8-008 permission/data-quality gaps: date fields now reject invalid dates, request_explanation rejects requestedFrom values that do not match the current actor, and accepted risk requires the generic action permission at execute time."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED: accept_risk execute still returned 501 and escalation/request_explanation actions were not listed/found before P8-008 implementation",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 15 tests passed; covers accept risk preview/no mutation, execute with mandatory reason, audit reason summary, portfolio readback handled status, dry-run-required direct execute denial, stale preview reuse denial, missing reason validation, malformed expiry rejection, cross-actor requestedFrom rejection, generic control.action:write execute guard, permission recheck denial, cross-tenant no-leak, escalation execution, request-explanation execution, audit evidence, and refreshed signal status",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 13 tests passed; covers explicit UI inputs for accept risk, escalation, and request explanation plus existing readback/audit states",
+        "npm test -- packages/action-engine packages/kpi-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx exit 0: 5 files, 47 tests passed",
+        "npm run test:integration exit 0: 11 files, 65 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 395 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until risk/escalation cleanup/reset and readback proof exist.",
-      "blocker": "P8-008 implementation has not started. Need accepted-risk/escalation action records, missing-reason tests, permission denial, E2E-073/E2E-074/E2E-075 evidence, and audit reason summary.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-008 state is deterministic in-memory API runtime state. API tests prove preview no-mutation, accepted-risk/escalation/request-explanation action execution, audit reason summary, denied/malformed requests without action evidence, generic permission denial without action evidence, and refreshed Portfolio Control readback. Browser E2E reload/reset cleanup remains pending for P8-009.",
+      "blocker": "P8-008 implementation and API/UI regression evidence are present, but row remains blocked for phase-exit verification until E2E-073/E2E-074/E2E-075 prove the browser UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
+      "last_checked_at": "2026-05-16T23:15:32.9030048+07:00",
       "e2e_evidence": []
     },
     {

@@ -3187,7 +3187,7 @@
         "P8-008"
       ],
       "title": "Implement accept risk, escalation, and request explanation bindings",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -3238,7 +3238,78 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next Phase 8 block. Implement accepted-risk/deviation, escalation, and request-explanation action records with mandatory reason, backend permission guards, audit/action evidence, refreshed signal/control-surface readback, direct API denial tests, and matrix evidence. Keep deterministic E2E fixtures for P8-009."
+      "notes": "Accepted 2026-05-16T23:15:32.9030048+07:00. Implemented accepted-risk/deviation, escalation, and request-explanation P8 action records with mandatory reason, preview-before-execute, backend permission guards, generic control.action:write enforcement for accepted risk, invalid expiry rejection, current-actor request-explanation guard, audit/action evidence, and refreshed Portfolio Control readback. Matrix row remains blocked only for P8-009 browser E2E-073/E2E-074/E2E-075 reload/reset evidence.",
+      "completed_at": "2026-05-16T23:15:32.9030048+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-008-risk-escalation-request-explanation-binding --once exit 0 at startup",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED: accept_risk returned 501 and escalation/request_explanation were missing before implementation",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 15 tests passed",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 13 tests passed",
+        "npm test -- packages/action-engine packages/kpi-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx exit 0: 5 files, 47 tests passed",
+        "npm run test:integration exit 0: 11 files, 65 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 395 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "node scripts/agent-bus-guard.mjs --task P8-008-risk-escalation-request-explanation-binding --once exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-009-deterministic-phase8-fixtures-e2e",
+      "aliases": [
+        "P8-009"
+      ],
+      "title": "Implement deterministic Phase 8 fixtures and E2E-070..075",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-008-risk-escalation-request-explanation-binding"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase8/**",
+        "apps/api/src/app.ts",
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-009-deterministic-phase8-fixtures-e2e.claim.json",
+        ".agent-bus/sessions/P8-009-deterministic-phase8-fixtures-e2e.md"
+      ],
+      "forbidden": [
+        "packages/project-core/**",
+        "packages/resource-planning/**",
+        "packages/kpi-engine/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-009-deterministic-phase8-fixtures-e2e --once",
+        "npm run test:e2e:phase -- --phase=8",
+        "npm test -- packages/shared-test-fixtures",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next Phase 8 block. Implement deterministic Phase 8 fixtures and executable E2E-070..075 proving UI, API/domain readback, direct backend denial, audit/action evidence, projection refresh, reload persistence, and reset cleanup."
     }
   ]
 }
