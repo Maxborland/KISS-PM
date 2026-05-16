@@ -1,6 +1,14 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T19:28:03+07:00
+Updated: 2026-05-16T19:41:28+07:00
+
+- P7-008 KPI Deviation Control UI completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p7-008-kpi-deviation-control-surface.md`.
+- `apps/web/src/kpiDeviationApiClient.ts` now exposes typed P7 KPI deviation API methods for signal list/detail, governed evaluation run, and audit readback.
+- `apps/web/src/KpiDeviationControlSurface.tsx` renders the Russian KPI Deviation Control management surface with severity signals, source/formula/threshold trace, version metadata, recommended P8 handoff actions, permission states, governed evaluation command, API readback refresh, and audit/action evidence. `apps/web/src/App.tsx` wires the surface into the app shell and KPI navigation fallback.
+- Fresh P7-008 evidence: `npm test -- apps/web/src/KpiDeviationControlSurface.test.tsx` passes with 8 tests; `npm test -- apps/web/src/App.test.tsx` passes with 14 tests; `npm test -- apps/web/src` passes with 8 files / 66 tests; `npm test -- apps/api/src/phase7KpiApi.test.ts`, `npm run test:integration`, `npm test`, `npm run typecheck`, `npm run lint`, and tracking matrix verification with `--allow-blocked` pass.
+- Bug Hunt / requested code review findings are fixed: command result evidence is taken only from audit/readback, `audit.read` is required for action evidence, traceability includes evaluation/source/version/source timestamp details, and KPI navigation can target the deviation surface.
+- `docs/status/phase7-requirements-matrix.json` records fresh UI evidence for P7-008 but keeps the row blocked until E2E-061/E2E-062 prove browser/API/reload evidence. Strict Phase 7 remains blocked as intended.
+- Next recommended step: claim `P7-009-deterministic-phase7-fixtures-e2e` and implement deterministic Phase 7 fixtures plus executable E2E-060..064. Do not mark Phase 7 accepted until P7-010 passes strict verification.
 
 - P7-007 KPI Definition Admin UI completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p7-007-kpi-definition-admin-ui.md`.
 - `apps/web/src/kpiDefinitionApiClient.ts` now exposes typed P7 KPI definition API methods for list, non-mutating preview, create, publish, retire, and audit readback.

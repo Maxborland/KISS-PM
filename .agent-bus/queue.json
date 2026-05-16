@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T12:28:03.473Z",
+  "updated_at": "2026-05-16T12:41:28.040Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2366,7 +2366,7 @@
         "P7-008"
       ],
       "title": "Implement KPI Deviation Control read surface",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P7",
       "depends_on": [
@@ -2376,6 +2376,7 @@
         "apps/web/src/**KpiDeviation**",
         "apps/web/src/*kpiDeviation*",
         "apps/web/src/App.tsx",
+        "apps/web/src/App.test.tsx",
         "apps/web/src/styles.css",
         "docs/status/phase7-requirements-matrix.json",
         ".agent-bus/queue.json",
@@ -2411,7 +2412,73 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable P7 block. Build the Russian KPI Deviation Control read/control-signal surface against accepted P7 API evaluation/deviation routes. Keep executable E2E rows blocked until P7-009."
+      "notes": "Completed P7 KPI Deviation Control UI block. Implemented typed deviation API client, Russian TanStack Query control surface for signal list/detail/evaluation run/audit, App shell wiring, component/App tests, and review fixes. Matrix P7-008 has fresh UI evidence but remains blocked until P7 E2E evidence exists.",
+      "completed_at": "2026-05-16T12:41:28.040Z",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 8 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 14 tests passed",
+        "npm test -- apps/web/src exit 0: 8 files, 66 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 53 files, 335 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P7-009-deterministic-phase7-fixtures-e2e",
+      "aliases": [
+        "P7-009"
+      ],
+      "title": "Implement deterministic Phase 7 fixtures and E2E-060..064",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P7",
+      "depends_on": [
+        "P7-008-kpi-deviation-control-surface"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase7/**",
+        "apps/web/src/**Kpi**",
+        "apps/web/src/*kpi*",
+        "apps/api/src/phase7Runtime.ts",
+        "apps/api/src/phase7KpiApi.test.ts",
+        "docs/status/phase7-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-009-deterministic-phase7-fixtures-e2e.claim.json",
+        ".agent-bus/sessions/P7-009-deterministic-phase7-fixtures-e2e.md"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-009-deterministic-phase7-fixtures-e2e --once",
+        "npm test -- packages/shared-test-fixtures",
+        "npm test -- apps/web/src/*Kpi*.test.tsx",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts",
+        "npm run test:e2e:phase -- --phase 7",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable P7 block. Implement deterministic fixtures and executable E2E-060..064 over accepted P7 API and UI surfaces. Keep strict phase exit blocked until P7-010."
     }
   ]
 }

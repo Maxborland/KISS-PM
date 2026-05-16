@@ -317,6 +317,88 @@ describe("KISS PM web shell", () => {
     expect(screen.getByRole("link", { name: "KPI" })).toHaveAttribute("href", "#kpi-definition-admin");
   });
 
+  it("wires the KPI Deviation Control surface into the app shell when the P7 deviation client is available", async () => {
+    const signal = {
+      id: "signal-kpi-schedule-variance-a",
+      tenantId: "tenant-a",
+      sourceType: "kpi_evaluation" as const,
+      sourceEvaluationId: "eval-kpi-schedule-variance-a-1",
+      kpiDefinitionId: "kpi-schedule-variance-a",
+      entityType: "project" as const,
+      entityId: "project-alpha-a",
+      period: { start: "2026-06-01", end: "2026-06-07" },
+      severity: "critical" as const,
+      explanation: "Критическое отклонение трудозатрат",
+      recommendedActionKeys: ["create_corrective_action"],
+      status: "open" as const,
+      actionExecutionState: "not_executed" as const,
+      createdAt: "2026-06-08T09:01:00.000Z",
+      updatedAt: "2026-06-08T09:01:00.000Z"
+    };
+    const evaluation = {
+      id: "eval-kpi-schedule-variance-a-1",
+      tenantId: "tenant-a",
+      kpiDefinitionId: "kpi-schedule-variance-a",
+      kpiDefinitionVersion: 1,
+      formulaDefinitionId: "formula-schedule-variance-a-v1",
+      formulaVersion: 1,
+      thresholdRuleSetId: "threshold-schedule-variance-a-v1",
+      thresholdRuleSetVersion: 1,
+      entityType: "project" as const,
+      entityId: "project-alpha-a",
+      period: { start: "2026-06-01", end: "2026-06-07" },
+      evaluatedAt: "2026-06-08T09:00:00.000Z",
+      value: -25,
+      severity: "critical" as const,
+      matchedThresholdRuleId: "schedule-variance-critical",
+      explanation: "Критическое отклонение трудозатрат",
+      recommendedActionKeys: ["create_corrective_action"],
+      sourceTrace: [
+        {
+          tenantId: "tenant-a",
+          bindingKey: "plannedWorkHours",
+          value: 80,
+          sourceEntityType: "project" as const,
+          sourceEntityId: "project-alpha-a",
+          sourceField: "plannedWorkHours",
+          observedAt: "2026-06-08T08:00:00.000Z"
+        }
+      ],
+      formulaTrace: ["result:-25"],
+      thresholdTrace: ["matched:schedule-variance-critical:critical"]
+    };
+    const apiClient = {
+      ...createAdminApiClient(),
+      getCurrentTenant: vi.fn(async () => ({
+        tenant: {
+          id: "tenant-a",
+          label: "Студия A",
+          configurationVersion: 1
+        },
+        actor: {
+          id: "project-manager-a",
+          displayName: "Руководитель проекта",
+          accessProfileId: "profile-project-manager-a"
+        },
+        labels: {
+          "role.project_manager": "Руководитель проекта"
+        },
+        permissions: ["tenant.read", "kpi:read", "kpi.evaluate:execute", "audit.read"]
+      })),
+      listSignals: vi.fn(async () => [signal]),
+      getSignalDetail: vi.fn(async () => ({ signal, evaluation })),
+      runEvaluation: vi.fn(),
+      getKpiAudit: vi.fn(async () => ({ events: [], actionExecutions: [] }))
+    };
+
+    render(<App apiClient={apiClient} testUser="project-manager-a" />);
+
+    expect(await screen.findByTestId("kpi-deviation-control")).toBeInTheDocument();
+    expect(await screen.findByTestId("kpi-deviation-list")).toHaveTextContent("Критическая");
+    expect(await screen.findByTestId("kpi-deviation-detail")).toHaveTextContent("result:-25");
+    expect(screen.getByRole("link", { name: "KPI" })).toHaveAttribute("href", "#kpi-deviation-control");
+  });
+
   it("blocks an unknown test user instead of opening the shell", async () => {
     render(<App testUser="unknown-user" />);
 

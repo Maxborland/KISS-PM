@@ -2,7 +2,7 @@
   "phase": "P7",
   "name": "Phase 7 KPI engine and control signals requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T12:28:03.473Z",
+  "updated_at": "2026-05-16T12:41:28.040Z",
   "rows": [
     {
       "id": "P7-001",
@@ -231,18 +231,33 @@
       "status": "blocked",
       "owner": "codex",
       "owned_scope": [
-        "apps/web",
-        "packages/kpi-engine"
+        "apps/web"
       ],
       "required_e2e": [
         "E2E-061",
         "E2E-062"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "P7 KPI Deviation Control surface has not been implemented; no UI/API readback evidence exists yet.",
-      "last_checked_at": null,
+      "evidence": [
+        "apps/web/src/kpiDeviationApiClient.ts exposes typed P7 KPI deviation API methods for deviation list/detail, governed evaluation run, and audit readback.",
+        "apps/web/src/KpiDeviationControlSurface.tsx renders the Russian KPI Deviation Control management surface with severity signals, selected deviation detail, source trace, formula trace, threshold trace, version metadata, recommended P8 handoff actions, permission states, governed evaluation command, API readback refresh, and audit/action evidence.",
+        "apps/web/src/App.tsx wires KPI Deviation Control into the app shell and routes KPI navigation to the deviation surface when the definition-admin client is not available.",
+        "apps/web/src/KpiDeviationControlSurface.test.tsx proves load/empty/error states, detail traceability, governed evaluation refetch, audit evidence, readback failure without local-only evidence, missing audit permission denial, read-only state, and no KPI-read denial.",
+        "Bug Hunt / requested code review findings were fixed: command result evidence now comes only from audit/readback, audit.read is required for action evidence, traceability includes evaluation/source/version/source timestamp details, and KPI navigation can target the deviation surface."
+      ],
+      "tests": [
+        "npm test -- apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm test -- apps/web/src exit 0: 8 files, 66 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 53 files, 335 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0"
+      ],
+      "cleanup": "Component and API-client tests use mocked in-memory clients and TanStack Query test wrappers; no browser, database, external service, or persisted fixture state is created. Evaluation command tests verify failed readback/audit evidence paths do not leave local-only action evidence.",
+      "blocker": "KPI Deviation Control UI evidence exists for P7-008, but the row remains blocked until executable E2E-061/E2E-062 prove the same deviation/readback/reload evidence through browser and API.",
+      "last_checked_at": "2026-05-16T12:41:28.040Z",
       "e2e_evidence": []
     },
     {
