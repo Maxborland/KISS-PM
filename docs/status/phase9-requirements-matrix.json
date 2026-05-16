@@ -1,0 +1,214 @@
+{
+  "phase": "P9",
+  "name": "Phase 9 Closed portfolio and retrospectives requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-16T23:49:57.1338658+07:00",
+  "rows": [
+    {
+      "id": "P9-001",
+      "requirement": "Closure checklist and closure workflow domain",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/project-core",
+        "packages/workflow-engine"
+      ],
+      "required_e2e": [
+        "E2E-080"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Closure workflow reset/readback cleanup must be proven by E2E-080 before verification.",
+      "blocker": "P9 product implementation has not started. Phase contract/matrix/verifier support is being established first by P9-000 before closure workflow code can be implemented.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-002",
+      "requirement": "ClosedProjectSnapshot model and snapshot creation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/retrospectives",
+        "packages/project-core",
+        "packages/scheduling-engine",
+        "packages/resource-planning",
+        "packages/kpi-engine"
+      ],
+      "required_e2e": [
+        "E2E-080",
+        "E2E-081"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Snapshot creation/stability cleanup must be proven by E2E-080 and E2E-081 before verification.",
+      "blocker": "P9 product implementation has not started. Snapshot domain and fixture reset/readback do not exist yet.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-003",
+      "requirement": "Snapshot stability and readback API",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/retrospectives",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-081",
+        "E2E-082"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Snapshot readback, immutability denial, and reset cleanup must be proven before verification.",
+      "blocker": "P9 snapshot readback API is not implemented yet; E2E-081/E2E-082 are still planned.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-004",
+      "requirement": "Plan/fact metrics and trend engine",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/retrospectives"
+      ],
+      "required_e2e": [
+        "E2E-082",
+        "E2E-083"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Trend calculation reset/readback and snapshot-source proof must be added before verification.",
+      "blocker": "P9 trend engine is not implemented yet; snapshot-based closed portfolio metrics are unavailable.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-005",
+      "requirement": "Lessons learned and retrospective insight model",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/retrospectives",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-082",
+        "E2E-083"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Insight handled-state and audit/reset cleanup must be proven before verification.",
+      "blocker": "P9 lessons/insight model is not implemented yet; no governed retrospective action can be linked to insights.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-006",
+      "requirement": "Closed portfolio and trends API/read models",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "packages/control-surfaces",
+        "packages/retrospectives"
+      ],
+      "required_e2e": [
+        "E2E-082"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. API readback and permission cleanup evidence must be added before verification.",
+      "blocker": "P9 closed portfolio/trends API does not exist yet; E2E-082 is still planned.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-007",
+      "requirement": "Closed portfolio and retrospective trends UI",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-082"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. UI reload/refetch and reset cleanup must be proven by component tests and E2E-082 before verification.",
+      "blocker": "P9 closed portfolio/trends UI is not implemented yet; no browser evidence exists.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-008",
+      "requirement": "Template-improvement governed action",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine",
+        "packages/tenant-config",
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-083"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Preview/apply, audit/action readback, future-template-version readback, and reset cleanup must be proven before verification.",
+      "blocker": "P9 template-improvement action path is not implemented yet; E2E-083 is still planned.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-009",
+      "requirement": "Deterministic P9 fixtures and E2E-080..083",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase9"
+      ],
+      "required_e2e": [
+        "E2E-080",
+        "E2E-081",
+        "E2E-082",
+        "E2E-083"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "Pending implementation. Phase 9 fixture reset must restore closure status, snapshots, insights, template actions, audit/action logs, and template versions before verification.",
+      "blocker": "P9 deterministic fixtures and executable E2E-080..083 are not implemented yet.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P9-010",
+      "requirement": "Phase 9 verification matrix and exit gate",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-080",
+        "E2E-081",
+        "E2E-082",
+        "E2E-083"
+      ],
+      "evidence": [
+        "P9-000 creates the phase contract, initial blocked matrix, and verifier support so later implementation rows have a finite exit gate."
+      ],
+      "tests": [],
+      "cleanup": "Pending implementation. Strict P9 phase exit requires E2E-080..083 cleanup/reset evidence before verification.",
+      "blocker": "P9 phase exit cannot be verified until P9-001..P9-009 are implemented and E2E-080..083 pass.",
+      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "e2e_evidence": []
+    }
+  ]
+}

@@ -20,7 +20,8 @@ const requiredIdsByPhase = {
   P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`),
   P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`),
   P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`),
-  P8: Array.from({ length: 10 }, (_, index) => `P8-${String(index + 1).padStart(3, "0")}`)
+  P8: Array.from({ length: 10 }, (_, index) => `P8-${String(index + 1).padStart(3, "0")}`),
+  P9: Array.from({ length: 10 }, (_, index) => `P9-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -106,6 +107,18 @@ const requiredE2eByPhaseRow = {
     "P8-008": ["E2E-073", "E2E-074", "E2E-075"],
     "P8-009": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"],
     "P8-010": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"]
+  },
+  P9: {
+    "P9-001": ["E2E-080"],
+    "P9-002": ["E2E-080", "E2E-081"],
+    "P9-003": ["E2E-081", "E2E-082"],
+    "P9-004": ["E2E-082", "E2E-083"],
+    "P9-005": ["E2E-082", "E2E-083"],
+    "P9-006": ["E2E-082"],
+    "P9-007": ["E2E-082"],
+    "P9-008": ["E2E-083"],
+    "P9-009": ["E2E-080", "E2E-081", "E2E-082", "E2E-083"],
+    "P9-010": ["E2E-080", "E2E-081", "E2E-082", "E2E-083"]
   }
 };
 const requiredE2eTestPath = {
@@ -145,7 +158,11 @@ const requiredE2eTestPath = {
   "E2E-072": "e2e/tests/phase8/resource-control-action.spec.ts",
   "E2E-073": "e2e/tests/phase8/accept-risk-audit.spec.ts",
   "E2E-074": "e2e/tests/phase8/action-permissions.spec.ts",
-  "E2E-075": "e2e/tests/phase8/control-surface-refresh.spec.ts"
+  "E2E-075": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+  "E2E-080": "e2e/tests/phase9/project-closure.spec.ts",
+  "E2E-081": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
+  "E2E-082": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+  "E2E-083": "e2e/tests/phase9/template-improvement-action.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -244,7 +261,8 @@ for (const row of matrix.rows ?? []) {
       failures.push(`${row.id}: verified row missing cleanup evidence`);
     } else if (
       /no runtime cleanup yet/i.test(row.cleanup) ||
-      (matrix.phase === "P8" && /^(no runtime cleanup|no runtime state exists yet)/i.test(row.cleanup.trim()))
+      (["P8", "P9"].includes(matrix.phase) &&
+        /^(no runtime cleanup|no runtime state exists yet)/i.test(row.cleanup.trim()))
     ) {
       failures.push(`${row.id}: verified row cleanup evidence is still a placeholder`);
     }
@@ -324,8 +342,21 @@ for (const row of matrix.rows ?? []) {
       failures.push(`${row.id}: final matrix row must be verified by running the verifier without --allow-blocked`);
     }
   }
-  if (row.status === "blocked" && !row.blocker) {
-    failures.push(`${row.id}: blocked row missing blocker`);
+  if (row.status === "blocked") {
+    if (!row.blocker) {
+      failures.push(`${row.id}: blocked row missing blocker`);
+    }
+    if (matrix.phase === "P9") {
+      if (typeof row.blocker !== "string" || row.blocker.trim().length < 20) {
+        failures.push(`${row.id}: blocked row requires a fresh, specific blocker reason`);
+      }
+      if (typeof row.blocker === "string" && /^(tbd|todo|placeholder|blocked|not implemented)$/i.test(row.blocker.trim())) {
+        failures.push(`${row.id}: blocked row has placeholder blocker text`);
+      }
+      if (!row.last_checked_at || Number.isNaN(Date.parse(row.last_checked_at))) {
+        failures.push(`${row.id}: blocked row missing valid last_checked_at`);
+      }
+    }
   }
 }
 

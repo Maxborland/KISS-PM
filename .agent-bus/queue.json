@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T23:42:55.5376858+07:00",
+  "updated_at": "2026-05-16T23:49:57.1338658+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3404,7 +3404,7 @@
         "P9-000"
       ],
       "title": "Finalize Phase 9 closed portfolio and retrospectives contract",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3444,12 +3444,77 @@
       "recommended_verification": [
         "node scripts/agent-bus-guard.mjs --task P9-000-closed-portfolio-retrospectives-phase-contract --once",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json",
         "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "npm test",
         "npm run typecheck",
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next Phase 9 block. Create the closed portfolio and retrospectives phase-detail contract, P9 matrix, and verifier support before any P9 product implementation. Do not declare Release 2 ready."
+      "notes": "Accepted 2026-05-16T23:49:57.1338658+07:00. Created Phase 9 closed portfolio/retrospectives contract, initial blocked P9 matrix, verifier support for P9-001..P9-010 and E2E-080..083, and verifier tests for P9 required_e2e, paths, placeholder blockers, cleanup, and complete strict evidence. Strict matrix is expected to fail until P9 product implementation and E2E-080..083 exist.",
+      "completed_at": "2026-05-16T23:49:57.1338658+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-000-closed-portfolio-retrospectives-phase-contract --once exit 0 at startup",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json exit 1 expected: P9 rows are blocked until implementation/E2E evidence exists",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 55 tests passed",
+        "npm test exit 0: 61 files, 402 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ]
+    },
+    {
+      "id": "P9-001-project-closure-snapshot-domain",
+      "aliases": [
+        "P9-001"
+      ],
+      "title": "Implement closure workflow and ClosedProjectSnapshot domain foundation",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-000-closed-portfolio-retrospectives-phase-contract"
+      ],
+      "write_scope": [
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/retrospectives/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-001-project-closure-snapshot-domain.claim.json",
+        ".agent-bus/sessions/P9-001-project-closure-snapshot-domain.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-001-project-closure-snapshot-domain --once",
+        "npm test -- packages/project-core packages/workflow-engine packages/retrospectives",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable product block. Implement the domain foundation for P9-001/P9-002: closure checklist/readiness, close-project preconditions, ClosedProjectSnapshot model/versioning/source refs, deterministic unit tests, and truthful matrix updates. Do not implement API/UI/E2E in this block unless required to unblock the domain contract."
     }
   ]
 }
