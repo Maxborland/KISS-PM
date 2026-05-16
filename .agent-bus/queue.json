@@ -1550,6 +1550,117 @@
         "npm run test:e2e:phase -- --phase 5 exit 0 and strict P5 matrix exit 0",
         "node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json exit 0"
       ]
+    },
+    {
+      "id": "P6-000-resource-planning-phase-contract",
+      "aliases": [
+        "P6-000"
+      ],
+      "title": "Finalize Phase 6 resource planning and conflict resolution contract",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "FIX-P4-E2E-GATE-001"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/P6-000-resource-planning-phase-contract.claim.json",
+        ".agent-bus/sessions/P6-000-resource-planning-phase-contract.md",
+        ".agent-bus/handoff/2026-05-16-p6-000-resource-planning-phase-contract.md",
+        ".agent-bus/locks/queue-json-p6-contract.lock/**",
+        ".agent-bus/locks/docs-status-p6-contract.lock/**",
+        ".agent-bus/locks/docs-phases-p6-contract.lock/**",
+        ".agent-bus/locks/state-current-p6-contract.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "playwright.config.ts",
+        "tsconfig.base.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        "docs/status/*",
+        "docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-000 --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase6-requirements-matrix.json",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8')); JSON.parse(require('fs').readFileSync('docs/status/phase6-requirements-matrix.json','utf8'))\"",
+        "rg -n \"P6-001|P6-010|E2E-050|E2E-055|resource|capacity|overload|reservation|conflict\" docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md docs/status/phase6-requirements-matrix.json scripts/verify-requirements-matrix.mjs scripts/verify-requirements-matrix.test.ts",
+        "git diff --check -- docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md docs/status/phase6-requirements-matrix.json docs/e2e/E2E_SCENARIOS.md scripts/verify-requirements-matrix.mjs scripts/verify-requirements-matrix.test.ts .agent-bus/queue.json .agent-bus/state/CURRENT.md"
+      ],
+      "notes": "P6-P12 are spec-only after P5. This task freezes the Phase 6 contract and tracking matrix before any Phase 6 product implementation starts.",
+      "completed_at": "2026-05-16T15:05:00+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-000 --once exit 0 after escalated rerun; sandboxed Node git spawn failed with EPERM",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase6-requirements-matrix.json exit 0",
+        "npm test -- scripts/verify-requirements-matrix.test.ts initial sandbox exit 1 due esbuild spawn EPERM, escalated rerun exit 0 with 40 tests passed",
+        "node -e JSON parse for .agent-bus/queue.json and docs/status/phase6-requirements-matrix.json exit 0",
+        "rg P6/E2E/resource contract scan exit 0"
+      ]
+    },
+    {
+      "id": "P6-001-resource-domain-foundation",
+      "aliases": [
+        "P6-001"
+      ],
+      "title": "Implement Phase 6 resource profiles, capacity calendars, exceptions, load buckets, reservations, and overload severity",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "P6-000-resource-planning-phase-contract"
+      ],
+      "write_scope": [
+        "packages/resource-planning/**",
+        "packages/project-core/**",
+        "packages/scheduling-engine/**",
+        "docs/status/phase6-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/P6-001-resource-domain-foundation.claim.json",
+        ".agent-bus/sessions/P6-001-resource-domain-foundation.md",
+        ".agent-bus/handoff/2026-05-16-p6-001-resource-domain-foundation.md",
+        ".agent-bus/locks/docs-status-p6-domain.lock/**",
+        ".agent-bus/locks/state-current-p6-domain.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-001 --once",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase6-requirements-matrix.json",
+        "git diff --check -- packages/resource-planning packages/project-core packages/scheduling-engine docs/status/phase6-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Next P6 implementation block. Covers P6-001..P6-005 at domain/unit level; P6 matrix rows remain blocked until API/UI/E2E evidence exists."
     }
   ]
 }

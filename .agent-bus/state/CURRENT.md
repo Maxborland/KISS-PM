@@ -1,6 +1,12 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T14:46:20+07:00
+Updated: 2026-05-16T15:05:00+07:00
+
+- P6-000 resource planning phase contract completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-000-resource-planning-phase-contract.md`.
+- Phase 6 detail doc exists at `docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md` with frozen scope, P6-001..P6-010 backlog, E2E-050..055, API/UI/fixture contracts, acceptance criteria, exit gate, and verification commands.
+- `docs/status/phase6-requirements-matrix.json` exists and passes tracking verification with `--allow-blocked`; strict phase-exit verification is intentionally blocked until P6 implementation and E2E evidence exist.
+- Matrix verifier supports P6 required rows and E2E-050..055 evidence paths; verifier regression test passed after escalated Vitest run.
+- Next recommended step: claim `P6-001-resource-domain-foundation` and implement Phase 6 domain/unit layer for resource profiles, capacity calendars, availability exceptions, load buckets, reservations, overload detection, and conflict severity.
 
 - Corrective task `FIX-P4-E2E-GATE-001` completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fix-p4-e2e-gate.md`.
 - P3-P12 post-run gate report is updated to `accepted` in `docs/status/p3-p12-post-run-gate-report.md`.
