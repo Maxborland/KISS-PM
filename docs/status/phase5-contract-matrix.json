@@ -1,0 +1,85 @@
+{
+  "phase": "P5-contract",
+  "name": "Phase 5 detail contract before implementation",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-15T19:29:32+07:00",
+  "rows": [
+    {
+      "id": "P5C-001",
+      "requirement": "Create Phase 5 detail document before implementation",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md"
+      ],
+      "evidence": [
+        "Phase 5 detail document defines objective, source documents, scope lock, functional scope, non-scope, domain model, API contracts, UI surfaces, E2E scenarios, tests, fixtures, exit gate, risks, and decisions",
+        "Scope is frozen around scheduling and Gantt foundation over canonical Phase 4 tasks without resource leveling, KPI control, external scheduler adapters, or separate Gantt task entities"
+      ],
+      "tests": [
+        "manual review",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0, 39 files and 220 tests passed"
+      ],
+      "cleanup": "No runtime writes; documentation-only contract block",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T19:29:32+07:00"
+    },
+    {
+      "id": "P5C-002",
+      "requirement": "Define finite closed implementation tasks for P5",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-requirements-matrix.json"
+      ],
+      "evidence": [
+        "Functional scope table defines P5-001 through P5-010 with owner/module, expected behavior, acceptance criteria, E2E references, verification, task non-scope, and done evidence",
+        "Phase 5 requirements matrix pre-creates every P5 row as blocked until implementation provides fresh command evidence"
+      ],
+      "tests": [
+        "manual review",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json exit 0",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json exit 1 because P5-001..P5-010 are intentionally blocked before implementation",
+        "npm test exit 0, 39 files and 220 tests passed"
+      ],
+      "cleanup": "No runtime writes; documentation-only contract block",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T19:29:32+07:00"
+    },
+    {
+      "id": "P5C-003",
+      "requirement": "Define mandatory E2E matrix and verifier contract for P5",
+      "status": "verified",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts"
+      ],
+      "evidence": [
+        "E2E-040 through E2E-044 are mapped to Phase 5 roles, fixtures, test paths, expected results, and required assertion pattern",
+        "Verifier owns the exact required_e2e contract and ledger test_path contract for P5-001 through P5-010 so final phase exit cannot pass with deleted, prose-only, or arbitrary Phase 5 E2E references"
+      ],
+      "tests": [
+        "manual review",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0, 1 file and 35 tests passed after sandbox EPERM retry with escalation",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json exit 0",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json exit 0",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json exit 1 expected because P5 implementation rows are intentionally blocked before implementation",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0",
+        "npm test exit 0, 39 files and 220 tests passed"
+      ],
+      "cleanup": "No runtime writes; documentation-only contract block",
+      "blocker": null,
+      "last_checked_at": "2026-05-15T19:29:32+07:00"
+    }
+  ]
+}

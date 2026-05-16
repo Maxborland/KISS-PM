@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -42,6 +42,18 @@ const p4RequiredE2e = {
   "P4-009": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
   "P4-010": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"]
 };
+const p5RequiredE2e = {
+  "P5-001": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+  "P5-002": ["E2E-040", "E2E-041"],
+  "P5-003": ["E2E-042"],
+  "P5-004": ["E2E-043"],
+  "P5-005": ["E2E-044"],
+  "P5-006": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+  "P5-007": ["E2E-040"],
+  "P5-008": ["E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+  "P5-009": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+  "P5-010": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"]
+};
 const e2eTestPaths = {
   "E2E-010": "e2e/tests/phase2/tenant-isolation.spec.ts",
   "E2E-011": "e2e/tests/phase2/access-profile.spec.ts",
@@ -57,7 +69,12 @@ const e2eTestPaths = {
   "E2E-031": "e2e/tests/phase4/stage-transition.spec.ts",
   "E2E-032": "e2e/tests/phase4/stage-gate-block.spec.ts",
   "E2E-033": "e2e/tests/phase4/my-tasks-relations.spec.ts",
-  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts"
+  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts",
+  "E2E-040": "e2e/tests/phase5/open-gantt.spec.ts",
+  "E2E-041": "e2e/tests/phase5/gantt-task-cross-view.spec.ts",
+  "E2E-042": "e2e/tests/phase5/gantt-date-persist.spec.ts",
+  "E2E-043": "e2e/tests/phase5/gantt-dependency.spec.ts",
+  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts"
 };
 
 function writeMatrixFixture(fileName: string, firstRow: Record<string, unknown>) {
@@ -164,7 +181,7 @@ function writeP2MatrixFixture(fileName: string, overrideById: Record<string, Rec
 }
 
 function writePhaseMatrixFixture(
-  phase: "P2" | "P3" | "P4",
+  phase: "P2" | "P3" | "P4" | "P5",
   fileName: string,
   requiredE2eById: Record<string, string[]>,
   overrideById: Record<string, Record<string, unknown>>
@@ -245,7 +262,30 @@ function completeP4Overrides(checkedAt: string) {
   );
 }
 
+function completeP5Overrides(checkedAt: string) {
+  return Object.fromEntries(
+    Object.entries(p5RequiredE2e).map(([id, requiredE2e]) => [
+      id,
+      {
+        status: "verified",
+        evidence: [`${id} verified`],
+        tests: ["npm run test:e2e:phase -- --phase=5 exit 0"],
+        blocker: null,
+        e2e_evidence: requiredE2e.map((e2eId) => ({
+          id: e2eId,
+          command: "npm run test:e2e:phase -- --phase=5",
+          test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
+          exit_code: 0,
+          status: "passed",
+          checked_at: checkedAt
+        }))
+      }
+    ])
+  );
+}
+
 function writeRequiredE2eSpecFiles(projectRoot: string, e2eIds: string[]) {
+  mkdirSync(resolve(projectRoot, "docs/status"), { recursive: true });
   for (const e2eId of e2eIds) {
     const relativePath = e2eTestPaths[e2eId as keyof typeof e2eTestPaths];
     const filePath = resolve(projectRoot, relativePath);
@@ -390,6 +430,20 @@ describe("verify-requirements-matrix", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("P2C-001: verified row must not retain blocker text");
+  });
+
+  it("rejects verified rows whose literal owned scope path is missing", () => {
+    const matrixPath = writeMatrixFixture("missing-owned-scope.json", {
+      owned_scope: ["docs/phases/MISSING_PHASE.md"]
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P2C-001: owned_scope path missing: docs/phases/MISSING_PHASE.md");
   });
 
   it("rejects structured E2E evidence without passed status", () => {
@@ -841,6 +895,8 @@ describe("verify-requirements-matrix", () => {
 
   it("rejects phase-exit matrices when a required E2E spec file is missing", () => {
     const checkedAt = "2026-05-15T02:13:52+07:00";
+    const projectRoot = resolve(fixtureDir, "missing-spec-p4-project-root");
+    mkdirSync(projectRoot, { recursive: true });
     const e2eRunMetadataPath = writeE2eRunMetadata("missing-spec-p4-run-metadata.json", {
       phase: "4",
       testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase4/")),
@@ -856,7 +912,7 @@ describe("verify-requirements-matrix", () => {
     );
 
     const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
-      cwd: resolve("."),
+      cwd: projectRoot,
       env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
       encoding: "utf8"
     });
@@ -917,5 +973,113 @@ describe("verify-requirements-matrix", () => {
     expect(result.stderr).toContain(
       "P4-010: final matrix row must be verified by running the verifier without --allow-blocked"
     );
+  });
+
+  it("accepts the initial blocked P5 matrix only with allow-blocked", () => {
+    const matrixPath = writePhaseMatrixFixture("P5", "blocked-p5-contract.json", p5RequiredE2e, {});
+
+    const blockedResult = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    const trackingResult = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(blockedResult.status).toBe(1);
+    expect(blockedResult.stderr).toContain("P5-001: blocked row requires --allow-blocked");
+    expect(trackingResult.status).toBe(0);
+    expect(trackingResult.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("rejects P5 rows whose required_e2e field does not match the phase contract", () => {
+    const matrixPath = writePhaseMatrixFixture("P5", "wrong-p5-required-e2e.json", p5RequiredE2e, {
+      "P5-008": {
+        required_e2e: ["E2E-041"]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P5-008: required_e2e must exactly match phase contract");
+  });
+
+  it("rejects P5 structured E2E evidence that points to a non-ledger phase5 file", () => {
+    const matrixPath = writePhaseMatrixFixture("P5", "wrong-p5-test-path.json", p5RequiredE2e, {
+      "P5-007": {
+        status: "verified",
+        evidence: ["P5-007 verified"],
+        tests: ["npm run test:e2e:phase -- --phase=5 exit 0"],
+        blocker: null,
+        e2e_evidence: [
+          {
+            id: "E2E-040",
+            command: "npm run test:e2e:phase -- --phase=5",
+            test_path: "e2e/tests/phase5/gantt.spec.ts",
+            exit_code: 0,
+            status: "passed",
+            checked_at: "2026-05-15T16:35:00+07:00"
+          }
+        ]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P5-007: E2E-040 E2E evidence test_path must match e2e/tests/phase5/open-gantt.spec.ts"
+    );
+  });
+
+  it("rejects P5 matrices missing a required row", () => {
+    const matrixPath = writePhaseMatrixFixture("P5", "missing-p5-row.json", p5RequiredE2e, {});
+    const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
+    matrix.rows = matrix.rows.filter((row: { id: string }) => row.id !== "P5-010");
+    writeFileSync(matrixPath, JSON.stringify(matrix, null, 2));
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P5-010: missing required P5 row");
+  });
+
+  it("accepts a complete P5 matrix only when every row is verified with phase 5 structured E2E evidence", () => {
+    const checkedAt = "2026-05-15T16:35:00+07:00";
+    const projectRoot = resolve(fixtureDir, "complete-p5-project-root");
+    writeRequiredE2eSpecFiles(projectRoot, Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-04")));
+    const e2eRunMetadataPath = writeE2eRunMetadata("complete-p5-run-metadata.json", {
+      phase: "5",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase5/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-04")),
+      startedAt: "2026-05-15T09:30:00.000Z",
+      finishedAt: "2026-05-15T09:35:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P5",
+      "complete-p5-phase-exit.json",
+      p5RequiredE2e,
+      completeP5Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: projectRoot,
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Requirements matrix verified");
   });
 });

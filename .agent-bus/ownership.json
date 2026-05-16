@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-15T04:00:00+07:00",
+  "exclusive_paths": [
+    "AGENTS.md",
+    ".gitignore",
+    "package.json",
+    "package-lock.json",
+    "docs/status/*",
+    ".agent-bus/state/*",
+    ".agent-bus/queue.json",
+    ".agent-bus/ownership.json",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "eslint.config.js",
+    "tsconfig.json",
+    "tsconfig.base.json"
+  ],
+  "ownership_groups": [
+    {
+      "key": "phase4_domain_lifecycle",
+      "paths": [
+        "packages/project-core/**",
+        "packages/workflow-engine/**"
+      ],
+      "parallelism": "exclusive_per_task",
+      "notes": "Lifecycle, gates, canonical tasks, participants, comments, and status history share core domain files. Avoid parallel edits unless files are explicitly disjoint."
+    },
+    {
+      "key": "phase4_api",
+      "paths": [
+        "apps/api/**"
+      ],
+      "parallelism": "exclusive_per_task",
+      "notes": "API work depends on stable domain contracts and usually needs integration tests."
+    },
+    {
+      "key": "phase4_web",
+      "paths": [
+        "apps/web/**"
+      ],
+      "parallelism": "parallel_after_api_contract",
+      "notes": "UI can run in parallel only against stable DTOs or mocked clients."
+    },
+    {
+      "key": "phase4_e2e_fixtures",
+      "paths": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase4/**"
+      ],
+      "parallelism": "exclusive_per_phase",
+      "notes": "Fixture and E2E changes coordinate with API/UI state and phase matrix evidence."
+    },
+    {
+      "key": "phase5_docs",
+      "paths": [
+        "docs/phases/PHASE_5_*",
+        "docs/domain/SCHEDULING_ENGINE_SPEC.md",
+        "docs/backlog/FUTURE_SCOPE.md"
+      ],
+      "parallelism": "safe_docs_only",
+      "notes": "Safe to draft while Phase 4 continues, but do not implement scheduling code early."
+    },
+    {
+      "key": "scheduling_engine",
+      "paths": [
+        "packages/scheduling-engine/**"
+      ],
+      "parallelism": "blocked_until_canonical_tasks",
+      "notes": "Implementation should wait for Phase 4 canonical Task and API contracts."
+    },
+    {
+      "key": "coordination",
+      "paths": [
+        ".agent-bus/**",
+        "scripts/agent-bus-status.mjs"
+      ],
+      "parallelism": "lock_state_files",
+      "notes": "Runtime claims/locks are local. Durable state files and queue/ownership require locks."
+    }
+  ],
+  "night_run_pairs": [
+    {
+      "agent_a": "phase4_domain_task",
+      "agent_b": "phase5_docs_or_coordination",
+      "safe": true,
+      "reason": "Different write scopes and no shared product code."
+    },
+    {
+      "agent_a": "phase4_domain_task",
+      "agent_b": "phase4_web_task",
+      "safe": false,
+      "reason": "UI depends on API/domain DTOs unless a stable mocked contract is explicitly provided."
+    },
+    {
+      "agent_a": "P4-002",
+      "agent_b": "P4-004",
+      "safe": false,
+      "reason": "Both edit project-core and lifecycle/task contracts."
+    }
+  ]
+}

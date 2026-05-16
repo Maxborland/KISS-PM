@@ -949,7 +949,7 @@
         "node scripts/agent-bus-guard.mjs --task P5-009 --once",
         "git diff --check -- packages/shared-test-fixtures e2e docs/e2e/E2E_SCENARIOS.md docs/status/phase5-requirements-matrix.json .agent-bus"
       ],
-    "notes": "Completed by Block Lead on 2026-05-16. Deterministic Phase 5 fixture contract and E2E-040..044 suite are implemented; npm run test:e2e:phase -- --phase=5 passed with 5 tests after review fixes. Matrix rows P5-001..P5-009 carry structured E2E evidence; P5-010 remains final phase-exit verification."
+    "notes": "Completed by Block Lead on 2026-05-16. Deterministic Phase 5 fixture contract and E2E-040..044 suite are implemented. Integration unblocker follow-up committed missing P5 scheduling foundation, Phase 5 brief/contract matrix, verifier support, and agent-bus guard artifacts into branch codex/p5-010-exit-gate so P5-010 can run from a clean worktree."
     },
     {
       "id": "P5-010",

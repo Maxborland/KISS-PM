@@ -15,7 +15,9 @@ const requiredIdsByPhase = {
   "P3-contract": ["P3C-001", "P3C-002", "P3C-003"],
   P3: Array.from({ length: 10 }, (_, index) => `P3-${String(index + 1).padStart(3, "0")}`),
   "P4-contract": ["P4C-001", "P4C-002", "P4C-003"],
-  P4: Array.from({ length: 10 }, (_, index) => `P4-${String(index + 1).padStart(3, "0")}`)
+  P4: Array.from({ length: 10 }, (_, index) => `P4-${String(index + 1).padStart(3, "0")}`),
+  "P5-contract": ["P5C-001", "P5C-002", "P5C-003"],
+  P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -53,6 +55,18 @@ const requiredE2eByPhaseRow = {
     "P4-008": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
     "P4-009": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"],
     "P4-010": ["E2E-030", "E2E-031", "E2E-032", "E2E-033", "E2E-034"]
+  },
+  P5: {
+    "P5-001": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+    "P5-002": ["E2E-040", "E2E-041"],
+    "P5-003": ["E2E-042"],
+    "P5-004": ["E2E-043"],
+    "P5-005": ["E2E-044"],
+    "P5-006": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+    "P5-007": ["E2E-040"],
+    "P5-008": ["E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+    "P5-009": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
+    "P5-010": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"]
   }
 };
 const requiredE2eTestPath = {
@@ -70,7 +84,12 @@ const requiredE2eTestPath = {
   "E2E-031": "e2e/tests/phase4/stage-transition.spec.ts",
   "E2E-032": "e2e/tests/phase4/stage-gate-block.spec.ts",
   "E2E-033": "e2e/tests/phase4/my-tasks-relations.spec.ts",
-  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts"
+  "E2E-034": "e2e/tests/phase4/kanban-canonical-task.spec.ts",
+  "E2E-040": "e2e/tests/phase5/open-gantt.spec.ts",
+  "E2E-041": "e2e/tests/phase5/gantt-task-cross-view.spec.ts",
+  "E2E-042": "e2e/tests/phase5/gantt-date-persist.spec.ts",
+  "E2E-043": "e2e/tests/phase5/gantt-dependency.spec.ts",
+  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -87,6 +106,37 @@ function sameStringSet(actual, expected) {
   const actualSorted = [...actual].sort();
   const expectedSorted = [...expected].sort();
   return expectedSorted.every((value, index) => actualSorted[index] === value);
+}
+
+function hasGlobSyntax(path) {
+  return /[*?[\]{}]/.test(path);
+}
+
+function normalizeMatrixPath(path) {
+  return path.replaceAll("\\", "/").replace(/\/+$/, "");
+}
+
+function verifyOwnedScopePaths(row) {
+  if (!Array.isArray(row.owned_scope) || row.owned_scope.length === 0) {
+    failures.push(`${row.id}: verified row missing owned_scope`);
+    return;
+  }
+
+  for (const rawPath of row.owned_scope) {
+    if (typeof rawPath !== "string" || rawPath.trim().length === 0) {
+      failures.push(`${row.id}: owned_scope entries must be non-empty strings`);
+      continue;
+    }
+
+    const normalizedPath = normalizeMatrixPath(rawPath.trim());
+    if (hasGlobSyntax(normalizedPath)) continue;
+
+    try {
+      statSync(normalizedPath);
+    } catch {
+      failures.push(`${row.id}: owned_scope path missing: ${normalizedPath}`);
+    }
+  }
 }
 
 if (!requiredIds) {
@@ -119,6 +169,8 @@ for (const row of matrix.rows ?? []) {
   if (row.status === "verified") {
     const tests = Array.isArray(row.tests) ? row.tests : [];
     const rowLastCheckedAt = row.last_checked_at ? Date.parse(row.last_checked_at) : Number.NaN;
+
+    verifyOwnedScopePaths(row);
 
     if (!Array.isArray(row.evidence) || row.evidence.length === 0) {
       failures.push(`${row.id}: verified row missing evidence`);

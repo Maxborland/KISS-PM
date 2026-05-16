@@ -1,5 +1,75 @@
 # AGENTS.md
 
+## 0. Multi-agent coordination protocol
+
+This repository uses `.agent-bus/` as the project-local coordination and memory layer for concurrent Codex agents. Every future agent must follow this protocol before editing project files.
+
+Two-agent runs use an explicit Lead/Worker model:
+
+- Agent A is the lead/orchestrator and owns task decomposition, process control, intervention, independent verification, and the final verdict.
+- Agent B is the worker and owns assigned implementation blocks.
+- Both agents may use subagents only inside the current objective. Delegated results are not accepted until the delegating agent verifies them, and final acceptance still belongs to Agent A.
+- Agent A must maintain a shared run ledger under `.agent-bus/orchestration/runs/<run-id>.json` using `.agent-bus/orchestration/TEMPLATE.json`.
+- Oral status is not source of truth. Progress, blockers, changed files, commands, exit codes, artifacts, interventions, and decisions must be written to the run ledger, handoff notes, task records, or events.
+
+Mandatory startup routine:
+
+1. Read this `AGENTS.md`.
+2. Read `.agent-bus/README.md`.
+3. Read `.agent-bus/state/CURRENT.md`.
+4. Read `.agent-bus/queue.json` and `.agent-bus/ownership.json` when they exist.
+5. Inspect `.agent-bus/tasks/` for backlog, active, blocked, and done tasks.
+6. Inspect `.agent-bus/claims/` and `.agent-bus/locks/` for current ownership and risky-file locks.
+7. Create or update a session note in `.agent-bus/sessions/` for the current run.
+8. Claim exactly one task before editing project files.
+9. Run `node scripts/agent-bus-guard.mjs --task <TASK_ID> --once` after claiming and locking. Do not edit project files if it fails.
+10. For a two-agent run, read `.agent-bus/orchestration/README.md` and create or update the shared run ledger before implementation starts.
+
+When working from a separate git worktree, use the shared bus path from `AGENT_BUS_ROOT` if it is set. If it is not set, use the `.agent-bus/` directory in the current checkout.
+
+Task claiming rules:
+
+- Claim files live in `.agent-bus/claims/`.
+- Claim file names must match task ids, for example `.agent-bus/claims/0001-verify-agent-bus.claim.json`.
+- Agents should claim only tasks marked `runnable` or otherwise unblocked in `.agent-bus/queue.json`.
+- Agents must stay inside the task `write_scope` and avoid the task `forbidden` globs.
+- An agent must not work on an already claimed task unless the claim is stale or explicitly abandoned in the claim file or a handoff note.
+- A claim is stale when `heartbeat_at` is older than 4 hours and no matching active session or lock has been updated in that period.
+- Before taking over a stale claim, write a handoff note explaining the takeover and preserve the old claim details in the new claim file `notes`.
+- Keep `heartbeat_at` current during long tasks.
+
+Locking rules:
+
+- Before editing risky shared files, create a lock in `.agent-bus/locks/`.
+- Risky files include `package.json`, package lockfiles, database schemas, migrations, global configs, CI configs, `AGENTS.md`, `.gitignore`, `docs/status/*`, and `.agent-bus/state/*`.
+- Ownership groups and exclusive paths are documented in `.agent-bus/ownership.json`; follow that file when deciding whether a lock is required.
+- Prefer atomic directory creation for locks, for example `mkdir .agent-bus/locks/AGENTS.md.lock`.
+- A lock must contain an `owner.json` or short `README.md` with agent id, task id, locked paths, timestamp, and reason.
+- Do not edit a locked risky file unless you own the lock, the lock is stale, or the previous owner explicitly handed it off.
+- Remove only your own locks during completion.
+
+Completion routine:
+
+1. Run the narrowest relevant verification commands.
+2. Run `node scripts/agent-bus-guard.mjs --task <TASK_ID> --once` before final handoff while your edits are still present.
+3. For a two-agent run, update the shared ledger and run `node scripts/agent-bus-orchestration-check.mjs --ledger <RUN_LEDGER>`.
+4. Agent A must run `node scripts/agent-bus-orchestration-check.mjs --ledger <RUN_LEDGER> --acceptance` before giving a final accepted verdict.
+5. Update the task status and move or copy task notes to the appropriate task directory when useful.
+6. Write a handoff note in `.agent-bus/handoff/`.
+7. Update `.agent-bus/state/CURRENT.md` if the project state, phase, active work, blockers, or next recommended step changed.
+8. Append an event to `.agent-bus/events/events.jsonl` when the task changes coordination state, completes, blocks, or hands off.
+9. Remove your own locks.
+10. Leave clear next steps and unresolved risks.
+
+Verification rules:
+
+- No task is considered done without tests, a documented verification command, or a clear explanation why testing was not possible.
+- Do not claim success without fresh evidence.
+- Document failed commands and unresolved issues in the task and handoff note.
+- Do not weaken tests, skip phase-critical E2E, or mark partial behavior as complete.
+- `scripts/agent-bus-guard.mjs` is the required coordination guard. It writes pass/fail events to `.agent-bus/events/events.jsonl`; a failure means the agent must stop, fix ownership/locks/scope, or hand off instead of continuing.
+- `scripts/agent-bus-orchestration-check.mjs` is the required Lead/Worker ledger checker. A `blocked` block must include fresh reason, evidence, and parallel action. A `verified` block must be verified by Agent A with evidence. Final acceptance requires the `--acceptance` check to pass.
+
 ## 1. Project mission
 
 We are building **KISS PM** — a greenfield SaaS platform for operational project control.
