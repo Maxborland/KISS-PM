@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import { buildProjectScheduleGanttView, scheduleValidationIssueLabel } from "./phase5ScheduleApiClient";
@@ -23,6 +24,16 @@ const defaultProjectId = "project-phase4-main";
 type GanttLoadState = "idle" | "loading" | "ready" | "empty" | "denied" | "error";
 type GanttCommandName = "create-task" | "update-task" | "dependency" | "baseline";
 type ScheduleEditDraft = UpdateScheduleTaskRequestDto;
+
+type ScheduleSnapshot = {
+  schedule: ProjectScheduleDto;
+  audit: ProjectScheduleAuditDto | null;
+};
+
+const ganttQueryKeys = {
+  schedule: (testUser: string, projectId: string, refreshKey: number, manualRefreshNonce: number, canReadAudit: boolean) =>
+    ["gantt", testUser, "project-schedule", projectId, refreshKey, manualRefreshNonce, { canReadAudit }] as const
+};
 
 function hasPermission(currentTenant: CurrentTenantDto, permissionKey: string): boolean {
   return currentTenant.permissions.includes(permissionKey);
@@ -72,12 +83,11 @@ export function GanttControlSurface({
   refreshKey = 0
 }: GanttControlSurfaceProps) {
   const [selectedProjectId, setSelectedProjectId] = useState(projectId);
-  const [schedule, setSchedule] = useState<ProjectScheduleDto | null>(null);
-  const [audit, setAudit] = useState<ProjectScheduleAuditDto | null>(null);
+  const [openedProjectId, setOpenedProjectId] = useState(projectId);
+  const [manualRefreshNonce, setManualRefreshNonce] = useState(0);
   const [status, setStatus] = useState("Готово к загрузке Гантта");
-  const [loadState, setLoadState] = useState<GanttLoadState>("idle");
-  const [isLoading, setIsLoading] = useState(false);
   const [pendingCommand, setPendingCommand] = useState<GanttCommandName | null>(null);
+  const [lastCommandStatus, setLastCommandStatus] = useState<string | null>(null);
   const [commandIssues, setCommandIssues] = useState<ScheduleValidationIssueDto[]>([]);
   const [createTaskDraft, setCreateTaskDraft] = useState<CreateScheduleTaskRequestDto>({
     id: "task-phase5-created",
@@ -94,10 +104,29 @@ export function GanttControlSurface({
     predecessorTaskId: "",
     successorTaskId: ""
   });
-  const requestSequence = useRef(0);
   const canReadSchedule = hasPermission(currentTenant, "project.read");
   const canReadAudit = hasPermission(currentTenant, "audit.read");
   const canWriteSchedule = hasPermission(currentTenant, "task.write");
+  const scheduleQuery = useQuery<ScheduleSnapshot>({
+    queryKey: ganttQueryKeys.schedule(testUser, openedProjectId, refreshKey, manualRefreshNonce, canReadAudit),
+    queryFn: () => fetchScheduleSnapshot(openedProjectId),
+    enabled: canReadSchedule,
+    retry: false
+  });
+  const schedule = canReadSchedule ? scheduleQuery.data?.schedule ?? null : null;
+  const audit = canReadSchedule ? scheduleQuery.data?.audit ?? null : null;
+  const loadState: GanttLoadState = !canReadSchedule
+    ? "denied"
+    : scheduleQuery.isFetching && scheduleQuery.data === undefined
+      ? "loading"
+      : scheduleQuery.isError
+        ? "error"
+        : schedule
+          ? schedule.schedulePlan.wbsNodes.length > 0
+            ? "ready"
+            : "empty"
+          : "idle";
+  const isLoading = scheduleQuery.isFetching;
   const ganttView = useMemo(() => (schedule ? buildProjectScheduleGanttView(schedule) : null), [schedule]);
   const rows = ganttView?.rows ?? [];
   const taskRows = rows.filter((row) => row.taskId !== undefined);
@@ -106,52 +135,52 @@ export function GanttControlSurface({
     schedule?.schedulePlan.wbsNodes.find((node) => node.stageId !== undefined)?.stageId ?? `${activeProjectId}:stage-initiation`;
   const commandInFlight = pendingCommand !== null;
 
-  const loadSchedule = useCallback(
-    async (nextProjectId: string) => {
-      if (!canReadSchedule) {
-        setSchedule(null);
-        setAudit(null);
-        setStatus("Нет доступа к Гантту");
-        setLoadState("denied");
-        return;
-      }
+  async function fetchScheduleSnapshot(nextProjectId: string): Promise<ScheduleSnapshot> {
+    const nextSchedule = await apiClient.getProjectSchedule(testUser, nextProjectId);
+    const nextAudit = canReadAudit ? await apiClient.getProjectScheduleAudit(testUser, nextProjectId).catch(() => null) : null;
 
-      const requestId = requestSequence.current + 1;
-      requestSequence.current = requestId;
-      setIsLoading(true);
-      setStatus("Загрузка Гантта");
-      setLoadState("loading");
-      try {
-        const nextSchedule = await apiClient.getProjectSchedule(testUser, nextProjectId);
-        const nextAudit =
-          canReadAudit
-            ? await apiClient.getProjectScheduleAudit(testUser, nextProjectId).catch(() => null)
-            : null;
-        if (requestId !== requestSequence.current) return;
-        setSchedule(nextSchedule);
-        setAudit(nextAudit);
-        setCommandIssues([]);
-        setStatus(nextAudit === null && canReadAudit ? "Гантт загружен, аудит временно недоступен" : "Гантт загружен");
-        setLoadState(nextSchedule.schedulePlan.wbsNodes.length > 0 ? "ready" : "empty");
-      } catch (error) {
-        if (requestId !== requestSequence.current) return;
-        setSchedule(null);
-        setAudit(null);
-        setStatus(getErrorMessage(error));
-        setLoadState("error");
-      } finally {
-        if (requestId === requestSequence.current) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [apiClient, canReadAudit, canReadSchedule, testUser]
-  );
+    return {
+      schedule: nextSchedule,
+      audit: nextAudit
+    };
+  }
 
   useEffect(() => {
     setSelectedProjectId(projectId);
-    void loadSchedule(projectId);
-  }, [loadSchedule, projectId, refreshKey]);
+    setOpenedProjectId(projectId);
+  }, [projectId, refreshKey]);
+
+  useEffect(() => {
+    if (!canReadSchedule) {
+      setStatus("Нет доступа к Гантту");
+      setCommandIssues([]);
+      return;
+    }
+    if (scheduleQuery.isFetching && scheduleQuery.data === undefined) {
+      setStatus("Загрузка Гантта");
+      return;
+    }
+    if (scheduleQuery.isError) {
+      setStatus(getErrorMessage(scheduleQuery.error));
+      return;
+    }
+    if (scheduleQuery.isSuccess) {
+      setCommandIssues([]);
+      setStatus(
+        lastCommandStatus ??
+          (scheduleQuery.data.audit === null && canReadAudit ? "Гантт загружен, аудит временно недоступен" : "Гантт загружен")
+      );
+    }
+  }, [
+    canReadAudit,
+    canReadSchedule,
+    lastCommandStatus,
+    scheduleQuery.data,
+    scheduleQuery.error,
+    scheduleQuery.isError,
+    scheduleQuery.isFetching,
+    scheduleQuery.isSuccess
+  ]);
 
   useEffect(() => {
     if (schedule === null) return;
@@ -185,8 +214,26 @@ export function GanttControlSurface({
     }));
   }, [firstStageId, schedule]);
 
+  const createTaskMutation = useMutation({
+    mutationFn: (request: CreateScheduleTaskRequestDto) => apiClient.createScheduleTask(testUser, activeProjectId, request)
+  });
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, request }: { taskId: string; request: UpdateScheduleTaskRequestDto }) =>
+      apiClient.updateScheduleTask(testUser, activeProjectId, taskId, request)
+  });
+  const createDependencyMutation = useMutation({
+    mutationFn: (request: Parameters<Phase5ScheduleApiClient["createFinishToStartDependency"]>[2]) =>
+      apiClient.createFinishToStartDependency(testUser, activeProjectId, request)
+  });
+  const captureBaselineMutation = useMutation({
+    mutationFn: (request: Parameters<Phase5ScheduleApiClient["captureBaseline"]>[2]) =>
+      apiClient.captureBaseline(testUser, activeProjectId, request)
+  });
+
   function openSelectedProject() {
-    void loadSchedule(selectedProjectId);
+    setLastCommandStatus(null);
+    setOpenedProjectId(selectedProjectId);
+    setManualRefreshNonce((current) => current + 1);
   }
 
   async function runScheduleCommand(
@@ -198,12 +245,14 @@ export function GanttControlSurface({
     if (commandInFlight) return;
     const commandProjectId = activeProjectId;
     setPendingCommand(commandName);
+    setLastCommandStatus(null);
     setCommandIssues([]);
     setStatus(pendingLabel);
     try {
       await command();
-      await loadSchedule(commandProjectId);
+      await scheduleQuery.refetch();
       if (selectedProjectId === commandProjectId) {
+        setLastCommandStatus(successLabel);
         setStatus(successLabel);
       }
     } catch (error) {
@@ -244,7 +293,7 @@ export function GanttControlSurface({
     };
     void runScheduleCommand(
       "create-task",
-      () => apiClient.createScheduleTask(testUser, activeProjectId, request),
+      () => createTaskMutation.mutateAsync(request),
       "Создание задачи через API",
       "Задача создана через API"
     );
@@ -257,11 +306,14 @@ export function GanttControlSurface({
     void runScheduleCommand(
       "update-task",
       () =>
-        apiClient.updateScheduleTask(testUser, activeProjectId, taskId, {
+        updateTaskMutation.mutateAsync({
+          taskId,
+          request: {
           plannedStartDate: draft.plannedStartDate,
           plannedFinishDate: draft.plannedFinishDate,
           plannedWorkHours: Number(draft.plannedWorkHours),
           progressPercent: Number(draft.progressPercent)
+          }
         }),
       "Сохранение расписания задачи через API",
       "Расписание задачи сохранено через API"
@@ -272,7 +324,7 @@ export function GanttControlSurface({
     void runScheduleCommand(
       "dependency",
       () =>
-        apiClient.createFinishToStartDependency(testUser, activeProjectId, {
+        createDependencyMutation.mutateAsync({
           id: `dependency-${dependencyDraft.predecessorTaskId}-${dependencyDraft.successorTaskId}`,
           predecessorTaskId: dependencyDraft.predecessorTaskId,
           successorTaskId: dependencyDraft.successorTaskId,
@@ -287,7 +339,7 @@ export function GanttControlSurface({
     void runScheduleCommand(
       "baseline",
       () =>
-        apiClient.captureBaseline(testUser, activeProjectId, {
+        captureBaselineMutation.mutateAsync({
           id: `baseline-${activeProjectId}-draft`
         }),
       "Фиксация базового плана через API",

@@ -12,7 +12,7 @@ test("E2E-040 project manager opens selected project Gantt with tenant isolation
 
   await openKissPm(page, "project-manager-a");
   await expect(page.getByTestId("project-work-surface")).toBeVisible();
-  await page.getByRole("button", { name: "Открыть Гантт проекта" }).click();
+  await page.getByTestId("project-work-surface").getByRole("button", { name: "Открыть Гантт проекта" }).click();
 
   await expect(page.getByTestId("gantt-status")).toContainText("Гантт загружен");
   await expect(page.getByLabel(`Старт ${phase5Seed.tenantA.tasks[0].id}`)).toHaveValue("2026-06-01");
