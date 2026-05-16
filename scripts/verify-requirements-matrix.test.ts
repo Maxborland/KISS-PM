@@ -54,6 +54,18 @@ const p5RequiredE2e = {
   "P5-009": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
   "P5-010": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"]
 };
+const p6RequiredE2e = {
+  "P6-001": ["E2E-050", "E2E-051"],
+  "P6-002": ["E2E-050", "E2E-051"],
+  "P6-003": ["E2E-050"],
+  "P6-004": ["E2E-050", "E2E-051"],
+  "P6-005": ["E2E-051"],
+  "P6-006": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+  "P6-007": ["E2E-050", "E2E-051", "E2E-052"],
+  "P6-008": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+  "P6-009": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+  "P6-010": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"]
+};
 const e2eTestPaths = {
   "E2E-010": "e2e/tests/phase2/tenant-isolation.spec.ts",
   "E2E-011": "e2e/tests/phase2/access-profile.spec.ts",
@@ -74,7 +86,13 @@ const e2eTestPaths = {
   "E2E-041": "e2e/tests/phase5/gantt-task-cross-view.spec.ts",
   "E2E-042": "e2e/tests/phase5/gantt-date-persist.spec.ts",
   "E2E-043": "e2e/tests/phase5/gantt-dependency.spec.ts",
-  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts"
+  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts",
+  "E2E-050": "e2e/tests/phase6/resource-load.spec.ts",
+  "E2E-051": "e2e/tests/phase6/overload-detection.spec.ts",
+  "E2E-052": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+  "E2E-053": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+  "E2E-054": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+  "E2E-055": "e2e/tests/phase6/resource-resolution-permissions.spec.ts"
 };
 
 function writeMatrixFixture(fileName: string, firstRow: Record<string, unknown>) {
@@ -181,7 +199,7 @@ function writeP2MatrixFixture(fileName: string, overrideById: Record<string, Rec
 }
 
 function writePhaseMatrixFixture(
-  phase: "P2" | "P3" | "P4" | "P5",
+  phase: "P2" | "P3" | "P4" | "P5" | "P6",
   fileName: string,
   requiredE2eById: Record<string, string[]>,
   overrideById: Record<string, Record<string, unknown>>
@@ -274,6 +292,28 @@ function completeP5Overrides(checkedAt: string) {
         e2e_evidence: requiredE2e.map((e2eId) => ({
           id: e2eId,
           command: "npm run test:e2e:phase -- --phase=5",
+          test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
+          exit_code: 0,
+          status: "passed",
+          checked_at: checkedAt
+        }))
+      }
+    ])
+  );
+}
+
+function completeP6Overrides(checkedAt: string) {
+  return Object.fromEntries(
+    Object.entries(p6RequiredE2e).map(([id, requiredE2e]) => [
+      id,
+      {
+        status: "verified",
+        evidence: [`${id} verified`],
+        tests: ["npm run test:e2e:phase -- --phase=6 exit 0"],
+        blocker: null,
+        e2e_evidence: requiredE2e.map((e2eId) => ({
+          id: e2eId,
+          command: "npm run test:e2e:phase -- --phase=6",
           test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
           exit_code: 0,
           status: "passed",
@@ -1071,6 +1111,99 @@ describe("verify-requirements-matrix", () => {
       "complete-p5-phase-exit.json",
       p5RequiredE2e,
       completeP5Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: projectRoot,
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("accepts the initial blocked P6 matrix only with allow-blocked", () => {
+    const matrixPath = writePhaseMatrixFixture("P6", "blocked-p6-contract.json", p6RequiredE2e, {});
+
+    const blockedResult = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    const trackingResult = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(blockedResult.status).toBe(1);
+    expect(blockedResult.stderr).toContain("P6-001: blocked row requires --allow-blocked");
+    expect(trackingResult.status).toBe(0);
+    expect(trackingResult.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("rejects P6 rows whose required_e2e field does not match the phase contract", () => {
+    const matrixPath = writePhaseMatrixFixture("P6", "wrong-p6-required-e2e.json", p6RequiredE2e, {
+      "P6-006": {
+        required_e2e: ["E2E-050"]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P6-006: required_e2e must exactly match phase contract");
+  });
+
+  it("rejects P6 structured E2E evidence that points to a non-ledger phase6 file", () => {
+    const matrixPath = writePhaseMatrixFixture("P6", "wrong-p6-test-path.json", p6RequiredE2e, {
+      "P6-010": {
+        status: "verified",
+        evidence: ["P6-010 verified"],
+        tests: ["npm run test:e2e:phase -- --phase=6 exit 0"],
+        blocker: null,
+        e2e_evidence: [
+          {
+            id: "E2E-055",
+            command: "npm run test:e2e:phase -- --phase=6",
+            test_path: "e2e/tests/phase6/permissions.spec.ts",
+            exit_code: 0,
+            status: "passed",
+            checked_at: "2026-05-16T15:05:00+07:00"
+          }
+        ]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P6-010: E2E-055 E2E evidence test_path must match e2e/tests/phase6/resource-resolution-permissions.spec.ts"
+    );
+  });
+
+  it("accepts a complete P6 matrix only when every row is verified with phase 6 structured E2E evidence", () => {
+    const checkedAt = "2026-05-16T07:55:00.000Z";
+    const projectRoot = resolve(fixtureDir, "complete-p6-project-root");
+    writeRequiredE2eSpecFiles(projectRoot, Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-05")));
+    const e2eRunMetadataPath = writeE2eRunMetadata("complete-p6-run-metadata.json", {
+      phase: "6",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase6/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-05")),
+      startedAt: "2026-05-16T07:56:00.000Z",
+      finishedAt: "2026-05-16T07:58:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P6",
+      "complete-p6-phase-exit.json",
+      p6RequiredE2e,
+      completeP6Overrides(checkedAt)
     );
 
     const result = spawnSync(process.execPath, [scriptPath, matrixPath], {

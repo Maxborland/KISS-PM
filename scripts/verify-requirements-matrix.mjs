@@ -17,7 +17,8 @@ const requiredIdsByPhase = {
   "P4-contract": ["P4C-001", "P4C-002", "P4C-003"],
   P4: Array.from({ length: 10 }, (_, index) => `P4-${String(index + 1).padStart(3, "0")}`),
   "P5-contract": ["P5C-001", "P5C-002", "P5C-003"],
-  P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`)
+  P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`),
+  P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -67,6 +68,18 @@ const requiredE2eByPhaseRow = {
     "P5-008": ["E2E-041", "E2E-042", "E2E-043", "E2E-044"],
     "P5-009": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"],
     "P5-010": ["E2E-040", "E2E-041", "E2E-042", "E2E-043", "E2E-044"]
+  },
+  P6: {
+    "P6-001": ["E2E-050", "E2E-051"],
+    "P6-002": ["E2E-050", "E2E-051"],
+    "P6-003": ["E2E-050"],
+    "P6-004": ["E2E-050", "E2E-051"],
+    "P6-005": ["E2E-051"],
+    "P6-006": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+    "P6-007": ["E2E-050", "E2E-051", "E2E-052"],
+    "P6-008": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+    "P6-009": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
+    "P6-010": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"]
   }
 };
 const requiredE2eTestPath = {
@@ -89,7 +102,13 @@ const requiredE2eTestPath = {
   "E2E-041": "e2e/tests/phase5/gantt-task-cross-view.spec.ts",
   "E2E-042": "e2e/tests/phase5/gantt-date-persist.spec.ts",
   "E2E-043": "e2e/tests/phase5/gantt-dependency.spec.ts",
-  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts"
+  "E2E-044": "e2e/tests/phase5/baseline-stability.spec.ts",
+  "E2E-050": "e2e/tests/phase6/resource-load.spec.ts",
+  "E2E-051": "e2e/tests/phase6/overload-detection.spec.ts",
+  "E2E-052": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+  "E2E-053": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+  "E2E-054": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+  "E2E-055": "e2e/tests/phase6/resource-resolution-permissions.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
