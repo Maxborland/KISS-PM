@@ -172,6 +172,7 @@ nav a:focus-visible {
 }
 
 .phase2-surface,
+.tenant-labels-surface,
 .crm-intake-surface,
 .project-work-surface,
 .gantt-surface,
@@ -226,6 +227,29 @@ nav a:focus-visible {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tenant-labels-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+}
+
+.tenant-label-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 72px minmax(0, 1fr) 150px;
+}
+
+.tenant-label-row span,
+.tenant-label-row small {
+  color: #526052;
+}
+
+.tenant-label-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .phase2-panel {
@@ -343,6 +367,11 @@ button:focus-visible {
   }
 
   .phase2-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-labels-layout,
+  .tenant-label-row {
     grid-template-columns: 1fr;
   }
 }

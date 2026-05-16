@@ -19,6 +19,11 @@ import { createPhase7RuntimeState } from "./phase7Runtime";
 import { createPhase8RuntimeState } from "./phase8Runtime";
 import { createPhase9RuntimeState } from "./phase9Runtime";
 import type { Phase9ClosureDataInput } from "./phase9Runtime";
+import {
+  buildRuntimeLabelProjection,
+  createPhase10RuntimeState,
+  tenantLabelPublishAuditDto
+} from "./phase10Runtime";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -84,6 +89,28 @@ const updateTenantLabelSchema = z.object({
   label: z.string().trim().min(1),
   expectedConfigurationVersion: z.number().int().positive()
 });
+
+const tenantLabelPreviewSchema = z
+  .object({
+    changes: z
+      .array(
+        z
+          .object({
+            key: z.string().trim().min(1),
+            label: z.string().trim().min(1)
+          })
+          .strict()
+      )
+      .min(1),
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const tenantLabelPublishSchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
 
 const permissionDiagnosticsSchema = z.object({
   permissionKey: z.string().trim().min(1),
@@ -655,6 +682,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase7Runtime = createPhase7RuntimeState();
   let phase8Runtime = createPhase8RuntimeState();
   let phase9Runtime = createPhase9RuntimeState();
+  let phase10Runtime = createPhase10RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -685,6 +713,127 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         },
         labels: { ...session.labelSet.labels },
         permissions: [...session.profile.permissions]
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/tenant/labels", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "tenantLabelSet",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({
+        labelSet: {
+          tenantId: session.labelSet.tenantId,
+          configurationVersion: session.labelSet.configurationVersion,
+          labels: { ...session.labelSet.labels },
+          updatedAt: session.labelSet.updatedAt
+        },
+        runtimeProjection: buildRuntimeLabelProjection(session.labelSet)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/labels/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantLabelSet",
+        tenantId: session.user.tenantId
+      });
+
+      const body = tenantLabelPreviewSchema.parse(await parseJson(context));
+      const preview = phase10Runtime.previewLabels({
+        labelSet: session.labelSet,
+        actorId: session.user.id,
+        changes: body.changes,
+        affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+      });
+
+      return context.json({
+        preview,
+        runtimeProjection: buildRuntimeLabelProjection({
+          ...session.labelSet,
+          configurationVersion: preview.after.configurationVersion,
+          labels: preview.after.labels,
+          updatedAt: preview.createdAt
+        })
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/labels/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantLabelSet",
+        tenantId: session.user.tenantId
+      });
+
+      const body = tenantLabelPublishSchema.parse(await parseJson(context));
+      const auditEventId = `audit-p10-labels-${session.user.tenantId}-${session.labelSet.configurationVersion + 1}`;
+      const result = phase10Runtime.publishLabels({
+        labelSet: session.labelSet,
+        actorId: session.user.id,
+        accessProfileId: session.user.accessProfileId,
+        previewId: body.previewId,
+        auditEventId
+      });
+      const savedLabelSet = runtime.replaceLabelSet(result.labelSet);
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "tenantLabelSet", entityId: session.user.tenantId },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { configurationVersion: result.audit.beforeConfigurationVersion },
+          after: { configurationVersion: result.audit.afterConfigurationVersion },
+          previousConfigurationVersion: result.audit.beforeConfigurationVersion,
+          newConfigurationVersion: result.audit.afterConfigurationVersion
+        }
+      });
+
+      return context.json({
+        result: {
+          labelSet: {
+            tenantId: savedLabelSet.tenantId,
+            configurationVersion: savedLabelSet.configurationVersion,
+            labels: { ...savedLabelSet.labels },
+            updatedAt: savedLabelSet.updatedAt
+          },
+          audit: tenantLabelPublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          runtimeProjection: buildRuntimeLabelProjection(savedLabelSet)
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/tenant/configuration/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({
+        events: runtime.auditStore.listByTenant(session.user.tenantId).map(auditEventDto),
+        actionExecutions: phase10Runtime.listLabelActionExecutions(session.user.tenantId).map(actionExecutionDto)
       });
     } catch (error) {
       return handleRouteError(context, error);
@@ -3026,6 +3175,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase7Runtime = createPhase7RuntimeState();
     phase8Runtime = createPhase8RuntimeState();
     phase9Runtime = createPhase9RuntimeState();
+    phase10Runtime = createPhase10RuntimeState();
     return context.json({ status: "reset" });
   });
 

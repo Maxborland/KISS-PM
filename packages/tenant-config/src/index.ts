@@ -294,6 +294,46 @@ export type TenantLabelUpdateResult = {
   trace: TenantLabelChangeTrace;
 };
 
+export type TenantLabelSetPreviewChange = {
+  key: string;
+  beforeLabel: string;
+  afterLabel: string;
+};
+
+export type TenantLabelSetPublishPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  mutatesState: false;
+  before: {
+    configurationVersion: number;
+    labels: Record<string, string>;
+  };
+  after: {
+    configurationVersion: number;
+    labels: Record<string, string>;
+  };
+  changes: TenantLabelSetPreviewChange[];
+  affectedRuntimeSurfaces: string[];
+  createdAt: string;
+};
+
+export type TenantLabelSetPublishAudit = {
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  auditEventId: string;
+  commandType: "tenant_label_set.publish";
+  beforeConfigurationVersion: number;
+  afterConfigurationVersion: number;
+  changedKeys: string[];
+  publishedAt: string;
+};
+
+export type TenantLabelSetPublishResult = {
+  labelSet: TenantLabelSet;
+  audit: TenantLabelSetPublishAudit;
+};
+
 export class TenantConfigModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict",
@@ -561,6 +601,29 @@ function normalizeLabels(labels: Record<string, string>): Record<string, string>
   }
 
   return normalized;
+}
+
+function sameStringRecord(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+
+  return leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key]);
+}
+
+function sameLabelChanges(left: TenantLabelSetPreviewChange[], right: TenantLabelSetPreviewChange[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((change, index) => {
+      const candidate = right[index];
+      return (
+        candidate !== undefined &&
+        change.key === candidate.key &&
+        change.beforeLabel === candidate.beforeLabel &&
+        change.afterLabel === candidate.afterLabel
+      );
+    })
+  );
 }
 
 function cloneConfigurationRefs(
@@ -1418,6 +1481,142 @@ export function createTenantLabelSet(input: {
     configurationVersion: requirePositiveInteger(input.configurationVersion, "tenantLabelSet.configurationVersion"),
     labels: normalizeLabels(input.labels),
     updatedAt: requireValidTimestamp(input.updatedAt, "tenantLabelSet.updatedAt")
+  };
+}
+
+export function previewTenantLabelSetPublish(
+  current: TenantLabelSet,
+  input: {
+    id: string;
+    actorId: TenantUserId;
+    changes: Array<{ key: string; label: string }>;
+    affectedRuntimeSurfaces: string[];
+    createdAt: string;
+  }
+): TenantLabelSetPublishPreview {
+  const currentLabelSet = createTenantLabelSet(current);
+  const changes = requireArray(input.changes, "tenantLabelSetPreview.changes").map((change) => ({
+    key: requireNonEmptyString(change.key, "tenantLabelSetPreview.change.key"),
+    afterLabel: requireNonEmptyString(change.label, "tenantLabelSetPreview.change.label")
+  }));
+  if (changes.length === 0) {
+    throw new TenantConfigModelError("validation_error", "tenantLabelSetPreview.changes must not be empty");
+  }
+
+  const seenKeys = new Set<string>();
+  const beforeLabels = normalizeLabels(currentLabelSet.labels);
+  const nextLabels = { ...beforeLabels };
+  const previewChanges: TenantLabelSetPreviewChange[] = [];
+
+  for (const change of changes) {
+    if (seenKeys.has(change.key)) {
+      throw new TenantConfigModelError("conflict", `Duplicate tenant label change key: ${change.key}`);
+    }
+    seenKeys.add(change.key);
+    const beforeLabel = beforeLabels[change.key];
+    if (beforeLabel === undefined) {
+      throw new TenantConfigModelError("validation_error", `Tenant label is not configured: ${change.key}`);
+    }
+    nextLabels[change.key] = change.afterLabel;
+    previewChanges.push({
+      key: change.key,
+      beforeLabel,
+      afterLabel: change.afterLabel
+    });
+  }
+
+  const affectedRuntimeSurfaces = requireArray(
+    input.affectedRuntimeSurfaces,
+    "tenantLabelSetPreview.affectedRuntimeSurfaces"
+  ).map((surface) => requireSystemKey(surface, "tenantLabelSetPreview.affectedRuntimeSurface"));
+  if (affectedRuntimeSurfaces.length === 0) {
+    throw new TenantConfigModelError(
+      "validation_error",
+      "tenantLabelSetPreview.affectedRuntimeSurfaces must not be empty"
+    );
+  }
+
+  return {
+    id: requireNonEmptyString(input.id, "tenantLabelSetPreview.id"),
+    tenantId: currentLabelSet.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "tenantLabelSetPreview.actorId"),
+    mutatesState: false,
+    before: {
+      configurationVersion: currentLabelSet.configurationVersion,
+      labels: { ...beforeLabels }
+    },
+    after: {
+      configurationVersion: currentLabelSet.configurationVersion + 1,
+      labels: nextLabels
+    },
+    changes: previewChanges,
+    affectedRuntimeSurfaces,
+    createdAt: requireValidTimestamp(input.createdAt, "tenantLabelSetPreview.createdAt")
+  };
+}
+
+export function publishTenantLabelSetPreview(
+  current: TenantLabelSet,
+  input: {
+    preview: TenantLabelSetPublishPreview;
+    expectedConfigurationVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): TenantLabelSetPublishResult {
+  const currentLabelSet = createTenantLabelSet(current);
+  const expectedConfigurationVersion = requirePositiveInteger(
+    input.expectedConfigurationVersion,
+    "tenantLabelSetPublish.expectedConfigurationVersion"
+  );
+  if (expectedConfigurationVersion !== currentLabelSet.configurationVersion) {
+    throw new TenantConfigModelError("conflict", "tenant label set preview is stale");
+  }
+  if (input.preview.tenantId !== currentLabelSet.tenantId) {
+    throw new TenantConfigModelError("validation_error", "tenant label set preview tenant mismatch");
+  }
+  if (input.preview.before.configurationVersion !== currentLabelSet.configurationVersion) {
+    throw new TenantConfigModelError("conflict", "tenant label set preview is stale");
+  }
+  if (!sameStringRecord(input.preview.before.labels, currentLabelSet.labels)) {
+    throw new TenantConfigModelError("conflict", "tenant label set changed after preview");
+  }
+
+  const recomputedPreview = previewTenantLabelSetPublish(currentLabelSet, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    changes: input.preview.changes.map((change) => ({ key: change.key, label: change.afterLabel })),
+    affectedRuntimeSurfaces: input.preview.affectedRuntimeSurfaces,
+    createdAt: input.preview.createdAt
+  });
+
+  if (
+    recomputedPreview.after.configurationVersion !== input.preview.after.configurationVersion ||
+    !sameStringRecord(recomputedPreview.after.labels, input.preview.after.labels) ||
+    !sameLabelChanges(recomputedPreview.changes, input.preview.changes)
+  ) {
+    throw new TenantConfigModelError("conflict", "tenant label set preview is stale");
+  }
+
+  const labelSet = createTenantLabelSet({
+    tenantId: currentLabelSet.tenantId,
+    configurationVersion: input.preview.after.configurationVersion,
+    labels: input.preview.after.labels,
+    updatedAt: requireValidTimestamp(input.publishedAt, "tenantLabelSetPublish.publishedAt")
+  });
+
+  return {
+    labelSet,
+    audit: {
+      tenantId: labelSet.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireNonEmptyString(input.auditEventId, "tenantLabelSetPublish.auditEventId"),
+      commandType: "tenant_label_set.publish",
+      beforeConfigurationVersion: currentLabelSet.configurationVersion,
+      afterConfigurationVersion: labelSet.configurationVersion,
+      changedKeys: input.preview.changes.map((change) => change.key),
+      publishedAt: requireValidTimestamp(input.publishedAt, "tenantLabelSetPublish.publishedAt")
+    }
   };
 }
 

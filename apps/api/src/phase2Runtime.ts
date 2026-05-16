@@ -45,6 +45,17 @@ export type Phase2RuntimeState = ReturnType<typeof createPhase2RuntimeState>;
 
 const FIXED_TIMESTAMP = PHASE2_FIXTURE_TIMESTAMP;
 
+const p10RuntimeLabelDefaults: Record<string, string> = {
+  "runtime.role.project_manager": "Руководитель проекта",
+  "runtime.role.resource_manager": "Ресурсный менеджер",
+  "runtime.role.executor": "Исполнитель",
+  "runtime.stage.initiation": "Инициация",
+  "runtime.stage.delivery": "Поставка",
+  "navigation.projects": "Проекты",
+  "navigation.portfolio": "Портфель",
+  "navigation.resources": "Ресурсы"
+};
+
 const phase2PermissionCatalog = [
   createPermission({
     key: "tenant.read",
@@ -69,6 +80,21 @@ const phase2PermissionCatalog = [
   createPermission({
     key: "tenant.config.write",
     description: "Apply governed tenant configuration and template version changes",
+    category: "tenant_config"
+  }),
+  createPermission({
+    key: "tenant.config.read",
+    description: "Read tenant configuration versions and runtime projections",
+    category: "tenant_config"
+  }),
+  createPermission({
+    key: "tenant.config.export",
+    description: "Export tenant configuration packages",
+    category: "tenant_config"
+  }),
+  createPermission({
+    key: "tenant.config.import",
+    description: "Preview and apply tenant configuration imports",
     category: "tenant_config"
   }),
   createPermission({
@@ -260,7 +286,10 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run",
       "audit.read",
+      "tenant.config.read",
       "tenant.config.write",
+      "tenant.config.export",
+      "tenant.config.import",
       "project_draft.read",
       "project_draft.create",
       "project.create_from_template",
@@ -294,6 +323,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run",
       "audit.read",
+      "tenant.config.read",
       "project_draft.read",
       "project_draft.create",
       "project.create_from_template",
@@ -329,6 +359,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.read",
       "resource.write",
       "audit.read",
+      "tenant.config.read",
       "kpi:read",
       "kpi.evaluate:execute",
       "control.surface:read",
@@ -346,7 +377,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.read",
       "kpi:read",
       "retrospective.read",
-      "control.surface:read"
+      "control.surface:read",
+      "tenant.config.read"
     ],
     tenant_user: [
       "crm.opportunity.read",
@@ -357,7 +389,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.read",
       "kpi:read",
       "retrospective.read",
-      "control.surface:read"
+      "control.surface:read",
+      "tenant.config.read"
     ]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
@@ -379,7 +412,7 @@ function createLabelSet(seed: Phase2TenantLabelSeed): TenantLabelSet {
   return createTenantLabelSet({
     tenantId: seed.tenantId,
     configurationVersion: seed.configurationVersion,
-    labels: seed.labels,
+    labels: { ...p10RuntimeLabelDefaults, ...seed.labels },
     updatedAt: seed.updatedAt
   });
 }
@@ -518,6 +551,16 @@ export function createPhase2RuntimeState() {
       };
     },
 
+    replaceLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
+      if (!tenants.has(labelSet.tenantId)) {
+        throw new Error(`Unknown tenant label set: ${labelSet.tenantId}`);
+      }
+      const stored = cloneLabelSet(labelSet);
+      labelSets.set(labelSet.tenantId, stored);
+
+      return cloneLabelSet(stored);
+    },
+
     getProbe(probeId: string): TenantIsolationProbe | undefined {
       const probe = probes.get(probeId);
       return probe ? { ...probe } : undefined;
@@ -547,12 +590,13 @@ export function createPhase2RuntimeState() {
 
     appendAuditEvent(input: {
       session: Phase2RuntimeSession;
+      id?: string;
       actionKey: string;
       target: { entityType: string; entityId: string };
       correlationId?: CorrelationId;
       details?: AuditEvent["details"];
     }): AuditEvent {
-      const auditId = nextAuditId();
+      const auditId = input.id ?? nextAuditId();
 
       return auditStore.append(
         createAuditEvent({
