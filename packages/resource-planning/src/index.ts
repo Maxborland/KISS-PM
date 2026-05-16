@@ -118,6 +118,7 @@ export type ResourceReservation = TenantOwned & {
   id: string;
   sourceType: "opportunity" | "project" | "stage";
   sourceId: string;
+  resourceProfileId?: string;
   roleKey: string;
   roleLabel: string;
   periodStart: string;
@@ -125,6 +126,109 @@ export type ResourceReservation = TenantOwned & {
   reservedHours: number;
   status: "active" | "released";
   sourceLabel: string;
+};
+
+export type ResourceProfileType = "person" | "role" | "team" | "placeholder";
+
+export type ResourceProfile = TenantOwned & {
+  id: string;
+  type: ResourceProfileType;
+  label: string;
+  userId?: string;
+  roleKeys: string[];
+  skillTags: string[];
+  calendarId: string;
+  active: boolean;
+};
+
+export type ResourceCapacityCalendar = TenantOwned & {
+  id: string;
+  resourceProfileId: string;
+  timezone: string;
+  workingDays: number[];
+  defaultDailyCapacityHours: number;
+  effectiveFrom: string;
+  effectiveTo: string;
+};
+
+export type AvailabilityExceptionType = "absence" | "reduced_capacity" | "capacity_override";
+export type AvailabilityExceptionSourceType = "manual" | "crm" | "project" | "system";
+
+export type AvailabilityException = TenantOwned & {
+  id: string;
+  resourceProfileId: string;
+  type: AvailabilityExceptionType;
+  periodStart: string;
+  periodEnd: string;
+  capacityHoursPerDay: number;
+  sourceType: AvailabilityExceptionSourceType;
+  sourceId: string;
+  sourceLabel: string;
+};
+
+export type CapacityGranularity = "day" | "week" | "month";
+
+export type CapacityPeriodBucket = TenantOwned & {
+  id: string;
+  resourceProfileId: string;
+  roleKeys: string[];
+  periodStart: string;
+  periodEnd: string;
+  capacityHours: number;
+  granularity: CapacityGranularity;
+  sourceRefs: string[];
+};
+
+export type ResourceAssignment = TenantOwned & {
+  id: string;
+  projectId: string;
+  taskId: string;
+  sourceParticipantId: string;
+  resourceProfileId: string;
+  roleKey: string;
+  roleLabel: string;
+  plannedStartDate: string;
+  plannedFinishDate: string;
+  plannedWorkHours: number;
+  sourceLabel: string;
+};
+
+export type ConflictSeverity = "none" | "warning" | "critical";
+
+export type ResourceLoadBucket = TenantOwned & {
+  id: string;
+  resourceProfileId: string;
+  roleKeys: string[];
+  periodStart: string;
+  periodEnd: string;
+  capacityHours: number;
+  assignedHours: number;
+  reservedHours: number;
+  totalLoadHours: number;
+  loadPercent: number;
+  severity: ConflictSeverity;
+  sourceRefs: string[];
+  affectedTaskIds: string[];
+  affectedProjectIds: string[];
+};
+
+export type ResourceOverloadStatus = "open" | "resolved" | "accepted" | "escalated";
+
+export type ResourceOverload = TenantOwned & {
+  id: string;
+  resourceProfileId: string;
+  roleKeys: string[];
+  periodStart: string;
+  periodEnd: string;
+  severity: Exclude<ConflictSeverity, "none">;
+  overloadHours: number;
+  loadPercent: number;
+  sourceRefs: string[];
+  affectedTaskIds: string[];
+  affectedProjectIds: string[];
+  recommendedActionKeys: string[];
+  status: ResourceOverloadStatus;
+  trace: string[];
 };
 
 export type ConflictingReservation = {
@@ -215,6 +319,14 @@ function requireProbability(value: number | undefined, fieldName: string): numbe
   return value;
 }
 
+function requireBoolean(value: boolean | undefined, fieldName: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new ResourcePlanningModelError("validation_error", `${fieldName} must be a boolean`);
+  }
+
+  return value;
+}
+
 function requireArray<T>(value: T[] | undefined, fieldName: string): T[] {
   if (!Array.isArray(value)) {
     throw new ResourcePlanningModelError("validation_error", `${fieldName} must be an array`);
@@ -238,6 +350,22 @@ function requireSystemKey(value: string | undefined, fieldName: string): string 
   }
 
   return key;
+}
+
+function requireSystemKeyArray(value: string[] | undefined, fieldName: string, allowEmpty: boolean): string[] {
+  if (!Array.isArray(value)) {
+    throw new ResourcePlanningModelError("validation_error", `${fieldName} must be an array`);
+  }
+  if (!allowEmpty && value.length === 0) {
+    throw new ResourcePlanningModelError("validation_error", `${fieldName} must not be empty`);
+  }
+
+  const keys = value.map((key) => requireSystemKey(key, `${fieldName}[]`));
+  if (new Set(keys).size !== keys.length) {
+    throw new ResourcePlanningModelError("conflict", `${fieldName} must be unique`);
+  }
+
+  return keys;
 }
 
 function requireValidTimestamp(value: string | undefined, fieldName: string): string {
@@ -612,6 +740,599 @@ export function createRoleCapacityBucket(input: {
   };
 }
 
+function requireResourceProfileType(value: ResourceProfileType | undefined): ResourceProfileType {
+  if (value !== "person" && value !== "role" && value !== "team" && value !== "placeholder") {
+    throw new ResourcePlanningModelError("validation_error", "resourceProfile.type is invalid");
+  }
+
+  return value;
+}
+
+function requireWorkingDay(value: number | undefined, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 7) {
+    throw new ResourcePlanningModelError("validation_error", `${fieldName} must be an ISO weekday 1..7`);
+  }
+
+  return value;
+}
+
+function requireAvailabilityExceptionType(value: AvailabilityExceptionType | undefined): AvailabilityExceptionType {
+  if (value !== "absence" && value !== "reduced_capacity" && value !== "capacity_override") {
+    throw new ResourcePlanningModelError("validation_error", "availabilityException.type is invalid");
+  }
+
+  return value;
+}
+
+function requireAvailabilityExceptionSourceType(
+  value: AvailabilityExceptionSourceType | undefined
+): AvailabilityExceptionSourceType {
+  if (value !== "manual" && value !== "crm" && value !== "project" && value !== "system") {
+    throw new ResourcePlanningModelError("validation_error", "availabilityException.sourceType is invalid");
+  }
+
+  return value;
+}
+
+function requireCapacityGranularity(value: CapacityGranularity | undefined): CapacityGranularity {
+  if (value !== "day" && value !== "week" && value !== "month") {
+    throw new ResourcePlanningModelError("validation_error", "capacity granularity is invalid");
+  }
+
+  return value;
+}
+
+function requireResourceProfile(input: ResourceProfile, fieldName = "resourceProfile"): ResourceProfile {
+  const profile = requireObject(input, fieldName);
+
+  return createResourceProfile({
+    id: profile.id,
+    tenantId: profile.tenantId,
+    type: profile.type,
+    label: profile.label,
+    userId: profile.userId,
+    roleKeys: profile.roleKeys,
+    skillTags: profile.skillTags,
+    calendarId: profile.calendarId,
+    active: profile.active
+  });
+}
+
+function requireCapacityPeriodBucket(input: CapacityPeriodBucket, fieldName = "capacityPeriodBucket"): CapacityPeriodBucket {
+  const bucket = requireObject(input, fieldName);
+  const period = createCapacityDateWindow(
+    { startDate: bucket.periodStart, endDate: bucket.periodEnd },
+    `${fieldName}.period`
+  );
+
+  return {
+    id: requireNonEmptyString(bucket.id, `${fieldName}.id`),
+    tenantId: requireNonEmptyString(bucket.tenantId, `${fieldName}.tenantId`),
+    resourceProfileId: requireNonEmptyString(bucket.resourceProfileId, `${fieldName}.resourceProfileId`),
+    roleKeys: requireSystemKeyArray(bucket.roleKeys, `${fieldName}.roleKeys`, true),
+    periodStart: period.startDate,
+    periodEnd: period.endDate,
+    capacityHours: requireNonNegativeNumber(bucket.capacityHours, `${fieldName}.capacityHours`),
+    granularity: requireCapacityGranularity(bucket.granularity),
+    sourceRefs: requireArray(bucket.sourceRefs, `${fieldName}.sourceRefs`).map((sourceRef) =>
+      requireNonEmptyString(sourceRef, `${fieldName}.sourceRef`)
+    )
+  };
+}
+
+function requireSameTenant(tenantId: TenantId, entity: TenantOwned, message: string): void {
+  if (entity.tenantId !== tenantId) {
+    throw new ResourcePlanningModelError("tenant_mismatch", message);
+  }
+}
+
+function dateToUtcMs(date: string): number {
+  return Date.parse(`${date}T00:00:00.000Z`);
+}
+
+function dateFromUtcMs(timestamp: number): string {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function addDays(date: string, days: number): string {
+  return dateFromUtcMs(dateToUtcMs(date) + days * 86_400_000);
+}
+
+function dayCountInclusive(startDate: string, endDate: string): number {
+  return Math.floor((dateToUtcMs(endDate) - dateToUtcMs(startDate)) / 86_400_000) + 1;
+}
+
+function isoWeekday(date: string): number {
+  const day = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+function periodKeyForDate(date: string, granularity: CapacityGranularity): { startDate: string; endDate: string } {
+  if (granularity === "day") {
+    return { startDate: date, endDate: date };
+  }
+
+  if (granularity === "week") {
+    const weekday = isoWeekday(date);
+    return {
+      startDate: addDays(date, 1 - weekday),
+      endDate: addDays(date, 7 - weekday)
+    };
+  }
+
+  const yearMonth = date.slice(0, 7);
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  return {
+    startDate: `${yearMonth}-01`,
+    endDate: monthEnd
+  };
+}
+
+function clampPeriod(period: { startDate: string; endDate: string }, window: CapacityDateWindow): CapacityDateWindow {
+  return {
+    startDate: period.startDate < window.startDate ? window.startDate : period.startDate,
+    endDate: period.endDate > window.endDate ? window.endDate : period.endDate
+  };
+}
+
+function overlapDays(leftStart: string, leftEnd: string, rightStart: string, rightEnd: string): number {
+  const start = leftStart > rightStart ? leftStart : rightStart;
+  const end = leftEnd < rightEnd ? leftEnd : rightEnd;
+  if (start > end) return 0;
+
+  return dayCountInclusive(start, end);
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function uniqueInOrder(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function assertUniqueIds<T extends { id: string }>(items: T[], message: string): void {
+  const ids = items.map((item) => item.id);
+  if (new Set(ids).size !== ids.length) {
+    throw new ResourcePlanningModelError("conflict", message);
+  }
+}
+
+export function createResourceProfile(input: {
+  id: string;
+  tenantId: TenantId;
+  type: ResourceProfileType;
+  label: string;
+  userId?: string;
+  roleKeys: string[];
+  skillTags: string[];
+  calendarId: string;
+  active: boolean;
+}): ResourceProfile {
+  const rawProfile = requireObject(input, "resourceProfile");
+
+  return {
+    id: requireNonEmptyString(rawProfile.id, "resourceProfile.id"),
+    tenantId: requireNonEmptyString(rawProfile.tenantId, "tenantId"),
+    type: requireResourceProfileType(rawProfile.type),
+    label: requireNonEmptyString(rawProfile.label, "resourceProfile.label"),
+    ...(rawProfile.userId !== undefined ? { userId: requireNonEmptyString(rawProfile.userId, "resourceProfile.userId") } : {}),
+    roleKeys: requireSystemKeyArray(rawProfile.roleKeys, "resourceProfile.roleKeys", false),
+    skillTags: requireSystemKeyArray(rawProfile.skillTags, "resourceProfile.skillTags", true),
+    calendarId: requireNonEmptyString(rawProfile.calendarId, "resourceProfile.calendarId"),
+    active: requireBoolean(rawProfile.active, "resourceProfile.active")
+  };
+}
+
+export function createResourceCapacityCalendar(input: {
+  id: string;
+  tenantId: TenantId;
+  resourceProfileId: string;
+  timezone: string;
+  workingDays: number[];
+  defaultDailyCapacityHours: number;
+  effectiveFrom: string;
+  effectiveTo: string;
+}): ResourceCapacityCalendar {
+  const rawCalendar = requireObject(input, "resourceCapacityCalendar");
+  const effectivePeriod = createCapacityDateWindow(
+    { startDate: rawCalendar.effectiveFrom, endDate: rawCalendar.effectiveTo },
+    "resourceCapacityCalendar.effectivePeriod"
+  );
+  const workingDays = requireArray(rawCalendar.workingDays, "resourceCapacityCalendar.workingDays").map((day) =>
+    requireWorkingDay(day, "resourceCapacityCalendar.workingDays[]")
+  );
+  if (workingDays.length === 0) {
+    throw new ResourcePlanningModelError("validation_error", "resourceCapacityCalendar.workingDays must not be empty");
+  }
+  if (new Set(workingDays).size !== workingDays.length) {
+    throw new ResourcePlanningModelError("conflict", "resourceCapacityCalendar.workingDays must be unique");
+  }
+
+  return {
+    id: requireNonEmptyString(rawCalendar.id, "resourceCapacityCalendar.id"),
+    tenantId: requireNonEmptyString(rawCalendar.tenantId, "tenantId"),
+    resourceProfileId: requireNonEmptyString(rawCalendar.resourceProfileId, "resourceCapacityCalendar.resourceProfileId"),
+    timezone: requireNonEmptyString(rawCalendar.timezone, "resourceCapacityCalendar.timezone"),
+    workingDays: [...workingDays].sort((left, right) => left - right),
+    defaultDailyCapacityHours: requireNonNegativeNumber(
+      rawCalendar.defaultDailyCapacityHours,
+      "resourceCapacityCalendar.defaultDailyCapacityHours"
+    ),
+    effectiveFrom: effectivePeriod.startDate,
+    effectiveTo: effectivePeriod.endDate
+  };
+}
+
+export function createAvailabilityException(input: {
+  id: string;
+  tenantId: TenantId;
+  resourceProfileId: string;
+  type: AvailabilityExceptionType;
+  periodStart: string;
+  periodEnd: string;
+  capacityHoursPerDay: number;
+  sourceType: AvailabilityExceptionSourceType;
+  sourceId: string;
+  sourceLabel: string;
+}): AvailabilityException {
+  const rawException = requireObject(input, "availabilityException");
+  const period = createCapacityDateWindow(
+    { startDate: rawException.periodStart, endDate: rawException.periodEnd },
+    "availabilityException.period"
+  );
+  const type = requireAvailabilityExceptionType(rawException.type);
+  const capacityHoursPerDay = requireNonNegativeNumber(
+    rawException.capacityHoursPerDay,
+    "availabilityException.capacityHoursPerDay"
+  );
+  if (type === "absence" && capacityHoursPerDay !== 0) {
+    throw new ResourcePlanningModelError("validation_error", "availabilityException.absence capacity must be 0");
+  }
+
+  return {
+    id: requireNonEmptyString(rawException.id, "availabilityException.id"),
+    tenantId: requireNonEmptyString(rawException.tenantId, "tenantId"),
+    resourceProfileId: requireNonEmptyString(rawException.resourceProfileId, "availabilityException.resourceProfileId"),
+    type,
+    periodStart: period.startDate,
+    periodEnd: period.endDate,
+    capacityHoursPerDay,
+    sourceType: requireAvailabilityExceptionSourceType(rawException.sourceType),
+    sourceId: requireNonEmptyString(rawException.sourceId, "availabilityException.sourceId"),
+    sourceLabel: requireNonEmptyString(rawException.sourceLabel, "availabilityException.sourceLabel")
+  };
+}
+
+export function createResourceAssignment(input: {
+  id: string;
+  tenantId: TenantId;
+  projectId: string;
+  taskId: string;
+  sourceParticipantId: string;
+  resourceProfileId: string;
+  roleKey: string;
+  roleLabel: string;
+  plannedStartDate: string;
+  plannedFinishDate: string;
+  plannedWorkHours: number;
+  sourceLabel: string;
+}): ResourceAssignment {
+  const rawAssignment = requireObject(input, "resourceAssignment");
+  const period = createCapacityDateWindow(
+    { startDate: rawAssignment.plannedStartDate, endDate: rawAssignment.plannedFinishDate },
+    "resourceAssignment.period"
+  );
+
+  return {
+    id: requireNonEmptyString(rawAssignment.id, "resourceAssignment.id"),
+    tenantId: requireNonEmptyString(rawAssignment.tenantId, "tenantId"),
+    projectId: requireNonEmptyString(rawAssignment.projectId, "resourceAssignment.projectId"),
+    taskId: requireNonEmptyString(rawAssignment.taskId, "resourceAssignment.taskId"),
+    sourceParticipantId: requireNonEmptyString(
+      rawAssignment.sourceParticipantId,
+      "resourceAssignment.sourceParticipantId"
+    ),
+    resourceProfileId: requireNonEmptyString(rawAssignment.resourceProfileId, "resourceAssignment.resourceProfileId"),
+    roleKey: requireSystemKey(rawAssignment.roleKey, "resourceAssignment.roleKey"),
+    roleLabel: requireNonEmptyString(rawAssignment.roleLabel, "resourceAssignment.roleLabel"),
+    plannedStartDate: period.startDate,
+    plannedFinishDate: period.endDate,
+    plannedWorkHours: requireNonNegativeNumber(rawAssignment.plannedWorkHours, "resourceAssignment.plannedWorkHours"),
+    sourceLabel: requireNonEmptyString(rawAssignment.sourceLabel, "resourceAssignment.sourceLabel")
+  };
+}
+
+export function deriveCapacityPeriodBuckets(input: {
+  tenantId: TenantId;
+  resourceProfiles: ResourceProfile[];
+  calendars: ResourceCapacityCalendar[];
+  availabilityExceptions: AvailabilityException[];
+  periodStart: string;
+  periodEnd: string;
+  granularity: CapacityGranularity;
+}): CapacityPeriodBucket[] {
+  const rawInput = requireObject(input, "capacityPeriodBuckets");
+  const tenantId = requireNonEmptyString(rawInput.tenantId, "tenantId");
+  const window = createCapacityDateWindow(
+    { startDate: rawInput.periodStart, endDate: rawInput.periodEnd },
+    "capacityPeriodBuckets.period"
+  );
+  const granularity = requireCapacityGranularity(rawInput.granularity);
+  assertRawTenantOwnership(
+    rawInput.resourceProfiles,
+    "capacityPeriodBuckets.resourceProfiles",
+    tenantId,
+    "Resource profile tenant mismatch"
+  );
+  assertRawTenantOwnership(
+    rawInput.calendars,
+    "capacityPeriodBuckets.calendars",
+    tenantId,
+    "Resource capacity calendar tenant mismatch"
+  );
+  assertRawTenantOwnership(
+    rawInput.availabilityExceptions,
+    "capacityPeriodBuckets.availabilityExceptions",
+    tenantId,
+    "Availability exception tenant mismatch"
+  );
+
+  const profiles = requireArray(rawInput.resourceProfiles, "capacityPeriodBuckets.resourceProfiles")
+    .map((profile) => requireResourceProfile(profile))
+    .filter((profile) => profile.active);
+  const calendars = requireArray(rawInput.calendars, "capacityPeriodBuckets.calendars").map((calendar) =>
+    createResourceCapacityCalendar(calendar)
+  );
+  const exceptions = requireArray(rawInput.availabilityExceptions, "capacityPeriodBuckets.availabilityExceptions").map(
+    (exception) => createAvailabilityException(exception)
+  );
+  assertUniqueIds(profiles, "Resource profile ids must be unique");
+  assertUniqueIds(calendars, "Resource capacity calendar ids must be unique");
+  assertUniqueIds(exceptions, "Availability exception ids must be unique");
+
+  for (const profile of profiles) requireSameTenant(tenantId, profile, "Resource profile tenant mismatch");
+  for (const calendar of calendars) requireSameTenant(tenantId, calendar, "Resource capacity calendar tenant mismatch");
+  for (const exception of exceptions) requireSameTenant(tenantId, exception, "Availability exception tenant mismatch");
+
+  const buckets = new Map<string, CapacityPeriodBucket>();
+  for (const profile of profiles) {
+    const calendar = calendars.find((candidate) => candidate.id === profile.calendarId && candidate.resourceProfileId === profile.id);
+    if (calendar === undefined) {
+      throw new ResourcePlanningModelError("validation_error", `Resource calendar not found for ${profile.id}`);
+    }
+
+    for (let date = window.startDate; date <= window.endDate; date = addDays(date, 1)) {
+      if (date < calendar.effectiveFrom || date > calendar.effectiveTo) continue;
+      if (!calendar.workingDays.includes(isoWeekday(date))) continue;
+
+      const dayExceptions = exceptions
+        .filter((exception) => exception.resourceProfileId === profile.id)
+        .filter((exception) => date >= exception.periodStart && date <= exception.periodEnd)
+        .sort((left, right) => left.id.localeCompare(right.id));
+      const dayCapacity =
+        dayExceptions.length === 0
+          ? calendar.defaultDailyCapacityHours
+          : dayExceptions[dayExceptions.length - 1]?.capacityHoursPerDay ?? calendar.defaultDailyCapacityHours;
+      const period = clampPeriod(periodKeyForDate(date, granularity), window);
+      const bucketId = `capacity:${profile.id}:${period.startDate}:${period.endDate}`;
+      const existing = buckets.get(bucketId);
+      const sourceRefs = [
+        ...(existing?.sourceRefs ?? [`calendar:${calendar.id}`]),
+        ...dayExceptions.map((exception) => `availability_exception:${exception.id}`)
+      ];
+      buckets.set(bucketId, {
+        id: bucketId,
+        tenantId,
+        resourceProfileId: profile.id,
+        roleKeys: [...profile.roleKeys],
+        periodStart: period.startDate,
+        periodEnd: period.endDate,
+        capacityHours: roundHours((existing?.capacityHours ?? 0) + dayCapacity),
+        granularity,
+        sourceRefs: uniqueInOrder(sourceRefs)
+      });
+    }
+  }
+
+  return [...buckets.values()].sort((left, right) => {
+    if (left.resourceProfileId !== right.resourceProfileId) return left.resourceProfileId.localeCompare(right.resourceProfileId);
+    return left.periodStart.localeCompare(right.periodStart);
+  });
+}
+
+function loadSeverity(capacityHours: number, totalLoadHours: number): ConflictSeverity {
+  if (capacityHours === 0 && totalLoadHours > 0) return "critical";
+  if (capacityHours === 0) return "none";
+  const loadPercent = (totalLoadHours / capacityHours) * 100;
+  if (loadPercent > 100) return "critical";
+  if (loadPercent >= 90) return "warning";
+  return "none";
+}
+
+function loadPercent(capacityHours: number, totalLoadHours: number): number {
+  if (capacityHours === 0) return totalLoadHours > 0 ? 100 : 0;
+  return roundHours((totalLoadHours / capacityHours) * 100);
+}
+
+export function calculateResourceLoadBuckets(input: {
+  tenantId: TenantId;
+  resourceProfiles: ResourceProfile[];
+  capacityBuckets: CapacityPeriodBucket[];
+  assignments: ResourceAssignment[];
+  reservations: ResourceReservation[];
+}): ResourceLoadBucket[] {
+  const rawInput = requireObject(input, "resourceLoadBuckets");
+  const tenantId = requireNonEmptyString(rawInput.tenantId, "tenantId");
+  assertRawTenantOwnership(
+    rawInput.resourceProfiles,
+    "resourceLoadBuckets.resourceProfiles",
+    tenantId,
+    "Resource profile tenant mismatch"
+  );
+  assertRawTenantOwnership(
+    rawInput.capacityBuckets,
+    "resourceLoadBuckets.capacityBuckets",
+    tenantId,
+    "Capacity period bucket tenant mismatch"
+  );
+  assertRawTenantOwnership(
+    rawInput.assignments,
+    "resourceLoadBuckets.assignments",
+    tenantId,
+    "Resource assignment tenant mismatch"
+  );
+  assertRawTenantOwnership(
+    rawInput.reservations,
+    "resourceLoadBuckets.reservations",
+    tenantId,
+    "Resource reservation tenant mismatch"
+  );
+
+  const profiles = requireArray(rawInput.resourceProfiles, "resourceLoadBuckets.resourceProfiles").map((profile) =>
+    requireResourceProfile(profile)
+  );
+  const capacityBuckets = requireArray(rawInput.capacityBuckets, "resourceLoadBuckets.capacityBuckets").map((bucket) =>
+    requireCapacityPeriodBucket(bucket)
+  );
+  const assignments = requireArray(rawInput.assignments, "resourceLoadBuckets.assignments").map((assignment) =>
+    createResourceAssignment(assignment)
+  );
+  const reservations = requireArray(rawInput.reservations, "resourceLoadBuckets.reservations").map((reservation) =>
+    createResourceReservation(reservation)
+  );
+  assertUniqueIds(profiles, "Resource profile ids must be unique");
+  assertUniqueIds(capacityBuckets, "Capacity period bucket ids must be unique");
+  assertUniqueIds(assignments, "Resource assignment ids must be unique");
+  assertUniqueIds(reservations, "Resource reservation ids must be unique");
+
+  for (const profile of profiles) requireSameTenant(tenantId, profile, "Resource profile tenant mismatch");
+  for (const bucket of capacityBuckets) requireSameTenant(tenantId, bucket, "Capacity period bucket tenant mismatch");
+  for (const assignment of assignments) requireSameTenant(tenantId, assignment, "Resource assignment tenant mismatch");
+  for (const reservation of reservations) requireSameTenant(tenantId, reservation, "Resource reservation tenant mismatch");
+
+  return capacityBuckets.map((capacityBucket) => {
+    const profile = profiles.find((candidate) => candidate.id === capacityBucket.resourceProfileId);
+    if (profile === undefined) {
+      throw new ResourcePlanningModelError("validation_error", `Resource profile not found for ${capacityBucket.resourceProfileId}`);
+    }
+    const bucketAssignments = assignments.filter(
+      (assignment) =>
+        assignment.resourceProfileId === capacityBucket.resourceProfileId &&
+        overlapsWindow(assignment.plannedStartDate, assignment.plannedFinishDate, {
+          startDate: capacityBucket.periodStart,
+          endDate: capacityBucket.periodEnd
+        })
+    );
+    const assignedHours = roundHours(
+      bucketAssignments.reduce((total, assignment) => {
+        const assignmentDays = dayCountInclusive(assignment.plannedStartDate, assignment.plannedFinishDate);
+        const daysInBucket = overlapDays(
+          assignment.plannedStartDate,
+          assignment.plannedFinishDate,
+          capacityBucket.periodStart,
+          capacityBucket.periodEnd
+        );
+        return requireFiniteCapacityResult(total + assignment.plannedWorkHours * (daysInBucket / assignmentDays));
+      }, 0)
+    );
+    const bucketReservations = reservations.filter((reservation) => {
+      const matchesResource =
+        reservation.resourceProfileId !== undefined
+          ? reservation.resourceProfileId === capacityBucket.resourceProfileId
+          : profile.roleKeys.includes(reservation.roleKey);
+      return (
+        reservation.status === "active" &&
+        matchesResource &&
+        overlapsWindow(reservation.periodStart, reservation.periodEnd, {
+          startDate: capacityBucket.periodStart,
+          endDate: capacityBucket.periodEnd
+        })
+      );
+    });
+    const reservedHours = roundHours(
+      bucketReservations.reduce((total, reservation) => {
+        const reservationDays = dayCountInclusive(reservation.periodStart, reservation.periodEnd);
+        const daysInBucket = overlapDays(
+          reservation.periodStart,
+          reservation.periodEnd,
+          capacityBucket.periodStart,
+          capacityBucket.periodEnd
+        );
+        return requireFiniteCapacityResult(total + reservation.reservedHours * (daysInBucket / reservationDays));
+      }, 0)
+    );
+    const totalLoadHours = roundHours(assignedHours + reservedHours);
+    const affectedProjectIds = uniqueSorted([
+      ...bucketAssignments.map((assignment) => assignment.projectId),
+      ...bucketReservations.map((reservation) => reservation.sourceId)
+    ]);
+    const affectedTaskIds = uniqueSorted(bucketAssignments.map((assignment) => assignment.taskId));
+
+    return {
+      id: `load:${capacityBucket.resourceProfileId}:${capacityBucket.periodStart}:${capacityBucket.periodEnd}`,
+      tenantId,
+      resourceProfileId: capacityBucket.resourceProfileId,
+      roleKeys: [...capacityBucket.roleKeys],
+      periodStart: capacityBucket.periodStart,
+      periodEnd: capacityBucket.periodEnd,
+      capacityHours: capacityBucket.capacityHours,
+      assignedHours,
+      reservedHours,
+      totalLoadHours,
+      loadPercent: loadPercent(capacityBucket.capacityHours, totalLoadHours),
+      severity: loadSeverity(capacityBucket.capacityHours, totalLoadHours),
+      sourceRefs: [
+        ...bucketAssignments.map((assignment) => `assignment:${assignment.id}`),
+        ...bucketReservations.map((reservation) => `reservation:${reservation.id}`)
+      ],
+      affectedTaskIds,
+      affectedProjectIds
+    };
+  });
+}
+
+export function detectResourceOverloads(input: {
+  tenantId: TenantId;
+  loadBuckets: ResourceLoadBucket[];
+}): ResourceOverload[] {
+  const rawInput = requireObject(input, "resourceOverloads");
+  const tenantId = requireNonEmptyString(rawInput.tenantId, "tenantId");
+  const loadBuckets = requireArray(rawInput.loadBuckets, "resourceOverloads.loadBuckets");
+
+  return loadBuckets
+    .filter((bucket) => bucket.tenantId === tenantId)
+    .filter((bucket) => bucket.severity === "critical")
+    .map((bucket) => {
+      const overloadHours = roundHours(Math.max(0, bucket.totalLoadHours - bucket.capacityHours));
+      return {
+        id: `overload:${bucket.resourceProfileId}:${bucket.periodStart}:${bucket.periodEnd}`,
+        tenantId,
+        resourceProfileId: bucket.resourceProfileId,
+        roleKeys: [...bucket.roleKeys],
+        periodStart: bucket.periodStart,
+        periodEnd: bucket.periodEnd,
+        severity: "critical",
+        overloadHours,
+        loadPercent: bucket.loadPercent,
+        sourceRefs: [...bucket.sourceRefs],
+        affectedTaskIds: [...bucket.affectedTaskIds],
+        affectedProjectIds: [...bucket.affectedProjectIds],
+        recommendedActionKeys: ["shift_work", "split_work", "reassign_resource", "accept_risk", "escalate"],
+        status: "open",
+        trace: [
+          `resource_overload:capacity:${bucket.capacityHours}`,
+          `resource_overload:assigned:${bucket.assignedHours}`,
+          `resource_overload:reserved:${bucket.reservedHours}`,
+          `resource_overload:overload:${overloadHours}`,
+          "resource_overload:severity:critical"
+        ]
+      };
+    });
+}
+
 function requireReservationStatus(value: ResourceReservation["status"] | undefined): ResourceReservation["status"] {
   if (value !== "active" && value !== "released") {
     throw new ResourcePlanningModelError("validation_error", "resourceReservation.status is invalid");
@@ -635,6 +1356,7 @@ export function createResourceReservation(input: {
   tenantId: TenantId;
   sourceType: ResourceReservation["sourceType"];
   sourceId: string;
+  resourceProfileId?: string;
   roleKey: string;
   roleLabel: string;
   periodStart: string;
@@ -654,6 +1376,9 @@ export function createResourceReservation(input: {
     tenantId: requireNonEmptyString(rawReservation.tenantId, "tenantId"),
     sourceType: requireReservationSourceType(rawReservation.sourceType),
     sourceId: requireNonEmptyString(rawReservation.sourceId, "resourceReservation.sourceId"),
+    ...(rawReservation.resourceProfileId !== undefined
+      ? { resourceProfileId: requireNonEmptyString(rawReservation.resourceProfileId, "resourceReservation.resourceProfileId") }
+      : {}),
     roleKey: requireSystemKey(rawReservation.roleKey, "resourceReservation.roleKey"),
     roleLabel: requireNonEmptyString(rawReservation.roleLabel, "resourceReservation.roleLabel"),
     periodStart: period.startDate,

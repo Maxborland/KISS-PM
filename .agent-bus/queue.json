@@ -1622,7 +1622,7 @@
         "P6-001"
       ],
       "title": "Implement Phase 6 resource profiles, capacity calendars, exceptions, load buckets, reservations, and overload severity",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P6",
       "depends_on": [
@@ -1640,6 +1640,7 @@
         ".agent-bus/handoff/2026-05-16-p6-001-resource-domain-foundation.md",
         ".agent-bus/locks/docs-status-p6-domain.lock/**",
         ".agent-bus/locks/state-current-p6-domain.lock/**",
+        ".agent-bus/locks/queue-json-p6-domain.lock/**",
         ".agent-bus/events/events.jsonl"
       ],
       "forbidden": [
@@ -1660,7 +1661,67 @@
         "npm run verify:matrix -- --allow-blocked docs/status/phase6-requirements-matrix.json",
         "git diff --check -- packages/resource-planning packages/project-core packages/scheduling-engine docs/status/phase6-requirements-matrix.json .agent-bus"
       ],
-      "notes": "Next P6 implementation block. Covers P6-001..P6-005 at domain/unit level; P6 matrix rows remain blocked until API/UI/E2E evidence exists."
+      "notes": "Completed at domain/unit level on 2026-05-16. Implemented ResourceProfile, ResourceCapacityCalendar, AvailabilityException, CapacityPeriodBucket, ResourceAssignment, ResourceLoadBucket, ResourceOverload, reservation resourceProfileId support, deterministic capacity/load/overload calculations, tenant mismatch ordering, and duplicate-id guards. P6 matrix rows P6-001..P6-005 remain blocked for strict phase exit until API/UI/E2E evidence exists.",
+      "completed_at": "2026-05-16T15:26:45+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0: 14 files, 92 tests passed",
+        "npm test exit 0: 45 files, 272 tests passed",
+        "npm run test:integration exit 0: 7 files, 33 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json exit 0",
+        "node scripts/agent-bus-guard.mjs --task P6-001 --once exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P6-006-resource-planning-api-governed-commands",
+      "aliases": [
+        "P6-006"
+      ],
+      "title": "Implement Phase 6 resource planning API read models and governed command endpoints",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "P6-001-resource-domain-foundation"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "packages/resource-planning/**",
+        "packages/action-engine/**",
+        "docs/status/phase6-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/P6-006-resource-planning-api-governed-commands.claim.json",
+        ".agent-bus/sessions/P6-006-resource-planning-api-governed-commands.md",
+        ".agent-bus/handoff/2026-05-16-p6-006-resource-planning-api-governed-commands.md",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-006 --once",
+        "npm run test:integration",
+        "npm test -- packages/resource-planning packages/action-engine apps/api/src",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json",
+        "git diff --check -- apps/api packages/resource-planning packages/action-engine docs/status/phase6-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Next P6 implementation block. Covers P6-006 API read models and governed resource commands; rows stay blocked until UI and E2E-050..055 evidence exists."
     }
   ]
 }

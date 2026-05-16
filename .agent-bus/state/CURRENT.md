@@ -1,6 +1,12 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T15:05:00+07:00
+Updated: 2026-05-16T15:26:45+07:00
+
+- P6-001 resource domain foundation completed at domain/unit level with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-001-resource-domain-foundation.md`.
+- `packages/resource-planning` now defines ResourceProfile, ResourceCapacityCalendar, AvailabilityException, CapacityPeriodBucket, ResourceAssignment, ResourceLoadBucket, ResourceOverload, resource-profile-scoped reservations, deterministic capacity/load/overload calculations, tenant mismatch ordering, and duplicate-id guards.
+- Fresh P6-001 evidence: `npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts` passes with 5 tests; `npm test -- packages/resource-planning` passes with 4 files / 20 tests; `npm test -- packages/resource-planning packages/project-core packages/scheduling-engine` passes with 14 files / 92 tests; `npm test` passes with 45 files / 272 tests; `npm run test:integration` passes with 7 files / 33 tests; `npm run typecheck` and `npm run lint` pass; `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json` passes; `node scripts/agent-bus-guard.mjs --task P6-001 --once` and `git diff --check` pass.
+- `docs/status/phase6-requirements-matrix.json` records P6-001..P6-005 domain/unit evidence but remains blocked for strict phase exit until API/UI/E2E-050..055 evidence exists.
+- Next recommended step: claim `P6-006-resource-planning-api-governed-commands` and implement Phase 6 resource planning API read models plus guarded preview/apply/reservation/audit command endpoints.
 
 - P6-000 resource planning phase contract completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-000-resource-planning-phase-contract.md`.
 - Phase 6 detail doc exists at `docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md` with frozen scope, P6-001..P6-010 backlog, E2E-050..055, API/UI/fixture contracts, acceptance criteria, exit gate, and verification commands.

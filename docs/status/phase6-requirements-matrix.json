@@ -2,7 +2,7 @@
   "phase": "P6",
   "name": "Phase 6 resource planning and conflict resolution requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T15:05:00+07:00",
+  "updated_at": "2026-05-16T15:23:15+07:00",
   "rows": [
     {
       "id": "P6-001",
@@ -11,11 +11,19 @@
       "owner": "codex",
       "owned_scope": ["packages/resource-planning"],
       "required_e2e": ["E2E-050", "E2E-051"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; resource profiles and capacity calendars must be implemented and verified.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers resource profile/calendar validation and capacity bucket derivation",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0: 14 files, 92 tests passed"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
+        "npm test -- packages/resource-planning exit 0",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0"
+      ],
+      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
+      "blocker": "Domain/unit foundation implemented; row remains blocked until Phase 6 API/UI/E2E-050..051 evidence proves resource load through user-facing flows.",
+      "last_checked_at": "2026-05-16T15:23:15+07:00"
     },
     {
       "id": "P6-002",
@@ -24,11 +32,17 @@
       "owner": "codex",
       "owned_scope": ["packages/resource-planning"],
       "required_e2e": ["E2E-050", "E2E-051"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; availability exception model and tests are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers absence/reduced-capacity exceptions and rejects invalid absence capacity",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
+        "npm test -- packages/resource-planning exit 0"
+      ],
+      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
+      "blocker": "Domain/unit availability exceptions implemented; row remains blocked until API/UI/E2E-050..051 evidence proves exceptions affect visible resource load.",
+      "last_checked_at": "2026-05-16T15:23:15+07:00"
     },
     {
       "id": "P6-003",
@@ -37,11 +51,17 @@
       "owner": "codex",
       "owned_scope": ["packages/resource-planning", "packages/project-core", "packages/scheduling-engine"],
       "required_e2e": ["E2E-050"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning packages/project-core packages/scheduling-engine"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; load bucket calculation from canonical task assignments is missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers ResourceAssignment tied to project/task/participant schedule fields and ResourceLoadBucket calculation",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0: 14 files, 92 tests passed"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
+        "npm test -- packages/resource-planning packages/project-core packages/scheduling-engine exit 0"
+      ],
+      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
+      "blocker": "Domain/unit assignment load buckets implemented; row remains blocked until API/UI/E2E-050 evidence proves canonical task assignment readback through the app.",
+      "last_checked_at": "2026-05-16T15:23:15+07:00"
     },
     {
       "id": "P6-004",
@@ -50,11 +70,17 @@
       "owner": "codex",
       "owned_scope": ["packages/resource-planning", "packages/crm-core", "packages/project-core"],
       "required_e2e": ["E2E-050", "E2E-051"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning packages/crm-core packages/project-core"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; operational resource reservations from CRM/project state are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers resource-profile-scoped active reservations contributing to load buckets",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
+        "npm test -- packages/resource-planning exit 0"
+      ],
+      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
+      "blocker": "Domain/unit reservation load model implemented; row remains blocked until CRM/project draft/active-project API and E2E-050..051 evidence exists.",
+      "last_checked_at": "2026-05-16T15:23:15+07:00"
     },
     {
       "id": "P6-005",
@@ -63,11 +89,17 @@
       "owner": "codex",
       "owned_scope": ["packages/resource-planning"],
       "required_e2e": ["E2E-051"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; overload detection and deterministic severity are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "packages/resource-planning/src/resourceOperationalPlanning.test.ts covers warning/critical severity, overloadHours, sourceRefs, affected tasks/projects, recommended actions, and tenant mismatch rejection",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed"
+      ],
+      "tests": [
+        "npm test -- packages/resource-planning/src/resourceOperationalPlanning.test.ts exit 0",
+        "npm test -- packages/resource-planning exit 0"
+      ],
+      "cleanup": "Domain/unit only; no runtime writes or persisted fixture state created",
+      "blocker": "Domain/unit overload detection implemented; row remains blocked until E2E-051 proves visible overload detection through Resource Load Control/API.",
+      "last_checked_at": "2026-05-16T15:23:15+07:00"
     },
     {
       "id": "P6-006",
