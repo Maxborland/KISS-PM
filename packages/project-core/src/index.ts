@@ -71,6 +71,91 @@ export type ProcessTemplate = TenantOwned & {
   stages: StageTemplate[];
 };
 
+export type ProcessTemplateBuilderTaskTemplateDraft = {
+  id: string;
+  label?: string;
+  defaultParticipantRoleKeys?: string[];
+  required?: boolean;
+};
+
+export type ProcessTemplateBuilderStageDraft = {
+  id: string;
+  label?: string;
+  sortOrder?: number;
+  active?: boolean;
+  taskTemplates?: ProcessTemplateBuilderTaskTemplateDraft[];
+};
+
+export type ProcessTemplateBuilderDraft = {
+  label?: string;
+  active?: boolean;
+  stages?: ProcessTemplateBuilderStageDraft[];
+};
+
+export type ProcessTemplateBuilderStageChange = {
+  stageId: string;
+  stageKey: string;
+  beforeLabel: string;
+  afterLabel: string;
+  beforeSortOrder: number;
+  afterSortOrder: number;
+  beforeActive: boolean;
+  afterActive: boolean;
+};
+
+export type ProcessTemplateBuilderTaskTemplateChange = {
+  stageId: string;
+  taskTemplateId: string;
+  taskTemplateKey: string;
+  beforeLabel: string;
+  afterLabel: string;
+  beforeDefaultParticipantRoleKeys: string[];
+  afterDefaultParticipantRoleKeys: string[];
+  beforeRequired: boolean;
+  afterRequired: boolean;
+};
+
+export type ProcessTemplatePublishPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  mutatesState: false;
+  draft: ProcessTemplateBuilderDraft;
+  before: {
+    templateId: string;
+    templateVersion: number;
+    label: string;
+    activeProjectTemplateVersions: number[];
+  };
+  after: {
+    templateId: string;
+    templateVersion: number;
+    label: string;
+    activeStageKeys: string[];
+    template: ProcessTemplate;
+  };
+  stageChanges: ProcessTemplateBuilderStageChange[];
+  taskTemplateChanges: ProcessTemplateBuilderTaskTemplateChange[];
+  affectedRuntimeSurfaces: string[];
+  createdAt: string;
+};
+
+export type ProcessTemplatePublishAudit = {
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  auditEventId: string;
+  commandType: "process_template.publish";
+  templateId: string;
+  beforeTemplateVersion: number;
+  afterTemplateVersion: number;
+  publishedAt: string;
+};
+
+export type ProcessTemplatePublishResult = {
+  template: ProcessTemplate;
+  audit: ProcessTemplatePublishAudit;
+};
+
 export type ArtifactTemplateSnapshot = Omit<ArtifactTemplate, "tenantId">;
 export type ApprovalTemplateSnapshot = Omit<ApprovalTemplate, "tenantId">;
 export type StageTaskTemplateSnapshot = Omit<StageTaskTemplate, "tenantId">;
@@ -2111,6 +2196,359 @@ export function createProcessTemplateVersionSnapshot(template: ProcessTemplate):
         required: taskTemplate.required
       }))
     }))
+  };
+}
+
+function cloneProcessTemplateBuilderDraft(draft: ProcessTemplateBuilderDraft | undefined): ProcessTemplateBuilderDraft {
+  if (draft === undefined) return {};
+
+  return {
+    ...(draft.label !== undefined ? { label: requireNonEmptyString(draft.label, "processTemplateBuilder.label") } : {}),
+    ...(draft.active !== undefined ? { active: requireBoolean(draft.active, "processTemplateBuilder.active") } : {}),
+    ...(draft.stages !== undefined
+      ? {
+          stages: requireArray(draft.stages, "processTemplateBuilder.stages").map((stageDraft) => ({
+            id: requireNonEmptyString(stageDraft.id, "processTemplateBuilder.stage.id"),
+            ...(stageDraft.label !== undefined
+              ? { label: requireNonEmptyString(stageDraft.label, "processTemplateBuilder.stage.label") }
+              : {}),
+            ...(stageDraft.sortOrder !== undefined
+              ? { sortOrder: requirePositiveInteger(stageDraft.sortOrder, "processTemplateBuilder.stage.sortOrder") }
+              : {}),
+            ...(stageDraft.active !== undefined
+              ? { active: requireBoolean(stageDraft.active, "processTemplateBuilder.stage.active") }
+              : {}),
+            ...(stageDraft.taskTemplates !== undefined
+              ? {
+                  taskTemplates: requireArray(
+                    stageDraft.taskTemplates,
+                    "processTemplateBuilder.stage.taskTemplates"
+                  ).map((taskTemplateDraft) => ({
+                    id: requireNonEmptyString(taskTemplateDraft.id, "processTemplateBuilder.taskTemplate.id"),
+                    ...(taskTemplateDraft.label !== undefined
+                      ? {
+                          label: requireNonEmptyString(
+                            taskTemplateDraft.label,
+                            "processTemplateBuilder.taskTemplate.label"
+                          )
+                        }
+                      : {}),
+                    ...(taskTemplateDraft.defaultParticipantRoleKeys !== undefined
+                      ? {
+                          defaultParticipantRoleKeys: requireSystemKeyArray(
+                            taskTemplateDraft.defaultParticipantRoleKeys,
+                            "processTemplateBuilder.taskTemplate.defaultParticipantRoleKeys",
+                            true
+                          )
+                        }
+                      : {}),
+                    ...(taskTemplateDraft.required !== undefined
+                      ? {
+                          required: requireBoolean(
+                            taskTemplateDraft.required,
+                            "processTemplateBuilder.taskTemplate.required"
+                          )
+                        }
+                      : {})
+                  }))
+                }
+              : {})
+          }))
+        }
+      : {})
+  };
+}
+
+function assertUniqueDraftIds(items: Array<{ id: string }>, message: string): void {
+  const ids = items.map((item) => item.id);
+  if (new Set(ids).size !== ids.length) {
+    throw new ProjectCoreModelError("conflict", message);
+  }
+}
+
+function applyProcessTemplateBuilderDraft(
+  current: ProcessTemplate,
+  draft: ProcessTemplateBuilderDraft,
+  updatedAt: string
+): ProcessTemplate {
+  const currentTemplate = createProcessTemplate(current);
+  const normalizedDraft = cloneProcessTemplateBuilderDraft(draft);
+  const stageDrafts = normalizedDraft.stages ?? [];
+  assertUniqueDraftIds(stageDrafts, "process template stage draft ids must be unique");
+  const stageDraftById = new Map(stageDrafts.map((stageDraft) => [stageDraft.id, stageDraft]));
+  for (const stageDraft of stageDrafts) {
+    if (!currentTemplate.stages.some((stage) => stage.id === stageDraft.id)) {
+      throw new ProjectCoreModelError("validation_error", `process template stage is not configured: ${stageDraft.id}`);
+    }
+    assertUniqueDraftIds(stageDraft.taskTemplates ?? [], "process template task template draft ids must be unique");
+  }
+
+  const nextStages = currentTemplate.stages.map((stage) => {
+    const stageDraft = stageDraftById.get(stage.id);
+    const taskDrafts = stageDraft?.taskTemplates ?? [];
+    const taskDraftById = new Map(taskDrafts.map((taskDraft) => [taskDraft.id, taskDraft]));
+    for (const taskDraft of taskDrafts) {
+      if (!stage.taskTemplates.some((taskTemplate) => taskTemplate.id === taskDraft.id)) {
+        throw new ProjectCoreModelError(
+          "validation_error",
+          `process template task template is not configured: ${taskDraft.id}`
+        );
+      }
+    }
+
+    const nextTaskTemplates = stage.taskTemplates.map((taskTemplate) => {
+      const taskDraft = taskDraftById.get(taskTemplate.id);
+
+      return {
+        ...taskTemplate,
+        label: taskDraft?.label ?? taskTemplate.label,
+        defaultParticipantRoleKeys: taskDraft?.defaultParticipantRoleKeys ?? taskTemplate.defaultParticipantRoleKeys,
+        required: taskDraft?.required ?? taskTemplate.required
+      };
+    });
+    const stageChanged =
+      stageDraft !== undefined ||
+      nextTaskTemplates.some((taskTemplate, index) => {
+        const previous = stage.taskTemplates[index];
+        return (
+          previous !== undefined &&
+          (previous.label !== taskTemplate.label ||
+            !stringArraysEqual(previous.defaultParticipantRoleKeys, taskTemplate.defaultParticipantRoleKeys) ||
+            previous.required !== taskTemplate.required)
+        );
+      });
+
+    return {
+      ...stage,
+      label: stageDraft?.label ?? stage.label,
+      sortOrder: stageDraft?.sortOrder ?? stage.sortOrder,
+      active: stageDraft?.active ?? stage.active,
+      version: stageChanged ? stage.version + 1 : stage.version,
+      updatedAt: stageChanged ? updatedAt : stage.updatedAt,
+      taskTemplates: nextTaskTemplates
+    };
+  });
+  if (!nextStages.some((stage) => stage.active)) {
+    throw new ProjectCoreModelError("validation_error", "process template must keep at least one active stage");
+  }
+
+  return createProcessTemplate({
+    ...currentTemplate,
+    label: normalizedDraft.label ?? currentTemplate.label,
+    active: normalizedDraft.active ?? currentTemplate.active,
+    version: currentTemplate.version + 1,
+    updatedAt,
+    stages: nextStages
+  });
+}
+
+function createStageChanges(before: ProcessTemplate, after: ProcessTemplate): ProcessTemplateBuilderStageChange[] {
+  return before.stages
+    .map((beforeStage): ProcessTemplateBuilderStageChange | null => {
+      const afterStage = after.stages.find((candidate) => candidate.id === beforeStage.id);
+      if (afterStage === undefined) {
+        throw new ProjectCoreModelError("validation_error", `process template stage disappeared: ${beforeStage.id}`);
+      }
+      if (
+        beforeStage.label === afterStage.label &&
+        beforeStage.sortOrder === afterStage.sortOrder &&
+        beforeStage.active === afterStage.active
+      ) {
+        return null;
+      }
+
+      return {
+        stageId: beforeStage.id,
+        stageKey: beforeStage.key,
+        beforeLabel: beforeStage.label,
+        afterLabel: afterStage.label,
+        beforeSortOrder: beforeStage.sortOrder,
+        afterSortOrder: afterStage.sortOrder,
+        beforeActive: beforeStage.active,
+        afterActive: afterStage.active
+      };
+    })
+    .filter((change): change is ProcessTemplateBuilderStageChange => change !== null);
+}
+
+function createTaskTemplateChanges(
+  before: ProcessTemplate,
+  after: ProcessTemplate
+): ProcessTemplateBuilderTaskTemplateChange[] {
+  const changes: ProcessTemplateBuilderTaskTemplateChange[] = [];
+  for (const beforeStage of before.stages) {
+    const afterStage = after.stages.find((candidate) => candidate.id === beforeStage.id);
+    if (afterStage === undefined) continue;
+    for (const beforeTaskTemplate of beforeStage.taskTemplates) {
+      const afterTaskTemplate = afterStage.taskTemplates.find((candidate) => candidate.id === beforeTaskTemplate.id);
+      if (afterTaskTemplate === undefined) {
+        throw new ProjectCoreModelError(
+          "validation_error",
+          `process template task template disappeared: ${beforeTaskTemplate.id}`
+        );
+      }
+      if (
+        beforeTaskTemplate.label === afterTaskTemplate.label &&
+        stringArraysEqual(
+          beforeTaskTemplate.defaultParticipantRoleKeys,
+          afterTaskTemplate.defaultParticipantRoleKeys
+        ) &&
+        beforeTaskTemplate.required === afterTaskTemplate.required
+      ) {
+        continue;
+      }
+
+      changes.push({
+        stageId: beforeStage.id,
+        taskTemplateId: beforeTaskTemplate.id,
+        taskTemplateKey: beforeTaskTemplate.key,
+        beforeLabel: beforeTaskTemplate.label,
+        afterLabel: afterTaskTemplate.label,
+        beforeDefaultParticipantRoleKeys: [...beforeTaskTemplate.defaultParticipantRoleKeys],
+        afterDefaultParticipantRoleKeys: [...afterTaskTemplate.defaultParticipantRoleKeys],
+        beforeRequired: beforeTaskTemplate.required,
+        afterRequired: afterTaskTemplate.required
+      });
+    }
+  }
+
+  return changes;
+}
+
+function sameProcessTemplatePublishPreview(
+  left: ProcessTemplatePublishPreview,
+  right: ProcessTemplatePublishPreview
+): boolean {
+  return (
+    left.before.templateVersion === right.before.templateVersion &&
+    left.after.templateVersion === right.after.templateVersion &&
+    left.after.label === right.after.label &&
+    JSON.stringify(left.stageChanges) === JSON.stringify(right.stageChanges) &&
+    JSON.stringify(left.taskTemplateChanges) === JSON.stringify(right.taskTemplateChanges)
+  );
+}
+
+export function previewProcessTemplatePublish(
+  current: ProcessTemplate,
+  input: {
+    id: string;
+    actorId: TenantUserId;
+    expectedTemplateVersion: number;
+    draft: ProcessTemplateBuilderDraft;
+    activeProjectTemplateVersions: number[];
+    affectedRuntimeSurfaces: string[];
+    createdAt: string;
+  }
+): ProcessTemplatePublishPreview {
+  const currentTemplate = createProcessTemplate(current);
+  const expectedTemplateVersion = requirePositiveInteger(
+    input.expectedTemplateVersion,
+    "processTemplatePublish.expectedTemplateVersion"
+  );
+  if (expectedTemplateVersion !== currentTemplate.version) {
+    throw new ProjectCoreModelError("conflict", "process template preview is stale");
+  }
+  const createdAt = requireValidTimestamp(input.createdAt, "processTemplatePublish.createdAt");
+  const draft = cloneProcessTemplateBuilderDraft(input.draft);
+  const afterTemplate = applyProcessTemplateBuilderDraft(currentTemplate, draft, createdAt);
+  const affectedRuntimeSurfaces = requireArray(
+    input.affectedRuntimeSurfaces,
+    "processTemplatePublish.affectedRuntimeSurfaces"
+  ).map((surface) => requireSystemKey(surface, "processTemplatePublish.affectedRuntimeSurface"));
+  if (affectedRuntimeSurfaces.length === 0) {
+    throw new ProjectCoreModelError("validation_error", "process template publish must affect at least one runtime surface");
+  }
+
+  return {
+    id: requireNonEmptyString(input.id, "processTemplatePublish.id"),
+    tenantId: currentTemplate.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "processTemplatePublish.actorId"),
+    mutatesState: false,
+    draft,
+    before: {
+      templateId: currentTemplate.id,
+      templateVersion: currentTemplate.version,
+      label: currentTemplate.label,
+      activeProjectTemplateVersions: requireArray(
+        input.activeProjectTemplateVersions,
+        "processTemplatePublish.activeProjectTemplateVersions"
+      ).map((version) => requirePositiveInteger(version, "processTemplatePublish.activeProjectTemplateVersion"))
+    },
+    after: {
+      templateId: afterTemplate.id,
+      templateVersion: afterTemplate.version,
+      label: afterTemplate.label,
+      activeStageKeys: afterTemplate.stages.filter((stage) => stage.active).map((stage) => stage.key),
+      template: afterTemplate
+    },
+    stageChanges: createStageChanges(currentTemplate, afterTemplate),
+    taskTemplateChanges: createTaskTemplateChanges(currentTemplate, afterTemplate),
+    affectedRuntimeSurfaces,
+    createdAt
+  };
+}
+
+export function publishProcessTemplatePreview(
+  current: ProcessTemplate,
+  input: {
+    preview: ProcessTemplatePublishPreview;
+    expectedTemplateVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): ProcessTemplatePublishResult {
+  const currentTemplate = createProcessTemplate(current);
+  const expectedTemplateVersion = requirePositiveInteger(
+    input.expectedTemplateVersion,
+    "processTemplatePublish.expectedTemplateVersion"
+  );
+  if (
+    expectedTemplateVersion !== currentTemplate.version ||
+    input.preview.tenantId !== currentTemplate.tenantId ||
+    input.preview.before.templateId !== currentTemplate.id ||
+    input.preview.before.templateVersion !== currentTemplate.version ||
+    input.preview.before.label !== currentTemplate.label
+  ) {
+    throw new ProjectCoreModelError("conflict", "process template preview is stale");
+  }
+
+  const recomputedPreview = previewProcessTemplatePublish(currentTemplate, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    expectedTemplateVersion: currentTemplate.version,
+    draft: input.preview.draft,
+    activeProjectTemplateVersions: input.preview.before.activeProjectTemplateVersions,
+    affectedRuntimeSurfaces: input.preview.affectedRuntimeSurfaces,
+    createdAt: input.preview.createdAt
+  });
+  if (!sameProcessTemplatePublishPreview(input.preview, recomputedPreview)) {
+    throw new ProjectCoreModelError("conflict", "process template preview is stale");
+  }
+  const publishedAt = requireValidTimestamp(input.publishedAt, "processTemplatePublish.publishedAt");
+
+  return {
+    template: createProcessTemplate({
+      ...recomputedPreview.after.template,
+      updatedAt: publishedAt,
+      stages: recomputedPreview.after.template.stages.map((stage) => ({
+        ...stage,
+        updatedAt:
+          recomputedPreview.stageChanges.some((change) => change.stageId === stage.id) ||
+          recomputedPreview.taskTemplateChanges.some((change) => change.stageId === stage.id)
+            ? publishedAt
+            : stage.updatedAt
+      }))
+    }),
+    audit: {
+      tenantId: currentTemplate.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireNonEmptyString(input.auditEventId, "processTemplatePublish.auditEventId"),
+      commandType: "process_template.publish",
+      templateId: currentTemplate.id,
+      beforeTemplateVersion: currentTemplate.version,
+      afterTemplateVersion: recomputedPreview.after.templateVersion,
+      publishedAt
+    }
   };
 }
 

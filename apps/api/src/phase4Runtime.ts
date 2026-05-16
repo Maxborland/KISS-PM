@@ -270,6 +270,26 @@ export function createPhase4RuntimeState() {
 
     getProject: getTenantProject,
 
+    getProcessTemplate,
+
+    replaceProcessTemplate(template: ProcessTemplate): ProcessTemplate {
+      const storedTemplate = createProcessTemplate(template);
+      processTemplates.set(storedTemplate.tenantId, storedTemplate);
+
+      return createProcessTemplate(storedTemplate);
+    },
+
+    listActiveProjectProcessTemplateVersions(tenantId: TenantId, templateId: string): number[] {
+      const versions = new Set<number>();
+      for (const project of projects.values()) {
+        if (project.tenantId === tenantId && project.processTemplateSnapshot.templateId === templateId) {
+          versions.add(project.processTemplateSnapshot.version);
+        }
+      }
+
+      return [...versions].sort((left, right) => left - right);
+    },
+
     closeProjectWithClosure(input: {
       tenantId: TenantId;
       projectId: string;

@@ -22,6 +22,7 @@ import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import {
   buildRuntimeLabelProjection,
   createPhase10RuntimeState,
+  processTemplatePublishAuditDto,
   tenantLabelPublishAuditDto
 } from "./phase10Runtime";
 import type {
@@ -33,6 +34,7 @@ import type {
 import type {
   ApprovalRequest,
   ManagedProject,
+  ProcessTemplate,
   ProjectArtifact,
   ProjectLifecycleTransitionError,
   ProjectStage,
@@ -108,6 +110,47 @@ const tenantLabelPreviewSchema = z
 
 const tenantLabelPublishSchema = z
   .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const processTemplateTaskDraftSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    label: z.string().trim().min(1).optional(),
+    defaultParticipantRoleKeys: z.array(z.string().trim().min(1)).optional(),
+    required: z.boolean().optional()
+  })
+  .strict();
+
+const processTemplateStageDraftSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    label: z.string().trim().min(1).optional(),
+    sortOrder: z.number().int().positive().optional(),
+    active: z.boolean().optional(),
+    taskTemplates: z.array(processTemplateTaskDraftSchema).optional()
+  })
+  .strict();
+
+const processTemplatePreviewSchema = z
+  .object({
+    templateId: z.string().trim().min(1),
+    expectedTemplateVersion: z.number().int().positive(),
+    draft: z
+      .object({
+        label: z.string().trim().min(1).optional(),
+        active: z.boolean().optional(),
+        stages: z.array(processTemplateStageDraftSchema).optional()
+      })
+      .strict(),
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const processTemplatePublishSchema = z
+  .object({
+    templateId: z.string().trim().min(1),
     previewId: z.string().trim().min(1)
   })
   .strict();
@@ -823,6 +866,125 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/tenant/process-templates", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "processTemplate",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({
+        templates: [processTemplateDto(phase4Runtime.getProcessTemplate(session.user.tenantId))]
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/process-templates/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "processTemplate",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "project.template.write", {
+        entityType: "processTemplate",
+        tenantId: session.user.tenantId
+      });
+
+      const body = processTemplatePreviewSchema.parse(await parseJson(context));
+      const template = phase4Runtime.getProcessTemplate(session.user.tenantId);
+      if (template.id !== body.templateId) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const preview = phase10Runtime.previewProcessTemplate({
+        template,
+        actorId: session.user.id,
+        expectedTemplateVersion: body.expectedTemplateVersion,
+        draft: body.draft,
+        activeProjectTemplateVersions: phase4Runtime.listActiveProjectProcessTemplateVersions(
+          session.user.tenantId,
+          body.templateId
+        ),
+        affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+      });
+
+      return context.json({
+        preview: {
+          ...preview,
+          after: {
+            ...preview.after,
+            template: processTemplateDto(preview.after.template)
+          }
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/process-templates/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "processTemplate",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "project.template.write", {
+        entityType: "processTemplate",
+        tenantId: session.user.tenantId
+      });
+
+      const body = processTemplatePublishSchema.parse(await parseJson(context));
+      const template = phase4Runtime.getProcessTemplate(session.user.tenantId);
+      if (template.id !== body.templateId) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const auditEventId = `audit-p10-process-template-${session.user.tenantId}-${template.version + 1}`;
+      const result = phase10Runtime.publishProcessTemplate({
+        template,
+        actorId: session.user.id,
+        accessProfileId: session.user.accessProfileId,
+        previewId: body.previewId,
+        auditEventId
+      });
+      const savedTemplate = phase4Runtime.replaceProcessTemplate(result.template);
+      phase3Runtime.replaceProcessTemplateForFutureIntake(savedTemplate);
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "processTemplate", entityId: savedTemplate.id },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { templateVersion: result.audit.beforeTemplateVersion },
+          after: {
+            templateVersion: result.audit.afterTemplateVersion,
+            activeProjectTemplateVersions: phase4Runtime.listActiveProjectProcessTemplateVersions(
+              session.user.tenantId,
+              savedTemplate.id
+            )
+          }
+        }
+      });
+
+      return context.json({
+        result: {
+          template: processTemplateDto(savedTemplate),
+          audit: processTemplatePublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          activeTemplate: processTemplateDto(phase4Runtime.getProcessTemplate(session.user.tenantId))
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -833,7 +995,10 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
       return context.json({
         events: runtime.auditStore.listByTenant(session.user.tenantId).map(auditEventDto),
-        actionExecutions: phase10Runtime.listLabelActionExecutions(session.user.tenantId).map(actionExecutionDto)
+        actionExecutions: [
+          ...phase10Runtime.listLabelActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listProcessTemplateActionExecutions(session.user.tenantId)
+        ].map(actionExecutionDto)
       });
     } catch (error) {
       return handleRouteError(context, error);
@@ -3371,6 +3536,34 @@ function projectDraftDto(projectDraft: {
     createdBy: projectDraft.createdBy,
     createdAt: projectDraft.createdAt,
     correlationId: projectDraft.correlationId
+  };
+}
+
+function processTemplateDto(template: ProcessTemplate) {
+  return {
+    id: template.id,
+    tenantId: template.tenantId,
+    key: template.key,
+    label: template.label,
+    active: template.active,
+    version: template.version,
+    updatedAt: template.updatedAt,
+    stages: template.stages.map((stage) => ({
+      id: stage.id,
+      tenantId: stage.tenantId,
+      key: stage.key,
+      label: stage.label,
+      sortOrder: stage.sortOrder,
+      active: stage.active,
+      version: stage.version,
+      updatedAt: stage.updatedAt,
+      requiredArtifactTemplates: stage.requiredArtifactTemplates.map((template) => ({ ...template })),
+      approvalTemplates: stage.approvalTemplates.map((template) => ({ ...template })),
+      taskTemplates: stage.taskTemplates.map((template) => ({
+        ...template,
+        defaultParticipantRoleKeys: [...template.defaultParticipantRoleKeys]
+      }))
+    }))
   };
 }
 

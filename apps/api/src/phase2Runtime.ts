@@ -153,6 +153,11 @@ const phase2PermissionCatalog = [
     category: "project_lifecycle"
   }),
   createPermission({
+    key: "project.template.write",
+    description: "Preview and publish governed project process-template versions",
+    category: "project_lifecycle"
+  }),
+  createPermission({
     key: "project.read",
     description: "Read managed projects and lifecycle state",
     category: "project_lifecycle"
@@ -290,6 +295,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "tenant.config.write",
       "tenant.config.export",
       "tenant.config.import",
+      "project.template.write",
       "project_draft.read",
       "project_draft.create",
       "project.create_from_template",

@@ -2,6 +2,17 @@ import { createActionExecutionLog } from "@kiss-pm/action-engine";
 import type { ActionExecutionLog } from "@kiss-pm/action-engine";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 import {
+  publishProcessTemplatePreview,
+  previewProcessTemplatePublish
+} from "@kiss-pm/project-core";
+import type {
+  ProcessTemplate,
+  ProcessTemplateBuilderDraft,
+  ProcessTemplatePublishAudit,
+  ProcessTemplatePublishPreview,
+  ProcessTemplatePublishResult
+} from "@kiss-pm/project-core";
+import {
   createTenantLabelSet,
   publishTenantLabelSetPreview,
   previewTenantLabelSetPublish
@@ -18,6 +29,8 @@ const PHASE10_TIMESTAMP_START = Date.parse("2026-08-01T00:00:00.000Z");
 type Phase10TenantState = {
   labelPreviews: Map<string, TenantLabelSetPublishPreview>;
   labelActionExecutions: ActionExecutionLog[];
+  processTemplatePreviews: Map<string, ProcessTemplatePublishPreview>;
+  processTemplateActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -44,7 +57,9 @@ export function createPhase10RuntimeState() {
     if (existing !== undefined) return existing;
     const next = {
       labelPreviews: new Map<string, TenantLabelSetPublishPreview>(),
-      labelActionExecutions: []
+      labelActionExecutions: [],
+      processTemplatePreviews: new Map<string, ProcessTemplatePublishPreview>(),
+      processTemplateActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -129,6 +144,89 @@ export function createPhase10RuntimeState() {
     return getState(tenantId).labelActionExecutions.map((entry) => clone(entry));
   }
 
+  function previewProcessTemplate(input: {
+    template: ProcessTemplate;
+    actorId: TenantUserId;
+    expectedTemplateVersion: number;
+    draft: ProcessTemplateBuilderDraft;
+    activeProjectTemplateVersions: number[];
+    affectedRuntimeSurfaces: string[];
+  }): ProcessTemplatePublishPreview {
+    const state = getState(input.template.tenantId);
+    const preview = previewProcessTemplatePublish(input.template, {
+      id: `preview-process-template-${input.template.tenantId}-${input.template.version}-${state.processTemplatePreviews.size + 1}`,
+      actorId: input.actorId,
+      expectedTemplateVersion: input.expectedTemplateVersion,
+      draft: input.draft,
+      activeProjectTemplateVersions: input.activeProjectTemplateVersions,
+      affectedRuntimeSurfaces: input.affectedRuntimeSurfaces,
+      createdAt: now()
+    });
+    state.processTemplatePreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function publishProcessTemplate(input: {
+    template: ProcessTemplate;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    previewId: string;
+    auditEventId: string;
+  }): ProcessTemplatePublishResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.template.tenantId);
+    const preview = state.processTemplatePreviews.get(input.previewId);
+    if (preview === undefined) {
+      throw stalePreview("process template preview is missing or stale");
+    }
+    if (preview.actorId !== input.actorId || preview.before.templateId !== input.template.id) {
+      throw stalePreview("process template preview is stale");
+    }
+
+    const result = publishProcessTemplatePreview(input.template, {
+      preview,
+      expectedTemplateVersion: input.template.version,
+      auditEventId: input.auditEventId,
+      publishedAt: now()
+    });
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.template.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `process-template-${input.template.tenantId}-${input.template.id}-${input.template.version}`
+      },
+      commandType: "process_template.publish",
+      requiredPermission: "project.template.write",
+      status: "succeeded",
+      source: { entityType: "processTemplate", entityId: input.template.id },
+      target: { entityType: "processTemplate", entityId: input.template.id },
+      before: {
+        templateVersion: input.template.version,
+        label: input.template.label,
+        preview
+      },
+      after: {
+        templateVersion: result.template.version,
+        label: result.template.label,
+        activeStageKeys: result.template.stages.filter((stage) => stage.active).map((stage) => stage.key)
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission project.template.write allowed"],
+      preconditionTrace: ["precondition:dry-run preview confirmed", "precondition:existing active projects retain snapshots"],
+      trace: ["process_template:preview confirmed", "process_template:future version published"]
+    });
+    state.processTemplateActionExecutions = [...state.processTemplateActionExecutions, actionExecution];
+    state.processTemplatePreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function listProcessTemplateActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).processTemplateActionExecutions.map((entry) => clone(entry));
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -138,7 +236,10 @@ export function createPhase10RuntimeState() {
     cloneLabelSet,
     previewLabels,
     publishLabels,
-    listLabelActionExecutions
+    listLabelActionExecutions,
+    previewProcessTemplate,
+    publishProcessTemplate,
+    listProcessTemplateActionExecutions
   };
 }
 
@@ -187,4 +288,8 @@ export function tenantLabelPublishAuditDto(audit: TenantLabelSetPublishAudit) {
     ...audit,
     changedKeys: [...audit.changedKeys]
   };
+}
+
+export function processTemplatePublishAuditDto(audit: ProcessTemplatePublishAudit) {
+  return { ...audit };
 }
