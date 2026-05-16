@@ -44,6 +44,11 @@ import {
   createKpiThresholdBuilderApiClient,
   type KpiThresholdBuilderApiClient
 } from "./kpiThresholdBuilderApiClient";
+import { SavedViewLayoutBuilderSurface } from "./SavedViewLayoutBuilderSurface";
+import {
+  createSavedViewLayoutBuilderApiClient,
+  type SavedViewLayoutBuilderApiClient
+} from "./savedViewLayoutBuilderApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -62,7 +67,8 @@ type AppProps = {
     Partial<TenantLabelsApiClient> &
     Partial<ProcessTemplateBuilderApiClient> &
     Partial<CustomFieldBuilderApiClient> &
-    Partial<KpiThresholdBuilderApiClient>;
+    Partial<KpiThresholdBuilderApiClient> &
+    Partial<SavedViewLayoutBuilderApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -323,6 +329,17 @@ function isKpiThresholdBuilderApiClient(
     typeof apiClient?.getThresholds === "function" &&
     typeof apiClient.previewThresholds === "function" &&
     typeof apiClient.publishThresholds === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isSavedViewLayoutBuilderApiClient(
+  apiClient: Partial<SavedViewLayoutBuilderApiClient> | null
+): apiClient is SavedViewLayoutBuilderApiClient {
+  return (
+    typeof apiClient?.getSavedViews === "function" &&
+    typeof apiClient.previewLayout === "function" &&
+    typeof apiClient.publishLayout === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -720,6 +737,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createKpiThresholdBuilderApiClient() : null;
   }, [apiClient]);
+  const savedViewLayoutBuilderApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isSavedViewLayoutBuilderApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createSavedViewLayoutBuilderApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -909,6 +934,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {kpiThresholdBuilderApiClient ? (
           <KpiThresholdBuilderSurface
             apiClient={kpiThresholdBuilderApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {savedViewLayoutBuilderApiClient ? (
+          <SavedViewLayoutBuilderSurface
+            apiClient={savedViewLayoutBuilderApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

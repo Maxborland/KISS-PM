@@ -34,6 +34,7 @@ type BuildReadModelInput = {
   customFields?: CustomFieldDefinition[];
   projects?: ManagedProject[];
   page?: { offset: number; limit: number };
+  layoutDefinition?: ControlSurfaceDefinition;
   isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
 };
@@ -789,13 +790,17 @@ export function createPhase8RuntimeState() {
     if (baseDefinition === undefined) {
       throw notFound("control surface not found");
     }
+    const sourceDefinition = input.layoutDefinition ?? baseDefinition;
+    if (sourceDefinition.tenantId !== input.tenantId || sourceDefinition.id !== baseDefinition.id) {
+      throw notFound("control surface layout not found");
+    }
     const definition =
       input.customFields !== undefined && input.customFields.length > 0
-        ? bindCustomProjectFieldsToControlSurfaceDefinition(baseDefinition, {
+        ? bindCustomProjectFieldsToControlSurfaceDefinition(sourceDefinition, {
             customFields: input.customFields,
             updatedAt: "2026-08-01T00:00:00.000Z"
           })
-        : baseDefinition;
+        : sourceDefinition;
     const records = addProjectCustomFieldValues(
       [
         ...kpiRows(

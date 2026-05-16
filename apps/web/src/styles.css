@@ -450,6 +450,12 @@ button:focus-visible {
   grid-template-columns: minmax(500px, 1fr) minmax(380px, 0.82fr);
 }
 
+.saved-view-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(500px, 1fr) minmax(380px, 0.82fr);
+}
+
 .portfolio-overview-panel,
 .portfolio-action-panel,
 .portfolio-detail-panel,
@@ -1031,6 +1037,7 @@ button:focus-visible {
   .kpi-definition-layout,
   .kpi-deviation-layout,
   .portfolio-control-layout,
+  .saved-view-layout,
   .kpi-trace-grid {
     grid-template-columns: 1fr;
   }

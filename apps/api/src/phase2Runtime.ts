@@ -243,6 +243,11 @@ const phase2PermissionCatalog = [
     category: "control_surfaces"
   }),
   createPermission({
+    key: "control_surface.config.write",
+    description: "Preview and publish tenant control-surface saved views and layouts",
+    category: "control_surfaces"
+  }),
+  createPermission({
     key: "control.action:write",
     description: "Preview and execute governed management actions from control surfaces",
     category: "control_surfaces"
@@ -321,6 +326,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "kpi.config:write",
       "kpi.evaluate:execute",
       "control.surface:read",
+      "control_surface.config.write",
       "control.action:write",
       "risk:accept",
       "retrospective.read",
