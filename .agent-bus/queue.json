@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T12:10:30.000Z",
+  "updated_at": "2026-05-16T12:28:03.473Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2300,7 +2300,7 @@
         "P7-007"
       ],
       "title": "Implement KPI Definition Admin MVP UI",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P7",
       "depends_on": [
@@ -2310,6 +2310,7 @@
         "apps/web/src/**Kpi**",
         "apps/web/src/*kpi*",
         "apps/web/src/App.tsx",
+        "apps/web/src/App.test.tsx",
         "apps/web/src/styles.css",
         "docs/status/phase7-requirements-matrix.json",
         ".agent-bus/queue.json",
@@ -2345,7 +2346,72 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable P7 block. Build Russian KPI Definition Admin control surface using the accepted P7 API. Must prove preview-before-create/publish/retire, backend permission denial, audit/action evidence, API readback, and keep E2E rows blocked until P7-009."
+      "notes": "Completed P7 KPI Definition Admin UI block. Implemented typed KPI API client, Russian TanStack Query control surface for definition read/preview/create/publish/retire, App shell wiring, component/App tests, and review fixes. Matrix P7-007 has fresh UI evidence but remains blocked until P7 E2E evidence exists.",
+      "completed_at": "2026-05-16T12:28:03.473Z",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx exit 0: 10 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 13 tests passed",
+        "npm test -- apps/web/src exit 0: 7 files, 57 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 52 files, 326 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ]
+    },
+    {
+      "id": "P7-008-kpi-deviation-control-surface",
+      "aliases": [
+        "P7-008"
+      ],
+      "title": "Implement KPI Deviation Control read surface",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P7",
+      "depends_on": [
+        "P7-007-kpi-definition-admin-ui"
+      ],
+      "write_scope": [
+        "apps/web/src/**KpiDeviation**",
+        "apps/web/src/*kpiDeviation*",
+        "apps/web/src/App.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/phase7-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-008-kpi-deviation-control-surface.claim.json",
+        ".agent-bus/sessions/P7-008-kpi-deviation-control-surface.md"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-008-kpi-deviation-control-surface --once",
+        "npm test -- apps/web/src/*Kpi*.test.tsx",
+        "npm test -- apps/web/src",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable P7 block. Build the Russian KPI Deviation Control read/control-signal surface against accepted P7 API evaluation/deviation routes. Keep executable E2E rows blocked until P7-009."
     }
   ]
 }

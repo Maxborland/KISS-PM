@@ -2,7 +2,7 @@
   "phase": "P7",
   "name": "Phase 7 KPI engine and control signals requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T12:09:45.265Z",
+  "updated_at": "2026-05-16T12:28:03.473Z",
   "rows": [
     {
       "id": "P7-001",
@@ -203,11 +203,26 @@
         "E2E-063",
         "E2E-064"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "P7 KPI Definition Admin UI has not been implemented; no component/browser evidence exists yet.",
-      "last_checked_at": null,
+      "evidence": [
+        "apps/web/src/kpiDefinitionApiClient.ts exposes the P7 KPI Definition Admin API client for list, preview, create, publish, retire, and audit routes with typed DTOs and testUser tenant scoping.",
+        "apps/web/src/KpiDefinitionAdminSurface.tsx renders the Russian KPI definition management surface with TanStack Query reads/mutations, loading/empty/error/permission states, non-mutating formula preview, governed create/publish/retire commands, API readback refresh, and visible action/audit evidence.",
+        "apps/web/src/App.tsx wires the KPI navigation entry and KPI Definition Admin surface into the app shell when the P7 API client is available.",
+        "apps/web/src/KpiDefinitionAdminSurface.test.tsx proves definition load states, preview-before-mutation, create/publish readback, retire targeting the active KPI, read-only/no-read permission states, missing audit permission state, stale readback failure without local-only evidence, and conflict recovery.",
+        "Bug Hunt / requested code review findings were fixed: retire now targets active definitions, command evidence is only shown after successful readback, missing audit.read no longer looks like empty audit, and user-facing copy is Russian."
+      ],
+      "tests": [
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx exit 0: 1 file, 10 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 13 tests passed",
+        "npm test -- apps/web/src exit 0: 7 files, 57 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 52 files, 326 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "Component and API-client tests use mocked in-memory clients and TanStack Query test wrappers; no browser, database, external service, or persisted fixture state is created. Mutation tests verify failed post-mutation readback does not leave local-only action evidence.",
+      "blocker": "KPI Definition Admin UI evidence exists for P7-007, but the row remains blocked until executable E2E-060/E2E-063/E2E-064 prove the same write flows through browser, API readback, audit, reload, and cleanup.",
+      "last_checked_at": "2026-05-16T12:28:03.473Z",
       "e2e_evidence": []
     },
     {

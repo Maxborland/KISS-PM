@@ -20,6 +20,8 @@ import { GanttControlSurface } from "./GanttControlSurface";
 import { createPhase5ScheduleApiClient, type Phase5ScheduleApiClient } from "./phase5ScheduleApiClient";
 import { ResourceLoadControlSurface } from "./ResourceLoadControlSurface";
 import { createResourcePlanningApiClient, type ResourcePlanningApiClient } from "./resourcePlanningApiClient";
+import { KpiDefinitionAdminSurface } from "./KpiDefinitionAdminSurface";
+import { createKpiDefinitionApiClient, type KpiDefinitionApiClient } from "./kpiDefinitionApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -29,7 +31,8 @@ type AppProps = {
     Partial<CrmIntakeApiClient> &
     Partial<Phase4ProjectWorkApiClient> &
     Partial<Phase5ScheduleApiClient> &
-    Partial<ResourcePlanningApiClient>;
+    Partial<ResourcePlanningApiClient> &
+    Partial<KpiDefinitionApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -53,7 +56,7 @@ const shellLabelDefaults = {
   "shell.configuration_version_prefix": "Версия конфигурации",
   "shell.primary_navigation_aria": "Основная навигация",
   "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 6: ресурсная нагрузка, перегрузки и управляемые команды",
+  "shell.phase_scope_notice": "Фаза 7: KPI, безопасные формулы и контрольные сигналы",
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
@@ -198,6 +201,17 @@ function isResourcePlanningApiClient(
     typeof apiClient.applyResolution === "function" &&
     typeof apiClient.createReservation === "function" &&
     typeof apiClient.getResourceAudit === "function"
+  );
+}
+
+function isKpiDefinitionApiClient(apiClient: Partial<KpiDefinitionApiClient> | null): apiClient is KpiDefinitionApiClient {
+  return (
+    typeof apiClient?.listDefinitions === "function" &&
+    typeof apiClient.previewDefinition === "function" &&
+    typeof apiClient.createDefinition === "function" &&
+    typeof apiClient.publishDefinition === "function" &&
+    typeof apiClient.retireDefinition === "function" &&
+    typeof apiClient.getKpiAudit === "function"
   );
 }
 
@@ -522,6 +536,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createResourcePlanningApiClient() : null;
   }, [apiClient]);
+  const kpiDefinitionApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isKpiDefinitionApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createKpiDefinitionApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
   const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
@@ -636,6 +658,8 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
                   ? "#gantt-workspace"
                   : labelKey === "navigation.resources"
                     ? "#resource-load-control"
+                    : labelKey === "navigation.kpi"
+                      ? "#kpi-definition-admin"
                     : "#phase-1-placeholder"
               }
               key={labelKey}
@@ -708,6 +732,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             apiClient={resourcePlanningApiClient}
             currentTenant={currentTenant}
             onOpenGanttProject={openGanttProject}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {kpiDefinitionApiClient ? (
+          <KpiDefinitionAdminSurface
+            apiClient={kpiDefinitionApiClient}
+            currentTenant={currentTenant}
             testUser={runtimeUser}
           />
         ) : null}

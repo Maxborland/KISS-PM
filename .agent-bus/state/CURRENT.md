@@ -1,6 +1,14 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T19:10:30+07:00
+Updated: 2026-05-16T19:28:03+07:00
+
+- P7-007 KPI Definition Admin UI completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p7-007-kpi-definition-admin-ui.md`.
+- `apps/web/src/kpiDefinitionApiClient.ts` now exposes typed P7 KPI definition API methods for list, non-mutating preview, create, publish, retire, and audit readback.
+- `apps/web/src/KpiDefinitionAdminSurface.tsx` renders the Russian KPI Definition Admin management surface with TanStack Query reads/mutations, loading/empty/error/permission states, preview-before-mutation, governed create/publish/retire commands, API readback refresh, and visible action/audit evidence. `apps/web/src/App.tsx` wires the KPI navigation entry to the surface.
+- Fresh P7-007 evidence: `npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx` passes with 10 tests; `npm test -- apps/web/src/App.test.tsx` passes with 13 tests; `npm test -- apps/web/src` passes with 7 files / 57 tests; `npm test -- apps/api/src/phase7KpiApi.test.ts`, `npm run test:integration`, `npm test`, `npm run typecheck`, and `npm run lint` pass.
+- Bug Hunt / requested code review found 4 in-scope findings and they are fixed: retire targets the active published KPI, command evidence appears only after successful readback, missing `audit.read` is shown as a permission state, and user-facing copy is Russian.
+- `docs/status/phase7-requirements-matrix.json` records fresh UI evidence for P7-007 but keeps the row blocked until E2E-060/E2E-063/E2E-064 prove browser/API/audit/reload/cleanup evidence. Strict Phase 7 remains blocked as intended.
+- Next recommended step: claim `P7-008-kpi-deviation-control-surface` and implement the KPI Deviation Control read/control-signal surface. Do not mark Phase 7 accepted until E2E-060..064 and P7-010 pass.
 
 - P7-006 KPI API and governed commands completed with verdict `accepted` for the API block; handoff: `.agent-bus/handoff/2026-05-16-p7-006-kpi-api-governed-commands.md`.
 - `apps/api/src/phase7Runtime.ts` now provides deterministic tenant-scoped KPI definitions, formula/threshold bundles, seeded evaluations/control signals, non-mutating definition preview, governed create/publish/retire commands, governed evaluation execution, source-entity precondition checks, and action execution readback.
