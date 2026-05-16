@@ -78,6 +78,18 @@ const p7RequiredE2e = {
   "P7-009": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"],
   "P7-010": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"]
 };
+const p8RequiredE2e = {
+  "P8-001": ["E2E-070", "E2E-074", "E2E-075"],
+  "P8-002": ["E2E-070", "E2E-074", "E2E-075"],
+  "P8-003": ["E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"],
+  "P8-004": ["E2E-072", "E2E-073", "E2E-074"],
+  "P8-005": ["E2E-070", "E2E-071", "E2E-073", "E2E-074", "E2E-075"],
+  "P8-006": ["E2E-071", "E2E-075"],
+  "P8-007": ["E2E-072", "E2E-075"],
+  "P8-008": ["E2E-073", "E2E-074", "E2E-075"],
+  "P8-009": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"],
+  "P8-010": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"]
+};
 const e2eTestPaths = {
   "E2E-010": "e2e/tests/phase2/tenant-isolation.spec.ts",
   "E2E-011": "e2e/tests/phase2/access-profile.spec.ts",
@@ -109,7 +121,13 @@ const e2eTestPaths = {
   "E2E-061": "e2e/tests/phase7/kpi-control-signal.spec.ts",
   "E2E-062": "e2e/tests/phase7/kpi-traceability.spec.ts",
   "E2E-063": "e2e/tests/phase7/kpi-versioning.spec.ts",
-  "E2E-064": "e2e/tests/phase7/kpi-permissions.spec.ts"
+  "E2E-064": "e2e/tests/phase7/kpi-permissions.spec.ts",
+  "E2E-070": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+  "E2E-071": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+  "E2E-072": "e2e/tests/phase8/resource-control-action.spec.ts",
+  "E2E-073": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+  "E2E-074": "e2e/tests/phase8/action-permissions.spec.ts",
+  "E2E-075": "e2e/tests/phase8/control-surface-refresh.spec.ts"
 };
 
 function writeMatrixFixture(fileName: string, firstRow: Record<string, unknown>) {
@@ -216,7 +234,7 @@ function writeP2MatrixFixture(fileName: string, overrideById: Record<string, Rec
 }
 
 function writePhaseMatrixFixture(
-  phase: "P2" | "P3" | "P4" | "P5" | "P6" | "P7",
+  phase: "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8",
   fileName: string,
   requiredE2eById: Record<string, string[]>,
   overrideById: Record<string, Record<string, unknown>>
@@ -353,6 +371,29 @@ function completeP7Overrides(checkedAt: string) {
         e2e_evidence: requiredE2e.map((e2eId) => ({
           id: e2eId,
           command: "npm run test:e2e:phase -- --phase=7",
+          test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
+          exit_code: 0,
+          status: "passed",
+          checked_at: checkedAt
+        }))
+      }
+    ])
+  );
+}
+
+function completeP8Overrides(checkedAt: string) {
+  return Object.fromEntries(
+    Object.entries(p8RequiredE2e).map(([id, requiredE2e]) => [
+      id,
+      {
+        status: "verified",
+        evidence: [`${id} verified`],
+        tests: ["npm run test:e2e:phase -- --phase=8 exit 0"],
+        cleanup: `${id} cleanup verified by Phase 8 fixture reset, API/domain readback, audit/action readback, and reload persistence.`,
+        blocker: null,
+        e2e_evidence: requiredE2e.map((e2eId) => ({
+          id: e2eId,
+          command: "npm run test:e2e:phase -- --phase=8",
           test_path: e2eTestPaths[e2eId as keyof typeof e2eTestPaths],
           exit_code: 0,
           status: "passed",
@@ -1336,6 +1377,118 @@ describe("verify-requirements-matrix", () => {
       "complete-p7-phase-exit.json",
       p7RequiredE2e,
       completeP7Overrides(checkedAt)
+    );
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: projectRoot,
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("accepts the initial blocked P8 matrix only with allow-blocked", () => {
+    const matrixPath = writePhaseMatrixFixture("P8", "blocked-p8-contract.json", p8RequiredE2e, {});
+
+    const blockedResult = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    const trackingResult = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(blockedResult.status).toBe(1);
+    expect(blockedResult.stderr).toContain("P8-001: blocked row requires --allow-blocked");
+    expect(trackingResult.status).toBe(0);
+    expect(trackingResult.stdout).toContain("Requirements matrix verified");
+  });
+
+  it("rejects P8 rows whose required_e2e field does not match the phase contract", () => {
+    const matrixPath = writePhaseMatrixFixture("P8", "wrong-p8-required-e2e.json", p8RequiredE2e, {
+      "P8-003": {
+        required_e2e: ["E2E-071"]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P8-003: required_e2e must exactly match phase contract");
+  });
+
+  it("rejects P8 structured E2E evidence that points to a non-ledger phase8 file", () => {
+    const matrixPath = writePhaseMatrixFixture("P8", "wrong-p8-test-path.json", p8RequiredE2e, {
+      "P8-010": {
+        status: "verified",
+        evidence: ["P8-010 verified"],
+        tests: ["npm run test:e2e:phase -- --phase=8 exit 0"],
+        blocker: null,
+        e2e_evidence: [
+          {
+            id: "E2E-075",
+            command: "npm run test:e2e:phase -- --phase=8",
+            test_path: "e2e/tests/phase8/refresh.spec.ts",
+            exit_code: 0,
+            status: "passed",
+            checked_at: "2026-05-16T13:40:00.000Z"
+          }
+        ]
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, "--allow-blocked", matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "P8-010: E2E-075 E2E evidence test_path must match e2e/tests/phase8/control-surface-refresh.spec.ts"
+    );
+  });
+
+  it("rejects complete P8 rows that keep placeholder cleanup evidence", () => {
+    const checkedAt = "2026-05-16T07:55:00.000Z";
+    const matrixPath = writePhaseMatrixFixture("P8", "placeholder-p8-cleanup.json", p8RequiredE2e, {
+      ...completeP8Overrides(checkedAt),
+      "P8-002": {
+        ...completeP8Overrides(checkedAt)["P8-002"],
+        cleanup: "No runtime cleanup"
+      }
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("P8-002: verified row cleanup evidence is still a placeholder");
+  });
+
+  it("accepts a complete P8 matrix only when every row is verified with phase 8 structured E2E evidence", () => {
+    const checkedAt = "2026-05-16T07:55:00.000Z";
+    const projectRoot = resolve(fixtureDir, "complete-p8-project-root");
+    writeRequiredE2eSpecFiles(projectRoot, Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-07")));
+    const e2eRunMetadataPath = writeE2eRunMetadata("complete-p8-run-metadata.json", {
+      phase: "8",
+      testPaths: Object.values(e2eTestPaths).filter((testPath) => testPath.includes("/phase8/")),
+      e2eIds: Object.keys(e2eTestPaths).filter((e2eId) => e2eId.startsWith("E2E-07")),
+      startedAt: "2026-05-16T07:56:00.000Z",
+      finishedAt: "2026-05-16T07:58:00.000Z"
+    });
+    const matrixPath = writePhaseMatrixFixture(
+      "P8",
+      "complete-p8-phase-exit.json",
+      p8RequiredE2e,
+      completeP8Overrides(checkedAt)
     );
 
     const result = spawnSync(process.execPath, [scriptPath, matrixPath], {

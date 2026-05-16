@@ -19,7 +19,8 @@ const requiredIdsByPhase = {
   "P5-contract": ["P5C-001", "P5C-002", "P5C-003"],
   P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`),
   P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`),
-  P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`)
+  P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`),
+  P8: Array.from({ length: 10 }, (_, index) => `P8-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -93,6 +94,18 @@ const requiredE2eByPhaseRow = {
     "P7-008": ["E2E-061", "E2E-062"],
     "P7-009": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"],
     "P7-010": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"]
+  },
+  P8: {
+    "P8-001": ["E2E-070", "E2E-074", "E2E-075"],
+    "P8-002": ["E2E-070", "E2E-074", "E2E-075"],
+    "P8-003": ["E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"],
+    "P8-004": ["E2E-072", "E2E-073", "E2E-074"],
+    "P8-005": ["E2E-070", "E2E-071", "E2E-073", "E2E-074", "E2E-075"],
+    "P8-006": ["E2E-071", "E2E-075"],
+    "P8-007": ["E2E-072", "E2E-075"],
+    "P8-008": ["E2E-073", "E2E-074", "E2E-075"],
+    "P8-009": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"],
+    "P8-010": ["E2E-070", "E2E-071", "E2E-072", "E2E-073", "E2E-074", "E2E-075"]
   }
 };
 const requiredE2eTestPath = {
@@ -126,7 +139,13 @@ const requiredE2eTestPath = {
   "E2E-061": "e2e/tests/phase7/kpi-control-signal.spec.ts",
   "E2E-062": "e2e/tests/phase7/kpi-traceability.spec.ts",
   "E2E-063": "e2e/tests/phase7/kpi-versioning.spec.ts",
-  "E2E-064": "e2e/tests/phase7/kpi-permissions.spec.ts"
+  "E2E-064": "e2e/tests/phase7/kpi-permissions.spec.ts",
+  "E2E-070": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+  "E2E-071": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+  "E2E-072": "e2e/tests/phase8/resource-control-action.spec.ts",
+  "E2E-073": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+  "E2E-074": "e2e/tests/phase8/action-permissions.spec.ts",
+  "E2E-075": "e2e/tests/phase8/control-surface-refresh.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -223,7 +242,10 @@ for (const row of matrix.rows ?? []) {
     }
     if (typeof row.cleanup !== "string" || row.cleanup.trim().length === 0) {
       failures.push(`${row.id}: verified row missing cleanup evidence`);
-    } else if (/no runtime cleanup yet/i.test(row.cleanup)) {
+    } else if (
+      /no runtime cleanup yet/i.test(row.cleanup) ||
+      (matrix.phase === "P8" && /^(no runtime cleanup|no runtime state exists yet)/i.test(row.cleanup.trim()))
+    ) {
       failures.push(`${row.id}: verified row cleanup evidence is still a placeholder`);
     }
     if (!row.last_checked_at) {
