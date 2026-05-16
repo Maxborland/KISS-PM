@@ -11,6 +11,7 @@ import type {
   ScheduleActionExecutionDto,
   ScheduleValidationIssueDto
 } from "./phase5ScheduleApiClient";
+import { withTestQueryClient } from "./testQueryClient";
 
 const projectId = "project-phase4-main";
 
@@ -301,16 +302,18 @@ function createMutableApiClient() {
 
 describe("Gantt control surface", () => {
   it("renders WBS schedule rows, baseline values, validation warnings, and audit evidence", async () => {
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={createApiClient()}
         currentTenant={createCurrentTenant()}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-surface")).toBeInTheDocument();
-    expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен");
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен");
+    });
 
     const row = screen.getByTestId("gantt-row-task-phase5-kickoff");
     expect(row).toHaveTextContent("task-phase5-kickoff");
@@ -328,13 +331,13 @@ describe("Gantt control surface", () => {
     const apiClient = createApiClient();
     vi.mocked(apiClient.getProjectScheduleAudit).mockRejectedValueOnce(new Error("Audit readback unavailable"));
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toHaveTextContent("task-phase5-kickoff");
     expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен, аудит временно недоступен");
@@ -345,13 +348,13 @@ describe("Gantt control surface", () => {
   it("shows a denied state without calling schedule APIs when user cannot read schedule", async () => {
     const apiClient = createApiClient();
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant(["tenant.read"])}
         testUser="readonly-observer-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-denied")).toHaveTextContent("Нет доступа к Гантту");
     expect(apiClient.getProjectSchedule).not.toHaveBeenCalled();
@@ -369,13 +372,13 @@ describe("Gantt control surface", () => {
       baseline: undefined
     });
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     const input = await screen.findByLabelText("ID проекта для Гантта");
     fireEvent.change(input, { target: { value: "project-phase5-selected" } });
@@ -389,7 +392,7 @@ describe("Gantt control surface", () => {
 
   it("reloads the active project when the entrypoint asks for the same project again", async () => {
     const apiClient = createApiClient();
-    const { rerender } = render(
+    const { rerender } = render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
@@ -397,10 +400,10 @@ describe("Gantt control surface", () => {
         refreshKey={0}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
-    rerender(
+    rerender(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
@@ -408,7 +411,7 @@ describe("Gantt control surface", () => {
         refreshKey={1}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     await waitFor(() => {
       expect(apiClient.getProjectSchedule).toHaveBeenCalledTimes(2);
@@ -419,13 +422,13 @@ describe("Gantt control surface", () => {
     const apiClient = createApiClient();
     vi.mocked(apiClient.getProjectSchedule).mockRejectedValueOnce(new Error("API расписания недоступен"));
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-loading-state")).toHaveTextContent("Получаем WBS");
     expect(screen.queryByTestId("gantt-empty-state")).not.toBeInTheDocument();
@@ -436,7 +439,7 @@ describe("Gantt control surface", () => {
   it("creates canonical tasks, edits schedule fields, creates FS dependencies, and reloads from API readback", async () => {
     const apiClient = createMutableApiClient();
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant([
@@ -448,7 +451,7 @@ describe("Gantt control surface", () => {
         ])}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toHaveTextContent("task-phase5-kickoff");
     fireEvent.change(screen.getByLabelText("ID новой задачи"), { target: { value: "task-phase5-created" } });
@@ -532,7 +535,7 @@ describe("Gantt control surface", () => {
     const createTaskDeferred = createDeferred<ScheduleCommandResultDto>();
     vi.mocked(apiClient.createScheduleTask).mockReturnValueOnce(createTaskDeferred.promise);
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant([
@@ -544,7 +547,7 @@ describe("Gantt control surface", () => {
         ])}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Создать задачу в Гантте" }));
@@ -573,18 +576,19 @@ describe("Gantt control surface", () => {
   it("shows denied and validation states for schedule commands without local-only mutation", async () => {
     const apiClient = createApiClient();
 
-    render(
+    const { unmount } = render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "audit.read"])}
         testUser="readonly-observer-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-command-denied")).toHaveTextContent("Изменение расписания недоступно по правам");
     expect(screen.queryByRole("button", { name: "Создать задачу в Гантте" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Старт task-phase5-kickoff")).not.toBeInTheDocument();
     expect(apiClient.createScheduleTask).not.toHaveBeenCalled();
+    unmount();
 
     const validationIssue: ScheduleValidationIssueDto = {
       code: "finish_to_start_conflict",
@@ -601,7 +605,7 @@ describe("Gantt control surface", () => {
       })
     );
 
-    render(
+    render(withTestQueryClient(
       <GanttControlSurface
         apiClient={writerClient}
         currentTenant={createCurrentTenant([
@@ -613,7 +617,7 @@ describe("Gantt control surface", () => {
         ])}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Предшественник FS"), { target: { value: "task-phase5-kickoff" } });
