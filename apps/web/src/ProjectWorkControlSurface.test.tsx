@@ -10,6 +10,7 @@ import type {
   TaskDto
 } from "./phase4ProjectWorkApiClient";
 import type { CurrentTenantDto } from "./phase2ApiClient";
+import { withTestQueryClient } from "./testQueryClient";
 
 const projectId = "project-phase4-main";
 const stageInitiationId = `${projectId}:stage-initiation`;
@@ -444,17 +445,17 @@ describe("Project Work Control surface", () => {
     const apiClient = createApiClient();
     const onOpenGanttProject = vi.fn();
 
-    render(
+    render(withTestQueryClient(
       <ProjectWorkControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant()}
         onOpenGanttProject={onOpenGanttProject}
         testUser="project-manager-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("project-work-surface")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Создать управляемый проект" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Создать управляемый проект" }));
 
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     expect(screen.getByTestId("stage-progress")).toHaveTextContent("Инициация");
@@ -472,7 +473,9 @@ describe("Project Work Control surface", () => {
     });
 
     fireEvent.click(within(screen.getByTestId("kanban-column-todo")).getByRole("button", { name: "В работу" }));
-    expect(await screen.findByTestId("kanban-column-in_progress")).toHaveTextContent(taskId);
+    await waitFor(() => {
+      expect(screen.getByTestId("kanban-column-in_progress")).toHaveTextContent(taskId);
+    });
     expect(screen.getByTestId("task-audit-events")).toHaveTextContent("task.status.change");
 
     fireEvent.click(within(screen.getByTestId("kanban-column-in_progress")).getByRole("button", { name: "Комментарий" }));
@@ -511,7 +514,7 @@ describe("Project Work Control surface", () => {
   it("shows executor My Tasks and writes task commands as the logged-in executor", async () => {
     const apiClient = createApiClient({ initialTaskStatus: "todo" });
 
-    render(
+    render(withTestQueryClient(
       <ProjectWorkControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant(
@@ -524,7 +527,7 @@ describe("Project Work Control surface", () => {
         )}
         testUser="executor-a"
       />
-    );
+    ));
 
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     await waitFor(() => {
@@ -534,7 +537,9 @@ describe("Project Work Control surface", () => {
     });
 
     fireEvent.click(within(screen.getByTestId("kanban-column-todo")).getByRole("button", { name: "В работу" }));
-    expect(await screen.findByTestId("kanban-column-in_progress")).toHaveTextContent(taskId);
+    await waitFor(() => {
+      expect(screen.getByTestId("kanban-column-in_progress")).toHaveTextContent(taskId);
+    });
     expect(screen.getByTestId("task-audit-events")).toHaveTextContent("Аудит задачи пока пуст");
     expect(apiClient.changeTaskStatus).toHaveBeenCalledWith("executor-a", taskId, "in_progress");
     expect(apiClient.listAuditEventsForTarget).not.toHaveBeenCalled();
@@ -544,9 +549,9 @@ describe("Project Work Control surface", () => {
     const apiClient = createApiClient({ initialTaskStatus: "in_progress" });
     vi.mocked(apiClient.addTaskComment).mockResolvedValueOnce(null);
 
-    render(
+    render(withTestQueryClient(
       <ProjectWorkControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     fireEvent.click(within(screen.getByTestId("kanban-column-in_progress")).getByRole("button", { name: "Комментарий" }));
@@ -556,18 +561,18 @@ describe("Project Work Control surface", () => {
 
   it("reloads existing project work state from the API instead of relying on local component state", async () => {
     const apiClient = createApiClient();
-    const { unmount } = render(
+    const { unmount } = render(withTestQueryClient(
       <ProjectWorkControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
     fireEvent.click(await screen.findByRole("button", { name: "Создать управляемый проект" }));
     fireEvent.click(await screen.findByRole("button", { name: "Создать стартовую задачу" }));
     expect(await screen.findByTestId("project-task-list")).toHaveTextContent(taskId);
 
     unmount();
-    render(
+    render(withTestQueryClient(
       <ProjectWorkControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
-    );
+    ));
 
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     expect(await screen.findByTestId("project-task-list")).toHaveTextContent(taskId);
@@ -580,13 +585,13 @@ describe("Project Work Control surface", () => {
       Object.assign(new Error("Доступ запрещен"), { code: "permission_denied" })
     );
 
-    render(
+    render(withTestQueryClient(
       <ProjectWorkControlSurface
         apiClient={apiClient}
         currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read"])}
         testUser="readonly-observer-a"
       />
-    );
+    ));
 
     fireEvent.click(await screen.findByRole("button", { name: "Проверить запрет создания проекта" }));
 
