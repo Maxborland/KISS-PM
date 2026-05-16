@@ -187,6 +187,54 @@ export type CustomFieldDefinitionUpdateResult = {
   definition: CustomFieldDefinition;
 };
 
+export type CustomFieldDefinitionDraft = {
+  id: string;
+  targetEntityType: string;
+  key: string;
+  label: string;
+  valueType: string;
+  required: boolean;
+  active: boolean;
+  validationRules?: Record<string, CustomFieldMetadataValue>;
+  visibilityRules?: CustomFieldVisibilityRule[];
+  permissionRules?: CustomFieldPermissionRules;
+  bindingFlags: CustomFieldBindingFlags;
+};
+
+export type CustomFieldDefinitionPublishPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  mutatesState: false;
+  before: {
+    registryVersion: number;
+    definitionCount: number;
+  };
+  after: {
+    registryVersion: number;
+    definitionCount: number;
+  };
+  definition: CustomFieldDefinition;
+  affectedRuntimeSurfaces: string[];
+  createdAt: string;
+};
+
+export type CustomFieldDefinitionPublishAudit = {
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  auditEventId: string;
+  commandType: "custom_field.publish";
+  definitionId: string;
+  beforeRegistryVersion: number;
+  afterRegistryVersion: number;
+  publishedAt: string;
+};
+
+export type CustomFieldDefinitionPublishResult = {
+  registry: CustomFieldRegistry;
+  audit: CustomFieldDefinitionPublishAudit;
+};
+
 export type TenantConfiguration = {
   id: string;
   tenantId: TenantId;
@@ -1467,6 +1515,198 @@ export function updateCustomFieldDefinitionMetadata(
       bindingFlags: input.bindingFlags ?? current.bindingFlags,
       updatedAt: input.updatedAt
     })
+  };
+}
+
+function assertCustomFieldBuilderSupported(definition: CustomFieldDefinition): void {
+  if (definition.targetEntityType !== "project") {
+    throw new TenantConfigModelError("validation_error", "custom field builder supports project fields only");
+  }
+  if (!definition.bindingFlags.usableInControlSurfaces) {
+    throw new TenantConfigModelError("validation_error", "custom field must be usable in control surfaces");
+  }
+  const visibleSurfaces = definition.visibilityRules?.filter((rule) => rule.visible).map((rule) => rule.surfaceKey) ?? [];
+  if (visibleSurfaces.length === 0) {
+    throw new TenantConfigModelError("validation_error", "custom field must be visible on at least one surface");
+  }
+  if (definition.valueType === "single_select" || definition.valueType === "multi_select") {
+    const options = definition.validationRules?.["options"];
+    if (!Array.isArray(options) || !options.every((option): option is string => typeof option === "string")) {
+      throw new TenantConfigModelError("validation_error", "custom field select options must be a string array");
+    }
+    if (options.length === 0) {
+      throw new TenantConfigModelError("validation_error", "custom field select options must not be empty");
+    }
+  }
+}
+
+function createDefinitionFromDraft(
+  registry: CustomFieldRegistry,
+  draft: CustomFieldDefinitionDraft,
+  updatedAt: string
+): CustomFieldDefinition {
+  const definition = createCustomFieldDefinition({
+    ...draft,
+    tenantId: registry.tenantId,
+    version: 1,
+    updatedAt
+  });
+  assertCustomFieldBuilderSupported(definition);
+
+  return definition;
+}
+
+function createRegistryWithDefinition(
+  registry: CustomFieldRegistry,
+  definition: CustomFieldDefinition,
+  updatedAt: string
+): CustomFieldRegistry {
+  return createCustomFieldRegistry({
+    tenantId: registry.tenantId,
+    version: registry.version + 1,
+    definitions: [...registry.definitions, definition],
+    updatedAt
+  });
+}
+
+export function previewCustomFieldDefinitionPublish(
+  current: CustomFieldRegistry,
+  input: {
+    id: string;
+    actorId: TenantUserId;
+    expectedRegistryVersion: number;
+    draft: CustomFieldDefinitionDraft;
+    affectedRuntimeSurfaces: string[];
+    createdAt: string;
+  }
+): CustomFieldDefinitionPublishPreview {
+  const registry = createCustomFieldRegistry(current);
+  const expectedRegistryVersion = requirePositiveInteger(
+    input.expectedRegistryVersion,
+    "customFieldPublish.expectedRegistryVersion"
+  );
+  if (expectedRegistryVersion !== registry.version) {
+    throw new TenantConfigModelError("conflict", "custom field preview is stale");
+  }
+  const createdAt = requireValidTimestamp(input.createdAt, "customFieldPublish.createdAt");
+  const definition = createDefinitionFromDraft(registry, input.draft, createdAt);
+  const nextRegistry = createRegistryWithDefinition(registry, definition, createdAt);
+  const affectedRuntimeSurfaces = requireArray(
+    input.affectedRuntimeSurfaces,
+    "customFieldPublish.affectedRuntimeSurfaces"
+  ).map((surface) => requireSystemKey(surface, "customFieldPublish.affectedRuntimeSurface"));
+  if (affectedRuntimeSurfaces.length === 0) {
+    throw new TenantConfigModelError("validation_error", "custom field publish must affect at least one runtime surface");
+  }
+  const visibleSurfaceKeys = new Set(definition.visibilityRules?.filter((rule) => rule.visible).map((rule) => rule.surfaceKey) ?? []);
+  for (const surface of affectedRuntimeSurfaces) {
+    if (!visibleSurfaceKeys.has(surface)) {
+      throw new TenantConfigModelError(
+        "validation_error",
+        `custom field is not visible on affected runtime surface: ${surface}`
+      );
+    }
+  }
+
+  return {
+    id: requireNonEmptyString(input.id, "customFieldPublish.id"),
+    tenantId: registry.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "customFieldPublish.actorId"),
+    mutatesState: false,
+    before: {
+      registryVersion: registry.version,
+      definitionCount: registry.definitions.length
+    },
+    after: {
+      registryVersion: nextRegistry.version,
+      definitionCount: nextRegistry.definitions.length
+    },
+    definition,
+    affectedRuntimeSurfaces,
+    createdAt
+  };
+}
+
+function sameCustomFieldPreview(
+  left: CustomFieldDefinitionPublishPreview,
+  right: CustomFieldDefinitionPublishPreview
+): boolean {
+  return (
+    left.before.registryVersion === right.before.registryVersion &&
+    left.after.registryVersion === right.after.registryVersion &&
+    JSON.stringify(left.definition) === JSON.stringify(right.definition) &&
+    JSON.stringify(left.affectedRuntimeSurfaces) === JSON.stringify(right.affectedRuntimeSurfaces)
+  );
+}
+
+export function publishCustomFieldDefinitionPreview(
+  current: CustomFieldRegistry,
+  input: {
+    preview: CustomFieldDefinitionPublishPreview;
+    expectedRegistryVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): CustomFieldDefinitionPublishResult {
+  const registry = createCustomFieldRegistry(current);
+  const expectedRegistryVersion = requirePositiveInteger(
+    input.expectedRegistryVersion,
+    "customFieldPublish.expectedRegistryVersion"
+  );
+  if (
+    expectedRegistryVersion !== registry.version ||
+    input.preview.tenantId !== registry.tenantId ||
+    input.preview.before.registryVersion !== registry.version
+  ) {
+    throw new TenantConfigModelError("conflict", "custom field preview is stale");
+  }
+  const recomputedPreview = previewCustomFieldDefinitionPublish(registry, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    expectedRegistryVersion: registry.version,
+    draft: {
+      id: input.preview.definition.id,
+      targetEntityType: input.preview.definition.targetEntityType,
+      key: input.preview.definition.key,
+      label: input.preview.definition.label,
+      valueType: input.preview.definition.valueType,
+      required: input.preview.definition.required,
+      active: input.preview.definition.active,
+      ...(input.preview.definition.validationRules !== undefined
+        ? { validationRules: input.preview.definition.validationRules }
+        : {}),
+      ...(input.preview.definition.visibilityRules !== undefined
+        ? { visibilityRules: input.preview.definition.visibilityRules }
+        : {}),
+      ...(input.preview.definition.permissionRules !== undefined
+        ? { permissionRules: input.preview.definition.permissionRules }
+        : {}),
+      bindingFlags: input.preview.definition.bindingFlags
+    },
+    affectedRuntimeSurfaces: input.preview.affectedRuntimeSurfaces,
+    createdAt: input.preview.createdAt
+  });
+  if (!sameCustomFieldPreview(input.preview, recomputedPreview)) {
+    throw new TenantConfigModelError("conflict", "custom field preview is stale");
+  }
+  const publishedAt = requireValidTimestamp(input.publishedAt, "customFieldPublish.publishedAt");
+  const definition = createCustomFieldDefinition({
+    ...recomputedPreview.definition,
+    updatedAt: publishedAt
+  });
+
+  return {
+    registry: createRegistryWithDefinition(registry, definition, publishedAt),
+    audit: {
+      tenantId: registry.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireNonEmptyString(input.auditEventId, "customFieldPublish.auditEventId"),
+      commandType: "custom_field.publish",
+      definitionId: definition.id,
+      beforeRegistryVersion: registry.version,
+      afterRegistryVersion: registry.version + 1,
+      publishedAt
+    }
   };
 }
 

@@ -98,6 +98,11 @@ const phase2PermissionCatalog = [
     category: "tenant_config"
   }),
   createPermission({
+    key: "custom_field.write",
+    description: "Preview, publish, and fill tenant custom project fields",
+    category: "tenant_config"
+  }),
+  createPermission({
     key: "permission.diagnostics.read",
     description: "Run safe permission diagnostics",
     category: "access_control"
@@ -295,6 +300,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "tenant.config.write",
       "tenant.config.export",
       "tenant.config.import",
+      "custom_field.write",
       "project.template.write",
       "project_draft.read",
       "project_draft.create",
@@ -330,6 +336,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.feasibility.run",
       "audit.read",
       "tenant.config.read",
+      "custom_field.write",
       "project_draft.read",
       "project_draft.create",
       "project.create_from_template",
