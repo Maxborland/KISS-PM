@@ -506,6 +506,41 @@ export function createPhase7RuntimeState() {
     return getState(tenantId).signals.map((signal) => clone(signal));
   }
 
+  function replaceThresholdRuleSet(input: {
+    tenantId: TenantId;
+    definitionId: string;
+    thresholdRuleSet: KpiThresholdRuleSet;
+  }): KpiDefinitionBundle {
+    const state = getState(input.tenantId);
+    const definition = state.definitions.find((candidate) => candidate.id === input.definitionId);
+    if (!definition) throw notFound("KPI definition not found");
+    if (definition.thresholdRuleSetId !== input.thresholdRuleSet.id) {
+      throw conflict("KPI threshold rule set does not belong to the definition");
+    }
+    if (input.thresholdRuleSet.tenantId !== input.tenantId) {
+      throw conflict("KPI threshold tenant mismatch");
+    }
+    state.thresholdRuleSets = state.thresholdRuleSets.map((candidate) =>
+      candidate.id === input.thresholdRuleSet.id ? clone(input.thresholdRuleSet) : candidate
+    );
+    if (!state.thresholdRuleSets.some((candidate) => candidate.id === input.thresholdRuleSet.id)) {
+      state.thresholdRuleSets = [...state.thresholdRuleSets, clone(input.thresholdRuleSet)];
+    }
+    state.version += 1;
+    const bundle = getBundle(input.tenantId, input.definitionId);
+    if (!bundle) throw notFound("KPI definition not found");
+
+    return bundle;
+  }
+
+  function getLatestEvaluationForDefinition(tenantId: TenantId, definitionId: string): KpiEvaluation | undefined {
+    const evaluation = getState(tenantId).evaluations
+      .filter((candidate) => candidate.kpiDefinitionId === definitionId)
+      .sort((left, right) => right.evaluatedAt.localeCompare(left.evaluatedAt))[0];
+
+    return evaluation ? clone(evaluation) : undefined;
+  }
+
   function getSignalDetail(tenantId: TenantId, signalId: string) {
     const state = getState(tenantId);
     const signal = state.signals.find((candidate) => candidate.id === signalId);
@@ -535,6 +570,8 @@ export function createPhase7RuntimeState() {
     runEvaluation,
     getEvaluation,
     listSignals,
+    replaceThresholdRuleSet,
+    getLatestEvaluationForDefinition,
     getSignalDetail,
     listActionExecutions
   };
