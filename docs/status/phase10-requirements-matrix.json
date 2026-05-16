@@ -2,7 +2,7 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T03:41:31.8468551+07:00",
+  "updated_at": "2026-05-17T04:25:15.0788892+07:00",
   "rows": [
     {
       "id": "P10-001",
@@ -228,14 +228,31 @@
         "E2E-093"
       ],
       "evidence": [
-        "P10 contract defines saved view and control-surface layout builder MVP before implementation."
+        "P10 contract defines saved view and control-surface layout builder MVP before implementation.",
+        "packages/control-surfaces/src/index.ts implements previewControlSurfaceLayoutPublish and publishControlSurfaceLayoutPreview for non-mutating layout/saved-view preview, stale preview rejection, unavailable field/widget/action explanations, previous-version readback inputs, and audited publish metadata.",
+        "apps/api/src/phase10Runtime.ts and apps/api/src/app.ts expose GET /api/tenant/saved-views, POST /api/tenant/saved-views/preview, POST /api/tenant/saved-views/publish, configuration audit readback, and active control-surface read-model projection through the published layout definition.",
+        "apps/api/src/phase10SavedViewsApi.test.ts proves readback, preview without mutation, governed publish, refreshed control-surface readback, previous-version readability, configuration audit/action evidence, read-only direct API denial, Tenant B no-leak stale denial, stale preview rejection, and invalid layout rejection without partial mutation.",
+        "apps/web/src/SavedViewLayoutBuilderSurface.tsx and apps/web/src/savedViewLayoutBuilderApiClient.ts implement the Russian saved-view/layout builder control surface with TanStack Query server state, API readback, dry-run preview, publish command, refreshed read model, audit/result evidence, read-only state, API error state, and stale-preview recovery.",
+        "apps/web/src/SavedViewLayoutBuilderSurface.test.tsx proves the surface loads active layout, handles API error, previews without applied success state, publishes only through API readback, shows audit/action evidence, shows previous version readback, blocks read-only mutation, and recovers from stale preview errors."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config packages/control-surfaces apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/control-surfaces/src/controlSurfaceLayoutBuilder.test.ts exit 1 RED: previewControlSurfaceLayoutPublish and publishControlSurfaceLayoutPreview were missing before implementation",
+        "npm test -- apps/api/src/phase10SavedViewsApi.test.ts exit 1 RED: /api/tenant/saved-views routes were missing before implementation",
+        "npm test -- apps/web/src/SavedViewLayoutBuilderSurface.test.tsx exit 1 RED: SavedViewLayoutBuilderSurface and savedViewLayoutBuilderApiClient were missing before implementation",
+        "npm test -- packages/control-surfaces/src/controlSurfaceLayoutBuilder.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10SavedViewsApi.test.ts exit 0: 1 file, 3 tests passed after review fix for preview target binding",
+        "npm test -- apps/web/src/SavedViewLayoutBuilderSurface.test.tsx exit 0: 1 file, 3 tests passed after review fix for API error parsing",
+        "npm test -- packages/control-surfaces apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/api/src/phase10CustomFieldsApi.test.ts apps/api/src/phase10KpiThresholdsApi.test.ts apps/api/src/phase10SavedViewsApi.test.ts exit 0: 9 files, 33 tests passed",
+        "npm test -- apps/web/src exit 0: 16 files, 108 tests passed",
+        "npm run test:integration exit 0: 17 files, 88 tests passed",
+        "npm test exit 0: 86 files, 506 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore saved-view/layout versions and target control-surface read models before verification.",
-      "blocker": "Blocked until P10-006 implementation adds saved-view/layout builder behavior and E2E-093 proves publish, reload, permission-aware readback, and cleanup.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime saved-view layout previews, published layout definitions, previous versions, control-surface readback, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 8 and Phase 10 runtimes, restoring layout definitions, previous versions, preview tokens, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-093.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-006 remains blocked for strict phase verification until P10-009 E2E-093 proves browser reload persistence, layout/saved-view readback, direct backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T04:25:15.0788892+07:00",
       "e2e_evidence": []
     },
     {

@@ -1,5 +1,16 @@
 import { createActionExecutionLog } from "@kiss-pm/action-engine";
 import type { ActionExecutionLog } from "@kiss-pm/action-engine";
+import {
+  previewControlSurfaceLayoutPublish,
+  publishControlSurfaceLayoutPreview
+} from "@kiss-pm/control-surfaces";
+import type {
+  ControlSurfaceDefinition,
+  ControlSurfaceLayoutDraft,
+  ControlSurfaceLayoutPublishAudit,
+  ControlSurfaceLayoutPublishPreview,
+  ControlSurfaceLayoutPublishResult
+} from "@kiss-pm/control-surfaces";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 import {
   previewKpiThresholdRuleSetPublish,
@@ -56,6 +67,10 @@ type Phase10TenantState = {
   customFieldValueActionExecutions: ActionExecutionLog[];
   kpiThresholdPreviews: Map<string, KpiThresholdRuleSetPublishPreview>;
   kpiThresholdActionExecutions: ActionExecutionLog[];
+  layoutDefinitions: Map<string, ControlSurfaceDefinition>;
+  layoutPreviousDefinitions: Map<string, ControlSurfaceDefinition[]>;
+  layoutPreviews: Map<string, ControlSurfaceLayoutPublishPreview>;
+  layoutActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -95,7 +110,11 @@ export function createPhase10RuntimeState() {
       customFieldActionExecutions: [],
       customFieldValueActionExecutions: [],
       kpiThresholdPreviews: new Map<string, KpiThresholdRuleSetPublishPreview>(),
-      kpiThresholdActionExecutions: []
+      kpiThresholdActionExecutions: [],
+      layoutDefinitions: new Map<string, ControlSurfaceDefinition>(),
+      layoutPreviousDefinitions: new Map<string, ControlSurfaceDefinition[]>(),
+      layoutPreviews: new Map<string, ControlSurfaceLayoutPublishPreview>(),
+      layoutActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -478,6 +497,120 @@ export function createPhase10RuntimeState() {
     return getState(tenantId).kpiThresholdActionExecutions.map((entry) => clone(entry));
   }
 
+  function getPublishedControlSurfaceLayout(tenantId: TenantId, surfaceId: string): ControlSurfaceDefinition | undefined {
+    const state = getState(tenantId);
+    const found =
+      state.layoutDefinitions.get(surfaceId) ??
+      [...state.layoutDefinitions.values()].find((definition) => definition.key === surfaceId);
+
+    return found === undefined ? undefined : clone(found);
+  }
+
+  function listPreviousControlSurfaceLayouts(tenantId: TenantId, surfaceId: string): ControlSurfaceDefinition[] {
+    const state = getState(tenantId);
+    const active = getPublishedControlSurfaceLayout(tenantId, surfaceId);
+    const key = active?.id ?? surfaceId;
+    return (state.layoutPreviousDefinitions.get(key) ?? []).map((entry) => clone(entry));
+  }
+
+  function previewControlSurfaceLayout(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    definition: ControlSurfaceDefinition;
+    expectedSurfaceVersion: number;
+    draft: ControlSurfaceLayoutDraft;
+    affectedRuntimeSurfaces: string[];
+  }): ControlSurfaceLayoutPublishPreview {
+    const state = getState(input.tenantId);
+    const current = state.layoutDefinitions.get(input.definition.id) ?? input.definition;
+    const preview = previewControlSurfaceLayoutPublish(current, {
+      id: `preview-layout-${input.tenantId}-${current.version}-${state.layoutPreviews.size + 1}`,
+      actorId: input.actorId,
+      expectedSurfaceVersion: input.expectedSurfaceVersion,
+      draft: input.draft,
+      affectedRuntimeSurfaces: input.affectedRuntimeSurfaces,
+      createdAt: now()
+    });
+    state.layoutPreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function publishControlSurfaceLayout(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    definition: ControlSurfaceDefinition;
+    previewId: string;
+    auditEventId: string;
+  }): ControlSurfaceLayoutPublishResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.tenantId);
+    const preview = state.layoutPreviews.get(input.previewId);
+    if (preview === undefined) {
+      throw stalePreview("control surface layout preview is missing or stale");
+    }
+    const current = state.layoutDefinitions.get(input.definition.id) ?? input.definition;
+    if (preview.actorId !== input.actorId || preview.surfaceDefinitionId !== current.id) {
+      throw stalePreview("control surface layout preview is stale");
+    }
+    const result = publishControlSurfaceLayoutPreview(current, {
+      preview,
+      expectedSurfaceVersion: current.version,
+      auditEventId: input.auditEventId,
+      publishedAt: now()
+    });
+    state.layoutDefinitions.set(result.definition.id, clone(result.definition));
+    state.layoutPreviousDefinitions.set(result.definition.id, [
+      ...(state.layoutPreviousDefinitions.get(result.definition.id) ?? []),
+      clone(result.previousDefinition)
+    ]);
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `layout-${input.tenantId}-${current.id}-${current.version}`
+      },
+      commandType: "control_surface_layout.publish",
+      requiredPermission: "control_surface.config.write",
+      status: "succeeded",
+      source: { entityType: "controlSurface", entityId: current.id },
+      target: { entityType: "savedView", entityId: result.audit.savedViewKey },
+      before: {
+        surfaceVersion: result.audit.beforeSurfaceVersion,
+        viewVersion: result.previousDefinition.view.version,
+        preview
+      },
+      after: {
+        surfaceVersion: result.audit.afterSurfaceVersion,
+        viewVersion: result.definition.view.version,
+        savedViewKey: result.audit.savedViewKey,
+        visibleFieldKeys: result.definition.view.fields.filter((field) => field.visible).map((field) => field.key)
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission control_surface.config.write allowed"],
+      preconditionTrace: ["precondition:dry-run preview confirmed", "precondition:layout references validated"],
+      trace: ["control_surface_layout:preview confirmed", "control_surface_layout:runtime projection refreshed"]
+    });
+    state.layoutActionExecutions = [...state.layoutActionExecutions, actionExecution];
+    state.layoutPreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function getControlSurfaceLayoutPreview(
+    tenantId: TenantId,
+    previewId: string
+  ): ControlSurfaceLayoutPublishPreview | undefined {
+    const preview = getState(tenantId).layoutPreviews.get(previewId);
+    return preview === undefined ? undefined : clone(preview);
+  }
+
+  function listLayoutActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).layoutActionExecutions.map((entry) => clone(entry));
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -500,7 +633,13 @@ export function createPhase10RuntimeState() {
     previewKpiThreshold,
     publishKpiThreshold,
     getKpiThresholdPreview,
-    listKpiThresholdActionExecutions
+    listKpiThresholdActionExecutions,
+    getPublishedControlSurfaceLayout,
+    listPreviousControlSurfaceLayouts,
+    previewControlSurfaceLayout,
+    publishControlSurfaceLayout,
+    getControlSurfaceLayoutPreview,
+    listLayoutActionExecutions
   };
 }
 
@@ -560,5 +699,9 @@ export function customFieldPublishAuditDto(audit: CustomFieldDefinitionPublishAu
 }
 
 export function kpiThresholdPublishAuditDto(audit: KpiThresholdRuleSetPublishAudit) {
+  return { ...audit };
+}
+
+export function controlSurfaceLayoutPublishAuditDto(audit: ControlSurfaceLayoutPublishAudit) {
   return { ...audit };
 }

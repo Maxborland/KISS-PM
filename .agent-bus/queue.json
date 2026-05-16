@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T04:06:15.7116415+07:00",
+  "updated_at": "2026-05-17T04:26:38.6563821+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -4495,6 +4495,136 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
         "git diff --check exit 0"
       ]
+    },
+    {
+      "id": "P10-006-saved-views-control-surface-layout-builder-mvp",
+      "aliases": [
+        "P10-006"
+      ],
+      "title": "Implement saved views and control-surface layout builder MVP",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-005-kpi-threshold-builder-future-evaluation-impact"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "packages/control-surfaces/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-006-saved-views-control-surface-layout-builder-mvp.claim.json",
+        ".agent-bus/sessions/P10-006-saved-views-control-surface-layout-builder-mvp.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-006-saved-views-control-surface-layout-builder-mvp --once",
+        "npm test -- packages/tenant-config packages/control-surfaces apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T04:26:38.6563821+07:00. Implemented saved-view/control-surface layout preview and publish domain helpers, governed Phase 10 saved-view layout API routes, active control-surface read-model projection through published layout definitions, previous-version readback, configuration audit/action evidence, and SavedViewLayoutBuilderSurface UI. Matrix P10-006 remains blocked only for later P10-009 E2E-093 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T04:26:38.6563821+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-006-saved-views-control-surface-layout-builder-mvp --once exit 0 at startup",
+        "npm test -- packages/control-surfaces/src/controlSurfaceLayoutBuilder.test.ts exit 1 RED: layout preview/publish helpers were missing before implementation",
+        "npm test -- apps/api/src/phase10SavedViewsApi.test.ts exit 1 RED: saved-view layout API routes were missing before implementation",
+        "npm test -- apps/web/src/SavedViewLayoutBuilderSurface.test.tsx exit 1 RED: SavedViewLayoutBuilderSurface and API client were missing before implementation",
+        "npm test -- packages/control-surfaces/src/controlSurfaceLayoutBuilder.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10SavedViewsApi.test.ts exit 0: 1 file, 3 tests passed after review fix for preview target binding",
+        "npm test -- apps/web/src/SavedViewLayoutBuilderSurface.test.tsx exit 0: 1 file, 3 tests passed after review fix for API error parsing",
+        "npm test -- packages/control-surfaces apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/api/src/phase10CustomFieldsApi.test.ts apps/api/src/phase10KpiThresholdsApi.test.ts apps/api/src/phase10SavedViewsApi.test.ts exit 0: 9 files, 33 tests passed",
+        "npm test -- apps/web/src exit 0: 16 files, 108 tests passed",
+        "npm run test:integration exit 0: 17 files, 88 tests passed",
+        "npm test exit 0: 86 files, 506 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json exit 1 expected: P10 rows remain blocked until E2E-090..095 and phase exit evidence exist",
+        "node scripts/agent-bus-guard.mjs --task P10-006-saved-views-control-surface-layout-builder-mvp --once exit 0 before completion updates",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P10-007-action-enable-disable-form-configuration",
+      "aliases": [
+        "P10-007"
+      ],
+      "title": "Implement action enable/disable and action-form configuration",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-006-saved-views-control-surface-layout-builder-mvp"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "packages/action-engine/**",
+        "packages/control-surfaces/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-007-action-enable-disable-form-configuration.claim.json",
+        ".agent-bus/sessions/P10-007-action-enable-disable-form-configuration.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-007-action-enable-disable-form-configuration --once",
+        "npm test -- packages/tenant-config packages/action-engine packages/control-surfaces apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Runnable after P10-006. Implement action enable/disable and safe action-form configuration for E2E-093/E2E-094/E2E-095 readiness. Strict phase verification remains blocked until P10-009 executable E2E-090..095 evidence exists."
     }
   ]
 }

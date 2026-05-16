@@ -76,6 +76,8 @@ export type ControlSurfaceSavedView = {
   ownerType: "tenant" | "user";
   filterKeys: readonly string[];
   sortKeys: readonly string[];
+  groupKeys?: readonly string[];
+  scope?: "tenant" | "role" | "user";
 };
 
 export type ControlSurfacePermissionRequirements = {
@@ -187,6 +189,7 @@ export type ControlSurfaceReadModel = {
   };
   fields: readonly ControlSurfaceFieldDefinition[];
   widgets: readonly ControlSurfaceReadWidget[];
+  savedViews: readonly ControlSurfaceSavedView[];
   rows: readonly ControlSurfaceReadRow[];
   pagination: { offset: number; limit: number; total: number };
 };
@@ -198,6 +201,69 @@ export type ControlSurfaceReadModelInput = {
   page: { offset: number; limit: number };
   isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
+};
+
+export type ControlSurfaceLayoutDraft = {
+  viewLabel: string;
+  visibleFieldKeys: readonly string[];
+  filterKeys: readonly string[];
+  sortKeys: readonly string[];
+  groupKeys: readonly string[];
+  widgetKeys: readonly string[];
+  actionSlotKeys: readonly string[];
+  savedView: ControlSurfaceSavedView;
+};
+
+export type ControlSurfaceLayoutPublishPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: string;
+  surfaceDefinitionId: string;
+  surfaceKey: string;
+  mutatesState: false;
+  before: {
+    surfaceVersion: number;
+    viewVersion: number;
+    visibleFieldKeys: string[];
+    widgetKeys: string[];
+    actionSlotKeys: string[];
+    savedViewKeys: string[];
+  };
+  after: {
+    surfaceVersion: number;
+    viewVersion: number;
+    visibleFieldKeys: string[];
+    widgetKeys: string[];
+    actionSlotKeys: string[];
+    savedViewKeys: string[];
+  };
+  layoutDefinition: ControlSurfaceDefinition;
+  unavailable: {
+    fields: string[];
+    widgets: string[];
+    actionSlots: string[];
+    reasons: string[];
+  };
+  affectedRuntimeSurfaces: string[];
+  createdAt: string;
+};
+
+export type ControlSurfaceLayoutPublishAudit = {
+  tenantId: TenantId;
+  actorId: string;
+  auditEventId: string;
+  commandType: "control_surface_layout.publish";
+  surfaceDefinitionId: string;
+  beforeSurfaceVersion: number;
+  afterSurfaceVersion: number;
+  savedViewKey: string;
+  publishedAt: string;
+};
+
+export type ControlSurfaceLayoutPublishResult = {
+  previousDefinition: ControlSurfaceDefinition;
+  definition: ControlSurfaceDefinition;
+  audit: ControlSurfaceLayoutPublishAudit;
 };
 
 export type ControlSurfaceCustomProjectFieldDefinition = TenantOwned & {
@@ -270,6 +336,7 @@ const statuses = new Set<ControlSurfaceStatus>(["draft", "active", "archived"]);
 const readModelSeverities = new Set<ControlSurfaceSeverity>(["none", "attention", "warning", "critical"]);
 const severities = new Set<Exclude<ControlSurfaceSeverity, "none">>(["attention", "warning", "critical"]);
 const savedViewOwnerTypes = new Set<ControlSurfaceSavedView["ownerType"]>(["tenant", "user"]);
+const savedViewScopes = new Set<NonNullable<ControlSurfaceSavedView["scope"]>>(["tenant", "role", "user"]);
 
 function requireAllowed<T extends string>(value: T | undefined, allowed: ReadonlySet<T>, fieldName: string): T {
   if (typeof value !== "string" || !allowed.has(value)) {
@@ -457,7 +524,9 @@ function createSavedView(input: ControlSurfaceSavedView): ControlSurfaceSavedVie
     label: requireNonEmptyString(input.label, "savedView.label"),
     ownerType: requireAllowed(input.ownerType, savedViewOwnerTypes, "savedView.ownerType"),
     filterKeys: [...requireArray(input.filterKeys, "savedView.filterKeys")],
-    sortKeys: [...requireArray(input.sortKeys, "savedView.sortKeys")]
+    sortKeys: [...requireArray(input.sortKeys, "savedView.sortKeys")],
+    ...(input.groupKeys !== undefined ? { groupKeys: [...requireArray(input.groupKeys, "savedView.groupKeys")] } : {}),
+    ...(input.scope !== undefined ? { scope: requireAllowed(input.scope, savedViewScopes, "savedView.scope") } : {})
   };
 }
 
@@ -501,6 +570,7 @@ export function createControlSurfaceView(input: ControlSurfaceView): ControlSurf
   for (const savedView of savedViews) {
     assertKnownFieldKeys(fieldKeys, savedView.filterKeys, "savedView.filterKeys");
     assertKnownFieldKeys(fieldKeys, savedView.sortKeys, "savedView.sortKeys");
+    assertKnownFieldKeys(fieldKeys, savedView.groupKeys ?? [], "savedView.groupKeys");
   }
 
   return {
@@ -616,6 +686,241 @@ export function bindCustomProjectFieldsToControlSurfaceDefinition(
       fields: [...definition.view.fields, ...addedFields]
     }
   });
+}
+
+function stringList(values: readonly string[] | undefined, fieldName: string): string[] {
+  const list = requireArray(values, fieldName).map((value) => requireNonEmptyString(value, fieldName));
+  if (new Set(list).size !== list.length) {
+    throw new ControlSurfaceModelError("conflict", `invalid_layout: duplicate ${fieldName}`);
+  }
+  return list;
+}
+
+function invalidLayout(message: string): never {
+  throw new ControlSurfaceModelError("validation_error", `invalid_layout: ${message}`);
+}
+
+function requireKnownKeys(knownKeys: ReadonlySet<string>, keys: readonly string[], label: string): void {
+  for (const key of keys) {
+    if (!knownKeys.has(key)) invalidLayout(`${label} is unavailable: ${key}`);
+  }
+}
+
+function sameLayoutPreview(left: ControlSurfaceLayoutPublishPreview, right: ControlSurfaceLayoutPublishPreview): boolean {
+  return JSON.stringify(left.after) === JSON.stringify(right.after) && JSON.stringify(left.layoutDefinition) === JSON.stringify(right.layoutDefinition);
+}
+
+export function previewControlSurfaceLayoutPublish(
+  current: ControlSurfaceDefinition,
+  input: {
+    id: string;
+    actorId: string;
+    expectedSurfaceVersion: number;
+    draft: ControlSurfaceLayoutDraft;
+    affectedRuntimeSurfaces: string[];
+    createdAt: string;
+  }
+): ControlSurfaceLayoutPublishPreview {
+  const definition = createControlSurfaceDefinition(current);
+  const expectedSurfaceVersion = requirePositiveInteger(input.expectedSurfaceVersion, "layoutPublish.expectedSurfaceVersion");
+  if (expectedSurfaceVersion !== definition.version) {
+    throw new ControlSurfaceModelError("conflict", "control surface layout preview is stale");
+  }
+  const createdAt = requireValidTimestamp(input.createdAt, "layoutPublish.createdAt");
+  const visibleFieldKeys = stringList(input.draft.visibleFieldKeys, "layout.visibleFieldKeys");
+  const filterKeys = stringList(input.draft.filterKeys, "layout.filterKeys");
+  const sortKeys = stringList(input.draft.sortKeys, "layout.sortKeys");
+  const groupKeys = stringList(input.draft.groupKeys, "layout.groupKeys");
+  const widgetKeys = stringList(input.draft.widgetKeys, "layout.widgetKeys");
+  const actionSlotKeys = stringList(input.draft.actionSlotKeys, "layout.actionSlotKeys");
+  if (visibleFieldKeys.length === 0) invalidLayout("at least one field must stay visible");
+
+  const fieldByKey = new Map(definition.view.fields.map((field) => [field.key, field]));
+  const widgetByKey = new Map(definition.view.widgets.map((widget) => [widget.key, widget]));
+  const actionByKey = new Map(definition.view.actionSlots.map((slot) => [slot.key, slot]));
+  const knownFieldKeys = new Set(fieldByKey.keys());
+  const visibleFieldKeySet = new Set(visibleFieldKeys);
+  requireKnownKeys(knownFieldKeys, visibleFieldKeys, "field");
+  requireKnownKeys(new Set(widgetByKey.keys()), widgetKeys, "widget");
+  requireKnownKeys(new Set(actionByKey.keys()), actionSlotKeys, "action");
+
+  for (const key of filterKeys) {
+    const field = fieldByKey.get(key);
+    if (field === undefined || !visibleFieldKeySet.has(key) || !field.filterable) {
+      invalidLayout(`filter field is unavailable: ${key}`);
+    }
+  }
+  for (const key of sortKeys) {
+    const field = fieldByKey.get(key);
+    if (field === undefined || !visibleFieldKeySet.has(key) || !field.sortable) {
+      invalidLayout(`sort field is unavailable: ${key}`);
+    }
+  }
+  for (const key of groupKeys) {
+    if (!visibleFieldKeySet.has(key)) invalidLayout(`group field is unavailable: ${key}`);
+  }
+  for (const key of widgetKeys) {
+    const widget = widgetByKey.get(key);
+    if (widget === undefined || !visibleFieldKeySet.has(widget.sourceFieldKey)) {
+      invalidLayout(`widget source field is unavailable: ${key}`);
+    }
+  }
+
+  const savedView = createSavedView({
+    ...input.draft.savedView,
+    filterKeys,
+    sortKeys,
+    groupKeys,
+    scope: input.draft.savedView.scope ?? input.draft.savedView.ownerType
+  });
+  for (const key of savedView.filterKeys) {
+    if (!filterKeys.includes(key)) invalidLayout(`saved view filter is not enabled in layout: ${key}`);
+  }
+  for (const key of savedView.sortKeys) {
+    if (!sortKeys.includes(key)) invalidLayout(`saved view sort is not enabled in layout: ${key}`);
+  }
+  for (const key of savedView.groupKeys ?? []) {
+    if (!groupKeys.includes(key)) invalidLayout(`saved view group is not enabled in layout: ${key}`);
+  }
+
+  const nextFields = definition.view.fields.map((field) => ({ ...field, visible: visibleFieldKeySet.has(field.key) }));
+  const nextWidgets = definition.view.widgets.filter((widget) => widgetKeys.includes(widget.key));
+  const nextActions = definition.view.actionSlots.filter((slot) => actionSlotKeys.includes(slot.key));
+  const nextSavedViews = [
+    ...definition.view.savedViews.filter((view) => view.key !== savedView.key),
+    savedView
+  ];
+  const layoutDefinition = createControlSurfaceDefinition({
+    ...definition,
+    version: definition.version + 1,
+    updatedAt: createdAt,
+    view: {
+      ...definition.view,
+      label: requireNonEmptyString(input.draft.viewLabel, "layout.viewLabel"),
+      version: definition.view.version + 1,
+      fields: nextFields,
+      widgets: nextWidgets,
+      actionSlots: nextActions,
+      savedViews: nextSavedViews
+    }
+  });
+  const affectedRuntimeSurfaces = stringList(input.affectedRuntimeSurfaces, "layout.affectedRuntimeSurfaces");
+  if (!affectedRuntimeSurfaces.includes(definition.key)) {
+    invalidLayout(`affected runtime surfaces must include ${definition.key}`);
+  }
+  const beforeVisibleFields = definition.view.fields.filter((field) => field.visible).map((field) => field.key);
+  const removedFields = beforeVisibleFields.filter((key) => !visibleFieldKeySet.has(key));
+  const removedWidgets = definition.view.widgets.map((widget) => widget.key).filter((key) => !widgetKeys.includes(key));
+  const removedActions = definition.view.actionSlots.map((slot) => slot.key).filter((key) => !actionSlotKeys.includes(key));
+  const reasons = [
+    ...removedFields.map((key) => `field ${key} will be hidden by the published layout`),
+    ...removedWidgets.map((key) => `widget ${key} will be hidden by the published layout`),
+    ...removedActions.map((key) => `action ${key} will be hidden by the published layout`)
+  ];
+
+  return {
+    id: requireNonEmptyString(input.id, "layoutPublish.id"),
+    tenantId: definition.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "layoutPublish.actorId"),
+    surfaceDefinitionId: definition.id,
+    surfaceKey: definition.key,
+    mutatesState: false,
+    before: {
+      surfaceVersion: definition.version,
+      viewVersion: definition.view.version,
+      visibleFieldKeys: beforeVisibleFields,
+      widgetKeys: definition.view.widgets.map((widget) => widget.key),
+      actionSlotKeys: definition.view.actionSlots.map((slot) => slot.key),
+      savedViewKeys: definition.view.savedViews.map((view) => view.key)
+    },
+    after: {
+      surfaceVersion: layoutDefinition.version,
+      viewVersion: layoutDefinition.view.version,
+      visibleFieldKeys,
+      widgetKeys,
+      actionSlotKeys,
+      savedViewKeys: layoutDefinition.view.savedViews.map((view) => view.key)
+    },
+    layoutDefinition,
+    unavailable: {
+      fields: removedFields,
+      widgets: removedWidgets,
+      actionSlots: removedActions,
+      reasons
+    },
+    affectedRuntimeSurfaces,
+    createdAt
+  };
+}
+
+export function publishControlSurfaceLayoutPreview(
+  current: ControlSurfaceDefinition,
+  input: {
+    preview: ControlSurfaceLayoutPublishPreview;
+    expectedSurfaceVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): ControlSurfaceLayoutPublishResult {
+  const definition = createControlSurfaceDefinition(current);
+  const expectedSurfaceVersion = requirePositiveInteger(input.expectedSurfaceVersion, "layoutPublish.expectedSurfaceVersion");
+  if (
+    expectedSurfaceVersion !== definition.version ||
+    input.preview.tenantId !== definition.tenantId ||
+    input.preview.surfaceDefinitionId !== definition.id ||
+    input.preview.before.surfaceVersion !== definition.version
+  ) {
+    throw new ControlSurfaceModelError("conflict", "control surface layout preview is stale");
+  }
+  const recomputedPreview = previewControlSurfaceLayoutPublish(definition, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    expectedSurfaceVersion: definition.version,
+    draft: {
+      viewLabel: input.preview.layoutDefinition.view.label,
+      visibleFieldKeys: input.preview.after.visibleFieldKeys,
+      filterKeys: input.preview.layoutDefinition.view.savedViews.at(-1)?.filterKeys ?? [],
+      sortKeys: input.preview.layoutDefinition.view.savedViews.at(-1)?.sortKeys ?? [],
+      groupKeys: input.preview.layoutDefinition.view.savedViews.at(-1)?.groupKeys ?? [],
+      widgetKeys: input.preview.after.widgetKeys,
+      actionSlotKeys: input.preview.after.actionSlotKeys,
+      savedView: input.preview.layoutDefinition.view.savedViews.at(-1) ?? {
+        id: "missing",
+        key: "missing",
+        label: "Missing",
+        ownerType: "tenant",
+        filterKeys: [],
+        sortKeys: []
+      }
+    },
+    affectedRuntimeSurfaces: input.preview.affectedRuntimeSurfaces,
+    createdAt: input.preview.createdAt
+  });
+  if (!sameLayoutPreview(input.preview, recomputedPreview)) {
+    throw new ControlSurfaceModelError("conflict", "control surface layout preview is stale");
+  }
+  const publishedAt = requireValidTimestamp(input.publishedAt, "layoutPublish.publishedAt");
+  const publishedDefinition = createControlSurfaceDefinition({
+    ...recomputedPreview.layoutDefinition,
+    updatedAt: publishedAt
+  });
+  const savedView = publishedDefinition.view.savedViews.at(-1);
+
+  return {
+    previousDefinition: definition,
+    definition: publishedDefinition,
+    audit: {
+      tenantId: definition.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireNonEmptyString(input.auditEventId, "layoutPublish.auditEventId"),
+      commandType: "control_surface_layout.publish",
+      surfaceDefinitionId: definition.id,
+      beforeSurfaceVersion: definition.version,
+      afterSurfaceVersion: publishedDefinition.version,
+      savedViewKey: savedView?.key ?? "",
+      publishedAt
+    }
+  };
 }
 
 export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInput): ControlSurfaceReadModel {
@@ -736,6 +1041,7 @@ export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInpu
     },
     fields: visibleFields,
     widgets,
+    savedViews: definition.view.savedViews,
     rows,
     pagination: { offset, limit, total: input.records.length }
   };

@@ -21,6 +21,7 @@ import { createPhase9RuntimeState } from "./phase9Runtime";
 import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import {
   buildRuntimeLabelProjection,
+  controlSurfaceLayoutPublishAuditDto,
   createPhase10RuntimeState,
   customFieldPublishAuditDto,
   kpiThresholdPublishAuditDto,
@@ -504,6 +505,41 @@ const kpiThresholdPreviewSchema = z
   .strict();
 
 const kpiThresholdPublishSchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const savedViewSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    key: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+    ownerType: z.enum(["tenant", "user"]),
+    filterKeys: z.array(z.string().trim().min(1)),
+    sortKeys: z.array(z.string().trim().min(1)),
+    groupKeys: z.array(z.string().trim().min(1)).optional(),
+    scope: z.enum(["tenant", "role", "user"]).optional()
+  })
+  .strict();
+
+const savedViewLayoutPreviewSchema = z
+  .object({
+    surfaceId: z.string().trim().min(1),
+    expectedSurfaceVersion: z.number().int().positive(),
+    viewLabel: z.string().trim().min(1),
+    visibleFieldKeys: z.array(z.string().trim().min(1)).min(1),
+    filterKeys: z.array(z.string().trim().min(1)),
+    sortKeys: z.array(z.string().trim().min(1)),
+    groupKeys: z.array(z.string().trim().min(1)),
+    widgetKeys: z.array(z.string().trim().min(1)),
+    actionSlotKeys: z.array(z.string().trim().min(1)),
+    savedView: savedViewSchema,
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const savedViewLayoutPublishSchema = z
   .object({
     previewId: z.string().trim().min(1)
   })
@@ -1291,6 +1327,154 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/tenant/saved-views", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      const surfaceId = context.req.query("surfaceId") ?? "portfolio-control";
+      const baseSurface = phase8Runtime.getSurface(session.user.tenantId, surfaceId);
+      if (baseSurface === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const activeSurface = phase10Runtime.getPublishedControlSurfaceLayout(session.user.tenantId, surfaceId) ?? baseSurface;
+
+      return context.json({
+        activeSurface,
+        previousVersions: phase10Runtime
+          .listPreviousControlSurfaceLayouts(session.user.tenantId, activeSurface.id)
+          .map((definition) => ({
+            id: definition.id,
+            version: definition.version,
+            viewLabel: definition.view.label,
+            updatedAt: definition.updatedAt
+          }))
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/saved-views/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "control_surface.config.write", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+
+      const body = savedViewLayoutPreviewSchema.parse(await parseJson(context));
+      const surface =
+        phase10Runtime.getPublishedControlSurfaceLayout(session.user.tenantId, body.surfaceId) ??
+        phase8Runtime.getSurface(session.user.tenantId, body.surfaceId);
+      if (surface === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const preview = phase10Runtime.previewControlSurfaceLayout({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        definition: surface,
+        expectedSurfaceVersion: body.expectedSurfaceVersion,
+        draft: {
+          viewLabel: body.viewLabel,
+          visibleFieldKeys: body.visibleFieldKeys,
+          filterKeys: body.filterKeys,
+          sortKeys: body.sortKeys,
+          groupKeys: body.groupKeys,
+          widgetKeys: body.widgetKeys,
+          actionSlotKeys: body.actionSlotKeys,
+          savedView: body.savedView
+        },
+        affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/saved-views/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "control_surface.config.write", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+
+      const body = savedViewLayoutPublishSchema.parse(await parseJson(context));
+      const storedPreview = phase10Runtime.getControlSurfaceLayoutPreview(session.user.tenantId, body.previewId);
+      if (storedPreview === undefined) {
+        throw Object.assign(new Error("control surface layout preview is missing or stale"), {
+          code: "stale_preview" as const
+        });
+      }
+      const activePreview = phase10Runtime.getPublishedControlSurfaceLayout(
+        session.user.tenantId,
+        storedPreview.surfaceDefinitionId
+      );
+      const baseSurface = activePreview ?? phase8Runtime.getSurface(session.user.tenantId, storedPreview.surfaceDefinitionId);
+      if (baseSurface === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const auditEventId = `audit-layout-${session.user.tenantId}-${baseSurface.version + 1}`;
+      const result = phase10Runtime.publishControlSurfaceLayout({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        definition: baseSurface,
+        previewId: body.previewId,
+        auditEventId
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "controlSurface", entityId: result.definition.id },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { surfaceVersion: result.audit.beforeSurfaceVersion },
+          after: { surfaceVersion: result.audit.afterSurfaceVersion, savedViewKey: result.audit.savedViewKey }
+        }
+      });
+
+      return context.json({
+        result: {
+          surface: result.definition,
+          audit: controlSurfaceLayoutPublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          activeSurface: phase10Runtime.getPublishedControlSurfaceLayout(session.user.tenantId, result.definition.id),
+          previousVersions: phase10Runtime
+            .listPreviousControlSurfaceLayouts(session.user.tenantId, result.definition.id)
+            .map((definition) => ({
+              id: definition.id,
+              version: definition.version,
+              viewLabel: definition.view.label,
+              updatedAt: definition.updatedAt
+            }))
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -1306,7 +1490,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           ...phase10Runtime.listProcessTemplateActionExecutions(session.user.tenantId),
           ...phase10Runtime.listCustomFieldActionExecutions(session.user.tenantId),
           ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId),
-          ...phase10Runtime.listKpiThresholdActionExecutions(session.user.tenantId)
+          ...phase10Runtime.listKpiThresholdActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listLayoutActionExecutions(session.user.tenantId)
         ].map(actionExecutionDto)
       });
     } catch (error) {
@@ -2765,6 +2950,10 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         actorPermissionKeys: session.profile.permissions,
         phase6Runtime,
         phase7Runtime,
+        layoutDefinition: phase10Runtime.getPublishedControlSurfaceLayout(
+          session.user.tenantId,
+          context.req.param("surfaceId")
+        ),
         customFields: phase10Runtime.getCustomFieldRegistry(session.user.tenantId).definitions,
         projects: phase4Runtime.listProjects(session.user.tenantId),
         page: {
@@ -4320,6 +4509,7 @@ function handleRouteError(context: Context, error: unknown) {
     error instanceof Error &&
     (error.name === "CrmCoreModelError" ||
       error.name === "ProjectCoreModelError" ||
+      error.name === "ControlSurfaceModelError" ||
       error.name === "RetrospectiveModelError" ||
       error.name === "ResourcePlanningModelError" ||
       error.name === "SchedulingEngineModelError") &&
