@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T00:33:05.9566428+07:00",
+  "updated_at": "2026-05-17T00:43:38.8195149+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3608,7 +3608,7 @@
         "P9-004"
       ],
       "title": "Implement plan/fact metrics and retrospective trend engine",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3651,7 +3651,73 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Implement deterministic PlanFactMetric and RetrospectiveTrend calculations from ClosedProjectSnapshot source data only. Do not edit API/UI/E2E in this block unless needed for a domain blocker."
+      "notes": "Accepted 2026-05-17T00:43:38.8195149+07:00. Implemented deterministic PlanFactMetric and RetrospectiveTrend domain calculations from immutable ClosedProjectSnapshot source data only. Trend grouping supports project_type, template, client, and period, is tenant-scoped, traces source snapshot/metric ids, validates runtime groupBy/closedAt inputs, and returns cloned stable read models. P9-004 remains blocked in the requirements matrix only for later API/UI/E2E-082/E2E-083 reload/readback/cleanup evidence.",
+      "completed_at": "2026-05-17T00:43:38.8195149+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-004-retrospective-plan-fact-trend-engine --once exit 0 at startup",
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 1 RED: calculatePlanFactMetrics/buildRetrospectiveTrends were missing before implementation",
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 1 RED during review: invalid closedAt/groupBy were not rejected before returning trend data",
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 0: 1 file, 4 tests passed",
+        "npm test -- packages/retrospectives exit 0: 2 files, 8 tests passed",
+        "npm run test:integration exit 0: 12 files, 68 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 65 files, 418 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P9-005-retrospective-insight-model",
+      "aliases": [
+        "P9-005"
+      ],
+      "title": "Implement lessons learned and retrospective insight model",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-004-retrospective-plan-fact-trend-engine"
+      ],
+      "write_scope": [
+        "packages/retrospectives/**",
+        "packages/action-engine/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-005-retrospective-insight-model.claim.json",
+        ".agent-bus/sessions/P9-005-retrospective-insight-model.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "apps/api/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-005-retrospective-insight-model --once",
+        "npm test -- packages/retrospectives packages/action-engine",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Implement RetrospectiveInsight source snapshot/trend trace and governed handled-state domain model. Do not implement API/UI/E2E or full template-improvement apply flow in this block unless required by a domain blocker."
     }
   ]
 }

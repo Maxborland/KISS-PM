@@ -133,11 +133,25 @@
         "E2E-082",
         "E2E-083"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Trend calculation reset/readback and snapshot-source proof must be added before verification.",
-      "blocker": "P9 trend engine is not implemented yet; snapshot-based closed portfolio metrics are unavailable.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "packages/retrospectives/src/index.ts implements PlanFactMetric, RetrospectiveTrend, calculatePlanFactMetrics, and buildRetrospectiveTrends.",
+        "Plan/fact metrics are calculated from ClosedProjectSnapshot source data only for work hours, schedule days, overload count, and KPI drift, with deterministic ids, variance values, variance percentages where meaningful, severity, and sourceSnapshotIds.",
+        "Trend calculations group tenant-scoped snapshot metrics by project_type, template, client, or period and return deterministic sourceSnapshotIds/sourceMetricIds without using live project state.",
+        "Review fixes added runtime validation for invalid period source timestamps and invalid groupBy values so future API callers receive typed domain errors instead of malformed trend ids/group keys."
+      ],
+      "tests": [
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 1 RED: calculatePlanFactMetrics/buildRetrospectiveTrends were missing before implementation",
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 1 RED during review: invalid closedAt/groupBy were not rejected before returning trend data",
+        "npm test -- packages/retrospectives/src/retrospectiveTrends.test.ts exit 0: 1 file, 4 tests passed",
+        "npm test -- packages/retrospectives exit 0: 2 files, 8 tests passed",
+        "npm run test:integration exit 0: 12 files, 68 tests passed",
+        "npm test exit 0: 65 files, 418 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "P9-004 is pure deterministic domain logic with no runtime persistence. Tests prove trend read models are cloned/stable after input snapshots are mutated later; full browser/API reset cleanup remains blocked until P9-009 E2E-082/E2E-083.",
+      "blocker": "P9 trend engine domain foundation is implemented, but P9-004 cannot be verified until closed portfolio/trends API/UI and executable E2E-082/E2E-083 prove readback, reload persistence, template-improvement source trace, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T00:43:38.8195149+07:00",
       "e2e_evidence": []
     },
     {
