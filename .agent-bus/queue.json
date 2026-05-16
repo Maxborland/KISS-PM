@@ -1,0 +1,1322 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-16T09:19:44+07:00",
+  "policy": {
+    "max_parallel_code_agents": 2,
+    "max_parallel_docs_agents": 2,
+    "default_stale_claim_hours": 4,
+    "integration_branch": "master",
+    "preferred_worktree_root": "../kiss-pm-worktrees",
+    "shared_bus_env": "AGENT_BUS_ROOT"
+  },
+  "tasks": [
+    {
+      "id": "P4-001-process-stage-templates",
+      "title": "Process and stage templates",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [],
+      "write_scope": [
+        "packages/project-core/**",
+        "packages/tenant-config/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/scheduling-engine/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/processTemplate.test.ts packages/tenant-config/src/processTemplateRegistry.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed in b95eb62 and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "agent-bus-autonomous-parallelism",
+      "title": "Make agent-bus usable for autonomous parallel work",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "write_scope": [
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "scripts/agent-bus-status.mjs"
+      ],
+      "forbidden": [
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "apps/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "AGENTS.md",
+        ".gitignore",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-status.mjs",
+        "node scripts/agent-bus-status.mjs --check",
+        "node scripts/agent-bus-status.mjs --check --task <TASK_ID>",
+        "node scripts/agent-bus-guard.mjs --task <TASK_ID> --once",
+        "node --test scripts/agent-bus-guard.test.mjs",
+        "node scripts/agent-bus-orchestration-check.mjs --ledger <RUN_LEDGER>",
+        "node scripts/agent-bus-orchestration-check.mjs --ledger <RUN_LEDGER> --acceptance",
+        "node --test scripts/agent-bus-orchestration-check.test.mjs",
+        "npm test -- scripts/agent-bus-status.test.ts",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8')); JSON.parse(require('fs').readFileSync('.agent-bus/ownership.json','utf8'));\"",
+        "npm run lint"
+      ],
+      "notes": "Coordination-only task completed with queue, ownership, runbooks, and status helper. Do not edit Phase 4 product code."
+    },
+    {
+      "id": "P4-002-project-lifecycle-state-machine",
+      "title": "Project lifecycle state machine",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-001-process-stage-templates"
+      ],
+      "write_scope": [
+        "packages/project-core/src/index.ts",
+        "packages/project-core/src/*lifecycle*.test.ts",
+        "packages/workflow-engine/src/index.ts",
+        "packages/workflow-engine/src/*lifecycle*.test.ts",
+        "packages/workflow-engine/package.json",
+        "package-lock.json",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "apps/api/**",
+        "package-lock.json",
+        "packages/scheduling-engine/**",
+        "docs/phases/PHASE_5_*"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json",
+        "package-lock.json",
+        "packages/workflow-engine/package.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/projectLifecycle.test.ts packages/workflow-engine/src/projectLifecycleWorkflow.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-003-stage-gates-artifacts-approvals",
+      "title": "Stage gates, artifacts, and approval basics",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-002-project-lifecycle-state-machine"
+      ],
+      "write_scope": [
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "packages/scheduling-engine/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/*gate*.test.ts packages/workflow-engine/src/*gate*.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-004-canonical-task-model",
+      "title": "Canonical task model and task templates",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-002-project-lifecycle-state-machine"
+      ],
+      "write_scope": [
+        "packages/project-core/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "packages/scheduling-engine/**",
+        "apps/web/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/*task*.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-005-task-participants-assignment-roles",
+      "title": "Task participants and assignment roles",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-004-canonical-task-model"
+      ],
+      "write_scope": [
+        "packages/project-core/**",
+        "packages/access-control/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "packages/scheduling-engine/**",
+        "apps/web/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/*participant*.test.ts packages/access-control/src/*.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-006-task-comments-status-history",
+      "title": "Task comments and status history",
+      "status": "done",
+      "priority": "medium",
+      "phase": "P4",
+      "depends_on": [
+        "P4-004-canonical-task-model"
+      ],
+      "write_scope": [
+        "packages/project-core/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "packages/scheduling-engine/**",
+        "apps/web/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/project-core/src/*comment*.test.ts packages/project-core/src/*status*.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-007-project-lifecycle-work-api",
+      "title": "Project lifecycle and work API endpoints",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-002-project-lifecycle-state-machine",
+        "P4-003-stage-gates-artifacts-approvals",
+        "P4-004-canonical-task-model",
+        "P4-005-task-participants-assignment-roles",
+        "P4-006-task-comments-status-history"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "packages/scheduling-engine/**"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json"
+      ],
+      "recommended_verification": [
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "notes": "Committed and marked verified in the Phase 4 requirements matrix."
+    },
+    {
+      "id": "P4-008-ui-surfaces",
+      "title": "Project lifecycle, My Tasks, and Kanban UI surfaces",
+      "status": "done",
+      "priority": "medium",
+      "phase": "P4",
+      "depends_on": [
+        "P4-007-project-lifecycle-work-api"
+      ],
+      "write_scope": [
+        "apps/web/**"
+      ],
+      "forbidden": [
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "docs/status/**"
+      ],
+      "required_locks": [],
+      "recommended_verification": [
+        "npm test -- apps/web/src",
+        "npm run lint"
+      ],
+      "notes": "Implemented in commit f518c25; matrix row remains blocked only until P4-009/P4-010 provide structured E2E evidence."
+    },
+    {
+      "id": "P4-009-fixtures-e2e-suite",
+      "title": "Deterministic Phase 4 fixtures and E2E suite",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-008-ui-surfaces"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase4/**",
+        "scripts/verify-requirements-matrix.test.ts",
+        "docs/status/phase4-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/**",
+        ".agent-bus/claims/**",
+        ".agent-bus/locks/**",
+        ".agent-bus/sessions/**",
+        "test-results/**"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/scheduling-engine/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/phase4-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/shared-test-fixtures/src/phase4Fixtures.test.ts",
+        "npm run test:e2e:phase -- --phase=4",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase4-requirements-matrix.json"
+      ],
+      "notes": "Completed in isolated worktree C:\\tmp\\kiss-pm-worktrees\\p4-009-e2e; P4-009 matrix row verified with E2E-030..034 evidence and no remaining Critical/Important review findings."
+    },
+    {
+      "id": "P4-010-phase4-verification-matrix",
+      "title": "Phase 4 verification matrix and phase exit evidence",
+      "status": "done",
+      "priority": "high",
+      "phase": "P4",
+      "depends_on": [
+        "P4-009-fixtures-e2e-suite"
+      ],
+      "write_scope": [
+        "docs/status/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/scheduling-engine/**"
+      ],
+      "required_locks": [
+        "docs/status/*"
+      ],
+      "recommended_verification": [
+        "npm run test:e2e:phase -- --phase=4",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json",
+        "npm test -- scripts/verify-requirements-matrix.test.ts"
+      ],
+      "notes": "Completed in isolated worktree C:\\tmp\\kiss-pm-worktrees\\p4-009-e2e; strict npm run verify:matrix -- docs/status/phase4-requirements-matrix.json passes without --allow-blocked."
+    },
+    {
+      "id": "P5-000-gantt-phase-brief-draft",
+      "title": "Finalize Phase 5 scheduling and Gantt contract",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P4-010-phase4-verification-matrix"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/**",
+        ".agent-bus/claims/**",
+        ".agent-bus/locks/**",
+        ".agent-bus/sessions/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/scheduling-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/*",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts"
+      ],
+      "recommended_verification": [
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Completed in isolated worktree C:\\tmp\\kiss-pm-worktrees\\p4-009-e2e on branch codex/p5-contract; commit 42b31b9. Phase 5 contract, tracking matrix, and verifier P5 support are committed."
+    },
+    {
+      "id": "P5-001",
+      "title": "Scheduling package model and primitives",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-000-gantt-phase-brief-draft"
+      ],
+      "write_scope": [
+        "packages/scheduling-engine/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/**",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/ms-project-ref/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/*",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/orchestration/runs/*",
+        ".agent-bus/claims/P5-001.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/scheduling-engine",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-001 --once",
+        "node scripts/agent-bus-orchestration-check.mjs --ledger .agent-bus/orchestration/runs/2026-05-15-p5-001-scheduling-primitives.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Accepted by Agent A in .agent-bus/orchestration/runs/2026-05-15-p5-001-scheduling-primitives.json. Domain/unit implementation is complete with npm test -- packages/scheduling-engine, typecheck, lint, guard, and orchestration acceptance evidence. Phase matrix row remains blocked until later P5 E2E-040..044 evidence exists."
+    },
+    {
+      "id": "P5-002",
+      "title": "WBS/tree projection over canonical project tasks",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-001"
+      ],
+      "write_scope": [
+        "packages/scheduling-engine/**",
+        "packages/project-core/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/orchestration/runs/*",
+        ".agent-bus/claims/P5-002.claim.json",
+        "docs/status/*",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/scheduling-engine packages/project-core",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-002 --once",
+        "node scripts/agent-bus-orchestration-check.mjs --ledger .agent-bus/orchestration/runs/2026-05-15-p5-002-wbs-projection.json",
+        "git diff --check -- packages/scheduling-engine packages/project-core docs/status/phase5-requirements-matrix.json .agent-bus/orchestration/runs/2026-05-15-p5-002-wbs-projection.json"
+      ],
+      "notes": "Accepted by Agent A in .agent-bus/orchestration/runs/2026-05-15-p5-002-wbs-projection.json. Fresh Lead verification passed: npm test -- packages/scheduling-engine packages/project-core, typecheck, lint, verify:matrix --allow-blocked, guard, orchestration acceptance, and diff check. Phase matrix row remains blocked until E2E-040 and E2E-041 evidence exists."
+    },
+    {
+      "id": "P5-DOC-001",
+      "title": "Clarify scheduling and customization benchmarks",
+      "status": "done",
+      "priority": "medium",
+      "phase": "P5",
+      "depends_on": [
+        "P5-000-gantt-phase-brief-draft"
+      ],
+      "write_scope": [
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/ms-project-ref/**",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        "AGENTS.md",
+        ".gitignore",
+        ".agent-bus/**",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/queue.json"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P5-DOC-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"MS Project desktop|BR2|Plancy|customization benchmark|benchmark hierarchy\" docs/01_PRD.md docs/04_MASTER_PHASE_PLAN.md docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "git diff --check -- docs/01_PRD.md docs/04_MASTER_PHASE_PLAN.md docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md .agent-bus/state/CURRENT.md .agent-bus/queue.json"
+      ],
+      "notes": "Docs-only alignment after competitor/reference research: MS Project desktop is the long-term scheduling benchmark, BR2 is the self-written Gantt implementation reference, and Plancy is the tenant customization/entity-modeling benchmark. Verified with agent-bus guard, JSON parse, rg benchmark readback, and git diff --check. Write scope tolerates pre-existing dirty P5 contract/coordination files in this checkout; actual P5-DOC-001 edits stayed in docs/01, docs/04, docs/phases, .agent-bus/state, .agent-bus/handoff, and .agent-bus/queue."
+    },
+    {
+      "id": "P5-003",
+      "title": "Planned dates, duration, work, and progress validation",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-002"
+      ],
+      "write_scope": [
+        "packages/scheduling-engine/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-003.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/scheduling-engine",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-003 --once",
+        "git diff --check -- packages/scheduling-engine docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-15. Local evidence: npm test -- packages/scheduling-engine, typecheck, lint, verify:matrix --allow-blocked, and guard exit 0. Matrix row remains blocked until E2E-042 phase evidence exists."
+    },
+    {
+      "id": "P5-004",
+      "title": "Basic Finish-to-Start dependency model",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-003"
+      ],
+      "write_scope": [
+        "packages/scheduling-engine/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-004.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/scheduling-engine",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-004 --once",
+        "git diff --check -- packages/scheduling-engine docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-16. Local evidence: npm test -- packages/scheduling-engine, typecheck, lint, verify:matrix --allow-blocked, guard, and git diff --check exit 0. Requested code review Medium finding about mixed-invalid validation hiding dependency structure was fixed. Matrix row remains blocked until E2E-043 evidence exists."
+    },
+    {
+      "id": "P5-005",
+      "title": "Baseline draft snapshots",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-004"
+      ],
+      "write_scope": [
+        "packages/scheduling-engine/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/roadmap/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-005.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/scheduling-engine",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-005 --once",
+        "git diff --check -- packages/scheduling-engine docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-16. Local evidence: RED then GREEN npm test -- packages/scheduling-engine, typecheck, lint, verify:matrix --allow-blocked, guard, and git diff --check exit 0. Bug Hunt and requested code review Critical/Important findings resolved. Matrix row remains blocked until E2E-044 baseline stability evidence exists."
+    },
+    {
+      "id": "P5-006",
+      "title": "Schedule and Gantt API endpoints",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-005"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "package-lock.json",
+        "packages/scheduling-engine/**",
+        "packages/project-core/**",
+        "packages/action-engine/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/product/",
+        "docs/product/**",
+        "docs/roadmap/**",
+        "docs/status/phase5-contract-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-006.claim.json"
+      ],
+      "recommended_verification": [
+        "npm run test:integration",
+        "npm test -- packages/scheduling-engine packages/project-core packages/action-engine",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-006 --once",
+        "git diff --check -- apps/api packages/scheduling-engine packages/project-core packages/action-engine docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-16. Local evidence: RED then GREEN npm run test:integration -- apps/api/src/phase5ScheduleApi.test.ts, typecheck, lint. Matrix row remains blocked until E2E-040..044 schedule/Gantt evidence exists."
+    },
+    {
+      "id": "P5-007",
+      "title": "Gantt UI MVP and entrypoint",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-006"
+      ],
+      "write_scope": [
+        "apps/web/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/roadmap/**",
+        "docs/status/phase5-contract-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/project-core/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-007.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-007 --once",
+        "git diff --check -- apps/web docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-16. Russian Gantt UI MVP and entrypoints are present; Bug Hunt and requested code review Critical/Important findings resolved. Matrix row remains blocked until E2E-040 evidence exists."
+    },
+    {
+      "id": "P5-008",
+      "title": "Gantt task creation and inline schedule edits",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-007"
+      ],
+      "write_scope": [
+        "apps/web/**",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        "AGENTS.md",
+        ".gitignore",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/roadmap/**",
+        "docs/status/phase5-contract-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/project-core/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-008.claim.json"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-008 --once",
+        "git diff --check -- apps/web docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Implemented by Block Lead on 2026-05-16. Gantt UI now creates canonical tasks through P5-006 API commands, edits planned start/finish/work/progress inline through API, creates Finish-to-Start dependencies through API, captures baseline draft, reloads from API readback, and shows denied/validation states in Russian. Matrix row remains blocked until E2E-041..044 evidence exists. Browser smoke passed against local Vite+API; exact same-task My Tasks/Kanban propagation is deferred to P5-009 E2E because current web surfaces use independent phase4/phase5 clients without shared query invalidation."
+    },
+    {
+      "id": "P5-009",
+      "title": "Deterministic Phase 5 fixtures and E2E suite",
+      "status": "done",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-008"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/status/phase5-requirements-matrix.json",
+        ".agent-bus/**",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/product/",
+        "docs/product/**",
+        "docs/roadmap/**",
+        "docs/status/phase5-contract-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/**",
+        "packages/project-core/**",
+        "packages/action-engine/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-009.claim.json"
+      ],
+      "recommended_verification": [
+        "npm run test:e2e:phase -- --phase=5",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "npm run verify:matrix -- --allow-blocked docs/status/phase5-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task P5-009 --once",
+        "git diff --check -- packages/shared-test-fixtures e2e docs/e2e/E2E_SCENARIOS.md docs/status/phase5-requirements-matrix.json .agent-bus"
+      ],
+    "notes": "Completed by Block Lead on 2026-05-16. Deterministic Phase 5 fixture contract and E2E-040..044 suite are implemented; npm run test:e2e:phase -- --phase=5 passed with 5 tests after review fixes. Matrix rows P5-001..P5-009 carry structured E2E evidence; P5-010 remains final phase-exit verification."
+    },
+    {
+      "id": "P5-010",
+      "title": "Phase 5 verification matrix and exit gate",
+      "status": "runnable",
+      "priority": "high",
+      "phase": "P5",
+      "depends_on": [
+        "P5-009"
+      ],
+      "write_scope": [
+        "docs/status/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/**",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        ".agent-bus/claims/P5-010.claim.json"
+      ],
+      "recommended_verification": [
+        "npm run verify:matrix -- docs/status/phase5-contract-matrix.json",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase=5",
+        "npm run typecheck -- --pretty false",
+        "npm run lint",
+        "node scripts/agent-bus-guard.mjs --task P5-010 --once",
+        "git diff --check -- docs/status scripts docs/e2e .agent-bus"
+      ],
+      "notes": "Unblocked by P5-009 E2E evidence. Run final strict Phase 5 matrix/exit verification without weakening verifier rules."
+    },
+    {
+      "id": "DOC-TENANT-CUSTOMIZATION-001",
+      "title": "Strengthen tenant customization documentation contract",
+      "status": "done",
+      "priority": "medium",
+      "phase": "docs",
+      "depends_on": [],
+      "write_scope": [
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        ".agent-bus/claims/DOC-TENANT-CUSTOMIZATION-001.claim.json",
+        ".agent-bus/sessions/DOC-TENANT-CUSTOMIZATION-001.md",
+        ".agent-bus/locks/queue-json.lock/**",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-TENANT-CUSTOMIZATION-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"Department|Position|AbsenceType|EmployeeProfile|configuration lifecycle|Plancy\" docs/domain/TENANT_CUSTOMIZATION_SPEC.md docs/04_MASTER_PHASE_PLAN.md docs/e2e/E2E_SCENARIOS.md",
+        "git diff --check -- docs/domain/TENANT_CUSTOMIZATION_SPEC.md docs/04_MASTER_PHASE_PLAN.md docs/e2e/E2E_SCENARIOS.md .agent-bus/queue.json"
+      ],
+      "notes": "Completed docs-only tenant customization contract strengthening. Actual doc edits: docs/domain/TENANT_CUSTOMIZATION_SPEC.md, docs/04_MASTER_PHASE_PLAN.md, docs/e2e/E2E_SCENARIOS.md. Scope still tolerates pre-existing dirty P5/coordination files in this checkout."
+    },
+    {
+      "id": "DOC-RELEASE2-ROADMAP-001",
+      "title": "Document Release 2 depth and hardening roadmap",
+      "status": "done",
+      "priority": "medium",
+      "phase": "docs",
+      "depends_on": [],
+      "write_scope": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/claims/DOC-RELEASE2-ROADMAP-001.claim.json",
+        ".agent-bus/sessions/DOC-RELEASE2-ROADMAP-001.md",
+        ".agent-bus/locks/queue-json-release2.lock/**",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-RELEASE2-ROADMAP-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"Release 2|Depth|Hardening|Plancy|MS Project|entry gate|anti-scope\" docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/backlog/FUTURE_SCOPE.md",
+        "git diff --check -- docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/backlog/FUTURE_SCOPE.md .agent-bus/queue.json"
+      ],
+      "notes": "Completed docs-only Release 2 roadmap. Actual doc edits: docs/roadmap/RELEASE_2_DEPTH_HARDENING.md and docs/backlog/FUTURE_SCOPE.md. Scope still tolerates pre-existing dirty P5/coordination files in this checkout."
+    },
+    {
+      "id": "DOC-RELEASE2-DECOMPOSITION-001",
+      "title": "Decompose Release 2 roadmap into blocked future implementation backlog",
+      "status": "done",
+      "priority": "medium",
+      "phase": "docs",
+      "depends_on": [],
+      "write_scope": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/claims/DOC-RELEASE2-DECOMPOSITION-001.claim.json",
+        ".agent-bus/sessions/DOC-RELEASE2-DECOMPOSITION-001.md",
+        ".agent-bus/locks/queue-json-release2-decomposition.lock/**",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-RELEASE2-DECOMPOSITION-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"R2-SCH|R2-RES|R2-TEN|R2-SEC|blocked|entry gate|candidate task\" docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/backlog/FUTURE_SCOPE.md",
+        "git diff --check -- docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/backlog/FUTURE_SCOPE.md .agent-bus/queue.json"
+      ],
+      "notes": "Completed docs-only Release 2 implementation decomposition. Actual doc edits: docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md, docs/roadmap/RELEASE_2_DEPTH_HARDENING.md, and docs/backlog/FUTURE_SCOPE.md. Scope still tolerates pre-existing dirty P5/coordination files in this checkout."
+    },
+    {
+      "id": "DOC-RELEASE2-REVIEW-FIXES-001",
+      "title": "Apply Release 2 roadmap review fixes",
+      "status": "done",
+      "priority": "medium",
+      "phase": "docs",
+      "depends_on": [
+        "DOC-RELEASE2-ROADMAP-001",
+        "DOC-RELEASE2-DECOMPOSITION-001"
+      ],
+      "write_scope": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/claims/DOC-RELEASE2-REVIEW-FIXES-001.claim.json",
+        ".agent-bus/sessions/DOC-RELEASE2-REVIEW-FIXES-001.md",
+        ".agent-bus/locks/queue-json-release2-review-fixes.lock/**",
+        ".agent-bus/handoff/2026-05-16-doc-release2-review-fixes.md",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/domain/TENANT_CUSTOMIZATION_SPEC.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/PHASE_5_SCHEDULING_GANTT_FOUNDATION.md",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-RELEASE2-REVIEW-FIXES-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"Pilot Slice Rules|Phase 10 MVP|R2-ACT|R2-DATA|R2-E2E-01[1-9]|R2-E2E-02[0-9]\" docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md docs/backlog/FUTURE_SCOPE.md",
+        "git diff --check -- docs/roadmap/RELEASE_2_DEPTH_HARDENING.md docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md docs/backlog/FUTURE_SCOPE.md .agent-bus/queue.json"
+      ],
+      "notes": "Completed docs-only Release 2 review fixes. Addressed pilot-slice rules, Phase 10 vs R2 boundary, atomic R2 E2E gates, R2-ACT action/audit hardening, and R2-DATA migration/reconciliation track."
+    },
+    {
+      "id": "DOC-P3-P12-POST-RUN-GATE-001",
+      "title": "Create post-run verification gate for broad P3-P12 worker run",
+      "status": "done",
+      "priority": "high",
+      "phase": "docs",
+      "depends_on": [],
+      "write_scope": [
+        "docs/roadmap/P3_P12_POST_RUN_VERIFICATION_GATE.md",
+        "docs/roadmap/**",
+        ".agent-bus/claims/DOC-P3-P12-POST-RUN-GATE-001.claim.json",
+        ".agent-bus/sessions/DOC-P3-P12-POST-RUN-GATE-001.md",
+        ".agent-bus/locks/queue-json-p3-p12-post-run-gate.lock/**",
+        ".agent-bus/handoff/2026-05-16-doc-p3-p12-post-run-gate.md",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/domain/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/**",
+        "docs/status/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "packages/scheduling-engine/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-P3-P12-POST-RUN-GATE-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "rg -n \"Post-Run|P3-P12|after Agent 2|Do Not Interrupt|Acceptance Verdict|Phase Gate|E2E\" docs/roadmap/P3_P12_POST_RUN_VERIFICATION_GATE.md",
+        "git diff --check -- docs/roadmap/P3_P12_POST_RUN_VERIFICATION_GATE.md .agent-bus/queue.json"
+      ],
+      "notes": "Completed docs-only post-run verification gate. It does not interrupt Agent 2; it applies only after Agent 2 reports completion through P12."
+    },
+    {
+      "id": "DOC-P3-P12-UX-CONTRACT-001",
+      "title": "Specify P3-P12 product UX, screen catalog, design system, and UX matrix",
+      "status": "active",
+      "priority": "high",
+      "phase": "docs",
+      "depends_on": [],
+      "write_scope": [
+        "docs/product/**",
+        "docs/status/p3-p12-ux-screen-matrix.json",
+        "scripts/verify-ux-screen-matrix.mjs",
+        ".agent-bus/claims/DOC-P3-P12-UX-CONTRACT-001.claim.json",
+        ".agent-bus/sessions/DOC-P3-P12-UX-CONTRACT-001.md",
+        ".agent-bus/locks/queue-json-p3-p12-ux-contract.lock/**",
+        ".agent-bus/locks/docs-status-p3-p12-ux-contract.lock/**",
+        ".agent-bus/handoff/2026-05-16-doc-p3-p12-ux-contract.md",
+        ".agent-bus/queue.json",
+        ".gitignore",
+        "AGENTS.md",
+        "docs/01_PRD.md",
+        "docs/04_MASTER_PHASE_PLAN.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/domain/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/ms-project-ref/**",
+        "docs/phases/**",
+        "docs/roadmap/**",
+        "docs/status/phase5-contract-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "e2e/**",
+        "packages/scheduling-engine/**",
+        "packages/shared-test-fixtures/**",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        "scripts/agent-bus-*.mjs",
+        "scripts/agent-bus-*.test.mjs",
+        "scripts/agent-bus-status.test.ts",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/project-core/**",
+        "packages/workflow-engine/**",
+        "packages/action-engine/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        "docs/status/*"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task DOC-P3-P12-UX-CONTRACT-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/p3-p12-ux-screen-matrix.json','utf8'))\"",
+        "node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json",
+        "rg -n \"Project Gantt|shadcn|TanStack Table|ControlSurfaceShell|UX-P5-PROJECT-GANTT|canonical task|primary next action|audit/result feedback\" docs/product docs/status/p3-p12-ux-screen-matrix.json",
+        "git diff --check -- docs/product docs/status/p3-p12-ux-screen-matrix.json scripts/verify-ux-screen-matrix.mjs .agent-bus/queue.json"
+      ],
+      "notes": "Docs-only UX/UI contract task. Product implementation is out of scope; specify P3-P12 UX docs, screen catalog, adapted shadcn design system, matrix, and verifier."
+    }
+  ]
+}

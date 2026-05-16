@@ -57,11 +57,11 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-040 | User opens project Gantt from project/portfolio entry | Project manager | Seed Tenant A | Gantt opens for the selected canonical project plan | scheduling-engine, project-core | PRD 10.6 | `e2e/tests/phase5/open-gantt.spec.ts` | planned |
-| E2E-041 | User creates a task in Gantt and sees it in My Tasks/Kanban | Project manager/executor | Seed Tenant A | Gantt-created task is same canonical task in other views | scheduling-engine, project-core | PRD 10.5, 10.6 | `e2e/tests/phase5/gantt-task-cross-view.spec.ts` | planned |
-| E2E-042 | User changes task dates in Gantt and plan persists after reload | Project manager | Seed Tenant A | Date change is saved, audited, and visible after reload | scheduling-engine, action-engine | PRD 10.6, 10.10 | `e2e/tests/phase5/gantt-date-persist.spec.ts` | planned |
-| E2E-043 | User creates a dependency and schedule view reflects it | Project manager | Seed Tenant A | Dependency is persisted and schedule validation reflects it | scheduling-engine | PRD 10.6 | `e2e/tests/phase5/gantt-dependency.spec.ts` | planned |
-| E2E-044 | Baseline values are visible and stable when live dates change | Project manager | Seed Tenant A | Live date edits do not silently mutate baseline values | scheduling-engine, audit | PRD 10.6 | `e2e/tests/phase5/baseline-stability.spec.ts` | planned |
+| E2E-040 | User opens project Gantt from project/portfolio entry | Project manager | Seed Tenant A | Gantt opens for the selected canonical project plan | scheduling-engine, project-core | PRD 10.6 | `e2e/tests/phase5/open-gantt.spec.ts` | passing |
+| E2E-041 | User creates schedule-backed tasks and sees canonical task identity across Gantt/My Tasks/Kanban | Project manager/executor | Seed Tenant A | UI-created Gantt task is same canonical task in project tasks and Kanban; participant-backed schedule-created task appears in My Tasks | scheduling-engine, project-core | PRD 10.5, 10.6 | `e2e/tests/phase5/gantt-task-cross-view.spec.ts` | passing |
+| E2E-042 | User changes task dates in Gantt and plan persists after reload | Project manager | Seed Tenant A | Date change is saved, audited, and visible after reload | scheduling-engine, action-engine | PRD 10.6, 10.10 | `e2e/tests/phase5/gantt-date-persist.spec.ts` | passing |
+| E2E-043 | User creates a dependency and schedule view reflects it | Project manager | Seed Tenant A | Dependency is persisted and schedule validation reflects it | scheduling-engine | PRD 10.6 | `e2e/tests/phase5/gantt-dependency.spec.ts` | passing |
+| E2E-044 | Baseline values are visible and stable when live dates change | Project manager | Seed Tenant A | Live date edits do not silently mutate baseline values | scheduling-engine, audit | PRD 10.6 | `e2e/tests/phase5/baseline-stability.spec.ts` | passing |
 
 ## Phase 6 — Resource planning and conflict resolution
 
