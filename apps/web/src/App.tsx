@@ -24,6 +24,8 @@ import { KpiDefinitionAdminSurface } from "./KpiDefinitionAdminSurface";
 import { createKpiDefinitionApiClient, type KpiDefinitionApiClient } from "./kpiDefinitionApiClient";
 import { KpiDeviationControlSurface } from "./KpiDeviationControlSurface";
 import { createKpiDeviationApiClient, type KpiDeviationApiClient } from "./kpiDeviationApiClient";
+import { PortfolioControlSurface } from "./PortfolioControlSurface";
+import { createPortfolioControlApiClient, type PortfolioControlApiClient } from "./portfolioControlApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -35,7 +37,8 @@ type AppProps = {
     Partial<Phase5ScheduleApiClient> &
     Partial<ResourcePlanningApiClient> &
     Partial<KpiDefinitionApiClient> &
-    Partial<KpiDeviationApiClient>;
+    Partial<KpiDeviationApiClient> &
+    Partial<PortfolioControlApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -59,7 +62,7 @@ const shellLabelDefaults = {
   "shell.configuration_version_prefix": "Версия конфигурации",
   "shell.primary_navigation_aria": "Основная навигация",
   "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 7: KPI, безопасные формулы и контрольные сигналы",
+  "shell.phase_scope_notice": "Фаза 8: контрольные поверхности и управляемые действия",
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
@@ -224,6 +227,18 @@ function isKpiDeviationApiClient(apiClient: Partial<KpiDeviationApiClient> | nul
     typeof apiClient.getSignalDetail === "function" &&
     typeof apiClient.runEvaluation === "function" &&
     typeof apiClient.getKpiAudit === "function"
+  );
+}
+
+function isPortfolioControlApiClient(
+  apiClient: Partial<PortfolioControlApiClient> | null
+): apiClient is PortfolioControlApiClient {
+  return (
+    typeof apiClient?.getSurfaceView === "function" &&
+    typeof apiClient.listSurfaceActions === "function" &&
+    typeof apiClient.previewAction === "function" &&
+    typeof apiClient.executeAction === "function" &&
+    typeof apiClient.getControlAudit === "function"
   );
 }
 
@@ -564,6 +579,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createKpiDeviationApiClient() : null;
   }, [apiClient]);
+  const portfolioControlApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isPortfolioControlApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createPortfolioControlApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -677,6 +700,8 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
               href={
                 labelKey === "navigation.gantt"
                   ? "#gantt-workspace"
+                  : labelKey === "navigation.portfolio"
+                    ? "#portfolio-control"
                   : labelKey === "navigation.resources"
                   ? "#resource-load-control"
                   : labelKey === "navigation.kpi"
@@ -734,6 +759,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {projectWorkApiClient ? (
           <ProjectWorkControlSurface
             apiClient={projectWorkApiClient}
+            currentTenant={currentTenant}
+            onOpenGanttProject={openGanttProject}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {portfolioControlApiClient ? (
+          <PortfolioControlSurface
+            apiClient={portfolioControlApiClient}
             currentTenant={currentTenant}
             onOpenGanttProject={openGanttProject}
             testUser={runtimeUser}

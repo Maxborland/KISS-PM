@@ -272,7 +272,7 @@ describe("KISS PM web shell", () => {
     expect(within(navigation).getByText("Настройки")).toBeInTheDocument();
 
     expect(screen.getByTestId("phase-scope-notice")).toHaveTextContent(
-      "Фаза 7: KPI, безопасные формулы и контрольные сигналы"
+      "Фаза 8: контрольные поверхности и управляемые действия"
     );
   });
 
