@@ -126,7 +126,7 @@ function withUser(path: string, testUser: string): string {
   return `${path}${separator}testUser=${encodeURIComponent(testUser)}`;
 }
 
-export function createActionConfigurationApiClient(basePath = "/api"): ActionConfigurationApiClient {
+export function createActionConfigurationApiClient(basePath = "/api/api"): ActionConfigurationApiClient {
   return {
     getActionConfigs(testUser) {
       return requestJson<ActionConfigurationReadModelDto>(withUser(`${basePath}/tenant/action-configs`, testUser));

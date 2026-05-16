@@ -150,7 +150,7 @@ function withUser(path: string, testUser: string): string {
   return `${path}${separator}testUser=${encodeURIComponent(testUser)}`;
 }
 
-export function createConfigurationOverviewApiClient(basePath = "/api"): ConfigurationOverviewApiClient {
+export function createConfigurationOverviewApiClient(basePath = "/api/api"): ConfigurationOverviewApiClient {
   return {
     getConfiguration(testUser) {
       return requestJson<ConfigurationOverviewDto>(withUser(`${basePath}/tenant/configuration`, testUser));
