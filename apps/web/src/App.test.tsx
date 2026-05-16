@@ -272,8 +272,49 @@ describe("KISS PM web shell", () => {
     expect(within(navigation).getByText("Настройки")).toBeInTheDocument();
 
     expect(screen.getByTestId("phase-scope-notice")).toHaveTextContent(
-      "Фаза 6: ресурсная нагрузка, перегрузки и управляемые команды"
+      "Фаза 7: KPI, безопасные формулы и контрольные сигналы"
     );
+  });
+
+  it("wires the KPI Definition Admin surface into the app shell when the P7 client is available", async () => {
+    const apiClient = {
+      ...createAdminApiClient(),
+      getCurrentTenant: vi.fn(async () => ({
+        tenant: {
+          id: "tenant-a",
+          label: "Студия A",
+          configurationVersion: 1
+        },
+        actor: {
+          id: "tenant-admin-a",
+          displayName: "Администратор",
+          accessProfileId: "profile-tenant-admin-a"
+        },
+        labels: {
+          "role.tenant_admin": "Администратор"
+        },
+        permissions: ["tenant.read", "kpi:read", "kpi.config:write", "audit.read"]
+      })),
+      listDefinitions: vi.fn(async () => []),
+      previewDefinition: vi.fn(async () => ({
+        mutatesState: false as const,
+        value: -25,
+        severity: "critical" as const,
+        formulaTrace: ["result:-25"],
+        thresholdTrace: ["matched:api-draft-critical:critical"],
+        recommendedActionKeys: ["create_corrective_action"]
+      })),
+      createDefinition: vi.fn(),
+      publishDefinition: vi.fn(),
+      retireDefinition: vi.fn(),
+      getKpiAudit: vi.fn(async () => ({ events: [], actionExecutions: [] }))
+    };
+
+    render(<App apiClient={apiClient} testUser="tenant-admin-a" />);
+
+    expect(await screen.findByTestId("kpi-definition-admin")).toBeInTheDocument();
+    expect(await screen.findByTestId("kpi-definition-empty")).toHaveTextContent("Нет KPI");
+    expect(screen.getByRole("link", { name: "KPI" })).toHaveAttribute("href", "#kpi-definition-admin");
   });
 
   it("blocks an unknown test user instead of opening the shell", async () => {

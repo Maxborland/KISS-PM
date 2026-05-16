@@ -175,7 +175,8 @@ nav a:focus-visible {
 .crm-intake-surface,
 .project-work-surface,
 .gantt-surface,
-.resource-load-surface {
+.resource-load-surface,
+.kpi-definition-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -254,7 +255,8 @@ nav a:focus-visible {
   font-size: 13px;
 }
 
-input {
+input,
+textarea {
   border: 1px solid #b8c8bb;
   border-radius: 6px;
   color: #17211b;
@@ -264,9 +266,16 @@ input {
 }
 
 input:disabled,
+textarea:disabled,
 button:disabled {
   cursor: not-allowed;
   opacity: 0.62;
+}
+
+textarea {
+  min-height: 86px;
+  padding: 10px;
+  resize: vertical;
 }
 
 button {
@@ -383,6 +392,73 @@ button:focus-visible {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(560px, 1.1fr) minmax(340px, 0.9fr);
+}
+
+.kpi-definition-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(520px, 1fr) minmax(360px, 0.85fr);
+}
+
+.kpi-definition-row {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.kpi-definition-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.kpi-definition-row > div:first-child span {
+  color: #59675a;
+  font-size: 12px;
+}
+
+.kpi-status-badge {
+  border: 1px solid #b8c8bb;
+  border-radius: 999px;
+  color: #29362d;
+  font-size: 12px;
+  font-weight: 700;
+  justify-self: start;
+  padding: 5px 8px;
+}
+
+.kpi-status-badge.active {
+  border-color: #7ca982;
+  background: #edf7ef;
+  color: #24542d;
+}
+
+.kpi-status-badge.draft {
+  border-color: #d39148;
+  background: #fff6e7;
+  color: #6a430c;
+}
+
+.kpi-definition-editor {
+  align-content: start;
+}
+
+.kpi-sample-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kpi-definition-formula-note {
+  color: #59675a;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.kpi-definition-result-panel {
+  border-color: #b8c8bb;
 }
 
 .resource-overview-panel {
@@ -736,7 +812,8 @@ button:focus-visible {
   .crm-intake-layout,
   .project-work-layout,
   .gantt-layout,
-  .resource-load-layout {
+  .resource-load-layout,
+  .kpi-definition-layout {
     grid-template-columns: 1fr;
   }
 
@@ -753,7 +830,8 @@ button:focus-visible {
   .split-fields,
   .compact-facts,
   .gantt-entry-panel,
-  .preview-facts {
+  .preview-facts,
+  .kpi-sample-grid {
     grid-template-columns: 1fr;
   }
 }
