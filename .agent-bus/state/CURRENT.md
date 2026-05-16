@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T15:26:45+07:00
+Updated: 2026-05-16T15:42:48+07:00
+
+- P6-006 resource planning API governed commands completed with verdict `accepted` for the API block; handoff: `.agent-bus/handoff/2026-05-16-p6-006-resource-planning-api-governed-commands.md`.
+- `apps/api/src/phase6Runtime.ts` now provides deterministic in-memory resource profiles, capacity calendars, availability exceptions, assignments, reservations, load buckets, overloads, non-mutating resolution previews, governed apply commands, stale preview rejection, and action execution readback.
+- `apps/api/src/app.ts` exposes Phase 6 API routes: `GET /api/resources/load`, `GET /api/resources/load/:bucketId`, `GET /api/resources/overloads/:overloadId`, `POST /api/resources/reservations`, `POST /api/resources/overloads/:overloadId/preview`, `POST /api/resources/overloads/:overloadId/apply`, and `GET /api/resources/audit`.
+- Fresh P6-006 evidence: `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts` passes with 5 tests; `npm test -- packages/resource-planning` passes with 4 files / 20 tests; `npm run test:integration` passes with 8 files / 38 tests; `npm test` passes with 46 files / 277 tests; `npm run typecheck` and `npm run lint` pass; `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json` and `git diff --check` pass. Strict matrix without `--allow-blocked` still fails as expected because P6 UI/E2E rows remain blocked.
+- `docs/status/phase6-requirements-matrix.json` records API/governed-command evidence but keeps P6-006 and P6-008 blocked until UI and E2E-050..055 prove full write-flow evidence.
+- Next recommended step: claim `P6-007-resource-load-control-surface` and implement the Russian Resource Load Control UI against the P6 API.
 
 - P6-001 resource domain foundation completed at domain/unit level with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-001-resource-domain-foundation.md`.
 - `packages/resource-planning` now defines ResourceProfile, ResourceCapacityCalendar, AvailabilityException, CapacityPeriodBucket, ResourceAssignment, ResourceLoadBucket, ResourceOverload, resource-profile-scoped reservations, deterministic capacity/load/overload calculations, tenant mismatch ordering, and duplicate-id guards.

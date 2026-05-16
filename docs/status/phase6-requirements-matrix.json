@@ -108,11 +108,22 @@
       "owner": "codex",
       "owned_scope": ["apps/api", "packages/resource-planning", "packages/action-engine"],
       "required_e2e": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
-      "evidence": [],
-      "tests": ["planned: npm run test:integration"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; resource load/read/preview/apply API and permission guards are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "apps/api/src/phase6Runtime.ts implements deterministic Phase 6 resource load read model, overload detail, reservation mutation, non-mutating resolution preview, guarded apply command, stale preview rejection, and action execution readback",
+        "apps/api/src/app.ts exposes GET /api/resources/load, GET /api/resources/load/:bucketId, GET /api/resources/overloads/:overloadId, POST /api/resources/reservations, POST /api/resources/overloads/:overloadId/preview, POST /api/resources/overloads/:overloadId/apply, and GET /api/resources/audit",
+        "apps/api/src/phase6ResourcePlanningApi.test.ts covers deterministic buckets, overload severity/affected entities, dry-run no mutation, apply readback, audit/action evidence, unauthorized apply denial, tenant isolation, stale preview, and invalid preconditions"
+      ],
+      "tests": [
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 46 files, 277 tests passed"
+      ],
+      "cleanup": "API runtime uses deterministic in-memory test state; allowTestFixtureReset recreates Phase 6 runtime and preview/apply tests prove no mutation before apply and no partial mutation on stale/invalid commands",
+      "blocker": "API/integration implementation is complete for this block, but P6-006 remains blocked for strict phase exit until UI and E2E-050..055 provide structured write-flow evidence.",
+      "last_checked_at": "2026-05-16T15:42:48+07:00"
     },
     {
       "id": "P6-007",
@@ -134,11 +145,16 @@
       "owner": "codex",
       "owned_scope": ["apps/web", "apps/api", "packages/resource-planning", "packages/action-engine"],
       "required_e2e": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
-      "evidence": [],
-      "tests": ["planned: npm test -- packages/resource-planning apps/web/src && npm run test:integration"],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Phase 6 implementation not started; non-mutating preview and governed apply flow are missing.",
-      "last_checked_at": "2026-05-16T15:05:00+07:00"
+      "evidence": [
+        "apps/api/src/phase6Runtime.ts and apps/api/src/phase6ResourcePlanningApi.test.ts provide API-level dry-run/apply support for shift_work, reserve_capacity preview, permission checks, stale preview rejection, and action/audit readback"
+      ],
+      "tests": [
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed"
+      ],
+      "cleanup": "API-level preview/apply state is in-memory and reset with createApiApp/test fixture reset; UI and E2E cleanup proof remains pending.",
+      "blocker": "API dry-run/apply command path exists, but P6-008 remains blocked until Resource Load Control UI and E2E-052..055 prove full user write-flow evidence.",
+      "last_checked_at": "2026-05-16T15:42:48+07:00"
     },
     {
       "id": "P6-009",

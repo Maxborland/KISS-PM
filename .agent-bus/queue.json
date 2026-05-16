@@ -1683,7 +1683,7 @@
         "P6-006"
       ],
       "title": "Implement Phase 6 resource planning API read models and governed command endpoints",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P6",
       "depends_on": [
@@ -1721,7 +1721,64 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json",
         "git diff --check -- apps/api packages/resource-planning packages/action-engine docs/status/phase6-requirements-matrix.json .agent-bus"
       ],
-      "notes": "Next P6 implementation block. Covers P6-006 API read models and governed resource commands; rows stay blocked until UI and E2E-050..055 evidence exists."
+      "notes": "Completed on 2026-05-16. Implemented Phase 6 resource planning API read models, overload detail, reservation creation, dry-run preview, governed apply commands, backend permission checks, tenant isolation, stale preview rejection, and audit/action readback. Matrix row remains blocked for strict phase exit until UI and E2E-050..055 evidence exists.",
+      "completed_at": "2026-05-16T15:42:48+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 46 files, 277 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 1: expected blocked P6 rows until UI/E2E",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P6-007-resource-load-control-surface",
+      "aliases": [
+        "P6-007"
+      ],
+      "title": "Implement Phase 6 Resource Load Control surface",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "P6-006-resource-planning-api-governed-commands"
+      ],
+      "write_scope": [
+        "apps/web/**",
+        "docs/status/phase6-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/P6-007-resource-load-control-surface.claim.json",
+        ".agent-bus/sessions/P6-007-resource-load-control-surface.md",
+        ".agent-bus/handoff/2026-05-16-p6-007-resource-load-control-surface.md",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-007-resource-load-control-surface --once",
+        "npm test -- apps/web/src",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase6-requirements-matrix.json",
+        "git diff --check -- apps/web docs/status/phase6-requirements-matrix.json .agent-bus"
+      ],
+      "notes": "Next P6 implementation block after API. Build Russian Resource Load Control UI against the P6 API read model with permission/denied states and resolution entry, but keep E2E rows blocked until P6-009."
     }
   ]
 }
