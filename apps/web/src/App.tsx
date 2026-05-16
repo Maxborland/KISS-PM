@@ -30,6 +30,8 @@ import { ClosedPortfolioRetrospectiveSurface } from "./ClosedPortfolioRetrospect
 import { createRetrospectiveApiClient, type RetrospectiveApiClient } from "./retrospectiveApiClient";
 import { ProjectClosureControlSurface } from "./ProjectClosureControlSurface";
 import { createProjectClosureApiClient, type ProjectClosureApiClient } from "./projectClosureApiClient";
+import { TenantLabelsAdminSurface } from "./TenantLabelsAdminSurface";
+import { createTenantLabelsApiClient, type TenantLabelsApiClient } from "./tenantLabelsApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -44,7 +46,8 @@ type AppProps = {
     Partial<KpiDeviationApiClient> &
     Partial<PortfolioControlApiClient> &
     Partial<RetrospectiveApiClient> &
-    Partial<ProjectClosureApiClient>;
+    Partial<ProjectClosureApiClient> &
+    Partial<TenantLabelsApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -261,6 +264,15 @@ function isProjectClosureApiClient(apiClient: Partial<ProjectClosureApiClient> |
     typeof apiClient?.getClosure === "function" &&
     typeof apiClient.previewClosure === "function" &&
     typeof apiClient.applyClosure === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isTenantLabelsApiClient(apiClient: Partial<TenantLabelsApiClient> | null): apiClient is TenantLabelsApiClient {
+  return (
+    typeof apiClient?.getLabels === "function" &&
+    typeof apiClient.previewLabels === "function" &&
+    typeof apiClient.publishLabels === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -626,6 +638,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createProjectClosureApiClient() : null;
   }, [apiClient]);
+  const tenantLabelsApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isTenantLabelsApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createTenantLabelsApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -785,6 +805,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {phase2ApiClient ? (
           <Phase2AdminSurface
             apiClient={phase2ApiClient}
+            currentTenant={currentTenant}
+            onCurrentTenantChange={setCurrentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {tenantLabelsApiClient ? (
+          <TenantLabelsAdminSurface
+            apiClient={tenantLabelsApiClient}
             currentTenant={currentTenant}
             onCurrentTenantChange={setCurrentTenant}
             testUser={runtimeUser}

@@ -56,14 +56,30 @@
         "E2E-090"
       ],
       "evidence": [
-        "P10 contract defines label/role/stage builder scope and runtime projection requirements before implementation."
+        "P10 contract defines label/role/stage builder scope and runtime projection requirements before implementation.",
+        "packages/tenant-config/src/index.ts implements previewTenantLabelSetPublish and publishTenantLabelSetPreview. Preview is non-mutating, rejects unknown/duplicate stable keys, returns before/after runtime surface impact, and publish requires fresh preview plus auditEventId.",
+        "apps/api/src/phase10Runtime.ts and apps/api/src/app.ts expose GET /api/tenant/labels, POST /api/tenant/labels/preview, POST /api/tenant/labels/publish, and GET /api/tenant/configuration/audit. API tests prove readback, preview without mutation, governed publish, audit/action evidence, read-only denial, Tenant B no-leak stale denial, invalid-key rejection, and no partial mutation.",
+        "apps/web/src/TenantLabelsAdminSurface.tsx and apps/web/src/tenantLabelsApiClient.ts implement a Russian admin control surface for role/stage labels with API readback, dry-run preview, publish command, refreshed runtime projection, read-only/audit states, and stale-preview recovery. Component tests prove success only after post-mutation readback.",
+        "apps/web/src/App.tsx wires TenantLabelsAdminSurface into the app shell and refreshes current tenant configuration labels/version after publish."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/tenant-config/src/tenantLabelBuilder.test.ts exit 1 RED: previewTenantLabelSetPublish and publishTenantLabelSetPreview were missing before implementation",
+        "npm test -- packages/tenant-config/src/tenantLabelBuilder.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10TenantLabelsApi.test.ts exit 1 RED: /api/tenant/labels routes were missing before implementation",
+        "npm test -- apps/api/src/phase10TenantLabelsApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 1 RED: TenantLabelsAdminSurface and tenantLabelsApiClient were missing before implementation",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 1 RED after bug-hunt: editor used defaults instead of API readback labels",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 0: 1 file, 6 tests passed",
+        "npm test -- packages/tenant-config apps/api/src/phase10TenantLabelsApi.test.ts apps/web/src exit 0: 19 files, 125 tests passed",
+        "npm run test:integration exit 0: 13 files, 76 tests passed",
+        "npm test exit 0: 73 files, 462 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore label-set versions and runtime projections before verification.",
-      "blocker": "Blocked until P10-002 implementation adds label builder API/UI/domain behavior and E2E-090 proves runtime labels after reload with permission/audit evidence.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime label previews are deterministic in-memory state. /test-fixtures/reset recreates Phase 10 runtime and Phase 2 label sets, restoring label-set versions and runtime projections. Browser-level reset/readback remains to be proven by P10-009 E2E-090.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-002 remains blocked for strict phase verification until P10-009 E2E-090 proves runtime labels after browser reload with direct backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T02:46:54.2390705+07:00",
       "e2e_evidence": []
     },
     {

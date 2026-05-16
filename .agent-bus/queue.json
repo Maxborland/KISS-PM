@@ -4204,7 +4204,10 @@
         "npm test exit 0: 70 files, 450 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json exit 1 expected: P10 rows remain blocked until E2E-090..095 and phase exit evidence exist",
+        "node scripts/agent-bus-guard.mjs --task P10-002-label-stage-role-builder-runtime-projection --once exit 0 after releasing own locks",
+        "git diff --check exit 0"
       ]
     },
     {
@@ -4213,7 +4216,7 @@
         "P10-002"
       ],
       "title": "Implement role/label/stage builder and runtime label projection",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P10",
       "depends_on": [
@@ -4258,7 +4261,79 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P10 runnable block. Implement label/stage/role builder API/UI/runtime projection, but keep E2E-090 for later P10-009 unless explicitly in scope."
+      "notes": "Accepted 2026-05-17T02:46:54.2390705+07:00. Implemented tenant label-set preview/publish domain helpers, P10 tenant labels API/read model/audit routes, Phase 10 runtime label projection, and TenantLabelsAdminSurface UI. Tests prove preview is non-mutating, publish requires fresh preview and backend tenant.config.write, read-only/direct API denial, Tenant B stale no-leak denial, audit/action evidence, API readback, UI readback after publish, and stale-preview recovery. Matrix P10-002 remains blocked only for later P10-009 E2E-090 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T02:46:54.2390705+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-002-label-stage-role-builder-runtime-projection --once exit 0 at startup",
+        "npm test -- packages/tenant-config/src/tenantLabelBuilder.test.ts exit 1 RED: label preview/publish helpers were missing before implementation",
+        "npm test -- packages/tenant-config/src/tenantLabelBuilder.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10TenantLabelsApi.test.ts exit 1 RED: /api/tenant/labels routes were missing before implementation",
+        "npm test -- apps/api/src/phase10TenantLabelsApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 1 RED: TenantLabelsAdminSurface was missing before implementation",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 1 RED after bug-hunt: editor used defaults instead of API readback labels",
+        "npm test -- apps/web/src/TenantLabelsAdminSurface.test.tsx exit 0: 1 file, 6 tests passed",
+        "npm test -- packages/tenant-config apps/api/src/phase10TenantLabelsApi.test.ts apps/web/src exit 0: 19 files, 125 tests passed",
+        "npm run test:integration exit 0: 13 files, 76 tests passed",
+        "npm test exit 0: 73 files, 462 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P10-003-process-template-builder-mvp",
+      "aliases": [
+        "P10-003"
+      ],
+      "title": "Implement process template builder MVP",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-002-label-stage-role-builder-runtime-projection"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "packages/project-core/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-003-process-template-builder-mvp.claim.json",
+        ".agent-bus/sessions/P10-003-process-template-builder-mvp.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-003-process-template-builder-mvp --once",
+        "npm test -- packages/tenant-config packages/project-core apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P10 runnable block. Implement safe process-template builder behavior and runtime future-template version readback; keep E2E-090/E2E-095 browser proof for P10-009 unless explicitly in scope."
     }
   ]
 }

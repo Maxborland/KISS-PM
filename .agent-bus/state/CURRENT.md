@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T02:27:23.0476262+07:00
+Updated: 2026-05-17T02:46:54.2390705+07:00
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.
@@ -42,5 +42,7 @@ Updated: 2026-05-17T02:27:23.0476262+07:00
 - P10 accepted implementation blocks:
   - `P10-000-no-code-tenant-customization-phase-contract`
   - `P10-001-tenant-configuration-version-foundation`
+  - `P10-002-label-stage-role-builder-runtime-projection`
 - `P10-001` implemented TenantConfiguration version refs, publish preview/apply lifecycle, stale preview/audit/tenant mismatch guards, immutable readback, and P10 tenant configuration permission constants. `docs/status/phase10-requirements-matrix.json` keeps P10-001 blocked only for later API/UI/E2E-090/E2E-095 evidence.
-- Next recommended step: claim `P10-002-label-stage-role-builder-runtime-projection` and implement the label/stage/role builder API/UI/runtime projection.
+- `P10-002` implemented tenant label-set preview/publish domain helpers, P10 tenant labels API/read model/audit routes, Phase 10 runtime label projection, and TenantLabelsAdminSurface UI. Tests prove preview is non-mutating, publish requires fresh preview and backend `tenant.config.write`, read-only/direct API denial, Tenant B stale no-leak denial, audit/action evidence, API readback, UI readback after publish, and stale-preview recovery. `docs/status/phase10-requirements-matrix.json` keeps P10-002 blocked only for later P10-009 E2E-090 browser reload/cleanup evidence.
+- Next recommended step: claim `P10-003-process-template-builder-mvp` and implement safe process-template builder behavior plus runtime future-template version readback.
