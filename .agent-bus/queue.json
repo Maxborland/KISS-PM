@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:59:29.000Z",
+  "updated_at": "2026-05-16T21:22:28.000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2764,7 +2764,7 @@
         "P8-002"
       ],
       "title": "Implement control surface data-source abstraction and read DTOs",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -2774,17 +2774,92 @@
         "packages/control-surfaces/**",
         "apps/api/src/**phase8**",
         "apps/api/src/app.ts",
+        "apps/api/src/phase2Runtime.ts",
         "docs/status/phase8-requirements-matrix.json",
         ".agent-bus/queue.json",
         ".agent-bus/state/CURRENT.md",
         ".agent-bus/handoff/**",
         ".agent-bus/events/events.jsonl",
         ".agent-bus/claims/P8-002-control-surface-data-source-read-dtos.claim.json",
-        ".agent-bus/sessions/P8-002-control-surface-data-source-read-dtos.md"
+        ".agent-bus/sessions/P8-002-control-surface-data-source-read-dtos.md",
+        "apps/api/package.json",
+        "package-lock.json"
       ],
       "forbidden": [
         "apps/web/**",
         "packages/action-engine/**",
+        "packages/kpi-engine/**",
+        "packages/resource-planning/**",
+        "packages/project-core/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json",
+        "apps/api/package.json",
+        "package-lock.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-002-control-surface-data-source-read-dtos --once",
+        "npm test -- packages/control-surfaces apps/api/src/*phase8*.test.ts",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Completed P8-002 read DTO/data-source/API block. packages/control-surfaces now builds tenant-scoped read DTOs with severity widgets, source refs, drilldowns, backend-policy availability callbacks, malformed pagination guards, and no execute URL. apps/api now exposes read-only control surface routes backed by P6/P7 deterministic projections and control.surface:read policy checks. Matrix row remains blocked only for later UI/E2E reload/permission/cleanup evidence.",
+      "completed_at": "2026-05-16T21:22:28.000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-002-control-surface-data-source-read-dtos --once exit 0 at startup",
+        "npm test -- packages/control-surfaces/src/controlSurfaceReadModel.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 1 RED: missing createControlSurfaceReadModel and P8 read API routes returned 404",
+        "npm test -- packages/control-surfaces/src/controlSurfaceReadModel.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 1 RED after review tests: malformed pagination returned partial DTOs",
+        "npm test -- packages/control-surfaces/src/controlSurfaceReadModel.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 11 tests passed",
+        "npm test -- packages/control-surfaces apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 3 files, 19 tests passed",
+        "npm run test:integration exit 0: 10 files, 50 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 57 files, 361 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-003-action-definitions-execution-log-foundation",
+      "aliases": [
+        "P8-003"
+      ],
+      "title": "Implement action definitions and execution log foundation",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-002-control-surface-data-source-read-dtos"
+      ],
+      "write_scope": [
+        "packages/action-engine/**",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-003-action-definitions-execution-log-foundation.claim.json",
+        ".agent-bus/sessions/P8-003-action-definitions-execution-log-foundation.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase8Runtime.ts",
+        "packages/control-surfaces/**",
         "packages/kpi-engine/**",
         "packages/resource-planning/**",
         "packages/project-core/**",
@@ -2804,15 +2879,14 @@
         ".agent-bus/queue.json"
       ],
       "recommended_verification": [
-        "node scripts/agent-bus-guard.mjs --task P8-002-control-surface-data-source-read-dtos --once",
-        "npm test -- packages/control-surfaces apps/api/src/*phase8*.test.ts",
-        "npm run test:integration",
+        "node scripts/agent-bus-guard.mjs --task P8-003-action-definitions-execution-log-foundation --once",
+        "npm test -- packages/action-engine",
         "npm run typecheck",
         "npm run lint",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P8 runnable block. Implement control surface read DTO/data-source abstraction and API read model only; keep action execution, UI, fixtures, and E2E for later P8 blocks."
+      "notes": "Next P8 runnable block. Implement action definition/command binding/execution log foundation only; keep API execute routes, UI, fixtures, and E2E for later P8 blocks."
     }
   ]
 }

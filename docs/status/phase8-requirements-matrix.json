@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T13:59:29.000Z",
+  "updated_at": "2026-05-16T21:22:28.000+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -48,14 +48,23 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires stable read DTOs with tenant scope, severity summary, action availability, drilldown refs, and projection refresh semantics."
+        "packages/control-surfaces/src/index.ts implements createControlSurfaceReadModel with tenant-scoped source records, visible field projection, severity widgets, sourceRefs, drilldown route interpolation, backend-policy override hooks for action/drilldown availability, strict pagination/severity validation, and no execute URL in read DTOs.",
+        "packages/control-surfaces/src/controlSurfaceReadModel.test.ts verifies deterministic read DTO construction, read-only users preserving rows without executable mutation paths, precomputed backend policy decisions overriding raw permission-key presence, cross-tenant source-record rejection without leaking private labels, and malformed pagination rejection.",
+        "apps/api/src/phase8Runtime.ts builds the deterministic Portfolio Control read model from P7 KPI control signals and P6 resource overload projections.",
+        "apps/api/src/app.ts exposes GET /api/control/surfaces, GET /api/control/surfaces/:surfaceId, and GET /api/control/surfaces/:surfaceId/view behind backend control.surface:read permission checks.",
+        "apps/api/src/phase8ControlSurfacesApi.test.ts verifies project-manager read DTOs with severity/source refs/drilldowns/action availability, read-only mutation denial without execute URLs, backend policy scope denial when the permission key exists but row target is out of scope, Tenant B isolation, malformed pagination 400 without row leakage, and unknown surface 404 without Tenant A source leakage."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- packages/control-surfaces/src/controlSurfaceReadModel.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 1 RED: missing createControlSurfaceReadModel and P8 read API routes returned 404",
+        "npm test -- packages/control-surfaces/src/controlSurfaceReadModel.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 11 tests passed",
+        "npm test -- packages/control-surfaces apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 3 files, 19 tests passed",
+        "npm run test:integration exit 0: 10 files, 50 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until read DTOs and E2E reset/readback exist.",
-      "blocker": "P8-002 implementation has not started. Need control surface data-source abstraction, API integration tests, E2E-070/E2E-074/E2E-075 evidence including action availability denial, and refresh/reload proof.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-002 adds read-only DTO/runtime/API state derived from deterministic in-memory P6/P7 projections; /test-fixtures/reset also recreates the P8 runtime, but E2E reload/reset readback remains pending for P8-009.",
+      "blocker": "P8-002 read DTO/API implementation is complete and covered by package/API integration tests, but row remains blocked for phase-exit verification until E2E-070/E2E-074/E2E-075 prove UI/API readback, reload, permission visibility, and cleanup.",
+      "last_checked_at": "2026-05-16T21:22:28.000+07:00",
       "e2e_evidence": []
     },
     {

@@ -16,6 +16,7 @@ import { createPhase5RuntimeState } from "./phase5Runtime";
 import { createPhase6RuntimeState } from "./phase6Runtime";
 import type { ResourceResolutionCommand } from "./phase6Runtime";
 import { createPhase7RuntimeState } from "./phase7Runtime";
+import { createPhase8RuntimeState } from "./phase8Runtime";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -540,6 +541,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase5Runtime = createPhase5RuntimeState();
   let phase6Runtime = createPhase6RuntimeState();
   let phase7Runtime = createPhase7RuntimeState();
+  let phase8Runtime = createPhase8RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -1591,6 +1593,102 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/control/surfaces", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      return context.json({
+        surfaces: phase8Runtime.listSurfaces(session.user.tenantId).map((surface) => ({
+          id: surface.id,
+          tenantId: surface.tenantId,
+          key: surface.key,
+          label: surface.label,
+          surfaceType: surface.surfaceType,
+          viewType: surface.view.viewType,
+          status: surface.status,
+          version: surface.version,
+          updatedAt: surface.updatedAt
+        }))
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/control/surfaces/:surfaceId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("surfaceId")
+      });
+      const surface = phase8Runtime.getSurface(session.user.tenantId, context.req.param("surfaceId"));
+      if (surface === undefined) {
+        throw Object.assign(new Error("control surface not found"), { code: "not_found" });
+      }
+
+      return context.json({ surface });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/control/surfaces/:surfaceId/view", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("surfaceId")
+      });
+      const model = phase8Runtime.buildReadModel({
+        tenantId: session.user.tenantId,
+        surfaceId: context.req.param("surfaceId"),
+        actorPermissionKeys: session.profile.permissions,
+        phase6Runtime,
+        phase7Runtime,
+        page: {
+          offset: Number(context.req.query("offset") ?? 0),
+          limit: Number(context.req.query("limit") ?? 50)
+        },
+        isActionAllowed: (record, slot) =>
+          runtime.evaluatePolicy({
+            session,
+            permissionKey: slot.requiredPermission,
+            target: {
+              entityType: slot.targetEntityType,
+              tenantId: record.tenantId,
+              entityId: record.entityId,
+              ...(record.policyContext?.ownerId !== undefined ? { ownerId: record.policyContext.ownerId } : {}),
+              ...(record.policyContext?.projectId !== undefined ? { projectId: record.policyContext.projectId } : {})
+            },
+            contextRefs: { projectIds: [record.policyContext?.projectId].filter((id): id is string => id !== undefined) }
+          }).allowed,
+        isDrilldownAllowed: (record, drilldown) =>
+          runtime.evaluatePolicy({
+            session,
+            permissionKey: drilldown.requiredPermission,
+            target: {
+              entityType: drilldown.targetEntityType,
+              tenantId: record.tenantId,
+              entityId: record.drilldownParams.projectId ?? record.entityId,
+              ...(record.policyContext?.ownerId !== undefined ? { ownerId: record.policyContext.ownerId } : {}),
+              ...(record.policyContext?.projectId !== undefined ? { projectId: record.policyContext.projectId } : {})
+            },
+            contextRefs: { projectIds: [record.policyContext?.projectId].filter((id): id is string => id !== undefined) }
+          }).allowed
+      });
+
+      return context.json(model);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/projects/:projectId", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -2261,6 +2359,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase5Runtime = createPhase5RuntimeState();
     phase6Runtime = createPhase6RuntimeState();
     phase7Runtime = createPhase7RuntimeState();
+    phase8Runtime = createPhase8RuntimeState();
     return context.json({ status: "reset" });
   });
 
