@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const apiPort = process.env.PW_API_PORT ?? "4183";
 const webPort = process.env.PW_WEB_PORT ?? "5183";
+const localNoProxy = "127.0.0.1,localhost";
 
 export default defineConfig({
   testDir: "./e2e/tests",
@@ -18,7 +19,9 @@ export default defineConfig({
       url: `http://127.0.0.1:${apiPort}/health`,
       reuseExistingServer: false,
       env: {
-        KISS_PM_ALLOW_TEST_FIXTURE_RESET: "true"
+        KISS_PM_ALLOW_TEST_FIXTURE_RESET: "true",
+        NO_PROXY: localNoProxy,
+        no_proxy: localNoProxy
       },
       timeout: 120000
     },
@@ -28,7 +31,9 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         PW_API_PORT: apiPort,
-        VITE_KISS_PM_ALLOW_FIXTURE_AUTH: "true"
+        VITE_KISS_PM_ALLOW_FIXTURE_AUTH: "true",
+        NO_PROXY: localNoProxy,
+        no_proxy: localNoProxy
       },
       timeout: 120000
     }

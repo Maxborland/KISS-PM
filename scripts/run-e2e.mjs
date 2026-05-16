@@ -18,6 +18,7 @@ const profileName = process.argv[2] ?? "all";
 const profile = profiles[profileName];
 let extraArgs = process.argv.slice(3);
 let selectedPhaseNumber = null;
+const localNoProxy = "127.0.0.1,localhost";
 
 if (!profile) {
   console.error(`Unknown E2E profile: ${profileName}`);
@@ -70,6 +71,8 @@ const result = spawnSync(
   {
     env: {
       ...process.env,
+      NO_PROXY: localNoProxy,
+      no_proxy: localNoProxy,
       PW_API_PORT: profile.apiPort,
       PW_WEB_PORT: profile.webPort
     },
@@ -91,7 +94,7 @@ if (result.error) {
 function extractPassedTests(output) {
   const passed = [];
   for (const line of stripVTControlCharacters(output).split(/\r?\n/)) {
-    const match = line.match(/\bok\s+\d+\s+.*?›\s+(e2e[\\/].+?\.spec\.ts):\d+:\d+\s+›\s+(E2E-\d+)/);
+    const match = line.match(/(?:\bok|✓)\s+\d+\s+.*?›\s+(e2e[\\/].+?\.spec\.ts):\d+:\d+\s+›\s+(E2E-\d+)/);
     if (!match) continue;
 
     passed.push({
