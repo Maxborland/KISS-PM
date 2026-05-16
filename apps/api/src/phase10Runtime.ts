@@ -2,6 +2,17 @@ import { createActionExecutionLog } from "@kiss-pm/action-engine";
 import type { ActionExecutionLog } from "@kiss-pm/action-engine";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 import {
+  previewKpiThresholdRuleSetPublish,
+  publishKpiThresholdRuleSetPreview
+} from "@kiss-pm/kpi-engine";
+import type {
+  KpiThresholdRule,
+  KpiThresholdRuleSet,
+  KpiThresholdRuleSetPublishAudit,
+  KpiThresholdRuleSetPublishPreview,
+  KpiThresholdRuleSetPublishResult
+} from "@kiss-pm/kpi-engine";
+import {
   publishProcessTemplatePreview,
   previewProcessTemplatePublish
 } from "@kiss-pm/project-core";
@@ -43,6 +54,8 @@ type Phase10TenantState = {
   customFieldPreviews: Map<string, CustomFieldDefinitionPublishPreview>;
   customFieldActionExecutions: ActionExecutionLog[];
   customFieldValueActionExecutions: ActionExecutionLog[];
+  kpiThresholdPreviews: Map<string, KpiThresholdRuleSetPublishPreview>;
+  kpiThresholdActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -80,7 +93,9 @@ export function createPhase10RuntimeState() {
       }),
       customFieldPreviews: new Map<string, CustomFieldDefinitionPublishPreview>(),
       customFieldActionExecutions: [],
-      customFieldValueActionExecutions: []
+      customFieldValueActionExecutions: [],
+      kpiThresholdPreviews: new Map<string, KpiThresholdRuleSetPublishPreview>(),
+      kpiThresholdActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -374,6 +389,95 @@ export function createPhase10RuntimeState() {
     return getState(tenantId).customFieldValueActionExecutions.map((entry) => clone(entry));
   }
 
+  function previewKpiThreshold(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    thresholdRuleSet: KpiThresholdRuleSet;
+    expectedVersion: number;
+    rules: KpiThresholdRule[];
+    sampleValue: number;
+    affectedRuntimeSurfaces: string[];
+  }): KpiThresholdRuleSetPublishPreview {
+    const state = getState(input.tenantId);
+    const preview = previewKpiThresholdRuleSetPublish(input.thresholdRuleSet, {
+      id: `preview-kpi-thresholds-${input.tenantId}-${input.thresholdRuleSet.version}-${state.kpiThresholdPreviews.size + 1}`,
+      actorId: input.actorId,
+      expectedVersion: input.expectedVersion,
+      rules: input.rules,
+      sampleValue: input.sampleValue,
+      affectedRuntimeSurfaces: input.affectedRuntimeSurfaces,
+      createdAt: now()
+    });
+    state.kpiThresholdPreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function publishKpiThreshold(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    definitionId: string;
+    thresholdRuleSet: KpiThresholdRuleSet;
+    previewId: string;
+    auditEventId: string;
+  }): KpiThresholdRuleSetPublishResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.tenantId);
+    const preview = state.kpiThresholdPreviews.get(input.previewId);
+    if (preview === undefined) {
+      throw stalePreview("KPI threshold preview is missing or stale");
+    }
+    if (preview.actorId !== input.actorId || preview.thresholdRuleSet.id !== input.thresholdRuleSet.id) {
+      throw stalePreview("KPI threshold preview is stale");
+    }
+    const result = publishKpiThresholdRuleSetPreview(input.thresholdRuleSet, {
+      preview,
+      expectedVersion: input.thresholdRuleSet.version,
+      auditEventId: input.auditEventId,
+      publishedAt: now()
+    });
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `kpi-threshold-${input.tenantId}-${input.thresholdRuleSet.id}-${input.thresholdRuleSet.version}`
+      },
+      commandType: "kpi_threshold.publish",
+      requiredPermission: "kpi.config:write",
+      status: "succeeded",
+      source: { entityType: "kpiDefinition", entityId: input.definitionId },
+      target: { entityType: "kpiThresholdRuleSet", entityId: input.thresholdRuleSet.id },
+      before: {
+        version: input.thresholdRuleSet.version,
+        preview
+      },
+      after: {
+        version: result.thresholdRuleSet.version,
+        sampleSeverity: preview.after.severity,
+        matchedRuleId: preview.after.matchedRuleId
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission kpi.config:write allowed"],
+      preconditionTrace: ["precondition:dry-run preview confirmed", "precondition:future evaluations only"],
+      trace: ["kpi_threshold:preview confirmed", "kpi_threshold:future rule set version published"]
+    });
+    state.kpiThresholdActionExecutions = [...state.kpiThresholdActionExecutions, actionExecution];
+    state.kpiThresholdPreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function getKpiThresholdPreview(tenantId: TenantId, previewId: string): KpiThresholdRuleSetPublishPreview | undefined {
+    const preview = getState(tenantId).kpiThresholdPreviews.get(previewId);
+    return preview === undefined ? undefined : clone(preview);
+  }
+
+  function listKpiThresholdActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).kpiThresholdActionExecutions.map((entry) => clone(entry));
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -392,7 +496,11 @@ export function createPhase10RuntimeState() {
     publishCustomField,
     listCustomFieldActionExecutions,
     recordProjectCustomFieldValueAction,
-    listCustomFieldValueActionExecutions
+    listCustomFieldValueActionExecutions,
+    previewKpiThreshold,
+    publishKpiThreshold,
+    getKpiThresholdPreview,
+    listKpiThresholdActionExecutions
   };
 }
 
@@ -448,5 +556,9 @@ export function processTemplatePublishAuditDto(audit: ProcessTemplatePublishAudi
 }
 
 export function customFieldPublishAuditDto(audit: CustomFieldDefinitionPublishAudit) {
+  return { ...audit };
+}
+
+export function kpiThresholdPublishAuditDto(audit: KpiThresholdRuleSetPublishAudit) {
   return { ...audit };
 }

@@ -39,6 +39,11 @@ import {
 } from "./processTemplateBuilderApiClient";
 import { CustomFieldBuilderSurface } from "./CustomFieldBuilderSurface";
 import { createCustomFieldBuilderApiClient, type CustomFieldBuilderApiClient } from "./customFieldBuilderApiClient";
+import { KpiThresholdBuilderSurface } from "./KpiThresholdBuilderSurface";
+import {
+  createKpiThresholdBuilderApiClient,
+  type KpiThresholdBuilderApiClient
+} from "./kpiThresholdBuilderApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -56,7 +61,8 @@ type AppProps = {
     Partial<ProjectClosureApiClient> &
     Partial<TenantLabelsApiClient> &
     Partial<ProcessTemplateBuilderApiClient> &
-    Partial<CustomFieldBuilderApiClient>;
+    Partial<CustomFieldBuilderApiClient> &
+    Partial<KpiThresholdBuilderApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -306,6 +312,17 @@ function isCustomFieldBuilderApiClient(
     typeof apiClient.publishCustomField === "function" &&
     typeof apiClient.setProjectCustomFieldValue === "function" &&
     typeof apiClient.getPortfolioSurfaceView === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isKpiThresholdBuilderApiClient(
+  apiClient: Partial<KpiThresholdBuilderApiClient> | null
+): apiClient is KpiThresholdBuilderApiClient {
+  return (
+    typeof apiClient?.getThresholds === "function" &&
+    typeof apiClient.previewThresholds === "function" &&
+    typeof apiClient.publishThresholds === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -695,6 +712,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createCustomFieldBuilderApiClient() : null;
   }, [apiClient]);
+  const kpiThresholdBuilderApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isKpiThresholdBuilderApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createKpiThresholdBuilderApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -877,6 +902,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {customFieldBuilderApiClient ? (
           <CustomFieldBuilderSurface
             apiClient={customFieldBuilderApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {kpiThresholdBuilderApiClient ? (
+          <KpiThresholdBuilderSurface
+            apiClient={kpiThresholdBuilderApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

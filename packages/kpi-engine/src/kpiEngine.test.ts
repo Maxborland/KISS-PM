@@ -10,6 +10,8 @@ import {
   evaluateKpi,
   evaluateThreshold,
   upsertControlSignalFromEvaluation,
+  previewKpiThresholdRuleSetPublish,
+  publishKpiThresholdRuleSetPreview,
 } from "./index";
 
 const tenantId = "tenant-alpha";
@@ -501,5 +503,159 @@ describe("P7 KPI engine domain foundation", () => {
       status: "open",
       updatedAt: "2026-05-08T09:05:00.000Z",
     });
+  });
+
+  it("previews and publishes a future threshold version without mutating historical evaluations", () => {
+    const historicalEvaluation = evaluateKpi({
+      id: "eval-threshold-history-001",
+      tenantId,
+      definition: kpi,
+      formula,
+      thresholdRuleSet: thresholds,
+      entity: { type: "project", id: "project-alpha" },
+      period: { start: "2026-05-01", end: "2026-05-07" },
+      evaluatedAt: "2026-05-08T09:00:00.000Z",
+      sourceValues: [
+        {
+          tenantId,
+          bindingKey: "plannedWorkHours",
+          value: 80,
+          sourceEntityType: "project",
+          sourceEntityId: "project-alpha",
+          sourceField: "plannedWorkHours",
+          observedAt: "2026-05-08T08:00:00.000Z",
+        },
+        {
+          tenantId,
+          bindingKey: "actualWorkHours",
+          value: 100,
+          sourceEntityType: "project",
+          sourceEntityId: "project-alpha",
+          sourceField: "actualWorkHours",
+          observedAt: "2026-05-08T08:00:00.000Z",
+        },
+      ],
+    });
+
+    const preview = previewKpiThresholdRuleSetPublish(thresholds, {
+      id: "preview-thresholds-001",
+      actorId: "tenant-admin-a",
+      expectedVersion: 1,
+      rules: [
+        {
+          id: "variance-critical",
+          severity: "critical",
+          condition: { operator: "lte", value: -30 },
+          explanation: "Отклонение превышает 30%",
+          recommendedActionKeys: ["create_corrective_action", "escalate"],
+        },
+        {
+          id: "variance-warning",
+          severity: "warning",
+          condition: { operator: "lte", value: -10 },
+          explanation: "Отклонение превышает 10%",
+          recommendedActionKeys: ["create_corrective_action"],
+        },
+      ],
+      sampleValue: -25,
+      affectedRuntimeSurfaces: ["kpi.deviation.control"],
+      createdAt: "2026-08-01T00:01:00.000Z",
+    });
+
+    expect(preview).toMatchObject({
+      mutatesState: false,
+      before: { version: 1, severity: "critical", matchedRuleId: "variance-critical" },
+      after: { version: 2, severity: "warning", matchedRuleId: "variance-warning" },
+      thresholdRuleSet: { id: thresholds.id, version: 2 },
+    });
+    expect(thresholds.version).toBe(1);
+    expect(evaluateThreshold(thresholds, { tenantId, value: -25 }).severity).toBe("critical");
+
+    const result = publishKpiThresholdRuleSetPreview(thresholds, {
+      preview,
+      expectedVersion: 1,
+      auditEventId: "audit-kpi-thresholds-001",
+      publishedAt: "2026-08-01T00:02:00.000Z",
+    });
+
+    expect(result.audit).toMatchObject({
+      commandType: "kpi_threshold.publish",
+      beforeVersion: 1,
+      afterVersion: 2,
+      auditEventId: "audit-kpi-thresholds-001",
+    });
+    expect(result.thresholdRuleSet.version).toBe(2);
+
+    const futureEvaluation = evaluateKpi({
+      id: "eval-threshold-future-001",
+      tenantId,
+      definition: { ...kpi, thresholdRuleSetId: result.thresholdRuleSet.id },
+      formula,
+      thresholdRuleSet: result.thresholdRuleSet,
+      entity: { type: "project", id: "project-alpha" },
+      period: { start: "2026-05-08", end: "2026-05-14" },
+      evaluatedAt: "2026-05-15T09:00:00.000Z",
+      sourceValues: historicalEvaluation.sourceTrace,
+    });
+
+    expect(futureEvaluation).toMatchObject({
+      severity: "warning",
+      thresholdRuleSetVersion: 2,
+      matchedThresholdRuleId: "variance-warning",
+    });
+    expect(historicalEvaluation).toMatchObject({
+      severity: "critical",
+      thresholdRuleSetVersion: 1,
+      matchedThresholdRuleId: "variance-critical",
+    });
+  });
+
+  it("rejects stale or invalid threshold publish previews without partial mutation", () => {
+    expect(() =>
+      previewKpiThresholdRuleSetPublish(thresholds, {
+        id: "preview-thresholds-invalid",
+        actorId: "tenant-admin-a",
+        expectedVersion: 1,
+        rules: [
+          {
+            id: "bad-range",
+            severity: "warning",
+            condition: { operator: "between", min: 10, max: -10 },
+            explanation: "Неверный диапазон",
+            recommendedActionKeys: ["request_explanation"],
+          },
+        ],
+        sampleValue: -25,
+        affectedRuntimeSurfaces: ["kpi.deviation.control"],
+        createdAt: "2026-08-01T00:01:00.000Z",
+      }),
+    ).toThrow(/threshold_invalid_range/);
+
+    const preview = previewKpiThresholdRuleSetPublish(thresholds, {
+      id: "preview-thresholds-stale",
+      actorId: "tenant-admin-a",
+      expectedVersion: 1,
+      rules: [
+        {
+          id: "variance-warning",
+          severity: "warning",
+          condition: { operator: "lte", value: -20 },
+          explanation: "Отклонение превышает 20%",
+          recommendedActionKeys: ["request_explanation"],
+        },
+      ],
+      sampleValue: -25,
+      affectedRuntimeSurfaces: ["kpi.deviation.control"],
+      createdAt: "2026-08-01T00:01:00.000Z",
+    });
+
+    expect(() =>
+      publishKpiThresholdRuleSetPreview({ ...thresholds, version: 2 }, {
+        preview,
+        expectedVersion: 2,
+        auditEventId: "audit-kpi-thresholds-stale",
+        publishedAt: "2026-08-01T00:02:00.000Z",
+      }),
+    ).toThrow(/stale/);
   });
 });

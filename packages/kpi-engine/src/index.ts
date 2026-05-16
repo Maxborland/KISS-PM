@@ -153,6 +153,43 @@ export interface KpiControlSignal {
   readonly updatedAt: string;
 }
 
+export interface KpiThresholdRuleSetPublishPreview {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly actorId: string;
+  readonly mutatesState: false;
+  readonly thresholdRuleSet: KpiThresholdRuleSet;
+  readonly before: {
+    readonly version: number;
+    readonly severity: KpiSeverity;
+    readonly matchedRuleId: string | null;
+  };
+  readonly after: {
+    readonly version: number;
+    readonly severity: KpiSeverity;
+    readonly matchedRuleId: string | null;
+  };
+  readonly sampleValue: number;
+  readonly affectedRuntimeSurfaces: readonly string[];
+  readonly createdAt: string;
+}
+
+export interface KpiThresholdRuleSetPublishAudit {
+  readonly tenantId: string;
+  readonly actorId: string;
+  readonly auditEventId: string;
+  readonly commandType: "kpi_threshold.publish";
+  readonly thresholdRuleSetId: string;
+  readonly beforeVersion: number;
+  readonly afterVersion: number;
+  readonly publishedAt: string;
+}
+
+export interface KpiThresholdRuleSetPublishResult {
+  readonly thresholdRuleSet: KpiThresholdRuleSet;
+  readonly audit: KpiThresholdRuleSetPublishAudit;
+}
+
 interface Token {
   readonly type: "number" | "identifier" | "operator" | "paren" | "comma";
   readonly value: string;
@@ -349,6 +386,115 @@ export function evaluateThreshold(
       `value:${formatNumber(value)}`,
       `matched:${matched.id}:${matched.severity}`,
     ],
+  };
+}
+
+export function previewKpiThresholdRuleSetPublish(
+  current: KpiThresholdRuleSet,
+  input: {
+    readonly id: string;
+    readonly actorId: string;
+    readonly expectedVersion: number;
+    readonly rules: readonly KpiThresholdRule[];
+    readonly sampleValue: number;
+    readonly affectedRuntimeSurfaces: readonly string[];
+    readonly createdAt: string;
+  },
+): KpiThresholdRuleSetPublishPreview {
+  const currentRuleSet = defineThresholdRuleSet(current);
+  const expectedVersion = requirePositiveInteger(input.expectedVersion, "threshold_expected_version");
+  if (expectedVersion !== currentRuleSet.version) {
+    throw new KpiEngineError("stale_preview", "KPI threshold preview is stale.");
+  }
+  const sampleValue = requireFiniteNumber(input.sampleValue, "threshold_sample_value");
+  const nextRuleSet = defineThresholdRuleSet({
+    id: currentRuleSet.id,
+    tenantId: currentRuleSet.tenantId,
+    version: currentRuleSet.version + 1,
+    rules: input.rules,
+    active: true,
+  });
+  const before = evaluateThreshold(currentRuleSet, { tenantId: currentRuleSet.tenantId, value: sampleValue });
+  const after = evaluateThreshold(nextRuleSet, { tenantId: currentRuleSet.tenantId, value: sampleValue });
+  const affectedRuntimeSurfaces = input.affectedRuntimeSurfaces.map((surface) =>
+    requireDottedSystemKey(surface, "affected_runtime_surface"),
+  );
+  if (affectedRuntimeSurfaces.length === 0) {
+    throw new KpiEngineError("affected_runtime_surface_required", "KPI threshold preview needs a runtime surface.");
+  }
+
+  return {
+    id: requireId(input.id, "threshold_preview_id"),
+    tenantId: currentRuleSet.tenantId,
+    actorId: requireId(input.actorId, "actor_id"),
+    mutatesState: false,
+    thresholdRuleSet: nextRuleSet,
+    before: {
+      version: currentRuleSet.version,
+      severity: before.severity,
+      matchedRuleId: before.matchedRuleId,
+    },
+    after: {
+      version: nextRuleSet.version,
+      severity: after.severity,
+      matchedRuleId: after.matchedRuleId,
+    },
+    sampleValue,
+    affectedRuntimeSurfaces,
+    createdAt: requireIsoDateTime(input.createdAt, "threshold_preview_created_at"),
+  };
+}
+
+export function publishKpiThresholdRuleSetPreview(
+  current: KpiThresholdRuleSet,
+  input: {
+    readonly preview: KpiThresholdRuleSetPublishPreview;
+    readonly expectedVersion: number;
+    readonly auditEventId: string;
+    readonly publishedAt: string;
+  },
+): KpiThresholdRuleSetPublishResult {
+  const currentRuleSet = defineThresholdRuleSet(current);
+  const expectedVersion = requirePositiveInteger(input.expectedVersion, "threshold_expected_version");
+  if (
+    expectedVersion !== currentRuleSet.version ||
+    input.preview.tenantId !== currentRuleSet.tenantId ||
+    input.preview.thresholdRuleSet.id !== currentRuleSet.id ||
+    input.preview.before.version !== currentRuleSet.version
+  ) {
+    throw new KpiEngineError("stale_preview", "KPI threshold preview is stale.");
+  }
+
+  const recomputedPreview = previewKpiThresholdRuleSetPublish(currentRuleSet, {
+    id: input.preview.id,
+    actorId: input.preview.actorId,
+    expectedVersion: currentRuleSet.version,
+    rules: input.preview.thresholdRuleSet.rules,
+    sampleValue: input.preview.sampleValue,
+    affectedRuntimeSurfaces: input.preview.affectedRuntimeSurfaces,
+    createdAt: input.preview.createdAt,
+  });
+  if (
+    JSON.stringify(recomputedPreview.thresholdRuleSet) !== JSON.stringify(input.preview.thresholdRuleSet) ||
+    JSON.stringify(recomputedPreview.before) !== JSON.stringify(input.preview.before) ||
+    JSON.stringify(recomputedPreview.after) !== JSON.stringify(input.preview.after)
+  ) {
+    throw new KpiEngineError("stale_preview", "KPI threshold preview is stale.");
+  }
+
+  const publishedAt = requireIsoDateTime(input.publishedAt, "threshold_published_at");
+  return {
+    thresholdRuleSet: defineThresholdRuleSet(input.preview.thresholdRuleSet),
+    audit: {
+      tenantId: currentRuleSet.tenantId,
+      actorId: input.preview.actorId,
+      auditEventId: requireId(input.auditEventId, "audit_event_id"),
+      commandType: "kpi_threshold.publish",
+      thresholdRuleSetId: currentRuleSet.id,
+      beforeVersion: currentRuleSet.version,
+      afterVersion: input.preview.thresholdRuleSet.version,
+      publishedAt,
+    },
   };
 }
 
@@ -810,6 +956,14 @@ function requireId(value: string, field: string): string {
 function requireSystemKey(value: string, field: string): string {
   const normalized = requireNonEmpty(value, field);
   if (!/^[a-z][a-z0-9_]*$/.test(normalized)) {
+    throw new KpiEngineError("invalid_system_key", `${field} must be a stable system key.`);
+  }
+  return normalized;
+}
+
+function requireDottedSystemKey(value: string, field: string): string {
+  const normalized = requireNonEmpty(value, field);
+  if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(normalized)) {
     throw new KpiEngineError("invalid_system_key", `${field} must be a stable system key.`);
   }
   return normalized;

@@ -23,6 +23,7 @@ import {
   buildRuntimeLabelProjection,
   createPhase10RuntimeState,
   customFieldPublishAuditDto,
+  kpiThresholdPublishAuditDto,
   processTemplatePublishAuditDto,
   tenantLabelPublishAuditDto
 } from "./phase10Runtime";
@@ -489,6 +490,22 @@ const kpiDefinitionConfigSchema = z
 const kpiDefinitionPreviewSchema = kpiDefinitionConfigSchema
   .extend({
     sampleValues: z.record(z.string(), z.number())
+  })
+  .strict();
+
+const kpiThresholdPreviewSchema = z
+  .object({
+    definitionId: z.string().trim().min(1),
+    expectedVersion: z.number().int().positive(),
+    rules: z.array(kpiThresholdRuleSchema).min(1),
+    sampleValue: z.number(),
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const kpiThresholdPublishSchema = z
+  .object({
+    previewId: z.string().trim().min(1)
   })
   .strict();
 
@@ -1144,6 +1161,136 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/tenant/kpi-thresholds", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "kpi:read", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+
+      const thresholds = phase7Runtime.listDefinitions(session.user.tenantId).map((bundle) => ({
+        definitionId: bundle.definition.id,
+        label: bundle.definition.label,
+        thresholdRuleSet: bundle.thresholdRuleSet
+      }));
+      const primaryDefinitionId = thresholds[0]?.definitionId;
+      const latestEvaluation =
+        primaryDefinitionId !== undefined
+          ? phase7Runtime.getLatestEvaluationForDefinition(session.user.tenantId, primaryDefinitionId)
+          : undefined;
+
+      return context.json({
+        thresholds,
+        latestEvaluation: latestEvaluation ?? null
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/kpi-thresholds/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+
+      const body = kpiThresholdPreviewSchema.parse(await parseJson(context));
+      const bundle = phase7Runtime.getBundle(session.user.tenantId, body.definitionId);
+      if (bundle === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const preview = phase10Runtime.previewKpiThreshold({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        thresholdRuleSet: bundle.thresholdRuleSet,
+        expectedVersion: body.expectedVersion,
+        rules: body.rules,
+        sampleValue: body.sampleValue,
+        affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/kpi-thresholds/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "kpi.config:write", {
+        entityType: "kpiThresholdRuleSet",
+        tenantId: session.user.tenantId
+      });
+
+      const body = kpiThresholdPublishSchema.parse(await parseJson(context));
+      const storedPreview = phase10Runtime.getKpiThresholdPreview(session.user.tenantId, body.previewId);
+      if (storedPreview === undefined) {
+        throw Object.assign(new Error("KPI threshold preview is missing or stale"), { code: "stale_preview" as const });
+      }
+      const matchingBundle = phase7Runtime
+        .listDefinitions(session.user.tenantId)
+        .find((bundle) => bundle.thresholdRuleSet.id === storedPreview.thresholdRuleSet.id);
+      if (matchingBundle === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const auditEventId = `audit-kpi-thresholds-${session.user.tenantId}-${matchingBundle.thresholdRuleSet.version + 1}`;
+      const result = phase10Runtime.publishKpiThreshold({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        definitionId: matchingBundle.definition.id,
+        thresholdRuleSet: matchingBundle.thresholdRuleSet,
+        previewId: body.previewId,
+        auditEventId
+      });
+      const readback = phase7Runtime.replaceThresholdRuleSet({
+        tenantId: session.user.tenantId,
+        definitionId: matchingBundle.definition.id,
+        thresholdRuleSet: result.thresholdRuleSet
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "kpiThresholdRuleSet", entityId: result.thresholdRuleSet.id },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { thresholdRuleSetVersion: result.audit.beforeVersion },
+          after: { thresholdRuleSetVersion: result.audit.afterVersion }
+        }
+      });
+
+      return context.json({
+        result: {
+          thresholdRuleSet: result.thresholdRuleSet,
+          audit: kpiThresholdPublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          thresholdRuleSet: readback.thresholdRuleSet
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -1158,7 +1305,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           ...phase10Runtime.listLabelActionExecutions(session.user.tenantId),
           ...phase10Runtime.listProcessTemplateActionExecutions(session.user.tenantId),
           ...phase10Runtime.listCustomFieldActionExecutions(session.user.tenantId),
-          ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId)
+          ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listKpiThresholdActionExecutions(session.user.tenantId)
         ].map(actionExecutionDto)
       });
     } catch (error) {
@@ -4160,6 +4308,9 @@ function handleRouteError(context: Context, error: unknown) {
   if (error instanceof Error && error.name === "KpiEngineError") {
     if ("code" in error && error.code === "tenant_mismatch") {
       return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+    }
+    if ("code" in error && (error.code === "stale_preview" || error.code === "conflict")) {
+      return context.json(errorDto("conflict", "Конфликт данных"), 409);
     }
 
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
