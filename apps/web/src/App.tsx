@@ -172,7 +172,11 @@ function isPhase5ScheduleApiClient(
 ): apiClient is Phase5ScheduleApiClient {
   return (
     typeof apiClient?.getProjectSchedule === "function" &&
-    typeof apiClient.getProjectScheduleAudit === "function"
+    typeof apiClient.getProjectScheduleAudit === "function" &&
+    typeof apiClient.createScheduleTask === "function" &&
+    typeof apiClient.updateScheduleTask === "function" &&
+    typeof apiClient.createFinishToStartDependency === "function" &&
+    typeof apiClient.captureBaseline === "function"
   );
 }
 
@@ -491,12 +495,14 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
   }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
+  const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
     fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
   );
   const [loadError, setLoadError] = useState("");
   const openGanttProject = useCallback((nextProjectId: string) => {
     setGanttProjectId(nextProjectId);
+    setGanttRefreshKey((key) => key + 1);
     window.requestAnimationFrame(() => document.getElementById("gantt-workspace")?.scrollIntoView({ block: "start" }));
   }, []);
 
@@ -655,6 +661,7 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             apiClient={scheduleApiClient}
             currentTenant={currentTenant}
             projectId={ganttProjectId}
+            refreshKey={ganttRefreshKey}
             testUser={runtimeUser}
           />
         ) : null}
