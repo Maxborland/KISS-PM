@@ -26,6 +26,9 @@ if (!profile) {
   process.exit(2);
 }
 
+profile.apiPort = process.env.PW_API_PORT ?? profile.apiPort;
+profile.webPort = process.env.PW_WEB_PORT ?? profile.webPort;
+
 if (profileName === "phase") {
   const explicitPhaseArgIndex = extraArgs.findIndex((arg) => arg === "--phase");
   const explicitPhaseEqualsArg = extraArgs.find((arg) => arg.startsWith("--phase="));

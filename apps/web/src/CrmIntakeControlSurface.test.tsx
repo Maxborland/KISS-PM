@@ -267,7 +267,9 @@ describe("CRM Intake Control surface", () => {
 
     fireEvent.click(within(screen.getByTestId("opportunity-list")).getByRole("button", { name: /Внедрение портала АКМЕ/ }));
     fireEvent.click(screen.getByRole("button", { name: "Проверить готовность" }));
-    expect(await screen.findByTestId("readiness-next-action")).toHaveTextContent("Запустить оценку реализуемости");
+    await waitFor(() => {
+      expect(screen.getByTestId("readiness-next-action")).toHaveTextContent("Запустить оценку реализуемости");
+    });
     expect(screen.getByTestId("readiness-blockers")).toHaveTextContent("Блокеров нет");
 
     fireEvent.click(screen.getByRole("button", { name: "Рассчитать реализуемость" }));
