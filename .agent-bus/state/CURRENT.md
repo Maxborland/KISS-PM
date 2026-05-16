@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T05:49:11.7860000+07:00
+Updated: 2026-05-17T06:00:02.0000000+07:00
+
+- Phase 11 Integrations and Migration has an accepted closed contract and initial tracking matrix:
+  - `P11-000-integrations-migration-phase-contract`
+  - contract: `docs/phases/PHASE_11_INTEGRATIONS_MIGRATION.md`
+  - matrix: `docs/status/phase11-requirements-matrix.json`
+  - verifier support recognizes P11-001..P11-010 and E2E-100..104 paths.
+- Phase 11 implementation is not accepted yet. `docs/status/phase11-requirements-matrix.json` currently passes only with `--allow-blocked`; strict verification is expected to fail until P11 product implementation and E2E-100..104 evidence exist.
+- P11 scope is frozen around external systems as adapters, ExternalMapping/idempotency, mock adapter import preview/apply, migration validation reports, safe failure diagnostics, Integration Admin Diagnostics UI, imported-project continuity without live adapter dependency, deterministic fixtures, and strict matrix exit.
+- Next recommended step: claim `P11-001-integration-adapter-foundation-external-mapping` and implement the P11 adapter/domain foundation before API/UI/E2E work.
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.

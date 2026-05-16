@@ -1,0 +1,255 @@
+{
+  "phase": "P11",
+  "name": "Phase 11 Integrations and migration requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-17T05:55:38.9918634+07:00",
+  "rows": [
+    {
+      "id": "P11-001",
+      "requirement": "Integration adapter foundation and ExternalMapping model",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/integrations",
+        "packages/access-control"
+      ],
+      "required_e2e": [
+        "E2E-100",
+        "E2E-101",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract defines adapter foundation, ExternalMapping, idempotency, permissions, and E2E expectations before implementation."
+      ],
+      "tests": [
+        "Pending P11-001 implementation: expected unit tests under packages/integrations and access-control permission tests."
+      ],
+      "cleanup": "Pending implementation: cleanup must prove deterministic fixture reset for mappings, idempotency state, sync audit, and adapter mode.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-001 implementation has not started; this contract block only defines required adapter/mapping scope and verifier tracking.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-002",
+      "requirement": "Mock adapter canonical import preview",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/integrations",
+        "packages/crm-core",
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-100"
+      ],
+      "evidence": [
+        "Phase 11 contract requires a non-mutating mock adapter preview mapping external payloads to canonical opportunity/project/task data."
+      ],
+      "tests": [
+        "Pending P11-002 implementation: expected preview/domain tests proving no mutation and validation report contents."
+      ],
+      "cleanup": "Pending implementation: cleanup must restore preview tokens, external payload fixtures, and canonical entities created during tests.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-002 product code is not implemented yet; preview behavior is specified but has no executable domain evidence.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-003",
+      "requirement": "Idempotent import apply and mapping persistence",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/integrations",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-101",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract requires repeated imports to reuse tenant-scoped mappings and avoid duplicate canonical records."
+      ],
+      "tests": [
+        "Pending P11-003 implementation: expected idempotency and mapping persistence unit/API tests."
+      ],
+      "cleanup": "Pending implementation: cleanup must reset import batches, idempotency keys, mappings, and canonical readbacks.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-003 implementation has not started; no idempotent apply command or mapping readback exists yet.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-004",
+      "requirement": "Sync audit, retry/rate-limit, and safe failure model",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/integrations",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-102",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract requires structured adapter failures, rate-limit/retry metadata, safe diagnostics, and no partial canonical mutation."
+      ],
+      "tests": [
+        "Pending P11-004 implementation: expected failure-mode domain/API tests and audit readback tests."
+      ],
+      "cleanup": "Pending implementation: cleanup must reset adapter failure modes, retry counters, sync audit events, and failed import batches.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-004 implementation has not started; failure diagnostics and retry/rate-limit model are contract-only.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-005",
+      "requirement": "Migration validation report and dry-run summary",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/integrations",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-100",
+        "E2E-102"
+      ],
+      "evidence": [
+        "Phase 11 contract requires import preview to return validation reports with creates, updates, skips, errors, blockers, and recovery text."
+      ],
+      "tests": [
+        "Pending P11-005 implementation: expected validation report and dry-run summary tests."
+      ],
+      "cleanup": "Pending implementation: cleanup must reset validation reports and prove dry-run summaries did not persist canonical changes.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-005 implementation has not started; migration validation reports have no executable API evidence yet.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-006",
+      "requirement": "Integrations API and governed import commands",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-100",
+        "E2E-101",
+        "E2E-102",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract defines adapter, connection, import preview/apply, batch, mapping, audit, and diagnostics API contracts."
+      ],
+      "tests": [
+        "Pending P11-006 implementation: expected API integration tests for preview/apply, permissions, tenant isolation, stale preview, invalid payload, and failure recovery."
+      ],
+      "cleanup": "Pending implementation: cleanup must reset API runtime import state, mapping state, audit/action evidence, and adapter modes.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-006 API runtime/routes are not implemented yet; direct API evidence is unavailable.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-007",
+      "requirement": "Integration Admin Diagnostics UI",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-102",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract defines a Russian Integration Admin Diagnostics control surface with preview/apply, mapping diagnostics, failure panel, and audit readback."
+      ],
+      "tests": [
+        "Pending P11-007 implementation: expected component/UI tests for loading, empty, error, denied, preview, apply readback, stale preview, failure, and mapping diagnostics."
+      ],
+      "cleanup": "Pending implementation: cleanup must prove UI reload/readback and reset for import results, failure state, and mapping diagnostics.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-007 UI is not implemented yet; no component or browser evidence exists.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-008",
+      "requirement": "Imported project works without adapter",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "apps/web",
+        "packages/project-core"
+      ],
+      "required_e2e": [
+        "E2E-103"
+      ],
+      "evidence": [
+        "Phase 11 contract requires imported canonical projects and tasks to remain operable after the adapter is disconnected or failing."
+      ],
+      "tests": [
+        "Pending P11-008 implementation: expected API/UI tests proving imported project continuity without live adapter dependency."
+      ],
+      "cleanup": "Pending implementation: cleanup must reset imported canonical entities and adapter disconnect/failure mode after continuity tests.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-008 continuity proof is not implemented yet; E2E-103 is still planned.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-009",
+      "requirement": "Deterministic Phase 11 fixtures and E2E-100..104",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase11"
+      ],
+      "required_e2e": [
+        "E2E-100",
+        "E2E-101",
+        "E2E-102",
+        "E2E-103",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Phase 11 contract defines deterministic fixtures and required executable Playwright scenarios E2E-100..104."
+      ],
+      "tests": [
+        "Pending P11-009 implementation: expected fixture tests and npm run test:e2e:phase -- --phase 11 evidence."
+      ],
+      "cleanup": "Pending implementation: cleanup must prove /test-fixtures/reset restores adapters, imports, mappings, audit, canonical imported entities, and adapter modes.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-009 deterministic fixtures and E2E-100..104 do not exist yet; no phase E2E evidence can be recorded.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P11-010",
+      "requirement": "Phase 11 verification matrix and exit gate",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-100",
+        "E2E-101",
+        "E2E-102",
+        "E2E-103",
+        "E2E-104"
+      ],
+      "evidence": [
+        "Verifier support is being added for P11 required rows and E2E-100..104 paths; strict exit remains blocked until product implementation and phase E2E pass."
+      ],
+      "tests": [
+        "Pending P11-010 strict exit: node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json must pass only after all rows are verified."
+      ],
+      "cleanup": "Pending phase exit: cleanup evidence must aggregate Phase 11 fixture reset, API/domain readback, audit/mapping readback, reload persistence, and adapter failure reset.",
+      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-010 strict exit is blocked because P11-001..P11-009 and E2E-100..104 are not implemented yet.",
+      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "e2e_evidence": []
+    }
+  ]
+}
