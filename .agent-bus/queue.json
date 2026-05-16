@@ -1423,6 +1423,72 @@
         "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json"
       ],
       "notes": "Completed in master. Restored P3-P12 UX/post-run gate docs and UX screen matrix/verifier, made Phase 5 E2E reproducible without Bun via esbuild API dev launcher plus local NO_PROXY handling, fixed E2E metadata parsing for current Playwright output, and resolved Gantt command/readback UX defects with regression tests. Did not edit unrelated docs/ms-project-ref changes."
+    },
+    {
+      "id": "GATE-P3-P12-FINAL-POST-RUN-001",
+      "title": "Final P3-P12 post-run gate review after Agent 2",
+      "status": "done",
+      "priority": "high",
+      "phase": "gate",
+      "depends_on": [
+        "FIX-P3-P12-BUG-HUNT-001",
+        "DOC-P3-P12-UX-CONTRACT-001",
+        "DOC-P3-P12-POST-RUN-GATE-001"
+      ],
+      "write_scope": [
+        "docs/status/p3-p12-post-run-gate-report.md",
+        "docs/status/p3-p12-post-run-gate-matrix.json",
+        ".gitignore",
+        "eslint.config.js",
+        "scripts/run-e2e.mjs",
+        "scripts/dev-api-server.mjs",
+        "apps/web/src/CrmIntakeControlSurface.test.tsx",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/GATE-P3-P12-FINAL-POST-RUN-001.claim.json",
+        ".agent-bus/sessions/GATE-P3-P12-FINAL-POST-RUN-001.md",
+        ".agent-bus/handoff/2026-05-16-gate-p3-p12-final-post-run.md",
+        ".agent-bus/locks/queue-json-p3-p12-final-gate.lock/**",
+        ".agent-bus/locks/docs-status-p3-p12-final-gate.lock/**",
+        ".agent-bus/locks/current-state-p3-p12-final-gate.lock/**",
+        ".agent-bus/locks/gitignore-p3-p12-final-gate.lock/**",
+        ".agent-bus/locks/eslint-config-p3-p12-final-gate.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/src/CrmIntakeControlSurface.tsx",
+        "packages/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json",
+        "playwright.config.ts",
+        "tsconfig.base.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".gitignore",
+        "eslint.config.js"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task GATE-P3-P12-FINAL-POST-RUN-001 --once",
+        "git status --short",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/p3-p12-ux-screen-matrix.json','utf8'))\"",
+        "node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "npm run test:e2e:phase -- --phase 3",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 4",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 5",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json"
+      ],
+      "notes": "Completed on 2026-05-16 with final verdict rejected. P3 and P5 fresh E2E/matrix gates pass; Phase 4 remains blocking because E2E-030..034 are absent and docs/status/phase4-requirements-matrix.json fails strict verification. Report: docs/status/p3-p12-post-run-gate-report.md."
     }
   ]
 }
