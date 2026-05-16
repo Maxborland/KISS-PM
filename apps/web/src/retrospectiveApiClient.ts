@@ -109,6 +109,59 @@ export type RetrospectiveInsightReadModelDto = {
   allowedActions: RetrospectiveReadActionDto[];
 };
 
+export type TemplateImprovementPreviewDto = {
+  id: string;
+  tenantId: string;
+  actorId: string;
+  sourceInsightId: string;
+  sourceTrendId: string;
+  sourceSnapshotIds: string[];
+  sourceMetricIds: string[];
+  improvementKey: "add_acceptance_checkpoint";
+  reason: string;
+  mutatesState: false;
+  stateVersion: number;
+  template: {
+    id: string;
+    key: string;
+    label: string;
+    currentVersion: number;
+    nextVersion: number;
+  };
+  before: {
+    templateVersion: number;
+  };
+  after: {
+    templateVersion: number;
+    addedChecklistItemKey: "add_acceptance_checkpoint";
+    recommendedLabel: string;
+  };
+  createdAt: string;
+};
+
+export type TemplateImprovementApplyResultDto = {
+  preview: TemplateImprovementPreviewDto;
+  insight: RetrospectiveInsightDto;
+  template: {
+    id: string;
+    tenantId: string;
+    key: string;
+    label: string;
+    version: number;
+    previousVersion: number;
+    active: boolean;
+    improvementSourceInsightId: string;
+    improvementSourceSnapshotIds: string[];
+    improvementKey: "add_acceptance_checkpoint";
+    improvedAt: string;
+  };
+  actionExecution: {
+    id: string;
+    commandType: string;
+    auditEventIds?: string[];
+  };
+};
+
 export type RetrospectiveQueryFiltersDto = {
   templateId?: string;
   clientId?: string;
@@ -119,6 +172,16 @@ export type RetrospectiveApiClient = {
   getClosedPortfolio(testUser: string, filters?: RetrospectiveQueryFiltersDto): Promise<ClosedPortfolioReadModelDto>;
   getTrends(testUser: string, filters?: RetrospectiveQueryFiltersDto): Promise<RetrospectiveTrendsReadModelDto>;
   getInsight(testUser: string, insightId: string): Promise<RetrospectiveInsightReadModelDto>;
+  previewTemplateImprovement(
+    testUser: string,
+    insightId: string,
+    input: { improvementKey: "add_acceptance_checkpoint"; reason: string }
+  ): Promise<{ preview: TemplateImprovementPreviewDto }>;
+  applyTemplateImprovement(
+    testUser: string,
+    insightId: string,
+    input: { previewId?: string }
+  ): Promise<{ result: TemplateImprovementApplyResultDto }>;
 };
 
 type ApiErrorDto = {
@@ -136,6 +199,22 @@ async function requestJson<T>(path: string): Promise<T> {
   }
 
   return body as T;
+}
+
+async function sendJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const responseBody = (await response.json()) as T | ApiErrorDto;
+
+  if (!response.ok) {
+    const errorBody = responseBody as ApiErrorDto;
+    throw Object.assign(new Error(errorBody.message), errorBody);
+  }
+
+  return responseBody as T;
 }
 
 function withParams(path: string, params: Record<string, string | undefined>): string {
@@ -186,6 +265,22 @@ export function createRetrospectiveApiClient(basePath = "/api/api"): Retrospecti
     getInsight(testUser, insightId) {
       return requestJson<RetrospectiveInsightReadModelDto>(
         withParams(`${basePath}/retrospectives/insights/${encodeURIComponent(insightId)}`, { testUser })
+      );
+    },
+    previewTemplateImprovement(testUser, insightId, input) {
+      return sendJson<{ preview: TemplateImprovementPreviewDto }>(
+        withParams(`${basePath}/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/preview`, {
+          testUser
+        }),
+        input
+      );
+    },
+    applyTemplateImprovement(testUser, insightId, input) {
+      return sendJson<{ result: TemplateImprovementApplyResultDto }>(
+        withParams(`${basePath}/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply`, {
+          testUser
+        }),
+        input
       );
     }
   };

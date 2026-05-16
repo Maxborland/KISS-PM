@@ -7,9 +7,20 @@ import {
 import type { ControlSurfaceReadAction, ControlSurfaceReadModel } from "@kiss-pm/control-surfaces";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 import {
+  applyProcessTemplateImprovementPreview,
+  createProcessTemplateConfigurationRef,
+  previewProcessTemplateImprovement
+} from "@kiss-pm/tenant-config";
+import type {
+  ImprovedProcessTemplateConfigurationRef,
+  ProcessTemplateConfigurationRef,
+  ProcessTemplateImprovementPreview
+} from "@kiss-pm/tenant-config";
+import {
   buildRetrospectiveTrends,
   createClosedProjectSnapshot,
   createRetrospectiveInsights,
+  markRetrospectiveInsightHandled,
   readRetrospectiveInsight,
   readClosedProjectSnapshot
 } from "../../../packages/retrospectives/src/index";
@@ -64,8 +75,11 @@ export type Phase9ClosurePreview = {
 
 type Phase9TenantState = {
   previews: Map<string, Phase9ClosurePreview>;
+  templateImprovementPreviews: Map<string, ProcessTemplateImprovementPreview>;
   snapshots: ClosedProjectSnapshot[];
   closureDecisions: ProjectClosureDecision[];
+  handledInsights: Map<string, RetrospectiveInsight>;
+  processTemplateVersions: Map<string, ImprovedProcessTemplateConfigurationRef>;
   actionExecutions: ActionExecutionLog[];
   version: number;
 };
@@ -108,6 +122,10 @@ function stalePreview(message: string): Error & { code: "stale_preview" } {
 
 function dryRunRequired(message: string): Error & { code: "dry_run_required" } {
   return Object.assign(new Error(message), { code: "dry_run_required" as const });
+}
+
+function notFound(message: string): Error & { code: "not_found" } {
+  return Object.assign(new Error(message), { code: "not_found" as const });
 }
 
 function closureChecklistForProject(project: ManagedProject): ClosureChecklist {
@@ -363,6 +381,17 @@ function actionForInsight(allowed: boolean): ControlSurfaceReadAction {
   };
 }
 
+function processTemplateRefFromSnapshot(snapshot: ClosedProjectSnapshot): ProcessTemplateConfigurationRef {
+  return createProcessTemplateConfigurationRef({
+    id: snapshot.project.processTemplate.templateId,
+    tenantId: snapshot.tenantId,
+    key: snapshot.project.processTemplate.key,
+    label: snapshot.project.processTemplate.label,
+    version: snapshot.project.processTemplate.version,
+    active: true
+  });
+}
+
 function filterSnapshots(
   snapshots: readonly ClosedProjectSnapshot[],
   filters: Phase9RetrospectiveFilters | undefined
@@ -421,8 +450,11 @@ export function createPhase9RuntimeState() {
     if (existing !== undefined) return existing;
     const next: Phase9TenantState = {
       previews: new Map(),
+      templateImprovementPreviews: new Map(),
       snapshots: [],
       closureDecisions: [],
+      handledInsights: new Map(),
+      processTemplateVersions: new Map(),
       actionExecutions: [],
       version: 1
     };
@@ -455,12 +487,7 @@ export function createPhase9RuntimeState() {
   } {
     const snapshots = filterSnapshots(listSnapshots(tenantId), input.filters);
     const trends = buildRetrospectiveTrends({ tenantId, snapshots, groupBy: input.groupBy });
-    const insights = createRetrospectiveInsights({
-      tenantId,
-      generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
-      trends,
-      snapshots
-    });
+    const insights = buildInsightReadModels(tenantId, trends, snapshots);
     const pagedTrends = trends.slice(input.offset, input.offset + input.limit);
     const trendIds = new Set(pagedTrends.map((trend) => trend.id));
 
@@ -476,14 +503,23 @@ export function createPhase9RuntimeState() {
     const trends = (["template", "project_type", "client", "period"] as const).flatMap((groupBy) =>
       buildRetrospectiveTrends({ tenantId, snapshots, groupBy })
     );
-    const insight = createRetrospectiveInsights({
+    const insight = buildInsightReadModels(tenantId, trends, snapshots).find((candidate) => candidate.id === insightId);
+
+    return insight === undefined ? undefined : readRetrospectiveInsight(insight);
+  }
+
+  function buildInsightReadModels(
+    tenantId: TenantId,
+    trends: readonly RetrospectiveTrend[],
+    snapshots: readonly ClosedProjectSnapshot[]
+  ): RetrospectiveInsight[] {
+    const state = getState(tenantId);
+    return createRetrospectiveInsights({
       tenantId,
       generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
       trends,
       snapshots
-    }).find((candidate) => candidate.id === insightId);
-
-    return insight === undefined ? undefined : readRetrospectiveInsight(insight);
+    }).map((insight) => readRetrospectiveInsight(state.handledInsights.get(insight.id) ?? insight));
   }
 
   function getInsightReadModel(
@@ -496,7 +532,12 @@ export function createPhase9RuntimeState() {
 
     return {
       insight,
-      allowedActions: [actionForInsight(actorPermissionKeys.includes("retrospective.improvement.write"))]
+      allowedActions: [
+        actionForInsight(
+          actorPermissionKeys.includes("retrospective.improvement.write") &&
+            actorPermissionKeys.includes("tenant.config.write")
+        )
+      ]
     };
   }
 
@@ -511,12 +552,7 @@ export function createPhase9RuntimeState() {
   ): Phase9ClosedPortfolioReadModel {
     const snapshots = filterSnapshots(listSnapshots(tenantId), input.filters).sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
     const trends = buildRetrospectiveTrends({ tenantId, snapshots, groupBy: "template" });
-    const insights = createRetrospectiveInsights({
-      tenantId,
-      generatedAt: PHASE9_RETROSPECTIVE_GENERATED_AT,
-      trends,
-      snapshots
-    });
+    const insights = buildInsightReadModels(tenantId, trends, snapshots);
     const trendsBySnapshotId = new Map<string, RetrospectiveTrend[]>();
     for (const trend of trends) {
       for (const snapshotId of trend.sourceSnapshotIds) {
@@ -737,6 +773,166 @@ export function createPhase9RuntimeState() {
     return getState(tenantId).actionExecutions.map((entry) => clone(entry));
   }
 
+  function currentTemplateForInsight(tenantId: TenantId, insight: RetrospectiveInsight): ProcessTemplateConfigurationRef {
+    const state = getState(tenantId);
+    const firstSourceSnapshot = state.snapshots.find((snapshot) => snapshot.id === insight.sourceSnapshotIds[0]);
+    if (firstSourceSnapshot === undefined) {
+      throw notFound("template improvement source snapshot not found");
+    }
+    const snapshotTemplate = processTemplateRefFromSnapshot(firstSourceSnapshot);
+    return state.processTemplateVersions.get(snapshotTemplate.id) ?? snapshotTemplate;
+  }
+
+  function previewTemplateImprovement(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    insightId: string;
+    improvementKey: string;
+    reason: string;
+  }): ProcessTemplateImprovementPreview {
+    const state = getState(input.tenantId);
+    const insight = getInsight(input.tenantId, input.insightId);
+    if (insight === undefined) {
+      throw notFound("retrospective insight not found");
+    }
+    if (insight.status !== "open") {
+      throw preconditionFailed("retrospective insight is already handled");
+    }
+    const currentTemplate = currentTemplateForInsight(input.tenantId, insight);
+    const preview = previewProcessTemplateImprovement({
+      id: `preview-template-improvement-${input.insightId}-${state.version}-${state.templateImprovementPreviews.size + 1}`,
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      sourceInsightId: insight.id,
+      sourceTrendId: insight.sourceTrendId,
+      sourceSnapshotIds: [...insight.sourceSnapshotIds],
+      sourceMetricIds: [...insight.sourceMetricIds],
+      currentTemplate,
+      improvementKey: input.improvementKey,
+      reason: input.reason,
+      stateVersion: state.version,
+      createdAt: now()
+    });
+    state.templateImprovementPreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function validateApplyTemplateImprovement(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    insightId: string;
+    previewId?: string;
+  }): ProcessTemplateImprovementPreview {
+    if (input.previewId === undefined) {
+      throw dryRunRequired("template improvement preview is required");
+    }
+    const state = getState(input.tenantId);
+    const preview = state.templateImprovementPreviews.get(input.previewId);
+    if (preview === undefined || preview.sourceInsightId !== input.insightId) {
+      throw stalePreview("template improvement preview is missing or stale");
+    }
+    if (preview.actorId !== input.actorId || preview.stateVersion !== state.version) {
+      throw stalePreview("template improvement preview is stale");
+    }
+    const insight = getInsight(input.tenantId, input.insightId);
+    if (insight === undefined) {
+      throw notFound("retrospective insight not found");
+    }
+    if (insight.status !== "open") {
+      throw stalePreview("retrospective insight was already handled");
+    }
+    const currentTemplate = currentTemplateForInsight(input.tenantId, insight);
+    if (currentTemplate.id !== preview.template.id || currentTemplate.version !== preview.template.currentVersion) {
+      throw stalePreview("process template changed after improvement preview");
+    }
+
+    return clone(preview);
+  }
+
+  function applyTemplateImprovement(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    insightId: string;
+    previewId?: string;
+    auditEventId: string;
+  }) {
+    const state = getState(input.tenantId);
+    const preview = validateApplyTemplateImprovement(input);
+    const insight = getInsight(input.tenantId, input.insightId);
+    if (insight === undefined) {
+      throw notFound("retrospective insight not found");
+    }
+    const currentTemplate = currentTemplateForInsight(input.tenantId, insight);
+    const appliedAt = now();
+    const templateResult = applyProcessTemplateImprovementPreview(currentTemplate, {
+      preview,
+      expectedStateVersion: state.version,
+      appliedAt
+    });
+    const correlationId = `template-improvement-${input.insightId}-${state.version}`;
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId
+      },
+      commandType: "template_improvement.apply",
+      requiredPermission: "retrospective.improvement.write",
+      status: "succeeded",
+      source: { entityType: "retrospectiveInsight", entityId: insight.id },
+      target: { entityType: "processTemplate", entityId: templateResult.template.id },
+      sourceSurface: {
+        surfaceId: `surface-p9-closed-portfolio-${input.tenantId}`,
+        surfaceKey: "retrospectives.closed_portfolio",
+        rowId: insight.sourceSnapshotIds[0] ?? insight.id,
+        actionSlotKey: "template_improvement.apply"
+      },
+      inputSummary: { improvementKey: preview.improvementKey, reason: preview.reason },
+      before: { insight, template: currentTemplate, preview },
+      after: { template: templateResult.template },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: [
+        "policy:permission retrospective.improvement.write allowed",
+        "policy:permission tenant.config.write allowed"
+      ],
+      preconditionTrace: [
+        "precondition:retrospective insight open",
+        "precondition:dry-run preview confirmed",
+        "precondition:closed snapshots immutable"
+      ],
+      trace: [
+        "template_improvement:permission allowed",
+        "template_improvement:preview confirmed",
+        "template_improvement:future template version created"
+      ]
+    });
+    const handledInsight = markRetrospectiveInsightHandled(insight, {
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      handledAt: appliedAt,
+      commandType: "template_improvement.apply",
+      actionExecutionId: actionExecution.id,
+      auditEventId: input.auditEventId
+    });
+    state.processTemplateVersions.set(templateResult.template.id, clone(templateResult.template));
+    state.handledInsights.set(handledInsight.id, handledInsight);
+    state.actionExecutions = [...state.actionExecutions, actionExecution];
+    state.version += 1;
+    state.templateImprovementPreviews.clear();
+
+    return {
+      preview,
+      insight: readRetrospectiveInsight(handledInsight),
+      template: clone(templateResult.template),
+      previousTemplateVersion: templateResult.previousVersion,
+      actionExecution: clone(actionExecution)
+    };
+  }
+
   return {
     now,
     readClosure,
@@ -749,6 +945,9 @@ export function createPhase9RuntimeState() {
     listTrendReadModels,
     getInsight,
     getInsightReadModel,
+    previewTemplateImprovement,
+    validateApplyTemplateImprovement,
+    applyTemplateImprovement,
     listActionExecutions
   };
 }

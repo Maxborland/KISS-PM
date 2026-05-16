@@ -7,6 +7,8 @@ import type {
   ClosedPortfolioReadModelDto,
   RetrospectiveApiClient,
   RetrospectiveInsightReadModelDto,
+  TemplateImprovementApplyResultDto,
+  TemplateImprovementPreviewDto,
   RetrospectiveTrendsReadModelDto
 } from "./retrospectiveApiClient";
 import { withTestQueryClient } from "./testQueryClient";
@@ -153,11 +155,68 @@ function insightModel(): RetrospectiveInsightReadModelDto {
   };
 }
 
+function templateImprovementPreview(): TemplateImprovementPreviewDto {
+  return {
+    id: "preview-template-improvement-insight-1",
+    tenantId: "tenant-a",
+    actorId: "tenant-admin-a",
+    sourceInsightId: "insight-tenant-a:template:process-template-integrations-tenant-a:schedule_delay",
+    sourceTrendId: "tenant-a:template:process-template-integrations-tenant-a:schedule_delay",
+    sourceSnapshotIds: ["snapshot-project-alpha-1"],
+    sourceMetricIds: ["snapshot-project-alpha-1:schedule_days"],
+    improvementKey: "add_acceptance_checkpoint",
+    reason: "Повторяющаяся задержка приемки",
+    mutatesState: false,
+    stateVersion: 3,
+    template: {
+      id: "process-template-integrations-tenant-a",
+      key: "implementation.integration_heavy",
+      label: "Внедрение с интеграциями",
+      currentVersion: 2,
+      nextVersion: 3
+    },
+    before: { templateVersion: 2 },
+    after: {
+      templateVersion: 3,
+      addedChecklistItemKey: "add_acceptance_checkpoint",
+      recommendedLabel: "Ранняя приемка результата"
+    },
+    createdAt: "2026-07-15T00:05:00.000Z"
+  };
+}
+
+function templateImprovementResult(): TemplateImprovementApplyResultDto {
+  return {
+    preview: templateImprovementPreview(),
+    insight: { ...trendsModel().insights[0]!, status: "handled", handledBy: "tenant-admin-a", handledAt: "2026-07-15T00:06:00.000Z" },
+    template: {
+      id: "process-template-integrations-tenant-a",
+      tenantId: "tenant-a",
+      key: "implementation.integration_heavy",
+      label: "Внедрение с интеграциями",
+      active: true,
+      previousVersion: 2,
+      version: 3,
+      improvementSourceInsightId: "insight-tenant-a:template:process-template-integrations-tenant-a:schedule_delay",
+      improvementSourceSnapshotIds: ["snapshot-project-alpha-1"],
+      improvementKey: "add_acceptance_checkpoint",
+      improvedAt: "2026-07-15T00:06:00.000Z"
+    },
+    actionExecution: {
+      id: "action-template-improvement-insight-1",
+      commandType: "template_improvement.apply",
+      auditEventIds: ["audit-template-improvement-insight-1"]
+    }
+  };
+}
+
 function apiClient(portfolio = portfolioModel(), trends = trendsModel(), insight = insightModel()): RetrospectiveApiClient {
   return {
     getClosedPortfolio: vi.fn(async () => portfolio),
     getTrends: vi.fn(async () => trends),
-    getInsight: vi.fn(async () => insight)
+    getInsight: vi.fn(async () => insight),
+    previewTemplateImprovement: vi.fn(async () => ({ preview: templateImprovementPreview() })),
+    applyTemplateImprovement: vi.fn(async () => ({ result: templateImprovementResult() }))
   };
 }
 
@@ -228,7 +287,9 @@ describe("ClosedPortfolioRetrospectiveSurface", () => {
     expect(screen.getByTestId("closed-portfolio-row-action-state")).toHaveTextContent("нет права");
     fireEvent.click(screen.getByRole("button", { name: /Открыть insight/i }));
     expect(await screen.findByTestId("retrospective-insight-panel")).toHaveTextContent("нет права");
-    expect(Object.keys(client).some((key) => key.toLowerCase().includes("apply"))).toBe(false);
+    expect(screen.queryByRole("button", { name: /Предпросмотр улучшения/i })).not.toBeInTheDocument();
+    expect(client.previewTemplateImprovement).not.toHaveBeenCalled();
+    expect(client.applyTemplateImprovement).not.toHaveBeenCalled();
   });
 
   it("refetches closed portfolio and trends through API readback instead of mutating local rows", async () => {
@@ -253,5 +314,48 @@ describe("ClosedPortfolioRetrospectiveSurface", () => {
 
     await waitFor(() => expect(client.getClosedPortfolio).toHaveBeenCalledTimes(2));
     expect(await screen.findByTestId("closed-portfolio-row-list")).toHaveTextContent("ERP стабилизация");
+  });
+
+  it("previews template improvement before apply and refreshes insight readback with audit evidence", async () => {
+    const handledInsight = {
+      ...insightModel(),
+      insight: { ...insightModel().insight, status: "handled" as const, handledBy: "tenant-admin-a", handledAt: "2026-07-15T00:06:00.000Z" }
+    };
+    const client = apiClient();
+    vi.mocked(client.getInsight).mockResolvedValueOnce(insightModel()).mockResolvedValueOnce(handledInsight);
+    renderSurface(client);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Открыть insight/i }));
+    expect(await screen.findByTestId("retrospective-insight-panel")).toHaveTextContent("Улучшить шаблон");
+
+    fireEvent.click(screen.getByRole("button", { name: /Предпросмотр улучшения/i }));
+    const previewPanel = await screen.findByTestId("template-improvement-preview");
+    expect(previewPanel).toHaveTextContent("Без мутации");
+    expect(previewPanel).toHaveTextContent("Версия 2 -> 3");
+    expect(client.applyTemplateImprovement).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Применить улучшение/i }));
+
+    const resultPanel = await screen.findByTestId("template-improvement-result");
+    expect(resultPanel).toHaveTextContent("template_improvement.apply");
+    expect(resultPanel).toHaveTextContent("audit-template-improvement-insight-1");
+    await waitFor(() => expect(client.getInsight).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("retrospective-insight-panel")).toHaveTextContent("handled");
+  });
+
+  it("shows stale preview errors and allows retrying preview", async () => {
+    const client = apiClient();
+    vi.mocked(client.applyTemplateImprovement).mockRejectedValueOnce(new Error("Предпросмотр устарел"));
+    renderSurface(client);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Открыть insight/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Предпросмотр улучшения/i }));
+    await screen.findByTestId("template-improvement-preview");
+    fireEvent.click(screen.getByRole("button", { name: /Применить улучшение/i }));
+
+    expect(await screen.findByTestId("template-improvement-error")).toHaveTextContent("Предпросмотр устарел");
+
+    fireEvent.click(screen.getByRole("button", { name: /Повторить предпросмотр/i }));
+    await waitFor(() => expect(client.previewTemplateImprovement).toHaveBeenCalledTimes(2));
   });
 });

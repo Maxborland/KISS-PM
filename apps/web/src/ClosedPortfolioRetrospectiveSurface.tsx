@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
@@ -8,6 +8,8 @@ import {
   type ClosedPortfolioReadModelDto,
   type RetrospectiveApiClient,
   type RetrospectiveInsightDto,
+  type TemplateImprovementApplyResultDto,
+  type TemplateImprovementPreviewDto,
   type RetrospectiveReadActionDto,
   type RetrospectiveReadRowDto,
   type RetrospectiveTrendDto
@@ -174,11 +176,28 @@ function TrendList({
 
 function InsightPanel({
   actions,
-  insight
+  applyPending,
+  applyResult,
+  errorMessage,
+  insight,
+  onApply,
+  onPreview,
+  preview,
+  previewPending
 }: {
   insight: RetrospectiveInsightDto;
   actions: RetrospectiveReadActionDto[];
+  preview: TemplateImprovementPreviewDto | null;
+  applyResult: TemplateImprovementApplyResultDto | null;
+  errorMessage: string | null;
+  previewPending: boolean;
+  applyPending: boolean;
+  onPreview(): void;
+  onApply(): void;
 }) {
+  const improvementAction = actions.find((action) => action.actionDefinitionKey === "template_improvement.apply");
+  const canApplyImprovement = improvementAction?.available === true;
+
   return (
     <section className="phase2-panel retrospective-insight-panel" data-testid="retrospective-insight-panel">
       <div className="surface-heading compact">
@@ -191,6 +210,7 @@ function InsightPanel({
         </span>
       </div>
       <p>{insight.title}</p>
+      <p>Статус: {insight.status}</p>
       <p>{insight.recommendation}</p>
       <div className="compact-list">
         {insight.sourceLessons.map((lesson) => (
@@ -204,6 +224,41 @@ function InsightPanel({
           <span key={action.key}>{actionLine(action)}</span>
         ))}
       </div>
+      {canApplyImprovement ? (
+        <div className="compact-action-row">
+          <button className="secondary-button" disabled={previewPending} type="button" onClick={onPreview}>
+            {preview === null ? "Предпросмотр улучшения" : "Повторить предпросмотр"}
+          </button>
+          <button className="primary-button" disabled={preview === null || applyPending} type="button" onClick={onApply}>
+            Применить улучшение
+          </button>
+        </div>
+      ) : null}
+      {preview ? (
+        <div className="compact-list template-improvement-preview" data-testid="template-improvement-preview">
+          <strong>Без мутации</strong>
+          <span>{preview.template.label}</span>
+          <span>
+            Версия {preview.before.templateVersion} -&gt; {preview.after.templateVersion}
+          </span>
+          <span>{preview.after.recommendedLabel}</span>
+          <span>{preview.sourceSnapshotIds.join(", ")}</span>
+        </div>
+      ) : null}
+      {applyResult ? (
+        <div className="compact-list template-improvement-result" data-testid="template-improvement-result">
+          <strong>{applyResult.actionExecution.commandType}</strong>
+          <span>
+            Версия {applyResult.template.previousVersion} -&gt; {applyResult.template.version}
+          </span>
+          <span>{applyResult.actionExecution.auditEventIds?.join(", ")}</span>
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <p className="readonly-notice" data-testid="template-improvement-error">
+          {errorMessage}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -217,6 +272,9 @@ export function ClosedPortfolioRetrospectiveSurface({
   const canReadRetrospectives = hasPermission(currentTenant, "retrospective.read");
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
+  const [templatePreview, setTemplatePreview] = useState<TemplateImprovementPreviewDto | null>(null);
+  const [templateApplyResult, setTemplateApplyResult] = useState<TemplateImprovementApplyResultDto | null>(null);
+  const [templateActionError, setTemplateActionError] = useState<string | null>(null);
   const portfolioQuery = useQuery<ClosedPortfolioReadModelDto>({
     queryKey: retrospectiveQueryKeys.portfolio(testUser),
     queryFn: () => apiClient.getClosedPortfolio(testUser),
@@ -234,6 +292,36 @@ export function ClosedPortfolioRetrospectiveSurface({
     queryFn: () => apiClient.getInsight(testUser, selectedInsightId as string),
     enabled: canReadRetrospectives && selectedInsightId !== null,
     retry: false
+  });
+  const previewMutation = useMutation({
+    mutationFn: (insightId: string) =>
+      apiClient.previewTemplateImprovement(testUser, insightId, {
+        improvementKey: "add_acceptance_checkpoint",
+        reason: "Повторяющаяся задержка из ретроспективного insight"
+      }),
+    onSuccess(data) {
+      setTemplatePreview(data.preview);
+      setTemplateApplyResult(null);
+      setTemplateActionError(null);
+    },
+    onError(error) {
+      setTemplateActionError(getErrorMessage(error));
+    }
+  });
+  const applyMutation = useMutation({
+    mutationFn: (input: { insightId: string; previewId?: string }) =>
+      apiClient.applyTemplateImprovement(testUser, input.insightId, { previewId: input.previewId }),
+    async onSuccess(data) {
+      setTemplateApplyResult(data.result);
+      setTemplateActionError(null);
+      await refreshReadback();
+      if (selectedInsightId !== null) {
+        await queryClient.invalidateQueries({ queryKey: retrospectiveQueryKeys.insight(testUser, selectedInsightId) });
+      }
+    },
+    onError(error) {
+      setTemplateActionError(getErrorMessage(error));
+    }
   });
 
   if (!canReadRetrospectives) {
@@ -270,6 +358,26 @@ export function ClosedPortfolioRetrospectiveSurface({
   function selectRow(rowId: string) {
     setSelectedRowId(rowId);
     setSelectedInsightId(null);
+    setTemplatePreview(null);
+    setTemplateApplyResult(null);
+    setTemplateActionError(null);
+  }
+
+  function selectInsight(insightId: string) {
+    setSelectedInsightId(insightId);
+    setTemplatePreview(null);
+    setTemplateApplyResult(null);
+    setTemplateActionError(null);
+  }
+
+  function previewTemplateImprovementAction() {
+    if (selectedInsightId === null) return;
+    previewMutation.mutate(selectedInsightId);
+  }
+
+  function applyTemplateImprovementAction() {
+    if (selectedInsightId === null) return;
+    applyMutation.mutate({ insightId: selectedInsightId, previewId: templatePreview?.id });
   }
 
   return (
@@ -329,7 +437,7 @@ export function ClosedPortfolioRetrospectiveSurface({
           ) : null}
           <TrendList
             insights={trends?.insights ?? []}
-            onOpenInsight={setSelectedInsightId}
+            onOpenInsight={selectInsight}
             trends={trends?.trends ?? []}
           />
         </section>
@@ -353,7 +461,17 @@ export function ClosedPortfolioRetrospectiveSurface({
       ) : null}
 
       {insightQuery.data ? (
-        <InsightPanel actions={insightQuery.data.allowedActions} insight={insightQuery.data.insight} />
+        <InsightPanel
+          actions={insightQuery.data.allowedActions}
+          applyPending={applyMutation.isPending}
+          applyResult={templateApplyResult}
+          errorMessage={templateActionError}
+          insight={insightQuery.data.insight}
+          onApply={applyTemplateImprovementAction}
+          onPreview={previewTemplateImprovementAction}
+          preview={templatePreview}
+          previewPending={previewMutation.isPending}
+        />
       ) : null}
     </section>
   );

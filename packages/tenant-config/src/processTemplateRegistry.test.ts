@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyProcessTemplateImprovementPreview,
   createProcessTemplateConfigurationRegistry,
-  createProcessTemplateConfigurationRef
+  createProcessTemplateConfigurationRef,
+  previewProcessTemplateImprovement
 } from "./index";
 
 describe("process template configuration registry", () => {
@@ -124,5 +126,108 @@ describe("process template configuration registry", () => {
         processTemplates: []
       })
     ).toThrow("processTemplateConfigurationRegistry.updatedAt must be a valid timestamp");
+  });
+
+  it("previews and applies a governed template improvement as a future version only", () => {
+    const templateRef = createProcessTemplateConfigurationRef({
+      id: "process-template-tenant-a-implementation",
+      tenantId: "tenant-a",
+      key: "implementation.standard",
+      label: "Стандартное внедрение",
+      version: 3,
+      active: true
+    });
+
+    const preview = previewProcessTemplateImprovement({
+      id: "preview-template-improvement-1",
+      tenantId: "tenant-a",
+      actorId: "tenant-admin-a",
+      sourceInsightId: "insight-template-delay",
+      sourceTrendId: "tenant-a:template:implementation.standard:schedule_delay",
+      sourceSnapshotIds: ["snapshot-a", "snapshot-b"],
+      sourceMetricIds: ["snapshot-a:schedule_days"],
+      currentTemplate: templateRef,
+      improvementKey: "add_acceptance_checkpoint",
+      reason: "Повторяющаяся задержка приемки",
+      stateVersion: 7,
+      createdAt: "2026-07-15T00:05:00.000Z"
+    });
+
+    expect(preview).toMatchObject({
+      mutatesState: false,
+      sourceInsightId: "insight-template-delay",
+      sourceSnapshotIds: ["snapshot-a", "snapshot-b"],
+      template: { id: templateRef.id, currentVersion: 3, nextVersion: 4 },
+      before: { templateVersion: 3 },
+      after: { templateVersion: 4, addedChecklistItemKey: "add_acceptance_checkpoint" }
+    });
+    expect(templateRef.version).toBe(3);
+
+    const result = applyProcessTemplateImprovementPreview(templateRef, {
+      preview,
+      expectedStateVersion: 7,
+      appliedAt: "2026-07-15T00:06:00.000Z"
+    });
+
+    expect(result).toMatchObject({
+      previousVersion: 3,
+      template: {
+        id: templateRef.id,
+        version: 4,
+        improvementSourceInsightId: "insight-template-delay",
+        improvementKey: "add_acceptance_checkpoint"
+      }
+    });
+    expect(templateRef.version).toBe(3);
+  });
+
+  it("rejects stale or cross-tenant template improvement previews", () => {
+    const templateRef = createProcessTemplateConfigurationRef({
+      id: "process-template-tenant-a-implementation",
+      tenantId: "tenant-a",
+      key: "implementation.standard",
+      label: "Стандартное внедрение",
+      version: 1,
+      active: true
+    });
+    const preview = previewProcessTemplateImprovement({
+      id: "preview-template-improvement-1",
+      tenantId: "tenant-a",
+      actorId: "tenant-admin-a",
+      sourceInsightId: "insight-template-delay",
+      sourceTrendId: "tenant-a:template:implementation.standard:schedule_delay",
+      sourceSnapshotIds: ["snapshot-a"],
+      sourceMetricIds: ["snapshot-a:schedule_days"],
+      currentTemplate: templateRef,
+      improvementKey: "add_acceptance_checkpoint",
+      reason: "Повторяющаяся задержка приемки",
+      stateVersion: 1,
+      createdAt: "2026-07-15T00:05:00.000Z"
+    });
+
+    expect(() =>
+      applyProcessTemplateImprovementPreview(templateRef, {
+        preview,
+        expectedStateVersion: 2,
+        appliedAt: "2026-07-15T00:06:00.000Z"
+      })
+    ).toThrow("Process template improvement preview is stale");
+
+    expect(() =>
+      previewProcessTemplateImprovement({
+        id: "preview-template-improvement-cross-tenant",
+        tenantId: "tenant-b",
+        actorId: "tenant-admin-b",
+        sourceInsightId: "insight-template-delay",
+        sourceTrendId: "tenant-a:template:implementation.standard:schedule_delay",
+        sourceSnapshotIds: ["snapshot-a"],
+        sourceMetricIds: ["snapshot-a:schedule_days"],
+        currentTemplate: templateRef,
+        improvementKey: "add_acceptance_checkpoint",
+        reason: "cross tenant",
+        stateVersion: 1,
+        createdAt: "2026-07-15T00:05:00.000Z"
+      })
+    ).toThrow("Process template improvement tenant mismatch");
   });
 });

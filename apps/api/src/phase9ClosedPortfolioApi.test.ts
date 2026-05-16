@@ -155,6 +155,30 @@ async function closeProjectForRetrospectives(
   return (await readJson(apply)) as { result: { snapshotId: string } };
 }
 
+async function createRetrospectiveInsight(app: ReturnType<typeof createApiApp>) {
+  const first = await closeProjectForRetrospectives(app, {
+    projectId: "project-phase9-template-improvement-a",
+    lessonId: "lesson-template-improvement-a"
+  });
+  const second = await closeProjectForRetrospectives(app, {
+    projectId: "project-phase9-template-improvement-b",
+    lessonId: "lesson-template-improvement-b"
+  });
+
+  const trends = await app.request("/api/retrospectives/trends?testUser=tenant-admin-a&groupBy=template");
+  expect(trends.status).toBe(200);
+  const trendsBody = (await readJson(trends)) as {
+    insights: Array<{ id: string; status: string; sourceSnapshotIds: string[] }>;
+  };
+  const insight = trendsBody.insights[0];
+  expect(insight).toBeDefined();
+
+  return {
+    insightId: insight!.id,
+    snapshotIds: [first.result.snapshotId, second.result.snapshotId]
+  };
+}
+
 const completeClosureData = {
   finalKpiSummary: "Проект закрыт в рамках допустимых KPI.",
   qualityScore: 5,
@@ -516,5 +540,173 @@ describe("Phase 9 closure and snapshot API", () => {
       events: [],
       actionExecutions: []
     });
+  });
+
+  it("previews and applies template improvement with audit evidence without rewriting closed snapshots", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const { insightId, snapshotIds } = await createRetrospectiveInsight(app);
+
+    const firstSnapshotBefore = await app.request(`/api/retrospectives/snapshots/${snapshotIds[0]}?testUser=tenant-admin-a`);
+    expect(firstSnapshotBefore.status).toBe(200);
+    const firstSnapshotBeforeBody = await readJson(firstSnapshotBefore);
+
+    const preview = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/preview?testUser=tenant-admin-a`,
+      jsonRequest({ improvementKey: "add_acceptance_checkpoint", reason: "Повторяющаяся задержка приемки" })
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = (await readJson(preview)) as {
+      preview: {
+        id: string;
+        mutatesState: boolean;
+        sourceInsightId: string;
+        sourceSnapshotIds: string[];
+        template: { id: string; currentVersion: number; nextVersion: number };
+        before: { templateVersion: number };
+        after: { templateVersion: number; addedChecklistItemKey: string };
+      };
+    };
+    expect(previewBody.preview).toMatchObject({
+      mutatesState: false,
+      sourceInsightId: insightId,
+      sourceSnapshotIds: expect.arrayContaining(snapshotIds),
+      after: { addedChecklistItemKey: "add_acceptance_checkpoint" }
+    });
+    expect(previewBody.preview.template.nextVersion).toBe(previewBody.preview.template.currentVersion + 1);
+    expect(previewBody.preview.before.templateVersion).toBe(previewBody.preview.template.currentVersion);
+    expect(previewBody.preview.after.templateVersion).toBe(previewBody.preview.template.nextVersion);
+
+    const afterPreviewInsight = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(afterPreviewInsight.status).toBe(200);
+    await expect(readJson(afterPreviewInsight)).resolves.toMatchObject({ insight: { status: "open" } });
+
+    const firstSnapshotAfterPreview = await app.request(`/api/retrospectives/snapshots/${snapshotIds[0]}?testUser=tenant-admin-a`);
+    expect(firstSnapshotAfterPreview.status).toBe(200);
+    expect(await readJson(firstSnapshotAfterPreview)).toEqual(firstSnapshotBeforeBody);
+
+    const apply = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=tenant-admin-a`,
+      jsonRequest({ previewId: previewBody.preview.id })
+    );
+    expect(apply.status).toBe(200);
+    const applyBody = (await readJson(apply)) as {
+      result: {
+        insight: { id: string; status: string; handledBy: string };
+        template: { id: string; previousVersion: number; version: number };
+        actionExecution: { id: string; commandType: string; auditEventIds: string[] };
+      };
+    };
+    expect(applyBody.result).toMatchObject({
+      insight: { id: insightId, status: "handled", handledBy: "tenant-admin-a" },
+      actionExecution: {
+        commandType: "template_improvement.apply",
+        auditEventIds: [expect.stringContaining("audit-")]
+      }
+    });
+    expect(applyBody.result.template.previousVersion).toBe(previewBody.preview.template.currentVersion);
+    expect(applyBody.result.template.version).toBe(previewBody.preview.template.nextVersion);
+
+    const insightReadback = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(insightReadback.status).toBe(200);
+    await expect(readJson(insightReadback)).resolves.toMatchObject({
+      insight: {
+        id: insightId,
+        status: "handled",
+        handledBy: "tenant-admin-a"
+      }
+    });
+
+    const firstSnapshotAfterApply = await app.request(`/api/retrospectives/snapshots/${snapshotIds[0]}?testUser=tenant-admin-a`);
+    expect(firstSnapshotAfterApply.status).toBe(200);
+    expect(await readJson(firstSnapshotAfterApply)).toEqual(firstSnapshotBeforeBody);
+
+    const audit = await app.request("/api/retrospectives/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.toMatchObject({
+      events: expect.arrayContaining([expect.objectContaining({ actionKey: "template_improvement.apply" })]),
+      actionExecutions: expect.arrayContaining([
+        expect.objectContaining({
+          id: applyBody.result.actionExecution.id,
+          commandType: "template_improvement.apply",
+          source: { entityType: "retrospectiveInsight", entityId: insightId },
+          target: { entityType: "processTemplate", entityId: applyBody.result.template.id }
+        })
+      ])
+    });
+  });
+
+  it("denies template improvement mutation for read-only and cross-tenant users without leaking or partial writes", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const { insightId } = await createRetrospectiveInsight(app);
+
+    const readOnlyPreview = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/preview?testUser=readonly-observer-a`,
+      jsonRequest({ improvementKey: "add_acceptance_checkpoint", reason: "readonly attempt" })
+    );
+    expect(readOnlyPreview.status).toBe(403);
+
+    const readOnlyApply = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=readonly-observer-a`,
+      jsonRequest({ previewId: "preview-template-improvement-readonly" })
+    );
+    expect(readOnlyApply.status).toBe(403);
+
+    const tenantBPreview = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/preview?testUser=tenant-admin-b`,
+      jsonRequest({ improvementKey: "add_acceptance_checkpoint", reason: "wrong tenant" })
+    );
+    expect(tenantBPreview.status).toBe(404);
+    expect(await tenantBPreview.text()).not.toContain(insightId);
+
+    const insightReadback = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(insightReadback.status).toBe(200);
+    await expect(readJson(insightReadback)).resolves.toMatchObject({ insight: { status: "open" } });
+
+    const audit = await app.request("/api/retrospectives/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.not.toMatchObject({
+      events: [expect.objectContaining({ actionKey: "template_improvement.apply" })]
+    });
+  });
+
+  it("requires fresh template improvement preview and rejects stale or malformed apply without partial mutation", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const { insightId } = await createRetrospectiveInsight(app);
+
+    const directApply = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=tenant-admin-a`,
+      jsonRequest({})
+    );
+    expect(directApply.status).toBe(409);
+    await expect(readJson(directApply)).resolves.toMatchObject({ code: "dry_run_required" });
+
+    const preview = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/preview?testUser=tenant-admin-a`,
+      jsonRequest({ improvementKey: "add_acceptance_checkpoint", reason: "first preview" })
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = (await readJson(preview)) as { preview: { id: string } };
+
+    const firstApply = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=tenant-admin-a`,
+      jsonRequest({ previewId: previewBody.preview.id })
+    );
+    expect(firstApply.status).toBe(200);
+
+    const staleApply = await app.request(
+      `/api/retrospectives/insights/${encodeURIComponent(insightId)}/template-improvement/apply?testUser=tenant-admin-a`,
+      jsonRequest({ previewId: previewBody.preview.id })
+    );
+    expect(staleApply.status).toBe(409);
+    await expect(readJson(staleApply)).resolves.toMatchObject({ code: "stale_preview" });
+
+    const handledInsight = await app.request(`/api/retrospectives/insights/${encodeURIComponent(insightId)}?testUser=tenant-admin-a`);
+    expect(handledInsight.status).toBe(200);
+    await expect(readJson(handledInsight)).resolves.toMatchObject({ insight: { status: "handled" } });
+
+    const audit = await app.request("/api/retrospectives/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    const auditBody = (await readJson(audit)) as { actionExecutions: Array<{ commandType: string }> };
+    expect(auditBody.actionExecutions.filter((entry) => entry.commandType === "template_improvement.apply")).toHaveLength(1);
   });
 });

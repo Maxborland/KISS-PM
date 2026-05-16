@@ -485,6 +485,19 @@ const retrospectiveTrendsQuerySchema = retrospectivePaginationQuerySchema
   })
   .strict();
 
+const templateImprovementPreviewSchema = z
+  .object({
+    improvementKey: z.literal("add_acceptance_checkpoint").default("add_acceptance_checkpoint"),
+    reason: z.string().trim().min(1)
+  })
+  .strict();
+
+const templateImprovementApplySchema = z
+  .object({
+    previewId: z.string().trim().min(1).optional()
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -1494,7 +1507,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
-  app.post("/api/retrospectives/insights/:insightId/template-improvement/apply", (context) => {
+  app.post("/api/retrospectives/insights/:insightId/template-improvement/preview", async (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
       const insightId = context.req.param("insightId");
@@ -1507,8 +1520,79 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         tenantId: session.user.tenantId,
         entityId: insightId
       });
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = templateImprovementPreviewSchema.parse(await parseJson(context));
+      const preview = phase9Runtime.previewTemplateImprovement({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        insightId,
+        improvementKey: body.improvementKey,
+        reason: body.reason
+      });
 
-      return context.json(errorDto("not_implemented", "Действие еще не подключено к доменной команде"), 501);
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/retrospectives/insights/:insightId/template-improvement/apply", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const insightId = context.req.param("insightId");
+      const readModel = phase9Runtime.getInsightReadModel(session.user.tenantId, insightId, session.profile.permissions);
+      if (readModel === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "retrospective.improvement.write", {
+        entityType: "retrospectiveInsight",
+        tenantId: session.user.tenantId,
+        entityId: insightId
+      });
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "tenantConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = templateImprovementApplySchema.parse(await parseJson(context));
+      phase9Runtime.validateApplyTemplateImprovement({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        insightId,
+        previewId: body.previewId
+      });
+      const auditEvent = runtime.appendAuditEvent({
+        session,
+        actionKey: "template_improvement.apply",
+        target: { entityType: "retrospectiveInsight", entityId: insightId },
+        correlationId: `template-improvement-${insightId}-audit`,
+        details: {
+          before: { insightId, sourceTrendId: readModel.insight.sourceTrendId },
+          after: { previewId: body.previewId }
+        }
+      });
+      const result = phase9Runtime.applyTemplateImprovement({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        insightId,
+        previewId: body.previewId,
+        auditEventId: auditEvent.id
+      });
+
+      return context.json({
+        result: {
+          preview: result.preview,
+          insight: result.insight,
+          template: {
+            ...result.template,
+            previousVersion: result.previousTemplateVersion
+          },
+          actionExecution: result.actionExecution
+        }
+      });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -1525,7 +1609,12 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       const actionCorrelationIds = new Set(actionExecutions.map((entry) => entry.correlationId));
       const events = runtime.auditStore
         .listByTenant(session.user.tenantId)
-        .filter((event) => actionCorrelationIds.has(event.correlationId) || event.actionKey.startsWith("project.closure"))
+        .filter(
+          (event) =>
+            actionCorrelationIds.has(event.correlationId) ||
+            event.actionKey.startsWith("project.closure") ||
+            event.actionKey.startsWith("template_improvement")
+        )
         .map(auditEventDto);
 
       return context.json({

@@ -67,6 +67,11 @@ const phase2PermissionCatalog = [
     category: "tenant_config"
   }),
   createPermission({
+    key: "tenant.config.write",
+    description: "Apply governed tenant configuration and template version changes",
+    category: "tenant_config"
+  }),
+  createPermission({
     key: "permission.diagnostics.read",
     description: "Run safe permission diagnostics",
     category: "access_control"
@@ -255,6 +260,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run",
       "audit.read",
+      "tenant.config.write",
       "project_draft.read",
       "project_draft.create",
       "project.create_from_template",
