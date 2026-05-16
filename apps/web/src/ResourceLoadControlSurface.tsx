@@ -19,6 +19,10 @@ import {
 
 type LoadState = "idle" | "loading" | "ready" | "empty" | "denied" | "error";
 type PendingAction = "preview" | "apply" | "reserve" | "refresh" | null;
+type RefreshReadback = {
+  projection: ResourceLoadProjectionDto;
+  audit: ResourcePlanningAuditDto;
+};
 
 type ResourceLoadControlSurfaceProps = {
   apiClient: ResourcePlanningApiClient;
@@ -187,11 +191,11 @@ export function ResourceLoadControlSurface({
   }, [availableGanttProjectIds, onOpenGanttProject, selectedOverload]);
 
   const refreshSurface = useCallback(
-    async (nextStatus = "Нагрузка загружена") => {
+    async (nextStatus = "Нагрузка загружена"): Promise<RefreshReadback | null> => {
       if (!canReadResources) {
         setLoadState("denied");
         setStatus("Нет доступа к ресурсной нагрузке");
-        return;
+        return null;
       }
 
       const sequence = requestSequence.current + 1;
@@ -206,7 +210,7 @@ export function ResourceLoadControlSurface({
           canReadAudit ? apiClient.getResourceAudit(testUser).catch(() => ({ events: [], actionExecutions: [] })) : Promise.resolve({ events: [], actionExecutions: [] })
         ]);
         if (requestSequence.current !== sequence) {
-          return;
+          return null;
         }
 
         setProjection(nextProjection);
@@ -216,13 +220,15 @@ export function ResourceLoadControlSurface({
         setPreview(null);
         setLoadState(nextProjection.loadBuckets.length > 0 ? "ready" : "empty");
         setStatus(nextProjection.loadBuckets.length > 0 ? nextStatus : "Нет ресурсных бакетов");
+        return { projection: nextProjection, audit: nextAudit };
       } catch (error) {
         if (requestSequence.current !== sequence) {
-          return;
+          return null;
         }
         setProjection(null);
         setLoadState("error");
         setStatus(getErrorMessage(error));
+        return null;
       }
     },
     [apiClient, canReadAudit, canReadResources, testUser]
@@ -278,7 +284,7 @@ export function ResourceLoadControlSurface({
     setCommandError("");
     setApplyResult(null);
     try {
-      const nextPreview = await apiClient.previewResolution(testUser, overloadDetail.overload.id, command);
+      const nextPreview = await apiClient.previewGovernedResolution(testUser, overloadDetail.overload, command);
       setPreview(nextPreview);
       setStatus("Preview готов: мутации еще нет");
     } catch (error) {
@@ -298,15 +304,41 @@ export function ResourceLoadControlSurface({
     setStatus("Применяем preview через команду");
     setCommandError("");
     try {
-      const result = await apiClient.applyResolution(testUser, preview.overloadId, { previewId: preview.id });
-      setApplyResult(result);
-      setProjection(result.readback);
+      const result = await apiClient.applyGovernedResolution(testUser, preview.actionKey, { previewId: preview.id });
       setPreview(null);
       setStatus("Команда применена, обновляем readback");
-      await refreshSurface("Команда применена через API");
+      const readback = await refreshSurface("Команда применена через API");
+      if (readback === null) {
+        throw new Error("Команда выполнена, но readback не подтвердил состояние");
+      }
+      if (
+        canReadAudit &&
+        !readback.audit.actionExecutions.some((actionExecution) => actionExecution.correlationId === result.result.correlationId)
+      ) {
+        throw new Error("Команда выполнена, но audit/readback не подтвердил action evidence");
+      }
+      const overloadStatus = readback.projection.overloads.some((overload) => overload.id === preview.overloadId)
+        ? "open"
+        : "resolved";
+      setApplyResult({
+        result: {
+          status: "succeeded",
+          actionExecution: result.result,
+          changedAssignmentIds: preview.affectedAssignments.map((assignment) => assignment.id),
+          changedReservationIds: preview.affectedReservations.map((reservation) => reservation.id),
+          overloadStatus,
+          beforeLoadBuckets: preview.beforeLoadBuckets,
+          afterLoadBuckets: readback.projection.loadBuckets
+        },
+        readback: readback.projection
+      });
     } catch (error) {
-      setCommandError(getErrorMessage(error));
-      setStatus(getErrorCode(error) === "stale_preview" ? "Preview устарел" : "Команда отклонена");
+      const nextCommandError = getErrorMessage(error);
+      const nextStatus = getErrorCode(error) === "stale_preview" ? "Preview устарел" : "Команда отклонена";
+      setPreview(null);
+      await refreshSurface("Команда отклонена, readback обновлен");
+      setCommandError(nextCommandError);
+      setStatus(nextStatus);
     } finally {
       setPendingAction(null);
     }

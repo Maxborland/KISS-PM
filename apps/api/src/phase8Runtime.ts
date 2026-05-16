@@ -17,6 +17,7 @@ import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 
 import type { Phase4RuntimeState } from "./phase4Runtime";
 import type { Phase6RuntimeState } from "./phase6Runtime";
+import type { ResourceResolutionCommand } from "./phase6Runtime";
 import type { Phase7RuntimeState } from "./phase7Runtime";
 
 export type Phase8RuntimeState = ReturnType<typeof createPhase8RuntimeState>;
@@ -43,6 +44,7 @@ export type Phase8ActionTargetInput = {
 export type Phase8ActionPreview = {
   id: string;
   tenantId: TenantId;
+  actorId: TenantUserId;
   actionDefinitionId: string;
   actionKey: string;
   commandType: string;
@@ -111,6 +113,57 @@ function requireActionInput(definition: ActionDefinition, input: Record<string, 
   }
 }
 
+function resourceCommandFromInput(definition: ActionDefinition, input: Record<string, unknown>): ResourceResolutionCommand {
+  if (definition.key === "shift_work") {
+    return {
+      actionKey: "shift_work",
+      assignmentId: requireStringInput(input, "assignmentId"),
+      shiftDays: Number(input.shiftDays),
+      reason: requireStringInput(input, "reason")
+    };
+  }
+
+  if (definition.key === "split_work") {
+    return {
+      actionKey: "split_work",
+      assignmentId: requireStringInput(input, "assignmentId"),
+      splitHours: Number(input.splitHours),
+      reason: requireStringInput(input, "reason")
+    };
+  }
+
+  if (definition.key === "reassign_resource") {
+    return {
+      actionKey: "reassign_resource",
+      assignmentId: requireStringInput(input, "assignmentId"),
+      targetResourceProfileId: requireStringInput(input, "targetResourceProfileId"),
+      reason: requireStringInput(input, "reason")
+    };
+  }
+
+  if (definition.key === "accept_resource_overload") {
+    return {
+      actionKey: "accept_risk",
+      reason: requireStringInput(input, "reason")
+    };
+  }
+
+  throw preconditionFailed(`resource action binding is not implemented yet: ${definition.key}`);
+}
+
+function isResourceResolutionAction(key: string): boolean {
+  return key === "shift_work" || key === "split_work" || key === "reassign_resource" || key === "accept_resource_overload";
+}
+
+function requirePreviewAfterString(preview: Phase8ActionPreview, key: string): string {
+  const value = preview.after[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw preconditionFailed(`action preview field is missing: ${key}`, "stale_preview");
+  }
+
+  return value;
+}
+
 function actionDefinitions(tenantId: TenantId): ActionDefinition[] {
   return [
     createActionDefinition({
@@ -170,6 +223,64 @@ function actionDefinitions(tenantId: TenantId): ActionDefinition[] {
       updatedAt: "2026-05-16T14:20:00.000Z"
     }),
     createActionDefinition({
+      id: "action-shift-resource-work",
+      tenantId,
+      key: "shift_work",
+      label: "Сдвинуть работу",
+      description: "Готовит управляемый сдвиг работы из перегруженного периода",
+      version: 1,
+      status: "active",
+      targetEntityType: "resource_overload",
+      sourceSurfaceKey: "portfolio.control",
+      commandBinding: {
+        commandType: "resource_resolution.shift_work",
+        handlerKey: "resource.overload.shift_work",
+        targetEntityType: "resource_overload",
+        resultEntityType: "action_execution"
+      },
+      requiredPermission: "resource.write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
+          { key: "shiftDays", label: "Дней", valueType: "number", required: true, summary: true },
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true }
+        ]
+      },
+      auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
+      createdAt: "2026-05-16T14:20:00.000Z",
+      updatedAt: "2026-05-16T14:20:00.000Z"
+    }),
+    createActionDefinition({
+      id: "action-split-resource-work",
+      tenantId,
+      key: "split_work",
+      label: "Разделить работу",
+      description: "Готовит управляемое разделение работы для снятия перегрузки",
+      version: 1,
+      status: "active",
+      targetEntityType: "resource_overload",
+      sourceSurfaceKey: "portfolio.control",
+      commandBinding: {
+        commandType: "resource_resolution.split_work",
+        handlerKey: "resource.overload.split_work",
+        targetEntityType: "resource_overload",
+        resultEntityType: "action_execution"
+      },
+      requiredPermission: "resource.write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
+          { key: "splitHours", label: "Часы", valueType: "number", required: true, summary: true },
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true }
+        ]
+      },
+      auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
+      createdAt: "2026-05-16T14:20:00.000Z",
+      updatedAt: "2026-05-16T14:20:00.000Z"
+    }),
+    createActionDefinition({
       id: "action-reassign-resource",
       tenantId,
       key: "reassign_resource",
@@ -189,7 +300,35 @@ function actionDefinitions(tenantId: TenantId): ActionDefinition[] {
       dryRunRequired: true,
       inputSchema: {
         fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
           { key: "targetResourceProfileId", label: "Новый ресурс", valueType: "text", required: true, summary: true },
+          { key: "reason", label: "Причина", valueType: "text", required: true, summary: true }
+        ]
+      },
+      auditPolicy: { required: true, includeInputSummary: true, includeBeforeAfter: true },
+      createdAt: "2026-05-16T14:20:00.000Z",
+      updatedAt: "2026-05-16T14:20:00.000Z"
+    }),
+    createActionDefinition({
+      id: "action-accept-resource-overload",
+      tenantId,
+      key: "accept_resource_overload",
+      label: "Принять ресурсный риск",
+      description: "Фиксирует принятие ресурсной перегрузки с причиной",
+      version: 1,
+      status: "active",
+      targetEntityType: "resource_overload",
+      sourceSurfaceKey: "portfolio.control",
+      commandBinding: {
+        commandType: "resource_resolution.accept_risk",
+        handlerKey: "resource.overload.accept_risk",
+        targetEntityType: "resource_overload",
+        resultEntityType: "action_execution"
+      },
+      requiredPermission: "resource.write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
           { key: "reason", label: "Причина", valueType: "text", required: true, summary: true }
         ]
       },
@@ -253,6 +392,26 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
           visible: true,
           sortable: true,
           filterable: true
+        },
+        {
+          id: "portfolio-field-primary-assignment",
+          key: "primary_assignment_id",
+          label: "Назначение",
+          entityType: "resource_overload",
+          valueType: "text",
+          visible: true,
+          sortable: false,
+          filterable: false
+        },
+        {
+          id: "portfolio-field-suggested-resource",
+          key: "suggested_resource_profile_id",
+          label: "Ресурс для переназначения",
+          entityType: "resource_overload",
+          valueType: "text",
+          visible: true,
+          sortable: false,
+          filterable: false
         }
       ],
       widgets: [
@@ -287,10 +446,40 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
           dryRunRequired: true
         },
         {
+          id: "portfolio-action-resource-shift",
+          key: "shift_work",
+          label: "Сдвинуть работу",
+          actionDefinitionKey: "shift_work",
+          slotType: "row",
+          targetEntityType: "resource_overload",
+          requiredPermission: "resource.write",
+          dryRunRequired: true
+        },
+        {
+          id: "portfolio-action-resource-split",
+          key: "split_work",
+          label: "Разделить работу",
+          actionDefinitionKey: "split_work",
+          slotType: "row",
+          targetEntityType: "resource_overload",
+          requiredPermission: "resource.write",
+          dryRunRequired: true
+        },
+        {
           id: "portfolio-action-resource-reassign",
           key: "reassign_resource",
           label: "Переназначить ресурс",
           actionDefinitionKey: "reassign_resource",
+          slotType: "row",
+          targetEntityType: "resource_overload",
+          requiredPermission: "resource.write",
+          dryRunRequired: true
+        },
+        {
+          id: "portfolio-action-resource-risk",
+          key: "accept_resource_overload",
+          label: "Принять ресурсный риск",
+          actionDefinitionKey: "accept_resource_overload",
           slotType: "row",
           targetEntityType: "resource_overload",
           requiredPermission: "resource.write",
@@ -365,6 +554,13 @@ function resourceRows(tenantId: TenantId, phase6Runtime: Phase6RuntimeState): Co
   const projection = phase6Runtime.getProjection(tenantId);
   return projection.overloads.map((overload) => {
     const resource = projection.resourceProfiles.find((candidate) => candidate.id === overload.resourceProfileId);
+    const assignmentId = overload.sourceRefs.find((sourceRef) => sourceRef.startsWith("assignment:"))?.slice("assignment:".length);
+    const reservationId = overload.sourceRefs.find((sourceRef) => sourceRef.startsWith("reservation:"))?.slice("reservation:".length);
+    const sourceRefs: ControlSurfaceSourceRecord["sourceRefs"] = [{ entityType: "resource_overload", entityId: overload.id }];
+    const suggestedResource = projection.resourceProfiles.find((candidate) => candidate.id !== overload.resourceProfileId);
+    const recommendedActionKeys = overload.recommendedActionKeys.map((key) =>
+      key === "accept_risk" ? "accept_resource_overload" : key
+    );
     return {
       id: `row-resource-overload-${overload.resourceProfileId}`,
       tenantId,
@@ -373,13 +569,16 @@ function resourceRows(tenantId: TenantId, phase6Runtime: Phase6RuntimeState): Co
       label: resource?.label ?? overload.resourceProfileId,
       severity: overload.severity,
       explanation: `Перегрузка ресурса ${resource?.label ?? overload.resourceProfileId}: ${overload.overloadHours} ч.`,
-      sourceRefs: [{ entityType: "resource_overload", entityId: overload.id }],
+      sourceRefs,
       fieldValues: {
         project_label: overload.affectedProjectIds[0] ?? overload.resourceProfileId,
         signal_label: `Перегрузка ${overload.overloadHours} ч.`,
-        severity: overload.severity
+        severity: overload.severity,
+        primary_assignment_id: assignmentId ?? null,
+        primary_reservation_id: reservationId ?? null,
+        suggested_resource_profile_id: suggestedResource?.id ?? null
       },
-      recommendedActionKeys: overload.recommendedActionKeys,
+      recommendedActionKeys,
       drilldownParams: { projectId: overload.affectedProjectIds[0] ?? "" },
       policyContext: { projectId: overload.affectedProjectIds[0] }
     };
@@ -508,18 +707,41 @@ export function createPhase8RuntimeState() {
     if (!record.recommendedActionKeys.includes(definition.key)) {
       throw preconditionFailed("action is not recommended for target");
     }
+    const resourcePreview =
+      isResourceResolutionAction(definition.key) && record.entityType === "resource_overload"
+        ? input.phase6Runtime.previewResolution(
+            input.tenantId,
+            input.actorId,
+            record.entityId,
+            resourceCommandFromInput(definition, input.commandInput)
+          )
+        : undefined;
     const state = actionState(input.tenantId);
     const preview: Phase8ActionPreview = {
       id: `preview-p8-${state.version}-${state.previews.size + 1}`,
       tenantId: input.tenantId,
+      actorId: input.actorId,
       actionDefinitionId: definition.id,
       actionKey: definition.key,
       commandType: definition.commandBinding.commandType,
       target: clone(input.target),
       input: clone(input.commandInput),
       mutatesState: false,
-      before: { targetStatus: "open" },
-      after: { status: "would_execute", commandType: definition.commandBinding.commandType },
+      before:
+        resourcePreview === undefined
+          ? { targetStatus: "open" }
+          : { loadBuckets: resourcePreview.beforeLoadBuckets, command: resourcePreview.command },
+      after:
+        resourcePreview === undefined
+          ? { status: "would_execute", commandType: definition.commandBinding.commandType }
+          : {
+              status: "would_execute",
+              commandType: definition.commandBinding.commandType,
+              p6PreviewId: resourcePreview.id,
+              afterLoadBuckets: resourcePreview.afterLoadBuckets,
+              affectedAssignments: resourcePreview.affectedAssignments,
+              affectedReservations: resourcePreview.affectedReservations
+            },
       requiredPermission: definition.requiredPermission,
       stateVersion: state.version
     };
@@ -551,6 +773,9 @@ export function createPhase8RuntimeState() {
     }
     if (preview !== undefined && (preview.actionDefinitionId !== definition.id || preview.stateVersion !== state.version)) {
       throw preconditionFailed("action preview is stale", "stale_preview");
+    }
+    if (preview !== undefined && preview.actorId !== input.actorId) {
+      throw preconditionFailed("action preview belongs to another actor", "stale_preview");
     }
     const target = preview?.target ?? input.target;
     if (target === undefined) throw preconditionFailed("action target is required", "validation_error");
@@ -637,6 +862,78 @@ export function createPhase8RuntimeState() {
         ]
       };
       state.previews.delete(preview?.id ?? "");
+      return clone(execution);
+    }
+    if (isResourceResolutionAction(definition.key)) {
+      if (record.entityType !== "resource_overload") {
+        throw preconditionFailed("resource action target must be a resource overload", "precondition_failed");
+      }
+      if (preview === undefined) {
+        throw preconditionFailed("resource action preview is required", "dry_run_required");
+      }
+      const p6PreviewId = requirePreviewAfterString(preview, "p6PreviewId");
+      let result;
+      try {
+        result = input.phase6Runtime.applyResolution({
+          tenantId: input.tenantId,
+          actorId: input.actorId,
+          ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+          overloadId: record.entityId,
+          previewId: p6PreviewId
+        });
+      } catch (error) {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "stale_preview") {
+          state.previews.delete(preview.id);
+        }
+        throw error;
+      }
+      const execution: ActionExecutionLog = {
+        id: `action-p8-resource-${state.version}`,
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        commandType: result.actionExecution.commandType,
+        requiredPermission: definition.requiredPermission,
+        status: "succeeded",
+        source: { entityType: record.entityType, entityId: record.entityId },
+        target: result.actionExecution.target,
+        before: {
+          loadBuckets: result.beforeLoadBuckets,
+          command: result.actionExecution.before?.command ?? commandInput
+        },
+        after: {
+          loadBuckets: result.afterLoadBuckets,
+          overloadStatus: result.overloadStatus,
+          changedAssignmentIds: result.changedAssignmentIds,
+          changedReservationIds: result.changedReservationIds
+        },
+        timestamp: result.actionExecution.timestamp,
+        correlationId: `p8-${result.actionExecution.correlationId}`,
+        sourceSurface: {
+          surfaceId: target.surfaceId,
+          surfaceKey: target.surfaceKey,
+          rowId: target.rowId,
+          actionSlotKey: definition.key
+        },
+        inputSummary: {
+          assignmentId: commandInput.assignmentId,
+          targetResourceProfileId: commandInput.targetResourceProfileId,
+          reason: commandInput.reason,
+          p6ActionExecutionId: result.actionExecution.id
+        },
+        permissionTrace: [...input.permissionTrace, "resource_resolution:delegated to P6 applyResolution"],
+        preconditionTrace: [
+          "target:resource_overload",
+          `overload:${record.entityId}`,
+          `p6Preview:${p6PreviewId}`,
+          `p6Status:${result.overloadStatus}`
+        ],
+        trace: [
+          "control_action:resource preview confirmed",
+          "control_action:P6 resource resolution applied",
+          "control_action:portfolio/resource projections should refetch"
+        ]
+      };
+      state.previews.delete(preview.id);
       return clone(execution);
     }
     throw notImplemented(`Action binding is not implemented yet: ${definition.commandBinding.commandType}`);

@@ -22,6 +22,14 @@ const target = {
   entityId: "signal-kpi-schedule-variance-a"
 };
 
+const resourceTarget = {
+  surfaceId: "portfolio-control",
+  surfaceKey: "portfolio.control",
+  rowId: "row-resource-overload-resource-architect-a",
+  entityType: "resource_overload",
+  entityId: "overload:resource-architect-a:2026-06-01:2026-06-05"
+};
+
 async function createDraft(app: ReturnType<typeof createApiApp>, testUser = "project-manager-a") {
   const response = await app.request(
     `/api/crm/opportunities/opportunity-seed-ready/project-draft?testUser=${testUser}`,
@@ -65,6 +73,30 @@ describe("Phase 8 governed action execution API", () => {
           id: "action-accept-risk",
           key: "accept_risk",
           requiredPermission: "risk:accept",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
+          id: "action-reassign-resource",
+          key: "reassign_resource",
+          requiredPermission: "resource.write",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
+          id: "action-shift-resource-work",
+          key: "shift_work",
+          commandType: "resource_resolution.shift_work",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
+          id: "action-split-resource-work",
+          key: "split_work",
+          commandType: "resource_resolution.split_work",
+          dryRunRequired: true
+        }),
+        expect.objectContaining({
+          id: "action-accept-resource-overload",
+          key: "accept_resource_overload",
+          commandType: "resource_resolution.accept_risk",
           dryRunRequired: true
         })
       ])
@@ -391,5 +423,234 @@ describe("Phase 8 governed action execution API", () => {
     const taskAudit = await app.request("/api/audit?testUser=tenant-admin-a&targetType=task&targetId=task-corrective-denied");
     expect(taskAudit.status).toBe(200);
     await expect(readJson(taskAudit)).resolves.toMatchObject({ events: [] });
+  });
+
+  it("routes resource overload reassignment through P8 action execution with P6 preview/apply readback", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const before = await app.request("/api/resources/load/load:resource-architect-a:2026-06-01:2026-06-05?testUser=resource-manager-a");
+    expect(before.status).toBe(200);
+    await expect(readJson(before)).resolves.toMatchObject({
+      bucket: { id: "load:resource-architect-a:2026-06-01:2026-06-05", totalLoadHours: 50, severity: "critical" }
+    });
+
+    const preview = await app.request(
+      "/api/control/actions/action-reassign-resource/preview?testUser=resource-manager-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          targetResourceProfileId: "resource-engineer-a",
+          reason: "Снять перегрузку через action engine"
+        }
+      })
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = (await readJson(preview)) as {
+      preview: { id: string; mutatesState: boolean; after: { p6PreviewId: string; afterLoadBuckets: Array<{ totalLoadHours: number }> } };
+    };
+    expect(previewBody.preview).toMatchObject({
+      mutatesState: false,
+      commandType: "resource_resolution.reassign_resource",
+      after: {
+        afterLoadBuckets: [expect.objectContaining({ totalLoadHours: 8 })]
+      }
+    });
+    expect(previewBody.preview.after.p6PreviewId).toContain("preview-resource-");
+
+    const unchanged = await app.request("/api/resources/load/load:resource-architect-a:2026-06-01:2026-06-05?testUser=resource-manager-a");
+    expect(unchanged.status).toBe(200);
+    await expect(readJson(unchanged)).resolves.toMatchObject({
+      bucket: { totalLoadHours: 50, severity: "critical" }
+    });
+
+    const execute = await app.request(
+      "/api/control/actions/action-reassign-resource/execute?testUser=resource-manager-a",
+      jsonRequest({ previewId: previewBody.preview.id })
+    );
+    expect(execute.status).toBe(200);
+    const executeBody = (await readJson(execute)) as { result: { id: string; commandType: string; correlationId: string } };
+    expect(executeBody.result).toMatchObject({
+      commandType: "resource_resolution.reassign_resource"
+    });
+
+    const after = await app.request("/api/resources/load/load:resource-architect-a:2026-06-01:2026-06-05?testUser=resource-manager-a");
+    expect(after.status).toBe(200);
+    await expect(readJson(after)).resolves.toMatchObject({
+      bucket: { totalLoadHours: 8, severity: "none" }
+    });
+
+    const view = await app.request("/api/control/surfaces/portfolio-control/view?testUser=resource-manager-a");
+    expect(view.status).toBe(200);
+    await expect(readJson(view)).resolves.toMatchObject({
+      rows: expect.not.arrayContaining([expect.objectContaining({ id: "row-resource-overload-resource-architect-a" })])
+    });
+
+    const controlAudit = await app.request("/api/control/audit?testUser=tenant-admin-a");
+    expect(controlAudit.status).toBe(200);
+    await expect(readJson(controlAudit)).resolves.toMatchObject({
+      actionExecutions: [
+        expect.objectContaining({
+          id: executeBody.result.id,
+          commandType: "resource_resolution.reassign_resource",
+          source: { entityType: "resource_overload", entityId: resourceTarget.entityId },
+          target: { entityType: "resourceAssignment", entityId: "assignment-design-architect-a" },
+          sourceSurface: {
+            surfaceId: "portfolio-control",
+            surfaceKey: "portfolio.control",
+            rowId: "row-resource-overload-resource-architect-a",
+            actionSlotKey: "reassign_resource"
+          },
+          auditEventIds: expect.arrayContaining([expect.stringContaining("audit-")])
+        })
+      ]
+    });
+
+    const resourceAudit = await app.request("/api/resources/audit?testUser=tenant-admin-a");
+    expect(resourceAudit.status).toBe(200);
+    const resourceAuditBody = (await readJson(resourceAudit)) as {
+      events: Array<{ actionKey: string }>;
+      actionExecutions: Array<{ commandType: string; source: { entityType: string; entityId: string } }>;
+    };
+    expect(resourceAuditBody.events).toEqual(
+      expect.arrayContaining([expect.objectContaining({ actionKey: "resource_resolution.reassign_resource" })])
+    );
+    expect(resourceAuditBody.actionExecutions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          commandType: "resource_resolution.reassign_resource",
+          source: { entityType: "resourceOverload", entityId: resourceTarget.entityId }
+        })
+      ])
+    );
+  });
+
+  it("denies resource action execution for users without resource.write without partial mutation", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const readonlyPreview = await app.request(
+      "/api/control/actions/action-reassign-resource/preview?testUser=readonly-observer-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          targetResourceProfileId: "resource-engineer-a",
+          reason: "Наблюдатель не должен применять ресурсное действие"
+        }
+      })
+    );
+    expect(readonlyPreview.status).toBe(403);
+
+    const afterDenied = await app.request("/api/resources/load/load:resource-architect-a:2026-06-01:2026-06-05?testUser=resource-manager-a");
+    expect(afterDenied.status).toBe(200);
+    await expect(readJson(afterDenied)).resolves.toMatchObject({
+      bucket: { totalLoadHours: 50, severity: "critical" }
+    });
+
+    const controlAudit = await app.request("/api/control/audit?testUser=tenant-admin-a");
+    expect(controlAudit.status).toBe(200);
+    await expect(readJson(controlAudit)).resolves.toMatchObject({ actionExecutions: [] });
+
+    const directExecute = await app.request(
+      "/api/control/actions/action-reassign-resource/execute?testUser=resource-manager-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          targetResourceProfileId: "resource-engineer-a",
+          reason: "No preview"
+        }
+      })
+    );
+    expect(directExecute.status).toBe(409);
+    await expect(readJson(directExecute)).resolves.toMatchObject({ code: "dry_run_required" });
+
+    const crossTenant = await app.request(
+      "/api/control/actions/action-reassign-resource/preview?testUser=tenant-admin-b",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          targetResourceProfileId: "resource-engineer-a",
+          reason: "Tenant B cannot touch Tenant A resource overload"
+        }
+      })
+    );
+    expect(crossTenant.status).toBe(404);
+    const crossTenantText = await crossTenant.text();
+    expect(crossTenantText).not.toContain("resource-architect-a");
+  });
+
+  it("binds resource previews to actor and supports shift, split, and accepted resource risk variants", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const shiftPreview = await app.request(
+      "/api/control/actions/action-shift-resource-work/preview?testUser=resource-manager-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          shiftDays: 7,
+          reason: "Сдвинуть перегруженную работу"
+        }
+      })
+    );
+    expect(shiftPreview.status).toBe(200);
+    const shiftPreviewBody = (await readJson(shiftPreview)) as { preview: { id: string; actorId: string } };
+    expect(shiftPreviewBody.preview.actorId).toBe("resource-manager-a");
+
+    const otherActorExecute = await app.request(
+      "/api/control/actions/action-shift-resource-work/execute?testUser=project-manager-a",
+      jsonRequest({ previewId: shiftPreviewBody.preview.id })
+    );
+    expect(otherActorExecute.status).toBe(409);
+    await expect(readJson(otherActorExecute)).resolves.toMatchObject({ code: "stale_preview" });
+
+    const splitPreview = await app.request(
+      "/api/control/actions/action-split-resource-work/preview?testUser=resource-manager-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: {
+          assignmentId: "assignment-design-architect-a",
+          splitHours: 6,
+          reason: "Разделить часть работы"
+        }
+      })
+    );
+    expect(splitPreview.status).toBe(200);
+    const splitPreviewBody = (await readJson(splitPreview)) as { preview: { id: string } };
+    const splitExecute = await app.request(
+      "/api/control/actions/action-split-resource-work/execute?testUser=resource-manager-a",
+      jsonRequest({ previewId: splitPreviewBody.preview.id })
+    );
+    expect(splitExecute.status).toBe(200);
+    await expect(readJson(splitExecute)).resolves.toMatchObject({
+      result: { commandType: "resource_resolution.split_work" }
+    });
+
+    const appForRisk = createApiApp({ allowTestFixtureReset: true });
+    const riskPreview = await appForRisk.request(
+      "/api/control/actions/action-accept-resource-overload/preview?testUser=resource-manager-a",
+      jsonRequest({
+        target: resourceTarget,
+        input: { reason: "Принимаем риск до комитета" }
+      })
+    );
+    expect(riskPreview.status).toBe(200);
+    const riskPreviewBody = (await readJson(riskPreview)) as { preview: { id: string } };
+    const riskExecute = await appForRisk.request(
+      "/api/control/actions/action-accept-resource-overload/execute?testUser=resource-manager-a",
+      jsonRequest({ previewId: riskPreviewBody.preview.id })
+    );
+    expect(riskExecute.status).toBe(200);
+    await expect(readJson(riskExecute)).resolves.toMatchObject({
+      result: { commandType: "resource_resolution.accept_risk" }
+    });
+
+    const riskView = await appForRisk.request("/api/control/surfaces/portfolio-control/view?testUser=resource-manager-a");
+    expect(riskView.status).toBe(200);
+    await expect(readJson(riskView)).resolves.toMatchObject({
+      rows: expect.not.arrayContaining([expect.objectContaining({ id: "row-resource-overload-resource-architect-a" })])
+    });
   });
 });

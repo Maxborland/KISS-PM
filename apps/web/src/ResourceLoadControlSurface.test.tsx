@@ -292,6 +292,7 @@ function createMutableApiClient(options: { failApplyOnce?: boolean; failLoad?: b
     }),
     getOverloadDetail: vi.fn(async () => createOverloadDetail()),
     previewResolution: vi.fn(async () => createPreview()),
+    previewGovernedResolution: vi.fn(async () => createPreview()),
     applyResolution: vi.fn(async (_testUser, _nextOverloadId, request) => {
       if (failNextApply) {
         failNextApply = false;
@@ -313,6 +314,17 @@ function createMutableApiClient(options: { failApplyOnce?: boolean; failLoad?: b
         },
         readback: cloneProjection(projection)
       } satisfies ResourceResolutionResultDto;
+    }),
+    applyGovernedResolution: vi.fn(async (_testUser, _actionKey, request) => {
+      if (failNextApply) {
+        failNextApply = false;
+        throw Object.assign(new Error("Предпросмотр устарел"), { code: "stale_preview" });
+      }
+      expect(request).toEqual({ previewId: "preview-resource-1-1" });
+      projection = cloneProjection(createProjection(false));
+      const actionExecution = createActionExecution();
+      audit = createAudit([actionExecution]);
+      return { result: actionExecution };
     }),
     createReservation: vi.fn(),
     getResourceAudit: vi.fn(async () => audit)
@@ -462,7 +474,10 @@ describe("Resource load control surface", () => {
     expect(previewPanel).toHaveTextContent("Состояние еще не изменено");
     expect(screen.getByTestId(`resource-load-bucket-${loadBucketId}`)).toHaveTextContent("50 ч");
     expect(screen.queryByTestId("resource-apply-result")).not.toBeInTheDocument();
+    expect(apiClient.previewGovernedResolution).toHaveBeenCalledTimes(1);
+    expect(apiClient.previewResolution).not.toHaveBeenCalled();
     expect(apiClient.applyResolution).not.toHaveBeenCalled();
+    expect(apiClient.applyGovernedResolution).not.toHaveBeenCalled();
   });
 
   it("applies a previewed resolution, refreshes from API readback, and shows audit/action evidence", async () => {
@@ -487,6 +502,10 @@ describe("Resource load control surface", () => {
     expect(await screen.findByTestId("resource-apply-result")).toHaveTextContent("resource_resolution.shift_work");
     expect(screen.getByTestId("resource-apply-result")).toHaveTextContent("resource.write");
     expect(screen.getByTestId("resource-audit-evidence")).toHaveTextContent("resource_resolution.shift_work");
+    expect(apiClient.previewGovernedResolution).toHaveBeenCalledTimes(1);
+    expect(apiClient.applyGovernedResolution).toHaveBeenCalledTimes(1);
+    expect(apiClient.previewResolution).not.toHaveBeenCalled();
+    expect(apiClient.applyResolution).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(apiClient.getResourceLoad).toHaveBeenCalledTimes(2);
     });
@@ -509,7 +528,9 @@ describe("Resource load control surface", () => {
     expect(screen.queryByRole("button", { name: "Предпросмотреть перенос" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Применить preview" })).not.toBeInTheDocument();
     expect(apiClient.previewResolution).not.toHaveBeenCalled();
+    expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
     expect(apiClient.applyResolution).not.toHaveBeenCalled();
+    expect(apiClient.applyGovernedResolution).not.toHaveBeenCalled();
   });
 
   it("recovers from a stale preview by refetching the API read model before retry", async () => {
@@ -532,9 +553,12 @@ describe("Resource load control surface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Применить preview" }));
 
     expect(await screen.findByTestId("resource-command-error")).toHaveTextContent("Предпросмотр устарел");
-    fireEvent.click(screen.getByRole("button", { name: "Обновить данные" }));
     await waitFor(() => {
       expect(apiClient.getResourceLoad).toHaveBeenCalledTimes(2);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Обновить данные" }));
+    await waitFor(() => {
+      expect(apiClient.getResourceLoad).toHaveBeenCalledTimes(3);
     });
     await waitFor(() => {
       expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("assignment-design-architect-a");

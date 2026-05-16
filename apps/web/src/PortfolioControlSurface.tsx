@@ -60,7 +60,12 @@ function actionDefinitionForSlot(
   return actions.find((action) => action.key === slot.actionDefinitionKey || action.id === slot.actionDefinitionKey) ?? null;
 }
 
-function createInputForAction(action: PortfolioActionDefinitionDto): Record<string, unknown> {
+function rowStringField(row: ControlSurfaceReadRowDto | undefined, key: string): string {
+  const value = row?.fieldValues[key];
+  return typeof value === "string" ? value : "";
+}
+
+function createInputForAction(action: PortfolioActionDefinitionDto, row?: ControlSurfaceReadRowDto): Record<string, unknown> {
   if (action.key === "accept_risk") {
     return {
       reason: "Контролируемый риск до перепланирования",
@@ -70,8 +75,31 @@ function createInputForAction(action: PortfolioActionDefinitionDto): Record<stri
 
   if (action.key === "reassign_resource") {
     return {
-      targetResourceProfileId: "resource-backup-a",
+      assignmentId: rowStringField(row, "primary_assignment_id"),
+      targetResourceProfileId: rowStringField(row, "suggested_resource_profile_id"),
       reason: "Снять перегрузку через управляемое переназначение"
+    };
+  }
+
+  if (action.key === "shift_work") {
+    return {
+      assignmentId: rowStringField(row, "primary_assignment_id"),
+      shiftDays: 7,
+      reason: "Снять перегрузку через управляемый сдвиг"
+    };
+  }
+
+  if (action.key === "split_work") {
+    return {
+      assignmentId: rowStringField(row, "primary_assignment_id"),
+      splitHours: 6,
+      reason: "Снять перегрузку через разделение работы"
+    };
+  }
+
+  if (action.key === "accept_resource_overload") {
+    return {
+      reason: "Принять ресурсный риск до перепланирования"
     };
   }
 
@@ -233,7 +261,7 @@ export function PortfolioControlSurface({
           entityType: row.entityType,
           entityId: row.entityId
         },
-        input: createInputForAction(actionDefinition)
+        input: createInputForAction(actionDefinition, row)
       })
   });
   const executeMutation = useMutation({

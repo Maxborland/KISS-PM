@@ -1323,7 +1323,12 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
       });
-      const actionExecutions = phase6Runtime.listActionExecutions(session.user.tenantId);
+      const actionExecutions = [
+        ...phase6Runtime.listActionExecutions(session.user.tenantId),
+        ...phase8Runtime
+          .listActionExecutions(session.user.tenantId)
+          .filter((actionExecution) => actionExecution.commandType.startsWith("resource_resolution."))
+      ];
       const actionCorrelationIds = new Set(actionExecutions.map((actionExecution) => actionExecution.correlationId));
       const events = runtime.auditStore
         .listByTenant(session.user.tenantId)

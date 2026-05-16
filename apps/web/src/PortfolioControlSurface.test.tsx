@@ -41,7 +41,9 @@ function createSurfaceView(rows: ControlSurfaceReadModelDto["rows"] = defaultRow
     fields: [
       { key: "project_label", label: "Проект", valueType: "text", visible: true },
       { key: "signal_label", label: "Сигнал", valueType: "text", visible: true },
-      { key: "severity", label: "Риск", valueType: "severity", visible: true }
+      { key: "severity", label: "Риск", valueType: "severity", visible: true },
+      { key: "primary_assignment_id", label: "Назначение", valueType: "text", visible: true },
+      { key: "suggested_resource_profile_id", label: "Новый ресурс", valueType: "text", visible: true }
     ],
     widgets: [
       { key: "critical_signal_count", label: "Критичные сигналы", widgetType: "severity_summary", value: 2, severity: "critical" }
@@ -110,7 +112,9 @@ function defaultRows(): ControlSurfaceReadModelDto["rows"] {
       fieldValues: {
         project_label: "project-alpha-a",
         signal_label: "Перегрузка 14 ч.",
-        severity: "critical"
+        severity: "critical",
+        primary_assignment_id: "assignment-design-architect-a",
+        suggested_resource_profile_id: "resource-engineer-a"
       },
       sourceRefs: [{ entityType: "resource_overload", entityId: "overload:resource-architect-a:2026-06-01:2026-06-05" }],
       drilldowns: [
@@ -124,6 +128,24 @@ function defaultRows(): ControlSurfaceReadModelDto["rows"] {
         }
       ],
       actions: [
+        {
+          key: "shift_work",
+          label: "Сдвинуть работу",
+          actionDefinitionKey: "shift_work",
+          slotType: "row",
+          targetEntityType: "resource_overload",
+          dryRunRequired: true,
+          available: true
+        },
+        {
+          key: "split_work",
+          label: "Разделить работу",
+          actionDefinitionKey: "split_work",
+          slotType: "row",
+          targetEntityType: "resource_overload",
+          dryRunRequired: true,
+          available: true
+        },
         {
           key: "reassign_resource",
           label: "Переназначить ресурс",
@@ -163,6 +185,38 @@ function createActions(): PortfolioActionDefinitionDto[] {
       commandType: "risk.accept"
     },
     {
+      id: "action-shift-resource-work",
+      key: "shift_work",
+      label: "Сдвинуть работу",
+      description: "Готовит сдвиг работы",
+      targetEntityType: "resource_overload",
+      requiredPermission: "resource.write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
+          { key: "shiftDays", label: "Дней", valueType: "number", required: true, summary: true }
+        ]
+      },
+      commandType: "resource_resolution.shift_work"
+    },
+    {
+      id: "action-split-resource-work",
+      key: "split_work",
+      label: "Разделить работу",
+      description: "Готовит разделение работы",
+      targetEntityType: "resource_overload",
+      requiredPermission: "resource.write",
+      dryRunRequired: true,
+      inputSchema: {
+        fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
+          { key: "splitHours", label: "Часы", valueType: "number", required: true, summary: true }
+        ]
+      },
+      commandType: "resource_resolution.split_work"
+    },
+    {
       id: "action-reassign-resource",
       key: "reassign_resource",
       label: "Переназначить ресурс",
@@ -171,7 +225,10 @@ function createActions(): PortfolioActionDefinitionDto[] {
       requiredPermission: "resource.write",
       dryRunRequired: true,
       inputSchema: {
-        fields: [{ key: "targetResourceProfileId", label: "Новый ресурс", valueType: "text", required: true, summary: true }]
+        fields: [
+          { key: "assignmentId", label: "Назначение", valueType: "text", required: true, summary: true },
+          { key: "targetResourceProfileId", label: "Новый ресурс", valueType: "text", required: true, summary: true }
+        ]
       },
       commandType: "resource_resolution.reassign_resource"
     }
@@ -274,6 +331,54 @@ describe("PortfolioControlSurface", () => {
     expect(screen.getByTestId("portfolio-control-preview")).toHaveTextContent("no mutation");
     expect(screen.getByTestId("portfolio-control-result")).toHaveTextContent("Команда еще не применялась");
     expect(apiClient.getControlAudit).toHaveBeenCalled();
+  });
+
+  it("builds resource action inputs from the selected overload row instead of schema labels", async () => {
+    const apiClient = createApiClient();
+    renderSurface(apiClient);
+
+    fireEvent.click(await screen.findByText("Перегрузка ресурса Анна Архитектор: 14 ч."));
+    fireEvent.click(screen.getByRole("button", { name: "Сдвинуть работу" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(1));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-shift-resource-work",
+      expect.objectContaining({
+        input: expect.objectContaining({
+          assignmentId: "assignment-design-architect-a",
+          shiftDays: 7
+        })
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Разделить работу" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(2));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-split-resource-work",
+      expect.objectContaining({
+        input: expect.objectContaining({
+          assignmentId: "assignment-design-architect-a",
+          splitHours: 6
+        })
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Переназначить ресурс" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр" }));
+    await waitFor(() => expect(apiClient.previewAction).toHaveBeenCalledTimes(3));
+    expect(apiClient.previewAction).toHaveBeenLastCalledWith(
+      "tenant-admin-a",
+      "action-reassign-resource",
+      expect.objectContaining({
+        input: expect.objectContaining({
+          assignmentId: "assignment-design-architect-a",
+          targetResourceProfileId: "resource-engineer-a"
+        })
+      })
+    );
   });
 
   it("does not fake success when apply reaches an unwired domain command and refetches readback", async () => {
