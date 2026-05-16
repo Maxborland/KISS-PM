@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T23:38:18.8293318+07:00",
+  "updated_at": "2026-05-16T23:42:55.5376858+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3309,7 +3309,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Accepted 2026-05-16T23:38:18.8293318+07:00. Implemented deterministic Phase 8 fixture seed plus executable E2E-070..075. Browser tests prove Portfolio Control read/drilldown, corrective task creation with backend direct denial/no-partial-mutation readback, Resource Load action-engine apply, accepted risk, permission/tenant isolation direct API denial, audit/action evidence, projection refresh, reload persistence, and reset cleanup. P8 matrix row P8-009 is verified; phase exit remains blocked until P8-010 promotes eligible rows and strict verifier passes.",
+      "notes": "Accepted 2026-05-16T23:38:18.8293318+07:00. Implemented deterministic Phase 8 fixture seed plus executable E2E-070..075. Browser tests prove Portfolio Control read/drilldown, corrective task creation with backend direct denial/no-partial-mutation readback, Resource Load action-engine apply, accepted risk, permission/tenant isolation direct API denial, audit/action evidence, projection refresh, reload persistence, and reset cleanup. P8 matrix row P8-009 is verified. P8-010 later accepted the Phase 8 exit gate and strict verifier now passes.",
       "completed_at": "2026-05-16T23:38:18.8293318+07:00",
       "result": "accepted",
       "verification": [
@@ -3339,7 +3339,7 @@
         "P8-010"
       ],
       "title": "Run Phase 8 verification matrix and exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -3382,7 +3382,74 @@
         "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next Phase 8 block. Promote eligible P8 rows with fresh E2E evidence, run strict matrix verifier without --allow-blocked, complete bug-hunt/code-review loop, update state/handoff, and only then mark Phase 8 accepted."
+      "notes": "Accepted 2026-05-16T23:42:55.5376858+07:00. Phase 8 exit gate passed: P8-001..P8-010 are verified, E2E-070..075 pass, strict docs/status/phase8-requirements-matrix.json verifier passes without --allow-blocked, typecheck/lint/full tests pass, review gate found no unresolved Critical/Important/Medium in-scope findings. Phase 8 is accepted; Release 2 is not ready until P9-P12 close.",
+      "completed_at": "2026-05-16T23:42:55.5376858+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-010-phase8-verification-matrix-exit-gate --once exit 0 at startup",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json exit 1 RED: blocked rows P8-001..P8-008/P8-010 before phase-exit promotion",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json exit 0 after row promotion",
+        "PW_API_PORT=4290 PW_WEB_PORT=5290 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed for E2E-070..075",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 61 files, 396 tests passed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json exit 0: strict verifier passed without --allow-blocked",
+        "node scripts/agent-bus-guard.mjs --task P8-010-phase8-verification-matrix-exit-gate --once exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P9-000-closed-portfolio-retrospectives-phase-contract",
+      "aliases": [
+        "P9-000"
+      ],
+      "title": "Finalize Phase 9 closed portfolio and retrospectives contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P8-010-phase8-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_9_CLOSED_PORTFOLIO_RETROSPECTIVES.md",
+        "docs/status/phase9-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-000-closed-portfolio-retrospectives-phase-contract.claim.json",
+        ".agent-bus/sessions/P9-000-closed-portfolio-retrospectives-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_9_CLOSED_PORTFOLIO_RETROSPECTIVES.md",
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-000-closed-portfolio-retrospectives-phase-contract --once",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next Phase 9 block. Create the closed portfolio and retrospectives phase-detail contract, P9 matrix, and verifier support before any P9 product implementation. Do not declare Release 2 ready."
     }
   ]
 }
