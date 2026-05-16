@@ -11,6 +11,7 @@ test("E2E-052 overload resolution starts from the control surface and creates a 
 
   await expect(page.getByTestId("resource-overload-signal")).toContainText(tenantAOverloadId);
   await expect(page.getByRole("button", { name: "Предпросмотреть перенос" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Открыть Гантт проекта" })).toHaveCount(0);
   await page.getByRole("button", { name: "Предпросмотреть перенос" }).click();
 
   const preview = page.getByTestId("resource-resolution-preview");

@@ -1,6 +1,12 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T17:59:00+07:00
+Updated: 2026-05-16T18:20:00+07:00
+
+- P6-011 Phase 6 review fixes completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-011-phase6-review-fixes.md`.
+- Bug Hunt findings after the P6 exit gate are fixed: `reserve_capacity` can no longer be previewed/applied as a false overload resolution, Resource Load only shows the Gantt opener for explicitly available schedule projects, and the web reservation DTO now matches the API/domain `sourceType` contract.
+- Fresh P6 review-fix evidence: `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm run test:integration`, `cmd /c "set PW_API_PORT=4299&& set PW_WEB_PORT=5299&& npm run test:e2e:phase -- --phase 6"`, `npm run typecheck`, `npm run lint`, `npm test`, strict P6 matrix verification, and a PowerShell API reproduction of the former bug paths all pass.
+- Phase 6 remains accepted as an implemented product phase after P6-011. P6 is still not Release 2 readiness; P7-P12 remain unimplemented/spec-only.
+- Next recommended step remains `P7-000-kpi-engine-control-signals-phase-contract`.
 
 - P6-010 Phase 6 verification matrix and exit gate completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-010-phase6-verification-matrix-exit-gate.md`.
 - Phase 6 Resource planning and conflict resolution is accepted as an implemented product phase. `docs/status/phase6-requirements-matrix.json` passes strict verification without `--allow-blocked` after fresh E2E-050..055 metadata.

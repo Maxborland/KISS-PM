@@ -404,7 +404,7 @@ function targetForCommand(command: ResourceResolutionCommand): ActionEntityRef {
 
 function assertPreviewableCommand(state: Phase6TenantState, overload: ResourceOverload, command: ResourceResolutionCommand): void {
   requireNonEmptyString(command.reason, "resourceResolution.reason");
-  if (!overload.recommendedActionKeys.includes(command.actionKey) && command.actionKey !== "reserve_capacity") {
+  if (!overload.recommendedActionKeys.includes(command.actionKey)) {
     throw preconditionFailed("resolution action is not recommended for this overload");
   }
 
@@ -443,6 +443,7 @@ function assertPreviewableCommand(state: Phase6TenantState, overload: ResourceOv
 
   if (command.actionKey === "reserve_capacity") {
     requirePositiveNumber(command.reservedHours, "resourceResolution.reservedHours");
+    throw preconditionFailed("reserve_capacity creates additional demand; use the reservation command outside overload resolution");
   }
 }
 
@@ -463,14 +464,13 @@ function simulateCommand(
     previews: new Map(),
     actionExecutions: []
   };
-  applyCommandToState(simulatedState, tenantId, overload, command);
+  applyCommandToState(simulatedState, overload, command);
 
   return buildProjection(simulatedState, tenantId);
 }
 
 function applyCommandToState(
   state: Phase6TenantState,
-  tenantId: TenantId,
   overload: ResourceOverload,
   command: ResourceResolutionCommand
 ): ResourceOverloadStatus {
@@ -530,24 +530,8 @@ function applyCommandToState(
   }
 
   if (command.actionKey === "reserve_capacity") {
-    state.reservations = [
-      ...state.reservations,
-      createResourceReservation({
-        id: `reservation-resolution-${state.version + 1}`,
-        tenantId,
-        sourceType: "project",
-        sourceId: overload.affectedProjectIds[0] ?? "resource-resolution",
-        resourceProfileId: overload.resourceProfileId,
-        roleKey: overload.roleKeys[0] ?? "resource",
-        roleLabel: overload.roleKeys[0] ?? "Ресурс",
-        periodStart: overload.periodStart,
-        periodEnd: overload.periodEnd,
-        reservedHours: requirePositiveNumber(command.reservedHours, "resourceResolution.reservedHours"),
-        status: "active",
-        sourceLabel: command.reason
-      })
-    ];
-    return "resolved";
+    requirePositiveNumber(command.reservedHours, "resourceResolution.reservedHours");
+    throw preconditionFailed("reserve_capacity is not an overload resolution command");
   }
 
   if (command.actionKey === "accept_risk") {
@@ -701,7 +685,7 @@ export function createPhase6RuntimeState() {
     }
     assertPreviewableCommand(state, overload, preview.command);
 
-    const overloadStatus = applyCommandToState(state, input.tenantId, overload, preview.command);
+    const overloadStatus = applyCommandToState(state, overload, preview.command);
     state.version += 1;
     state.previews.clear();
     const afterProjection = buildProjection(state, input.tenantId);

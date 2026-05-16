@@ -25,6 +25,7 @@ type ResourceLoadControlSurfaceProps = {
   currentTenant: CurrentTenantDto;
   testUser: string;
   refreshKey?: number;
+  availableGanttProjectIds?: string[];
   onOpenGanttProject?: (projectId: string) => void;
 };
 
@@ -151,6 +152,7 @@ export function ResourceLoadControlSurface({
   currentTenant,
   testUser,
   refreshKey = 0,
+  availableGanttProjectIds = [],
   onOpenGanttProject
 }: ResourceLoadControlSurfaceProps) {
   const canReadResources = hasPermission(currentTenant, "resource.read");
@@ -175,7 +177,14 @@ export function ResourceLoadControlSurface({
 
     return projection.overloads.find((overload) => overload.id === selectedOverloadId) ?? firstOverload(projection);
   }, [projection, selectedOverloadId]);
-  const selectedProjectId = selectedOverload?.affectedProjectIds[0];
+  const openableGanttProjectId = useMemo(() => {
+    if (selectedOverload === null || onOpenGanttProject === undefined || availableGanttProjectIds.length === 0) {
+      return undefined;
+    }
+
+    const availableIds = new Set(availableGanttProjectIds);
+    return selectedOverload.affectedProjectIds.find((projectId) => availableIds.has(projectId));
+  }, [availableGanttProjectIds, onOpenGanttProject, selectedOverload]);
 
   const refreshSurface = useCallback(
     async (nextStatus = "Нагрузка загружена") => {
@@ -460,12 +469,12 @@ export function ResourceLoadControlSurface({
                 >
                   Создать резерв
                 </button>
-                {selectedProjectId !== undefined && onOpenGanttProject !== undefined ? (
+                {openableGanttProjectId !== undefined && onOpenGanttProject !== undefined ? (
                   <button
                     className="secondary-button"
                     disabled={pendingAction !== null}
                     type="button"
-                    onClick={() => onOpenGanttProject(selectedProjectId)}
+                    onClick={() => onOpenGanttProject(openableGanttProjectId)}
                   >
                     Открыть Гантт проекта
                   </button>

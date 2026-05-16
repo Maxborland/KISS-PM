@@ -46,7 +46,7 @@ The user workflow stays simple: open Resource Load Control, see the overload, in
 | P6-005 | `packages/resource-planning` | Overload detection and severity | Detect overloads by resource/user/team/role and period from capacity, exceptions, assignments, and reservations | Severity is deterministic from utilization/gap, source buckets are traceable, and Tenant B data cannot affect Tenant A load | E2E-051 | unit tests | No KPI engine ownership of resource overload logic in P6 | Unit/E2E evidence and matrix row update |
 | P6-006 | `apps/api`, `packages/resource-planning`, `packages/action-engine` | Resource planning API and governed commands | Add API read models and command endpoints for load, overload detail, dry-run preview, apply resolution, reservations, and audit | Routes validate actor/tenant/permission/DTOs; read-only and cross-tenant attempts are denied; state-changing commands write audit/action evidence | E2E-050..055 | integration tests plus E2E | No production auth provider, no direct control-surface mutations | Integration/E2E evidence and matrix row update |
 | P6-007 | `apps/web` | Resource Load Control surface | Add Russian Resource Load Control with heatmap/table/list, overload signals, filters, permission states, and resolution entry | User sees load buckets, capacity, assignments, reservations, overload severity, primary next action, empty/loading/error/denied states, and result feedback | E2E-050, E2E-051, E2E-052 | component tests plus E2E | No generic BI report, no decorative dashboard-only surface | Component/E2E evidence and matrix row update |
-| P6-008 | `apps/web`, `apps/api`, `packages/resource-planning`, `packages/action-engine` | Overload resolution dry-run and apply flow | Support shift, split, reassign, reserve, accept risk, and escalate options with preview-before-apply for material mutations | Preview shows before/after load, affected tasks/reservations/projects, blockers, permission requirements, and no mutation until confirm; apply refreshes load and audit | E2E-052, E2E-053, E2E-054, E2E-055 | unit/integration/component/E2E | No AI-only recommendations, no fully optimal resource leveling | Full write-flow evidence and matrix row update |
+| P6-008 | `apps/web`, `apps/api`, `packages/resource-planning`, `packages/action-engine` | Overload resolution dry-run and apply flow | Support shift, split, reassign, accept risk, and escalate options with preview-before-apply for material mutations; reserve capacity remains a separate Resource Load reservation action and must not be reported as overload resolution when it adds demand | Preview shows before/after load, affected tasks/reservations/projects, blockers, permission requirements, and no mutation until confirm; apply refreshes load and audit | E2E-052, E2E-053, E2E-054, E2E-055 | unit/integration/component/E2E | No AI-only recommendations, no fully optimal resource leveling | Full write-flow evidence and matrix row update |
 | P6-009 | `packages/shared-test-fixtures`, `e2e/` | Deterministic Phase 6 fixtures and E2E-050..055 | Extend seed data with resource profiles, calendars, exceptions, assignments, reservations, overloads, Tenant B private load, and reset rules | E2E proves UI, API/domain readback, permissions, audit/action log, related projection refresh, reload persistence, and cleanup/reset | E2E-050..055 | fixture tests plus E2E | No production data, random IDs, live external systems, or skipped/flaky scenarios | Fixture/E2E evidence and matrix row update |
 | P6-010 | `docs/status`, `scripts` | Phase 6 verification matrix and exit gate | Track P6-001..P6-010 and require structured E2E evidence for Phase 6 exit | Strict verifier fails blocked rows, missing tests, missing cleanup, stale metadata, prose-only evidence, placeholder blockers, and missing E2E command/test_path/exit_code/checked_at | E2E-050..055 | `npm run verify:matrix -- docs/status/phase6-requirements-matrix.json` | No `--allow-blocked` phase exit, no stale logs, no planned E2E as evidence | Passing strict matrix verifier and final command log |
 
@@ -119,13 +119,14 @@ Contracts:
 - `/resources/load` Resource Load Control:
   - heatmap/table/list over capacity, assignments, reservations, and overload buckets;
   - primary next action: open overload resolution;
-  - secondary actions: filter by period/team/project/resource, reserve capacity, open project/Gantt;
+  - secondary actions: filter by period/team/project/resource, reserve capacity, open project/Gantt only when the schedule project is available;
   - Russian loading/empty/error/denied states;
   - permission explanations for unavailable actions;
   - audit/result feedback after reservation or resolution.
 - Overload resolution flow:
   - source overload summary and affected work;
-  - options for shift, split, reassign, reserve, accept risk, and escalate;
+  - options for shift, split, reassign, accept risk, and escalate;
+  - `reserve_capacity` is not an overload-resolution apply command in P6 when it creates additional demand; use the reservation endpoint/action instead;
   - `PreviewBeforeApplyPanel` with before/after load and blockers;
   - confirm/apply result with audit id and refreshed projections;
   - reload keeps the resolved or accepted state.
@@ -163,7 +164,7 @@ Required assertion pattern:
 - Reservation validation and conflict tests.
 - Overload detection/severity tests by resource/user/team/role and period.
 - Resolution preview tests proving no mutation and deterministic before/after effects.
-- Resolution apply tests for shift, split, reassign, reserve, accept risk, and escalate where included in the UI flow.
+- Resolution apply tests for shift, split, reassign, accept risk, and escalate where included in the UI flow; reserve-capacity regression tests must prove it cannot falsely resolve an overload when it adds demand.
 - API integration tests for load read, overload detail, reservation create, preview, apply, permission denial, direct API denial, tenant isolation, audit readback, stale preview rejection, and no partial mutation on blockers.
 - Web component tests for Russian Resource Load Control states and resolution flow states.
 - Matrix verifier regression tests for Phase 6 required rows and mandatory E2E evidence.

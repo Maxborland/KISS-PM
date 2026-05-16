@@ -14,7 +14,7 @@ Start state: canonical task is assigned. Intent: execute and update status. Scre
 
 ## 4. Resource Manager: Overload To Resolution
 
-Start state: overload signal exists. Intent: restore feasible capacity. Screens visited: UX-P6-RESOURCE-LOAD, UX-P6-OVERLOAD-RESOLUTION, UX-P5-PROJECT-GANTT. Decisions: reassign, shift dates, reserve capacity, escalate. Actions: run preview, execute resolution command, inspect refreshed load. Audit points: overload signal, preview, command result. Success state: overload reduced or accepted with traceable reason. Failure/recovery: command blocked by permissions or schedule constraints. E2E: E2E-050, E2E-051.
+Start state: overload signal exists. Intent: restore feasible capacity. Screens visited: UX-P6-RESOURCE-LOAD, UX-P6-OVERLOAD-RESOLUTION, UX-P5-PROJECT-GANTT when the schedule project is available. Decisions: reassign, shift dates, create a separate capacity reservation when appropriate, escalate. Actions: run preview, execute resolution command, inspect refreshed load. Audit points: overload signal, preview, command result. Success state: overload reduced or accepted with traceable reason; a reservation that adds demand is not reported as overload resolution. Failure/recovery: command blocked by permissions or schedule constraints. E2E: E2E-050, E2E-051.
 
 ## 5. Executive/PM: KPI Deviation To Corrective Action
 

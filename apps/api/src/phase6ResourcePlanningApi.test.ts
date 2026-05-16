@@ -194,7 +194,7 @@ describe("Phase 6 resource planning API", () => {
     expect(tenantBMutateTenantA.status).toBe(404);
   });
 
-  it("supports reserve-capacity dry-run as a governed resolution option without mutating before apply", async () => {
+  it("rejects reserve-capacity as an overload resolution because it would add demand instead of resolving load", async () => {
     const app = createApiApp({ allowTestFixtureReset: true });
 
     const preview = await app.request(
@@ -205,24 +205,22 @@ describe("Phase 6 resource planning API", () => {
         reason: "Зафиксировать дополнительный резерв перед решением комитета"
       })
     );
-    expect(preview.status).toBe(200);
+    expect(preview.status).toBe(409);
     await expect(readJson(preview)).resolves.toMatchObject({
-      preview: {
-        actionKey: "reserve_capacity",
-        canConfirm: true,
-        auditSummary: {
-          source: { entityType: "resourceOverload", entityId: tenantAOverloadId },
-          target: { entityType: "resourceOverload", entityId: "reserve_capacity" }
-        },
-        beforeLoadBuckets: [expect.objectContaining({ id: tenantALoadBucketId, reservedHours: 8 })],
-        afterLoadBuckets: [expect.objectContaining({ id: tenantALoadBucketId, reservedHours: 10 })]
-      }
+      code: "precondition_failed"
     });
 
     const unchanged = await app.request(`/api/resources/load/${tenantALoadBucketId}?testUser=resource-manager-a`);
     expect(unchanged.status).toBe(200);
     await expect(readJson(unchanged)).resolves.toMatchObject({
       bucket: { id: tenantALoadBucketId, reservedHours: 8, totalLoadHours: 50 }
+    });
+
+    const audit = await app.request("/api/resources/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.toMatchObject({
+      events: [],
+      actionExecutions: []
     });
   });
 
@@ -302,6 +300,56 @@ describe("Phase 6 resource planning API", () => {
     expect(after.status).toBe(200);
     await expect(readJson(after)).resolves.toMatchObject({
       bucket: { id: tenantALoadBucketId, assignedHours: 42, reservedHours: 10, totalLoadHours: 52 }
+    });
+  });
+
+  it("keeps reservation source type contract aligned with the resource domain model", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+
+    const manualReservation = await app.request(
+      "/api/resources/reservations?testUser=resource-manager-a",
+      jsonRequest({
+        id: "reservation-manual-source-a",
+        sourceType: "manual",
+        sourceId: "manual-note",
+        resourceProfileId: "resource-architect-a",
+        roleKey: "solution_architect",
+        roleLabel: "Архитектор решения",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-05",
+        reservedHours: 1,
+        sourceLabel: "Manual source should be rejected by API contract"
+      })
+    );
+    expect(manualReservation.status).toBe(400);
+
+    const stageReservation = await app.request(
+      "/api/resources/reservations?testUser=resource-manager-a",
+      jsonRequest({
+        id: "reservation-stage-source-a",
+        sourceType: "stage",
+        sourceId: "project-alpha-a:stage-initiation",
+        resourceProfileId: "resource-architect-a",
+        roleKey: "solution_architect",
+        roleLabel: "Архитектор решения",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-05",
+        reservedHours: 1,
+        sourceLabel: "Stage source matches domain reservation contract"
+      })
+    );
+    expect(stageReservation.status).toBe(201);
+    await expect(readJson(stageReservation)).resolves.toMatchObject({
+      reservation: {
+        id: "reservation-stage-source-a",
+        sourceType: "stage",
+        status: "active"
+      },
+      readback: {
+        loadBuckets: expect.arrayContaining([
+          expect.objectContaining({ id: tenantALoadBucketId, reservedHours: 9, totalLoadHours: 51 })
+        ])
+      }
     });
   });
 });

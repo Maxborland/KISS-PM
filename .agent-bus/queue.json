@@ -2034,6 +2034,79 @@
       ]
     },
     {
+      "id": "P6-011-phase6-review-fixes",
+      "aliases": [
+        "P6-011"
+      ],
+      "title": "Fix Phase 6 bug-hunt review findings",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P6",
+      "depends_on": [
+        "P6-010-phase6-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "apps/api/src/phase6Runtime.ts",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase6ResourcePlanningApi.test.ts",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts",
+        "e2e/tests/phase6/**",
+        "docs/status/phase6-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P6-011-phase6-review-fixes.claim.json",
+        ".agent-bus/sessions/P6-011-phase6-review-fixes.md",
+        "docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md",
+        "docs/product/SCREEN_INTERACTION_CATALOG.md",
+        "docs/product/ROLE_BASED_JOURNEYS.md"
+      ],
+      "forbidden": [
+        "packages/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json",
+        "docs/phases/PHASE_6_RESOURCE_PLANNING_CONFLICT_RESOLUTION.md"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P6-011-phase6-review-fixes --once",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "npm run test:e2e:phase -- --phase 6",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "git diff --check"
+      ],
+      "notes": "Completed after Bug Hunt / Receiving Code Review. Fixed reserve_capacity false-resolution semantics, Resource Load unavailable Gantt action exposure, and web/API/domain reservation sourceType mismatch. P6 strict matrix remains verified after fresh evidence.",
+      "completed_at": "2026-05-16T18:20:00+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 6 tests passed",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 8 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "cmd /c \"set PW_API_PORT=4299&& set PW_WEB_PORT=5299&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "PowerShell bug-hunt API reproduction exit 0: reserve_capacity preview 409/no mutation; manual sourceType 400; stage sourceType 201",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 49 files, 295 tests passed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P6-011-phase6-review-fixes --once exit 0"
+      ]
+    },
+    {
       "id": "P7-000-kpi-engine-control-signals-phase-contract",
       "aliases": [
         "P7-000"
