@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T16:28:24+07:00",
+  "updated_at": "2026-05-16T16:54:33+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -1904,6 +1904,56 @@
         "git diff --check"
       ],
       "notes": "Completed in commits 15bb8e0, e514e30, 0c346c6, and 56a51b7. Installed exact @tanstack/react-query@5.100.10, rejected forbidden TanStack packages, added QueryClientProvider/foundation, and migrated P3 CRM Intake, P4 Project Work, and P5 Gantt server state to TanStack Query. Final evidence: npm audit --omit=dev exit 0; npm run typecheck exit 0; npm run lint exit 0; npm test exit 0 with 48 files / 286 tests after escalated run; P3/P4/P5 phase E2E and strict matrices exit 0. P6 ResourceLoad remains intentionally out of scope for a separate follow-up."
+    },
+    {
+      "id": "FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001",
+      "title": "Fix Bug Hunt findings from TanStack Query migration",
+      "status": "done",
+      "priority": "high",
+      "phase": "frontend-architecture",
+      "depends_on": [
+        "FE-SERVER-STATE-TANSTACK-QUERY-001"
+      ],
+      "write_scope": [
+        "apps/web/src/CrmIntakeControlSurface.tsx",
+        "apps/web/src/CrmIntakeControlSurface.test.tsx",
+        "apps/web/src/ProjectWorkControlSurface.tsx",
+        "apps/web/src/ProjectWorkControlSurface.test.tsx",
+        "apps/web/src/GanttControlSurface.tsx",
+        "apps/web/src/GanttControlSurface.test.tsx",
+        "e2e/tests/phase5/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001.claim.json",
+        ".agent-bus/sessions/FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001.md",
+        ".agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query-review-fixes.md",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts",
+        "docs/status/phase6-requirements-matrix.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001 --once",
+        "npm test -- apps/web/src/CrmIntakeControlSurface.test.tsx apps/web/src/ProjectWorkControlSurface.test.tsx apps/web/src/GanttControlSurface.test.tsx",
+        "npm run test:e2e:phase -- --phase 3",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 4",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 5",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Completed after Bug Hunt / Receiving Code Review. Fixed critical readback semantics by using TanStack Query throwOnError for invalidation/refetch in P3/P4/P5 write flows, stopped masking CRM draft errors other than not_found, and cleared stale Gantt command success on prop-driven project opens. Evidence: targeted component tests exit 0 with 3 files / 24 tests; npm test exit 0 with 48 files / 291 tests; npm run typecheck exit 0; npm run lint exit 0; P3/P4/P5 phase E2E exit 0 and strict matrix verifiers exit 0 when each verifier is run immediately after its phase E2E metadata; agent-bus guard and git diff --check exit 0."
     }
   ]
 }

@@ -1,6 +1,11 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T16:28:24+07:00
+Updated: 2026-05-16T16:54:33+07:00
+
+- FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query-review-fixes.md`.
+- Bug Hunt findings from the TanStack Query migration are fixed: P3/P4/P5 write flows now fail closed when required API readback/refetch fails, CRM draft readback only swallows expected `not_found`, and Gantt clears stale command success when an external project open/refresh changes props.
+- Fresh review-fix evidence: targeted component tests pass with 3 files / 24 tests; full `npm test` passes with 48 files / 291 tests; `npm run typecheck`, `npm run lint`, `git diff --check`, and `node scripts/agent-bus-guard.mjs --task FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001 --once` pass.
+- P3/P4/P5 phase E2E suites pass after the fixes. Strict matrix verifiers for P3/P4/P5 also pass when each verifier is run immediately after its matching phase E2E run because the verifier consumes `test-results/kiss-pm-e2e-last-run.json` as the latest metadata artifact.
 
 - FE-SERVER-STATE-TANSTACK-QUERY-001 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query.md`.
 - Frontend server state standard is now TanStack Query via exact `@tanstack/react-query@5.100.10`; forbidden TanStack router/start/setup packages are absent from `package.json` and `package-lock.json`, and `npm audit --omit=dev` reports 0 vulnerabilities.

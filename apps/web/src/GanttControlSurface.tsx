@@ -148,6 +148,8 @@ export function GanttControlSurface({
   useEffect(() => {
     setSelectedProjectId(projectId);
     setOpenedProjectId(projectId);
+    setLastCommandStatus(null);
+    setCommandIssues([]);
   }, [projectId, refreshKey]);
 
   useEffect(() => {
@@ -250,7 +252,7 @@ export function GanttControlSurface({
     setStatus(pendingLabel);
     try {
       await command();
-      await scheduleQuery.refetch();
+      await scheduleQuery.refetch({ throwOnError: true });
       if (selectedProjectId === commandProjectId) {
         setLastCommandStatus(successLabel);
         setStatus(successLabel);
