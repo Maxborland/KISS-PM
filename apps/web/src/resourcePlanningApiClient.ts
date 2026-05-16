@@ -64,7 +64,7 @@ export type ResourceAssignmentDto = {
 export type ResourceReservationDto = {
   id: string;
   tenantId: string;
-  sourceType: "opportunity" | "project" | "manual";
+  sourceType: "opportunity" | "project" | "stage";
   sourceId: string;
   resourceProfileId: string;
   roleKey: string;
@@ -72,7 +72,7 @@ export type ResourceReservationDto = {
   periodStart: string;
   periodEnd: string;
   reservedHours: number;
-  status: "draft" | "active" | "released" | "expired";
+  status: "active" | "released";
   sourceLabel: string;
 };
 

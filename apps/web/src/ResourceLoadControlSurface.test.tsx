@@ -351,6 +351,36 @@ describe("Resource load control surface", () => {
       expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("reservation-draft-architect-a");
     });
     expect(screen.getByTestId("resource-audit-evidence")).toHaveTextContent("Действий пока нет");
+    expect(screen.queryByRole("button", { name: "Открыть Гантт проекта" })).not.toBeInTheDocument();
+  });
+
+  it("opens related Gantt only when the affected project is available in the schedule surface", async () => {
+    const onOpenGanttProject = vi.fn();
+
+    const { rerender } = render(
+      <ResourceLoadControlSurface
+        apiClient={createMutableApiClient()}
+        currentTenant={createCurrentTenant()}
+        onOpenGanttProject={onOpenGanttProject}
+        testUser="resource-manager-a"
+      />
+    );
+
+    expect(await screen.findByTestId("resource-overload-signal")).toHaveTextContent("project-alpha-a");
+    expect(screen.queryByRole("button", { name: "Открыть Гантт проекта" })).not.toBeInTheDocument();
+
+    rerender(
+      <ResourceLoadControlSurface
+        apiClient={createMutableApiClient()}
+        availableGanttProjectIds={["project-alpha-a"]}
+        currentTenant={createCurrentTenant()}
+        onOpenGanttProject={onOpenGanttProject}
+        testUser="resource-manager-a"
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Открыть Гантт проекта" }));
+    expect(onOpenGanttProject).toHaveBeenCalledWith("project-alpha-a");
   });
 
   it("renders loading, empty, denied, and error states", async () => {
