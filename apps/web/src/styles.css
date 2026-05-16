@@ -356,6 +356,17 @@ button:focus-visible {
   grid-column: 1 / -1;
 }
 
+.gantt-command-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.gantt-command-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
 .project-lifecycle-panel,
 .kanban-panel {
   grid-column: 1 / -1;
@@ -380,7 +391,7 @@ button:focus-visible {
 
 .gantt-header,
 .gantt-row {
-  min-width: 860px;
+  min-width: 1180px;
 }
 
 .gantt-header {
@@ -390,7 +401,7 @@ button:focus-visible {
   font-size: 12px;
   font-weight: 700;
   gap: 8px;
-  grid-template-columns: 1.6fr 96px 96px 56px 70px 44px 190px 120px;
+  grid-template-columns: 1.5fr 118px 118px 56px 82px 76px 190px 210px;
   padding: 0 10px 4px;
 }
 
@@ -400,7 +411,7 @@ button:focus-visible {
   border-radius: 6px;
   display: grid;
   gap: 8px;
-  grid-template-columns: 1.6fr 96px 96px 56px 70px 44px 190px 120px;
+  grid-template-columns: 1.5fr 118px 118px 56px 82px 76px 190px 210px;
   min-height: 44px;
   padding: 8px 10px;
 }
@@ -408,6 +419,21 @@ button:focus-visible {
 .gantt-row span {
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.gantt-row input {
+  width: 100%;
+}
+
+.inline-save-button {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.warning-list {
+  border: 1px solid #d39148;
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .timeline-scale {

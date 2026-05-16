@@ -89,6 +89,46 @@ export type ProjectScheduleAuditDto = {
   actionExecutions: ScheduleActionExecutionDto[];
 };
 
+export type CreateScheduleTaskRequestDto = {
+  id?: string;
+  stageId: string;
+  taskTemplateId: string;
+  taskTemplateKey: string;
+  plannedStartDate: string;
+  plannedFinishDate: string;
+  plannedWorkHours: number;
+  progressPercent: number;
+};
+
+export type UpdateScheduleTaskRequestDto = {
+  plannedStartDate: string;
+  plannedFinishDate: string;
+  plannedWorkHours: number;
+  progressPercent: number;
+};
+
+export type CreateScheduleDependencyRequestDto = {
+  id?: string;
+  predecessorTaskId: string;
+  successorTaskId: string;
+  type: "finish_to_start";
+};
+
+export type CaptureScheduleBaselineRequestDto = {
+  id?: string;
+};
+
+export type ScheduleCommandResultDto = ProjectScheduleDto & {
+  task?: {
+    id: string;
+    projectId: string;
+    dueDate?: string;
+    plannedWorkHours?: number;
+  };
+  dependency?: ScheduleDependencyDto;
+  actionExecution: ScheduleActionExecutionDto;
+};
+
 export type GanttRowViewDto = {
   id: string;
   taskId?: string;
@@ -116,11 +156,33 @@ export type ProjectScheduleGanttViewDto = {
 export type Phase5ScheduleApiClient = {
   getProjectSchedule(testUser: string, projectId: string): Promise<ProjectScheduleDto>;
   getProjectScheduleAudit(testUser: string, projectId: string): Promise<ProjectScheduleAuditDto>;
+  createScheduleTask(
+    testUser: string,
+    projectId: string,
+    request: CreateScheduleTaskRequestDto
+  ): Promise<ScheduleCommandResultDto>;
+  updateScheduleTask(
+    testUser: string,
+    projectId: string,
+    taskId: string,
+    request: UpdateScheduleTaskRequestDto
+  ): Promise<ScheduleCommandResultDto>;
+  createFinishToStartDependency(
+    testUser: string,
+    projectId: string,
+    request: CreateScheduleDependencyRequestDto
+  ): Promise<ScheduleCommandResultDto>;
+  captureBaseline(
+    testUser: string,
+    projectId: string,
+    request: CaptureScheduleBaselineRequestDto
+  ): Promise<ScheduleCommandResultDto>;
 };
 
 type ApiErrorDto = {
   code: string;
   message: string;
+  validationIssues?: ScheduleValidationIssueDto[];
 };
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -140,15 +202,46 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+function jsonBody(body: unknown, method = "POST"): RequestInit {
+  return {
+    method,
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body)
+  };
+}
+
 function withUser(path: string, testUser: string): string {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}testUser=${encodeURIComponent(testUser)}`;
 }
 
-function issueLabel(issue: ScheduleValidationIssueDto): string {
+function scheduleIssueMessage(issue: ScheduleValidationIssueDto): string {
+  const labels: Record<string, string> = {
+    finish_to_start_conflict: "Последователь начинается раньше завершения предшественника",
+    missing_planned_start: "Не заполнена плановая дата старта",
+    missing_planned_finish: "Не заполнена плановая дата финиша",
+    invalid_date_range: "Плановый финиш раньше старта",
+    missing_planned_work: "Не заполнена плановая работа",
+    invalid_planned_work: "Плановая работа должна быть неотрицательной",
+    missing_progress: "Не заполнен прогресс",
+    invalid_progress: "Прогресс должен быть от 0 до 100",
+    duplicate_wbs_node: "Дубликат WBS-узла",
+    unknown_dependency_endpoint: "Связь указывает на неизвестную задачу",
+    duplicate_dependency: "Дубликат связи расписания",
+    dependency_cycle: "Обнаружен цикл зависимостей",
+    cross_project_dependency: "Связь выходит за пределы проекта",
+    cross_tenant_dependency: "Связь выходит за пределы тенанта"
+  };
+
+  return labels[issue.code] ?? issue.message;
+}
+
+export function scheduleValidationIssueLabel(issue: ScheduleValidationIssueDto): string {
   const severityLabel = issue.severity === "blocking" ? "Блокер" : "Предупреждение";
 
-  return `${severityLabel}: ${issue.message} (${issue.code})`;
+  return `${severityLabel}: ${scheduleIssueMessage(issue)} (${issue.code})`;
 }
 
 function baselineLabel(baseline: ScheduleBaselineDto | undefined, taskId: string | undefined): string {
@@ -222,7 +315,7 @@ export function buildProjectScheduleGanttView(schedule: ProjectScheduleDto): Pro
         ...(node.plannedWorkHours !== undefined ? { plannedWorkHours: node.plannedWorkHours } : {}),
         ...(node.progressPercent !== undefined ? { progressPercent: node.progressPercent } : {}),
         baselineLabel: baselineLabel(schedule.baseline, node.taskId),
-        validationLabel: nodeIssues.length > 0 ? nodeIssues.map(issueLabel).join("; ") : "Без предупреждений",
+        validationLabel: nodeIssues.length > 0 ? nodeIssues.map(scheduleValidationIssueLabel).join("; ") : "Без предупреждений",
         ...(hasBar
           ? {
               bar: {
@@ -246,6 +339,33 @@ export function createPhase5ScheduleApiClient(basePath = "/api/api"): Phase5Sche
     getProjectScheduleAudit(testUser, projectId) {
       return requestJson<ProjectScheduleAuditDto>(
         withUser(`${basePath}/projects/${encodeURIComponent(projectId)}/schedule/audit`, testUser)
+      );
+    },
+    createScheduleTask(testUser, projectId, request) {
+      return requestJson<ScheduleCommandResultDto>(
+        withUser(`${basePath}/projects/${encodeURIComponent(projectId)}/schedule/tasks`, testUser),
+        jsonBody(request)
+      );
+    },
+    updateScheduleTask(testUser, projectId, taskId, request) {
+      return requestJson<ScheduleCommandResultDto>(
+        withUser(
+          `${basePath}/projects/${encodeURIComponent(projectId)}/schedule/tasks/${encodeURIComponent(taskId)}`,
+          testUser
+        ),
+        jsonBody(request, "PATCH")
+      );
+    },
+    createFinishToStartDependency(testUser, projectId, request) {
+      return requestJson<ScheduleCommandResultDto>(
+        withUser(`${basePath}/projects/${encodeURIComponent(projectId)}/schedule/dependencies`, testUser),
+        jsonBody(request)
+      );
+    },
+    captureBaseline(testUser, projectId, request) {
+      return requestJson<ScheduleCommandResultDto>(
+        withUser(`${basePath}/projects/${encodeURIComponent(projectId)}/schedule/baseline`, testUser),
+        jsonBody(request)
       );
     }
   };
