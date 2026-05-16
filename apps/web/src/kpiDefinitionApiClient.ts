@@ -194,7 +194,7 @@ export function kpiSeverityLabel(severity: KpiSeverityDto): string {
   return labels[severity];
 }
 
-export function createKpiDefinitionApiClient(basePath = "/api"): KpiDefinitionApiClient {
+export function createKpiDefinitionApiClient(basePath = "/api/api"): KpiDefinitionApiClient {
   return {
     async listDefinitions(testUser) {
       const body = await requestJson<{ definitions: KpiDefinitionListItemDto[] }>(

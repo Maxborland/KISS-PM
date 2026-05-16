@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T12:41:28.040Z",
+  "updated_at": "2026-05-16T13:09:12.233Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2433,7 +2433,7 @@
         "P7-009"
       ],
       "title": "Implement deterministic Phase 7 fixtures and E2E-060..064",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P7",
       "depends_on": [
@@ -2478,7 +2478,76 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable P7 block. Implement deterministic fixtures and executable E2E-060..064 over accepted P7 API and UI surfaces. Keep strict phase exit blocked until P7-010."
+      "notes": "Completed deterministic Phase 7 fixtures and executable E2E-060..064. Added warning and critical KPI signal fixtures, direct API/UI permission and Tenant B list isolation checks, browser KPI threshold/versioning flows, and truthful matrix evidence. P7-010 remains the next strict exit gate.",
+      "completed_at": "2026-05-16T20:10:00+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- packages/shared-test-fixtures exit 0: 5 files, 10 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "npm run test:integration exit 0: 9 files, 44 tests passed",
+        "npm test exit 0: 54 files, 337 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json exit 1: expected P7-010 blocked until exit gate",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P7-009-deterministic-phase7-fixtures-e2e --once exit 0"
+      ]
+    },
+    {
+      "id": "P7-010-phase7-verification-matrix-exit-gate",
+      "aliases": [
+        "P7-010"
+      ],
+      "title": "Phase 7 verification matrix and exit gate",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P7",
+      "depends_on": [
+        "P7-009-deterministic-phase7-fixtures-e2e"
+      ],
+      "write_scope": [
+        "docs/status/phase7-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-010-phase7-verification-matrix-exit-gate.claim.json",
+        ".agent-bus/sessions/P7-010-phase7-verification-matrix-exit-gate.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-010-phase7-verification-matrix-exit-gate --once",
+        "npm test -- packages/kpi-engine",
+        "npm test -- packages/shared-test-fixtures",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts",
+        "npm test -- apps/web/src/*Kpi*.test.tsx",
+        "npm run test:integration",
+        "npm test",
+        "npm run test:e2e:phase -- --phase 7",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable P7 block. Convert P7-010 from blocked to verified only after fresh strict phase gate, full verification, review loop, state/handoff, and no unresolved Critical/Important findings."
     }
   ]
 }

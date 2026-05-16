@@ -79,6 +79,31 @@ function getErrorMessage(error: unknown): string {
   return "Не удалось выполнить действие";
 }
 
+function getCriticalThresholdValue(draft: KpiDefinitionConfigDto): number {
+  const condition = draft.thresholdRuleSet.rules[0]?.condition;
+
+  return condition && "value" in condition ? condition.value : -25;
+}
+
+function withCriticalThresholdValue(draft: KpiDefinitionConfigDto, value: number): KpiDefinitionConfigDto {
+  const [firstRule, ...restRules] = draft.thresholdRuleSet.rules;
+  if (!firstRule || !("value" in firstRule.condition)) return draft;
+
+  return {
+    ...draft,
+    thresholdRuleSet: {
+      ...draft.thresholdRuleSet,
+      rules: [
+        {
+          ...firstRule,
+          condition: { ...firstRule.condition, value }
+        },
+        ...restRules
+      ]
+    }
+  };
+}
+
 function statusLabel(definition: KpiDefinitionListItemDto): string {
   return definition.active ? "Опубликована" : "Черновик";
 }
@@ -422,6 +447,19 @@ export function KpiDefinitionAdminSurface({ apiClient, currentTenant, testUser }
                   }}
                   type="number"
                   value={sampleValues.actualWorkHours}
+                />
+              </label>
+              <label className="field-stack">
+                <span>Критический порог, %</span>
+                <input
+                  aria-label="Критический порог KPI"
+                  disabled={!canWriteKpiConfig || commandInFlight}
+                  onChange={(event) => {
+                    setPreview(null);
+                    setDraft((current) => withCriticalThresholdValue(current, Number(event.target.value)));
+                  }}
+                  type="number"
+                  value={getCriticalThresholdValue(draft)}
                 />
               </label>
             </div>

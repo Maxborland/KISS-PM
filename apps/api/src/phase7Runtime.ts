@@ -155,7 +155,7 @@ function definitionSeed(tenantId: TenantId, suffix: string, active = true): KpiD
   return { definition, formula, thresholdRuleSet };
 }
 
-function seedSourceValues(tenantId: TenantId, projectId: string): KpiSourceValue[] {
+function seedSourceValues(tenantId: TenantId, projectId: string, actualWorkHours = 100): KpiSourceValue[] {
   return [
     {
       tenantId,
@@ -169,7 +169,7 @@ function seedSourceValues(tenantId: TenantId, projectId: string): KpiSourceValue
     {
       tenantId,
       bindingKey: "actualWorkHours",
-      value: 100,
+      value: actualWorkHours,
       sourceEntityType: "project",
       sourceEntityId: projectId,
       sourceField: "actualWorkHours",
@@ -181,9 +181,12 @@ function seedSourceValues(tenantId: TenantId, projectId: string): KpiSourceValue
 function createSeedState(tenantId: TenantId): Phase7TenantState {
   const isTenantB = tenantId === "tenant-b";
   const projectId = isTenantB ? "project-private-b" : "project-alpha-a";
+  const warningProjectId = isTenantB ? "project-private-warning-b" : "project-warning-a";
   const suffix = isTenantB ? "private-b" : "a";
   const bundle = definitionSeed(tenantId, suffix);
-  const sourceValues = seedSourceValues(tenantId, projectId);
+  const criticalSourceValues = seedSourceValues(tenantId, projectId);
+  const warningSourceValues = seedSourceValues(tenantId, warningProjectId, 90);
+  const sourceValues = [...criticalSourceValues, ...warningSourceValues];
   const evaluation = evaluateKpi({
     id: isTenantB ? "eval-kpi-private-b-1" : "eval-kpi-schedule-variance-a-1",
     tenantId,
@@ -193,12 +196,28 @@ function createSeedState(tenantId: TenantId): Phase7TenantState {
     entity: { type: "project", id: projectId },
     period: SEED_PERIOD,
     evaluatedAt: "2026-06-08T09:00:00.000Z",
-    sourceValues
+    sourceValues: criticalSourceValues
+  });
+  const warningEvaluation = evaluateKpi({
+    id: isTenantB ? "eval-kpi-private-b-warning-1" : "eval-kpi-schedule-variance-a-warning-1",
+    tenantId,
+    definition: bundle.definition,
+    formula: bundle.formula,
+    thresholdRuleSet: bundle.thresholdRuleSet,
+    entity: { type: "project", id: warningProjectId },
+    period: SEED_PERIOD,
+    evaluatedAt: "2026-06-08T09:02:00.000Z",
+    sourceValues: warningSourceValues
   });
   const signal = createControlSignalFromEvaluation({
     id: isTenantB ? "signal-kpi-private-b" : "signal-kpi-schedule-variance-a",
     evaluation,
     createdAt: "2026-06-08T09:01:00.000Z"
+  });
+  const warningSignal = createControlSignalFromEvaluation({
+    id: isTenantB ? "signal-kpi-private-b-warning" : "signal-kpi-schedule-variance-a-warning",
+    evaluation: warningEvaluation,
+    createdAt: "2026-06-08T09:03:00.000Z"
   });
 
   return {
@@ -206,8 +225,8 @@ function createSeedState(tenantId: TenantId): Phase7TenantState {
     formulas: [bundle.formula],
     thresholdRuleSets: [bundle.thresholdRuleSet],
     sourceValues,
-    evaluations: [evaluation],
-    signals: signal ? [signal] : [],
+    evaluations: [evaluation, warningEvaluation],
+    signals: [signal, warningSignal].filter((candidate): candidate is KpiControlSignal => candidate !== null),
     actionExecutions: [],
     version: 1
   };

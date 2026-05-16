@@ -2,12 +2,12 @@
   "phase": "P7",
   "name": "Phase 7 KPI engine and control signals requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T12:41:28.040Z",
+  "updated_at": "2026-05-16T13:09:12.233Z",
   "rows": [
     {
       "id": "P7-001",
       "requirement": "KPI definitions, formulas, thresholds, and versioning",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/kpi-engine",
@@ -21,24 +21,59 @@
       "evidence": [
         "packages/kpi-engine/src/index.ts defines tenant-owned versioned KpiDefinition, KpiFormulaDefinition, and KpiThresholdRuleSet primitives",
         "packages/kpi-engine/src/kpiEngine.test.ts proves KPI/formula/threshold ids, version fields, active status, and source binding contract",
-        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid runtime entity/cadence-style inputs are rejected before API wiring can pass unsafe JSON into the domain model"
+        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid runtime entity/cadence-style inputs are rejected before API wiring can pass unsafe JSON into the domain model",
+        "E2E-060 proves KPI definition/threshold publication through the Admin UI and API readback.",
+        "E2E-063 proves a changed threshold affects a future evaluation without corrupting the historical seeded evaluation trace.",
+        "E2E-064 proves read-only and cross-tenant users cannot mutate KPI definitions through UI or direct API paths."
       ],
       "tests": [
         "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
         "npm run test:integration exit 0: 8 files, 39 tests passed",
         "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
         "npm run typecheck -- --pretty false exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Domain-only deterministic unit tests; no persisted state, API runtime, browser state, or external resources are created.",
-      "blocker": "Domain evidence exists for P7-001, but the row remains blocked until P7 API/UI/E2E evidence for E2E-060/E2E-063/E2E-064 is implemented.",
-      "last_checked_at": "2026-05-16T11:54:27.719Z",
-      "e2e_evidence": []
+      "cleanup": "Definitions, formulas, thresholds, and historical evaluations are deterministic in-memory test state; E2E-060/E2E-063/E2E-064 call /test-fixtures/reset and verify draft/action cleanup or preserved seeded history by readback.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        },
+        {
+          "id": "E2E-064",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-permissions.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Read-only UI, direct API checks, and Tenant B list readbacks prove backend mutation denial and cross-tenant no-leak behavior."
+        }
+      ]
     },
     {
       "id": "P7-002",
       "requirement": "Safe constrained formula evaluation",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/kpi-engine"
@@ -51,24 +86,67 @@
       ],
       "evidence": [
         "packages/kpi-engine/src/index.ts implements a constrained tokenizer/parser/evaluator for arithmetic, parentheses, numeric bindings, and whitelisted math functions only",
-        "packages/kpi-engine/src/kpiEngine.test.ts proves deterministic formula trace and rejects unsafe global/property syntax, unknown bindings, missing values, tenant mismatch, and non-finite division results"
+        "packages/kpi-engine/src/kpiEngine.test.ts proves deterministic formula trace and rejects unsafe global/property syntax, unknown bindings, missing values, tenant mismatch, and non-finite division results",
+        "E2E-060 and E2E-063 prove the constrained formula preview/evaluation path from browser through API without mutating state during preview.",
+        "E2E-061 and E2E-062 prove formula trace result:-25 is visible and reproducible in KPI deviation readback."
       ],
       "tests": [
         "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
         "npm run test:integration exit 0: 8 files, 39 tests passed",
         "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
         "npm run typecheck -- --pretty false exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Formula evaluation is pure in-memory computation; tests create no persisted state and leave no cleanup surface.",
-      "blocker": "Safe formula unit evidence exists, but the row remains blocked until API/UI/E2E paths prove the evaluator through executable P7 scenarios.",
-      "last_checked_at": "2026-05-16T11:54:27.719Z",
-      "e2e_evidence": []
+      "cleanup": "Formula preview is non-mutating and E2E-060/E2E-063 verify no definition/audit mutation before create; fixture reset clears created draft/evaluation state.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        }
+      ]
     },
     {
       "id": "P7-003",
       "requirement": "KPI source bindings and evaluation periods",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/kpi-engine",
@@ -83,24 +161,50 @@
       "evidence": [
         "packages/kpi-engine/src/index.ts evaluates KPI values from canonical source values with bindingKey/sourceEntity/sourceField/observedAt trace and evaluation period validation",
         "packages/kpi-engine/src/kpiEngine.test.ts proves source trace, formula trace, threshold trace, entity/period output, and cross-tenant rejection before evaluation proceeds",
-        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid calendar dates, empty sourceEntityId, and malformed source observedAt are rejected before trace creation"
+        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid calendar dates, empty sourceEntityId, and malformed source observedAt are rejected before trace creation",
+        "E2E-061 proves seeded project source data creates a reproducible KPI signal for project-alpha-a.",
+        "E2E-062 proves source trace shows plannedWorkHours and actualWorkHours values, entity id, field, and observedAt through UI/API readback.",
+        "E2E-061 and E2E-064 now cover both critical project-alpha-a source data and warning project-warning-a source data without Tenant B leakage."
       ],
       "tests": [
         "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
         "npm run test:integration exit 0: 8 files, 39 tests passed",
         "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
         "npm run typecheck -- --pretty false exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "KPI evaluation inputs are immutable in-memory test values; no persisted source records or external fixtures are created.",
-      "blocker": "Source-binding domain evidence exists, but the row remains blocked until API fixture/readback and E2E-061/E2E-062 evidence exist.",
-      "last_checked_at": "2026-05-16T11:54:27.719Z",
-      "e2e_evidence": []
+      "cleanup": "Source binding fixtures are deterministic in-memory source values recreated by /test-fixtures/reset; E2E-062 verifies source readback remains stable after reload and reset.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        }
+      ]
     },
     {
       "id": "P7-004",
       "requirement": "Threshold mapping and severity",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/kpi-engine"
@@ -113,24 +217,60 @@
       "evidence": [
         "packages/kpi-engine/src/index.ts maps threshold rules by gt/gte/lt/lte/eq/between conditions and selects strongest matching severity deterministically",
         "packages/kpi-engine/src/kpiEngine.test.ts proves critical, warning, and none threshold outcomes with matched rule/action recommendations and trace",
-        "packages/kpi-engine/src/kpiEngine.test.ts proves duplicate threshold rule ids are rejected to avoid ambiguous severity/readback semantics"
+        "packages/kpi-engine/src/kpiEngine.test.ts proves duplicate threshold rule ids are rejected to avoid ambiguous severity/readback semantics",
+        "E2E-061 proves threshold severity maps the seeded -25 value to critical.",
+        "E2E-062 proves matched threshold trace is visible through the Deviation Control surface.",
+        "E2E-063 proves a stricter -30 threshold changes a future evaluation to none while preserving historical critical trace.",
+        "E2E-061/E2E-062 prove warning threshold severity as well as critical severity through UI and API readback."
       ],
       "tests": [
         "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
         "npm run test:integration exit 0: 8 files, 39 tests passed",
         "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
         "npm run typecheck -- --pretty false exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Threshold mapping is pure in-memory computation; no cleanup required beyond deterministic unit process teardown.",
-      "blocker": "Threshold domain evidence exists, but the row remains blocked until control-surface/API/E2E severity readback evidence exists.",
-      "last_checked_at": "2026-05-16T11:54:27.719Z",
-      "e2e_evidence": []
+      "cleanup": "Threshold fixtures are deterministic in-memory config; E2E-063 publishes a changed threshold, verifies future evaluation behavior, then reset restores the original seeded threshold trace.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        }
+      ]
     },
     {
       "id": "P7-005",
       "requirement": "KPI ControlSignal / Deviation creation",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/kpi-engine",
@@ -142,24 +282,50 @@
       ],
       "evidence": [
         "packages/kpi-engine/src/index.ts creates traceable KPI control signals from non-none evaluations without executing P8 actions and upserts matching open signals by definition/entity/period",
-        "packages/kpi-engine/src/kpiEngine.test.ts proves signal tenant/source/evaluation trace, recommended action keys, not_executed action state, and deduped update semantics"
+        "packages/kpi-engine/src/kpiEngine.test.ts proves signal tenant/source/evaluation trace, recommended action keys, not_executed action state, and deduped update semantics",
+        "E2E-061 proves a deterministic KPI evaluation creates/upserts an open KPI control signal with recommended actions.",
+        "E2E-062 proves the deviation control signal traces to its source evaluation and recommended P8 handoff actions.",
+        "E2E-061 proves deterministic critical and warning KPI control signals with distinct recommendation keys."
       ],
       "tests": [
         "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
         "npm run test:integration exit 0: 8 files, 39 tests passed",
         "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
         "npm run typecheck -- --pretty false exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Control-signal tests use in-memory value objects only; P8 action execution is intentionally not invoked.",
-      "blocker": "ControlSignal domain evidence exists, but the row remains blocked until API/UI/E2E prove signal persistence/readback and permissions.",
-      "last_checked_at": "2026-05-16T11:54:27.719Z",
-      "e2e_evidence": []
+      "cleanup": "Control signals are deterministic in-memory projections; E2E-061 and E2E-062 verify reload persistence, and reset restores the single seeded open signal with empty action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        }
+      ]
     },
     {
       "id": "P7-006",
       "requirement": "KPI API and governed configuration commands",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
@@ -174,7 +340,10 @@
       "evidence": [
         "apps/api/src/phase7Runtime.ts provides deterministic tenant-scoped KPI definitions, source values, evaluations, control signals, non-mutating definition preview, governed create/publish/retire commands, governed evaluation execution, and action execution readback.",
         "apps/api/src/app.ts exposes P7 KPI API routes for definitions, preview/create/publish/retire, evaluation run/readback, deviations/readback, and audit while using backend permissions kpi:read, kpi.config:write, kpi.evaluate:execute, and audit.read.",
-        "apps/api/src/phase7KpiApi.test.ts proves deterministic read models, tenant isolation, dry-run preview without mutation, governed config commands with audit/action evidence, evaluation readback, deviation projection, read-only denial, cross-tenant denial without leaked ids, version conflicts, invalid formula rejection, and source-entity precondition rejection without partial mutation."
+        "apps/api/src/phase7KpiApi.test.ts proves deterministic read models, tenant isolation, dry-run preview without mutation, governed config commands with audit/action evidence, evaluation readback, deviation projection, read-only denial, cross-tenant denial without leaked ids, version conflicts, invalid formula rejection, and source-entity precondition rejection without partial mutation.",
+        "E2E-060 proves KPI definition create/publish API command readback and audit through the browser flow.",
+        "E2E-061 proves governed evaluation run API command creates refreshed signal/readback and audit evidence.",
+        "E2E-064 proves backend permission and tenant isolation denial for direct API mutation/read attempts."
       ],
       "tests": [
         "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 1 file, 5 tests passed",
@@ -183,17 +352,49 @@
         "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 1 file, 6 tests passed",
         "npm test exit 0: 51 files, 315 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "P7 API/runtime state is deterministic in-memory per createApiApp instance; denied, invalid, preview-only, and source-entity mismatch paths are tested to leave no audit/action records or created KPI definitions. No browser, persisted database, external service, or generated fixture state is created in this block.",
-      "blocker": "API/governed-command evidence exists for P7-006, but the row remains blocked until P7 UI and executable E2E-060/E2E-063/E2E-064 prove the same flows through the user control surfaces.",
-      "last_checked_at": "2026-05-16T12:09:45.265Z",
-      "e2e_evidence": []
+      "cleanup": "P7 API/runtime state is deterministic per test server and reset recreates it; E2E-060/E2E-061/E2E-063/E2E-064 verify no preview mutation, command audit, direct denial without partial mutation, reload, and cleanup/readback.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        },
+        {
+          "id": "E2E-064",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-permissions.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Read-only UI, direct API checks, and Tenant B list readbacks prove backend mutation denial and cross-tenant no-leak behavior."
+        }
+      ]
     },
     {
       "id": "P7-007",
       "requirement": "KPI Definition Admin MVP",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/web"
@@ -208,7 +409,10 @@
         "apps/web/src/KpiDefinitionAdminSurface.tsx renders the Russian KPI definition management surface with TanStack Query reads/mutations, loading/empty/error/permission states, non-mutating formula preview, governed create/publish/retire commands, API readback refresh, and visible action/audit evidence.",
         "apps/web/src/App.tsx wires the KPI navigation entry and KPI Definition Admin surface into the app shell when the P7 API client is available.",
         "apps/web/src/KpiDefinitionAdminSurface.test.tsx proves definition load states, preview-before-mutation, create/publish readback, retire targeting the active KPI, read-only/no-read permission states, missing audit permission state, stale readback failure without local-only evidence, and conflict recovery.",
-        "Bug Hunt / requested code review findings were fixed: retire now targets active definitions, command evidence is only shown after successful readback, missing audit.read no longer looks like empty audit, and user-facing copy is Russian."
+        "Bug Hunt / requested code review findings were fixed: retire now targets active definitions, command evidence is only shown after successful readback, missing audit.read no longer looks like empty audit, and user-facing copy is Russian.",
+        "E2E-060 proves KPI Definition Admin preview/create/publish/readback/audit/reload/reset flow.",
+        "E2E-063 proves KPI Definition Admin exposes the critical threshold input and publishes the changed threshold configuration.",
+        "E2E-064 proves read-only UI cannot edit KPI definitions and backend denial is enforced."
       ],
       "tests": [
         "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx exit 0: 1 file, 10 tests passed",
@@ -218,17 +422,49 @@
         "npm run test:integration exit 0: 9 files, 44 tests passed",
         "npm test exit 0: 52 files, 326 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Component and API-client tests use mocked in-memory clients and TanStack Query test wrappers; no browser, database, external service, or persisted fixture state is created. Mutation tests verify failed post-mutation readback does not leave local-only action evidence.",
-      "blocker": "KPI Definition Admin UI evidence exists for P7-007, but the row remains blocked until executable E2E-060/E2E-063/E2E-064 prove the same write flows through browser, API readback, audit, reload, and cleanup.",
-      "last_checked_at": "2026-05-16T12:28:03.473Z",
-      "e2e_evidence": []
+      "cleanup": "Definition Admin browser tests use /test-fixtures/reset; E2E-060/E2E-063 verify publish/readback/reload and cleanup removes the draft plus clears action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        },
+        {
+          "id": "E2E-064",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-permissions.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Read-only UI, direct API checks, and Tenant B list readbacks prove backend mutation denial and cross-tenant no-leak behavior."
+        }
+      ]
     },
     {
       "id": "P7-008",
       "requirement": "KPI Deviation Control read surface",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/web"
@@ -242,7 +478,9 @@
         "apps/web/src/KpiDeviationControlSurface.tsx renders the Russian KPI Deviation Control management surface with severity signals, selected deviation detail, source trace, formula trace, threshold trace, version metadata, recommended P8 handoff actions, permission states, governed evaluation command, API readback refresh, and audit/action evidence.",
         "apps/web/src/App.tsx wires KPI Deviation Control into the app shell and routes KPI navigation to the deviation surface when the definition-admin client is not available.",
         "apps/web/src/KpiDeviationControlSurface.test.tsx proves load/empty/error states, detail traceability, governed evaluation refetch, audit evidence, readback failure without local-only evidence, missing audit permission denial, read-only state, and no KPI-read denial.",
-        "Bug Hunt / requested code review findings were fixed: command result evidence now comes only from audit/readback, audit.read is required for action evidence, traceability includes evaluation/source/version/source timestamp details, and KPI navigation can target the deviation surface."
+        "Bug Hunt / requested code review findings were fixed: command result evidence now comes only from audit/readback, audit.read is required for action evidence, traceability includes evaluation/source/version/source timestamp details, and KPI navigation can target the deviation surface.",
+        "E2E-061 proves KPI Deviation Control renders a deterministic critical signal, can run governed evaluation, refreshes readback, and shows audit evidence.",
+        "E2E-062 proves KPI Deviation Control displays source/formula/threshold/version trace plus recommended management handoff and reload persistence."
       ],
       "tests": [
         "npm test -- apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 1 file, 8 tests passed",
@@ -253,17 +491,40 @@
         "npm test exit 0: 53 files, 335 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
       ],
-      "cleanup": "Component and API-client tests use mocked in-memory clients and TanStack Query test wrappers; no browser, database, external service, or persisted fixture state is created. Evaluation command tests verify failed readback/audit evidence paths do not leave local-only action evidence.",
-      "blocker": "KPI Deviation Control UI evidence exists for P7-008, but the row remains blocked until executable E2E-061/E2E-062 prove the same deviation/readback/reload evidence through browser and API.",
-      "last_checked_at": "2026-05-16T12:41:28.040Z",
-      "e2e_evidence": []
+      "cleanup": "Deviation Control browser tests use deterministic reset; E2E-061/E2E-062 verify signal/evaluation/audit readback after reload and reset restores seeded signal state.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        }
+      ]
     },
     {
       "id": "P7-009",
       "requirement": "Deterministic Phase 7 fixtures and E2E-060..064",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/shared-test-fixtures",
@@ -276,12 +537,73 @@
         "E2E-063",
         "E2E-064"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "Executable P7 fixtures and Playwright scenarios are planned but not implemented in this contract-only block.",
-      "last_checked_at": null,
-      "e2e_evidence": []
+      "evidence": [
+        "packages/shared-test-fixtures/src/phase7Fixtures.ts defines deterministic Tenant A/Tenant B KPI definition, signal, evaluation, draft, and E2E ids for Phase 7.",
+        "packages/shared-test-fixtures/src/phase7Fixtures.test.ts proves stable identifiers and defensive copies.",
+        "e2e/tests/phase7/kpi-threshold.spec.ts implements E2E-060 UI/API/audit/reload/reset proof for KPI threshold publication.",
+        "e2e/tests/phase7/kpi-control-signal.spec.ts implements E2E-061 deterministic control signal and governed evaluation proof.",
+        "e2e/tests/phase7/kpi-traceability.spec.ts implements E2E-062 source/formula/threshold traceability proof.",
+        "e2e/tests/phase7/kpi-versioning.spec.ts implements E2E-063 threshold change and history preservation proof.",
+        "e2e/tests/phase7/kpi-permissions.spec.ts implements E2E-064 UI plus direct backend permission and tenant-isolation denial proof.",
+        "apps/web/src/kpiDefinitionApiClient.ts and apps/web/src/kpiDeviationApiClient.ts now use the established /api/api Vite proxy base path so browser flows hit API JSON instead of Vite HTML fallback.",
+        "Review fixes added deterministic warning KPI deviation fixtures, Tenant B real read-only actor id user-b, and Tenant B list readbacks in E2E-064."
+      ],
+      "tests": [
+        "npm test -- packages/shared-test-fixtures/src/phase7Fixtures.test.ts exit 0: 2 tests passed",
+        "npm test -- apps/web/src/KpiDefinitionAdminSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 18 tests passed",
+        "npm test -- apps/api/src/phase7KpiApi.test.ts exit 0: 5 tests passed",
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
+      ],
+      "cleanup": "All Phase 7 E2E specs start from /test-fixtures/reset. E2E-060 and E2E-063 verify created KPI draft/evaluation state is removed by reset; E2E-061 verifies evaluation actions are cleared by reset; E2E-064 verifies denied attempts create no action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        },
+        {
+          "id": "E2E-064",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-permissions.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Read-only UI, direct API checks, and Tenant B list readbacks prove backend mutation denial and cross-tenant no-leak behavior."
+        }
+      ]
     },
     {
       "id": "P7-010",
@@ -300,13 +622,62 @@
         "E2E-064"
       ],
       "evidence": [
-        "P7 verifier support and phase contract are introduced by P7-000, but phase exit cannot be verified until P7 implementation and E2E-060..064 pass."
+        "P7-001..P7-009 now have fresh domain/API/UI/fixture/E2E evidence for E2E-060..064.",
+        "P7-010 is reserved for the strict Phase 7 exit gate, final review loop, and verifier run without --allow-blocked."
       ],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "Strict P7 phase exit remains blocked because P7-001..P7-009 implementation and executable E2E-060..064 do not exist yet.",
-      "last_checked_at": null,
-      "e2e_evidence": []
+      "tests": [
+        "cmd /c \"set PW_API_PORT=5097&& set PW_WEB_PORT=6097&& npm run test:e2e:phase -- --phase 7\" exit 0: E2E-060..064 passed"
+      ],
+      "cleanup": "P7-009 E2E proves deterministic reset/readback for KPI draft, evaluation/action, historical trace, permission denial, and tenant isolation paths; P7-010 still needs final strict gate verification.",
+      "blocker": "P7-010 phase exit gate is not completed yet: strict verifier without --allow-blocked, full regression/typecheck/lint, review loop, state/handoff, and final acceptance still need a fresh gate run.",
+      "last_checked_at": "2026-05-16T13:09:12.233Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-060",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-threshold.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI preview/create/publish flow proves threshold config, API readback, audit, reload persistence, and reset cleanup."
+        },
+        {
+          "id": "E2E-061",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI and API readback prove deterministic critical and warning control signals plus governed evaluation command audit."
+        },
+        {
+          "id": "E2E-062",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-traceability.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Deviation UI/API readback prove source, formula, threshold, version, recommendation, reload, reset, and warning/critical traceability."
+        },
+        {
+          "id": "E2E-063",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-versioning.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Admin UI threshold change plus API future evaluation prove new threshold outcome while historical evaluation trace remains unchanged."
+        },
+        {
+          "id": "E2E-064",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 7",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase7/kpi-permissions.spec.ts",
+          "checked_at": "2026-05-16T13:09:12.233Z",
+          "notes": "Read-only UI, direct API checks, and Tenant B list readbacks prove backend mutation denial and cross-tenant no-leak behavior."
+        }
+      ]
     }
   ]
 }

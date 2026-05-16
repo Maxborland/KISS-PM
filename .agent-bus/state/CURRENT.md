@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T19:41:28+07:00
+Updated: 2026-05-16T20:10:00+07:00
+
+- P7-009 deterministic Phase 7 fixtures and E2E-060..064 completed with verdict `accepted` for the fixture/E2E block; handoff: `.agent-bus/handoff/2026-05-16-p7-009-deterministic-phase7-fixtures-e2e.md`.
+- `packages/shared-test-fixtures/src/phase7Fixtures.ts` now defines stable Tenant A/Tenant B KPI fixture ids for definitions, draft config, critical and warning control signals, evaluations, users, periods, source values, and E2E ids.
+- `e2e/tests/phase7/` now contains executable E2E-060..064 proving KPI threshold publication, deterministic critical/warning signal creation, deviation source/formula/threshold traceability, threshold-change future evaluation without historical corruption, and UI plus direct API permission/tenant-isolation denial.
+- P7 browser API clients now use the established `/api/api` Vite proxy base path, preventing the P7 UI from receiving Vite HTML fallback instead of API JSON in Playwright/browser flows.
+- Review findings were fixed: Tenant B read-only fixture now points to real `user-b`, E2E-064 checks Tenant B list readbacks for no Tenant A leakage, and P7 fixtures/E2E cover both warning and critical KPI deviations.
+- Fresh P7-009 evidence: `npm test -- packages/shared-test-fixtures`, P7 KPI web component tests, `apps/api/src/phase7KpiApi.test.ts`, `npm run test:integration`, `npm test`, `npm run test:e2e:phase -- --phase 7`, `npm run typecheck`, `npm run lint`, `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json`, `git diff --check`, and agent-bus guard pass.
+- `docs/status/phase7-requirements-matrix.json` records fresh structured E2E evidence for P7-001..P7-009 and keeps P7-010 blocked truthfully. Strict Phase 7 remains blocked until P7-010 runs the final exit gate without `--allow-blocked`.
+- Next recommended step: claim `P7-010-phase7-verification-matrix-exit-gate`, run the final Phase 7 strict verification/review loop, and only then mark Phase 7 accepted. Do not start P8 while P7-010 is red except unrelated docs-only prep that does not mask the gate.
 
 - P7-008 KPI Deviation Control UI completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p7-008-kpi-deviation-control-surface.md`.
 - `apps/web/src/kpiDeviationApiClient.ts` now exposes typed P7 KPI deviation API methods for signal list/detail, governed evaluation run, and audit readback.
