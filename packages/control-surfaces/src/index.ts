@@ -111,6 +111,95 @@ export type ControlSurfaceDefinition = TenantOwned & {
   updatedAt: string;
 };
 
+export type ControlSurfaceSourceRef = {
+  entityType: ControlSurfaceEntityType;
+  entityId: string;
+};
+
+export type ControlSurfaceSourceRecord = TenantOwned & {
+  id: string;
+  entityType: ControlSurfaceEntityType;
+  entityId: string;
+  label: string;
+  severity: ControlSurfaceSeverity;
+  explanation: string;
+  sourceRefs: readonly ControlSurfaceSourceRef[];
+  fieldValues: Readonly<Record<string, string | number | boolean | null>>;
+  recommendedActionKeys: readonly string[];
+  drilldownParams: Readonly<Record<string, string>>;
+  policyContext?: {
+    ownerId?: string;
+    projectId?: string;
+  };
+};
+
+export type ControlSurfaceReadAction = {
+  key: string;
+  label: string;
+  actionDefinitionKey: string;
+  slotType: ControlSurfaceActionSlotType;
+  targetEntityType: ControlSurfaceEntityType;
+  dryRunRequired: boolean;
+  available: boolean;
+  unavailableReason?: "not_recommended" | "permission_denied";
+};
+
+export type ControlSurfaceReadDrilldown = {
+  key: string;
+  label: string;
+  targetSurfaceKey: string;
+  targetEntityType: ControlSurfaceEntityType;
+  href?: string;
+  available: boolean;
+  unavailableReason?: "missing_param" | "permission_denied";
+};
+
+export type ControlSurfaceReadRow = {
+  id: string;
+  entityType: ControlSurfaceEntityType;
+  entityId: string;
+  label: string;
+  severity: ControlSurfaceSeverity;
+  explanation: string;
+  fieldValues: Readonly<Record<string, string | number | boolean | null>>;
+  sourceRefs: readonly ControlSurfaceSourceRef[];
+  drilldowns: readonly ControlSurfaceReadDrilldown[];
+  actions: readonly ControlSurfaceReadAction[];
+};
+
+export type ControlSurfaceReadWidget = {
+  key: string;
+  label: string;
+  widgetType: ControlSurfaceWidgetType;
+  value: number;
+  severity?: Exclude<ControlSurfaceSeverity, "none">;
+};
+
+export type ControlSurfaceReadModel = {
+  surface: {
+    id: string;
+    tenantId: TenantId;
+    key: string;
+    label: string;
+    viewType: ControlSurfaceViewType;
+    version: number;
+    updatedAt: string;
+  };
+  fields: readonly ControlSurfaceFieldDefinition[];
+  widgets: readonly ControlSurfaceReadWidget[];
+  rows: readonly ControlSurfaceReadRow[];
+  pagination: { offset: number; limit: number; total: number };
+};
+
+export type ControlSurfaceReadModelInput = {
+  definition: ControlSurfaceDefinition;
+  records: readonly ControlSurfaceSourceRecord[];
+  actorPermissionKeys: readonly string[];
+  page: { offset: number; limit: number };
+  isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
+  isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
+};
+
 export class ControlSurfaceModelError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict" | "tenant_mismatch",
@@ -164,6 +253,7 @@ const fieldValueTypes = new Set<ControlSurfaceFieldValueType>([
 const widgetTypes = new Set<ControlSurfaceWidgetType>(["metric", "severity_summary", "trend", "action_summary"]);
 const actionSlotTypes = new Set<ControlSurfaceActionSlotType>(["primary", "row", "bulk", "global"]);
 const statuses = new Set<ControlSurfaceStatus>(["draft", "active", "archived"]);
+const readModelSeverities = new Set<ControlSurfaceSeverity>(["none", "attention", "warning", "critical"]);
 const severities = new Set<Exclude<ControlSurfaceSeverity, "none">>(["attention", "warning", "critical"]);
 const savedViewOwnerTypes = new Set<ControlSurfaceSavedView["ownerType"]>(["tenant", "user"]);
 
@@ -194,6 +284,14 @@ function requireNonEmptyString(value: string | undefined, fieldName: string): st
 function requirePositiveInteger(value: number | undefined, fieldName: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw new ControlSurfaceModelError("validation_error", `${fieldName} must be a positive integer`);
+  }
+
+  return value;
+}
+
+function requireNonNegativeInteger(value: number | undefined, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new ControlSurfaceModelError("validation_error", `${fieldName} must be a non-negative integer`);
   }
 
   return value;
@@ -240,6 +338,25 @@ function assertTenantId(expectedTenantId: TenantId, actualTenantId: TenantId, me
   if (expectedTenantId !== actualTenantId) {
     throw new ControlSurfaceModelError("tenant_mismatch", message);
   }
+}
+
+function clonePlain<T>(value: T): T {
+  return structuredClone(value) as T;
+}
+
+function interpolateRoute(template: string, params: Readonly<Record<string, string>>): string | undefined {
+  let missing = false;
+  const href = template.replace(/:([A-Za-z0-9_]+)/g, (_match, key: string) => {
+    const value = params[key];
+    if (typeof value !== "string" || value.trim().length === 0) {
+      missing = true;
+      return "";
+    }
+
+    return encodeURIComponent(value);
+  });
+
+  return missing ? undefined : href;
 }
 
 function createDataSource(input: ControlSurfaceDataSource): ControlSurfaceDataSource {
@@ -409,4 +526,127 @@ export function validateControlSurfaceDefinition(input: ControlSurfaceDefinition
     }
     throw error;
   }
+}
+
+export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInput): ControlSurfaceReadModel {
+  const definition = createControlSurfaceDefinition(input.definition);
+  const actorPermissionKeys = new Set(input.actorPermissionKeys);
+  const offset = requireNonNegativeInteger(input.page.offset, "controlSurface.page.offset");
+  const limit = requirePositiveInteger(input.page.limit, "controlSurface.page.limit");
+  const visibleFields = definition.view.fields.filter((field) => field.visible);
+  const visibleFieldKeys = new Set(visibleFields.map((field) => field.key));
+
+  if (!actorPermissionKeys.has(definition.view.permissionRequirements.read)) {
+    throw new ControlSurfaceModelError("validation_error", "controlSurface.read permission is required");
+  }
+
+  for (const record of input.records) {
+    assertTenantId(definition.tenantId, record.tenantId, "controlSurface.record tenant mismatch");
+    requireAllowed(record.entityType, entityTypes, "controlSurface.record.entityType");
+    requireAllowed(record.severity, readModelSeverities, "controlSurface.record.severity");
+    requireNonEmptyString(record.id, "controlSurface.record.id");
+    requireNonEmptyString(record.entityId, "controlSurface.record.entityId");
+    requireNonEmptyString(record.label, "controlSurface.record.label");
+  }
+
+  const pagedRecords = input.records.slice(offset, offset + limit);
+  const rows = pagedRecords.map((record): ControlSurfaceReadRow => {
+    const fieldValues = Object.fromEntries(
+      Object.entries(record.fieldValues).filter(([key]) => visibleFieldKeys.has(key))
+    ) as Record<string, string | number | boolean | null>;
+    return {
+      id: record.id,
+      entityType: record.entityType,
+      entityId: record.entityId,
+      label: record.label,
+      severity: record.severity,
+      explanation: record.explanation,
+      fieldValues,
+      sourceRefs: clonePlain(record.sourceRefs),
+      drilldowns: definition.view.drilldowns.map((drilldown): ControlSurfaceReadDrilldown => {
+        const drilldownAllowed =
+          input.isDrilldownAllowed?.(record, drilldown) ?? actorPermissionKeys.has(drilldown.requiredPermission);
+        if (!drilldownAllowed) {
+          return {
+            key: drilldown.key,
+            label: drilldown.label,
+            targetSurfaceKey: drilldown.targetSurfaceKey,
+            targetEntityType: drilldown.targetEntityType,
+            available: false,
+            unavailableReason: "permission_denied"
+          };
+        }
+        const href = interpolateRoute(drilldown.routeTemplate, record.drilldownParams);
+        if (href === undefined) {
+          return {
+            key: drilldown.key,
+            label: drilldown.label,
+            targetSurfaceKey: drilldown.targetSurfaceKey,
+            targetEntityType: drilldown.targetEntityType,
+            available: false,
+            unavailableReason: "missing_param"
+          };
+        }
+
+        return {
+          key: drilldown.key,
+          label: drilldown.label,
+          targetSurfaceKey: drilldown.targetSurfaceKey,
+          targetEntityType: drilldown.targetEntityType,
+          href,
+          available: true
+        };
+      }),
+      actions: definition.view.actionSlots.map((slot): ControlSurfaceReadAction => {
+        const isRecommended = record.recommendedActionKeys.includes(slot.actionDefinitionKey);
+        const hasPermission = input.isActionAllowed?.(record, slot) ?? actorPermissionKeys.has(slot.requiredPermission);
+
+        return {
+          key: slot.key,
+          label: slot.label,
+          actionDefinitionKey: slot.actionDefinitionKey,
+          slotType: slot.slotType,
+          targetEntityType: slot.targetEntityType,
+          dryRunRequired: slot.dryRunRequired,
+          available: isRecommended && hasPermission,
+          ...(!isRecommended
+            ? { unavailableReason: "not_recommended" as const }
+            : !hasPermission
+              ? { unavailableReason: "permission_denied" as const }
+              : {})
+        };
+      })
+    };
+  });
+
+  const widgets = definition.view.widgets.map((widget): ControlSurfaceReadWidget => {
+    const value =
+      widget.widgetType === "severity_summary" && widget.severity !== undefined
+        ? input.records.filter((record) => record.fieldValues[widget.sourceFieldKey] === widget.severity).length
+        : input.records.filter((record) => record.fieldValues[widget.sourceFieldKey] !== undefined).length;
+
+    return {
+      key: widget.key,
+      label: widget.label,
+      widgetType: widget.widgetType,
+      value,
+      ...(widget.severity !== undefined ? { severity: widget.severity } : {})
+    };
+  });
+
+  return {
+    surface: {
+      id: definition.id,
+      tenantId: definition.tenantId,
+      key: definition.key,
+      label: definition.label,
+      viewType: definition.view.viewType,
+      version: definition.version,
+      updatedAt: definition.updatedAt
+    },
+    fields: visibleFields,
+    widgets,
+    rows,
+    pagination: { offset, limit, total: input.records.length }
+  };
 }

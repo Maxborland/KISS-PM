@@ -185,6 +185,26 @@ const phase2PermissionCatalog = [
     key: "kpi.evaluate:execute",
     description: "Run governed KPI evaluations and signal projection commands",
     category: "kpi_control"
+  }),
+  createPermission({
+    key: "control.surface:read",
+    description: "Read tenant control surface definitions and operational read models",
+    category: "control_surfaces"
+  }),
+  createPermission({
+    key: "control.action:write",
+    description: "Preview and execute governed management actions from control surfaces",
+    category: "control_surfaces"
+  }),
+  createPermission({
+    key: "risk:accept",
+    description: "Accept a visible control risk through a governed action",
+    category: "control_surfaces"
+  }),
+  createPermission({
+    key: "schedule:read",
+    description: "Open schedule and Gantt drilldowns from control surfaces",
+    category: "scheduling"
   })
 ] satisfies Permission[];
 
@@ -225,7 +245,11 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.write",
       "kpi:read",
       "kpi.config:write",
-      "kpi.evaluate:execute"
+      "kpi.evaluate:execute",
+      "control.surface:read",
+      "control.action:write",
+      "risk:accept",
+      "schedule:read"
     ],
     project_manager: [
       "crm.opportunity.read",
@@ -248,7 +272,10 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.read",
       "resource.write",
       "kpi:read",
-      "kpi.evaluate:execute"
+      "kpi.evaluate:execute",
+      "control.surface:read",
+      "control.action:write",
+      "schedule:read"
     ],
     resource_manager: [
       "crm.opportunity.read",
@@ -261,11 +288,30 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "resource.write",
       "audit.read",
       "kpi:read",
-      "kpi.evaluate:execute"
+      "kpi.evaluate:execute",
+      "control.surface:read",
+      "control.action:write",
+      "schedule:read"
     ],
     executor: ["project.read", "task.read", "task.status.write", "task.comment.write"],
-    readonly_observer: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read", "kpi:read"],
-    tenant_user: ["crm.opportunity.read", "project_draft.read", "project.read", "task.read", "resource.read", "kpi:read"]
+    readonly_observer: [
+      "crm.opportunity.read",
+      "project_draft.read",
+      "project.read",
+      "task.read",
+      "resource.read",
+      "kpi:read",
+      "control.surface:read"
+    ],
+    tenant_user: [
+      "crm.opportunity.read",
+      "project_draft.read",
+      "project.read",
+      "task.read",
+      "resource.read",
+      "kpi:read",
+      "control.surface:read"
+    ]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
 
@@ -435,6 +481,9 @@ export function createPhase2RuntimeState() {
       permissionKey: string;
       target: PolicyTargetRef;
       requestedScope?: string;
+      contextRefs?: {
+        projectIds?: string[];
+      };
     }): PolicyEvaluation {
       return evaluatePolicy({
         actor: {
@@ -444,7 +493,8 @@ export function createPhase2RuntimeState() {
         profile: input.session.profile,
         permissionKey: input.permissionKey,
         target: input.target,
-        ...(input.requestedScope !== undefined ? { requestedScope: input.requestedScope } : {})
+        ...(input.requestedScope !== undefined ? { requestedScope: input.requestedScope } : {}),
+        ...(input.contextRefs !== undefined ? { contextRefs: input.contextRefs } : {})
       });
     },
 
