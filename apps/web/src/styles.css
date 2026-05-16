@@ -178,7 +178,8 @@ nav a:focus-visible {
 .resource-load-surface,
 .kpi-definition-surface,
 .kpi-deviation-surface,
-.portfolio-control-surface {
+.portfolio-control-surface,
+.closed-portfolio-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -414,9 +415,17 @@ button:focus-visible {
   grid-template-columns: minmax(500px, 1fr) minmax(380px, 0.82fr);
 }
 
+.closed-portfolio-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(500px, 1fr) minmax(380px, 0.82fr);
+}
+
 .portfolio-overview-panel,
 .portfolio-action-panel,
-.portfolio-detail-panel {
+.portfolio-detail-panel,
+.retrospective-detail-panel,
+.retrospective-insight-panel {
   min-width: 0;
 }
 
@@ -450,7 +459,18 @@ button:focus-visible {
   overflow: auto;
 }
 
+.closed-portfolio-row-list,
+.retrospective-trend-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
 .portfolio-control-row {
+  min-height: 104px;
+}
+
+.closed-portfolio-row,
+.retrospective-trend-card {
   min-height: 104px;
 }
 
@@ -532,6 +552,46 @@ button:focus-visible {
 .kpi-signal-card span {
   color: #59675a;
   font-size: 12px;
+}
+
+.retrospective-trend-card {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.retrospective-trend-card > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.retrospective-trend-card p {
+  color: #59675a;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.retrospective-trend-card.severity-critical {
+  border-color: #ce6a64;
+  box-shadow: inset 3px 0 0 #ce6a64;
+}
+
+.retrospective-trend-card.severity-warning {
+  border-color: #d39148;
+  box-shadow: inset 3px 0 0 #d39148;
+}
+
+.retrospective-trend-card.severity-attention {
+  border-color: #decf98;
+  box-shadow: inset 3px 0 0 #d39148;
 }
 
 .kpi-deviation-detail-panel {

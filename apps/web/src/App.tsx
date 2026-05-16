@@ -26,6 +26,8 @@ import { KpiDeviationControlSurface } from "./KpiDeviationControlSurface";
 import { createKpiDeviationApiClient, type KpiDeviationApiClient } from "./kpiDeviationApiClient";
 import { PortfolioControlSurface } from "./PortfolioControlSurface";
 import { createPortfolioControlApiClient, type PortfolioControlApiClient } from "./portfolioControlApiClient";
+import { ClosedPortfolioRetrospectiveSurface } from "./ClosedPortfolioRetrospectiveSurface";
+import { createRetrospectiveApiClient, type RetrospectiveApiClient } from "./retrospectiveApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -38,7 +40,8 @@ type AppProps = {
     Partial<ResourcePlanningApiClient> &
     Partial<KpiDefinitionApiClient> &
     Partial<KpiDeviationApiClient> &
-    Partial<PortfolioControlApiClient>;
+    Partial<PortfolioControlApiClient> &
+    Partial<RetrospectiveApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -239,6 +242,14 @@ function isPortfolioControlApiClient(
     typeof apiClient.previewAction === "function" &&
     typeof apiClient.executeAction === "function" &&
     typeof apiClient.getControlAudit === "function"
+  );
+}
+
+function isRetrospectiveApiClient(apiClient: Partial<RetrospectiveApiClient> | null): apiClient is RetrospectiveApiClient {
+  return (
+    typeof apiClient?.getClosedPortfolio === "function" &&
+    typeof apiClient.getTrends === "function" &&
+    typeof apiClient.getInsight === "function"
   );
 }
 
@@ -587,6 +598,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createPortfolioControlApiClient() : null;
   }, [apiClient]);
+  const retrospectiveApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isRetrospectiveApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createRetrospectiveApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -706,6 +725,8 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
                   ? "#resource-load-control"
                   : labelKey === "navigation.kpi"
                       ? kpiNavigationHref
+                    : labelKey === "navigation.retrospectives"
+                      ? "#closed-portfolio-retrospectives"
                     : "#phase-1-placeholder"
               }
               key={labelKey}
@@ -799,6 +820,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {kpiDeviationApiClient ? (
           <KpiDeviationControlSurface
             apiClient={kpiDeviationApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {retrospectiveApiClient ? (
+          <ClosedPortfolioRetrospectiveSurface
+            apiClient={retrospectiveApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />
