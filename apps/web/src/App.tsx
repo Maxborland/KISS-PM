@@ -22,6 +22,8 @@ import { ResourceLoadControlSurface } from "./ResourceLoadControlSurface";
 import { createResourcePlanningApiClient, type ResourcePlanningApiClient } from "./resourcePlanningApiClient";
 import { KpiDefinitionAdminSurface } from "./KpiDefinitionAdminSurface";
 import { createKpiDefinitionApiClient, type KpiDefinitionApiClient } from "./kpiDefinitionApiClient";
+import { KpiDeviationControlSurface } from "./KpiDeviationControlSurface";
+import { createKpiDeviationApiClient, type KpiDeviationApiClient } from "./kpiDeviationApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -32,7 +34,8 @@ type AppProps = {
     Partial<Phase4ProjectWorkApiClient> &
     Partial<Phase5ScheduleApiClient> &
     Partial<ResourcePlanningApiClient> &
-    Partial<KpiDefinitionApiClient>;
+    Partial<KpiDefinitionApiClient> &
+    Partial<KpiDeviationApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -211,6 +214,15 @@ function isKpiDefinitionApiClient(apiClient: Partial<KpiDefinitionApiClient> | n
     typeof apiClient.createDefinition === "function" &&
     typeof apiClient.publishDefinition === "function" &&
     typeof apiClient.retireDefinition === "function" &&
+    typeof apiClient.getKpiAudit === "function"
+  );
+}
+
+function isKpiDeviationApiClient(apiClient: Partial<KpiDeviationApiClient> | null): apiClient is KpiDeviationApiClient {
+  return (
+    typeof apiClient?.listSignals === "function" &&
+    typeof apiClient.getSignalDetail === "function" &&
+    typeof apiClient.runEvaluation === "function" &&
     typeof apiClient.getKpiAudit === "function"
   );
 }
@@ -544,7 +556,16 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createKpiDefinitionApiClient() : null;
   }, [apiClient]);
+  const kpiDeviationApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isKpiDeviationApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createKpiDeviationApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
+  const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
   const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
@@ -657,9 +678,9 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
                 labelKey === "navigation.gantt"
                   ? "#gantt-workspace"
                   : labelKey === "navigation.resources"
-                    ? "#resource-load-control"
-                    : labelKey === "navigation.kpi"
-                      ? "#kpi-definition-admin"
+                  ? "#resource-load-control"
+                  : labelKey === "navigation.kpi"
+                      ? kpiNavigationHref
                     : "#phase-1-placeholder"
               }
               key={labelKey}
@@ -738,6 +759,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {kpiDefinitionApiClient ? (
           <KpiDefinitionAdminSurface
             apiClient={kpiDefinitionApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {kpiDeviationApiClient ? (
+          <KpiDeviationControlSurface
+            apiClient={kpiDeviationApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />
