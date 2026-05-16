@@ -1,5 +1,17 @@
-import { createActionExecutionLog } from "@kiss-pm/action-engine";
-import type { ActionExecutionLog } from "@kiss-pm/action-engine";
+import {
+  createActionConfigurationSet,
+  createActionExecutionLog,
+  previewActionConfigurationPublish,
+  publishActionConfigurationPreview
+} from "@kiss-pm/action-engine";
+import type {
+  ActionConfigurationPublishAudit,
+  ActionConfigurationPublishPreview,
+  ActionConfigurationPublishResult,
+  ActionConfigurationSet,
+  ActionDefinition,
+  ActionExecutionLog
+} from "@kiss-pm/action-engine";
 import {
   previewControlSurfaceLayoutPublish,
   publishControlSurfaceLayoutPreview
@@ -71,6 +83,10 @@ type Phase10TenantState = {
   layoutPreviousDefinitions: Map<string, ControlSurfaceDefinition[]>;
   layoutPreviews: Map<string, ControlSurfaceLayoutPublishPreview>;
   layoutActionExecutions: ActionExecutionLog[];
+  actionConfiguration: ActionConfigurationSet;
+  actionConfigurationPrevious: ActionConfigurationSet[];
+  actionConfigurationPreviews: Map<string, ActionConfigurationPublishPreview>;
+  actionConfigurationActionExecutions: ActionExecutionLog[];
 };
 
 export type Phase10RuntimeState = ReturnType<typeof createPhase10RuntimeState>;
@@ -114,7 +130,16 @@ export function createPhase10RuntimeState() {
       layoutDefinitions: new Map<string, ControlSurfaceDefinition>(),
       layoutPreviousDefinitions: new Map<string, ControlSurfaceDefinition[]>(),
       layoutPreviews: new Map<string, ControlSurfaceLayoutPublishPreview>(),
-      layoutActionExecutions: []
+      layoutActionExecutions: [],
+      actionConfiguration: createActionConfigurationSet({
+        tenantId,
+        version: 1,
+        actionConfigs: [],
+        updatedAt: new Date(PHASE10_TIMESTAMP_START).toISOString()
+      }),
+      actionConfigurationPrevious: [],
+      actionConfigurationPreviews: new Map<string, ActionConfigurationPublishPreview>(),
+      actionConfigurationActionExecutions: []
     };
     states.set(tenantId, next);
 
@@ -611,6 +636,112 @@ export function createPhase10RuntimeState() {
     return getState(tenantId).layoutActionExecutions.map((entry) => clone(entry));
   }
 
+  function getActionConfiguration(tenantId: TenantId): ActionConfigurationSet {
+    return createActionConfigurationSet(getState(tenantId).actionConfiguration);
+  }
+
+  function listPreviousActionConfigurations(tenantId: TenantId): ActionConfigurationSet[] {
+    return getState(tenantId).actionConfigurationPrevious.map((entry) => createActionConfigurationSet(entry));
+  }
+
+  function previewActionConfiguration(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    expectedVersion: number;
+    actionDefinitions: readonly ActionDefinition[];
+    draft: {
+      actionConfigs: ActionConfigurationSet["actionConfigs"];
+      affectedRuntimeSurfaces: readonly string[];
+    };
+  }): ActionConfigurationPublishPreview {
+    const state = getState(input.tenantId);
+    const preview = previewActionConfigurationPublish(state.actionConfiguration, {
+      id: `preview-action-config-${input.tenantId}-${state.actionConfiguration.version}-${state.actionConfigurationPreviews.size + 1}`,
+      actorId: input.actorId,
+      expectedVersion: input.expectedVersion,
+      actionDefinitions: input.actionDefinitions,
+      draft: input.draft,
+      createdAt: now()
+    });
+    state.actionConfigurationPreviews.set(preview.id, clone(preview));
+
+    return clone(preview);
+  }
+
+  function publishActionConfiguration(input: {
+    tenantId: TenantId;
+    actorId: TenantUserId;
+    accessProfileId?: string;
+    previewId: string;
+    auditEventId: string;
+  }): ActionConfigurationPublishResult & { actionExecution: ActionExecutionLog } {
+    const state = getState(input.tenantId);
+    const preview = state.actionConfigurationPreviews.get(input.previewId);
+    if (preview === undefined) {
+      throw stalePreview("action configuration preview is missing or stale");
+    }
+    if (preview.actorId !== input.actorId) {
+      throw stalePreview("action configuration preview is stale");
+    }
+    const result = publishActionConfigurationPreview(state.actionConfiguration, {
+      preview,
+      expectedVersion: state.actionConfiguration.version,
+      auditEventId: input.auditEventId,
+      publishedAt: now()
+    });
+    state.actionConfigurationPrevious = [...state.actionConfigurationPrevious, createActionConfigurationSet(result.previousConfiguration)];
+    state.actionConfiguration = createActionConfigurationSet(result.configuration);
+    const actionExecution = createActionExecutionLog({
+      actor: {
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        ...(input.accessProfileId !== undefined ? { accessProfileId: input.accessProfileId } : {}),
+        correlationId: `action-config-${input.tenantId}-${result.previousConfiguration.version}`
+      },
+      commandType: "action_configuration.publish",
+      requiredPermission: "action.config.write",
+      status: "succeeded",
+      source: { entityType: "actionConfiguration", entityId: input.tenantId },
+      target: { entityType: "actionConfiguration", entityId: input.tenantId },
+      before: {
+        version: result.previousConfiguration.version,
+        preview
+      },
+      after: {
+        version: result.configuration.version,
+        disabledActionKeys: [...result.audit.disabledActionKeys]
+      },
+      timestamp: now(),
+      auditEventIds: [input.auditEventId],
+      permissionTrace: ["policy:permission action.config.write allowed"],
+      preconditionTrace: ["precondition:dry-run preview confirmed", "precondition:command schema compatibility validated"],
+      trace: ["action_configuration:preview confirmed", "action_configuration:runtime action projection refreshed"]
+    });
+    state.actionConfigurationActionExecutions = [...state.actionConfigurationActionExecutions, actionExecution];
+    state.actionConfigurationPreviews.clear();
+
+    return { ...result, actionExecution: clone(actionExecution) };
+  }
+
+  function getActionConfigurationPreview(tenantId: TenantId, previewId: string): ActionConfigurationPublishPreview | undefined {
+    const preview = getState(tenantId).actionConfigurationPreviews.get(previewId);
+    return preview === undefined ? undefined : clone(preview);
+  }
+
+  function listActionConfigurationActionExecutions(tenantId: TenantId): ActionExecutionLog[] {
+    return getState(tenantId).actionConfigurationActionExecutions.map((entry) => clone(entry));
+  }
+
+  function isActionEnabled(tenantId: TenantId, actionKey: string): boolean {
+    const config = getState(tenantId).actionConfiguration.actionConfigs.find((entry) => entry.actionKey === actionKey);
+    return config?.enabled !== false;
+  }
+
+  function getActionFormFields(tenantId: TenantId, actionKey: string) {
+    const config = getState(tenantId).actionConfiguration.actionConfigs.find((entry) => entry.actionKey === actionKey);
+    return config?.formFields.map((field) => clone(field)) ?? [];
+  }
+
   function cloneLabelSet(labelSet: TenantLabelSet): TenantLabelSet {
     return createTenantLabelSet(labelSet);
   }
@@ -639,7 +770,15 @@ export function createPhase10RuntimeState() {
     previewControlSurfaceLayout,
     publishControlSurfaceLayout,
     getControlSurfaceLayoutPreview,
-    listLayoutActionExecutions
+    listLayoutActionExecutions,
+    getActionConfiguration,
+    listPreviousActionConfigurations,
+    previewActionConfiguration,
+    publishActionConfiguration,
+    getActionConfigurationPreview,
+    listActionConfigurationActionExecutions,
+    isActionEnabled,
+    getActionFormFields
   };
 }
 
@@ -704,4 +843,11 @@ export function kpiThresholdPublishAuditDto(audit: KpiThresholdRuleSetPublishAud
 
 export function controlSurfaceLayoutPublishAuditDto(audit: ControlSurfaceLayoutPublishAudit) {
   return { ...audit };
+}
+
+export function actionConfigurationPublishAuditDto(audit: ActionConfigurationPublishAudit) {
+  return {
+    ...audit,
+    disabledActionKeys: [...audit.disabledActionKeys]
+  };
 }

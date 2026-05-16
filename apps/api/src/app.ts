@@ -20,6 +20,7 @@ import { createPhase8RuntimeState } from "./phase8Runtime";
 import { createPhase9RuntimeState } from "./phase9Runtime";
 import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import {
+  actionConfigurationPublishAuditDto,
   buildRuntimeLabelProjection,
   controlSurfaceLayoutPublishAuditDto,
   createPhase10RuntimeState,
@@ -540,6 +541,36 @@ const savedViewLayoutPreviewSchema = z
   .strict();
 
 const savedViewLayoutPublishSchema = z
+  .object({
+    previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const actionFormFieldConfigSchema = z
+  .object({
+    fieldKey: z.string().trim().min(1),
+    label: z.string().trim().min(1).optional(),
+    defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional()
+  })
+  .strict();
+
+const actionConfigEntrySchema = z
+  .object({
+    actionKey: z.string().trim().min(1),
+    enabled: z.boolean(),
+    formFields: z.array(actionFormFieldConfigSchema)
+  })
+  .strict();
+
+const actionConfigurationPreviewSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    actionConfigs: z.array(actionConfigEntrySchema),
+    affectedRuntimeSurfaces: z.array(z.string().trim().min(1)).min(1)
+  })
+  .strict();
+
+const actionConfigurationPublishSchema = z
   .object({
     previewId: z.string().trim().min(1)
   })
@@ -1475,6 +1506,161 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
   });
 
+  app.get("/api/tenant/action-configs", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.read", {
+        entityType: "actionConfiguration",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "control.surface:read", {
+        entityType: "controlSurface",
+        tenantId: session.user.tenantId
+      });
+      const configuration = phase10Runtime.getActionConfiguration(session.user.tenantId);
+      const actions = phase8Runtime.listActionDefinitions(session.user.tenantId, "portfolio-control").map((definition) => {
+        const enabled = phase10Runtime.isActionEnabled(session.user.tenantId, definition.key);
+        return {
+          id: definition.id,
+          key: definition.key,
+          label: definition.label,
+          description: definition.description,
+          version: definition.version,
+          targetEntityType: definition.targetEntityType,
+          commandType: definition.commandBinding.commandType,
+          requiredPermission: definition.requiredPermission,
+          dryRunRequired: definition.dryRunRequired,
+          enabled,
+          ...(enabled ? {} : { disabledReason: "configuration_disabled" }),
+          inputSchema: definition.inputSchema,
+          formFields: phase10Runtime.getActionFormFields(session.user.tenantId, definition.key)
+        };
+      });
+
+      return context.json({
+        configuration,
+        actions,
+        runtime: {
+          affectedRuntimeSurfaces: ["portfolio.control"],
+          disabledActionKeys: configuration.actionConfigs.filter((entry) => !entry.enabled).map((entry) => entry.actionKey)
+        },
+        previousVersions: phase10Runtime.listPreviousActionConfigurations(session.user.tenantId).map((entry) => ({
+          version: entry.version,
+          updatedAt: entry.updatedAt
+        }))
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/action-configs/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "actionConfiguration",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "action.config.write", {
+        entityType: "actionConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = actionConfigurationPreviewSchema.parse(await parseJson(context));
+      const preview = phase10Runtime.previewActionConfiguration({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        expectedVersion: body.expectedVersion,
+        actionDefinitions: phase8Runtime.listActionDefinitions(session.user.tenantId, "portfolio-control"),
+        draft: {
+          actionConfigs: body.actionConfigs,
+          affectedRuntimeSurfaces: body.affectedRuntimeSurfaces
+        }
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/tenant/action-configs/publish", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "tenant.config.write", {
+        entityType: "actionConfiguration",
+        tenantId: session.user.tenantId
+      });
+      assertAllowed(runtime, session, "action.config.write", {
+        entityType: "actionConfiguration",
+        tenantId: session.user.tenantId
+      });
+      const body = actionConfigurationPublishSchema.parse(await parseJson(context));
+      const storedPreview = phase10Runtime.getActionConfigurationPreview(session.user.tenantId, body.previewId);
+      if (storedPreview === undefined) {
+        throw Object.assign(new Error("action configuration preview is missing or stale"), {
+          code: "stale_preview" as const
+        });
+      }
+      const auditEventId = `audit-action-config-${session.user.tenantId}-${storedPreview.after.version}`;
+      const result = phase10Runtime.publishActionConfiguration({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        previewId: body.previewId,
+        auditEventId
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: result.audit.auditEventId,
+        actionKey: result.audit.commandType,
+        target: { entityType: "actionConfiguration", entityId: session.user.tenantId },
+        correlationId: result.actionExecution.correlationId,
+        details: {
+          before: { version: result.audit.beforeVersion },
+          after: { version: result.audit.afterVersion, disabledActionKeys: result.audit.disabledActionKeys }
+        }
+      });
+
+      const configuration = phase10Runtime.getActionConfiguration(session.user.tenantId);
+      const actions = phase8Runtime.listActionDefinitions(session.user.tenantId, "portfolio-control").map((definition) => {
+        const enabled = phase10Runtime.isActionEnabled(session.user.tenantId, definition.key);
+        return {
+          id: definition.id,
+          key: definition.key,
+          label: definition.label,
+          description: definition.description,
+          version: definition.version,
+          targetEntityType: definition.targetEntityType,
+          commandType: definition.commandBinding.commandType,
+          requiredPermission: definition.requiredPermission,
+          dryRunRequired: definition.dryRunRequired,
+          enabled,
+          ...(enabled ? {} : { disabledReason: "configuration_disabled" }),
+          inputSchema: definition.inputSchema,
+          formFields: phase10Runtime.getActionFormFields(session.user.tenantId, definition.key)
+        };
+      });
+
+      return context.json({
+        result: {
+          configuration: result.configuration,
+          audit: actionConfigurationPublishAuditDto(result.audit),
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          configuration,
+          actions,
+          runtime: {
+            affectedRuntimeSurfaces: ["portfolio.control"],
+            disabledActionKeys: configuration.actionConfigs.filter((entry) => !entry.enabled).map((entry) => entry.actionKey)
+          }
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
@@ -1491,7 +1677,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           ...phase10Runtime.listCustomFieldActionExecutions(session.user.tenantId),
           ...phase10Runtime.listCustomFieldValueActionExecutions(session.user.tenantId),
           ...phase10Runtime.listKpiThresholdActionExecutions(session.user.tenantId),
-          ...phase10Runtime.listLayoutActionExecutions(session.user.tenantId)
+          ...phase10Runtime.listLayoutActionExecutions(session.user.tenantId),
+          ...phase10Runtime.listActionConfigurationActionExecutions(session.user.tenantId)
         ].map(actionExecutionDto)
       });
     } catch (error) {
@@ -2973,6 +3160,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
             },
             contextRefs: { projectIds: [record.policyContext?.projectId].filter((id): id is string => id !== undefined) }
           }).allowed,
+        isActionConfigured: (_record, slot) => phase10Runtime.isActionEnabled(session.user.tenantId, slot.actionDefinitionKey),
         isDrilldownAllowed: (record, drilldown) =>
           runtime.evaluatePolicy({
             session,
@@ -3003,7 +3191,9 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         entityId: context.req.param("surfaceId")
       });
       return context.json({
-        actions: phase8Runtime.listActionDefinitions(session.user.tenantId, context.req.param("surfaceId")).map((definition) => ({
+        actions: phase8Runtime.listActionDefinitions(session.user.tenantId, context.req.param("surfaceId")).map((definition) => {
+          const enabled = phase10Runtime.isActionEnabled(session.user.tenantId, definition.key);
+          return ({
           id: definition.id,
           key: definition.key,
           label: definition.label,
@@ -3013,8 +3203,12 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           commandType: definition.commandBinding.commandType,
           requiredPermission: definition.requiredPermission,
           dryRunRequired: definition.dryRunRequired,
-          inputSchema: definition.inputSchema
-        }))
+          enabled,
+          ...(enabled ? {} : { disabledReason: "configuration_disabled" }),
+          inputSchema: definition.inputSchema,
+          formFields: phase10Runtime.getActionFormFields(session.user.tenantId, definition.key)
+        });
+        })
       });
     } catch (error) {
       return handleRouteError(context, error);
@@ -3025,6 +3219,9 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
       const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
+      if (!phase10Runtime.isActionEnabled(session.user.tenantId, actionDefinition.key)) {
+        throw Object.assign(new Error("action disabled by tenant configuration"), { code: "permission_denied", status: 403 });
+      }
       const body = controlActionPreviewSchema.parse(await parseJson(context));
       const policyContext = phase8Runtime.getActionTargetPolicyContext({
         tenantId: session.user.tenantId,
@@ -3059,6 +3256,9 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     try {
       const session = requireSession(runtime, context.req.query("testUser"));
       const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
+      if (!phase10Runtime.isActionEnabled(session.user.tenantId, actionDefinition.key)) {
+        throw Object.assign(new Error("action disabled by tenant configuration"), { code: "permission_denied", status: 403 });
+      }
       const body = controlActionExecuteSchema.parse(await parseJson(context));
       const previewForPolicy =
         body.previewId !== undefined ? phase8Runtime.getActionPreview(session.user.tenantId, body.previewId) : undefined;

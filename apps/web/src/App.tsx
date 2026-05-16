@@ -49,6 +49,11 @@ import {
   createSavedViewLayoutBuilderApiClient,
   type SavedViewLayoutBuilderApiClient
 } from "./savedViewLayoutBuilderApiClient";
+import { ActionConfigurationSurface } from "./ActionConfigurationSurface";
+import {
+  createActionConfigurationApiClient,
+  type ActionConfigurationApiClient
+} from "./actionConfigurationApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -68,7 +73,8 @@ type AppProps = {
     Partial<ProcessTemplateBuilderApiClient> &
     Partial<CustomFieldBuilderApiClient> &
     Partial<KpiThresholdBuilderApiClient> &
-    Partial<SavedViewLayoutBuilderApiClient>;
+    Partial<SavedViewLayoutBuilderApiClient> &
+    Partial<ActionConfigurationApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -340,6 +346,17 @@ function isSavedViewLayoutBuilderApiClient(
     typeof apiClient?.getSavedViews === "function" &&
     typeof apiClient.previewLayout === "function" &&
     typeof apiClient.publishLayout === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isActionConfigurationApiClient(
+  apiClient: Partial<ActionConfigurationApiClient> | null
+): apiClient is ActionConfigurationApiClient {
+  return (
+    typeof apiClient?.getActionConfigs === "function" &&
+    typeof apiClient.previewActionConfigs === "function" &&
+    typeof apiClient.publishActionConfigs === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -745,6 +762,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createSavedViewLayoutBuilderApiClient() : null;
   }, [apiClient]);
+  const actionConfigurationApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isActionConfigurationApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createActionConfigurationApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -941,6 +966,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {savedViewLayoutBuilderApiClient ? (
           <SavedViewLayoutBuilderSurface
             apiClient={savedViewLayoutBuilderApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {actionConfigurationApiClient ? (
+          <ActionConfigurationSurface
+            apiClient={actionConfigurationApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

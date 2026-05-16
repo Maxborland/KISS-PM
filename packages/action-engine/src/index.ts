@@ -68,6 +68,63 @@ export type ActionDefinition = TenantOwned & {
   updatedAt: string;
 };
 
+export type ActionFormFieldConfig = {
+  fieldKey: string;
+  label?: string;
+  defaultValue?: string | number | boolean;
+};
+
+export type ActionConfiguration = {
+  actionKey: string;
+  enabled: boolean;
+  formFields: readonly ActionFormFieldConfig[];
+};
+
+export type ActionConfigurationSet = TenantOwned & {
+  version: number;
+  actionConfigs: readonly ActionConfiguration[];
+  updatedAt: string;
+};
+
+export type ActionConfigurationDraft = {
+  actionConfigs: readonly ActionConfiguration[];
+  affectedRuntimeSurfaces: readonly string[];
+};
+
+export type ActionConfigurationPublishPreview = TenantOwned & {
+  id: string;
+  actorId: string;
+  mutatesState: false;
+  configuration: ActionConfigurationSet;
+  before: {
+    version: number;
+    disabledActionKeys: readonly string[];
+  };
+  after: {
+    version: number;
+    disabledActionKeys: readonly string[];
+  };
+  formChanges: readonly { actionKey: string; fieldKeys: readonly string[] }[];
+  affectedRuntimeSurfaces: readonly string[];
+  createdAt: string;
+};
+
+export type ActionConfigurationPublishAudit = TenantOwned & {
+  actorId: string;
+  auditEventId: string;
+  commandType: "action_configuration.publish";
+  beforeVersion: number;
+  afterVersion: number;
+  disabledActionKeys: readonly string[];
+  publishedAt: string;
+};
+
+export type ActionConfigurationPublishResult = {
+  configuration: ActionConfigurationSet;
+  previousConfiguration: ActionConfigurationSet;
+  audit: ActionConfigurationPublishAudit;
+};
+
 export type ActionSourceSurfaceRef = {
   surfaceId: string;
   surfaceKey: string;
@@ -238,6 +295,231 @@ function createInputSchema(input: ActionInputSchema): ActionInputSchema {
   }
 
   return { fields };
+}
+
+function validateDefaultValue(field: ActionInputFieldDefinition, value: string | number | boolean): void {
+  if (field.valueType === "number") {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new ActionEngineModelError("validation_error", `defaultValue for ${field.key} must be a number`);
+    }
+    return;
+  }
+
+  if (field.valueType === "boolean") {
+    if (typeof value !== "boolean") {
+      throw new ActionEngineModelError("validation_error", `defaultValue for ${field.key} must be a boolean`);
+    }
+    return;
+  }
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new ActionEngineModelError("validation_error", `defaultValue for ${field.key} must be a string`);
+  }
+  if (field.valueType === "date" && Number.isNaN(Date.parse(value))) {
+    throw new ActionEngineModelError("validation_error", `defaultValue for ${field.key} must be a valid date`);
+  }
+}
+
+function createActionFormFieldConfig(
+  input: ActionFormFieldConfig,
+  definition: ActionDefinition
+): ActionFormFieldConfig {
+  const fieldKey = requireNonEmptyString(input.fieldKey, "actionConfiguration.formField.fieldKey");
+  const field = definition.inputSchema.fields.find((candidate) => candidate.key === fieldKey);
+  if (field === undefined) {
+    throw new ActionEngineModelError("validation_error", `Unknown action form field: ${fieldKey}`);
+  }
+  if (input.defaultValue !== undefined) {
+    validateDefaultValue(field, input.defaultValue);
+  }
+
+  return {
+    fieldKey,
+    ...(input.label !== undefined
+      ? { label: requireNonEmptyString(input.label, "actionConfiguration.formField.label") }
+      : {}),
+    ...(input.defaultValue !== undefined ? { defaultValue: input.defaultValue } : {})
+  };
+}
+
+function createActionConfiguration(
+  input: ActionConfiguration,
+  definitionsByKey: ReadonlyMap<string, ActionDefinition>
+): ActionConfiguration {
+  const actionKey = requireNonEmptyString(input.actionKey, "actionConfiguration.actionKey");
+  const definition = definitionsByKey.get(actionKey);
+  if (definition === undefined) {
+    throw new ActionEngineModelError("validation_error", `Unknown action key: ${actionKey}`);
+  }
+  const formFields = requireArray(input.formFields, "actionConfiguration.formFields").map((field) =>
+    createActionFormFieldConfig(field, definition)
+  );
+  const seen = new Set<string>();
+  for (const field of formFields) {
+    if (seen.has(field.fieldKey)) {
+      throw new ActionEngineModelError("conflict", `Duplicate action form field: ${field.fieldKey}`);
+    }
+    seen.add(field.fieldKey);
+  }
+
+  return {
+    actionKey,
+    enabled: requireBoolean(input.enabled, "actionConfiguration.enabled"),
+    formFields
+  };
+}
+
+function definitionsByActionKey(definitions: readonly ActionDefinition[], tenantId: TenantId): Map<string, ActionDefinition> {
+  const byKey = new Map<string, ActionDefinition>();
+  for (const input of definitions) {
+    const definition = createActionDefinition(input);
+    assertTenant(tenantId, definition, "actionDefinition");
+    if (byKey.has(definition.key)) {
+      throw new ActionEngineModelError("conflict", `Duplicate action key: ${definition.key}`);
+    }
+    byKey.set(definition.key, definition);
+  }
+
+  return byKey;
+}
+
+function disabledKeys(configuration: ActionConfigurationSet): string[] {
+  return configuration.actionConfigs
+    .filter((entry) => entry.enabled === false)
+    .map((entry) => entry.actionKey)
+    .sort();
+}
+
+export function createActionConfigurationSet(
+  input: ActionConfigurationSet,
+  definitions: readonly ActionDefinition[] = []
+): ActionConfigurationSet {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const definitionMap = definitions.length > 0 ? definitionsByActionKey(definitions, tenantId) : new Map<string, ActionDefinition>();
+  const actionConfigs = requireArray(input.actionConfigs, "actionConfigurationSet.actionConfigs").map((entry) => {
+    if (definitionMap.size === 0) {
+      return {
+        actionKey: requireNonEmptyString(entry.actionKey, "actionConfiguration.actionKey"),
+        enabled: requireBoolean(entry.enabled, "actionConfiguration.enabled"),
+        formFields: requireArray(entry.formFields, "actionConfiguration.formFields").map((field) => ({
+          fieldKey: requireNonEmptyString(field.fieldKey, "actionConfiguration.formField.fieldKey"),
+          ...(field.label !== undefined ? { label: requireNonEmptyString(field.label, "actionConfiguration.formField.label") } : {}),
+          ...(field.defaultValue !== undefined ? { defaultValue: field.defaultValue } : {})
+        }))
+      };
+    }
+
+    return createActionConfiguration(entry, definitionMap);
+  });
+  const seen = new Set<string>();
+  for (const config of actionConfigs) {
+    if (seen.has(config.actionKey)) {
+      throw new ActionEngineModelError("conflict", `Duplicate action configuration key: ${config.actionKey}`);
+    }
+    seen.add(config.actionKey);
+  }
+
+  return {
+    tenantId,
+    version: requirePositiveInteger(input.version, "actionConfigurationSet.version"),
+    actionConfigs,
+    updatedAt: requireValidTimestamp(input.updatedAt, "actionConfigurationSet.updatedAt")
+  };
+}
+
+export function previewActionConfigurationPublish(
+  current: ActionConfigurationSet,
+  input: {
+    id: string;
+    actorId: string;
+    expectedVersion: number;
+    actionDefinitions: readonly ActionDefinition[];
+    draft: ActionConfigurationDraft;
+    createdAt: string;
+  }
+): ActionConfigurationPublishPreview {
+  const currentConfiguration = createActionConfigurationSet(current);
+  if (currentConfiguration.version !== input.expectedVersion) {
+    throw new ActionEngineModelError("conflict", "action configuration preview is stale");
+  }
+  const definitions = definitionsByActionKey(input.actionDefinitions, currentConfiguration.tenantId);
+  const draft = requireObject(input.draft, "actionConfigurationDraft");
+  const nextConfiguration = createActionConfigurationSet(
+    {
+      tenantId: currentConfiguration.tenantId,
+      version: currentConfiguration.version + 1,
+      actionConfigs: requireArray(draft.actionConfigs, "actionConfigurationDraft.actionConfigs").map((entry) =>
+        createActionConfiguration(entry, definitions)
+      ),
+      updatedAt: input.createdAt
+    },
+    input.actionDefinitions
+  );
+  const affectedRuntimeSurfaces = requireNonEmptyStringArray(
+    [...requireArray(draft.affectedRuntimeSurfaces, "actionConfigurationDraft.affectedRuntimeSurfaces")],
+    "actionConfigurationDraft.affectedRuntimeSurfaces"
+  );
+
+  return {
+    id: requireNonEmptyString(input.id, "actionConfigurationPreview.id"),
+    tenantId: currentConfiguration.tenantId,
+    actorId: requireNonEmptyString(input.actorId, "actionConfigurationPreview.actorId"),
+    mutatesState: false,
+    configuration: nextConfiguration,
+    before: {
+      version: currentConfiguration.version,
+      disabledActionKeys: disabledKeys(currentConfiguration)
+    },
+    after: {
+      version: nextConfiguration.version,
+      disabledActionKeys: disabledKeys(nextConfiguration)
+    },
+    formChanges: nextConfiguration.actionConfigs
+      .filter((entry) => entry.formFields.length > 0)
+      .map((entry) => ({ actionKey: entry.actionKey, fieldKeys: entry.formFields.map((field) => field.fieldKey) })),
+    affectedRuntimeSurfaces,
+    createdAt: requireValidTimestamp(input.createdAt, "actionConfigurationPreview.createdAt")
+  };
+}
+
+export function publishActionConfigurationPreview(
+  current: ActionConfigurationSet,
+  input: {
+    preview: ActionConfigurationPublishPreview;
+    expectedVersion: number;
+    auditEventId: string;
+    publishedAt: string;
+  }
+): ActionConfigurationPublishResult {
+  const currentConfiguration = createActionConfigurationSet(current);
+  if (
+    input.preview.tenantId !== currentConfiguration.tenantId ||
+    input.preview.before.version !== currentConfiguration.version ||
+    input.expectedVersion !== currentConfiguration.version
+  ) {
+    throw new ActionEngineModelError("conflict", "action configuration preview is stale");
+  }
+  const configuration = createActionConfigurationSet({
+    ...input.preview.configuration,
+    updatedAt: input.publishedAt
+  });
+  const auditEventId = requireNonEmptyString(input.auditEventId, "actionConfigurationPublish.auditEventId");
+  const publishedAt = requireValidTimestamp(input.publishedAt, "actionConfigurationPublish.publishedAt");
+
+  return {
+    configuration,
+    previousConfiguration: currentConfiguration,
+    audit: {
+      tenantId: currentConfiguration.tenantId,
+      actorId: requireNonEmptyString(input.preview.actorId, "actionConfigurationPublish.actorId"),
+      auditEventId,
+      commandType: "action_configuration.publish",
+      beforeVersion: currentConfiguration.version,
+      afterVersion: configuration.version,
+      disabledActionKeys: disabledKeys(configuration),
+      publishedAt
+    }
+  };
 }
 
 function createCommandBinding(input: ActionCommandBinding): ActionCommandBinding {
