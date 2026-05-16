@@ -98,14 +98,29 @@
         "E2E-095"
       ],
       "evidence": [
-        "P10 contract defines process template builder MVP and active-runtime stability boundaries before implementation."
+        "P10 contract defines process template builder MVP and active-runtime stability boundaries before implementation.",
+        "packages/project-core/src/index.ts implements previewProcessTemplatePublish and publishProcessTemplatePreview for non-mutating draft preview, stale preview/version rejection, active-stage safety validation, immutable active-project version readback, and audited publish result.",
+        "apps/api/src/phase10Runtime.ts and apps/api/src/app.ts expose GET /api/tenant/process-templates, POST /api/tenant/process-templates/preview, and POST /api/tenant/process-templates/publish through governed Phase 10 runtime commands. Publish requires tenant.config.write and project.template.write, writes audit/action evidence, refreshes the Phase 4 active process-template runtime, and updates Phase 3 future CRM intake template binding.",
+        "apps/web/src/ProcessTemplateBuilderSurface.tsx and apps/web/src/processTemplateBuilderApiClient.ts implement the Russian process-template builder control surface with API readback, dry-run preview, publish command, refreshed active-template/audit evidence, read-only state, stale-preview recovery, and no local-only success state.",
+        "apps/api/src/phase10ProcessTemplateApi.test.ts proves preview does not mutate, publish creates audit/action/readback evidence, read-only users cannot preview/apply, Tenant B cannot use Tenant A preview ids, invalid no-active-stage drafts fail without partial mutation, stale previews fail, future CRM draft creation uses the new template version, and new projects use the published stage label while existing active projects keep their old process-template snapshot."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config packages/project-core apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/project-core/src/processTemplateBuilder.test.ts exit 1 RED: previewProcessTemplatePublish and publishProcessTemplatePreview were missing before implementation",
+        "npm test -- packages/project-core/src/processTemplateBuilder.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10ProcessTemplateApi.test.ts exit 1 RED: process-template builder API routes were missing before implementation",
+        "npm test -- apps/api/src/phase10ProcessTemplateApi.test.ts exit 1 RED after bug-hunt: future CRM project draft still used old process-template version after publish",
+        "npm test -- apps/api/src/phase10ProcessTemplateApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/web/src/ProcessTemplateBuilderSurface.test.tsx exit 1 RED: ProcessTemplateBuilderSurface and API client were missing before implementation",
+        "npm test -- apps/web/src/ProcessTemplateBuilderSurface.test.tsx exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/tenant-config packages/project-core apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/web/src exit 0: 31 files, 188 tests passed",
+        "npm run test:integration exit 0: 14 files, 79 tests passed",
+        "npm test exit 0: 76 files, 473 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore process-template draft/active versions before verification.",
-      "blocker": "Blocked until P10-003 implementation adds safe process-template builder behavior and E2E-090/E2E-095 prove future-template effect plus existing-runtime stability.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime process-template previews are deterministic in-memory state. /test-fixtures/reset recreates Phase 3, Phase 4, and Phase 10 runtimes, restoring active process-template versions, project snapshots, and future intake bindings. Browser-level reload/reset readback remains to be proven by P10-009 E2E-090/E2E-095.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-003 remains blocked for strict phase verification until P10-009 E2E-090/E2E-095 prove browser reload persistence, future-template effect, existing-runtime stability, backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T03:11:47.6740214+07:00",
       "e2e_evidence": []
     },
     {

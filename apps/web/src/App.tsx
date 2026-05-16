@@ -32,6 +32,11 @@ import { ProjectClosureControlSurface } from "./ProjectClosureControlSurface";
 import { createProjectClosureApiClient, type ProjectClosureApiClient } from "./projectClosureApiClient";
 import { TenantLabelsAdminSurface } from "./TenantLabelsAdminSurface";
 import { createTenantLabelsApiClient, type TenantLabelsApiClient } from "./tenantLabelsApiClient";
+import { ProcessTemplateBuilderSurface } from "./ProcessTemplateBuilderSurface";
+import {
+  createProcessTemplateBuilderApiClient,
+  type ProcessTemplateBuilderApiClient
+} from "./processTemplateBuilderApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -47,7 +52,8 @@ type AppProps = {
     Partial<PortfolioControlApiClient> &
     Partial<RetrospectiveApiClient> &
     Partial<ProjectClosureApiClient> &
-    Partial<TenantLabelsApiClient>;
+    Partial<TenantLabelsApiClient> &
+    Partial<ProcessTemplateBuilderApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -273,6 +279,17 @@ function isTenantLabelsApiClient(apiClient: Partial<TenantLabelsApiClient> | nul
     typeof apiClient?.getLabels === "function" &&
     typeof apiClient.previewLabels === "function" &&
     typeof apiClient.publishLabels === "function" &&
+    typeof apiClient.getAudit === "function"
+  );
+}
+
+function isProcessTemplateBuilderApiClient(
+  apiClient: Partial<ProcessTemplateBuilderApiClient> | null
+): apiClient is ProcessTemplateBuilderApiClient {
+  return (
+    typeof apiClient?.getProcessTemplates === "function" &&
+    typeof apiClient.previewProcessTemplate === "function" &&
+    typeof apiClient.publishProcessTemplate === "function" &&
     typeof apiClient.getAudit === "function"
   );
 }
@@ -646,6 +663,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createTenantLabelsApiClient() : null;
   }, [apiClient]);
+  const processTemplateBuilderApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isProcessTemplateBuilderApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createProcessTemplateBuilderApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -815,6 +840,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             apiClient={tenantLabelsApiClient}
             currentTenant={currentTenant}
             onCurrentTenantChange={setCurrentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {processTemplateBuilderApiClient ? (
+          <ProcessTemplateBuilderSurface
+            apiClient={processTemplateBuilderApiClient}
+            currentTenant={currentTenant}
             testUser={runtimeUser}
           />
         ) : null}

@@ -21,7 +21,7 @@ import type {
 } from "@kiss-pm/crm-core";
 import type { TenantId } from "@kiss-pm/domain-core";
 import { createProjectProcessTemplateDraft } from "@kiss-pm/project-core";
-import type { ProjectDraft, ProjectProcessTemplateDraft } from "@kiss-pm/project-core";
+import type { ProcessTemplate, ProjectDraft, ProjectProcessTemplateDraft } from "@kiss-pm/project-core";
 import {
   assessCapacityFeasibility,
   createDemandTemplateProfile,
@@ -567,6 +567,37 @@ export function createPhase3CrmRuntimeState() {
         opportunity,
         templates: templates.get(tenantId) ?? []
       });
+    },
+
+    replaceProcessTemplateForFutureIntake(template: ProcessTemplate): ProjectProcessTemplateDraft {
+      const tenantTemplates = templates.get(template.tenantId);
+      const currentTemplate = tenantTemplates?.find((candidate) => candidate.id === template.id);
+      if (tenantTemplates === undefined || currentTemplate === undefined) {
+        throw Object.assign(new Error("process template not found"), { code: "not_found" });
+      }
+      const nextTemplate = createProjectProcessTemplateDraft({
+        ...currentTemplate,
+        label: template.label,
+        active: template.active,
+        version: template.version,
+        updatedAt: template.updatedAt
+      });
+      templates.set(
+        template.tenantId,
+        tenantTemplates.map((candidate) => (candidate.id === nextTemplate.id ? nextTemplate : candidate))
+      );
+      const currentDemandProfile = demandProfiles.get(template.tenantId);
+      if (currentDemandProfile !== undefined && currentDemandProfile.templateKey === nextTemplate.key) {
+        demandProfiles.set(
+          template.tenantId,
+          createDemandTemplateProfile({
+            ...currentDemandProfile,
+            templateVersion: nextTemplate.version
+          })
+        );
+      }
+
+      return nextTemplate;
     },
 
     runFeasibility(tenantId: TenantId, opportunityId: string): Phase3FeasibilityBundle | undefined {
