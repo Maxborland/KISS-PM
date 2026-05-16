@@ -5,11 +5,14 @@ import {
   buildExternalMappingKey,
   buildImportIdempotencyKey,
   createAdapterFailure,
+  createAdapterHealthStatus,
   createExternalMapping,
   createExternalMappingDiagnostic,
   createExternalPayloadEnvelope,
   createIntegrationAdapterDefinition,
   createIntegrationConnection,
+  createRateLimitPolicy,
+  createRetryPolicy,
   createSyncAuditEvent
 } from "./index";
 
@@ -199,6 +202,56 @@ describe("integration adapter foundation", () => {
       command: "import_preview",
       result: "failed"
     });
+  });
+
+  it("creates retry/rate-limit policies and adapter health status without leaking failure secrets", () => {
+    const retryPolicy = createRetryPolicy({
+      maxAttempts: 3,
+      backoff: "exponential",
+      retryableFailureCodes: ["adapter_rate_limited", "adapter_unavailable"]
+    });
+    const rateLimitPolicy = createRateLimitPolicy({
+      windowSeconds: 60,
+      maxRequests: 30,
+      retryAfterSeconds: 45
+    });
+    const health = createAdapterHealthStatus({
+      tenantId: "tenant-a",
+      adapterId: "adapter-mock-crm",
+      connectionId: "conn-mock-crm-a",
+      status: "rate_limited",
+      checkedAt: "2026-05-17T06:52:00+07:00",
+      failure: {
+        code: "adapter_rate_limited",
+        message: "Rate limited with token secret-token",
+        retryable: true,
+        retryAfterSeconds: 45,
+        occurredAt: "2026-05-17T06:52:00+07:00"
+      },
+      retryPolicy,
+      rateLimitPolicy
+    });
+
+    expect(health).toMatchObject({
+      tenantId: "tenant-a",
+      status: "rate_limited",
+      retryPolicy: {
+        maxAttempts: 3,
+        backoff: "exponential",
+        retryableFailureCodes: ["adapter_rate_limited", "adapter_unavailable"]
+      },
+      rateLimitPolicy: {
+        windowSeconds: 60,
+        maxRequests: 30,
+        retryAfterSeconds: 45
+      },
+      failure: {
+        code: "adapter_rate_limited",
+        retryable: true,
+        retryAfterSeconds: 45
+      }
+    });
+    expect(health.failure?.message).not.toContain("secret-token");
   });
 
   it("redacts secret-looking sync audit details before they can reach diagnostics", () => {
