@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import type {
@@ -26,10 +27,34 @@ type ProjectWorkControlSurfaceProps = {
   onOpenGanttProject?: (projectId: string) => void;
 };
 
+type WorkQueuesState = {
+  projectTasks: TaskDto[];
+  myTasks: MyTaskDto[];
+  controlledTasks: MyTaskDto[];
+  kanban: KanbanProjectDto | null;
+  taskAuditEvents: Awaited<ReturnType<Phase4ProjectWorkApiClient["listAuditEventsForTarget"]>>;
+};
+
 const defaultProjectId = "project-phase4-main";
 const defaultTenantAOpportunityId = "opportunity-seed-ready";
 const defaultTenantBOpportunityId = "opportunity-b-private";
 const defaultTaskId = "task-phase4-kickoff";
+
+const emptyWorkQueues: WorkQueuesState = {
+  projectTasks: [],
+  myTasks: [],
+  controlledTasks: [],
+  kanban: null,
+  taskAuditEvents: []
+};
+
+const projectWorkQueryKeys = {
+  project: (testUser: string, projectId: string) => ["project-work", testUser, "project", projectId] as const,
+  workQueuesBase: (testUser: string, projectId: string) =>
+    ["project-work", testUser, "project", projectId, "work-queues"] as const,
+  workQueues: (testUser: string, projectId: string, auditTargetTaskId: string | null, canReadAudit: boolean) =>
+    [...projectWorkQueryKeys.workQueuesBase(testUser, projectId), { auditTargetTaskId, canReadAudit }] as const
+};
 
 function getDefaultSeedOpportunityId(tenantId: string): string {
   return tenantId === "tenant-b" ? defaultTenantBOpportunityId : defaultTenantAOpportunityId;
@@ -139,12 +164,8 @@ export function ProjectWorkControlSurface({
   defaultExecutorUserId,
   onOpenGanttProject
 }: ProjectWorkControlSurfaceProps) {
-  const [project, setProject] = useState<ManagedProjectDto | null>(null);
-  const [projectTasks, setProjectTasks] = useState<TaskDto[]>([]);
-  const [myTasks, setMyTasks] = useState<MyTaskDto[]>([]);
-  const [controlledTasks, setControlledTasks] = useState<MyTaskDto[]>([]);
-  const [kanban, setKanban] = useState<KanbanProjectDto | null>(null);
-  const [taskAuditEvents, setTaskAuditEvents] = useState<Awaited<ReturnType<Phase4ProjectWorkApiClient["listAuditEventsForTarget"]>>>([]);
+  const queryClient = useQueryClient();
+  const [auditTargetTaskId, setAuditTargetTaskId] = useState<string | null>(null);
   const [gateBlockers, setGateBlockers] = useState<StageGateBlockerDto[]>([]);
   const [status, setStatus] = useState("Готово к управлению проектом");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -156,28 +177,39 @@ export function ProjectWorkControlSurface({
   const canWriteTaskStatus = hasPermission(currentTenant, "task.status.write");
   const canWriteTaskComments = hasPermission(currentTenant, "task.comment.write");
   const canReadAudit = hasPermission(currentTenant, "audit.read");
-  const activeStage = getActiveStage(project);
-  const activeStageTemplate = getStageTemplate(project, activeStage?.templateId);
-  const firstRequiredArtifact = activeStageTemplate?.requiredArtifactTemplates[0];
-  const firstRequiredApproval = activeStageTemplate?.approvalTemplates[0];
-  const firstTaskTemplate = activeStageTemplate?.taskTemplates[0];
-  const projectTaskIds = useMemo(() => getTaskIdSet(projectTasks), [projectTasks]);
   const activeSeedOpportunityId = seedOpportunityId ?? getDefaultSeedOpportunityId(currentTenant.tenant.id);
   const taskExecutorUserId =
     defaultExecutorUserId ?? getDefaultExecutorUserId(currentTenant.tenant.id, currentTenant.actor.id);
+  const projectQueryKey = projectWorkQueryKeys.project(testUser, projectId);
+  const projectQuery = useQuery<ManagedProjectDto | null>({
+    queryKey: projectQueryKey,
+    queryFn: async () => {
+      try {
+        return await apiClient.getProject(testUser, projectId);
+      } catch (error) {
+        if (getErrorMessage(error) === "Объект не найден") {
+          return null;
+        }
 
-  const refreshWorkQueues = useCallback(
-    async (nextProject: ManagedProjectDto, auditTaskId?: string) => {
+        throw error;
+      }
+    },
+    retry: false
+  });
+  const project = projectQuery.data ?? null;
+  const workQueuesQuery = useQuery<WorkQueuesState>({
+    queryKey: projectWorkQueryKeys.workQueues(testUser, project?.id ?? projectId, auditTargetTaskId, canReadAudit),
+    queryFn: async () => {
+      if (!project) {
+        return emptyWorkQueues;
+      }
+
       const [tasks, executorTasks, controllerTasks, nextKanban] = await Promise.all([
-        apiClient.listProjectTasks(testUser, nextProject.id),
+        apiClient.listProjectTasks(testUser, project.id),
         apiClient.listMyTasks(testUser, ["executor", "co_executor"]),
         apiClient.listMyTasks(testUser, ["controller", "requester", "approver", "observer"]),
-        apiClient.getKanbanProject(testUser, nextProject.id)
+        apiClient.getKanbanProject(testUser, project.id)
       ]);
-      setProjectTasks(tasks);
-      setMyTasks(executorTasks);
-      setControlledTasks(controllerTasks);
-      setKanban(nextKanban);
 
       const projectedTasks = [
         ...tasks,
@@ -185,40 +217,126 @@ export function ProjectWorkControlSurface({
         ...controllerTasks,
         ...nextKanban.columns.flatMap((column) => column.tasks)
       ];
-      const auditTask = projectedTasks.find((task) => task.id === auditTaskId) ?? projectedTasks[0];
+      const auditTask = projectedTasks.find((task) => task.id === auditTargetTaskId) ?? projectedTasks[0];
+      let taskAuditEvents: WorkQueuesState["taskAuditEvents"] = [];
       if (auditTask && canReadAudit) {
         try {
-          setTaskAuditEvents(await apiClient.listAuditEventsForTarget(testUser, "task", auditTask.id));
+          taskAuditEvents = await apiClient.listAuditEventsForTarget(testUser, "task", auditTask.id);
         } catch {
-          setTaskAuditEvents([]);
+          taskAuditEvents = [];
         }
-      } else {
-        setTaskAuditEvents([]);
       }
-    },
-    [apiClient, canReadAudit, testUser]
-  );
 
-  const loadExistingProject = useCallback(async () => {
-    try {
-      const nextProject = await apiClient.getProject(testUser, projectId);
-      setProject(nextProject);
-      await refreshWorkQueues(nextProject);
-      setStatus("Проект загружен из API");
-    } catch (error) {
-      setProject(null);
-      setProjectTasks([]);
-      setMyTasks([]);
-      setControlledTasks([]);
-      setKanban(null);
-      setTaskAuditEvents([]);
-      setStatus(getErrorMessage(error) === "Объект не найден" ? "Проект еще не создан" : getErrorMessage(error));
-    }
-  }, [apiClient, projectId, refreshWorkQueues, testUser]);
+      return {
+        projectTasks: tasks,
+        myTasks: executorTasks,
+        controlledTasks: controllerTasks,
+        kanban: nextKanban,
+        taskAuditEvents
+      };
+    },
+    enabled: project !== null
+  });
+  const workQueues = workQueuesQuery.data ?? emptyWorkQueues;
+  const { projectTasks, myTasks, controlledTasks, kanban, taskAuditEvents } = workQueues;
+  const activeStage = getActiveStage(project);
+  const activeStageTemplate = getStageTemplate(project, activeStage?.templateId);
+  const firstRequiredArtifact = activeStageTemplate?.requiredArtifactTemplates[0];
+  const firstRequiredApproval = activeStageTemplate?.approvalTemplates[0];
+  const firstTaskTemplate = activeStageTemplate?.taskTemplates[0];
+  const projectTaskIds = useMemo(() => getTaskIdSet(projectTasks), [projectTasks]);
+
+  async function updateProjectCache(nextProject: ManagedProjectDto, nextAuditTargetTaskId: string | null = auditTargetTaskId) {
+    queryClient.setQueryData(projectQueryKey, nextProject);
+    setAuditTargetTaskId(nextAuditTargetTaskId);
+    await queryClient.invalidateQueries({
+      queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
+    });
+  }
 
   useEffect(() => {
-    void loadExistingProject();
-  }, [loadExistingProject]);
+    if (projectQuery.isFetching && projectQuery.data === undefined) {
+      setStatus("Загрузка проекта");
+      return;
+    }
+    if (projectQuery.isError) {
+      setStatus(getErrorMessage(projectQuery.error));
+      return;
+    }
+    if (projectQuery.isSuccess) {
+      setStatus((current) => {
+        if (!projectQuery.data) {
+          return current === "Готово к управлению проектом" || current === "Загрузка проекта" ? "Проект еще не создан" : current;
+        }
+
+        return current === "Готово к управлению проектом" || current === "Загрузка проекта" ? "Проект загружен из API" : current;
+      });
+    }
+  }, [projectQuery.data, projectQuery.error, projectQuery.isError, projectQuery.isFetching, projectQuery.isSuccess]);
+
+  const createManagedProjectMutation = useMutation({
+    mutationFn: async () => {
+      const projectDraftId = canCreateProject
+        ? (await apiClient.ensureProjectDraft(testUser, activeSeedOpportunityId)).id
+        : projectDraftIdForSeedOpportunity(activeSeedOpportunityId);
+
+      return apiClient.createProjectFromTemplate(testUser, {
+        projectDraftId,
+        projectId
+      });
+    },
+    onSuccess: async (nextProject) => {
+      await updateProjectCache(nextProject, null);
+    }
+  });
+  const transitionStageMutation = useMutation({
+    mutationFn: ({ nextProject, stageId }: { nextProject: ManagedProjectDto; stageId: string }) =>
+      apiClient.transitionProjectStage(testUser, nextProject.id, stageId, "advance_stage"),
+    onSuccess: async (nextProject) => {
+      await updateProjectCache(nextProject);
+    }
+  });
+  const recordArtifactMutation = useMutation({
+    mutationFn: ({ nextProject, stageId }: { nextProject: ManagedProjectDto; stageId: string }) => {
+      if (!firstRequiredArtifact) {
+        throw new Error("Артефакт стадии не найден");
+      }
+
+      return apiClient.recordArtifact(testUser, nextProject.id, stageId, {
+        id: "artifact-phase4-charter",
+        templateId: firstRequiredArtifact.id,
+        templateKey: firstRequiredArtifact.key,
+        status: "accepted",
+        evidenceRef: "artifact://phase4/charter"
+      });
+    },
+    onSuccess: async (nextProject) => {
+      queryClient.setQueryData(projectQueryKey, nextProject);
+      await queryClient.invalidateQueries({
+        queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
+      });
+    }
+  });
+  const recordApprovalMutation = useMutation({
+    mutationFn: ({ nextProject, stageId }: { nextProject: ManagedProjectDto; stageId: string }) => {
+      if (!firstRequiredApproval) {
+        throw new Error("Согласование стадии не найдено");
+      }
+
+      return apiClient.recordApproval(testUser, nextProject.id, stageId, {
+        id: "approval-phase4-charter",
+        templateId: firstRequiredApproval.id,
+        templateKey: firstRequiredApproval.key,
+        decision: "approved"
+      });
+    },
+    onSuccess: async (nextProject) => {
+      queryClient.setQueryData(projectQueryKey, nextProject);
+      await queryClient.invalidateQueries({
+        queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
+      });
+    }
+  });
 
   async function createManagedProject() {
     if (pendingAction !== null) return;
@@ -226,15 +344,7 @@ export function ProjectWorkControlSurface({
     setStatus("Создание управляемого проекта");
     setGateBlockers([]);
     try {
-      const projectDraftId = canCreateProject
-        ? (await apiClient.ensureProjectDraft(testUser, activeSeedOpportunityId)).id
-        : projectDraftIdForSeedOpportunity(activeSeedOpportunityId);
-      const nextProject = await apiClient.createProjectFromTemplate(testUser, {
-        projectDraftId,
-        projectId
-      });
-      setProject(nextProject);
-      await refreshWorkQueues(nextProject);
+      await createManagedProjectMutation.mutateAsync();
       setStatus("Управляемый проект создан");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -249,9 +359,7 @@ export function ProjectWorkControlSurface({
     setStatus("Проверка stage gate");
     setGateBlockers([]);
     try {
-      const nextProject = await apiClient.transitionProjectStage(testUser, project.id, activeStage.id, "advance_stage");
-      setProject(nextProject);
-      await refreshWorkQueues(nextProject);
+      await transitionStageMutation.mutateAsync({ nextProject: project, stageId: activeStage.id });
       setStatus("Стадия переведена");
     } catch (error) {
       const blockers = getGateBlockers(error);
@@ -267,14 +375,7 @@ export function ProjectWorkControlSurface({
     setPendingAction("artifact");
     setStatus("Фиксация артефакта");
     try {
-      const nextProject = await apiClient.recordArtifact(testUser, project.id, activeStage.id, {
-        id: "artifact-phase4-charter",
-        templateId: firstRequiredArtifact.id,
-        templateKey: firstRequiredArtifact.key,
-        status: "accepted",
-        evidenceRef: "artifact://phase4/charter"
-      });
-      setProject(nextProject);
+      await recordArtifactMutation.mutateAsync({ nextProject: project, stageId: activeStage.id });
       setGateBlockers([]);
       setStatus("Артефакт принят");
     } catch (error) {
@@ -289,13 +390,7 @@ export function ProjectWorkControlSurface({
     setPendingAction("approval");
     setStatus("Фиксация согласования");
     try {
-      const nextProject = await apiClient.recordApproval(testUser, project.id, activeStage.id, {
-        id: "approval-phase4-charter",
-        templateId: firstRequiredApproval.id,
-        templateKey: firstRequiredApproval.key,
-        decision: "approved"
-      });
-      setProject(nextProject);
+      await recordApprovalMutation.mutateAsync({ nextProject: project, stageId: activeStage.id });
       setGateBlockers([]);
       setStatus("Согласование принято");
     } catch (error) {
@@ -322,8 +417,7 @@ export function ProjectWorkControlSurface({
           { id: "participant-kickoff-controller", userId: testUser, role: "controller" }
         ]
       });
-      setProject(result.project);
-      await refreshWorkQueues(result.project, result.task.id);
+      await updateProjectCache(result.project, result.task.id);
       setStatus("Задача создана");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -339,8 +433,7 @@ export function ProjectWorkControlSurface({
     try {
       await apiClient.changeTaskStatus(testUser, task.id, toStatus);
       const nextProject = await apiClient.getProject(testUser, project.id);
-      setProject(nextProject);
-      await refreshWorkQueues(nextProject, task.id);
+      await updateProjectCache(nextProject, task.id);
       setStatus("Статус задачи изменен");
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -360,8 +453,7 @@ export function ProjectWorkControlSurface({
       }
       if (project) {
         const nextProject = await apiClient.getProject(testUser, project.id);
-        setProject(nextProject);
-        await refreshWorkQueues(nextProject, task.id);
+        await updateProjectCache(nextProject, task.id);
       }
       setStatus("Комментарий добавлен");
     } catch (error) {
@@ -389,7 +481,9 @@ export function ProjectWorkControlSurface({
       <div className="project-work-layout">
         <section className="phase2-panel project-lifecycle-panel">
           <h3>Жизненный цикл проекта</h3>
-          {project ? (
+          {projectQuery.isFetching && projectQuery.data === undefined ? (
+            <p>Загрузка проекта</p>
+          ) : project ? (
             <>
               <p className="selected-title" data-testid="managed-project-title">
                 {project.title}
