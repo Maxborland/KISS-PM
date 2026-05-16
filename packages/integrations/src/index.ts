@@ -323,9 +323,41 @@ export type MockAdapterCanonicalImportPreview = TenantOwned & {
   };
 };
 
+export type ImportBatchResultStatus = "applied" | "idempotent_replay";
+
+export type ImportBatch = TenantOwned & {
+  id: string;
+  adapterId: string;
+  connectionId: string;
+  sourceSystem: string;
+  previewId: string;
+  idempotencyKey: string;
+  payloadFingerprint: string;
+  mappingKeys: string[];
+  canonicalEntityRefs: CanonicalImportEntityRef[];
+  resultStatus: ImportBatchResultStatus;
+  appliedAt: string;
+  actorId: TenantUserId;
+};
+
+export type ImportApplyResult = TenantOwned & {
+  status: ImportBatchResultStatus;
+  idempotentReplay: boolean;
+  batch: ImportBatch;
+  mappings: ExternalMapping[];
+  canonicalEntityRefs: CanonicalImportEntityRef[];
+  audit: SyncAuditEvent;
+};
+
 export class IntegrationDomainError extends Error {
   constructor(
-    readonly code: "validation_error" | "conflict" | "tenant_mismatch",
+    readonly code:
+      | "validation_error"
+      | "conflict"
+      | "tenant_mismatch"
+      | "import_preview_required"
+      | "stale_preview"
+      | "idempotency_conflict",
     message: string
   ) {
     super(message);
@@ -559,6 +591,10 @@ function createPreviewMapping(input: {
     action: previewActionForMapping(existingMapping, input.payloadFingerprint),
     ...(existingMapping !== undefined ? { existingMappingId: existingMapping.id } : {})
   };
+}
+
+function deterministicMappingId(mappingKey: string): string {
+  return `mapping-${stableIdSegment([mappingKey])}`;
 }
 
 export function createIntegrationAdapterDefinition(input: {
@@ -1128,7 +1164,7 @@ export function createMockAdapterImportPreview(input: {
       scopeHints: structuredClone(opportunity.scopeHints ?? [])
     },
     projectDraft: {
-      id: `imported-draft-${project.externalId}`,
+      id: `imported-draft-${stableIdSegment([tenantId, sourceSystem, "project_draft", project.externalId])}`,
       tenantId,
       title: requireNonEmptyString(project.title, "project.title"),
       sourceOpportunity: {
@@ -1191,5 +1227,143 @@ export function createMockAdapterImportPreview(input: {
     ],
     mappingPreview,
     canonical
+  };
+}
+
+export function applyMockAdapterImportPreview(input: {
+  preview: MockAdapterCanonicalImportPreview;
+  actorId: TenantUserId;
+  batchId: string;
+  idempotencyKey: string;
+  appliedAt: string;
+  auditEventId: string;
+  confirmed: boolean;
+  expectedTenantId?: TenantId;
+  existingBatches?: ImportBatch[];
+  existingMappings?: ExternalMapping[];
+  existingAuditEvents?: SyncAuditEvent[];
+}): ImportApplyResult {
+  const tenantId = requireNonEmptyString(input.preview.tenantId, "importApply.preview.tenantId");
+  if (input.expectedTenantId !== undefined && input.expectedTenantId !== tenantId) {
+    throw new IntegrationDomainError("tenant_mismatch", "import preview tenant mismatch");
+  }
+  if (!input.confirmed) {
+    throw new IntegrationDomainError("import_preview_required", "import apply requires confirmation");
+  }
+  const blockingIssues = input.preview.validationIssues.filter((issue) => issue.severity === "blocking");
+  if (blockingIssues.length > 0) {
+    throw new IntegrationDomainError("validation_error", "import preview has blocking validation issues");
+  }
+
+  const idempotencyKey = requireNonEmptyString(input.idempotencyKey, "importApply.idempotencyKey");
+  const batchId = requireNonEmptyString(input.batchId, "importApply.batchId");
+  const auditEventId = requireNonEmptyString(input.auditEventId, "importApply.auditEventId");
+  const existingBatch = (input.existingBatches ?? []).find(
+    (batch) => batch.tenantId === tenantId && batch.idempotencyKey === idempotencyKey
+  );
+  if (existingBatch !== undefined) {
+    const replayMappings = (input.existingMappings ?? []).filter((mapping) =>
+      existingBatch.mappingKeys.includes(mapping.mappingKey)
+    );
+    const replayAudit = (input.existingAuditEvents ?? []).find(
+      (event) => event.tenantId === tenantId && event.command === "import_apply" && event.target.entityId === existingBatch.id
+    );
+    if (replayMappings.length !== existingBatch.mappingKeys.length || replayAudit === undefined) {
+      throw new IntegrationDomainError("idempotency_conflict", "idempotent import replay is missing prior mapping or audit evidence");
+    }
+
+    return {
+      tenantId,
+      status: "idempotent_replay",
+      idempotentReplay: true,
+      batch: structuredClone(existingBatch),
+      mappings: structuredClone(replayMappings),
+      canonicalEntityRefs: structuredClone(existingBatch.canonicalEntityRefs),
+      audit: structuredClone(replayAudit)
+    };
+  }
+
+  const batchIdConflict = (input.existingBatches ?? []).find(
+    (batch) => batch.tenantId === tenantId && batch.id === batchId
+  );
+  if (batchIdConflict !== undefined) {
+    throw new IntegrationDomainError("idempotency_conflict", "import batch id already exists with another idempotency key");
+  }
+
+  const auditIdConflict = (input.existingAuditEvents ?? []).find(
+    (event) => event.tenantId === tenantId && event.id === auditEventId
+  );
+  if (auditIdConflict !== undefined) {
+    throw new IntegrationDomainError("idempotency_conflict", "import audit id already exists with another target");
+  }
+
+  const appliedAt = requireValidTimestamp(input.appliedAt, "importApply.appliedAt");
+  const actorId = requireNonEmptyString(input.actorId, "importApply.actorId");
+  const mappings = input.preview.mappingPreview.map((mappingPreview) =>
+    createExternalMapping({
+      id: mappingPreview.existingMappingId ?? deterministicMappingId(mappingPreview.mappingKey),
+      tenantId,
+      sourceSystem: input.preview.sourceSystem,
+      connectionId: input.preview.connectionId,
+      externalEntityType: mappingPreview.externalEntityType,
+      externalEntityId: mappingPreview.externalEntityId,
+      canonicalEntityType: mappingPreview.canonicalEntityType,
+      canonicalEntityId: mappingPreview.canonicalEntityId,
+      lastBatchId: batchId,
+      lastSyncStatus: "synced",
+      lastSyncedAt: appliedAt,
+      safeMetadata: {
+        previewId: input.preview.id,
+        payloadFingerprint: input.preview.payloadFingerprint,
+        idempotencyKey,
+        action: mappingPreview.action
+      }
+    })
+  );
+  const batch: ImportBatch = {
+    id: batchId,
+    tenantId,
+    adapterId: input.preview.adapterId,
+    connectionId: input.preview.connectionId,
+    sourceSystem: input.preview.sourceSystem,
+    previewId: input.preview.id,
+    idempotencyKey,
+    payloadFingerprint: input.preview.payloadFingerprint,
+    mappingKeys: mappings.map((mapping) => mapping.mappingKey),
+    canonicalEntityRefs: structuredClone(input.preview.affectedCanonicalEntities),
+    resultStatus: "applied",
+    appliedAt,
+    actorId
+  };
+  const audit = createSyncAuditEvent({
+    id: auditEventId,
+    tenantId,
+    actorId,
+    adapterId: input.preview.adapterId,
+    connectionId: input.preview.connectionId,
+    command: "import_apply",
+    result: "success",
+    target: {
+      entityType: "import_batch",
+      entityId: batchId
+    },
+    timestamp: appliedAt,
+    correlationId: `corr-${batchId}`,
+    details: {
+      previewId: input.preview.id,
+      idempotencyKey,
+      mappingCount: mappings.length,
+      canonicalEntityCount: input.preview.affectedCanonicalEntities.length
+    }
+  });
+
+  return {
+    tenantId,
+    status: "applied",
+    idempotentReplay: false,
+    batch,
+    mappings,
+    canonicalEntityRefs: structuredClone(input.preview.affectedCanonicalEntities),
+    audit
   };
 }
