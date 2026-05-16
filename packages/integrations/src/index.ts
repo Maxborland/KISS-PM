@@ -120,6 +120,209 @@ export type SyncAuditEvent = TenantOwned & {
   details?: JsonRecord;
 };
 
+export type ImportPreviewAction = "create" | "update" | "skip" | "error";
+export type ImportValidationIssueSeverity = "blocking" | "warning";
+export type ImportValidationIssueCode =
+  | "canonical_title_missing"
+  | "date_window_invalid"
+  | "external_id_missing"
+  | "task_due_date_outside_project_window"
+  | "tenant_mismatch";
+
+export type ImportValidationIssue = {
+  code: ImportValidationIssueCode;
+  severity: ImportValidationIssueSeverity;
+  fieldPath: string;
+  message: string;
+  recoveryText: string;
+  externalEntityType?: ExternalEntityType;
+  externalEntityId?: string;
+};
+
+export type CanonicalImportEntityRef = {
+  entityType: CanonicalEntityType;
+  entityId: string;
+  displayName: string;
+};
+
+export type ImportPreviewMapping = ExternalMappingKeyInput & {
+  action: ImportPreviewAction;
+  canonicalEntityId: string;
+  mappingKey: string;
+  existingMappingId?: string;
+};
+
+export type MockAdapterCanonicalImportPayload = {
+  opportunity: {
+    externalId: string;
+    title: string;
+    account?: {
+      externalId: string;
+      displayName: string;
+      legalName?: string;
+      taxId?: string;
+    };
+    contacts?: {
+      externalId: string;
+      displayName: string;
+      email?: string;
+      phone?: string;
+      roleLabel?: string;
+    }[];
+    plannedStartDate: string;
+    desiredFinishDate: string;
+    expectedValue: {
+      amount: number;
+      currency: string;
+    };
+    probability: number;
+    categoryKey: string;
+    typologyKey: string;
+    scopeHints?: {
+      key: string;
+      label: string;
+      value: string | number | boolean;
+    }[];
+  };
+  project: {
+    externalId: string;
+    title: string;
+    template: {
+      templateId: string;
+      key: string;
+      label: string;
+      version: number;
+      matchConfidence: number;
+      assumptions: {
+        code: string;
+        message: string;
+      }[];
+    };
+    demand: {
+      totalPlannedWorkHours: number;
+      scenarioKey: string;
+      scenarioLabel: string;
+      formulaKey: string;
+      formulaVersion: number;
+      confidence: number;
+      stageRoleDemands: {
+        stageKey: string;
+        stageLabel: string;
+        roleKey: string;
+        roleLabel: string;
+        plannedWorkHours: number;
+      }[];
+    };
+    feasibility: {
+      status: "fit" | "overloaded";
+      severity: "none" | "warning" | "critical";
+      blockerCodes: string[];
+    };
+  };
+  tasks?: {
+    externalId: string;
+    title: string;
+    stageKey: string;
+    plannedWorkHours: number;
+    dueDate: string;
+    participantRoleKeys: string[];
+  }[];
+};
+
+export type MockAdapterCanonicalImportPreview = TenantOwned & {
+  id: string;
+  adapterId: string;
+  connectionId: string;
+  sourceSystem: string;
+  payloadFingerprint: string;
+  receivedAt: string;
+  previewedAt: string;
+  mutatesState: false;
+  report: {
+    creates: number;
+    updates: number;
+    skips: number;
+    errors: number;
+  };
+  validationIssues: ImportValidationIssue[];
+  affectedCanonicalEntities: CanonicalImportEntityRef[];
+  mappingPreview: ImportPreviewMapping[];
+  canonical: {
+    account?: {
+      id: string;
+      tenantId: TenantId;
+      displayName: string;
+      legalName?: string;
+      taxId?: string;
+    };
+    contacts: {
+      id: string;
+      tenantId: TenantId;
+      accountId?: string;
+      displayName: string;
+      email?: string;
+      phone?: string;
+      roleLabel?: string;
+    }[];
+    opportunity?: {
+      id: string;
+      tenantId: TenantId;
+      title: string;
+      plannedStartDate: string;
+      desiredFinishDate: string;
+      expectedValue: {
+        amount: number;
+        currency: string;
+      };
+      probability: number;
+      categoryKey: string;
+      typologyKey: string;
+      scopeHints: {
+        key: string;
+        label: string;
+        value: string | number | boolean;
+      }[];
+    };
+    projectDraft?: {
+      id: string;
+      tenantId: TenantId;
+      title: string;
+      sourceOpportunity: {
+        tenantId: TenantId;
+        type: "crm_opportunity";
+        opportunityId: string;
+        title: string;
+        accountId?: string;
+        contactIds: string[];
+        plannedStartDate: string;
+        desiredFinishDate: string;
+      };
+      processTemplate: MockAdapterCanonicalImportPayload["project"]["template"] & {
+        tenantId: TenantId;
+      };
+      demand: MockAdapterCanonicalImportPayload["project"]["demand"] & {
+        tenantId: TenantId;
+      };
+      feasibility: MockAdapterCanonicalImportPayload["project"]["feasibility"] & {
+        tenantId: TenantId;
+        expectedWindow: {
+          startDate: string;
+          endDate: string;
+        };
+      };
+    };
+    tasks: {
+      id: string;
+      tenantId: TenantId;
+      title: string;
+      stageKey: string;
+      plannedWorkHours: number;
+      dueDate: string;
+      participantRoleKeys: string[];
+    }[];
+  };
+};
+
 export class IntegrationDomainError extends Error {
   constructor(
     readonly code: "validation_error" | "conflict" | "tenant_mismatch",
@@ -254,6 +457,108 @@ function redactSecrets(value: unknown, keyHint = ""): unknown {
   }
 
   return value;
+}
+
+function stableIdSegment(parts: string[]): string {
+  let hash = 2166136261;
+  for (const char of parts.join("|")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+
+  return hash.toString(36).padStart(7, "0");
+}
+
+function deterministicCanonicalId(input: {
+  tenantId: TenantId;
+  sourceSystem: string;
+  entityType: CanonicalEntityType;
+  externalId: string;
+}): string {
+  return `imported-${input.entityType}-${stableIdSegment([
+    requireNonEmptyString(input.tenantId, "tenantId"),
+    requireNonEmptyString(input.sourceSystem, "sourceSystem"),
+    input.entityType,
+    requireNonEmptyString(input.externalId, `${input.entityType}.externalId`)
+  ])}`;
+}
+
+function requireIsoDate(value: string | undefined, fieldName: string): string {
+  const date = requireNonEmptyString(value, fieldName);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new IntegrationDomainError("validation_error", `${fieldName} must be an ISO date`);
+  }
+
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new IntegrationDomainError("validation_error", `${fieldName} must be a valid ISO date`);
+  }
+
+  return date;
+}
+
+function tryRequireIsoDate(value: string | undefined): string | undefined {
+  try {
+    return requireIsoDate(value, "date");
+  } catch {
+    return undefined;
+  }
+}
+
+function createValidationIssue(input: ImportValidationIssue): ImportValidationIssue {
+  return {
+    code: input.code,
+    severity: input.severity,
+    fieldPath: input.fieldPath,
+    message: input.message,
+    recoveryText: input.recoveryText,
+    ...(input.externalEntityType !== undefined ? { externalEntityType: input.externalEntityType } : {}),
+    ...(input.externalEntityId !== undefined ? { externalEntityId: input.externalEntityId } : {})
+  };
+}
+
+function findExistingMapping(
+  mappings: ExternalMapping[] | undefined,
+  input: ExternalMappingKeyInput
+): ExternalMapping | undefined {
+  const mappingKey = buildExternalMappingKey(input);
+  return (mappings ?? []).find((mapping) => mapping.mappingKey === mappingKey);
+}
+
+function previewActionForMapping(
+  mapping: ExternalMapping | undefined,
+  payloadFingerprint: string
+): Exclude<ImportPreviewAction, "error"> {
+  if (mapping === undefined) return "create";
+  return mapping.safeMetadata?.payloadFingerprint === payloadFingerprint ? "skip" : "update";
+}
+
+function createPreviewMapping(input: {
+  tenantId: TenantId;
+  sourceSystem: string;
+  externalEntityType: ExternalEntityType;
+  externalEntityId: string;
+  canonicalEntityType: CanonicalEntityType;
+  canonicalEntityId: string;
+  payloadFingerprint: string;
+  existingMappings?: ExternalMapping[];
+}): ImportPreviewMapping {
+  const keyInput: ExternalMappingKeyInput = {
+    tenantId: input.tenantId,
+    sourceSystem: input.sourceSystem,
+    externalEntityType: input.externalEntityType,
+    externalEntityId: input.externalEntityId,
+    canonicalEntityType: input.canonicalEntityType
+  };
+  const existingMapping = findExistingMapping(input.existingMappings, keyInput);
+
+  return {
+    ...keyInput,
+    canonicalEntityId: existingMapping?.canonicalEntityId ?? input.canonicalEntityId,
+    mappingKey: buildExternalMappingKey(keyInput),
+    action: previewActionForMapping(existingMapping, input.payloadFingerprint),
+    ...(existingMapping !== undefined ? { existingMappingId: existingMapping.id } : {})
+  };
 }
 
 export function createIntegrationAdapterDefinition(input: {
@@ -431,5 +736,460 @@ export function createSyncAuditEvent(input: {
     correlationId: requireNonEmptyString(input.correlationId, "syncAudit.correlationId"),
     ...(input.failure !== undefined ? { failure: createAdapterFailure(input.failure) } : {}),
     ...(input.details !== undefined ? { details: redactSecrets(cloneRecord(input.details, "syncAudit.details")) as JsonRecord } : {})
+  };
+}
+
+export function createMockAdapterImportPreview(input: {
+  id: string;
+  tenantId: TenantId;
+  adapterId: string;
+  connectionId: string;
+  sourceSystem: string;
+  payloadFingerprint: string;
+  receivedAt: string;
+  previewedAt: string;
+  payload: MockAdapterCanonicalImportPayload;
+  existingMappings?: ExternalMapping[];
+}): MockAdapterCanonicalImportPreview {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const sourceSystem = requireNonEmptyString(input.sourceSystem, "importPreview.sourceSystem");
+  const payloadFingerprint = requireNonEmptyString(input.payloadFingerprint, "importPreview.payloadFingerprint");
+  const payload = structuredClone(input.payload);
+  const issues: ImportValidationIssue[] = [];
+  const opportunity = payload.opportunity;
+  const project = payload.project;
+  const tasks = payload.tasks ?? [];
+
+  if (!opportunity || typeof opportunity !== "object") {
+    issues.push(
+      createValidationIssue({
+        code: "external_id_missing",
+        severity: "blocking",
+        fieldPath: "opportunity",
+        message: "Opportunity payload is required",
+        recoveryText: "Проверьте payload mock adapter: блок opportunity обязателен."
+      })
+    );
+  } else {
+    if (!opportunity.externalId?.trim()) {
+      issues.push(
+        createValidationIssue({
+          code: "external_id_missing",
+          severity: "blocking",
+          fieldPath: "opportunity.externalId",
+          message: "Opportunity external id is required",
+          recoveryText: "Добавьте стабильный externalId для opportunity перед preview."
+        })
+      );
+    }
+    if (!opportunity.title?.trim()) {
+      issues.push(
+        createValidationIssue({
+          code: "canonical_title_missing",
+          severity: "blocking",
+          fieldPath: "opportunity.title",
+          message: "Opportunity title is required for canonical import",
+          recoveryText: "Заполните название opportunity в adapter payload.",
+          externalEntityType: "opportunity",
+          externalEntityId: opportunity.externalId
+        })
+      );
+    }
+    if (opportunity.account !== undefined && !opportunity.account.externalId?.trim()) {
+      issues.push(
+        createValidationIssue({
+          code: "external_id_missing",
+          severity: "blocking",
+          fieldPath: "opportunity.account.externalId",
+          message: "Account external id is required",
+          recoveryText: "Добавьте stable externalId для account перед preview.",
+          externalEntityType: "account"
+        })
+      );
+    }
+    for (const contact of opportunity.contacts ?? []) {
+      if (!contact.externalId?.trim()) {
+        issues.push(
+          createValidationIssue({
+            code: "external_id_missing",
+            severity: "blocking",
+            fieldPath: "opportunity.contacts[].externalId",
+            message: "Contact external id is required",
+            recoveryText: "Добавьте stable externalId для каждого contact перед preview.",
+            externalEntityType: "contact"
+          })
+        );
+      }
+    }
+    const plannedStartDate = tryRequireIsoDate(opportunity.plannedStartDate);
+    const desiredFinishDate = tryRequireIsoDate(opportunity.desiredFinishDate);
+    if (plannedStartDate === undefined) {
+      issues.push(
+        createValidationIssue({
+          code: "date_window_invalid",
+          severity: "blocking",
+          fieldPath: "opportunity.plannedStartDate",
+          message: "Opportunity planned start date is not a valid ISO date",
+          recoveryText: "Исправьте дату начала в формате YYYY-MM-DD.",
+          externalEntityType: "opportunity",
+          externalEntityId: opportunity.externalId
+        })
+      );
+    }
+    if (desiredFinishDate === undefined) {
+      issues.push(
+        createValidationIssue({
+          code: "date_window_invalid",
+          severity: "blocking",
+          fieldPath: "opportunity.desiredFinishDate",
+          message: "Opportunity desired finish date is not a valid ISO date",
+          recoveryText: "Исправьте дату завершения в формате YYYY-MM-DD.",
+          externalEntityType: "opportunity",
+          externalEntityId: opportunity.externalId
+        })
+      );
+    }
+    if (plannedStartDate !== undefined && desiredFinishDate !== undefined && desiredFinishDate < plannedStartDate) {
+      issues.push(
+        createValidationIssue({
+          code: "date_window_invalid",
+          severity: "blocking",
+          fieldPath: "opportunity.desiredFinishDate",
+          message: "Opportunity desired finish date is before planned start date",
+          recoveryText: "Исправьте окно дат во внешней системе или выберите другой payload fixture.",
+          externalEntityType: "opportunity",
+          externalEntityId: opportunity.externalId
+        })
+      );
+    }
+  }
+
+  if (!project.externalId?.trim()) {
+    issues.push(
+      createValidationIssue({
+        code: "external_id_missing",
+        severity: "blocking",
+        fieldPath: "project.externalId",
+        message: "Project external id is required",
+        recoveryText: "Добавьте стабильный externalId для project перед preview."
+      })
+    );
+  }
+  if (!project.title?.trim()) {
+    issues.push(
+      createValidationIssue({
+        code: "canonical_title_missing",
+        severity: "blocking",
+        fieldPath: "project.title",
+        message: "Project title is required for canonical import",
+        recoveryText: "Заполните название project в adapter payload.",
+        externalEntityType: "project",
+        externalEntityId: project.externalId
+      })
+    );
+  }
+  for (const task of tasks) {
+    if (!task.externalId?.trim()) {
+      issues.push(
+        createValidationIssue({
+          code: "external_id_missing",
+          severity: "blocking",
+          fieldPath: "tasks[].externalId",
+          message: "Task external id is required",
+          recoveryText: "Добавьте stable externalId для каждой task перед preview."
+        })
+      );
+    }
+    if (!task.title?.trim()) {
+      issues.push(
+        createValidationIssue({
+          code: "canonical_title_missing",
+          severity: "blocking",
+          fieldPath: `tasks.${task.externalId}.title`,
+          message: "Task title is required for canonical import",
+          recoveryText: "Заполните название task в adapter payload.",
+          externalEntityType: "task",
+          externalEntityId: task.externalId
+        })
+      );
+    }
+    const dueDate = tryRequireIsoDate(task.dueDate);
+    if (dueDate === undefined) {
+      issues.push(
+        createValidationIssue({
+          code: "date_window_invalid",
+          severity: "blocking",
+          fieldPath: `tasks.${task.externalId}.dueDate`,
+          message: "Task due date is not a valid ISO date",
+          recoveryText: "Исправьте срок задачи в формате YYYY-MM-DD.",
+          externalEntityType: "task",
+          externalEntityId: task.externalId
+        })
+      );
+    }
+    if (
+      dueDate !== undefined &&
+      tryRequireIsoDate(opportunity.plannedStartDate) !== undefined &&
+      tryRequireIsoDate(opportunity.desiredFinishDate) !== undefined &&
+      (dueDate < opportunity.plannedStartDate || dueDate > opportunity.desiredFinishDate)
+    ) {
+      issues.push(
+        createValidationIssue({
+          code: "task_due_date_outside_project_window",
+          severity: "warning",
+          fieldPath: `tasks.${task.externalId}.dueDate`,
+          message: "Task due date is outside the imported project window",
+          recoveryText: "Проверьте даты задачи после preview перед применением импорта.",
+          externalEntityType: "task",
+          externalEntityId: task.externalId
+        })
+      );
+    }
+  }
+
+  const hasBlockingIssues = issues.some((issue) => issue.severity === "blocking");
+  if (hasBlockingIssues) {
+    return {
+      id: requireNonEmptyString(input.id, "importPreview.id"),
+      tenantId,
+      adapterId: requireNonEmptyString(input.adapterId, "importPreview.adapterId"),
+      connectionId: requireNonEmptyString(input.connectionId, "importPreview.connectionId"),
+      sourceSystem,
+      payloadFingerprint,
+      receivedAt: requireValidTimestamp(input.receivedAt, "importPreview.receivedAt"),
+      previewedAt: requireValidTimestamp(input.previewedAt, "importPreview.previewedAt"),
+      mutatesState: false,
+      report: {
+        creates: 0,
+        updates: 0,
+        skips: 0,
+        errors: issues.filter((issue) => issue.severity === "blocking").length
+      },
+      validationIssues: issues,
+      affectedCanonicalEntities: [],
+      mappingPreview: [],
+      canonical: {
+        contacts: [],
+        tasks: []
+      }
+    };
+  }
+
+  const accountId =
+    opportunity.account !== undefined
+      ? deterministicCanonicalId({
+          tenantId,
+          sourceSystem,
+          entityType: "account",
+          externalId: opportunity.account.externalId
+        })
+      : undefined;
+  const contactPreviews = (opportunity.contacts ?? []).map((contact) => ({
+    id: deterministicCanonicalId({ tenantId, sourceSystem, entityType: "contact", externalId: contact.externalId }),
+    tenantId,
+    ...(accountId !== undefined ? { accountId } : {}),
+    displayName: requireNonEmptyString(contact.displayName, "contact.displayName"),
+    ...(contact.email !== undefined ? { email: requireNonEmptyString(contact.email, "contact.email") } : {}),
+    ...(contact.phone !== undefined ? { phone: requireNonEmptyString(contact.phone, "contact.phone") } : {}),
+    ...(contact.roleLabel !== undefined ? { roleLabel: requireNonEmptyString(contact.roleLabel, "contact.roleLabel") } : {})
+  }));
+  const opportunityId = deterministicCanonicalId({
+    tenantId,
+    sourceSystem,
+    entityType: "opportunity",
+    externalId: opportunity.externalId
+  });
+  const projectId = deterministicCanonicalId({ tenantId, sourceSystem, entityType: "project", externalId: project.externalId });
+  const taskPreviews = tasks.map((task) => ({
+    id: deterministicCanonicalId({ tenantId, sourceSystem, entityType: "task", externalId: task.externalId }),
+    tenantId,
+    title: requireNonEmptyString(task.title, "task.title"),
+    stageKey: requireNonEmptyString(task.stageKey, "task.stageKey"),
+    plannedWorkHours: task.plannedWorkHours,
+    dueDate: requireIsoDate(task.dueDate, "task.dueDate"),
+    participantRoleKeys: [...task.participantRoleKeys]
+  }));
+  const mappingPreview: ImportPreviewMapping[] = [];
+
+  if (opportunity.account !== undefined && accountId !== undefined) {
+    mappingPreview.push(
+      createPreviewMapping({
+        tenantId,
+        sourceSystem,
+        externalEntityType: "account",
+        externalEntityId: opportunity.account.externalId,
+        canonicalEntityType: "account",
+        canonicalEntityId: accountId,
+        payloadFingerprint,
+        existingMappings: input.existingMappings
+      })
+    );
+  }
+  for (const contact of opportunity.contacts ?? []) {
+    mappingPreview.push(
+      createPreviewMapping({
+        tenantId,
+        sourceSystem,
+        externalEntityType: "contact",
+        externalEntityId: contact.externalId,
+        canonicalEntityType: "contact",
+        canonicalEntityId: deterministicCanonicalId({
+          tenantId,
+          sourceSystem,
+          entityType: "contact",
+          externalId: contact.externalId
+        }),
+        payloadFingerprint,
+        existingMappings: input.existingMappings
+      })
+    );
+  }
+  mappingPreview.push(
+    createPreviewMapping({
+      tenantId,
+      sourceSystem,
+      externalEntityType: "opportunity",
+      externalEntityId: opportunity.externalId,
+      canonicalEntityType: "opportunity",
+      canonicalEntityId: opportunityId,
+      payloadFingerprint,
+      existingMappings: input.existingMappings
+    }),
+    createPreviewMapping({
+      tenantId,
+      sourceSystem,
+      externalEntityType: "project",
+      externalEntityId: project.externalId,
+      canonicalEntityType: "project",
+      canonicalEntityId: projectId,
+      payloadFingerprint,
+      existingMappings: input.existingMappings
+    })
+  );
+  for (const task of tasks) {
+    mappingPreview.push(
+      createPreviewMapping({
+        tenantId,
+        sourceSystem,
+        externalEntityType: "task",
+        externalEntityId: task.externalId,
+        canonicalEntityType: "task",
+        canonicalEntityId: deterministicCanonicalId({
+          tenantId,
+          sourceSystem,
+          entityType: "task",
+          externalId: task.externalId
+        }),
+        payloadFingerprint,
+        existingMappings: input.existingMappings
+      })
+    );
+  }
+
+  const actionCounts = mappingPreview.reduce(
+    (counts, mapping) => ({
+      creates: counts.creates + (mapping.action === "create" ? 1 : 0),
+      updates: counts.updates + (mapping.action === "update" ? 1 : 0),
+      skips: counts.skips + (mapping.action === "skip" ? 1 : 0)
+    }),
+    { creates: 0, updates: 0, skips: 0 }
+  );
+
+  const canonical = {
+    ...(opportunity.account !== undefined && accountId !== undefined
+      ? {
+          account: {
+            id: accountId,
+            tenantId,
+            displayName: requireNonEmptyString(opportunity.account.displayName, "account.displayName"),
+            ...(opportunity.account.legalName !== undefined
+              ? { legalName: requireNonEmptyString(opportunity.account.legalName, "account.legalName") }
+              : {}),
+            ...(opportunity.account.taxId !== undefined
+              ? { taxId: requireNonEmptyString(opportunity.account.taxId, "account.taxId") }
+              : {})
+          }
+        }
+      : {}),
+    contacts: contactPreviews,
+    opportunity: {
+      id: opportunityId,
+      tenantId,
+      title: requireNonEmptyString(opportunity.title, "opportunity.title"),
+      plannedStartDate: requireIsoDate(opportunity.plannedStartDate, "opportunity.plannedStartDate"),
+      desiredFinishDate: requireIsoDate(opportunity.desiredFinishDate, "opportunity.desiredFinishDate"),
+      expectedValue: {
+        amount: opportunity.expectedValue.amount,
+        currency: requireNonEmptyString(opportunity.expectedValue.currency, "opportunity.expectedValue.currency")
+      },
+      probability: opportunity.probability,
+      categoryKey: requireNonEmptyString(opportunity.categoryKey, "opportunity.categoryKey"),
+      typologyKey: requireNonEmptyString(opportunity.typologyKey, "opportunity.typologyKey"),
+      scopeHints: structuredClone(opportunity.scopeHints ?? [])
+    },
+    projectDraft: {
+      id: `imported-draft-${project.externalId}`,
+      tenantId,
+      title: requireNonEmptyString(project.title, "project.title"),
+      sourceOpportunity: {
+        tenantId,
+        type: "crm_opportunity" as const,
+        opportunityId,
+        title: requireNonEmptyString(opportunity.title, "opportunity.title"),
+        ...(accountId !== undefined ? { accountId } : {}),
+        contactIds: contactPreviews.map((contact) => contact.id),
+        plannedStartDate: requireIsoDate(opportunity.plannedStartDate, "opportunity.plannedStartDate"),
+        desiredFinishDate: requireIsoDate(opportunity.desiredFinishDate, "opportunity.desiredFinishDate")
+      },
+      processTemplate: {
+        tenantId,
+        ...structuredClone(project.template)
+      },
+      demand: {
+        tenantId,
+        ...structuredClone(project.demand)
+      },
+      feasibility: {
+        tenantId,
+        ...structuredClone(project.feasibility),
+        expectedWindow: {
+          startDate: requireIsoDate(opportunity.plannedStartDate, "opportunity.plannedStartDate"),
+          endDate: requireIsoDate(opportunity.desiredFinishDate, "opportunity.desiredFinishDate")
+        }
+      }
+    },
+    tasks: taskPreviews
+  };
+
+  return {
+    id: requireNonEmptyString(input.id, "importPreview.id"),
+    tenantId,
+    adapterId: requireNonEmptyString(input.adapterId, "importPreview.adapterId"),
+    connectionId: requireNonEmptyString(input.connectionId, "importPreview.connectionId"),
+    sourceSystem,
+    payloadFingerprint,
+    receivedAt: requireValidTimestamp(input.receivedAt, "importPreview.receivedAt"),
+    previewedAt: requireValidTimestamp(input.previewedAt, "importPreview.previewedAt"),
+    mutatesState: false,
+    report: {
+      ...actionCounts,
+      errors: issues.filter((issue) => issue.severity === "blocking").length
+    },
+    validationIssues: issues,
+    affectedCanonicalEntities: [
+      ...(canonical.account !== undefined
+        ? [{ entityType: "account" as const, entityId: canonical.account.id, displayName: canonical.account.displayName }]
+        : []),
+      ...canonical.contacts.map((contact) => ({
+        entityType: "contact" as const,
+        entityId: contact.id,
+        displayName: contact.displayName
+      })),
+      { entityType: "opportunity" as const, entityId: opportunityId, displayName: opportunity.title },
+      { entityType: "project" as const, entityId: projectId, displayName: project.title },
+      ...canonical.tasks.map((task) => ({ entityType: "task" as const, entityId: task.id, displayName: task.title }))
+    ],
+    mappingPreview,
+    canonical
   };
 }
