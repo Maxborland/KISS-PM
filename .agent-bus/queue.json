@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T09:19:44+07:00",
+  "updated_at": "2026-05-16T12:54:30+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -1260,7 +1260,7 @@
     {
       "id": "DOC-P3-P12-UX-CONTRACT-001",
       "title": "Specify P3-P12 product UX, screen catalog, design system, and UX matrix",
-      "status": "active",
+      "status": "done",
       "priority": "high",
       "phase": "docs",
       "depends_on": [],
@@ -1316,7 +1316,113 @@
         "rg -n \"Project Gantt|shadcn|TanStack Table|ControlSurfaceShell|UX-P5-PROJECT-GANTT|canonical task|primary next action|audit/result feedback\" docs/product docs/status/p3-p12-ux-screen-matrix.json",
         "git diff --check -- docs/product docs/status/p3-p12-ux-screen-matrix.json scripts/verify-ux-screen-matrix.mjs .agent-bus/queue.json"
       ],
-      "notes": "Docs-only UX/UI contract task. Product implementation is out of scope; specify P3-P12 UX docs, screen catalog, adapted shadcn design system, matrix, and verifier."
+      "notes": "Completed docs-only UX/UI contract. Product implementation is out of scope; specified P3-P12 UX docs, screen catalog, adapted shadcn design system, matrix, and verifier."
+    },
+    {
+      "id": "GATE-P3-P12-BUG-HUNT-001",
+      "title": "Run post-worker P3-P12 bug-hunt gate review in master",
+      "status": "done",
+      "priority": "high",
+      "phase": "gate",
+      "depends_on": [
+        "P5-010",
+        "DOC-P3-P12-UX-CONTRACT-001",
+        "DOC-P3-P12-POST-RUN-GATE-001"
+      ],
+      "write_scope": [
+        "docs/bug-hunt-report.md",
+        "docs/ms-project-ref/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/claims/GATE-P3-P12-BUG-HUNT-001.claim.json",
+        ".agent-bus/sessions/GATE-P3-P12-BUG-HUNT-001.md",
+        ".agent-bus/handoff/2026-05-16-gate-p3-p12-bug-hunt.md",
+        ".agent-bus/locks/queue-json-p3-p12-bug-hunt-gate.lock/**",
+        ".agent-bus/locks/docs-bug-hunt-report.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        "docs/bug-hunt-report.md"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task GATE-P3-P12-BUG-HUNT-001 --once",
+        "git status --short",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "npm run test:e2e:phase -- --phase=5",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\""
+      ],
+      "notes": "Completed review-only bug-hunt gate in master. Product code was not edited. Verdict is blocked: P3-P12 UX/post-run gate docs are missing from master, and Phase 5 E2E/matrix proof cannot be reproduced here because bun is unavailable."
+    },
+    {
+      "id": "FIX-P3-P12-BUG-HUNT-001",
+      "title": "Fix confirmed P3-P12 bug-hunt gate findings",
+      "status": "done",
+      "priority": "high",
+      "phase": "gate",
+      "depends_on": [
+        "GATE-P3-P12-BUG-HUNT-001"
+      ],
+      "write_scope": [
+        "docs/product/**",
+        "docs/roadmap/**",
+        "docs/status/p3-p12-ux-screen-matrix.json",
+        "playwright.config.ts",
+        "scripts/run-e2e.mjs",
+        "scripts/dev-api-server.mjs",
+        "scripts/verify-ux-screen-matrix.mjs",
+        "docs/bug-hunt-report.md",
+        "apps/web/src/GanttControlSurface.tsx",
+        "apps/web/src/GanttControlSurface.test.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase2Runtime.ts",
+        "apps/api/package.json",
+        "tsconfig.base.json",
+        "docs/ms-project-ref/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/claims/FIX-P3-P12-BUG-HUNT-001.claim.json",
+        ".agent-bus/claims/P5-008.claim.json",
+        ".agent-bus/sessions/FIX-P3-P12-BUG-HUNT-001.md",
+        ".agent-bus/handoff/2026-05-16-gate-p3-p12-bug-hunt.md",
+        ".agent-bus/handoff/2026-05-16-fix-p3-p12-bug-hunt.md",
+        ".agent-bus/locks/queue-json-p3-p12-review-fixes.lock/**",
+        ".agent-bus/locks/package-json-p3-p12-review-fixes.lock/**",
+        ".agent-bus/locks/docs-status-p3-p12-review-fixes.lock/**",
+        ".agent-bus/locks/playwright-config-p3-p12-review-fixes.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "packages/**",
+        "e2e/**",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        "apps/api/package.json",
+        "docs/status/*",
+        "playwright.config.ts"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task FIX-P3-P12-BUG-HUNT-001 --once",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/p3-p12-ux-screen-matrix.json','utf8'))\"",
+        "node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test -- apps/web/src/GanttControlSurface.test.tsx",
+        "npm run test:e2e:phase -- --phase=5",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json"
+      ],
+      "notes": "Completed in master. Restored P3-P12 UX/post-run gate docs and UX screen matrix/verifier, made Phase 5 E2E reproducible without Bun via esbuild API dev launcher plus local NO_PROXY handling, fixed E2E metadata parsing for current Playwright output, and resolved Gantt command/readback UX defects with regression tests. Did not edit unrelated docs/ms-project-ref changes."
     }
   ]
 }
