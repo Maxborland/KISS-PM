@@ -1,6 +1,12 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T18:40:00+07:00
+Updated: 2026-05-16T18:54:50+07:00
+
+- P7-001 KPI domain safe formula foundation completed with verdict `accepted` for the domain-only block; handoff: `.agent-bus/handoff/2026-05-16-p7-001-kpi-domain-safe-formula-foundation.md`.
+- `packages/kpi-engine` now defines tenant-owned versioned KPI definitions, constrained formula definitions, threshold rule sets, source binding/evaluation trace, threshold severity mapping, KPI evaluations, and KPI control signal/upsert primitives.
+- Fresh P7-001 evidence: `npm test -- packages/kpi-engine` passes with 1 file / 11 tests; `npm run test:integration` passes with 8 files / 39 tests; `npm test` passes with 50 files / 310 tests after an unrelated/order-sensitive P4 UI test passed standalone and on full rerun; `npm run typecheck -- --pretty false`, `npm run lint`, and `node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json` pass.
+- `docs/status/phase7-requirements-matrix.json` records fresh domain evidence for P7-001..P7-005 but keeps those rows blocked until API/UI/E2E-060..064 evidence exists. Strict P7 phase gate remains blocked as intended.
+- Next recommended step: claim `P7-006-kpi-api-governed-commands` and implement the KPI API/runtime layer with tenant isolation, backend permission checks, governed configuration/evaluation commands, audit/action evidence, and deterministic readback.
 
 - P7-000 KPI engine and control signals phase contract completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p7-000-kpi-engine-control-signals-phase-contract.md`.
 - `docs/phases/PHASE_7_KPI_ENGINE_CONTROL_SIGNALS.md` now freezes Phase 7 scope around safe KPI definitions, constrained formulas, threshold versions, deterministic evaluations, KPI control signals, admin/deviation surfaces, fixtures, E2E-060..064, and the strict exit gate.

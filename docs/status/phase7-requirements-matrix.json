@@ -2,7 +2,7 @@
   "phase": "P7",
   "name": "Phase 7 KPI engine and control signals requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T11:36:58.3178946Z",
+  "updated_at": "2026-05-16T11:54:27.719Z",
   "rows": [
     {
       "id": "P7-001",
@@ -18,11 +18,21 @@
         "E2E-063",
         "E2E-064"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "P7-001 implementation has not started yet; this P7-000 block only freezes the phase contract and verifier support.",
-      "last_checked_at": null,
+      "evidence": [
+        "packages/kpi-engine/src/index.ts defines tenant-owned versioned KpiDefinition, KpiFormulaDefinition, and KpiThresholdRuleSet primitives",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves KPI/formula/threshold ids, version fields, active status, and source binding contract",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid runtime entity/cadence-style inputs are rejected before API wiring can pass unsafe JSON into the domain model"
+      ],
+      "tests": [
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "Domain-only deterministic unit tests; no persisted state, API runtime, browser state, or external resources are created.",
+      "blocker": "Domain evidence exists for P7-001, but the row remains blocked until P7 API/UI/E2E evidence for E2E-060/E2E-063/E2E-064 is implemented.",
+      "last_checked_at": "2026-05-16T11:54:27.719Z",
       "e2e_evidence": []
     },
     {
@@ -39,11 +49,20 @@
         "E2E-062",
         "E2E-063"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "P7 safe formula parser/evaluator is not implemented yet; next runnable implementation task must add deterministic unit coverage before any verified status.",
-      "last_checked_at": null,
+      "evidence": [
+        "packages/kpi-engine/src/index.ts implements a constrained tokenizer/parser/evaluator for arithmetic, parentheses, numeric bindings, and whitelisted math functions only",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves deterministic formula trace and rejects unsafe global/property syntax, unknown bindings, missing values, tenant mismatch, and non-finite division results"
+      ],
+      "tests": [
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "Formula evaluation is pure in-memory computation; tests create no persisted state and leave no cleanup surface.",
+      "blocker": "Safe formula unit evidence exists, but the row remains blocked until API/UI/E2E paths prove the evaluator through executable P7 scenarios.",
+      "last_checked_at": "2026-05-16T11:54:27.719Z",
       "e2e_evidence": []
     },
     {
@@ -61,11 +80,21 @@
         "E2E-061",
         "E2E-062"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "Canonical KPI source-binding resolver has not been implemented; no evaluation/source trace evidence exists for P7 yet.",
-      "last_checked_at": null,
+      "evidence": [
+        "packages/kpi-engine/src/index.ts evaluates KPI values from canonical source values with bindingKey/sourceEntity/sourceField/observedAt trace and evaluation period validation",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves source trace, formula trace, threshold trace, entity/period output, and cross-tenant rejection before evaluation proceeds",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves invalid calendar dates, empty sourceEntityId, and malformed source observedAt are rejected before trace creation"
+      ],
+      "tests": [
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "KPI evaluation inputs are immutable in-memory test values; no persisted source records or external fixtures are created.",
+      "blocker": "Source-binding domain evidence exists, but the row remains blocked until API fixture/readback and E2E-061/E2E-062 evidence exist.",
+      "last_checked_at": "2026-05-16T11:54:27.719Z",
       "e2e_evidence": []
     },
     {
@@ -81,11 +110,21 @@
         "E2E-062",
         "E2E-063"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "Versioned threshold severity mapping has not been implemented or tested for Phase 7 yet.",
-      "last_checked_at": null,
+      "evidence": [
+        "packages/kpi-engine/src/index.ts maps threshold rules by gt/gte/lt/lte/eq/between conditions and selects strongest matching severity deterministically",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves critical, warning, and none threshold outcomes with matched rule/action recommendations and trace",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves duplicate threshold rule ids are rejected to avoid ambiguous severity/readback semantics"
+      ],
+      "tests": [
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "Threshold mapping is pure in-memory computation; no cleanup required beyond deterministic unit process teardown.",
+      "blocker": "Threshold domain evidence exists, but the row remains blocked until control-surface/API/E2E severity readback evidence exists.",
+      "last_checked_at": "2026-05-16T11:54:27.719Z",
       "e2e_evidence": []
     },
     {
@@ -101,11 +140,20 @@
         "E2E-061",
         "E2E-062"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "",
-      "blocker": "KPI evaluation-to-control-signal creation is not implemented; P8 action execution remains future scope.",
-      "last_checked_at": null,
+      "evidence": [
+        "packages/kpi-engine/src/index.ts creates traceable KPI control signals from non-none evaluations without executing P8 actions and upserts matching open signals by definition/entity/period",
+        "packages/kpi-engine/src/kpiEngine.test.ts proves signal tenant/source/evaluation trace, recommended action keys, not_executed action state, and deduped update semantics"
+      ],
+      "tests": [
+        "npm test -- packages/kpi-engine exit 0: 1 file, 11 tests passed",
+        "npm run test:integration exit 0: 8 files, 39 tests passed",
+        "npm test exit 0: 50 files, 310 tests passed after rerun; first run exposed a P4 ProjectWorkControlSurface order-sensitive failure that passed standalone and on full rerun without P7 code changes",
+        "npm run typecheck -- --pretty false exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "Control-signal tests use in-memory value objects only; P8 action execution is intentionally not invoked.",
+      "blocker": "ControlSignal domain evidence exists, but the row remains blocked until API/UI/E2E prove signal persistence/readback and permissions.",
+      "last_checked_at": "2026-05-16T11:54:27.719Z",
       "e2e_evidence": []
     },
     {
