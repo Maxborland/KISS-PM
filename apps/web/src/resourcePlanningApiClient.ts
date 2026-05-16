@@ -220,6 +220,16 @@ export type ResourcePlanningApiClient = {
     overloadId: string,
     request: { previewId: string }
   ): Promise<ResourceResolutionResultDto>;
+  previewGovernedResolution(
+    testUser: string,
+    overload: ResourceOverloadDto,
+    command: ResourceResolutionCommandDto
+  ): Promise<ResourceResolutionPreviewDto>;
+  applyGovernedResolution(
+    testUser: string,
+    actionKey: ResourceResolutionActionKeyDto,
+    request: { previewId: string }
+  ): Promise<{ result: ResourceActionExecutionDto }>;
   createReservation(
     testUser: string,
     request: CreateResourceReservationRequestDto
@@ -289,6 +299,24 @@ export function resourceResolutionActionLabel(actionKey: ResourceResolutionActio
 }
 
 export function createResourcePlanningApiClient(basePath = "/api/api"): ResourcePlanningApiClient {
+  function actionDefinitionIdForResourceAction(actionKey: ResourceResolutionActionKeyDto): string {
+    if (actionKey === "accept_risk") return "action-accept-resource-overload";
+    if (actionKey === "shift_work") return "action-shift-resource-work";
+    if (actionKey === "split_work") return "action-split-resource-work";
+    if (actionKey === "reassign_resource") return "action-reassign-resource";
+    return `action-${actionKey.replaceAll("_", "-")}`;
+  }
+
+  function targetForOverload(overload: ResourceOverloadDto) {
+    return {
+      surfaceId: "portfolio-control",
+      surfaceKey: "portfolio.control",
+      rowId: `row-resource-overload-${overload.resourceProfileId}`,
+      entityType: "resource_overload",
+      entityId: overload.id
+    };
+  }
+
   return {
     getResourceLoad(testUser) {
       return requestJson<ResourceLoadProjectionDto>(withUser(`${basePath}/resources/load`, testUser));
@@ -314,6 +342,56 @@ export function createResourcePlanningApiClient(basePath = "/api/api"): Resource
     applyResolution(testUser, overloadId, request) {
       return requestJson<ResourceResolutionResultDto>(
         withUser(`${basePath}/resources/overloads/${encodeURIComponent(overloadId)}/apply`, testUser),
+        jsonBody(request)
+      );
+    },
+    async previewGovernedResolution(testUser, overload, command) {
+      const body = await requestJson<{
+        preview: {
+          id: string;
+          tenantId: string;
+          actorId: string;
+          input: Record<string, unknown>;
+          stateVersion: number;
+          after: {
+            p6PreviewId?: string;
+            afterLoadBuckets?: ResourceLoadBucketDto[];
+            affectedAssignments?: ResourceAssignmentDto[];
+            affectedReservations?: ResourceReservationDto[];
+          };
+          before: { loadBuckets?: ResourceLoadBucketDto[] };
+        };
+      }>(
+        withUser(`${basePath}/control/actions/${encodeURIComponent(actionDefinitionIdForResourceAction(command.actionKey))}/preview`, testUser),
+        jsonBody({ target: targetForOverload(overload), input: command })
+      );
+      return {
+        id: body.preview.id,
+        tenantId: body.preview.tenantId,
+        actorId: body.preview.actorId,
+        overloadId: overload.id,
+        actionKey: command.actionKey,
+        command,
+        commandFingerprint: body.preview.after.p6PreviewId ?? body.preview.id,
+        stateVersion: body.preview.stateVersion,
+        beforeLoadBuckets: body.preview.before.loadBuckets ?? [],
+        afterLoadBuckets: body.preview.after.afterLoadBuckets ?? [],
+        affectedAssignments: body.preview.after.affectedAssignments ?? [],
+        affectedReservations: body.preview.after.affectedReservations ?? [],
+        blockers: [],
+        warnings: [],
+        requiredPermissions: ["resource.write"],
+        auditSummary: {
+          source: { entityType: "resourceOverload", entityId: overload.id },
+          target: { entityType: command.assignmentId ? "resourceAssignment" : "resourceOverload", entityId: command.assignmentId ?? overload.id },
+          reason: command.reason
+        },
+        canConfirm: true
+      };
+    },
+    applyGovernedResolution(testUser, actionKey, request) {
+      return requestJson<{ result: ResourceActionExecutionDto }>(
+        withUser(`${basePath}/control/actions/${encodeURIComponent(actionDefinitionIdForResourceAction(actionKey))}/execute`, testUser),
         jsonBody(request)
       );
     },

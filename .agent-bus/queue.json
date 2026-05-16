@@ -3063,6 +3063,9 @@
         "apps/web/src/PortfolioControlSurface.tsx",
         "apps/web/src/PortfolioControlSurface.test.tsx",
         "apps/web/src/portfolioControlApiClient.ts",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts",
         "docs/status/phase8-requirements-matrix.json",
         ".agent-bus/queue.json",
         ".agent-bus/state/CURRENT.md",
@@ -3098,6 +3101,144 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-16T22:25:41.5420746+07:00. Implemented create_corrective_action as a canonical Phase 4 task binding with required preview, backend control.action:write plus task.write enforcement, KPI-signal-to-task linkage, duplicate prevention, validated action execution/audit evidence, API readback, and regression tests. P8-006 matrix row remains blocked only for phase-exit E2E-071/E2E-075 reload/reset evidence in P8-009."
+    },
+    {
+      "id": "P8-007-resource-overload-action-engine-binding",
+      "aliases": [
+        "P8-007"
+      ],
+      "title": "Implement resource overload action-engine binding",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-006-corrective-action-from-kpi-deviation"
+      ],
+      "write_scope": [
+        "packages/action-engine/**",
+        "packages/resource-planning/**",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase6Runtime.ts",
+        "apps/api/src/phase8Runtime.ts",
+        "apps/api/src/*phase8*.test.ts",
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/PortfolioControlSurface.test.tsx",
+        "apps/web/src/portfolioControlApiClient.ts",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-007-resource-overload-action-engine-binding.claim.json",
+        ".agent-bus/sessions/P8-007-resource-overload-action-engine-binding.md"
+      ],
+      "forbidden": [
+        "packages/project-core/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-007-resource-overload-action-engine-binding --once",
+        "npm test -- packages/action-engine packages/resource-planning apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-16T22:56:16.0862985+07:00. Implemented P8 resource overload action-engine binding for shift_work, split_work, reassign_resource, and accept_resource_overload. P8 preview delegates to P6 dry-run, execute delegates to P6 apply, actor-bound stale previews are rejected, control/resource audit readback is unified, Resource Load UI routes preview/apply through P8 governed endpoints with readback/audit confirmation, and Portfolio resource actions derive inputs from selected row fieldValues. Matrix row remains blocked only for P8-009 browser E2E-072/E2E-075 reload/reset evidence.",
+      "completed_at": "2026-05-16T22:56:16.0862985+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-007-resource-overload-action-engine-binding --once exit 0 at startup",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED before review fixes: resource audit assertion gap and split_work execute returned 501",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 1 RED before review fixes: stale-preview recovery assertion exposed readback/error-state issue",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 12 tests passed",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 12 tests passed",
+        "npm test -- packages/action-engine packages/resource-planning apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 9 files, 60 tests passed",
+        "npm run test:integration exit 0: 11 files, 62 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 391 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "node scripts/agent-bus-guard.mjs --task P8-007-resource-overload-action-engine-binding --once exit 0 after write_scope correction",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-008-risk-escalation-request-explanation-binding",
+      "aliases": [
+        "P8-008"
+      ],
+      "title": "Implement accept risk, escalation, and request explanation bindings",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-007-resource-overload-action-engine-binding"
+      ],
+      "write_scope": [
+        "packages/action-engine/**",
+        "packages/kpi-engine/**",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase7Runtime.ts",
+        "apps/api/src/phase8Runtime.ts",
+        "apps/api/src/*phase8*.test.ts",
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/PortfolioControlSurface.test.tsx",
+        "apps/web/src/portfolioControlApiClient.ts",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-008-risk-escalation-request-explanation-binding.claim.json",
+        ".agent-bus/sessions/P8-008-risk-escalation-request-explanation-binding.md"
+      ],
+      "forbidden": [
+        "packages/project-core/**",
+        "packages/resource-planning/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-008-risk-escalation-request-explanation-binding --once",
+        "npm test -- packages/action-engine packages/kpi-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next Phase 8 block. Implement accepted-risk/deviation, escalation, and request-explanation action records with mandatory reason, backend permission guards, audit/action evidence, refreshed signal/control-surface readback, direct API denial tests, and matrix evidence. Keep deterministic E2E fixtures for P8-009."
     }
   ]
 }

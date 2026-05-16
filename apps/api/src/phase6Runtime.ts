@@ -672,6 +672,9 @@ export function createPhase6RuntimeState() {
     if (preview === undefined || preview.overloadId !== input.overloadId) {
       throw stalePreview("resolution preview is missing or stale");
     }
+    if (preview.actorId !== input.actorId) {
+      throw stalePreview("resolution preview belongs to another actor");
+    }
     if (preview.stateVersion !== state.version) {
       throw stalePreview("resource state changed after preview");
     }

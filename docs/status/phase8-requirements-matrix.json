@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T22:03:04.0000000+07:00",
+  "updated_at": "2026-05-16T22:56:16.0862985+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -226,14 +226,30 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires Resource Load Control P8 actions to route through generic action definitions/execution while preserving P6 preview/apply semantics."
+        "Phase 8 contract requires Resource Load Control P8 actions to route through generic action definitions/execution while preserving P6 preview/apply semantics.",
+        "apps/api/src/phase8Runtime.ts exposes P8 resource action definitions for shift_work, split_work, reassign_resource, and accept_resource_overload, validates P8 action input, creates P8 dry-run previews by delegating to P6 previewResolution, stores the bound P6 preview id, and executes via P6 applyResolution only through the governed P8 action command path.",
+        "apps/api/src/phase6Runtime.ts binds P6 previews to the actor so a P8 preview cannot be applied by a different actor through the delegated resource command path.",
+        "apps/api/src/app.ts includes P8 resource_resolution.* action executions in /api/resources/audit readback so Resource Load Control receives unified action/audit evidence after P8-driven resource mutations.",
+        "apps/web/src/resourcePlanningApiClient.ts and apps/web/src/ResourceLoadControlSurface.tsx route preview/apply through P8 governed action endpoints instead of direct P6 mutation endpoints while preserving P6-style before/after load readback, stale-preview recovery, audit/result feedback, and refreshed resource projection.",
+        "apps/web/src/PortfolioControlSurface.tsx derives resource shift, split, reassign, and accept-risk inputs from the selected P8 row fieldValues rather than seeded fixture ids or input-schema labels, so Portfolio Control can act on the selected resource overload row.",
+        "Review hardening fixed Resource Load UI readback proof: successful P8 apply now refreshes the resource projection and, when audit.read is available, requires action evidence with the returned correlation id before showing command result."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 1 RED before review fixes: resource audit assertion did not prove P8 resource audit readback and split_work execute returned 501",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 1 RED before review fixes: stale-preview readback cleared the visible command error before recovery proof",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 12 tests passed; covers P8 resource reassign dry-run no mutation, execute through P6 apply, resource load readback, Portfolio row refresh, control audit, /api/resources/audit readback, direct dry-run-required denial, resource.write denial, cross-tenant denial, actor-bound stale preview, split_work execution, and accept_resource_overload execution",
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 1 file, 8 tests passed; covers P8-governed preview/apply path, no direct P6 preview/apply calls, read-only denial, stale-preview recovery with API readback, reload/refetch behavior, and audit/result feedback",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 12 tests passed; includes resource shift/split/reassign input built from selected overload row fieldValues",
+        "npm test -- packages/action-engine packages/resource-planning apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 9 files, 60 tests passed",
+        "npm run test:integration exit 0: 11 files, 62 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 391 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: blocked rows allowed"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until resource action cleanup/reset and readback proof exist.",
-      "blocker": "P8-007 implementation has not started. Need P6 action binding integration, dry-run/apply tests, E2E-072/E2E-075 evidence, unified audit, and refreshed load readback.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-007 uses deterministic in-memory API runtime state. API/component tests prove dry-run no mutation, P8 execute mutation through P6 apply, refreshed resource load projection, unified control/resource audit readback, denied mutation with unchanged load/audit state, stale preview rejection, UI refetch/reload behavior, and no local-only apply result without readback/audit confirmation. Browser E2E reset/readback cleanup remains pending for P8-009.",
+      "blocker": "P8-007 implementation and API/UI regression evidence are present, but row remains blocked for phase-exit verification until E2E-072/E2E-075 prove the browser UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
+      "last_checked_at": "2026-05-16T22:56:16.0862985+07:00",
       "e2e_evidence": []
     },
     {
