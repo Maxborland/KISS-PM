@@ -10,6 +10,7 @@ export { getPhase6FixtureSeed, PHASE6_FIXTURE_TIMESTAMP } from "./phase6Fixtures
 export { getPhase7FixtureSeed, PHASE7_FIXTURE_TIMESTAMP } from "./phase7Fixtures";
 export { getPhase8FixtureSeed, PHASE8_FIXTURE_TIMESTAMP } from "./phase8Fixtures";
 export { getPhase9FixtureSeed, PHASE9_FIXTURE_TIMESTAMP } from "./phase9Fixtures";
+export { getPhase10FixtureSeed, PHASE10_FIXTURE_TIMESTAMP } from "./phase10Fixtures";
 export type {
   Phase2AccessProfileSeed,
   Phase2FixtureSeed,
@@ -42,3 +43,13 @@ export type {
   Phase9LessonFixture,
   Phase9TenantRetrospectiveFixture
 } from "./phase9Fixtures";
+export type {
+  Phase10ActionConfigFixture,
+  Phase10CustomFieldFixture,
+  Phase10FixtureSeed,
+  Phase10KpiThresholdFixture,
+  Phase10KpiThresholdRuleFixture,
+  Phase10LabelChangesFixture,
+  Phase10SavedViewFixture,
+  Phase10TenantCustomizationFixture
+} from "./phase10Fixtures";

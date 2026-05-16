@@ -2,12 +2,12 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T05:08:31.3726613+07:00",
+  "updated_at": "2026-05-17T05:37:37.1680000+07:00",
   "rows": [
     {
       "id": "P10-001",
       "requirement": "TenantConfiguration root, versions, and publish lifecycle",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -35,17 +35,35 @@
         "npm test exit 0: 70 files, 450 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "Domain-only P10-001 changes are pure deterministic in-memory functions with no runtime state to clean up. Phase row remains blocked until later API/UI/E2E fixture reset proves configuration-version cleanup/readback for E2E-090 and E2E-095.",
-      "blocker": "Domain foundation is implemented and package tests pass, but P10-001 remains blocked for phase verification until API/UI runtime readback and E2E-090/E2E-095 evidence prove labels/runtime stability through the browser and fixture cleanup.",
-      "last_checked_at": "2026-05-17T02:27:23.0476262+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-002",
       "requirement": "Role/label/stage builder and runtime label projection",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -75,17 +93,27 @@
         "npm test exit 0: 73 files, 462 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime label previews are deterministic in-memory state. /test-fixtures/reset recreates Phase 10 runtime and Phase 2 label sets, restoring label-set versions and runtime projections. Browser-level reset/readback remains to be proven by P10-009 E2E-090.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-002 remains blocked for strict phase verification until P10-009 E2E-090 proves runtime labels after browser reload with direct backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T02:46:54.2390705+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-003",
       "requirement": "Process template builder MVP",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -116,17 +144,35 @@
         "npm run test:integration exit 0: 14 files, 79 tests passed",
         "npm test exit 0: 76 files, 473 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime process-template previews are deterministic in-memory state. /test-fixtures/reset recreates Phase 3, Phase 4, and Phase 10 runtimes, restoring active process-template versions, project snapshots, and future intake bindings. Browser-level reload/reset readback remains to be proven by P10-009 E2E-090/E2E-095.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-003 remains blocked for strict phase verification until P10-009 E2E-090/E2E-095 prove browser reload persistence, future-template effect, existing-runtime stability, backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T03:11:47.6740214+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-004",
       "requirement": "Custom field builder and control-surface binding",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -162,17 +208,27 @@
         "npm test exit 0: 81 files, 490 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime custom-field registry, previews, project values, portfolio readback, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 4, Phase 8, and Phase 10 runtimes, restoring custom-field definitions, values, and control-surface projections. Browser-level reload/reset readback remains to be proven by P10-009 E2E-091.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-004 remains blocked for strict phase verification until P10-009 E2E-091 proves custom field use in a control surface through browser reload, direct backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T03:41:31.8468551+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-091",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/custom-field-control-surface.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-005",
       "requirement": "KPI threshold builder and future evaluation impact",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -206,17 +262,35 @@
         "npm test exit 0: 83 files, 497 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime KPI threshold previews, threshold versions, evaluation projections, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 7 and Phase 10 runtimes, restoring threshold rule set version 1, seeded evaluations, preview tokens, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-092/E2E-094.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-005 remains blocked for strict phase verification until P10-009 E2E-092/E2E-094 prove browser reload persistence, future evaluation impact, invalid configuration rejection, backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T04:03:32.8613062+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-092",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-094",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-validation.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-006",
       "requirement": "Saved views and control-surface layout builder MVP",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -248,17 +322,27 @@
         "npm test exit 0: 86 files, 506 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime saved-view layout previews, published layout definitions, previous versions, control-surface readback, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 8 and Phase 10 runtimes, restoring layout definitions, previous versions, preview tokens, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-093.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-006 remains blocked for strict phase verification until P10-009 E2E-093 proves browser reload persistence, layout/saved-view readback, direct backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T04:25:15.0788892+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-093",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-007",
       "requirement": "Action enable/disable and action-form configuration",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -294,17 +378,43 @@
         "npm test exit 0: 89 files, 515 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime action configuration previews, published action configuration versions, previous versions, action availability projections, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 8 and Phase 10 runtimes, restoring action configuration version 1, preview tokens, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-093/E2E-094/E2E-095.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-007 remains blocked for strict phase verification until P10-009 E2E-093/E2E-094/E2E-095 prove browser reload persistence, layout/action effects, invalid configuration rejection, disabled direct backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T04:42:55.9899525+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-093",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-094",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-validation.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-008",
       "requirement": "Configuration validation, admin preview, export/import, permissions, and audit API",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/tenant-config",
@@ -341,17 +451,67 @@
         "npm test exit 0: 92 files, 525 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup"
       ],
-      "cleanup": "API/runtime configuration import previews, imported label/action/custom-field config state, export packages, validation results, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 2 and Phase 10 runtimes, restoring label sets, custom-field registry, action configuration, import previews, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-090..095.",
-      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-008 remains blocked for strict phase verification until P10-009 E2E-090..095 prove browser reload persistence, validation/export/import flows, backend denial, audit evidence, and fixture cleanup/readback.",
-      "last_checked_at": "2026-05-17T05:08:31.3726613+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for this row through the required Phase 10 browser flow(s); API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-091",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/custom-field-control-surface.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-092",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-093",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-094",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-validation.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-009",
       "requirement": "Deterministic P10 fixtures and E2E-090..095",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/shared-test-fixtures",
@@ -366,16 +526,78 @@
         "E2E-095"
       ],
       "evidence": [
-        "P10 contract defines deterministic fixture and executable E2E requirements before implementation."
+        "packages/shared-test-fixtures/src/phase10Fixtures.ts provides deterministic Phase 10 tenant customization seeds for E2E-090..095, tenant A/B users, label changes, custom field metadata, KPI thresholds, saved view/layout inputs, action configuration inputs, import labels, stable generatedAt, and defensive copies.",
+        "e2e/tests/phase10/helpers.ts centralizes reset, tenant fixture access, API readback helpers, UI opening helpers, project creation, and future KPI evaluation calls against the active Playwright API port.",
+        "E2E-090 proves role/stage label runtime projection and process-template publishing through UI, non-mutating previews, direct read-only backend denial, real tenant A preview no-leak denial for Tenant B, future-project template version/readback, existing active-project stability, publish audit/action evidence, API readback, reload persistence, and reset cleanup.",
+        "E2E-091 proves custom project field publish, control-surface binding, project value write, read-only backend write denial, API/project/control-surface readback, audit evidence, reload persistence, and reset cleanup.",
+        "E2E-092 proves KPI threshold publish, future-evaluation severity/version effect, historical evaluation stability, read-only backend denial, audit evidence, reload persistence, and reset cleanup.",
+        "E2E-093 proves saved-view/layout publish, action-configuration publish, disabled governed action direct backend denial, portfolio readback, audit evidence, reload persistence, and reset cleanup.",
+        "E2E-094 proves configuration export and invalid import validation reject bad checksum without partial mutation, disables apply, denies read-only export through backend, reloads stable readback, and resets cleanup.",
+        "E2E-095 proves configuration import preview/apply with runtime stability for existing project state, read-only backend denial, audit/action evidence, API readback, reload persistence, and reset cleanup.",
+        "P10 web API client defaults now route through the Vite proxy consistently so browser E2E reaches backend /api routes without bypassing the API layer."
       ],
       "tests": [
-        "pending: npm test -- packages/shared-test-fixtures/src/phase10Fixtures.test.ts",
-        "pending: npm run test:e2e:phase -- --phase 10"
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup",
+        "npm test -- packages/shared-test-fixtures/src/phase10Fixtures.test.ts exit 1 RED: Phase 10 deterministic fixture module was missing before implementation",
+        "npm test -- packages/shared-test-fixtures/src/phase10Fixtures.test.ts exit 0: 1 file, 2 tests passed",
+        "npm run test:e2e:phase -- --phase 10 exit 1 INFRA: canonical port 4187 was already in use; rerun used explicit PW_API_PORT/PW_WEB_PORT without product-code bypass",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 1 RED: browser P10 surfaces could not load through Vite proxy because P10 web API clients used backend-relative base paths",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 1 RED after bug-hunt: E2E-090 did not yet prove the P10-003 future process-template effect before the process-template UI/readback assertions were added",
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 1 RED during review: future-project creation reused the old seed opportunity draft until the E2E helper created a fresh opportunity after template publish"
       ],
-      "cleanup": "Pending implementation. E2E-090..095 must each prove reset/readback for configuration changes before verification.",
-      "blocker": "Blocked until P10-009 implementation adds deterministic Phase 10 fixtures and executable, non-skipped Playwright E2E-090..095 with cleanup/readback evidence.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
-      "e2e_evidence": []
+      "cleanup": "E2E-090..095 each call /test-fixtures/reset and prove post-reset readback for labels, custom-field registry/project values, KPI thresholds, saved views/layout, action configuration, configuration import state, and in-memory runtime projections.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-091",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/custom-field-control-surface.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-092",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-093",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-094",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-validation.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     },
     {
       "id": "P10-010",
@@ -399,12 +621,62 @@
       ],
       "tests": [
         "pending: node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json",
-        "pending: npm run test:e2e:phase -- --phase 10"
+        "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10 exit 0: E2E-090..095 passed (6 tests) with UI + API/domain readback, backend denial, audit/result evidence, reload persistence, process-template future-version proof, and /test-fixtures/reset cleanup",
+        "npm test -- packages/shared-test-fixtures/src/phase10Fixtures.test.ts exit 0: 1 file, 2 tests passed"
       ],
-      "cleanup": "Pending implementation. Strict P10 phase exit requires E2E-090..095 cleanup/reset evidence before verification.",
-      "blocker": "P10 phase exit cannot be verified until P10-001..P10-009 are implemented and E2E-090..095 pass with structured evidence.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
-      "e2e_evidence": []
+      "cleanup": "P10-009 now proves E2E reset/readback for E2E-090..095; strict phase-exit cleanup evidence remains blocked until P10-010 runs the full strict gate and review loop.",
+      "blocker": "Fresh P10-009 deterministic fixtures and E2E-090..095 are implemented and passing with P10-003 process-template future-version coverage, but P10-010 strict phase-exit verification has not yet run without --allow-blocked, so phase acceptance remains blocked by the dedicated exit-gate task.",
+      "last_checked_at": "2026-05-17T05:37:37.1680000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-090",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/labels-runtime.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-091",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/custom-field-control-surface.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-092",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-093",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-094",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-validation.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        },
+        {
+          "id": "E2E-095",
+          "status": "passed",
+          "command": "$env:PW_API_PORT='4287'; $env:PW_WEB_PORT='5287'; npm run test:e2e:phase -- --phase 10",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase10/config-regression.spec.ts",
+          "checked_at": "2026-05-17T05:37:37.1680000+07:00"
+        }
+      ]
     }
   ]
 }

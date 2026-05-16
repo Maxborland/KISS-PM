@@ -177,7 +177,7 @@ function withUser(path: string, testUser: string): string {
   return `${path}${separator}testUser=${encodeURIComponent(testUser)}`;
 }
 
-export function createProcessTemplateBuilderApiClient(basePath = "/api"): ProcessTemplateBuilderApiClient {
+export function createProcessTemplateBuilderApiClient(basePath = "/api/api"): ProcessTemplateBuilderApiClient {
   return {
     getProcessTemplates(testUser) {
       return requestJson<ProcessTemplateReadModelDto>(withUser(`${basePath}/tenant/process-templates`, testUser));

@@ -173,7 +173,7 @@ function jsonBody(body: unknown, method = "POST"): RequestInit {
   };
 }
 
-export function createCustomFieldBuilderApiClient(basePath = "/api"): CustomFieldBuilderApiClient {
+export function createCustomFieldBuilderApiClient(basePath = "/api/api"): CustomFieldBuilderApiClient {
   return {
     getCustomFieldRegistry(testUser) {
       return requestJson<{ registry: CustomFieldRegistryDto }>(withUser(`${basePath}/tenant/custom-fields`, testUser));

@@ -121,7 +121,7 @@ function withUser(path: string, testUser: string): string {
   return `${path}${separator}testUser=${encodeURIComponent(testUser)}`;
 }
 
-export function createTenantLabelsApiClient(basePath = "/api"): TenantLabelsApiClient {
+export function createTenantLabelsApiClient(basePath = "/api/api"): TenantLabelsApiClient {
   return {
     getLabels(testUser) {
       return requestJson<TenantLabelReadModelDto>(withUser(`${basePath}/tenant/labels`, testUser));

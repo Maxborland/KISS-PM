@@ -105,7 +105,7 @@ function jsonBody(body: unknown): RequestInit {
   };
 }
 
-export function createKpiThresholdBuilderApiClient(basePath = "/api"): KpiThresholdBuilderApiClient {
+export function createKpiThresholdBuilderApiClient(basePath = "/api/api"): KpiThresholdBuilderApiClient {
   return {
     getThresholds(testUser) {
       return requestJson<KpiThresholdReadModelDto>(withUser(`${basePath}/tenant/kpi-thresholds`, testUser));

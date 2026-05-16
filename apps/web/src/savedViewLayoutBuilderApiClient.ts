@@ -143,7 +143,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function createSavedViewLayoutBuilderApiClient(baseUrl = ""): SavedViewLayoutBuilderApiClient {
+export function createSavedViewLayoutBuilderApiClient(baseUrl = "/api"): SavedViewLayoutBuilderApiClient {
   return {
     async getSavedViews(testUser) {
       return requestJson<SavedViewLayoutReadModelDto>(
