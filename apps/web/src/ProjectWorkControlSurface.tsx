@@ -23,6 +23,7 @@ type ProjectWorkControlSurfaceProps = {
   projectId?: string;
   seedOpportunityId?: string;
   defaultExecutorUserId?: string;
+  onOpenGanttProject?: (projectId: string) => void;
 };
 
 const defaultProjectId = "project-phase4-main";
@@ -135,7 +136,8 @@ export function ProjectWorkControlSurface({
   testUser,
   projectId = defaultProjectId,
   seedOpportunityId,
-  defaultExecutorUserId
+  defaultExecutorUserId,
+  onOpenGanttProject
 }: ProjectWorkControlSurfaceProps) {
   const [project, setProject] = useState<ManagedProjectDto | null>(null);
   const [projectTasks, setProjectTasks] = useState<TaskDto[]>([]);
@@ -400,11 +402,25 @@ export function ProjectWorkControlSurface({
                 ))}
               </div>
               {canTransitionStage ? (
-                <button disabled={!activeStage || pendingAction !== null} type="button" onClick={() => void advanceStage()}>
-                  Перейти к следующей стадии
-                </button>
+                <div className="button-row">
+                  <button disabled={!activeStage || pendingAction !== null} type="button" onClick={() => void advanceStage()}>
+                    Перейти к следующей стадии
+                  </button>
+                  {onOpenGanttProject ? (
+                    <button type="button" onClick={() => onOpenGanttProject(project.id)}>
+                      Открыть Гантт проекта
+                    </button>
+                  ) : null}
+                </div>
               ) : (
-                <p className="readonly-notice">Переход стадии недоступен по правам.</p>
+                <>
+                  <p className="readonly-notice">Переход стадии недоступен по правам.</p>
+                  {onOpenGanttProject ? (
+                    <button type="button" onClick={() => onOpenGanttProject(project.id)}>
+                      Открыть Гантт проекта
+                    </button>
+                  ) : null}
+                </>
               )}
             </>
           ) : (

@@ -16,11 +16,13 @@ import { CrmIntakeControlSurface } from "./CrmIntakeControlSurface";
 import { createCrmIntakeApiClient, type CrmIntakeApiClient } from "./crmIntakeApiClient";
 import { ProjectWorkControlSurface } from "./ProjectWorkControlSurface";
 import { createPhase4ProjectWorkApiClient, type Phase4ProjectWorkApiClient } from "./phase4ProjectWorkApiClient";
+import { GanttControlSurface } from "./GanttControlSurface";
+import { createPhase5ScheduleApiClient, type Phase5ScheduleApiClient } from "./phase5ScheduleApiClient";
 
 type AppProps = {
   testUser?: string;
   tenantLabelOverrides?: Record<string, string>;
-  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient> & Partial<Phase4ProjectWorkApiClient>;
+  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient> & Partial<Phase4ProjectWorkApiClient> & Partial<Phase5ScheduleApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -162,6 +164,15 @@ function isPhase4ProjectWorkApiClient(
     typeof apiClient.listMyTasks === "function" &&
     typeof apiClient.getKanbanProject === "function" &&
     typeof apiClient.listAuditEventsForTarget === "function"
+  );
+}
+
+function isPhase5ScheduleApiClient(
+  apiClient: Partial<Phase5ScheduleApiClient> | null
+): apiClient is Phase5ScheduleApiClient {
+  return (
+    typeof apiClient?.getProjectSchedule === "function" &&
+    typeof apiClient.getProjectScheduleAudit === "function"
   );
 }
 
@@ -470,11 +481,24 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createPhase4ProjectWorkApiClient() : null;
   }, [apiClient]);
+  const scheduleApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isPhase5ScheduleApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createPhase5ScheduleApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
+  const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
     fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
   );
   const [loadError, setLoadError] = useState("");
+  const openGanttProject = useCallback((nextProjectId: string) => {
+    setGanttProjectId(nextProjectId);
+    window.requestAnimationFrame(() => document.getElementById("gantt-workspace")?.scrollIntoView({ block: "start" }));
+  }, []);
 
   useEffect(() => {
     if (!fixtureSession || !phase2ApiClient) {
@@ -571,7 +595,7 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
           data-testid="primary-navigation"
         >
           {navigationLabelKeys.map((labelKey) => (
-            <a href="#phase-1-placeholder" key={labelKey}>
+            <a href={labelKey === "navigation.gantt" ? "#gantt-workspace" : "#phase-1-placeholder"} key={labelKey}>
               {resolveTenantLabel(tenantLabelSet, labelKey)}
             </a>
           ))}
@@ -622,6 +646,15 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
           <ProjectWorkControlSurface
             apiClient={projectWorkApiClient}
             currentTenant={currentTenant}
+            onOpenGanttProject={openGanttProject}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {scheduleApiClient ? (
+          <GanttControlSurface
+            apiClient={scheduleApiClient}
+            currentTenant={currentTenant}
+            projectId={ganttProjectId}
             testUser={runtimeUser}
           />
         ) : null}
