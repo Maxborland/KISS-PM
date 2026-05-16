@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T12:54:30+07:00",
+  "updated_at": "2026-05-16T16:28:24+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -1843,6 +1843,67 @@
         "git diff --check -- packages/shared-test-fixtures e2e/tests/phase6 docs/e2e/E2E_SCENARIOS.md docs/status/phase6-requirements-matrix.json .agent-bus"
       ],
       "notes": "Next P6 block. Wire executable E2E-050..055 over the accepted P6 API and Resource Load Control UI, including UI+API readback, backend denial, audit, reload persistence, and cleanup/reset evidence."
+    },
+    {
+      "id": "FE-SERVER-STATE-TANSTACK-QUERY-001",
+      "title": "Introduce TanStack Query foundation and migrate legacy P3-P5 server state",
+      "status": "done",
+      "priority": "high",
+      "phase": "frontend-architecture",
+      "depends_on": [
+        "FIX-P4-E2E-GATE-001"
+      ],
+      "write_scope": [
+        "package.json",
+        "package-lock.json",
+        "apps/web/src/App.tsx",
+        "apps/web/src/queryClient.ts",
+        "apps/web/src/CrmIntakeControlSurface.tsx",
+        "apps/web/src/ProjectWorkControlSurface.tsx",
+        "apps/web/src/GanttControlSurface.tsx",
+        "apps/web/src/*ApiClient.ts",
+        "apps/web/src/*.test.tsx",
+        "docs/decisions/*",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/FE-SERVER-STATE-TANSTACK-QUERY-001.claim.json",
+        ".agent-bus/sessions/FE-SERVER-STATE-TANSTACK-QUERY-001.md",
+        ".agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query.md",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/phase6/**",
+        "docs/status/phase6-requirements-matrix.json",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/resourcePlanningApiClient.ts"
+      ],
+      "required_locks": [
+        "package.json",
+        "package-lock.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        "docs/decisions/*",
+        "docs/backlog/FUTURE_SCOPE.md"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task FE-SERVER-STATE-TANSTACK-QUERY-001 --once",
+        "rg -n \"\\\"tanstack\\\"|\\\"@tanstack/\" package.json package-lock.json",
+        "npm audit --omit=dev",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "npm run test:e2e:phase -- --phase 3",
+        "npm run verify:matrix -- docs/status/phase3-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 4",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 5",
+        "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Completed in commits 15bb8e0, e514e30, 0c346c6, and 56a51b7. Installed exact @tanstack/react-query@5.100.10, rejected forbidden TanStack packages, added QueryClientProvider/foundation, and migrated P3 CRM Intake, P4 Project Work, and P5 Gantt server state to TanStack Query. Final evidence: npm audit --omit=dev exit 0; npm run typecheck exit 0; npm run lint exit 0; npm test exit 0 with 48 files / 286 tests after escalated run; P3/P4/P5 phase E2E and strict matrices exit 0. P6 ResourceLoad remains intentionally out of scope for a separate follow-up."
     }
   ]
 }

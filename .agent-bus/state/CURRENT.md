@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T15:58:00+07:00
+Updated: 2026-05-16T16:28:24+07:00
+
+- FE-SERVER-STATE-TANSTACK-QUERY-001 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query.md`.
+- Frontend server state standard is now TanStack Query via exact `@tanstack/react-query@5.100.10`; forbidden TanStack router/start/setup packages are absent from `package.json` and `package-lock.json`, and `npm audit --omit=dev` reports 0 vulnerabilities.
+- `apps/web/src/App.tsx` is wrapped in `AppQueryClientProvider`; `apps/web/src/queryClient.tsx` and `apps/web/src/testQueryClient.tsx` provide app/test query clients.
+- P3 CRM Intake, P4 Project Work, and P5 Gantt now use TanStack Query for server-state reads and mutations while preserving API readback, permission feedback, audit evidence, reload behavior, and phase E2E contracts.
+- Fresh frontend server-state evidence: `rg -n "\"tanstack\"|\"@tanstack/" package.json package-lock.json` finds only `@tanstack/react-query` and `@tanstack/query-core` 5.100.10; `npm audit --omit=dev`, `npm run typecheck`, `npm run lint`, and escalated `npm test` pass; P3/P4/P5 `npm run test:e2e:phase -- --phase <N>` and strict matrix verifiers pass.
+- P6 Resource Load Control remains intentionally not migrated in this task to avoid taking over Agent 2's P6-owned files. Follow-up: migrate P6 server state to TanStack Query after the P6 E2E block is stable or as a dedicated P6 frontend hardening task.
 
 - P6-007 Resource Load Control surface completed with verdict `accepted` for the UI block; handoff: `.agent-bus/handoff/2026-05-16-p6-007-resource-load-control-surface.md`.
 - `apps/web/src/resourcePlanningApiClient.ts` now exposes the Phase 6 web API client for resource load, load bucket, overload detail, reservation, preview, apply, and audit routes.
