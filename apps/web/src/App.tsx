@@ -18,11 +18,17 @@ import { ProjectWorkControlSurface } from "./ProjectWorkControlSurface";
 import { createPhase4ProjectWorkApiClient, type Phase4ProjectWorkApiClient } from "./phase4ProjectWorkApiClient";
 import { GanttControlSurface } from "./GanttControlSurface";
 import { createPhase5ScheduleApiClient, type Phase5ScheduleApiClient } from "./phase5ScheduleApiClient";
+import { ResourceLoadControlSurface } from "./ResourceLoadControlSurface";
+import { createResourcePlanningApiClient, type ResourcePlanningApiClient } from "./resourcePlanningApiClient";
 
 type AppProps = {
   testUser?: string;
   tenantLabelOverrides?: Record<string, string>;
-  apiClient?: Phase2ApiClient & Partial<CrmIntakeApiClient> & Partial<Phase4ProjectWorkApiClient> & Partial<Phase5ScheduleApiClient>;
+  apiClient?: Phase2ApiClient &
+    Partial<CrmIntakeApiClient> &
+    Partial<Phase4ProjectWorkApiClient> &
+    Partial<Phase5ScheduleApiClient> &
+    Partial<ResourcePlanningApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -46,7 +52,7 @@ const shellLabelDefaults = {
   "shell.configuration_version_prefix": "Версия конфигурации",
   "shell.primary_navigation_aria": "Основная навигация",
   "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 4: проектный жизненный цикл, задачи, мои очереди и Kanban",
+  "shell.phase_scope_notice": "Фаза 6: ресурсная нагрузка, перегрузки и управляемые команды",
   "shell.empty_state_title": "Основа готовится для управляемых сценариев",
   "shell.empty_state_body":
     "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
@@ -177,6 +183,20 @@ function isPhase5ScheduleApiClient(
     typeof apiClient.updateScheduleTask === "function" &&
     typeof apiClient.createFinishToStartDependency === "function" &&
     typeof apiClient.captureBaseline === "function"
+  );
+}
+
+function isResourcePlanningApiClient(
+  apiClient: Partial<ResourcePlanningApiClient> | null
+): apiClient is ResourcePlanningApiClient {
+  return (
+    typeof apiClient?.getResourceLoad === "function" &&
+    typeof apiClient.getResourceLoadBucket === "function" &&
+    typeof apiClient.getOverloadDetail === "function" &&
+    typeof apiClient.previewResolution === "function" &&
+    typeof apiClient.applyResolution === "function" &&
+    typeof apiClient.createReservation === "function" &&
+    typeof apiClient.getResourceAudit === "function"
   );
 }
 
@@ -493,6 +513,14 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createPhase5ScheduleApiClient() : null;
   }, [apiClient]);
+  const resourcePlanningApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isResourcePlanningApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createResourcePlanningApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
   const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
@@ -601,7 +629,16 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
           data-testid="primary-navigation"
         >
           {navigationLabelKeys.map((labelKey) => (
-            <a href={labelKey === "navigation.gantt" ? "#gantt-workspace" : "#phase-1-placeholder"} key={labelKey}>
+            <a
+              href={
+                labelKey === "navigation.gantt"
+                  ? "#gantt-workspace"
+                  : labelKey === "navigation.resources"
+                    ? "#resource-load-control"
+                    : "#phase-1-placeholder"
+              }
+              key={labelKey}
+            >
               {resolveTenantLabel(tenantLabelSet, labelKey)}
             </a>
           ))}
@@ -662,6 +699,14 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             currentTenant={currentTenant}
             projectId={ganttProjectId}
             refreshKey={ganttRefreshKey}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {resourcePlanningApiClient ? (
+          <ResourceLoadControlSurface
+            apiClient={resourcePlanningApiClient}
+            currentTenant={currentTenant}
+            onOpenGanttProject={openGanttProject}
             testUser={runtimeUser}
           />
         ) : null}
