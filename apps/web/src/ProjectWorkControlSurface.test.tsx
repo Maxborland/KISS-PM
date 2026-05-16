@@ -559,6 +559,29 @@ describe("Project Work Control surface", () => {
     expect(await screen.findByTestId("project-work-status")).toHaveTextContent("Комментарий не подтвержден API");
   });
 
+  it("does not claim task creation when work queue readback fails", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.listProjectTasks).mockImplementation(async () => {
+      if (vi.mocked(apiClient.createProjectTask).mock.calls.length > 0) {
+        throw new Error("Очереди задач недоступны");
+      }
+
+      return [];
+    });
+
+    render(withTestQueryClient(
+      <ProjectWorkControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
+    ));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Создать управляемый проект" }));
+    expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
+
+    fireEvent.click(screen.getByRole("button", { name: "Создать стартовую задачу" }));
+
+    expect(await screen.findByTestId("project-work-status")).toHaveTextContent("Очереди задач недоступны");
+    expect(screen.getByTestId("project-work-status")).not.toHaveTextContent("Задача создана");
+  });
+
   it("reloads existing project work state from the API instead of relying on local component state", async () => {
     const apiClient = createApiClient();
     const { unmount } = render(withTestQueryClient(

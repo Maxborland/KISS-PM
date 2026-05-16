@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import { GanttControlSurface } from "./GanttControlSurface";
+import { createAppQueryClient } from "./queryClient";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import type {
   Phase5ScheduleApiClient,
@@ -571,6 +573,75 @@ describe("Gantt control surface", () => {
     expect(screen.getByLabelText("ID проекта для Гантта")).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "Открыть Гантт" })).not.toBeDisabled();
     expect(apiClient.getProjectSchedule).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not claim schedule command success when API readback fails", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.getProjectSchedule)
+      .mockResolvedValueOnce(createSchedule())
+      .mockRejectedValueOnce(new Error("Schedule readback unavailable"));
+    vi.mocked(apiClient.createScheduleTask).mockResolvedValueOnce({
+      ...createSchedule(),
+      actionExecution: createAudit().actionExecutions[0]
+    });
+
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant([
+          "tenant.read",
+          "project.read",
+          "task.read",
+          "task.write",
+          "audit.read"
+        ])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать задачу в Гантте" }));
+
+    expect(await screen.findByTestId("gantt-status")).toHaveTextContent("Schedule readback unavailable");
+    expect(screen.getByTestId("gantt-status")).not.toHaveTextContent("Задача создана через API");
+  });
+
+  it("clears stale command success when an external project open refreshes Gantt", async () => {
+    const apiClient = createMutableApiClient();
+    const queryClient = createAppQueryClient({ testMode: true });
+    const renderSurface = (nextProjectId: string, nextRefreshKey: number) => (
+      <QueryClientProvider client={queryClient}>
+        <GanttControlSurface
+          apiClient={apiClient}
+          currentTenant={createCurrentTenant([
+            "tenant.read",
+            "project.read",
+            "task.read",
+            "task.write",
+            "audit.read"
+          ])}
+          projectId={nextProjectId}
+          refreshKey={nextRefreshKey}
+          testUser="project-manager-a"
+        />
+      </QueryClientProvider>
+    );
+
+    const { rerender } = render(renderSurface(projectId, 0));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать задачу в Гантте" }));
+    expect(await screen.findByTestId("gantt-status")).toHaveTextContent("Задача создана через API");
+
+    rerender(renderSurface("project-phase5-selected", 1));
+
+    await waitFor(() => {
+      expect(apiClient.getProjectSchedule).toHaveBeenLastCalledWith("project-manager-a", "project-phase5-selected");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен");
+    });
+    expect(screen.getByTestId("gantt-status")).not.toHaveTextContent("Задача создана через API");
   });
 
   it("shows denied and validation states for schedule commands without local-only mutation", async () => {

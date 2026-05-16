@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import type {
@@ -246,12 +246,14 @@ export function ProjectWorkControlSurface({
   const firstTaskTemplate = activeStageTemplate?.taskTemplates[0];
   const projectTaskIds = useMemo(() => getTaskIdSet(projectTasks), [projectTasks]);
 
+  async function invalidateActiveQuery(queryKey: QueryKey) {
+    await queryClient.invalidateQueries({ queryKey }, { throwOnError: true });
+  }
+
   async function updateProjectCache(nextProject: ManagedProjectDto, nextAuditTargetTaskId: string | null = auditTargetTaskId) {
     queryClient.setQueryData(projectQueryKey, nextProject);
     setAuditTargetTaskId(nextAuditTargetTaskId);
-    await queryClient.invalidateQueries({
-      queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
-    });
+    await invalidateActiveQuery(projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id));
   }
 
   useEffect(() => {
@@ -312,9 +314,7 @@ export function ProjectWorkControlSurface({
     },
     onSuccess: async (nextProject) => {
       queryClient.setQueryData(projectQueryKey, nextProject);
-      await queryClient.invalidateQueries({
-        queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
-      });
+      await invalidateActiveQuery(projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id));
     }
   });
   const recordApprovalMutation = useMutation({
@@ -332,9 +332,7 @@ export function ProjectWorkControlSurface({
     },
     onSuccess: async (nextProject) => {
       queryClient.setQueryData(projectQueryKey, nextProject);
-      await queryClient.invalidateQueries({
-        queryKey: projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id)
-      });
+      await invalidateActiveQuery(projectWorkQueryKeys.workQueuesBase(testUser, nextProject.id));
     }
   });
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
@@ -56,6 +56,10 @@ function getErrorMessage(error: unknown): string {
   return "Не удалось выполнить действие";
 }
 
+function hasErrorCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
 function formatMoney(opportunity: OpportunityDto): string {
   return `${opportunity.expectedValue.amount.toLocaleString("ru-RU")} ${opportunity.expectedValue.currency}`;
 }
@@ -99,6 +103,9 @@ export function CrmIntakeControlSurface({
   const canRunReadiness = hasPermission(currentTenant, "crm.readiness.run");
   const canRunFeasibility = hasPermission(currentTenant, "crm.feasibility.run");
   const canCreateDraft = hasPermission(currentTenant, "project_draft.create");
+  async function invalidateActiveQuery(queryKey: QueryKey) {
+    await queryClient.invalidateQueries({ queryKey }, { throwOnError: true });
+  }
   const opportunitiesQuery = useQuery({
     queryKey: crmQueryKeys.opportunities(testUser),
     queryFn: () => apiClient.listOpportunities(testUser)
@@ -125,21 +132,29 @@ export function CrmIntakeControlSurface({
       if (!selectedOpportunity) return null;
       try {
         return await apiClient.getProjectDraft(testUser, projectDraftIdForOpportunity(selectedOpportunity.id));
-      } catch {
-        return null;
+      } catch (error) {
+        if (hasErrorCode(error, "not_found")) {
+          return null;
+        }
+
+        throw error;
       }
     },
-    enabled: selectedOpportunity !== undefined
+    enabled: selectedOpportunity !== undefined,
+    retry: false
   });
   const auditQuery = useQuery<AuditEventDto[]>({
     queryKey: crmQueryKeys.audit(testUser, selectedOpportunityQueryId),
     queryFn: () => (selectedOpportunity ? apiClient.listOpportunityAuditEvents(testUser, selectedOpportunity.id) : []),
-    enabled: selectedOpportunity !== undefined
+    enabled: selectedOpportunity !== undefined,
+    retry: false
   });
   const selectedReadiness = readinessQuery.data;
   const selectedFeasibility = feasibilityQuery.data;
   const selectedDraft = draftQuery.data ?? undefined;
   const selectedAuditEvents = auditQuery.data ?? [];
+  const selectedDraftReadbackStatus =
+    draftQuery.isError ? `Черновик не подтвержден: ${getErrorMessage(draftQuery.error)}` : "Черновик еще не создан";
   const selectedAuditReadbackStatus =
     auditQuery.isError ? `Аудит не подтвержден: ${getErrorMessage(auditQuery.error)}` : "Аудит по возможности пуст";
 
@@ -147,7 +162,7 @@ export function CrmIntakeControlSurface({
     mutationFn: (request: Parameters<CrmIntakeApiClient["createOpportunity"]>[1]) =>
       apiClient.createOpportunity(testUser, request),
     onSuccess: async (opportunity) => {
-      await queryClient.invalidateQueries({ queryKey: crmQueryKeys.opportunities(testUser) });
+      await invalidateActiveQuery(crmQueryKeys.opportunities(testUser));
       setSelectedOpportunityId(opportunity.id);
     }
   });
@@ -167,7 +182,7 @@ export function CrmIntakeControlSurface({
     mutationFn: (opportunityId: string) => apiClient.createProjectDraft(testUser, opportunityId),
     onSuccess: async (result, opportunityId) => {
       queryClient.setQueryData(crmQueryKeys.draft(testUser, opportunityId), result.projectDraft);
-      await queryClient.invalidateQueries({ queryKey: crmQueryKeys.audit(testUser, opportunityId) });
+      await invalidateActiveQuery(crmQueryKeys.audit(testUser, opportunityId));
     }
   });
 
@@ -563,7 +578,7 @@ export function CrmIntakeControlSurface({
             {canCreateDraft ? "Создать проектный черновик" : "Проверить запрет создания черновика"}
           </button>
           <p data-testid="project-draft-result">
-            {selectedDraft ? `${selectedDraft.id}: ${selectedDraft.status}` : "Черновик еще не создан"}
+            {selectedDraft ? `${selectedDraft.id}: ${selectedDraft.status}` : selectedDraftReadbackStatus}
           </p>
           <div className="compact-list" data-testid="opportunity-audit-events">
             {selectedAuditEvents.length > 0

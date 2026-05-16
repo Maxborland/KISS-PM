@@ -342,6 +342,44 @@ describe("CRM Intake Control surface", () => {
     expect(apiClient.createProjectDraft).toHaveBeenCalledWith("readonly-observer-a", "opportunity-seed-ready");
   });
 
+  it("does not hide project draft readback failures as an empty draft state", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.getProjectDraft).mockRejectedValueOnce(
+      Object.assign(new Error("Доступ запрещен"), { code: "permission_denied" })
+    );
+
+    render(withTestQueryClient(
+      <CrmIntakeControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
+    ));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
+
+    expect(await screen.findByTestId("project-draft-result")).toHaveTextContent("Черновик не подтвержден: Доступ запрещен");
+    expect(screen.getByTestId("project-draft-result")).not.toHaveTextContent("Черновик еще не создан");
+  });
+
+  it("does not claim opportunity creation when list readback fails", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.listOpportunities)
+      .mockResolvedValueOnce([seedOpportunity])
+      .mockRejectedValueOnce(new Error("CRM readback unavailable"));
+
+    render(withTestQueryClient(
+      <CrmIntakeControlSurface apiClient={apiClient} currentTenant={createCurrentTenant()} testUser="project-manager-a" />
+    ));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("opportunity-list")).toHaveTextContent("Внедрение портала АКМЕ");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Создать возможность" }));
+
+    expect(await screen.findByTestId("crm-intake-status")).toHaveTextContent("CRM readback unavailable");
+    expect(screen.getByTestId("crm-intake-status")).not.toHaveTextContent("Возможность создана");
+    expect(screen.getByTestId("selected-opportunity-title")).toHaveTextContent("Внедрение портала АКМЕ");
+  });
+
   it("does not present command response as confirmed audit readback", async () => {
     const apiClient = createApiClient();
     vi.mocked(apiClient.listOpportunityAuditEvents).mockRejectedValue(
