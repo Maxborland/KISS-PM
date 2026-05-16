@@ -4013,7 +4013,7 @@
         "P9-010"
       ],
       "title": "Run Phase 9 verification matrix and exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -4058,7 +4058,73 @@
         "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Complete P9 phase-exit verification by validating all matrix rows, resolving P9-010, running strict verifier without --allow-blocked, and updating final handoff/state."
+      "notes": "Accepted 2026-05-17T02:04:53.0450145+07:00. Closed Phase 9 exit gate: P9-001..P9-010 are verified, E2E-080..083 pass, and strict docs/status/phase9-requirements-matrix.json verification passes without --allow-blocked.",
+      "completed_at": "2026-05-17T02:04:53.0450145+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-010-phase9-verification-matrix-exit-gate --once exit 0 at startup",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 69 files, 440 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P10-000-no-code-tenant-customization-phase-contract",
+      "aliases": [
+        "P10-000"
+      ],
+      "title": "Finalize Phase 10 no-code tenant customization contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P9-010-phase9-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_10_NO_CODE_TENANT_CUSTOMIZATION.md",
+        "docs/status/phase10-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-000-no-code-tenant-customization-phase-contract.claim.json",
+        ".agent-bus/sessions/P10-000-no-code-tenant-customization-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_10_NO_CODE_TENANT_CUSTOMIZATION.md",
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-000-no-code-tenant-customization-phase-contract --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable phase. Create the Phase 10 closed contract and initial strict matrix for no-code tenant customization before implementation."
     }
   ]
 }

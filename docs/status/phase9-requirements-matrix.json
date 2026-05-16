@@ -2,7 +2,7 @@
   "phase": "P9",
   "name": "Phase 9 Closed portfolio and retrospectives requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T01:58:47.2520821+07:00",
+  "updated_at": "2026-05-17T02:04:53.0450145+07:00",
   "rows": [
     {
       "id": "P9-001",
@@ -44,7 +44,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-080",
@@ -52,7 +52,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/project-closure.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -99,7 +99,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-080",
@@ -107,7 +107,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/project-closure.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-081",
@@ -115,7 +115,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -152,7 +152,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-081",
@@ -160,7 +160,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-082",
@@ -168,7 +168,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -205,7 +205,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-082",
@@ -213,7 +213,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-083",
@@ -221,7 +221,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -259,7 +259,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-082",
@@ -267,7 +267,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-083",
@@ -275,7 +275,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -315,7 +315,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-082",
@@ -323,7 +323,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -361,7 +361,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-082",
@@ -369,7 +369,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -420,7 +420,7 @@
       ],
       "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-083",
@@ -428,7 +428,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
@@ -470,7 +470,7 @@
       ],
       "cleanup": "E2E-080..083 each call /test-fixtures/reset and verify cleanup/readback: closed project, snapshots, trends, insight handled state, template-improvement action, audit/action logs, and template versions are restored by the in-memory test runtime reset.",
       "blocker": "",
-      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-080",
@@ -478,7 +478,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/project-closure.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-081",
@@ -486,7 +486,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-082",
@@ -494,7 +494,7 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         },
         {
           "id": "E2E-083",
@@ -502,14 +502,14 @@
           "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
           "exit_code": 0,
           "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
-          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
         }
       ]
     },
     {
       "id": "P9-010",
       "requirement": "Phase 9 verification matrix and exit gate",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -522,13 +522,56 @@
         "E2E-083"
       ],
       "evidence": [
-        "P9-000 creates the phase contract, initial blocked matrix, and verifier support so later implementation rows have a finite exit gate."
+        "P9-001..P9-009 are verified with structured E2E evidence for E2E-080..083 and no remaining blocked implementation rows.",
+        "docs/e2e/E2E_SCENARIOS.md and docs/phases/PHASE_9_CLOSED_PORTFOLIO_RETROSPECTIVES.md mark E2E-080..083 as passing with concrete Playwright paths.",
+        "test-results/kiss-pm-e2e-last-run.json records phase 9 passed with E2E-080, E2E-081, E2E-082, and E2E-083 paths.",
+        "Strict matrix verifier is run without --allow-blocked for Phase 9 exit."
       ],
-      "tests": [],
-      "cleanup": "Pending implementation. Strict P9 phase exit requires E2E-080..083 cleanup/reset evidence before verification.",
-      "blocker": "P9 phase exit cannot be verified until P9-001..P9-009 are implemented and E2E-080..083 pass.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
-      "e2e_evidence": []
+      "tests": [
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 69 files, 440 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json exit 0"
+      ],
+      "cleanup": "Phase 9 exit gate uses deterministic in-memory test runtime reset. E2E-080..083 prove reset/readback cleanup for closure state, snapshots, retrospective trends/insights, template-improvement actions, audit/action logs, and template versions.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:41.6820000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-080",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/project-closure.spec.ts",
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
+        },
+        {
+          "id": "E2E-081",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
+        },
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
+        },
+        {
+          "id": "E2E-083",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
+          "checked_at": "2026-05-17T01:58:41.6820000+07:00"
+        }
+      ]
     }
   ]
 }
