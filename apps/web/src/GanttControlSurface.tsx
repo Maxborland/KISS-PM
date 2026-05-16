@@ -122,15 +122,16 @@ export function GanttControlSurface({
       setStatus("Загрузка Гантта");
       setLoadState("loading");
       try {
-        const [nextSchedule, nextAudit] = await Promise.all([
-          apiClient.getProjectSchedule(testUser, nextProjectId),
-          canReadAudit ? apiClient.getProjectScheduleAudit(testUser, nextProjectId) : Promise.resolve(null)
-        ]);
+        const nextSchedule = await apiClient.getProjectSchedule(testUser, nextProjectId);
+        const nextAudit =
+          canReadAudit
+            ? await apiClient.getProjectScheduleAudit(testUser, nextProjectId).catch(() => null)
+            : null;
         if (requestId !== requestSequence.current) return;
         setSchedule(nextSchedule);
         setAudit(nextAudit);
         setCommandIssues([]);
-        setStatus("Гантт загружен");
+        setStatus(nextAudit === null && canReadAudit ? "Гантт загружен, аудит временно недоступен" : "Гантт загружен");
         setLoadState(nextSchedule.schedulePlan.wbsNodes.length > 0 ? "ready" : "empty");
       } catch (error) {
         if (requestId !== requestSequence.current) return;
@@ -188,15 +189,23 @@ export function GanttControlSurface({
     void loadSchedule(selectedProjectId);
   }
 
-  async function runScheduleCommand(commandName: GanttCommandName, command: () => Promise<unknown>, successLabel: string) {
+  async function runScheduleCommand(
+    commandName: GanttCommandName,
+    command: () => Promise<unknown>,
+    pendingLabel: string,
+    successLabel: string
+  ) {
     if (commandInFlight) return;
+    const commandProjectId = activeProjectId;
     setPendingCommand(commandName);
     setCommandIssues([]);
-    setStatus(successLabel);
+    setStatus(pendingLabel);
     try {
       await command();
-      await loadSchedule(activeProjectId);
-      setStatus(successLabel);
+      await loadSchedule(commandProjectId);
+      if (selectedProjectId === commandProjectId) {
+        setStatus(successLabel);
+      }
     } catch (error) {
       setCommandIssues(getValidationIssues(error));
       setStatus(getErrorMessage(error));
@@ -236,6 +245,7 @@ export function GanttControlSurface({
     void runScheduleCommand(
       "create-task",
       () => apiClient.createScheduleTask(testUser, activeProjectId, request),
+      "Создание задачи через API",
       "Задача создана через API"
     );
   }
@@ -253,6 +263,7 @@ export function GanttControlSurface({
           plannedWorkHours: Number(draft.plannedWorkHours),
           progressPercent: Number(draft.progressPercent)
         }),
+      "Сохранение расписания задачи через API",
       "Расписание задачи сохранено через API"
     );
   }
@@ -267,6 +278,7 @@ export function GanttControlSurface({
           successorTaskId: dependencyDraft.successorTaskId,
           type: "finish_to_start"
         }),
+      "Создание FS-связи через API",
       "FS-связь создана через API"
     );
   }
@@ -278,6 +290,7 @@ export function GanttControlSurface({
         apiClient.captureBaseline(testUser, activeProjectId, {
           id: `baseline-${activeProjectId}-draft`
         }),
+      "Фиксация базового плана через API",
       "Базовый план зафиксирован через API"
     );
   }
@@ -299,11 +312,12 @@ export function GanttControlSurface({
           <span>ID проекта</span>
           <input
             aria-label="ID проекта для Гантта"
+            disabled={commandInFlight}
             onChange={(event) => setSelectedProjectId(event.target.value)}
             value={selectedProjectId}
           />
         </label>
-        <button disabled={isLoading} type="button" onClick={openSelectedProject}>
+        <button disabled={isLoading || commandInFlight} type="button" onClick={openSelectedProject}>
           Открыть Гантт
         </button>
       </section>
