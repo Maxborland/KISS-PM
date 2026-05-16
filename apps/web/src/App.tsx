@@ -20,6 +20,7 @@ import { GanttControlSurface } from "./GanttControlSurface";
 import { createPhase5ScheduleApiClient, type Phase5ScheduleApiClient } from "./phase5ScheduleApiClient";
 import { ResourceLoadControlSurface } from "./ResourceLoadControlSurface";
 import { createResourcePlanningApiClient, type ResourcePlanningApiClient } from "./resourcePlanningApiClient";
+import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
   testUser?: string;
@@ -479,7 +480,7 @@ function Phase2AdminSurface({
   );
 }
 
-export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
+function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
   const runtimeUser = getRuntimeTestUser(testUser);
   const fixtureSession = useMemo(
     () => (runtimeUser && isFixtureAuthEnabled() ? resolveFixtureSession(runtimeUser) : null),
@@ -712,5 +713,13 @@ export function App({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         ) : null}
       </main>
     </div>
+  );
+}
+
+export function App(props: AppProps) {
+  return (
+    <AppQueryClientProvider>
+      <AppShell {...props} />
+    </AppQueryClientProvider>
   );
 }

@@ -24,6 +24,7 @@
     "verify:matrix": "node scripts/verify-requirements-matrix.mjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.100.10",
     "@vitejs/plugin-react": "^5.1.1",
     "hono": "^4.10.6",
     "react": "^19.2.3",
