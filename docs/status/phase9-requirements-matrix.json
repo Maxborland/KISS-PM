@@ -17,10 +17,25 @@
         "E2E-080"
       ],
       "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Closure workflow reset/readback cleanup must be proven by E2E-080 before verification.",
-      "blocker": "P9 product implementation has not started. Phase contract/matrix/verifier support is being established first by P9-000 before closure workflow code can be implemented.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "packages/project-core/src/index.ts implements ClosureChecklist, ClosureRequirement, ClosureData, LessonLearned, ProjectClosureReadiness, ProjectClosureDecision, evaluateProjectClosureReadiness, and closeManagedProjectWithClosure.",
+        "Closure readiness checks tenant/project mismatch before exposing detailed closure state, validates required closure fields, blocks non-final/non-active projects, includes stage-gate blockers, and detects open required template tasks.",
+        "closeManagedProjectWithClosure requires auditEventId, actor, timestamp, correlation id, complete closure data, and only allows overridable blockers when a blockerOverride has a reason and auditEventId. It returns an immutable completed ManagedProject plus auditable closure decision without mutating the source project.",
+        "packages/project-core/src/projectClosure.test.ts covers missing closure requirements, open required task blocker, successful closure, auditable closure decision, targeted governed override with audit reference, rejection of generic/partial overrides, tenant mismatch, and source-project immutability."
+      ],
+      "tests": [
+        "npm test -- packages/project-core/src/projectClosure.test.ts exit 1 RED: evaluateProjectClosureReadiness and closeManagedProjectWithClosure were missing before implementation",
+        "npm test -- packages/project-core/src/projectClosure.test.ts exit 1 RED during review: generic blockerCode-only override incorrectly resolved targeted open_required_task blockers",
+        "npm test -- packages/project-core/src/projectClosure.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test -- packages/project-core packages/workflow-engine packages/retrospectives exit 0: 12 files, 58 tests passed",
+        "npm run test:integration exit 0: 11 files, 65 tests passed",
+        "npm test exit 0: 63 files, 411 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "P9-001 is pure deterministic domain logic with no runtime persistence. Source-project immutability is covered by packages/project-core/src/projectClosure.test.ts; API/browser reset/readback cleanup remains blocked for P9-009 E2E-080.",
+      "blocker": "Domain foundation is implemented, but P9-001 cannot be verified until closure API/UI and executable E2E-080 prove write-flow readback, audit, permissions, reload persistence, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T00:12:32.1639103+07:00",
       "e2e_evidence": []
     },
     {
@@ -39,11 +54,25 @@
         "E2E-080",
         "E2E-081"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Snapshot creation/stability cleanup must be proven by E2E-080 and E2E-081 before verification.",
-      "blocker": "P9 product implementation has not started. Snapshot domain and fixture reset/readback do not exist yet.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "packages/retrospectives introduces the @kiss-pm/retrospectives bounded context for Phase 9 snapshot/retrospective domain work.",
+        "packages/retrospectives/src/index.ts implements ClosedProjectSnapshot, source refs, schedule/resource/KPI summary DTOs, createClosedProjectSnapshot, readClosedProjectSnapshot, and RetrospectiveModelError.",
+        "createClosedProjectSnapshot requires a completed project, tenant/project match with ProjectClosureDecision, deterministic snapshot version/capturedAt, source refs for project/process template/closure decision/schedule baseline/KPI evaluations, and deep-cloned snapshot/readback data.",
+        "packages/retrospectives/src/closedProjectSnapshot.test.ts proves snapshot capture, source refs, plan/work metrics, stability after mutating source project/template/lesson data, tenant mismatch rejection, and KPI summary runtime validation."
+      ],
+      "tests": [
+        "npm test -- packages/retrospectives/src/closedProjectSnapshot.test.ts exit 1 RED: ./index did not exist before implementation",
+        "npm test -- packages/retrospectives/src/closedProjectSnapshot.test.ts exit 1 RED during review: invalid KPI summary severity/value were accepted before runtime validation",
+        "npm test -- packages/retrospectives/src/closedProjectSnapshot.test.ts exit 0: 1 file, 4 tests passed",
+        "npm test -- packages/project-core packages/workflow-engine packages/retrospectives exit 0: 12 files, 58 tests passed",
+        "npm run test:integration exit 0: 11 files, 65 tests passed",
+        "npm test exit 0: 63 files, 411 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
+      ],
+      "cleanup": "P9-002 is pure deterministic domain logic with no runtime persistence. Snapshot immutability/readback is covered by packages/retrospectives/src/closedProjectSnapshot.test.ts; browser/API reset cleanup and E2E-080/E2E-081 evidence remain blocked.",
+      "blocker": "Snapshot domain foundation is implemented, but P9-002 cannot be verified until closure API/UI, snapshot readback API, deterministic fixtures, and E2E-080/E2E-081 prove snapshot creation/stability, reload persistence, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T00:12:32.1639103+07:00",
       "e2e_evidence": []
     },
     {
