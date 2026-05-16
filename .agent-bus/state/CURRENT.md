@@ -1,18 +1,25 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T18:20:00+07:00
+Updated: 2026-05-16T18:40:00+07:00
+
+- P7-000 KPI engine and control signals phase contract completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p7-000-kpi-engine-control-signals-phase-contract.md`.
+- `docs/phases/PHASE_7_KPI_ENGINE_CONTROL_SIGNALS.md` now freezes Phase 7 scope around safe KPI definitions, constrained formulas, threshold versions, deterministic evaluations, KPI control signals, admin/deviation surfaces, fixtures, E2E-060..064, and the strict exit gate.
+- `docs/status/phase7-requirements-matrix.json` exists with P7-001..P7-010 rows. Rows remain blocked truthfully because P7 implementation and executable E2E-060..064 are not implemented yet; tracking verification passes only with `--allow-blocked`.
+- `scripts/verify-requirements-matrix.mjs` and its tests now know P7 rows, required E2E ids, and phase7 test paths. Strict P7 matrix verification is expected to fail until product implementation and E2E evidence exist.
+- Known docs-sync risk: master plan and E2E ledger assign P7 to E2E-060..064, while the current P3-P12 UX screen matrix still references E2E-070 for P7 and E2E-060..062 for P10. Resolve before P8/P10 gate work.
+- Next recommended step: claim `P7-001-kpi-domain-safe-formula-foundation` and implement the domain-only KPI model, safe formula evaluator, threshold mapping, evaluation trace, and control signal primitives before API/UI/E2E work.
 
 - P6-011 Phase 6 review fixes completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-011-phase6-review-fixes.md`.
 - Bug Hunt findings after the P6 exit gate are fixed: `reserve_capacity` can no longer be previewed/applied as a false overload resolution, Resource Load only shows the Gantt opener for explicitly available schedule projects, and the web reservation DTO now matches the API/domain `sourceType` contract.
 - Fresh P6 review-fix evidence: `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm run test:integration`, `cmd /c "set PW_API_PORT=4299&& set PW_WEB_PORT=5299&& npm run test:e2e:phase -- --phase 6"`, `npm run typecheck`, `npm run lint`, `npm test`, strict P6 matrix verification, and a PowerShell API reproduction of the former bug paths all pass.
 - Phase 6 remains accepted as an implemented product phase after P6-011. P6 is still not Release 2 readiness; P7-P12 remain unimplemented/spec-only.
-- Next recommended step remains `P7-000-kpi-engine-control-signals-phase-contract`.
+- Historical next step after P6-011 was P7-000; that contract is now completed above.
 
 - P6-010 Phase 6 verification matrix and exit gate completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-010-phase6-verification-matrix-exit-gate.md`.
 - Phase 6 Resource planning and conflict resolution is accepted as an implemented product phase. `docs/status/phase6-requirements-matrix.json` passes strict verification without `--allow-blocked` after fresh E2E-050..055 metadata.
 - Fresh P6 exit evidence: `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- packages/resource-planning`, `npm test -- packages/shared-test-fixtures`, `npm run test:integration`, `npm test`, `npm run test:e2e:phase -- --phase 6`, strict P6 matrix verification, `npm run typecheck`, `npm run lint`, `git diff --check`, and agent-bus guard all pass.
 - P6 is not Release 2 readiness. P7-P12 remain product/UX-specified only until their phase-detail docs, executable suites, and strict matrices exist.
-- Next recommended step: claim `P7-000-kpi-engine-control-signals-phase-contract` and freeze the Phase 7 KPI engine/control signals contract before implementation.
+- Historical next step after P6-010 was P7-000; that contract is now completed above.
 
 - P6-009 deterministic Phase 6 fixtures and E2E-050..055 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-009-deterministic-phase6-fixtures-e2e.md`.
 - `packages/shared-test-fixtures/src/phase6Fixtures.ts` now defines stable Tenant A/Tenant B resource planning fixture ids for resource profiles, load bucket, overload, assignment, reservation, permissions, and E2E ids.

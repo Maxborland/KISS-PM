@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T17:59:00+07:00",
+  "updated_at": "2026-05-16T11:36:58.3178946Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2112,7 +2112,7 @@
         "P7-000"
       ],
       "title": "Finalize Phase 7 KPI engine and control signals contract",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P7",
       "depends_on": [
@@ -2154,7 +2154,66 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next phase after accepted P6. Create/freeze the Phase 7 finite contract and strict matrix support before KPI implementation starts. Do not call Release 2 ready."
+      "notes": "Completed Phase 7 contract/matrix/verifier support. P7 remains implementation-blocked until P7-001+ product work and E2E-060..064 are implemented. Release 2 is not ready.",
+      "completed_at": "2026-05-16T11:36:58.3178946Z",
+      "result": "accepted",
+      "verification": [
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json exit 1: expected blocked P7 rows before implementation",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P7-000-kpi-engine-control-signals-phase-contract --once exit 0"
+      ]
+    },
+    {
+      "id": "P7-001-kpi-domain-safe-formula-foundation",
+      "aliases": [
+        "P7-001"
+      ],
+      "title": "Implement Phase 7 KPI domain model, safe formula evaluation, thresholds, and signal primitives",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P7",
+      "depends_on": [
+        "P7-000-kpi-engine-control-signals-phase-contract"
+      ],
+      "write_scope": [
+        "packages/kpi-engine/**",
+        "docs/status/phase7-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-001-kpi-domain-safe-formula-foundation.claim.json",
+        ".agent-bus/sessions/P7-001-kpi-domain-safe-formula-foundation.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-001-kpi-domain-safe-formula-foundation --once",
+        "npm test -- packages/kpi-engine",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable P7 implementation block. Owns domain-only KPI model, constrained formula evaluation, threshold mapping, evaluation/signal primitives, and matrix rows P7-001..P7-005 where evidence is real. Do not edit API/UI/E2E in this block."
     }
   ]
 }

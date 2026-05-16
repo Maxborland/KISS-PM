@@ -18,7 +18,8 @@ const requiredIdsByPhase = {
   P4: Array.from({ length: 10 }, (_, index) => `P4-${String(index + 1).padStart(3, "0")}`),
   "P5-contract": ["P5C-001", "P5C-002", "P5C-003"],
   P5: Array.from({ length: 10 }, (_, index) => `P5-${String(index + 1).padStart(3, "0")}`),
-  P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`)
+  P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`),
+  P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -80,6 +81,18 @@ const requiredE2eByPhaseRow = {
     "P6-008": ["E2E-052", "E2E-053", "E2E-054", "E2E-055"],
     "P6-009": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"],
     "P6-010": ["E2E-050", "E2E-051", "E2E-052", "E2E-053", "E2E-054", "E2E-055"]
+  },
+  P7: {
+    "P7-001": ["E2E-060", "E2E-063", "E2E-064"],
+    "P7-002": ["E2E-060", "E2E-061", "E2E-062", "E2E-063"],
+    "P7-003": ["E2E-061", "E2E-062"],
+    "P7-004": ["E2E-061", "E2E-062", "E2E-063"],
+    "P7-005": ["E2E-061", "E2E-062"],
+    "P7-006": ["E2E-060", "E2E-063", "E2E-064"],
+    "P7-007": ["E2E-060", "E2E-063", "E2E-064"],
+    "P7-008": ["E2E-061", "E2E-062"],
+    "P7-009": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"],
+    "P7-010": ["E2E-060", "E2E-061", "E2E-062", "E2E-063", "E2E-064"]
   }
 };
 const requiredE2eTestPath = {
@@ -108,7 +121,12 @@ const requiredE2eTestPath = {
   "E2E-052": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
   "E2E-053": "e2e/tests/phase6/resolution-dry-run.spec.ts",
   "E2E-054": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
-  "E2E-055": "e2e/tests/phase6/resource-resolution-permissions.spec.ts"
+  "E2E-055": "e2e/tests/phase6/resource-resolution-permissions.spec.ts",
+  "E2E-060": "e2e/tests/phase7/kpi-threshold.spec.ts",
+  "E2E-061": "e2e/tests/phase7/kpi-control-signal.spec.ts",
+  "E2E-062": "e2e/tests/phase7/kpi-traceability.spec.ts",
+  "E2E-063": "e2e/tests/phase7/kpi-versioning.spec.ts",
+  "E2E-064": "e2e/tests/phase7/kpi-permissions.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};

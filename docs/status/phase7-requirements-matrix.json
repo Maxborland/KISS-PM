@@ -1,0 +1,222 @@
+{
+  "phase": "P7",
+  "name": "Phase 7 KPI engine and control signals requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-16T11:36:58.3178946Z",
+  "rows": [
+    {
+      "id": "P7-001",
+      "requirement": "KPI definitions, formulas, thresholds, and versioning",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/kpi-engine",
+        "packages/tenant-config"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "P7-001 implementation has not started yet; this P7-000 block only freezes the phase contract and verifier support.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-002",
+      "requirement": "Safe constrained formula evaluation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/kpi-engine"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-061",
+        "E2E-062",
+        "E2E-063"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "P7 safe formula parser/evaluator is not implemented yet; next runnable implementation task must add deterministic unit coverage before any verified status.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-003",
+      "requirement": "KPI source bindings and evaluation periods",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/kpi-engine",
+        "packages/project-core",
+        "packages/scheduling-engine",
+        "packages/resource-planning"
+      ],
+      "required_e2e": [
+        "E2E-061",
+        "E2E-062"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "Canonical KPI source-binding resolver has not been implemented; no evaluation/source trace evidence exists for P7 yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-004",
+      "requirement": "Threshold mapping and severity",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/kpi-engine"
+      ],
+      "required_e2e": [
+        "E2E-061",
+        "E2E-062",
+        "E2E-063"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "Versioned threshold severity mapping has not been implemented or tested for Phase 7 yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-005",
+      "requirement": "KPI ControlSignal / Deviation creation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/kpi-engine",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-061",
+        "E2E-062"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "KPI evaluation-to-control-signal creation is not implemented; P8 action execution remains future scope.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-006",
+      "requirement": "KPI API and governed configuration commands",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "packages/kpi-engine",
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "P7 API routes, command guards, audit readback, and direct API denial tests have not been implemented yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-007",
+      "requirement": "KPI Definition Admin MVP",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "P7 KPI Definition Admin UI has not been implemented; no component/browser evidence exists yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-008",
+      "requirement": "KPI Deviation Control read surface",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web",
+        "packages/kpi-engine"
+      ],
+      "required_e2e": [
+        "E2E-061",
+        "E2E-062"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "P7 KPI Deviation Control surface has not been implemented; no UI/API readback evidence exists yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-009",
+      "requirement": "Deterministic Phase 7 fixtures and E2E-060..064",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase7"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-061",
+        "E2E-062",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "evidence": [],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "Executable P7 fixtures and Playwright scenarios are planned but not implemented in this contract-only block.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    },
+    {
+      "id": "P7-010",
+      "requirement": "Phase 7 verification matrix and exit gate",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-060",
+        "E2E-061",
+        "E2E-062",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "evidence": [
+        "P7 verifier support and phase contract are introduced by P7-000, but phase exit cannot be verified until P7 implementation and E2E-060..064 pass."
+      ],
+      "tests": [],
+      "cleanup": "",
+      "blocker": "Strict P7 phase exit remains blocked because P7-001..P7-009 implementation and executable E2E-060..064 do not exist yet.",
+      "last_checked_at": null,
+      "e2e_evidence": []
+    }
+  ]
+}
