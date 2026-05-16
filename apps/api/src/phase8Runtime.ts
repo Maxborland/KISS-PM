@@ -36,6 +36,7 @@ type BuildReadModelInput = {
   page?: { offset: number; limit: number };
   layoutDefinition?: ControlSurfaceDefinition;
   isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
+  isActionConfigured?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
 };
 
@@ -821,6 +822,7 @@ export function createPhase8RuntimeState() {
       actorPermissionKeys: input.actorPermissionKeys,
       page: input.page ?? { offset: 0, limit: 50 },
       ...(input.isActionAllowed !== undefined ? { isActionAllowed: input.isActionAllowed } : {}),
+      ...(input.isActionConfigured !== undefined ? { isActionConfigured: input.isActionConfigured } : {}),
       ...(input.isDrilldownAllowed !== undefined ? { isDrilldownAllowed: input.isDrilldownAllowed } : {})
     });
   }

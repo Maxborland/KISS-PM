@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T04:26:38.6563821+07:00",
+  "updated_at": "2026-05-17T04:48:51.5246150+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -4577,7 +4577,7 @@
         "P10-007"
       ],
       "title": "Implement action enable/disable and action-form configuration",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P10",
       "depends_on": [
@@ -4624,7 +4624,79 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Runnable after P10-006. Implement action enable/disable and safe action-form configuration for E2E-093/E2E-094/E2E-095 readiness. Strict phase verification remains blocked until P10-009 executable E2E-090..095 evidence exists."
+      "notes": "Accepted 2026-05-17T04:48:51.5246150+07:00. Implemented tenant-scoped action enable/disable and safe action-form configuration. Domain helpers validate command-schema field compatibility and typed defaults, API routes preview/publish with audit/action evidence, control-surface actions reflect configuration_disabled, direct governed action preview/execute is denied for disabled actions, and ActionConfigurationSurface publishes only through API readback. Matrix P10-007 remains blocked only for later P10-009 E2E-093/E2E-094/E2E-095 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T04:48:51.5246150+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-007-action-enable-disable-form-configuration --once exit 0 at startup",
+        "npm test -- packages/action-engine/src/actionConfiguration.test.ts exit 1 RED: action configuration helpers were missing before implementation",
+        "npm test -- apps/api/src/phase10ActionConfigsApi.test.ts exit 1 RED: /api/tenant/action-configs routes were missing before implementation",
+        "npm test -- apps/web/src/ActionConfigurationSurface.test.tsx exit 1 RED: ActionConfigurationSurface and API client were missing before implementation",
+        "npm test -- packages/action-engine/src/actionConfiguration.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10ActionConfigsApi.test.ts exit 0: 1 file, 2 tests passed",
+        "npm test -- apps/web/src/ActionConfigurationSurface.test.tsx exit 0: 1 file, 3 tests passed",
+        "npm test -- packages/action-engine apps/api/src/phase10ActionConfigsApi.test.ts apps/web/src/ActionConfigurationSurface.test.tsx exit 0: 5 files, 16 tests passed",
+        "npm run test:integration exit 0: 18 files, 90 tests passed",
+        "npm test exit 0: 89 files, 515 tests passed after review fix",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json exit 1 expected: P10 rows remain blocked until E2E-090..095 and phase exit evidence exist",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P10-008-configuration-validation-admin-preview-export-import-permissions-audit-api",
+      "aliases": [
+        "P10-008"
+      ],
+      "title": "Implement configuration validation, admin preview, export/import, permissions, and audit API",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P10",
+      "depends_on": [
+        "P10-007-action-enable-disable-form-configuration"
+      ],
+      "write_scope": [
+        "packages/tenant-config/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase10-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P10-008-configuration-validation-admin-preview-export-import-permissions-audit-api.claim.json",
+        ".agent-bus/sessions/P10-008-configuration-validation-admin-preview-export-import-permissions-audit-api.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-008-configuration-validation-admin-preview-export-import-permissions-audit-api --once",
+        "npm test -- packages/tenant-config apps/api/src/*phase10*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Runnable after P10-007. Implement tenant configuration read model, validate/preview/publish/export/import-preview/import-apply API and UI states, permission checks, tenant isolation, no-partial-write behavior, and audit/action evidence for E2E-090..095 readiness. Strict phase verification remains blocked until P10-009 executable E2E-090..095 evidence exists."
     }
   ]
 }

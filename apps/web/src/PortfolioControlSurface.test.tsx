@@ -622,6 +622,22 @@ describe("PortfolioControlSurface", () => {
     expect(apiClient.executeAction).not.toHaveBeenCalled();
   });
 
+  it("explains tenant-disabled actions separately from recommendations and permissions", async () => {
+    const disabledRows = defaultRows().map((row) => ({
+      ...row,
+      actions: row.actions.map((action) =>
+        action.key === "accept_risk"
+          ? { ...action, available: false, unavailableReason: "configuration_disabled" as const }
+          : action
+      )
+    }));
+    const apiClient = createApiClient(createSurfaceView(disabledRows));
+    renderSurface(apiClient);
+
+    await screen.findByTestId("portfolio-control-detail");
+    expect(screen.getByTestId("portfolio-control-action-panel")).toHaveTextContent("Принять риск: отключено конфигурацией");
+  });
+
   it("recovers from stale preview errors with a new preview", async () => {
     const apiClient = createApiClient();
     vi.mocked(apiClient.executeAction).mockRejectedValueOnce(new Error("stale_preview"));

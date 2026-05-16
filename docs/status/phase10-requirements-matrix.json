@@ -2,7 +2,7 @@
   "phase": "P10",
   "name": "Phase 10 No-code tenant customization requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T04:25:15.0788892+07:00",
+  "updated_at": "2026-05-17T04:42:55.9899525+07:00",
   "rows": [
     {
       "id": "P10-001",
@@ -273,14 +273,32 @@
         "E2E-095"
       ],
       "evidence": [
-        "P10 contract defines action enable/disable and safe form configuration boundaries before implementation."
+        "P10 contract defines action enable/disable and safe form configuration boundaries before implementation.",
+        "packages/action-engine/src/index.ts implements createActionConfigurationSet, previewActionConfigurationPublish, and publishActionConfigurationPreview for tenant-scoped action availability/form config, non-mutating preview, stale preview rejection, unknown action rejection, command schema field validation, typed default validation, previous-version readback inputs, and publish audit metadata.",
+        "apps/api/src/phase10Runtime.ts and apps/api/src/app.ts expose GET /api/tenant/action-configs, POST /api/tenant/action-configs/preview, POST /api/tenant/action-configs/publish, configuration audit readback, action definition form-field projection, and direct backend denial for disabled governed actions.",
+        "apps/api/src/phase10ActionConfigsApi.test.ts proves readback, preview without mutation, governed publish, refreshed action configuration readback, control-surface action availability projection, disabled direct action preview denial, configuration audit/action evidence, read-only direct API denial, Tenant B no-leak stale denial, invalid default rejection, and no partial mutation.",
+        "apps/web/src/ActionConfigurationSurface.tsx and apps/web/src/actionConfigurationApiClient.ts implement the Russian action configuration builder with TanStack Query server state, API readback, dry-run preview, publish command, refreshed read model, audit/result evidence, read-only state, API error state, and stale-preview recovery.",
+        "apps/web/src/ActionConfigurationSurface.test.tsx proves the surface loads active action configuration, handles API error, previews without applied success state, publishes only through API readback, shows audit/action evidence, blocks read-only mutation, and recovers from stale preview errors."
       ],
       "tests": [
-        "pending: npm test -- packages/tenant-config packages/action-engine packages/control-surfaces apps/api/src/*phase10*.test.ts apps/web/src"
+        "npm test -- packages/action-engine/src/actionConfiguration.test.ts exit 1 RED: action configuration preview/publish helpers were missing before implementation",
+        "npm test -- apps/api/src/phase10ActionConfigsApi.test.ts exit 1 RED: /api/tenant/action-configs routes were missing before implementation",
+        "npm test -- apps/web/src/ActionConfigurationSurface.test.tsx exit 1 RED: ActionConfigurationSurface and actionConfigurationApiClient were missing before implementation",
+        "npm test -- packages/action-engine/src/actionConfiguration.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase10ActionConfigsApi.test.ts exit 0: 1 file, 2 tests passed",
+        "npm test -- apps/web/src/ActionConfigurationSurface.test.tsx exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/ActionConfigurationSurface.test.tsx exit 0: 2 files, 17 tests passed after review fix for configuration-disabled action explanation",
+        "npm test -- packages/tenant-config packages/action-engine packages/control-surfaces apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/api/src/phase10CustomFieldsApi.test.ts apps/api/src/phase10KpiThresholdsApi.test.ts apps/api/src/phase10SavedViewsApi.test.ts apps/api/src/phase10ActionConfigsApi.test.ts exit 0: 20 files, 78 tests passed",
+        "npm test -- apps/web/src exit 0: 17 files, 112 tests passed",
+        "npm run test:integration exit 0: 18 files, 90 tests passed",
+        "npm test exit 0: 89 files, 515 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase10-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation. Phase 10 reset must restore action configuration versions and action availability projections before verification.",
-      "blocker": "Blocked until P10-007 implementation adds action-configuration behavior and E2E-093/E2E-094/E2E-095 prove layout/action effects, validation, backend denial, and runtime stability.",
-      "last_checked_at": "2026-05-17T02:13:25.8730399+07:00",
+      "cleanup": "API/runtime action configuration previews, published action configuration versions, previous versions, action availability projections, and audit/action evidence are deterministic in-memory state. /test-fixtures/reset recreates Phase 8 and Phase 10 runtimes, restoring action configuration version 1, preview tokens, and configuration audit state. Browser-level reload/reset readback remains to be proven by P10-009 E2E-093/E2E-094/E2E-095.",
+      "blocker": "Domain/API/UI implementation is complete and tested for this block, but P10-007 remains blocked for strict phase verification until P10-009 E2E-093/E2E-094/E2E-095 prove browser reload persistence, layout/action effects, invalid configuration rejection, disabled direct backend denial, audit evidence, and fixture cleanup/readback.",
+      "last_checked_at": "2026-05-17T04:42:55.9899525+07:00",
       "e2e_evidence": []
     },
     {

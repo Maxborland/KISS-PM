@@ -143,7 +143,7 @@ export type ControlSurfaceReadAction = {
   targetEntityType: ControlSurfaceEntityType;
   dryRunRequired: boolean;
   available: boolean;
-  unavailableReason?: "not_recommended" | "permission_denied";
+  unavailableReason?: "not_recommended" | "permission_denied" | "configuration_disabled";
 };
 
 export type ControlSurfaceReadDrilldown = {
@@ -200,6 +200,7 @@ export type ControlSurfaceReadModelInput = {
   actorPermissionKeys: readonly string[];
   page: { offset: number; limit: number };
   isActionAllowed?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
+  isActionConfigured?: (record: ControlSurfaceSourceRecord, slot: ControlSurfaceActionSlot) => boolean;
   isDrilldownAllowed?: (record: ControlSurfaceSourceRecord, drilldown: ControlSurfaceDrilldownTarget) => boolean;
 };
 
@@ -995,6 +996,7 @@ export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInpu
       actions: definition.view.actionSlots.map((slot): ControlSurfaceReadAction => {
         const isRecommended = record.recommendedActionKeys.includes(slot.actionDefinitionKey);
         const hasPermission = input.isActionAllowed?.(record, slot) ?? actorPermissionKeys.has(slot.requiredPermission);
+        const isConfigured = input.isActionConfigured?.(record, slot) ?? true;
 
         return {
           key: slot.key,
@@ -1003,9 +1005,11 @@ export function createControlSurfaceReadModel(input: ControlSurfaceReadModelInpu
           slotType: slot.slotType,
           targetEntityType: slot.targetEntityType,
           dryRunRequired: slot.dryRunRequired,
-          available: isRecommended && hasPermission,
+          available: isRecommended && hasPermission && isConfigured,
           ...(!isRecommended
             ? { unavailableReason: "not_recommended" as const }
+            : !isConfigured
+              ? { unavailableReason: "configuration_disabled" as const }
             : !hasPermission
               ? { unavailableReason: "permission_denied" as const }
               : {})

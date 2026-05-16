@@ -20,7 +20,7 @@ export type ControlSurfaceReadActionDto = {
   targetEntityType: ControlEntityTypeDto;
   dryRunRequired: boolean;
   available: boolean;
-  unavailableReason?: "not_recommended" | "permission_denied";
+  unavailableReason?: "not_recommended" | "permission_denied" | "configuration_disabled";
 };
 
 export type ControlSurfaceReadDrilldownDto = {

@@ -133,7 +133,9 @@ function createInputForAction(
 
 function actionLine(action: ControlSurfaceReadActionDto): string {
   if (action.available) return `${action.label}${action.dryRunRequired ? " / dry-run" : ""}`;
-  return `${action.label}: ${action.unavailableReason === "permission_denied" ? "нет права" : "не рекомендовано"}`;
+  if (action.unavailableReason === "permission_denied") return `${action.label}: нет права`;
+  if (action.unavailableReason === "configuration_disabled") return `${action.label}: отключено конфигурацией`;
+  return `${action.label}: не рекомендовано`;
 }
 
 function latestAction(audit: PortfolioControlAuditDto): string {
