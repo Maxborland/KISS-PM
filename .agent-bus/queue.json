@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:41:23.000Z",
+  "updated_at": "2026-05-16T13:59:29.000Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2696,7 +2696,7 @@
         "P8-001"
       ],
       "title": "Implement control surface definition and view model foundation",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -2742,7 +2742,77 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P8 runnable block. Implement tenant-owned ControlSurfaceDefinition/View model foundation only; keep action execution, API/UI, fixtures, and E2E for later P8 blocks."
+      "notes": "Completed P8-001 domain foundation. packages/control-surfaces now defines and validates tenant-owned ControlSurfaceDefinition/View models with fields/widgets/action slots/drilldowns/saved views/permissions, duplicate rejection, runtime enum guards, malformed DTO guards, field-reference validation, and multi-surface coverage. Matrix row remains blocked only for later API/E2E evidence.",
+      "completed_at": "2026-05-16T13:59:29.000Z",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-001-control-surface-definition-view-model-foundation --once exit 0 at startup",
+        "npm test -- packages/control-surfaces exit 1 RED before implementation: missing createControlSurfaceDefinition/createControlSurfaceView",
+        "npm test -- packages/control-surfaces exit 1 RED before runtime enum guards: invalid surfaceType accepted",
+        "npm test -- packages/control-surfaces exit 1 RED before review fixes: malformed DTO TypeError and invalid nested enums accepted",
+        "npm test -- packages/control-surfaces exit 0: 1 file, 8 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P8-001-control-surface-definition-view-model-foundation --once exit 0 after locks removed"
+      ]
+    },
+    {
+      "id": "P8-002-control-surface-data-source-read-dtos",
+      "aliases": [
+        "P8-002"
+      ],
+      "title": "Implement control surface data-source abstraction and read DTOs",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-001-control-surface-definition-view-model-foundation"
+      ],
+      "write_scope": [
+        "packages/control-surfaces/**",
+        "apps/api/src/**phase8**",
+        "apps/api/src/app.ts",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-002-control-surface-data-source-read-dtos.claim.json",
+        ".agent-bus/sessions/P8-002-control-surface-data-source-read-dtos.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "packages/action-engine/**",
+        "packages/kpi-engine/**",
+        "packages/resource-planning/**",
+        "packages/project-core/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-002-control-surface-data-source-read-dtos --once",
+        "npm test -- packages/control-surfaces apps/api/src/*phase8*.test.ts",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P8 runnable block. Implement control surface read DTO/data-source abstraction and API read model only; keep action execution, UI, fixtures, and E2E for later P8 blocks."
     }
   ]
 }

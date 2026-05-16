@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T13:41:23.000Z",
+  "updated_at": "2026-05-16T13:59:29.000Z",
   "rows": [
     {
       "id": "P8-001",
@@ -19,14 +19,18 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract defines ControlSurfaceDefinition, ControlSurfaceView, action slots, visible fields/widgets, drilldown targets, permissions, and saved-view basics."
+        "packages/control-surfaces/src/index.ts implements tenant-owned ControlSurfaceDefinition and ControlSurfaceView foundation with versioning, data source, fields, widgets, action slots, drilldowns, saved views, permission requirements, runtime enum guards, duplicate-key rejection, tenant mismatch checks, reference validation, typed malformed DTO validation, and detached output copies.",
+        "packages/control-surfaces/src/controlSurfaceDefinition.test.ts covers creation, validation, duplicate fields/actions, action-slot permissions, cross-tenant nested views, runtime-invalid enum rejection, malformed DTOs, field reference validation, and Portfolio/KPI Deviation/Resource Load/CRM Intake/My Work surface descriptions without tenant-specific branches."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- packages/control-surfaces exit 0: 1 file, 8 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until implementation fixtures and E2E prove reset/readback.",
-      "blocker": "P8-001 implementation has not started. Need control-surfaces package model, validation tests, API/read-model integration, E2E-070/E2E-074/E2E-075 evidence, and cleanup/readback proof.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "No runtime state or external resources are created by P8-001; implementation is pure domain model plus unit tests. Phase 8 fixture reset/readback remains pending for E2E-070/E2E-074/E2E-075.",
+      "blocker": "P8-001 domain foundation is implemented and unit-tested, but row remains blocked for phase-exit verification until API/read-model integration and structured E2E-070/E2E-074/E2E-075 evidence prove UI/API permissions, reload, and cleanup/readback.",
+      "last_checked_at": "2026-05-16T13:59:29.000Z",
       "e2e_evidence": []
     },
     {
