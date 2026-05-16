@@ -350,6 +350,118 @@ export type ProjectLifecycleTransitionError = {
   blockers?: StageGateBlocker[];
 };
 
+export type ClosureRequirementField =
+  | "final_kpi_summary"
+  | "quality_score"
+  | "client_satisfaction_score"
+  | "closing_summary"
+  | "lessons_learned";
+
+export type ClosureRequirement = TenantOwned & {
+  id: string;
+  key: string;
+  label: string;
+  field: ClosureRequirementField;
+  required: boolean;
+};
+
+export type ClosureChecklist = TenantOwned & {
+  id: string;
+  projectId: string;
+  version: number;
+  requirements: ClosureRequirement[];
+};
+
+export type LessonLearnedSeverity = "positive" | "attention" | "critical";
+
+export type LessonLearned = {
+  id: string;
+  categoryKey: string;
+  summary: string;
+  recommendation?: string;
+  severity: LessonLearnedSeverity;
+};
+
+export type ClosureData = TenantOwned & {
+  projectId: string;
+  finalKpiSummary?: string;
+  qualityScore?: number;
+  clientSatisfactionScore?: number;
+  closingSummary?: string;
+  lessonsLearned: LessonLearned[];
+};
+
+export type ProjectClosureBlockerCode =
+  | "tenant_mismatch"
+  | "project_not_active"
+  | "project_not_in_final_stage"
+  | "stage_gate_blocked"
+  | "missing_closure_requirement"
+  | "open_required_task";
+
+export type ProjectClosureBlocker = {
+  code: ProjectClosureBlockerCode;
+  message: string;
+  requirementId?: string;
+  field?: string;
+  taskId?: string;
+  stageId?: string;
+  overridable: boolean;
+};
+
+export type ProjectClosureReadiness = {
+  ok: boolean;
+  projectId: string;
+  blockers: ProjectClosureBlocker[];
+};
+
+export type ProjectClosureBlockerOverride = {
+  blockerCode: ProjectClosureBlockerCode;
+  requirementId?: string;
+  taskId?: string;
+  stageId?: string;
+  reason: string;
+  auditEventId: string;
+};
+
+export type ProjectClosureDecision = TenantOwned & {
+  id: string;
+  projectId: string;
+  actorId: string;
+  checklistId: string;
+  checklistVersion: number;
+  closureData: ClosureData;
+  closedAt: string;
+  correlationId: string;
+  auditEventId: string;
+  blockerOverrides: ProjectClosureBlockerOverride[];
+};
+
+export type ProjectClosureCommand = {
+  id: string;
+  tenantId: TenantId;
+  actorId: string;
+  checklist: ClosureChecklist;
+  closureData: ClosureData;
+  closedAt: string;
+  correlationId: string;
+  auditEventId: string;
+  blockerOverrides?: ProjectClosureBlockerOverride[];
+};
+
+export type ProjectClosureResult =
+  | {
+      ok: true;
+      project: ManagedProject;
+      closureDecision: ProjectClosureDecision;
+      readiness: ProjectClosureReadiness;
+    }
+  | {
+      ok: false;
+      project: ManagedProject;
+      readiness: ProjectClosureReadiness;
+    };
+
 export type ProjectLifecycleTransitionResult =
   | {
       ok: true;
@@ -485,6 +597,14 @@ function requireArray<T>(value: T[] | undefined, fieldName: string): T[] {
 function requireNonNegativeNumber(value: number | undefined, fieldName: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new ProjectCoreModelError("validation_error", `${fieldName} must be a non-negative number`);
+  }
+
+  return value;
+}
+
+function requireScore(value: number | undefined, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 5) {
+    throw new ProjectCoreModelError("validation_error", `${fieldName} must be an integer from 1 to 5`);
   }
 
   return value;
@@ -1077,6 +1197,110 @@ function cloneTaskStatusHistoryEntry(entry: TaskStatusHistoryEntry): TaskStatusH
     actorId: requireNonEmptyString(rawEntry.actorId, "taskStatusHistory.actorId"),
     changedAt: requireValidTimestamp(rawEntry.changedAt, "taskStatusHistory.changedAt"),
     correlationId: requireNonEmptyString(rawEntry.correlationId, "taskStatusHistory.correlationId")
+  };
+}
+
+function requireClosureRequirementField(
+  value: ClosureRequirementField | undefined,
+  fieldName: string
+): ClosureRequirementField {
+  if (
+    value === "final_kpi_summary" ||
+    value === "quality_score" ||
+    value === "client_satisfaction_score" ||
+    value === "closing_summary" ||
+    value === "lessons_learned"
+  ) {
+    return value;
+  }
+
+  throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+}
+
+function requireLessonLearnedSeverity(
+  value: LessonLearnedSeverity | undefined,
+  fieldName: string
+): LessonLearnedSeverity {
+  if (value === "positive" || value === "attention" || value === "critical") {
+    return value;
+  }
+
+  throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+}
+
+function cloneLessonLearned(lesson: LessonLearned): LessonLearned {
+  const rawLesson = requireObject(lesson, "lessonLearned");
+
+  return {
+    id: requireNonEmptyString(rawLesson.id, "lessonLearned.id"),
+    categoryKey: requireSystemKey(rawLesson.categoryKey, "lessonLearned.categoryKey"),
+    summary: requireNonEmptyString(rawLesson.summary, "lessonLearned.summary"),
+    ...(rawLesson.recommendation !== undefined
+      ? { recommendation: requireNonEmptyString(rawLesson.recommendation, "lessonLearned.recommendation") }
+      : {}),
+    severity: requireLessonLearnedSeverity(rawLesson.severity, "lessonLearned.severity")
+  };
+}
+
+function cloneClosureRequirement(tenantId: TenantId, requirement: ClosureRequirement): ClosureRequirement {
+  const rawRequirement = requireObject(requirement, "closureRequirement");
+  const id = requireNonEmptyString(rawRequirement.id, "closureRequirement.id");
+  assertTenantId(tenantId, requireNonEmptyString(rawRequirement.tenantId, "closureRequirement.tenantId"), "closureRequirement tenant mismatch");
+
+  return {
+    id,
+    tenantId,
+    key: requireSystemKey(rawRequirement.key, "closureRequirement.key"),
+    label: requireNonEmptyString(rawRequirement.label, "closureRequirement.label"),
+    field: requireClosureRequirementField(rawRequirement.field, "closureRequirement.field"),
+    required: requireBoolean(rawRequirement.required, "closureRequirement.required")
+  };
+}
+
+function cloneClosureChecklist(checklist: ClosureChecklist): ClosureChecklist {
+  const rawChecklist = requireObject(checklist, "closureChecklist");
+  const tenantId = requireNonEmptyString(rawChecklist.tenantId, "closureChecklist.tenantId");
+  const clonedRequirements = requireArray(rawChecklist.requirements, "closureChecklist.requirements").map((requirement) =>
+    cloneClosureRequirement(tenantId, requirement)
+  );
+  assertUniqueFieldValues(clonedRequirements, (requirement) => requirement.id, "closure requirements ids must be unique");
+  assertUniqueFieldValues(clonedRequirements, (requirement) => requirement.key, "closure requirements keys must be unique");
+
+  return {
+    id: requireNonEmptyString(rawChecklist.id, "closureChecklist.id"),
+    tenantId,
+    projectId: requireNonEmptyString(rawChecklist.projectId, "closureChecklist.projectId"),
+    version: requirePositiveInteger(rawChecklist.version, "closureChecklist.version"),
+    requirements: clonedRequirements
+  };
+}
+
+function cloneClosureData(closureData: ClosureData): ClosureData {
+  const rawData = requireObject(closureData, "closureData");
+  const lessonsLearned = requireArray(rawData.lessonsLearned, "closureData.lessonsLearned").map(cloneLessonLearned);
+  assertUniqueFieldValues(lessonsLearned, (lesson) => lesson.id, "closure lessons ids must be unique");
+
+  return {
+    tenantId: requireNonEmptyString(rawData.tenantId, "closureData.tenantId"),
+    projectId: requireNonEmptyString(rawData.projectId, "closureData.projectId"),
+    ...(rawData.finalKpiSummary !== undefined
+      ? { finalKpiSummary: requireNonEmptyString(rawData.finalKpiSummary, "closureData.finalKpiSummary") }
+      : {}),
+    ...(rawData.qualityScore !== undefined
+      ? { qualityScore: requireScore(rawData.qualityScore, "closureData.qualityScore") }
+      : {}),
+    ...(rawData.clientSatisfactionScore !== undefined
+      ? {
+          clientSatisfactionScore: requireScore(
+            rawData.clientSatisfactionScore,
+            "closureData.clientSatisfactionScore"
+          )
+        }
+      : {}),
+    ...(rawData.closingSummary !== undefined
+      ? { closingSummary: requireNonEmptyString(rawData.closingSummary, "closureData.closingSummary") }
+      : {}),
+    lessonsLearned
   };
 }
 
@@ -2101,6 +2325,317 @@ export function evaluateStageGate(project: ManagedProject, stageId: string): Sta
     ok: blockers.length === 0,
     stageId: stage.id,
     blockers
+  };
+}
+
+function closureRequirementIsSatisfied(requirement: ClosureRequirement, closureData: ClosureData): boolean {
+  if (!requirement.required) {
+    return true;
+  }
+
+  if (requirement.field === "final_kpi_summary") {
+    return typeof closureData.finalKpiSummary === "string" && closureData.finalKpiSummary.trim().length > 0;
+  }
+  if (requirement.field === "quality_score") {
+    return typeof closureData.qualityScore === "number";
+  }
+  if (requirement.field === "client_satisfaction_score") {
+    return typeof closureData.clientSatisfactionScore === "number";
+  }
+  if (requirement.field === "closing_summary") {
+    return typeof closureData.closingSummary === "string" && closureData.closingSummary.trim().length > 0;
+  }
+
+  return closureData.lessonsLearned.length > 0;
+}
+
+function createProjectClosureBlocker(input: ProjectClosureBlocker): ProjectClosureBlocker {
+  return { ...input };
+}
+
+export function evaluateProjectClosureReadiness(
+  project: ManagedProject,
+  input: {
+    checklist: ClosureChecklist;
+    closureData: ClosureData;
+  }
+): ProjectClosureReadiness {
+  const managedProject = cloneManagedProject(project);
+  if (input.checklist?.tenantId !== managedProject.tenantId) {
+    return {
+      ok: false,
+      projectId: managedProject.id,
+      blockers: [
+        createProjectClosureBlocker({
+          code: "tenant_mismatch",
+          message: "Closure checklist tenant does not match project tenant",
+          requirementId: typeof input.checklist?.id === "string" ? input.checklist.id : undefined,
+          field: "tenantId",
+          overridable: false
+        })
+      ]
+    };
+  }
+  if (input.closureData?.tenantId !== managedProject.tenantId) {
+    return {
+      ok: false,
+      projectId: managedProject.id,
+      blockers: [
+        createProjectClosureBlocker({
+          code: "tenant_mismatch",
+          message: "Closure data tenant does not match project tenant",
+          field: "tenantId",
+          overridable: false
+        })
+      ]
+    };
+  }
+  const checklist = cloneClosureChecklist(input.checklist);
+  const closureData = cloneClosureData(input.closureData);
+  const blockers: ProjectClosureBlocker[] = [];
+
+  if (checklist.projectId !== managedProject.id || closureData.projectId !== managedProject.id) {
+    return {
+      ok: false,
+      projectId: managedProject.id,
+      blockers: [
+        createProjectClosureBlocker({
+          code: "tenant_mismatch",
+          message: "Closure data project does not match managed project",
+          field: "projectId",
+          overridable: false
+        })
+      ]
+    };
+  }
+
+  if (managedProject.lifecycleStatus !== "active") {
+    blockers.push(
+      createProjectClosureBlocker({
+        code: "project_not_active",
+        message: "Project closure requires an active project",
+        overridable: false
+      })
+    );
+  }
+
+  const currentStageId = managedProject.currentStageId;
+  if (currentStageId === null || !getAllowedProjectLifecycleTransitions(managedProject).includes("complete_project")) {
+    blockers.push(
+      createProjectClosureBlocker({
+        code: "project_not_in_final_stage",
+        message: "Project closure requires the final active stage",
+        stageId: currentStageId ?? undefined,
+        overridable: false
+      })
+    );
+  } else {
+    const stageGate = evaluateStageGate(managedProject, currentStageId);
+    if (!stageGate.ok) {
+      blockers.push(
+        createProjectClosureBlocker({
+          code: "stage_gate_blocked",
+          message: "Project closure is blocked by the current stage gate",
+          stageId: currentStageId,
+          field: stageGate.blockers.map((blocker) => blocker.code).join(","),
+          overridable: true
+        })
+      );
+    }
+  }
+
+  for (const requirement of checklist.requirements) {
+    if (!closureRequirementIsSatisfied(requirement, closureData)) {
+      blockers.push(
+        createProjectClosureBlocker({
+          code: "missing_closure_requirement",
+          message: `Closure requirement is missing: ${requirement.label}`,
+          requirementId: requirement.id,
+          field: requirement.field,
+          overridable: false
+        })
+      );
+    }
+  }
+
+  for (const task of managedProject.tasks) {
+    if (task.sourceTemplate.required && task.status !== "done" && task.status !== "cancelled") {
+      blockers.push(
+        createProjectClosureBlocker({
+          code: "open_required_task",
+          message: `Required task is still open: ${task.title}`,
+          taskId: task.id,
+          stageId: task.stageId,
+          overridable: true
+        })
+      );
+    }
+  }
+
+  return {
+    ok: blockers.length === 0,
+    projectId: managedProject.id,
+    blockers
+  };
+}
+
+function cloneProjectClosureBlockerOverride(override: ProjectClosureBlockerOverride): ProjectClosureBlockerOverride {
+  const rawOverride = requireObject(override, "closureBlockerOverride");
+
+  return {
+    blockerCode: requireProjectClosureBlockerCode(rawOverride.blockerCode, "closureBlockerOverride.blockerCode"),
+    ...(rawOverride.requirementId !== undefined
+      ? { requirementId: requireNonEmptyString(rawOverride.requirementId, "closureBlockerOverride.requirementId") }
+      : {}),
+    ...(rawOverride.taskId !== undefined
+      ? { taskId: requireNonEmptyString(rawOverride.taskId, "closureBlockerOverride.taskId") }
+      : {}),
+    ...(rawOverride.stageId !== undefined
+      ? { stageId: requireNonEmptyString(rawOverride.stageId, "closureBlockerOverride.stageId") }
+      : {}),
+    reason: requireNonEmptyString(rawOverride.reason, "closureBlockerOverride.reason"),
+    auditEventId: requireNonEmptyString(rawOverride.auditEventId, "closureBlockerOverride.auditEventId")
+  };
+}
+
+function requireProjectClosureBlockerCode(
+  value: ProjectClosureBlockerCode | undefined,
+  fieldName: string
+): ProjectClosureBlockerCode {
+  if (
+    value === "tenant_mismatch" ||
+    value === "project_not_active" ||
+    value === "project_not_in_final_stage" ||
+    value === "stage_gate_blocked" ||
+    value === "missing_closure_requirement" ||
+    value === "open_required_task"
+  ) {
+    return value;
+  }
+
+  throw new ProjectCoreModelError("validation_error", `${fieldName} is invalid`);
+}
+
+function allClosureBlockersResolvedByOverrides(
+  blockers: ProjectClosureBlocker[],
+  overrides: ProjectClosureBlockerOverride[]
+): boolean {
+  return blockers.every((blocker) => blocker.overridable && overrides.some((override) => overrideMatchesBlocker(override, blocker)));
+}
+
+function overrideMatchesBlocker(
+  override: ProjectClosureBlockerOverride,
+  blocker: ProjectClosureBlocker
+): boolean {
+  if (override.blockerCode !== blocker.code) {
+    return false;
+  }
+  if (blocker.requirementId !== undefined) {
+    return override.requirementId === blocker.requirementId;
+  }
+  if (blocker.taskId !== undefined) {
+    return override.taskId === blocker.taskId;
+  }
+  if (blocker.stageId !== undefined) {
+    return override.stageId === blocker.stageId;
+  }
+
+  return true;
+}
+
+export function closeManagedProjectWithClosure(
+  project: ManagedProject,
+  command: ProjectClosureCommand
+): ProjectClosureResult {
+  const managedProject = cloneManagedProject(project);
+  const tenantId = requireNonEmptyString(command.tenantId, "projectClosure.tenantId");
+  assertTenantId(tenantId, managedProject.tenantId, "projectClosure tenant mismatch");
+  const actorId = requireNonEmptyString(command.actorId, "projectClosure.actorId");
+  const closedAt = requireValidTimestamp(command.closedAt, "projectClosure.closedAt");
+  const correlationId = requireNonEmptyString(command.correlationId, "projectClosure.correlationId");
+  const auditEventId = requireNonEmptyString(command.auditEventId, "projectClosure.auditEventId");
+  if (timestampIsBefore(closedAt, managedProject.updatedAt)) {
+    throw new ProjectCoreModelError("validation_error", "projectClosure closedAt cannot be earlier than current project state");
+  }
+  const checklist = cloneClosureChecklist(command.checklist);
+  const closureData = cloneClosureData(command.closureData);
+  const blockerOverrides = (command.blockerOverrides ?? []).map(cloneProjectClosureBlockerOverride);
+  const readiness = evaluateProjectClosureReadiness(managedProject, { checklist, closureData });
+
+  if (!readiness.ok && !allClosureBlockersResolvedByOverrides(readiness.blockers, blockerOverrides)) {
+    return {
+      ok: false,
+      project: managedProject,
+      readiness
+    };
+  }
+
+  const currentStage = managedProject.currentStageId === null ? null : findProjectStage(managedProject, managedProject.currentStageId);
+  if (currentStage === null) {
+    return {
+      ok: false,
+      project: managedProject,
+      readiness: {
+        ok: false,
+        projectId: managedProject.id,
+        blockers: [
+          createProjectClosureBlocker({
+            code: "project_not_in_final_stage",
+            message: "Project closure requires the final active stage",
+            overridable: false
+          })
+        ]
+      }
+    };
+  }
+
+  const nextProject: ManagedProject = {
+    ...managedProject,
+    lifecycleStatus: "completed",
+    currentStageId: null,
+    updatedAt: closedAt,
+    stages: managedProject.stages.map((stage) =>
+      stage.id === currentStage.id ? { ...stage, status: "completed", completedAt: closedAt } : { ...stage }
+    )
+  };
+  const closedProject: ManagedProject = {
+    ...nextProject,
+    stageHistory: [
+      ...nextProject.stageHistory,
+      createStageHistoryEntry({
+        project: nextProject,
+        stageId: currentStage.id,
+        transition: "complete_project",
+        fromStatus: currentStage.status,
+        toStatus: "completed",
+        actorId,
+        occurredAt: closedAt,
+        correlationId
+      })
+    ]
+  };
+  const closureDecision: ProjectClosureDecision = {
+    id: requireNonEmptyString(command.id, "projectClosure.id"),
+    tenantId,
+    projectId: managedProject.id,
+    actorId,
+    checklistId: checklist.id,
+    checklistVersion: checklist.version,
+    closureData,
+    closedAt,
+    correlationId,
+    auditEventId,
+    blockerOverrides
+  };
+
+  return {
+    ok: true,
+    project: closedProject,
+    closureDecision,
+    readiness: {
+      ...readiness,
+      ok: true
+    }
   };
 }
 
