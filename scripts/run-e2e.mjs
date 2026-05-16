@@ -10,7 +10,7 @@ const profiles = {
   smoke: { apiPort: "4183", webPort: "5183", args: ["e2e/tests/phase1"] },
   critical: { apiPort: "4184", webPort: "5184", args: ["e2e/tests/phase1"] },
   permissions: { apiPort: "4185", webPort: "5185", args: ["e2e/tests/phase1/auth-guard.spec.ts"] },
-  phase: { apiPort: "4187", webPort: "5187", args: [], workers: "1" },
+  phase: { apiPort: "4287", webPort: "5287", args: [], workers: "1" },
   all: { apiPort: "4186", webPort: "5186", args: [], workers: "1" }
 };
 
