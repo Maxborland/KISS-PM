@@ -56,6 +56,7 @@ export type Phase4CreateTaskInput = {
   stageId: string;
   taskTemplateId: string;
   taskTemplateKey: string;
+  title?: string;
   status?: TaskStatus;
   dueDate: string;
   plannedWorkHours: number;
@@ -372,6 +373,7 @@ export function createPhase4RuntimeState() {
         stageId: input.stageId,
         taskTemplateId: input.taskTemplateId,
         taskTemplateKey: input.taskTemplateKey,
+        ...(input.title !== undefined ? { title: input.title } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         dueDate: input.dueDate,
         plannedWorkHours: input.plannedWorkHours,

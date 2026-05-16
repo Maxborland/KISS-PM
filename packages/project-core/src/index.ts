@@ -2213,6 +2213,7 @@ export function createTaskFromStageTaskTemplate(
     stageId: string;
     taskTemplateId: string;
     taskTemplateKey: string;
+    title?: string;
     status?: TaskStatus;
     dueDate: string;
     plannedWorkHours: number;
@@ -2250,7 +2251,10 @@ export function createTaskFromStageTaskTemplate(
     tenantId,
     projectId: managedProject.id,
     stageId: stage.id,
-    title: taskTemplate.label,
+    title:
+      input.title !== undefined
+        ? requireNonEmptyString(input.title, "task.title")
+        : taskTemplate.label,
     status: requireTaskStatus(input.status ?? "todo", "task.status"),
     dueDate: requireDateOnly(input.dueDate, "task.dueDate"),
     plannedWorkHours: requireNonNegativeNumber(input.plannedWorkHours, "task.plannedWorkHours"),

@@ -1,5 +1,6 @@
 import {
   createActionDefinition,
+  createActionExecutionLog,
   type ActionDefinition,
   type ActionExecutionLog
 } from "@kiss-pm/action-engine";
@@ -14,6 +15,7 @@ import {
 } from "@kiss-pm/control-surfaces";
 import type { TenantId, TenantUserId } from "@kiss-pm/domain-core";
 
+import type { Phase4RuntimeState } from "./phase4Runtime";
 import type { Phase6RuntimeState } from "./phase6Runtime";
 import type { Phase7RuntimeState } from "./phase7Runtime";
 
@@ -56,6 +58,7 @@ export type Phase8ActionPreview = {
 type Phase8TenantActionState = {
   previews: Map<string, Phase8ActionPreview>;
   actionExecutions: ActionExecutionLog[];
+  correctiveLinks: Map<string, { taskId: string; actionExecutionId: string }>;
   version: number;
 };
 
@@ -73,6 +76,18 @@ function notImplemented(message: string): Error & { code: "not_implemented" } {
 
 function clone<T>(value: T): T {
   return structuredClone(value) as T;
+}
+
+function requireStringInput(input: Record<string, unknown>, key: string): string {
+  const value = input[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw preconditionFailed(`action input field must be a string: ${key}`, "validation_error");
+  }
+  return value;
+}
+
+function toStableIdPart(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "item";
 }
 
 function requireActionInput(definition: ActionDefinition, input: Record<string, unknown>): void {
@@ -115,7 +130,7 @@ function actionDefinitions(tenantId: TenantId): ActionDefinition[] {
         resultEntityType: "task"
       },
       requiredPermission: "control.action:write",
-      dryRunRequired: false,
+      dryRunRequired: true,
       inputSchema: {
         fields: [
           { key: "title", label: "Название", valueType: "text", required: true, summary: true },
@@ -259,7 +274,7 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
           slotType: "primary",
           targetEntityType: "control_signal",
           requiredPermission: "control.action:write",
-          dryRunRequired: false
+          dryRunRequired: true
         },
         {
           id: "portfolio-action-risk",
@@ -304,28 +319,46 @@ function portfolioControlDefinition(tenantId: TenantId): ControlSurfaceDefinitio
   });
 }
 
-function kpiRows(tenantId: TenantId, phase7Runtime: Phase7RuntimeState): ControlSurfaceSourceRecord[] {
-  return phase7Runtime.listSignals(tenantId).map((signal) => ({
-    id: `row-kpi-${signal.id}`,
-    tenantId,
-    entityType: "kpi_signal",
-    entityId: signal.id,
-    label: signal.explanation,
-    severity: signal.severity,
-    explanation: signal.explanation,
-    sourceRefs: [
+function kpiRows(
+  tenantId: TenantId,
+  phase7Runtime: Phase7RuntimeState,
+  correctiveLinks: Map<string, { taskId: string; actionExecutionId: string }>
+): ControlSurfaceSourceRecord[] {
+  return phase7Runtime.listSignals(tenantId).map((signal) => {
+    const correctiveLink = correctiveLinks.get(signal.id);
+    const recommendedActionKeys =
+      correctiveLink === undefined
+        ? [...new Set([...signal.recommendedActionKeys, "accept_risk"])]
+        : [...new Set(signal.recommendedActionKeys.filter((key) => key !== "create_corrective_action").concat("accept_risk"))];
+    const sourceRefs: ControlSurfaceSourceRecord["sourceRefs"] = [
       { entityType: "project", entityId: signal.entityId },
-      { entityType: "kpi_signal", entityId: signal.id }
-    ],
-    fieldValues: {
-      project_label: signal.entityId,
-      signal_label: signal.explanation,
-      severity: signal.severity
-    },
-    recommendedActionKeys: [...new Set([...signal.recommendedActionKeys, "accept_risk"])],
-    drilldownParams: { projectId: signal.entityId },
-    policyContext: { projectId: signal.entityId }
-  }));
+      { entityType: "kpi_signal", entityId: signal.id },
+      ...(correctiveLink !== undefined ? [{ entityType: "task" as const, entityId: correctiveLink.taskId }] : [])
+    ];
+
+    return {
+      id: `row-kpi-${signal.id}`,
+      tenantId,
+      entityType: "kpi_signal",
+      entityId: signal.id,
+      label: signal.explanation,
+      severity: correctiveLink === undefined ? signal.severity : "attention",
+      explanation:
+        correctiveLink === undefined
+          ? signal.explanation
+          : `${signal.explanation}. Корректирующая задача создана: ${correctiveLink.taskId}`,
+      sourceRefs,
+      fieldValues: {
+        project_label: signal.entityId,
+        signal_label: correctiveLink === undefined ? signal.explanation : `Корректирующая задача: ${correctiveLink.taskId}`,
+        severity: correctiveLink === undefined ? signal.severity : "attention",
+        ...(correctiveLink !== undefined ? { corrective_task_id: correctiveLink.taskId } : {})
+      },
+      recommendedActionKeys,
+      drilldownParams: { projectId: signal.entityId },
+      policyContext: { projectId: signal.entityId }
+    };
+  });
 }
 
 function resourceRows(tenantId: TenantId, phase6Runtime: Phase6RuntimeState): ControlSurfaceSourceRecord[] {
@@ -359,7 +392,12 @@ export function createPhase8RuntimeState() {
   function actionState(tenantId: TenantId): Phase8TenantActionState {
     const existing = actionStates.get(tenantId);
     if (existing !== undefined) return existing;
-    const next: Phase8TenantActionState = { previews: new Map(), actionExecutions: [], version: 1 };
+    const next: Phase8TenantActionState = {
+      previews: new Map(),
+      actionExecutions: [],
+      correctiveLinks: new Map(),
+      version: 1
+    };
     actionStates.set(tenantId, next);
     return next;
   }
@@ -381,7 +419,7 @@ export function createPhase8RuntimeState() {
     return createControlSurfaceReadModel({
       definition,
       records: [
-        ...kpiRows(input.tenantId, input.phase7Runtime),
+        ...kpiRows(input.tenantId, input.phase7Runtime, actionState(input.tenantId).correctiveLinks),
         ...resourceRows(input.tenantId, input.phase6Runtime)
       ],
       actorPermissionKeys: input.actorPermissionKeys,
@@ -413,7 +451,7 @@ export function createPhase8RuntimeState() {
   }
 
   function sourceRecords(tenantId: TenantId, phase6Runtime: Phase6RuntimeState, phase7Runtime: Phase7RuntimeState) {
-    return [...kpiRows(tenantId, phase7Runtime), ...resourceRows(tenantId, phase6Runtime)];
+    return [...kpiRows(tenantId, phase7Runtime, actionState(tenantId).correctiveLinks), ...resourceRows(tenantId, phase6Runtime)];
   }
 
   function findTargetRecord(input: {
@@ -497,10 +535,11 @@ export function createPhase8RuntimeState() {
     target?: Phase8ActionTargetInput;
     commandInput?: Record<string, unknown>;
     previewId?: string;
+    phase4Runtime?: Phase4RuntimeState;
     phase6Runtime: Phase6RuntimeState;
     phase7Runtime: Phase7RuntimeState;
     permissionTrace: string[];
-  }) {
+  }): ActionExecutionLog {
     const state = actionState(input.tenantId);
     const definition = getActionDefinition(input.tenantId, input.actionDefinitionId);
     const preview = input.previewId !== undefined ? state.previews.get(input.previewId) : undefined;
@@ -515,10 +554,124 @@ export function createPhase8RuntimeState() {
     }
     const target = preview?.target ?? input.target;
     if (target === undefined) throw preconditionFailed("action target is required", "validation_error");
-    findTargetRecord({ tenantId: input.tenantId, target, phase6Runtime: input.phase6Runtime, phase7Runtime: input.phase7Runtime });
+    const record = findTargetRecord({ tenantId: input.tenantId, target, phase6Runtime: input.phase6Runtime, phase7Runtime: input.phase7Runtime });
+    if (!record.recommendedActionKeys.includes(definition.key)) {
+      throw preconditionFailed("action is not recommended for target");
+    }
     const commandInput = preview?.input ?? input.commandInput ?? {};
     requireActionInput(definition, commandInput);
+    if (definition.key === "create_corrective_action") {
+      if (input.phase4Runtime === undefined) {
+        throw notImplemented("Phase 4 runtime is required for corrective task creation");
+      }
+      if (record.entityType !== "kpi_signal") {
+        throw preconditionFailed("corrective action target must be a KPI signal", "precondition_failed");
+      }
+      const projectId = record.policyContext?.projectId;
+      if (projectId === undefined) {
+        throw preconditionFailed("corrective action target project is missing", "precondition_failed");
+      }
+      const project = input.phase4Runtime.getProject(input.tenantId, projectId);
+      if (project === undefined) {
+        throw preconditionFailed("corrective action target project is not active", "precondition_failed");
+      }
+      const currentStage = project.stages.find((stage) => stage.id === project.currentStageId);
+      const stageTemplate = project.processTemplateSnapshot.stageTemplates.find((stage) => stage.key === currentStage?.templateKey);
+      const taskTemplate = stageTemplate?.taskTemplates[0];
+      if (currentStage === undefined || taskTemplate === undefined) {
+        throw preconditionFailed("corrective action task template is missing", "precondition_failed");
+      }
+      const taskId = `task-corrective-${toStableIdPart(record.entityId)}-${state.version}`;
+      const taskResult = input.phase4Runtime.createTask({
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        projectId,
+        id: taskId,
+        stageId: currentStage.id,
+        taskTemplateId: taskTemplate.id,
+        taskTemplateKey: taskTemplate.key,
+        title: requireStringInput(commandInput, "title"),
+        dueDate: requireStringInput(commandInput, "dueDate"),
+        plannedWorkHours: 4,
+        participants: [{ userId: input.actorId, role: "controller" }]
+      });
+      const correlationId = `p8-corrective-${taskResult.task.id}`;
+      const execution: ActionExecutionLog = {
+        id: `action-${correlationId}`,
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        commandType: definition.commandBinding.commandType,
+        requiredPermission: definition.requiredPermission,
+        status: "succeeded",
+        source: { entityType: record.entityType, entityId: record.entityId },
+        target: { entityType: "task", entityId: taskResult.task.id },
+        before: { signal: { id: record.entityId, status: "open" }, taskCount: project.tasks.length },
+        after: {
+          task: clone(taskResult.task),
+          participants: clone(taskResult.participants),
+          projectId
+        },
+        timestamp: "2026-05-16T15:00:00.000Z",
+        correlationId,
+        sourceSurface: {
+          surfaceId: target.surfaceId,
+          surfaceKey: target.surfaceKey,
+          rowId: target.rowId,
+          actionSlotKey: definition.key
+        },
+        inputSummary: {
+          title: commandInput.title,
+          dueDate: commandInput.dueDate
+        },
+        permissionTrace: [...input.permissionTrace],
+        preconditionTrace: [
+          "target:kpi_signal",
+          `project:${projectId}`,
+          `stage:${currentStage.id}`,
+          `taskTemplate:${taskTemplate.key}`
+        ],
+        trace: [
+          "control_action:preview confirmed",
+          "control_action:canonical task created",
+          "control_action:portfolio projection should refetch"
+        ]
+      };
+      state.previews.delete(preview?.id ?? "");
+      return clone(execution);
+    }
     throw notImplemented(`Action binding is not implemented yet: ${definition.commandBinding.commandType}`);
+  }
+
+  function attachAuditEvent(tenantId: TenantId, execution: ActionExecutionLog, auditEventId: string): ActionExecutionLog {
+    const state = actionState(tenantId);
+    if (execution.tenantId !== tenantId) throw notFound("action execution not found");
+    const next = createActionExecutionLog({
+      actor: {
+        tenantId: execution.tenantId,
+        actorId: execution.actorId,
+        correlationId: execution.correlationId
+      },
+      commandType: execution.commandType,
+      requiredPermission: execution.requiredPermission,
+      status: execution.status,
+      source: execution.source,
+      ...(execution.target !== undefined ? { target: execution.target } : {}),
+      ...(execution.sourceSurface !== undefined ? { sourceSurface: execution.sourceSurface } : {}),
+      ...(execution.inputSummary !== undefined ? { inputSummary: execution.inputSummary } : {}),
+      auditEventIds: [auditEventId],
+      ...(execution.permissionTrace !== undefined ? { permissionTrace: execution.permissionTrace } : {}),
+      ...(execution.preconditionTrace !== undefined ? { preconditionTrace: execution.preconditionTrace } : {}),
+      before: execution.before,
+      after: execution.after,
+      timestamp: execution.timestamp,
+      trace: execution.trace
+    });
+    state.actionExecutions.push(clone(next));
+    if (next.commandType === "corrective_task.create" && next.target?.entityType === "task") {
+      state.correctiveLinks.set(next.source.entityId, { taskId: next.target.entityId, actionExecutionId: next.id });
+    }
+    state.version += 1;
+    return clone(next);
   }
 
   function getActionExecution(tenantId: TenantId, executionId: string): ActionExecutionLog | undefined {
@@ -540,6 +693,7 @@ export function createPhase8RuntimeState() {
     getActionTargetPolicyContext,
     previewAction,
     executeAction,
+    attachAuditEvent,
     getActionExecution,
     listActionExecutions
   };
