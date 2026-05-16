@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T05:37:37.1680000+07:00",
+  "updated_at": "2026-05-17T05:49:11.7860000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -4797,7 +4797,7 @@
         "P10-010"
       ],
       "title": "Close Phase 10 verification matrix and strict exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P10",
       "depends_on": [
@@ -4806,6 +4806,7 @@
       "write_scope": [
         "docs/status/phase10-requirements-matrix.json",
         "scripts/verify-requirements-matrix.mjs",
+        "scripts/run-e2e.mjs",
         "scripts/verify-requirements-matrix.test.ts",
         ".agent-bus/queue.json",
         ".agent-bus/state/CURRENT.md",
@@ -4841,7 +4842,72 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Runnable after P10-009. Convert P10-010 from blocked to verified only after strict verifier passes without --allow-blocked, all required P10 verification remains fresh, review findings are closed, and phase exit can be accepted."
+      "notes": "Accepted 2026-05-17T05:49:11.7860000+07:00. Closed the strict Phase 10 exit gate: P10-001..P10-010 are verified, E2E-090..095 pass, strict matrix verifier passes without --allow-blocked, and canonical npm run test:e2e:phase -- --phase 10 passes after moving phase E2E default ports to 4287/5287.",
+      "completed_at": "2026-05-17T05:49:11.7860000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P10-010-phase10-verification-matrix-exit-gate --once exit 0 at startup",
+        "npm run test:e2e:phase -- --phase 10 exit 1 INFRA before fix: dev-api-server could not bind 127.0.0.1:4187",
+        "npm run test:e2e:phase -- --phase 10 exit 0 after scripts/run-e2e.mjs phase default ports changed to 4287/5287: E2E-090..095 passed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json exit 0",
+        "npm test -- packages/shared-test-fixtures/src/phase10Fixtures.test.ts exit 0: 1 file, 2 tests passed",
+        "npm test -- apps/web/src exit 0: 18 files, 115 tests passed",
+        "npm test -- apps/api/src/phase10TenantLabelsApi.test.ts apps/api/src/phase10ProcessTemplateApi.test.ts apps/api/src/phase10CustomFieldsApi.test.ts apps/api/src/phase10KpiThresholdsApi.test.ts apps/api/src/phase10SavedViewsApi.test.ts apps/api/src/phase10ActionConfigsApi.test.ts apps/api/src/phase10ConfigurationApi.test.ts exit 0: 7 files, 21 tests passed",
+        "npm run test:integration exit 0: 19 files, 94 tests passed",
+        "npm test exit 0: 93 files, 527 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P11-000-integrations-migration-phase-contract",
+      "aliases": [
+        "P11-000"
+      ],
+      "title": "Draft Phase 11 integrations and migration contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P11",
+      "depends_on": [
+        "P10-010-phase10-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_11_INTEGRATIONS_MIGRATION.md",
+        "docs/status/phase11-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P11-000-integrations-migration-phase-contract.claim.json",
+        ".agent-bus/sessions/P11-000-integrations-migration-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_11_INTEGRATIONS_MIGRATION.md",
+        "docs/status/*",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-000-integrations-migration-phase-contract --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Runnable after P10 acceptance. Create the closed P11 integrations/migration contract and initial blocked matrix before any P11 product implementation."
     }
   ]
 }
