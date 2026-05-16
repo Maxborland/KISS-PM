@@ -191,14 +191,23 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires KPI deviation to canonical corrective task/action creation through the action engine with source signal link, audit, readback, and projection refresh."
+        "Phase 8 contract requires KPI deviation to canonical corrective task/action creation through the action engine with source signal link, audit, readback, and projection refresh.",
+        "P8-006 API binding implemented: create_corrective_action preview remains non-mutating, execute creates a canonical Phase 4 task with the requested corrective title/due date, links source KPI signal and portfolio surface row, records action execution, attaches audit event id, and preserves portfolio readback.",
+        "P8-006 extends the canonical task path instead of introducing a duplicate corrective-task model: Phase 4 runtime passes an optional task title into project-core createTaskFromStageTaskTemplate.",
+        "Review hardening fixed P8-006 permission/audit/linkage gaps: corrective task creation now requires preview, rechecks action availability on execute, enforces bound command permission task.write before mutation, persists KPI-signal-to-task linkage so duplicate corrective actions are no longer recommended, and stores action execution only after createActionExecutionLog validates non-empty audit evidence."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts exit 0: 1 file, 9 tests passed; includes corrective action preview/no-mutation, execute, canonical task readback, action audit, domain audit, portfolio projection readback, duplicate prevention, dry-run-required direct execute denial, and resource-manager task.write backend denial with no task/audit mutation",
+        "npm test -- packages/project-core apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx exit 0: 10 files, 67 tests passed",
+        "npm run test:integration exit 0: 11 files, 59 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 387 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until corrective task cleanup/reset and readback proof exist.",
-      "blocker": "P8-006 implementation has not started. Need canonical task action binding, API/UI tests, E2E-071/E2E-075 evidence, and proof no duplicate corrective-task model is created.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-006 state is deterministic in-memory API runtime state. API tests create the managed project and prove tasks are empty before execution, then read back the created canonical task, action execution audit id, domain audit event, refreshed portfolio projection, and denied resource-manager execute with empty task/action/audit readback. Phase-level browser reload/reset cleanup remains pending for P8-009 E2E fixtures.",
+      "blocker": "P8-006 implementation and API/component regression evidence are present, but row remains blocked for phase-exit verification until E2E-071/E2E-075 prove the user-facing UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
+      "last_checked_at": "2026-05-16T22:25:41.5420746+07:00",
       "e2e_evidence": []
     },
     {

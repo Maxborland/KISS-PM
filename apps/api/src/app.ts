@@ -1808,6 +1808,14 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
               entityType: actionDefinition.targetEntityType,
               tenantId: session.user.tenantId
             });
+      const boundCommandPermissionEvaluation =
+        actionDefinition.key === "create_corrective_action" && targetPolicyContext !== undefined
+          ? assertAllowed(runtime, session, "task.write", {
+              entityType: "task",
+              tenantId: targetPolicyContext.tenantId,
+              ...(targetPolicyContext.projectId !== undefined ? { projectId: targetPolicyContext.projectId } : {})
+            }, undefined, targetPolicyContext.contextRefs)
+          : undefined;
       const result = phase8Runtime.executeAction({
         tenantId: session.user.tenantId,
         actorId: session.user.id,
@@ -1816,12 +1824,27 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(body.target !== undefined ? { target: body.target } : {}),
         ...(body.input !== undefined ? { commandInput: body.input } : {}),
         ...(body.previewId !== undefined ? { previewId: body.previewId } : {}),
+        phase4Runtime,
         phase6Runtime,
         phase7Runtime,
-        permissionTrace: permissionEvaluation.trace
+        permissionTrace: [
+          ...permissionEvaluation.trace,
+          ...(boundCommandPermissionEvaluation?.trace ?? [])
+        ]
       });
+      const auditEvent = runtime.appendAuditEvent({
+        session,
+        actionKey: result.commandType,
+        target: result.target ?? result.source,
+        correlationId: result.correlationId,
+        details: {
+          before: result.before ?? undefined,
+          after: result.after ?? undefined
+        }
+      });
+      const resultWithAudit = phase8Runtime.attachAuditEvent(session.user.tenantId, result, auditEvent.id);
 
-      return context.json({ result });
+      return context.json({ result: actionExecutionDto(resultWithAudit) });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -2732,6 +2755,11 @@ function actionExecutionDto(actionExecution: {
   after: Record<string, unknown> | null;
   timestamp: string;
   correlationId: string;
+  sourceSurface?: { surfaceId: string; surfaceKey: string; rowId: string; actionSlotKey: string };
+  inputSummary?: Record<string, unknown>;
+  auditEventIds?: string[];
+  permissionTrace?: string[];
+  preconditionTrace?: string[];
   trace: string[];
 }) {
   return {
@@ -2747,6 +2775,11 @@ function actionExecutionDto(actionExecution: {
     after: actionExecution.after === null ? null : structuredClone(actionExecution.after),
     timestamp: actionExecution.timestamp,
     correlationId: actionExecution.correlationId,
+    ...(actionExecution.sourceSurface !== undefined ? { sourceSurface: { ...actionExecution.sourceSurface } } : {}),
+    ...(actionExecution.inputSummary !== undefined ? { inputSummary: structuredClone(actionExecution.inputSummary) } : {}),
+    ...(actionExecution.auditEventIds !== undefined ? { auditEventIds: [...actionExecution.auditEventIds] } : {}),
+    ...(actionExecution.permissionTrace !== undefined ? { permissionTrace: [...actionExecution.permissionTrace] } : {}),
+    ...(actionExecution.preconditionTrace !== undefined ? { preconditionTrace: [...actionExecution.preconditionTrace] } : {}),
     trace: [...actionExecution.trace]
   };
 }
