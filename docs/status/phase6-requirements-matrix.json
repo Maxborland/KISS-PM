@@ -2,7 +2,7 @@
   "phase": "P6",
   "name": "Phase 6 resource planning and conflict resolution requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T10:16:53.667Z",
+  "updated_at": "2026-05-16T10:56:27.511Z",
   "rows": [
     {
       "id": "P6-001",
@@ -540,7 +540,7 @@
     {
       "id": "P6-010",
       "requirement": "Phase 6 verification matrix and exit gate",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -554,13 +554,85 @@
         "E2E-054",
         "E2E-055"
       ],
-      "evidence": [],
-      "tests": [
-        "planned: npm run verify:matrix -- docs/status/phase6-requirements-matrix.json"
+      "evidence": [
+        "P6-001..P6-009 are verified with domain, API, UI, deterministic fixture, and structured E2E evidence for E2E-050..055",
+        "E2E-050..055 passed in a fresh Phase 6 Playwright run with UI, API readback, direct backend denial, audit/action evidence, reload persistence, and cleanup/reset assertions",
+        "Strict Phase 6 requirements matrix verification passes without --allow-blocked after the P6-010 exit row is verified",
+        "No Critical/Important review findings remain in the P6 phase gate scope"
       ],
-      "cleanup": "Pending implementation; no runtime writes yet",
-      "blocker": "Final P6 phase-exit row intentionally remains blocked for P6-010 until strict verifier, full verification command set, review loop, and gate report are run after E2E evidence is integrated.",
-      "last_checked_at": "2026-05-16T10:16:53.667Z"
+      "tests": [
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 4 files, 8 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 49 files, 293 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P6-010-phase6-verification-matrix-exit-gate --once exit 0"
+      ],
+      "cleanup": "Phase 6 uses deterministic in-memory runtime fixtures. E2E-053 proves dry-run preview leaves load/audit unchanged; E2E-054 applies a command, verifies API/UI/audit/reload readback, then calls /test-fixtures/reset and verifies original 50 ч/critical load plus empty action executions.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T10:56:27.511Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-050",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-load.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-050 passed in final Phase 6 exit-gate Playwright run"
+        },
+        {
+          "id": "E2E-051",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-detection.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-051 passed in final Phase 6 exit-gate Playwright run"
+        },
+        {
+          "id": "E2E-052",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/overload-resolution-entry.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-052 passed in final Phase 6 exit-gate Playwright run"
+        },
+        {
+          "id": "E2E-053",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-dry-run.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-053 passed in final Phase 6 exit-gate Playwright run"
+        },
+        {
+          "id": "E2E-054",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resolution-apply-audit.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-054 passed in final Phase 6 exit-gate Playwright run"
+        },
+        {
+          "id": "E2E-055",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 6",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase6/resource-resolution-permissions.spec.ts",
+          "checked_at": "2026-05-16T10:56:27.511Z",
+          "notes": "E2E-055 passed in final Phase 6 exit-gate Playwright run"
+        }
+      ]
     }
   ]
 }

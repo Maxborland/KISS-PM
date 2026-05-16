@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T17:22:00+07:00",
+  "updated_at": "2026-05-16T17:59:00+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -1977,7 +1977,7 @@
         "P6-010"
       ],
       "title": "Phase 6 verification matrix and exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P6",
       "depends_on": [
@@ -2016,7 +2016,72 @@
         "git diff --check",
         "node scripts/agent-bus-guard.mjs --task P6-010-phase6-verification-matrix-exit-gate --once"
       ],
-      "notes": "Next P6 block. Run final verification/review loop, flip P6-010 only with strict matrix evidence, and do not declare Release 2 complete after P6."
+      "notes": "Completed final Phase 6 exit gate. Phase 6 strict matrix passes without --allow-blocked after E2E-050..055; P6 is accepted as an implemented product phase, but Release 2 remains incomplete until P7-P12 close.",
+      "completed_at": "2026-05-16T17:59:00+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 7 tests passed",
+        "npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts exit 0: 5 tests passed",
+        "npm test -- packages/resource-planning exit 0: 4 files, 20 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 4 files, 8 tests passed",
+        "npm run test:integration exit 0: 8 files, 38 tests passed",
+        "npm test exit 0: 49 files, 293 tests passed",
+        "cmd /c \"set PW_API_PORT=4287&& set PW_WEB_PORT=5287&& npm run test:e2e:phase -- --phase 6\" exit 0: E2E-050..055 passed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P7-000-kpi-engine-control-signals-phase-contract",
+      "aliases": [
+        "P7-000"
+      ],
+      "title": "Finalize Phase 7 KPI engine and control signals contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P7",
+      "depends_on": [
+        "P6-010-phase6-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_7_KPI_ENGINE_CONTROL_SIGNALS.md",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P7-000-kpi-engine-control-signals-phase-contract.claim.json",
+        ".agent-bus/sessions/P7-000-kpi-engine-control-signals-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        "docs/phases/PHASE_7_KPI_ENGINE_CONTROL_SIGNALS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-000-kpi-engine-control-signals-phase-contract --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase7-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next phase after accepted P6. Create/freeze the Phase 7 finite contract and strict matrix support before KPI implementation starts. Do not call Release 2 ready."
     }
   ]
 }

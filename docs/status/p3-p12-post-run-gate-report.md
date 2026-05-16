@@ -9,7 +9,8 @@ Verdict: accepted
 - P3: executable E2E exists and passed fresh gate run.
 - P4: executable E2E exists and passed fresh gate run; strict matrix now passes.
 - P5: executable E2E exists and passed fresh gate run.
-- P6-P12: product/UX contract is specified; no executable implementation phase suites or phase requirement matrices are present in this checkout, so acceptance here is limited to the spec layer for those future phases.
+- P6: executable E2E exists and passed fresh gate run; strict matrix now passes.
+- P7-P12: product/UX contract is specified; no executable implementation phase suites or phase requirement matrices are present in this checkout, so acceptance here is limited to the spec layer for those future phases.
 
 ## Tasks checked
 
@@ -17,6 +18,7 @@ Verdict: accepted
 - P3 rows P3-001..P3-010 are verified by strict matrix after fresh P3 E2E metadata.
 - P4 rows P4-001..P4-010 are verified by strict matrix after fresh P4 E2E metadata.
 - P5 rows P5-001..P5-010 are verified by strict matrix after fresh P5 E2E metadata.
+- P6 rows P6-001..P6-010 are verified by strict matrix after fresh P6 E2E metadata.
 - Prior gate/fix tasks `GATE-P3-P12-BUG-HUNT-001` and `FIX-P3-P12-BUG-HUNT-001` are done.
 
 ## Matrices checked
@@ -25,13 +27,15 @@ Verdict: accepted
 - `docs/status/phase3-requirements-matrix.json`: passed strict `npm run verify:matrix`.
 - `docs/status/phase4-requirements-matrix.json`: passed strict `npm run verify:matrix`.
 - `docs/status/phase5-requirements-matrix.json`: passed strict `npm run verify:matrix`.
+- `docs/status/phase6-requirements-matrix.json`: passed strict `npm run verify:matrix`.
 
 ## E2E ids observed
 
 - P3 passed: E2E-020, E2E-021, E2E-022, E2E-023, E2E-024.
 - P4 passed: E2E-030, E2E-031, E2E-032, E2E-033, E2E-034.
 - P5 passed: E2E-040, E2E-041, E2E-042, E2E-043, E2E-044.
-- P6-P12 ids are documented/spec-linked only; no executable suites were found under `e2e/tests/phase6` through `e2e/tests/phase12`.
+- P6 passed: E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055.
+- P7-P12 ids are documented/spec-linked only; no executable suites were found under `e2e/tests/phase7` through `e2e/tests/phase12`.
 
 ## Critical and important findings
 
@@ -47,6 +51,17 @@ Fresh evidence:
 - `docs/status/phase4-requirements-matrix.json` has no blocked rows and records structured E2E evidence for P4-001..P4-010.
 
 Impact: the CRM draft -> managed project -> lifecycle/tasks/Kanban -> Gantt bridge is now executable across P3, P4, and P5.
+
+### Resolved critical: Phase 6 resource planning gate is complete
+
+Fresh evidence:
+
+- Added deterministic Phase 6 fixture ids and executable specs under `e2e/tests/phase6/` for E2E-050..055.
+- `npm run test:e2e:phase -- --phase 6` exits 0; 6 Playwright tests pass.
+- `docs/status/phase6-requirements-matrix.json` has no blocked rows and records structured E2E evidence for P6-001..P6-010.
+- Strict `node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json` exits 0 after the fresh P6 E2E metadata.
+
+Impact: resource load, overload detection, dry-run preview, governed apply, audit/action evidence, reload persistence, cleanup/reset, and backend permission/tenant isolation denial are now executable for Phase 6.
 
 ### Important: E2E launcher was not reproducible on this Windows checkout
 
@@ -66,7 +81,7 @@ Fixed during this gate:
 
 - UX matrix verifier proves screen-contract structure, but it does not prove implementation readiness or E2E file existence. This is acceptable only as a spec verifier, not as release evidence.
 - Content audit found `later` in `docs/status/phase2-requirements-matrix.json` as ordinary wording: `later API/audit DTOs`; not a placeholder.
-- P6-P12 are product/UX-specified only in this checkout. They are not accepted as implemented product phases until their phase-detail docs, executable suites, and requirement matrices exist.
+- P7-P12 are product/UX-specified only in this checkout. They are not accepted as implemented product phases until their phase-detail docs, executable suites, and requirement matrices exist.
 
 ## Verification commands
 
@@ -86,6 +101,8 @@ Fixed during this gate:
 - `npm run verify:matrix -- docs/status/phase4-requirements-matrix.json`: exit 0 immediately after P4 E2E run.
 - `npm run test:e2e:phase -- --phase 5`: exit 0; 5 passed.
 - `npm run verify:matrix -- docs/status/phase5-requirements-matrix.json`: exit 0 immediately after P5 E2E run.
+- `npm run test:e2e:phase -- --phase 6`: exit 0; 6 passed.
+- `node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json`: exit 0 immediately after P6 E2E run.
 - `node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json`: exit 0; 33 screens.
 - `rg -n "TBD|TODO|later|nice to have|generic dashboard|ready-made Gantt|Bryntum|Ant Design" docs/product docs/status docs/roadmap`: exit 0 with one non-placeholder `later` hit in Phase 2 matrix.
 
@@ -99,4 +116,4 @@ Fixed during this gate:
 
 accepted
 
-Reason: P3, P4, and P5 are freshly reproducible through executable phase E2E suites and strict requirement matrices. The P3-P12 UX/spec layer passes its screen-matrix verifier. P6-P12 remain spec-only in this checkout and are not accepted as implemented product phases.
+Reason: P3, P4, P5, and P6 are freshly reproducible through executable phase E2E suites and strict requirement matrices. The P3-P12 UX/spec layer passes its screen-matrix verifier. P7-P12 remain spec-only in this checkout and are not accepted as implemented product phases.

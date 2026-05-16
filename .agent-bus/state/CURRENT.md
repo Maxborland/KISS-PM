@@ -1,13 +1,18 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T17:22:00+07:00
+Updated: 2026-05-16T17:59:00+07:00
+
+- P6-010 Phase 6 verification matrix and exit gate completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-010-phase6-verification-matrix-exit-gate.md`.
+- Phase 6 Resource planning and conflict resolution is accepted as an implemented product phase. `docs/status/phase6-requirements-matrix.json` passes strict verification without `--allow-blocked` after fresh E2E-050..055 metadata.
+- Fresh P6 exit evidence: `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- packages/resource-planning`, `npm test -- packages/shared-test-fixtures`, `npm run test:integration`, `npm test`, `npm run test:e2e:phase -- --phase 6`, strict P6 matrix verification, `npm run typecheck`, `npm run lint`, `git diff --check`, and agent-bus guard all pass.
+- P6 is not Release 2 readiness. P7-P12 remain product/UX-specified only until their phase-detail docs, executable suites, and strict matrices exist.
+- Next recommended step: claim `P7-000-kpi-engine-control-signals-phase-contract` and freeze the Phase 7 KPI engine/control signals contract before implementation.
 
 - P6-009 deterministic Phase 6 fixtures and E2E-050..055 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-p6-009-deterministic-phase6-fixtures-e2e.md`.
 - `packages/shared-test-fixtures/src/phase6Fixtures.ts` now defines stable Tenant A/Tenant B resource planning fixture ids for resource profiles, load bucket, overload, assignment, reservation, permissions, and E2E ids.
 - `e2e/tests/phase6/` now contains executable E2E-050..055 proving deterministic load, overload detection, control-surface resolution entry, dry-run no mutation, apply/readback/audit/reload/reset, and UI plus direct API permission/tenant isolation denial.
 - A narrow P6 UI DTO fix was made in `apps/web/src/resourcePlanningApiClient.ts` and `apps/web/src/ResourceLoadControlSurface.tsx`: resource buckets now use API/domain `loadPercent` instead of stale `utilizationPercent`, preventing browser readback from rendering `undefined%`.
-- Fresh P6-009 evidence: `npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts`, `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- packages/resource-planning`, P6 phase E2E, matrix verifier with `--allow-blocked`, `npm run typecheck`, `npm run lint`, `git diff --check`, and agent-bus guard all pass. Strict P6 matrix remains intentionally blocked only at P6-010.
-- Next recommended step: claim `P6-010-phase6-verification-matrix-exit-gate`, run the final P6 gate/review loop, and only then mark P6 exit accepted. Do not call Release 2 ready after P6.
+- Fresh P6-009 evidence: `npm test -- packages/shared-test-fixtures/src/phase6Fixtures.test.ts`, `npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx`, `npm test -- apps/api/src/phase6ResourcePlanningApi.test.ts`, `npm test -- packages/resource-planning`, P6 phase E2E, matrix verifier with `--allow-blocked`, `npm run typecheck`, `npm run lint`, `git diff --check`, and agent-bus guard all pass. P6-010 later closed the strict phase gate.
 
 - FE-SERVER-STATE-TANSTACK-QUERY-REVIEW-FIXES-001 completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fe-server-state-tanstack-query-review-fixes.md`.
 - Bug Hunt findings from the TanStack Query migration are fixed: P3/P4/P5 write flows now fail closed when required API readback/refetch fails, CRM draft readback only swallows expected `not_found`, and Gantt clears stale command success when an external project open/refresh changes props.
@@ -51,8 +56,7 @@ Updated: 2026-05-16T17:22:00+07:00
 - P3-P12 post-run gate report is updated to `accepted` in `docs/status/p3-p12-post-run-gate-report.md`.
 - Fresh gate evidence: P3 E2E-020..024 pass and `docs/status/phase3-requirements-matrix.json` passes strict verification; P4 E2E-030..034 pass and `docs/status/phase4-requirements-matrix.json` passes strict verification; P5 E2E-040..044 pass and `docs/status/phase5-requirements-matrix.json` passes strict verification.
 - P3-P12 UX/spec screen matrix passes `node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json`.
-- P6-P12 remain product/UX-specified only in this checkout. They are not accepted as implemented product phases until their phase-detail docs, executable suites, and requirement matrices exist.
-- Next recommended step: commit `FIX-P4-E2E-GATE-001`, then plan Phase 6/resource-capacity kickoff or Release 2 hardening with the explicit P6-P12 spec-only boundary.
+- P7-P12 remain product/UX-specified only in this checkout. They are not accepted as implemented product phases until their phase-detail docs, executable suites, and requirement matrices exist.
 
 - Phase 4 P4-001..P4-010 are completed and verified on branch codex/p4-009-e2e-suite.
 - P5-000 Phase 5 scheduling/Gantt contract is completed on branch codex/p5-contract, commit 42b31b9.
