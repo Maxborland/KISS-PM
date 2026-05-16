@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:20:53.029Z",
+  "updated_at": "2026-05-16T13:29:02.004Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2576,7 +2576,7 @@
         "P7-DOC-011"
       ],
       "title": "Sync Phase 7 E2E scenario ledger statuses after accepted gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "medium",
       "phase": "P7",
       "depends_on": [
@@ -2612,7 +2612,71 @@
         "rg -n \"E2E-060|E2E-061|E2E-062|E2E-063|E2E-064\" docs/e2e/E2E_SCENARIOS.md",
         "git diff --check"
       ],
-      "notes": "Follow-up from P7-010 review: docs/e2e/E2E_SCENARIOS.md still labels E2E-060..064 as planned while matrix/E2E evidence proves they pass. Kept out of P7-010 because docs/e2e was not in that task write_scope."
+      "notes": "Completed narrow P7 E2E ledger status sync. docs/e2e/E2E_SCENARIOS.md now marks E2E-060..064 passing to match accepted Phase 7 matrix and fresh E2E evidence. No product code or E2E tests changed.",
+      "completed_at": "2026-05-16T13:29:02.004Z",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P7-DOC-011-e2e-ledger-status-sync --once exit 0 at startup",
+        "rg -n \"E2E-060|E2E-061|E2E-062|E2E-063|E2E-064\" docs/e2e/E2E_SCENARIOS.md exit 0: all Phase 7 ledger rows now show passing",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P7-DOC-011-e2e-ledger-status-sync --once exit 0 before handoff"
+      ]
+    },
+    {
+      "id": "P8-000-control-surfaces-action-engine-phase-contract",
+      "aliases": [
+        "P8-000"
+      ],
+      "title": "Finalize Phase 8 Control surfaces and action engine contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P7-DOC-011-e2e-ledger-status-sync"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_8_CONTROL_SURFACES_ACTION_ENGINE.md",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-000-control-surfaces-action-engine-phase-contract.claim.json",
+        ".agent-bus/sessions/P8-000-control-surfaces-action-engine-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        "docs/phases/PHASE_8_CONTROL_SURFACES_ACTION_ENGINE.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-000-control-surfaces-action-engine-phase-contract --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next Phase 8 runnable block. Create/freeze the Phase 8 contract, requirement matrix P8-001..P8-010, E2E-070..075 mapping, and verifier support before any product implementation."
     }
   ]
 }

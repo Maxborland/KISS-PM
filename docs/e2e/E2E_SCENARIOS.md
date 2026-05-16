@@ -78,11 +78,11 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-060 | Admin defines KPI threshold for delay or work variance | Tenant admin | Seed Tenant A | KPI definition/threshold saves as versioned config | kpi-engine, tenant-config | PRD 10.8 | `e2e/tests/phase7/kpi-threshold.spec.ts` | planned |
-| E2E-061 | Project state creates warning/critical control signal | Project manager | Seed Tenant A | Evaluation creates traceable control signal | kpi-engine, project-core | PRD 10.8 | `e2e/tests/phase7/kpi-control-signal.spec.ts` | planned |
-| E2E-062 | User opens KPI deviation and sees source/formula/threshold | Project manager | Seed Tenant A | Deviation detail explains source data and rule | kpi-engine, control-surfaces | PRD 10.8, 10.9 | `e2e/tests/phase7/kpi-traceability.spec.ts` | planned |
-| E2E-063 | Threshold change affects future evaluation without corrupting history | Tenant admin | Seed Tenant A | Historical evaluation keeps old version; new evaluation uses new version | kpi-engine | PRD 10.8 | `e2e/tests/phase7/kpi-versioning.spec.ts` | planned |
-| E2E-064 | Unauthorized user cannot edit KPI definitions | Read-only observer | Seed Tenant A | Edit attempt is denied at UI/API path | access-control, kpi-engine | PRD 10.2, 10.8 | `e2e/tests/phase7/kpi-permissions.spec.ts` | planned |
+| E2E-060 | Admin defines KPI threshold for delay or work variance | Tenant admin | Seed Tenant A | KPI definition/threshold saves as versioned config | kpi-engine, tenant-config | PRD 10.8 | `e2e/tests/phase7/kpi-threshold.spec.ts` | passing |
+| E2E-061 | Project state creates warning/critical control signal | Project manager | Seed Tenant A | Evaluation creates traceable control signal | kpi-engine, project-core | PRD 10.8 | `e2e/tests/phase7/kpi-control-signal.spec.ts` | passing |
+| E2E-062 | User opens KPI deviation and sees source/formula/threshold | Project manager | Seed Tenant A | Deviation detail explains source data and rule | kpi-engine, control-surfaces | PRD 10.8, 10.9 | `e2e/tests/phase7/kpi-traceability.spec.ts` | passing |
+| E2E-063 | Threshold change affects future evaluation without corrupting history | Tenant admin | Seed Tenant A | Historical evaluation keeps old version; new evaluation uses new version | kpi-engine | PRD 10.8 | `e2e/tests/phase7/kpi-versioning.spec.ts` | passing |
+| E2E-064 | Unauthorized user cannot edit KPI definitions | Read-only observer | Seed Tenant A | Edit attempt is denied at UI/API path | access-control, kpi-engine | PRD 10.2, 10.8 | `e2e/tests/phase7/kpi-permissions.spec.ts` | passing |
 
 ## Phase 8 — Control surfaces and action engine
 
