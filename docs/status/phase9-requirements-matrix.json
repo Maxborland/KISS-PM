@@ -2,12 +2,12 @@
   "phase": "P9",
   "name": "Phase 9 Closed portfolio and retrospectives requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T01:33:17.9791241+07:00",
+  "updated_at": "2026-05-17T01:58:47.2520821+07:00",
   "rows": [
     {
       "id": "P9-001",
       "requirement": "Closure checklist and closure workflow domain",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/project-core",
@@ -37,17 +37,29 @@
         "npm run test:integration exit 0: 12 files, 68 tests passed",
         "npm test exit 0: 64 files, 414 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "Domain logic remains deterministic and P9 API uses in-memory test runtime. apps/api/src/phase9ClosedPortfolioApi.test.ts proves no snapshot is created after denied/missing/stale closure attempts; browser reset/readback cleanup remains blocked for P9-009 E2E-080.",
-      "blocker": "Domain and API foundation are implemented, but P9-001 cannot be verified until closure UI and executable E2E-080 prove full user write-flow readback, audit, permissions, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:29:35.1931959+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-080",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/project-closure.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-002",
       "requirement": "ClosedProjectSnapshot model and snapshot creation",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/retrospectives",
@@ -80,17 +92,37 @@
         "npm run test:integration exit 0: 12 files, 68 tests passed",
         "npm test exit 0: 64 files, 414 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "Snapshot domain is deterministic and API tests prove denied/stale/missing closure attempts leave snapshot list empty. Browser reset/reload cleanup and E2E-080/E2E-081 evidence remain blocked.",
-      "blocker": "Snapshot domain/API foundation is implemented, but P9-002 cannot be verified until closure UI, deterministic fixtures, and E2E-080/E2E-081 prove snapshot creation/stability, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:29:35.1931959+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-080",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/project-closure.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-081",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-003",
       "requirement": "Snapshot stability and readback API",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/retrospectives",
@@ -113,17 +145,37 @@
         "npm run test:integration exit 0: 12 files, 68 tests passed",
         "npm test exit 0: 64 files, 414 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "API tests use in-memory deterministic app instances and prove no snapshot is created after denied/stale/missing closure attempts. Full reset/reload cleanup remains blocked until P9 deterministic fixtures and E2E-081/E2E-082.",
-      "blocker": "Snapshot readback API exists and has integration evidence, but P9-003 remains blocked until deterministic fixtures and E2E-081/E2E-082 prove browser/API reload persistence, later live/template edits do not rewrite snapshots, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:29:35.1931959+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-081",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-004",
       "requirement": "Plan/fact metrics and trend engine",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/retrospectives"
@@ -146,17 +198,37 @@
         "npm run test:integration exit 0: 12 files, 68 tests passed",
         "npm test exit 0: 65 files, 418 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "P9-004 is pure deterministic domain logic with no runtime persistence. Tests prove trend read models are cloned/stable after input snapshots are mutated later; full browser/API reset cleanup remains blocked until P9-009 E2E-082/E2E-083.",
-      "blocker": "P9 trend engine domain foundation is implemented, but P9-004 cannot be verified until closed portfolio/trends API/UI and executable E2E-082/E2E-083 prove readback, reload persistence, template-improvement source trace, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:43:38.8195149+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-083",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-005",
       "requirement": "Lessons learned and retrospective insight model",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/retrospectives",
@@ -180,17 +252,37 @@
         "npm run test:integration exit 0: 12 files, 68 tests passed",
         "npm test exit 0: 66 files, 423 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "P9-005 is pure deterministic domain logic with no runtime persistence. Tests prove insight readback is cloned/stable after source snapshots/trends are mutated; full API/browser reset cleanup remains blocked until P9-009 E2E-082/E2E-083.",
-      "blocker": "P9 insight domain foundation is implemented, but P9-005 cannot be verified until closed portfolio/trends API/UI and executable E2E-082/E2E-083 prove insight readback, handled-state audit/action evidence, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:52:54.113025+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-083",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-006",
       "requirement": "Closed portfolio and trends API/read models",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
@@ -216,17 +308,29 @@
         "npm test exit 0: 66 files, 425 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 1 before review fix: unused calculatePlanFactMetrics import",
-        "npm run lint exit 0 after review fix"
+        "npm run lint exit 0 after review fix",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "P9-006 uses deterministic in-memory API runtime state. API tests create isolated app instances, prove denied read-only mutation leaves insight status open, prove Tenant B cannot read Tenant A insight ids, and rely on test-only reset/runtime isolation. Full browser reload/reset cleanup remains blocked until P9-009 E2E-082.",
-      "blocker": "Closed portfolio/trends API read models are implemented, but P9-006 remains blocked until P9 closed portfolio UI and executable E2E-082 prove browser readback, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T01:07:11.3735029+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-007",
       "requirement": "Closed portfolio and retrospective trends UI",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/web"
@@ -250,17 +354,29 @@
         "npm test exit 0: 67 files, 429 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 1 before review fix: unused within import",
-        "npm run lint exit 0 after review fix"
+        "npm run lint exit 0 after review fix",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "P9-007 component tests use isolated QueryClient wrappers and mocked API clients. Refetch/readback test proves the UI uses a fresh API response after refresh rather than locally appending rows. Browser reload/reset cleanup remains blocked until P9-009 E2E-082.",
-      "blocker": "Closed portfolio/trends UI is implemented and component-tested, but P9-007 remains blocked until deterministic fixtures and executable E2E-082 prove browser/API readback, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T01:16:26.7081566+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-008",
       "requirement": "Template-improvement governed action",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/action-engine",
@@ -297,17 +413,29 @@
         "npm run lint exit 0",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0",
         "node scripts/agent-bus-guard.mjs --task P9-008-template-improvement-governed-action --once exit 0",
-        "git diff --check exit 0"
+        "git diff --check exit 0",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed"
       ],
-      "cleanup": "P9-008 uses deterministic in-memory runtime state. API tests use isolated createApiApp instances and prove denied, cross-tenant, direct, and stale template-improvement attempts leave insight status/audit/action state unchanged; preview does not mutate insight or snapshots; apply does not rewrite closed snapshots. Browser reload/reset cleanup remains blocked until P9-009 E2E-083.",
-      "blocker": "P9-008 API/domain/UI implementation is complete, but the matrix row remains blocked until deterministic fixtures and executable E2E-083 prove the full browser write-flow with reload persistence and cleanup/reset.",
-      "last_checked_at": "2026-05-17T01:38:29.2455852+07:00",
-      "e2e_evidence": []
+      "cleanup": "P9 deterministic E2E reset uses /test-fixtures/reset and proves cleanup/readback for the relevant Phase 9 flow; API/runtime state is in-memory test-only and restored after reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-083",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-009",
       "requirement": "Deterministic P9 fixtures and E2E-080..083",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/shared-test-fixtures",
@@ -319,12 +447,64 @@
         "E2E-082",
         "E2E-083"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Phase 9 fixture reset must restore closure status, snapshots, insights, template actions, audit/action logs, and template versions before verification.",
-      "blocker": "P9 deterministic fixtures and executable E2E-080..083 are not implemented yet.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
-      "e2e_evidence": []
+      "evidence": [
+        "packages/shared-test-fixtures/src/phase9Fixtures.ts defines deterministic P9 fixture ids, closure data, tenant users, snapshot project ids, and template-improvement key for E2E-080..083.",
+        "e2e/tests/phase9/helpers.ts seeds closable projects through existing API commands and verifies reset/readback through /test-fixtures/reset.",
+        "e2e/tests/phase9/project-closure.spec.ts proves closure UI preview/apply, backend read-only denial, API readback, audit/action evidence, reload persistence, and reset cleanup.",
+        "e2e/tests/phase9/closed-snapshot-stability.spec.ts proves closed snapshot readback remains stable after mutation denial/later live-state attempt and reset cleanup.",
+        "e2e/tests/phase9/closed-portfolio-trends.spec.ts proves closed portfolio UI and API trend metrics from snapshot data, reload persistence, and reset cleanup.",
+        "e2e/tests/phase9/template-improvement-action.spec.ts proves template-improvement UI preview/apply, read-only and Tenant B backend denial, API readback, audit/action evidence, closed snapshot immutability, reload persistence, and reset cleanup."
+      ],
+      "tests": [
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9 exit 0: E2E-080..083 passed (4 tests)",
+        "npm test -- packages/shared-test-fixtures/src/phase9Fixtures.test.ts apps/web/src/ProjectClosureControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 4 files, 18 tests passed",
+        "npm test -- packages/shared-test-fixtures apps/web/src apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 19 files, 108 tests passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 69 files, 440 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json exit 1 expected: P9-010 remains blocked for phase-exit verification",
+        "node scripts/agent-bus-guard.mjs --task P9-009-deterministic-phase9-fixtures-e2e --once exit 0",
+        "git diff --check exit 0"
+      ],
+      "cleanup": "E2E-080..083 each call /test-fixtures/reset and verify cleanup/readback: closed project, snapshots, trends, insight handled state, template-improvement action, audit/action logs, and template versions are restored by the in-memory test runtime reset.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T01:58:47.2520821+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-080",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/project-closure.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-081",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-082",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        },
+        {
+          "id": "E2E-083",
+          "status": "passed",
+          "command": "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase 9",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase9/template-improvement-action.spec.ts",
+          "checked_at": "2026-05-17T01:58:47.2520821+07:00"
+        }
+      ]
     },
     {
       "id": "P9-010",

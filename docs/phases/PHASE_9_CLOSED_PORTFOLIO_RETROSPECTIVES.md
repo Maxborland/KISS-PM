@@ -180,10 +180,10 @@ User-facing copy must be Russian by default.
 
 | E2E ID | Scenario | User role | Fixture | Test path | Status |
 |---|---|---|---|---|---|
-| E2E-080 | User closes project with required closure data | Project manager | Seed Tenant A active closable project with required closure checklist | `e2e/tests/phase9/project-closure.spec.ts` | planned |
-| E2E-081 | Closed project snapshot remains stable after later changes | Project manager | Seed Tenant A closed snapshot plus live/template change path | `e2e/tests/phase9/closed-snapshot-stability.spec.ts` | planned |
-| E2E-082 | User opens closed portfolio and sees trend metrics | Executive | Seed Tenant A closed snapshots with plan/fact variance trends | `e2e/tests/phase9/closed-portfolio-trends.spec.ts` | planned |
-| E2E-083 | User creates template-improvement action from retrospective finding | Executive/admin | Seed Tenant A retrospective insight and versioned template target | `e2e/tests/phase9/template-improvement-action.spec.ts` | planned |
+| E2E-080 | User closes project with required closure data | Project manager | Seed Tenant A active closable project with required closure checklist | `e2e/tests/phase9/project-closure.spec.ts` | passing |
+| E2E-081 | Closed project snapshot remains stable after later changes | Project manager | Seed Tenant A closed snapshot plus live/template change path | `e2e/tests/phase9/closed-snapshot-stability.spec.ts` | passing |
+| E2E-082 | User opens closed portfolio and sees trend metrics | Executive | Seed Tenant A closed snapshots with plan/fact variance trends | `e2e/tests/phase9/closed-portfolio-trends.spec.ts` | passing |
+| E2E-083 | User creates template-improvement action from retrospective finding | Executive/admin | Seed Tenant A retrospective insight and versioned template target | `e2e/tests/phase9/template-improvement-action.spec.ts` | passing |
 
 Required assertion pattern:
 

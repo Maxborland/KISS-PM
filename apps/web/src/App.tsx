@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDemoTenantSummary, getDemoTenants } from "@kiss-pm/shared-test-fixtures";
+import { getDemoTenantSummary, getDemoTenants, getPhase9FixtureSeed } from "@kiss-pm/shared-test-fixtures";
 import { createTenantLabelSet, resolveTenantLabel } from "@kiss-pm/tenant-config";
 import type { TenantLabelSet } from "@kiss-pm/tenant-config";
 
@@ -28,6 +28,8 @@ import { PortfolioControlSurface } from "./PortfolioControlSurface";
 import { createPortfolioControlApiClient, type PortfolioControlApiClient } from "./portfolioControlApiClient";
 import { ClosedPortfolioRetrospectiveSurface } from "./ClosedPortfolioRetrospectiveSurface";
 import { createRetrospectiveApiClient, type RetrospectiveApiClient } from "./retrospectiveApiClient";
+import { ProjectClosureControlSurface } from "./ProjectClosureControlSurface";
+import { createProjectClosureApiClient, type ProjectClosureApiClient } from "./projectClosureApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -41,7 +43,8 @@ type AppProps = {
     Partial<KpiDefinitionApiClient> &
     Partial<KpiDeviationApiClient> &
     Partial<PortfolioControlApiClient> &
-    Partial<RetrospectiveApiClient>;
+    Partial<RetrospectiveApiClient> &
+    Partial<ProjectClosureApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -250,6 +253,15 @@ function isRetrospectiveApiClient(apiClient: Partial<RetrospectiveApiClient> | n
     typeof apiClient?.getClosedPortfolio === "function" &&
     typeof apiClient.getTrends === "function" &&
     typeof apiClient.getInsight === "function"
+  );
+}
+
+function isProjectClosureApiClient(apiClient: Partial<ProjectClosureApiClient> | null): apiClient is ProjectClosureApiClient {
+  return (
+    typeof apiClient?.getClosure === "function" &&
+    typeof apiClient.previewClosure === "function" &&
+    typeof apiClient.applyClosure === "function" &&
+    typeof apiClient.getAudit === "function"
   );
 }
 
@@ -606,6 +618,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createRetrospectiveApiClient() : null;
   }, [apiClient]);
+  const projectClosureApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isProjectClosureApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createProjectClosureApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -828,6 +848,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
           <ClosedPortfolioRetrospectiveSurface
             apiClient={retrospectiveApiClient}
             currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {projectClosureApiClient ? (
+          <ProjectClosureControlSurface
+            apiClient={projectClosureApiClient}
+            currentTenant={currentTenant}
+            projectId={getPhase9FixtureSeed().tenantA.closureProjectId}
             testUser={runtimeUser}
           />
         ) : null}

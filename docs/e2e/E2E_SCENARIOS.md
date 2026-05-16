@@ -99,10 +99,10 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-080 | User closes project with required closure data | Project manager | Seed Tenant A | Closure workflow completes only with required data | project-core, workflow-engine | PRD 10.11 | `e2e/tests/phase9/project-closure.spec.ts` | planned |
-| E2E-081 | Closed project snapshot remains stable after later changes | Project manager | Seed Tenant A | Snapshot metrics do not silently change after live/template edits | project-core | PRD 10.11 | `e2e/tests/phase9/closed-snapshot-stability.spec.ts` | planned |
-| E2E-082 | User opens closed portfolio and sees trend metrics | Executive | Seed Tenant A | Retrospective surface shows plan/fact/trend summary | control-surfaces, retrospective | PRD 10.11 | `e2e/tests/phase9/closed-portfolio-trends.spec.ts` | planned |
-| E2E-083 | User creates template-improvement action from retrospective finding | Executive/admin | Seed Tenant A | Action creates governed improvement item with audit | action-engine, tenant-config, retrospective | PRD 10.11 | `e2e/tests/phase9/template-improvement-action.spec.ts` | planned |
+| E2E-080 | User closes project with required closure data | Project manager | Seed Tenant A | Closure workflow completes only with required data | project-core, workflow-engine | PRD 10.11 | `e2e/tests/phase9/project-closure.spec.ts` | passing |
+| E2E-081 | Closed project snapshot remains stable after later changes | Project manager | Seed Tenant A | Snapshot metrics do not silently change after live/template edits | project-core | PRD 10.11 | `e2e/tests/phase9/closed-snapshot-stability.spec.ts` | passing |
+| E2E-082 | User opens closed portfolio and sees trend metrics | Executive | Seed Tenant A | Retrospective surface shows plan/fact/trend summary | control-surfaces, retrospective | PRD 10.11 | `e2e/tests/phase9/closed-portfolio-trends.spec.ts` | passing |
+| E2E-083 | User creates template-improvement action from retrospective finding | Executive/admin | Seed Tenant A | Action creates governed improvement item with audit | action-engine, tenant-config, retrospective | PRD 10.11 | `e2e/tests/phase9/template-improvement-action.spec.ts` | passing |
 
 ## Phase 10 — No-code tenant customization
 
