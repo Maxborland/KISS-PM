@@ -8,6 +8,7 @@ import {
   createProcessTemplate,
   createStageApprovalRequest,
   createTaskFromStageTaskTemplate,
+  closeManagedProjectWithClosure,
   listProjectTasks,
   listTaskComments,
   listTaskParticipants,
@@ -17,8 +18,12 @@ import {
   updateTaskPlanningFields
 } from "@kiss-pm/project-core";
 import type {
+  ClosureChecklist,
+  ClosureData,
   ManagedProject,
   ProcessTemplate,
+  ProjectClosureBlockerOverride,
+  ProjectClosureResult,
   ProjectArtifactStatus,
   ProjectDraft,
   ProjectLifecycleTransition,
@@ -264,6 +269,39 @@ export function createPhase4RuntimeState() {
     },
 
     getProject: getTenantProject,
+
+    closeProjectWithClosure(input: {
+      tenantId: TenantId;
+      projectId: string;
+      actorId: TenantUserId;
+      checklist: ClosureChecklist;
+      closureData: ClosureData;
+      closedAt: string;
+      correlationId: string;
+      auditEventId: string;
+      blockerOverrides?: ProjectClosureBlockerOverride[];
+    }): ProjectClosureResult {
+      const project = getTenantProject(input.tenantId, input.projectId);
+      if (project === undefined) {
+        throw Object.assign(new Error("project not found"), { code: "not_found" });
+      }
+      const result = closeManagedProjectWithClosure(project, {
+        id: `closure-decision-${input.projectId}-${project.stageHistory.length + 1}`,
+        tenantId: input.tenantId,
+        actorId: input.actorId,
+        checklist: input.checklist,
+        closureData: input.closureData,
+        closedAt: input.closedAt,
+        correlationId: input.correlationId,
+        auditEventId: input.auditEventId,
+        ...(input.blockerOverrides !== undefined ? { blockerOverrides: input.blockerOverrides } : {})
+      });
+      if (result.ok) {
+        setProject(result.project);
+      }
+
+      return result;
+    },
 
     transitionProjectStage(
       tenantId: TenantId,

@@ -132,6 +132,16 @@ const phase2PermissionCatalog = [
     category: "project_lifecycle"
   }),
   createPermission({
+    key: "project.closure.read",
+    description: "Read project closure checklist, readiness, and snapshot links",
+    category: "project_lifecycle"
+  }),
+  createPermission({
+    key: "project.close",
+    description: "Preview and apply governed project closure commands",
+    category: "project_lifecycle"
+  }),
+  createPermission({
     key: "project.artifact.write",
     description: "Record project stage artifact evidence",
     category: "project_lifecycle"
@@ -202,6 +212,16 @@ const phase2PermissionCatalog = [
     category: "control_surfaces"
   }),
   createPermission({
+    key: "retrospective.read",
+    description: "Read closed project snapshots and retrospective read models",
+    category: "retrospectives"
+  }),
+  createPermission({
+    key: "retrospective.write",
+    description: "Write governed retrospective records",
+    category: "retrospectives"
+  }),
+  createPermission({
     key: "schedule:read",
     description: "Open schedule and Gantt drilldowns from control surfaces",
     category: "scheduling"
@@ -235,6 +255,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "project.create_from_template",
       "project.read",
       "project.lifecycle.transition",
+      "project.closure.read",
+      "project.close",
       "project.artifact.write",
       "project.approval.write",
       "task.read",
@@ -249,6 +271,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "control.surface:read",
       "control.action:write",
       "risk:accept",
+      "retrospective.read",
+      "retrospective.write",
       "schedule:read"
     ],
     project_manager: [
@@ -263,6 +287,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "project.create_from_template",
       "project.read",
       "project.lifecycle.transition",
+      "project.closure.read",
+      "project.close",
       "project.artifact.write",
       "project.approval.write",
       "task.read",
@@ -275,6 +301,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "kpi.evaluate:execute",
       "control.surface:read",
       "control.action:write",
+      "retrospective.read",
+      "retrospective.write",
       "schedule:read"
     ],
     resource_manager: [
@@ -283,6 +311,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.template_match.run",
       "crm.feasibility.run",
       "project.read",
+      "project.closure.read",
       "task.read",
       "resource.read",
       "resource.write",
@@ -290,6 +319,7 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "kpi:read",
       "kpi.evaluate:execute",
       "control.surface:read",
+      "retrospective.read",
       "control.action:write",
       "schedule:read"
     ],
@@ -298,18 +328,22 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "crm.opportunity.read",
       "project_draft.read",
       "project.read",
+      "project.closure.read",
       "task.read",
       "resource.read",
       "kpi:read",
+      "retrospective.read",
       "control.surface:read"
     ],
     tenant_user: [
       "crm.opportunity.read",
       "project_draft.read",
       "project.read",
+      "project.closure.read",
       "task.read",
       "resource.read",
       "kpi:read",
+      "retrospective.read",
       "control.surface:read"
     ]
   };

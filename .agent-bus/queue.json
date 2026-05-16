@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T23:49:57.1338658+07:00",
+  "updated_at": "2026-05-17T00:33:05.9566428+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3540,7 +3540,7 @@
         "P9-002"
       ],
       "title": "Implement project closure and snapshot readback API",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3585,7 +3585,73 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Expose closure readiness/close-project/snapshot readback through API runtime with tenant isolation, backend permission guards, audit/action evidence, deterministic readback, typed errors, and truthful matrix updates. Do not implement web UI/E2E in this block unless needed to fix an API blocker."
+      "notes": "Accepted 2026-05-17T00:29:35.1931959+07:00. Implemented P9 closure readiness/preview/apply API, snapshot list/detail readback, immutable snapshot mutation denial, retrospective audit readback, backend permission guards, tenant isolation, dry-run-required apply, stale preview validation, and no-partial-write behavior for denied/stale/missing closure attempts. P9-001/P9-002/P9-003 remain blocked only for later UI/E2E/reload/reset evidence.",
+      "completed_at": "2026-05-17T00:29:35.1931959+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-002-project-closure-api-snapshot-readback --once exit 0 at startup",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED: P9 closure/snapshot API routes missing before implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED during review: direct/stale apply left partial audit events before preview validation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED during review: non-blocking project changes after preview were still applied instead of stale_preview",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts packages/project-core packages/retrospectives exit 0: 11 files, 59 tests passed",
+        "npm run test:integration exit 0: 12 files, 68 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0",
+        "npm test exit 0: 64 files, 414 tests passed"
+      ]
+    },
+    {
+      "id": "P9-004-retrospective-plan-fact-trend-engine",
+      "aliases": [
+        "P9-004"
+      ],
+      "title": "Implement plan/fact metrics and retrospective trend engine",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-002-project-closure-api-snapshot-readback"
+      ],
+      "write_scope": [
+        "packages/retrospectives/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-004-retrospective-plan-fact-trend-engine.claim.json",
+        ".agent-bus/sessions/P9-004-retrospective-plan-fact-trend-engine.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "apps/api/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-004-retrospective-plan-fact-trend-engine --once",
+        "npm test -- packages/retrospectives",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Implement deterministic PlanFactMetric and RetrospectiveTrend calculations from ClosedProjectSnapshot source data only. Do not edit API/UI/E2E in this block unless needed for a domain blocker."
     }
   ]
 }

@@ -17,6 +17,8 @@ import { createPhase6RuntimeState } from "./phase6Runtime";
 import type { ResourceResolutionCommand } from "./phase6Runtime";
 import { createPhase7RuntimeState } from "./phase7Runtime";
 import { createPhase8RuntimeState } from "./phase8Runtime";
+import { createPhase9RuntimeState } from "./phase9Runtime";
+import type { Phase9ClosureDataInput } from "./phase9Runtime";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -36,6 +38,7 @@ import type {
   TaskParticipantRole,
   TaskStatusHistoryEntry
 } from "@kiss-pm/project-core";
+import type { ProjectClosureBlockerOverride } from "@kiss-pm/project-core";
 import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
 
 type ApiErrorCode =
@@ -414,6 +417,58 @@ const controlActionExecuteSchema = z
   })
   .strict();
 
+const closureLessonSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    categoryKey: z.string().trim().min(1),
+    summary: z.string().trim().min(1),
+    recommendation: z.string().trim().min(1).optional(),
+    severity: z.enum(["positive", "attention", "critical"])
+  })
+  .strict();
+
+const closureDataSchema = z
+  .object({
+    finalKpiSummary: z.string().trim().min(1).optional(),
+    qualityScore: z.number().int().min(1).max(5).optional(),
+    clientSatisfactionScore: z.number().int().min(1).max(5).optional(),
+    closingSummary: z.string().trim().min(1).optional(),
+    lessonsLearned: z.array(closureLessonSchema).optional()
+  })
+  .strict();
+
+const closureBlockerOverrideSchema = z
+  .object({
+    blockerCode: z.enum([
+      "tenant_mismatch",
+      "project_not_active",
+      "project_not_in_final_stage",
+      "stage_gate_blocked",
+      "missing_closure_requirement",
+      "open_required_task"
+    ]),
+    requirementId: z.string().trim().min(1).optional(),
+    taskId: z.string().trim().min(1).optional(),
+    stageId: z.string().trim().min(1).optional(),
+    reason: z.string().trim().min(1),
+    auditEventId: z.string().trim().min(1)
+  })
+  .strict();
+
+const closurePreviewSchema = z
+  .object({
+    closureData: closureDataSchema,
+    blockerOverrides: z.array(closureBlockerOverrideSchema).optional()
+  })
+  .strict();
+
+const closureApplySchema = z
+  .object({
+    previewId: z.string().trim().min(1).optional(),
+    closureData: closureDataSchema.optional()
+  })
+  .strict();
+
 const taskStatusUpdateSchema = z
   .object({
     toStatus: z.enum(["todo", "in_progress", "blocked", "done", "cancelled"])
@@ -570,6 +625,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase6Runtime = createPhase6RuntimeState();
   let phase7Runtime = createPhase7RuntimeState();
   let phase8Runtime = createPhase8RuntimeState();
+  let phase9Runtime = createPhase9RuntimeState();
 
   app.get("/health", (context) =>
     context.json({
@@ -1157,6 +1213,200 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       const events = runtime.auditStore
         .listByTenant(session.user.tenantId)
         .filter((event) => actionCorrelationIds.has(event.correlationId))
+        .map(auditEventDto);
+
+      return context.json({
+        events,
+        actionExecutions: actionExecutions.map(actionExecutionDto)
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/closure", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.closure.read", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const closure = phase9Runtime.readClosure(project);
+
+      return context.json({
+        project: projectDto(project),
+        checklist: closure.checklist,
+        readiness: closure.readiness,
+        snapshots: closure.snapshots,
+        latestSnapshot: closure.latestSnapshot
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/closure/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.close", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = closurePreviewSchema.parse(await parseJson(context));
+      const preview = phase9Runtime.previewClosure({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        project,
+        closureData: body.closureData as Phase9ClosureDataInput,
+        ...(body.blockerOverrides !== undefined
+          ? { blockerOverrides: body.blockerOverrides as ProjectClosureBlockerOverride[] }
+          : {})
+      });
+
+      return context.json({ preview });
+    } catch (error) {
+      if (hasBlockerError(error)) {
+        const code = error.code === "stale_preview" ? "stale_preview" : "precondition_failed";
+        return context.json(
+          {
+            ...errorDto(code, code === "stale_preview" ? "Предпросмотр устарел" : "Условия закрытия проекта не выполнены"),
+            blockers: error.blockers.map(stageGateLikeBlockerDto)
+          },
+          409
+        );
+      }
+
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/closure/apply", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const projectId = context.req.param("projectId");
+      const project = phase4Runtime.getProject(session.user.tenantId, projectId);
+      if (project === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      assertAllowed(runtime, session, "project.close", {
+        entityType: "project",
+        tenantId: session.user.tenantId,
+        entityId: projectId
+      });
+      const body = closureApplySchema.parse(await parseJson(context));
+      phase9Runtime.validateApplyClosure({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        project,
+        previewId: body.previewId
+      });
+      const auditEvent = runtime.appendAuditEvent({
+        session,
+        actionKey: "project.closure.apply",
+        target: { entityType: "project", entityId: projectId },
+        correlationId: `closure-${projectId}-audit`,
+        details: { before: projectDto(project) }
+      });
+      const result = phase9Runtime.applyClosure({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        ...(session.user.accessProfileId !== undefined ? { accessProfileId: session.user.accessProfileId } : {}),
+        project,
+        previewId: body.previewId,
+        phase4Runtime,
+        auditEventId: auditEvent.id
+      });
+      const readbackProject = phase4Runtime.getProject(session.user.tenantId, projectId);
+
+      return context.json({
+        result: {
+          snapshotId: result.snapshot.id,
+          closureDecision: result.closureDecision,
+          actionExecution: actionExecutionDto(result.actionExecution)
+        },
+        readback: {
+          project: readbackProject === undefined ? null : projectDto(readbackProject),
+          snapshot: result.snapshot
+        }
+      });
+    } catch (error) {
+      if (hasBlockerError(error)) {
+        const code = error.code === "stale_preview" ? "stale_preview" : "precondition_failed";
+        return context.json(
+          {
+            ...errorDto(code, code === "stale_preview" ? "Предпросмотр устарел" : "Условия закрытия проекта не выполнены"),
+            blockers: error.blockers.map(stageGateLikeBlockerDto)
+          },
+          409
+        );
+      }
+
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/retrospectives/snapshots", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "retrospective.read", {
+        entityType: "closedProjectSnapshot",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ snapshots: phase9Runtime.listSnapshots(session.user.tenantId) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/retrospectives/snapshots/:snapshotId", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      const snapshotId = context.req.param("snapshotId");
+      assertAllowed(runtime, session, "retrospective.read", {
+        entityType: "closedProjectSnapshot",
+        tenantId: session.user.tenantId,
+        entityId: snapshotId
+      });
+      const snapshot = phase9Runtime.getSnapshot(session.user.tenantId, snapshotId);
+      if (snapshot === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json({ snapshot });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.all("/api/retrospectives/snapshots/:snapshotId", (context) =>
+    context.json(errorDto("precondition_failed", "Закрытые снимки неизменяемы"), 405)
+  );
+
+  app.get("/api/retrospectives/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "audit.read", {
+        entityType: "auditEvent",
+        tenantId: session.user.tenantId
+      });
+      const actionExecutions = phase9Runtime.listActionExecutions(session.user.tenantId);
+      const actionCorrelationIds = new Set(actionExecutions.map((entry) => entry.correlationId));
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter((event) => actionCorrelationIds.has(event.correlationId) || event.actionKey.startsWith("project.closure"))
         .map(auditEventDto);
 
       return context.json({
@@ -2567,6 +2817,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase6Runtime = createPhase6RuntimeState();
     phase7Runtime = createPhase7RuntimeState();
     phase8Runtime = createPhase8RuntimeState();
+    phase9Runtime = createPhase9RuntimeState();
     return context.json({ status: "reset" });
   });
 
@@ -2601,6 +2852,16 @@ function isSchedulePreconditionError(error: unknown): error is Error & {
     error.code === "precondition_failed" &&
     "validationIssues" in error &&
     Array.isArray(error.validationIssues)
+  );
+}
+
+function hasBlockerError(error: unknown): error is Error & { code: "precondition_failed" | "stale_preview"; blockers: Array<{ code: string }> } {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "precondition_failed" || error.code === "stale_preview") &&
+    "blockers" in error &&
+    Array.isArray(error.blockers)
   );
 }
 
@@ -2984,6 +3245,10 @@ function stageGateBlockerDto(blocker: StageGateBlocker) {
   return { ...blocker };
 }
 
+function stageGateLikeBlockerDto(blocker: Record<string, unknown>) {
+  return { ...blocker };
+}
+
 function transitionErrorDto(error: ProjectLifecycleTransitionError) {
   return {
     code: error.code,
@@ -3057,6 +3322,7 @@ function handleRouteError(context: Context, error: unknown) {
     error instanceof Error &&
     (error.name === "CrmCoreModelError" ||
       error.name === "ProjectCoreModelError" ||
+      error.name === "RetrospectiveModelError" ||
       error.name === "ResourcePlanningModelError" ||
       error.name === "SchedulingEngineModelError") &&
     hasModelErrorCode(error)
