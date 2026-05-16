@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:29:02.004Z",
+  "updated_at": "2026-05-16T13:41:23.000Z",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2628,7 +2628,7 @@
         "P8-000"
       ],
       "title": "Finalize Phase 8 Control surfaces and action engine contract",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -2676,7 +2676,73 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next Phase 8 runnable block. Create/freeze the Phase 8 contract, requirement matrix P8-001..P8-010, E2E-070..075 mapping, and verifier support before any product implementation."
+      "notes": "Completed Phase 8 contract block. Created PHASE_8_CONTROL_SURFACES_ACTION_ENGINE.md, phase8-requirements-matrix.json with P8-001..P8-010 blocked truthfully, and verifier support/tests for E2E-070..075. Review fixes added P8 cleanup-placeholder rejection and E2E-074 permission coverage for P8-002/P8-005. Product implementation has not started.",
+      "completed_at": "2026-05-16T13:41:23.000Z",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-000-control-surfaces-action-engine-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 49 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json exit 1: expected blocked P8-001..P8-010 until implementation/E2E evidence exists",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P8-000-control-surfaces-action-engine-phase-contract --once exit 0 after locks removed"
+      ]
+    },
+    {
+      "id": "P8-001-control-surface-definition-view-model-foundation",
+      "aliases": [
+        "P8-001"
+      ],
+      "title": "Implement control surface definition and view model foundation",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-000-control-surfaces-action-engine-phase-contract"
+      ],
+      "write_scope": [
+        "packages/control-surfaces/**",
+        "packages/tenant-config/**",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-001-control-surface-definition-view-model-foundation.claim.json",
+        ".agent-bus/sessions/P8-001-control-surface-definition-view-model-foundation.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/action-engine/**",
+        "packages/kpi-engine/**",
+        "packages/resource-planning/**",
+        "packages/project-core/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-001-control-surface-definition-view-model-foundation --once",
+        "npm test -- packages/control-surfaces",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P8 runnable block. Implement tenant-owned ControlSurfaceDefinition/View model foundation only; keep action execution, API/UI, fixtures, and E2E for later P8 blocks."
     }
   ]
 }

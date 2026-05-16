@@ -1,0 +1,272 @@
+{
+  "phase": "P8",
+  "name": "Phase 8 Control surfaces and action engine requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-16T13:41:23.000Z",
+  "rows": [
+    {
+      "id": "P8-001",
+      "requirement": "Control surface definition and view model foundation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/control-surfaces",
+        "packages/tenant-config"
+      ],
+      "required_e2e": [
+        "E2E-070",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract defines ControlSurfaceDefinition, ControlSurfaceView, action slots, visible fields/widgets, drilldown targets, permissions, and saved-view basics."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until implementation fixtures and E2E prove reset/readback.",
+      "blocker": "P8-001 implementation has not started. Need control-surfaces package model, validation tests, API/read-model integration, E2E-070/E2E-074/E2E-075 evidence, and cleanup/readback proof.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-002",
+      "requirement": "Control surface data-source abstraction and read DTOs",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/control-surfaces",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-070",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires stable read DTOs with tenant scope, severity summary, action availability, drilldown refs, and projection refresh semantics."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until read DTOs and E2E reset/readback exist.",
+      "blocker": "P8-002 implementation has not started. Need control surface data-source abstraction, API integration tests, E2E-070/E2E-074/E2E-075 evidence including action availability denial, and refresh/reload proof.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-003",
+      "requirement": "Action definitions and execution log foundation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine"
+      ],
+      "required_e2e": [
+        "E2E-071",
+        "E2E-072",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires ActionDefinition, command binding registry, ActionExecutionLog, permission/precondition traces, input summary, audit ids, and source surface refs."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until action execution fixtures and cleanup/readback exist.",
+      "blocker": "P8-003 implementation has not started. Need action-engine foundation, unit/API tests, E2E-071..075 evidence, audit/action log proof, and no-mutation denial tests.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-004",
+      "requirement": "Governed action execution API and dry-run/preview",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine",
+        "apps/api"
+      ],
+      "required_e2e": [
+        "E2E-072",
+        "E2E-073",
+        "E2E-074"
+      ],
+      "evidence": [
+        "Phase 8 contract requires action preview/execute/audit routes, stale preview handling, permission guard, precondition validation, and no mutation during denied/invalid preview."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until API write-flow cleanup/readback exists.",
+      "blocker": "P8-004 implementation has not started. Need action API/runtime, direct API denial tests, dry-run no-mutation tests, E2E-072/E2E-073/E2E-074 evidence, and audit proof.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-005",
+      "requirement": "Portfolio Control surface MVP",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/web",
+        "apps/api",
+        "packages/control-surfaces"
+      ],
+      "required_e2e": [
+        "E2E-070",
+        "E2E-071",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires /control/portfolio with project/resource/KPI signals, Gantt drilldown, corrective action, accept-risk flow, permission states, audit side panel, and refreshed projection."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until component/E2E cleanup and reload evidence exist.",
+      "blocker": "P8-005 implementation has not started. Need Portfolio Control UI/API, component tests, E2E-070/E2E-071/E2E-073/E2E-074/E2E-075 evidence including permission states, and reload/readback proof.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-006",
+      "requirement": "Corrective action creation from KPI deviation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine",
+        "packages/project-core",
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-071",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires KPI deviation to canonical corrective task/action creation through the action engine with source signal link, audit, readback, and projection refresh."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until corrective task cleanup/reset and readback proof exist.",
+      "blocker": "P8-006 implementation has not started. Need canonical task action binding, API/UI tests, E2E-071/E2E-075 evidence, and proof no duplicate corrective-task model is created.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-007",
+      "requirement": "Resource overload action-engine binding",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine",
+        "packages/resource-planning",
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-072",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires Resource Load Control P8 actions to route through generic action definitions/execution while preserving P6 preview/apply semantics."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until resource action cleanup/reset and readback proof exist.",
+      "blocker": "P8-007 implementation has not started. Need P6 action binding integration, dry-run/apply tests, E2E-072/E2E-075 evidence, unified audit, and refreshed load readback.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-008",
+      "requirement": "Accept risk/deviation, escalation, and request explanation",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/action-engine",
+        "packages/kpi-engine",
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires accepted-risk/deviation action with mandatory reason, escalation/request-explanation records, backend permission guard, audit, and refreshed signal status."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until risk/escalation cleanup/reset and readback proof exist.",
+      "blocker": "P8-008 implementation has not started. Need accepted-risk/escalation action records, missing-reason tests, permission denial, E2E-073/E2E-074/E2E-075 evidence, and audit reason summary.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-009",
+      "requirement": "Deterministic Phase 8 fixtures and E2E-070..075",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase8"
+      ],
+      "required_e2e": [
+        "E2E-070",
+        "E2E-071",
+        "E2E-072",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract requires deterministic Portfolio, KPI, resource, task, action, permission, Tenant B isolation, and reset fixtures plus executable E2E-070..075."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until Phase 8 fixture reset proves cleanup/readback for all write flows.",
+      "blocker": "P8-009 implementation has not started. Need shared fixtures, E2E-070..075 specs, no skipped/flaky tests, UI/API/audit/reload/cleanup evidence, and matrix update.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P8-010",
+      "requirement": "Phase 8 verification matrix and exit gate",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-070",
+        "E2E-071",
+        "E2E-072",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "evidence": [
+        "Phase 8 contract and verifier support define strict matrix requirements for P8-001..P8-010 and E2E-070..075."
+      ],
+      "tests": [
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+      ],
+      "cleanup": "No runtime state exists yet; row is blocked until P8 strict exit gate proves cleanup/readback for all rows.",
+      "blocker": "P8-010 phase exit gate is not completed. Need all P8 rows verified, E2E-070..075 passing, strict verifier without --allow-blocked, full regression/typecheck/lint, review loop, state/handoff, and final acceptance.",
+      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "e2e_evidence": []
+    }
+  ]
+}
