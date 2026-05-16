@@ -8,6 +8,7 @@ export {
 export { getPhase5FixtureSeed, PHASE5_FIXTURE_TIMESTAMP } from "./phase5Fixtures";
 export { getPhase6FixtureSeed, PHASE6_FIXTURE_TIMESTAMP } from "./phase6Fixtures";
 export { getPhase7FixtureSeed, PHASE7_FIXTURE_TIMESTAMP } from "./phase7Fixtures";
+export { getPhase8FixtureSeed, PHASE8_FIXTURE_TIMESTAMP } from "./phase8Fixtures";
 export type {
   Phase2AccessProfileSeed,
   Phase2FixtureSeed,
@@ -33,3 +34,4 @@ export type {
   Phase7KpiSignalFixture,
   Phase7TenantKpiFixture
 } from "./phase7Fixtures";
+export type { Phase8ActionFixture, Phase8FixtureSeed, Phase8TenantControlFixture } from "./phase8Fixtures";

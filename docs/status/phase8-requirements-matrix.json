@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T23:15:32.9030048+07:00",
+  "updated_at": "2026-05-16T16:36:35.085Z",
   "rows": [
     {
       "id": "P8-001",
@@ -31,7 +31,32 @@
       "cleanup": "No runtime state or external resources are created by P8-001; implementation is pure domain model plus unit tests. Phase 8 fixture reset/readback remains pending for E2E-070/E2E-074/E2E-075.",
       "blocker": "P8-001 domain foundation is implemented and unit-tested, but row remains blocked for phase-exit verification until API/read-model integration and structured E2E-070/E2E-074/E2E-075 evidence prove UI/API permissions, reload, and cleanup/readback.",
       "last_checked_at": "2026-05-16T13:59:29.000Z",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-070",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-002",
@@ -65,7 +90,32 @@
       "cleanup": "P8-002 adds read-only DTO/runtime/API state derived from deterministic in-memory P6/P7 projections; /test-fixtures/reset also recreates the P8 runtime, but E2E reload/reset readback remains pending for P8-009.",
       "blocker": "P8-002 read DTO/API implementation is complete and covered by package/API integration tests, but row remains blocked for phase-exit verification until E2E-070/E2E-074/E2E-075 prove UI/API readback, reload, permission visibility, and cleanup.",
       "last_checked_at": "2026-05-16T21:22:28.000+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-070",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-003",
@@ -100,7 +150,48 @@
       "cleanup": "P8-003 adds pure action-engine definitions/log validation and no runtime/external state. Action execution fixture cleanup/readback remains pending for P8-009 E2E.",
       "blocker": "P8-003 action-engine foundation is implemented and package/regression tested, but row remains blocked for phase-exit verification until API execution bindings and E2E-071..075 prove audit/action logs, direct denial, reload, and cleanup/readback.",
       "last_checked_at": "2026-05-16T21:31:23.2267101+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-071",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-072",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/resource-control-action.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-073",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-004",
@@ -134,7 +225,32 @@
       "cleanup": "P8-004 action previews/executions are deterministic in-memory tenant state recreated by /test-fixtures/reset. Preview no-mutation and empty audit after denied/not-implemented execution are API-tested; E2E cleanup/readback remains pending for P8-009.",
       "blocker": "P8-004 API foundation is implemented and tested, but row remains blocked for phase-exit verification because domain command bindings intentionally return not_implemented until P8-006/P8-007/P8-008, and E2E-072/E2E-073/E2E-074 evidence is still missing.",
       "last_checked_at": "2026-05-16T21:45:59.9284450+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-072",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/resource-control-action.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-073",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-005",
@@ -173,7 +289,48 @@
       "cleanup": "P8-005 UI uses TanStack Query server state and no durable frontend state. Component tests prove preview does not create local success evidence, failed apply refetches API/audit readback, successful execute requires readback/audit verification when permitted, and missing audit permission is reported as an audit visibility state rather than fake failure. Phase cleanup/reset and reload persistence remain pending for P8-009 E2E.",
       "blocker": "P8-005 UI and component evidence are implemented, but row remains blocked for phase-exit verification because E2E-070/E2E-071/E2E-073/E2E-074/E2E-075 and real domain command bindings from P8-006/P8-007/P8-008 are still missing.",
       "last_checked_at": "2026-05-16T22:03:04.0000000+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-070",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-071",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-073",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-006",
@@ -208,7 +365,24 @@
       "cleanup": "P8-006 state is deterministic in-memory API runtime state. API tests create the managed project and prove tasks are empty before execution, then read back the created canonical task, action execution audit id, domain audit event, refreshed portfolio projection, and denied resource-manager execute with empty task/action/audit readback. Phase-level browser reload/reset cleanup remains pending for P8-009 E2E fixtures.",
       "blocker": "P8-006 implementation and API/component regression evidence are present, but row remains blocked for phase-exit verification until E2E-071/E2E-075 prove the user-facing UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
       "last_checked_at": "2026-05-16T22:25:41.5420746+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-071",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-007",
@@ -250,7 +424,24 @@
       "cleanup": "P8-007 uses deterministic in-memory API runtime state. API/component tests prove dry-run no mutation, P8 execute mutation through P6 apply, refreshed resource load projection, unified control/resource audit readback, denied mutation with unchanged load/audit state, stale preview rejection, UI refetch/reload behavior, and no local-only apply result without readback/audit confirmation. Browser E2E reset/readback cleanup remains pending for P8-009.",
       "blocker": "P8-007 implementation and API/UI regression evidence are present, but row remains blocked for phase-exit verification until E2E-072/E2E-075 prove the browser UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
       "last_checked_at": "2026-05-16T22:56:16.0862985+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-072",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/resource-control-action.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-008",
@@ -291,12 +482,37 @@
       "cleanup": "P8-008 state is deterministic in-memory API runtime state. API tests prove preview no-mutation, accepted-risk/escalation/request-explanation action execution, audit reason summary, denied/malformed requests without action evidence, generic permission denial without action evidence, and refreshed Portfolio Control readback. Browser E2E reload/reset cleanup remains pending for P8-009.",
       "blocker": "P8-008 implementation and API/UI regression evidence are present, but row remains blocked for phase-exit verification until E2E-073/E2E-074/E2E-075 prove the browser UI flow, backend direct denial, reload persistence, and cleanup/reset readback.",
       "last_checked_at": "2026-05-16T23:15:32.9030048+07:00",
-      "e2e_evidence": []
+      "e2e_evidence": [
+        {
+          "id": "E2E-073",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-009",
       "requirement": "Deterministic Phase 8 fixtures and E2E-070..075",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/shared-test-fixtures",
@@ -311,15 +527,79 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires deterministic Portfolio, KPI, resource, task, action, permission, Tenant B isolation, and reset fixtures plus executable E2E-070..075."
+        "packages/shared-test-fixtures/src/phase8Fixtures.ts exposes deterministic P8 seed ids for Portfolio Control, KPI signals, resource overloads, Tenant A/B users, action definitions, rows, bucket, and assignment ids.",
+        "packages/shared-test-fixtures/src/phase8Fixtures.test.ts verifies E2E-070..075 ids and stable P8 fixture ids for deterministic browser/API assertions.",
+        "e2e/tests/phase8/helpers.ts provides reset, UI open, target construction, API preview/execute, Portfolio/readback, resource/readback, audit, and cleanup helpers over the existing deterministic in-memory reset API.",
+        "E2E-070..075 are implemented as executable Playwright specs covering Portfolio to Gantt drilldown, corrective task creation, resource action binding, accepted risk, permissions/tenant isolation, refresh/reload persistence, audit/action evidence, and reset cleanup."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- packages/shared-test-fixtures/src/phase8Fixtures.test.ts exit 1 RED: missing ./phase8Fixtures before implementation",
+        "npm test -- packages/shared-test-fixtures/src/phase8Fixtures.test.ts exit 0: 1 file, 1 test passed",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase=8 exit 1 RED: No tests found before e2e/tests/phase8 existed",
+        "PW_API_PORT=4288 PW_WEB_PORT=5288 npm run test:e2e:phase -- --phase=8 exit 1 RED: selector ambiguity and missing managed project setup exposed by E2E-070/E2E-071/E2E-073/E2E-075",
+        "PW_API_PORT=4288 PW_WEB_PORT=5288 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed for E2E-070..075",
+        "PW_API_PORT=4289 PW_WEB_PORT=5289 npm run test:e2e:phase -- --phase=8 exit 1 RED: corrective-task direct denial used relative URL and hit web port instead of API",
+        "PW_API_PORT=4289 PW_WEB_PORT=5289 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed after E2E-071 added corrective-task backend denial and no-partial-mutation readback",
+        "npm test -- packages/shared-test-fixtures exit 0: 6 files, 11 tests passed",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 21 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 61 files, 396 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until Phase 8 fixture reset proves cleanup/readback for all write flows.",
-      "blocker": "P8-009 implementation has not started. Need shared fixtures, E2E-070..075 specs, no skipped/flaky tests, UI/API/audit/reload/cleanup evidence, and matrix update.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
-      "e2e_evidence": []
+      "cleanup": "P8-009 E2E uses deterministic in-memory /test-fixtures/reset. E2E-071 verifies corrective tasks are empty again after reset, E2E-072 verifies resource bucket returns to 50h/critical and resource audit clears, E2E-073 verifies accepted-risk audit clears and signal explanation no longer contains risk acceptance, E2E-075 verifies request-explanation audit clears and warning signal explanation resets. No live services or production data are used.",
+      "blocker": null,
+      "last_checked_at": "2026-05-16T16:36:35.085Z",
+      "e2e_evidence": [
+        {
+          "id": "E2E-070",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/portfolio-to-gantt.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-071",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/kpi-corrective-task.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-072",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/resource-control-action.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-073",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/accept-risk-audit.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-074",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/action-permissions.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        },
+        {
+          "id": "E2E-075",
+          "command": "npm run test:e2e:phase -- --phase=8",
+          "exit_code": 0,
+          "status": "passed",
+          "test_path": "e2e/tests/phase8/control-surface-refresh.spec.ts",
+          "checked_at": "2026-05-16T16:36:35.085Z"
+        }
+      ]
     },
     {
       "id": "P8-010",
@@ -342,11 +622,15 @@
         "Phase 8 contract and verifier support define strict matrix requirements for P8-001..P8-010 and E2E-070..075."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "PW_API_PORT=4288 PW_WEB_PORT=5288 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed for E2E-070..075",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 61 files, 396 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until P8 strict exit gate proves cleanup/readback for all rows.",
-      "blocker": "P8-010 phase exit gate is not completed. Need all P8 rows verified, E2E-070..075 passing, strict verifier without --allow-blocked, full regression/typecheck/lint, review loop, state/handoff, and final acceptance.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-009 E2E reset/readback evidence exists, but P8-010 remains blocked until the strict phase-exit matrix review promotes all eligible rows and runs strict verifier without --allow-blocked.",
+      "blocker": "P8-010 phase exit gate is not completed in this block. Need all P8 rows promoted from blocked to verified where P8-009 E2E evidence closes their phase-exit blockers, strict verifier without --allow-blocked, full regression/typecheck/lint, review loop, state/handoff, and final acceptance.",
+      "last_checked_at": "2026-05-16T16:36:35.085Z",
       "e2e_evidence": []
     }
   ]

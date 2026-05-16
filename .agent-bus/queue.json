@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T22:04:30.000+07:00",
+  "updated_at": "2026-05-16T23:38:18.8293318+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3262,7 +3262,7 @@
         "P8-009"
       ],
       "title": "Implement deterministic Phase 8 fixtures and E2E-070..075",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -3309,7 +3309,80 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next Phase 8 block. Implement deterministic Phase 8 fixtures and executable E2E-070..075 proving UI, API/domain readback, direct backend denial, audit/action evidence, projection refresh, reload persistence, and reset cleanup."
+      "notes": "Accepted 2026-05-16T23:38:18.8293318+07:00. Implemented deterministic Phase 8 fixture seed plus executable E2E-070..075. Browser tests prove Portfolio Control read/drilldown, corrective task creation with backend direct denial/no-partial-mutation readback, Resource Load action-engine apply, accepted risk, permission/tenant isolation direct API denial, audit/action evidence, projection refresh, reload persistence, and reset cleanup. P8 matrix row P8-009 is verified; phase exit remains blocked until P8-010 promotes eligible rows and strict verifier passes.",
+      "completed_at": "2026-05-16T23:38:18.8293318+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-009-deterministic-phase8-fixtures-e2e --once exit 0 at startup",
+        "npm test -- packages/shared-test-fixtures/src/phase8Fixtures.test.ts exit 1 RED: missing ./phase8Fixtures before implementation",
+        "npm test -- packages/shared-test-fixtures/src/phase8Fixtures.test.ts exit 0: 1 file, 1 test passed",
+        "PW_API_PORT=4287 PW_WEB_PORT=5287 npm run test:e2e:phase -- --phase=8 exit 1 RED: No tests found before phase8 specs existed",
+        "PW_API_PORT=4288 PW_WEB_PORT=5288 npm run test:e2e:phase -- --phase=8 exit 1 RED: selector ambiguity and missing managed project setup exposed by E2E",
+        "PW_API_PORT=4288 PW_WEB_PORT=5288 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed",
+        "PW_API_PORT=4289 PW_WEB_PORT=5289 npm run test:e2e:phase -- --phase=8 exit 1 RED: corrective-task direct denial used relative URL and hit web port instead of API",
+        "PW_API_PORT=4289 PW_WEB_PORT=5289 npm run test:e2e:phase -- --phase=8 exit 0: 6 tests passed after E2E-071 direct-denial fix",
+        "npm test -- packages/shared-test-fixtures exit 0: 6 files, 11 tests passed",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 21 tests passed",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/ResourceLoadControlSurface.test.tsx exit 0: 2 files, 21 tests passed",
+        "npm run test:integration exit 0: 11 files, 65 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 61 files, 396 tests passed",
+        "node scripts/agent-bus-guard.mjs --task P8-009-deterministic-phase8-fixtures-e2e --once exit 0 after P8-009 locks removed",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-010-phase8-verification-matrix-exit-gate",
+      "aliases": [
+        "P8-010"
+      ],
+      "title": "Run Phase 8 verification matrix and exit gate",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-009-deterministic-phase8-fixtures-e2e"
+      ],
+      "write_scope": [
+        "docs/status/phase8-requirements-matrix.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-010-phase8-verification-matrix-exit-gate.claim.json",
+        ".agent-bus/sessions/P8-010-phase8-verification-matrix-exit-gate.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-010-phase8-verification-matrix-exit-gate --once",
+        "npm run test:e2e:phase -- --phase=8",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next Phase 8 block. Promote eligible P8 rows with fresh E2E evidence, run strict matrix verifier without --allow-blocked, complete bug-hunt/code-review loop, update state/handoff, and only then mark Phase 8 accepted."
     }
   ]
 }
