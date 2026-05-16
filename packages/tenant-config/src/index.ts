@@ -124,6 +124,50 @@ export type ProcessTemplateConfigurationRef = {
   active: boolean;
 };
 
+export type ProcessTemplateImprovementKey = "add_acceptance_checkpoint";
+
+export type ProcessTemplateImprovementPreview = {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  sourceInsightId: string;
+  sourceTrendId: string;
+  sourceSnapshotIds: string[];
+  sourceMetricIds: string[];
+  improvementKey: ProcessTemplateImprovementKey;
+  reason: string;
+  mutatesState: false;
+  stateVersion: number;
+  template: {
+    id: string;
+    key: string;
+    label: string;
+    currentVersion: number;
+    nextVersion: number;
+  };
+  before: {
+    templateVersion: number;
+  };
+  after: {
+    templateVersion: number;
+    addedChecklistItemKey: ProcessTemplateImprovementKey;
+    recommendedLabel: string;
+  };
+  createdAt: string;
+};
+
+export type ImprovedProcessTemplateConfigurationRef = ProcessTemplateConfigurationRef & {
+  improvementSourceInsightId: string;
+  improvementSourceSnapshotIds: string[];
+  improvementKey: ProcessTemplateImprovementKey;
+  improvedAt: string;
+};
+
+export type ProcessTemplateImprovementApplyResult = {
+  previousVersion: number;
+  template: ImprovedProcessTemplateConfigurationRef;
+};
+
 export type ProcessTemplateConfigurationRegistry = {
   tenantId: TenantId;
   version: number;
@@ -321,6 +365,14 @@ function requireOpportunityIntakeStandardFieldKey(value: string | undefined): Op
     value !== "scope_hints"
   ) {
     throw new TenantConfigModelError("validation_error", `Unsupported opportunity intake standard field: ${value}`);
+  }
+
+  return value;
+}
+
+function requireProcessTemplateImprovementKey(value: string | undefined): ProcessTemplateImprovementKey {
+  if (value !== "add_acceptance_checkpoint") {
+    throw new TenantConfigModelError("validation_error", `Unsupported process template improvement: ${value}`);
   }
 
   return value;
@@ -576,6 +628,118 @@ export function createProcessTemplateConfigurationRef(input: {
     label: requireNonEmptyString(input.label, "processTemplateConfiguration.label"),
     version: requirePositiveInteger(input.version, "processTemplateConfiguration.version"),
     active: requireBoolean(input.active, "processTemplateConfiguration.active")
+  };
+}
+
+export function previewProcessTemplateImprovement(input: {
+  id: string;
+  tenantId: TenantId;
+  actorId: TenantUserId;
+  sourceInsightId: string;
+  sourceTrendId: string;
+  sourceSnapshotIds: string[];
+  sourceMetricIds: string[];
+  currentTemplate: ProcessTemplateConfigurationRef;
+  improvementKey: string;
+  reason: string;
+  stateVersion: number;
+  createdAt: string;
+}): ProcessTemplateImprovementPreview {
+  const tenantId = requireNonEmptyString(input.tenantId, "tenantId");
+  const currentTemplate = createProcessTemplateConfigurationRef(input.currentTemplate);
+  if (currentTemplate.tenantId !== tenantId) {
+    throw new TenantConfigModelError("validation_error", "Process template improvement tenant mismatch");
+  }
+  const sourceSnapshotIds = requireArray(input.sourceSnapshotIds, "processTemplateImprovement.sourceSnapshotIds").map((id) =>
+    requireNonEmptyString(id, "processTemplateImprovement.sourceSnapshotId")
+  );
+  if (sourceSnapshotIds.length === 0) {
+    throw new TenantConfigModelError("validation_error", "processTemplateImprovement.sourceSnapshotIds must not be empty");
+  }
+  const sourceMetricIds = requireArray(input.sourceMetricIds, "processTemplateImprovement.sourceMetricIds").map((id) =>
+    requireNonEmptyString(id, "processTemplateImprovement.sourceMetricId")
+  );
+  if (sourceMetricIds.length === 0) {
+    throw new TenantConfigModelError("validation_error", "processTemplateImprovement.sourceMetricIds must not be empty");
+  }
+  const improvementKey = requireProcessTemplateImprovementKey(input.improvementKey);
+  const currentVersion = requirePositiveInteger(currentTemplate.version, "processTemplateConfiguration.version");
+
+  return {
+    id: requireNonEmptyString(input.id, "processTemplateImprovement.id"),
+    tenantId,
+    actorId: requireNonEmptyString(input.actorId, "processTemplateImprovement.actorId"),
+    sourceInsightId: requireNonEmptyString(input.sourceInsightId, "processTemplateImprovement.sourceInsightId"),
+    sourceTrendId: requireNonEmptyString(input.sourceTrendId, "processTemplateImprovement.sourceTrendId"),
+    sourceSnapshotIds,
+    sourceMetricIds,
+    improvementKey,
+    reason: requireNonEmptyString(input.reason, "processTemplateImprovement.reason"),
+    mutatesState: false,
+    stateVersion: requirePositiveInteger(input.stateVersion, "processTemplateImprovement.stateVersion"),
+    template: {
+      id: currentTemplate.id,
+      key: currentTemplate.key,
+      label: currentTemplate.label,
+      currentVersion,
+      nextVersion: currentVersion + 1
+    },
+    before: {
+      templateVersion: currentVersion
+    },
+    after: {
+      templateVersion: currentVersion + 1,
+      addedChecklistItemKey: improvementKey,
+      recommendedLabel: "Ранняя приемка результата"
+    },
+    createdAt: requireValidTimestamp(input.createdAt, "processTemplateImprovement.createdAt")
+  };
+}
+
+export function applyProcessTemplateImprovementPreview(
+  currentTemplateInput: ProcessTemplateConfigurationRef,
+  input: {
+    preview: ProcessTemplateImprovementPreview;
+    expectedStateVersion: number;
+    appliedAt: string;
+  }
+): ProcessTemplateImprovementApplyResult {
+  const currentTemplate = createProcessTemplateConfigurationRef(currentTemplateInput);
+  const preview = previewProcessTemplateImprovement({
+    id: input.preview.id,
+    tenantId: input.preview.tenantId,
+    actorId: input.preview.actorId,
+    sourceInsightId: input.preview.sourceInsightId,
+    sourceTrendId: input.preview.sourceTrendId,
+    sourceSnapshotIds: input.preview.sourceSnapshotIds,
+    sourceMetricIds: input.preview.sourceMetricIds,
+    currentTemplate,
+    improvementKey: input.preview.improvementKey,
+    reason: input.preview.reason,
+    stateVersion: input.preview.stateVersion,
+    createdAt: input.preview.createdAt
+  });
+  const expectedStateVersion = requirePositiveInteger(
+    input.expectedStateVersion,
+    "processTemplateImprovement.expectedStateVersion"
+  );
+  if (preview.stateVersion !== expectedStateVersion || preview.template.currentVersion !== currentTemplate.version) {
+    throw new TenantConfigModelError("conflict", "Process template improvement preview is stale");
+  }
+  if (preview.template.id !== currentTemplate.id || preview.tenantId !== currentTemplate.tenantId) {
+    throw new TenantConfigModelError("validation_error", "Process template improvement tenant mismatch");
+  }
+
+  return {
+    previousVersion: currentTemplate.version,
+    template: {
+      ...currentTemplate,
+      version: currentTemplate.version + 1,
+      improvementSourceInsightId: preview.sourceInsightId,
+      improvementSourceSnapshotIds: [...preview.sourceSnapshotIds],
+      improvementKey: preview.improvementKey,
+      improvedAt: requireValidTimestamp(input.appliedAt, "processTemplateImprovement.appliedAt")
+    }
   };
 }
 

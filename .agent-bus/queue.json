@@ -3872,7 +3872,7 @@
         "P9-008"
       ],
       "title": "Implement template-improvement governed action",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3917,7 +3917,75 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Implement governed template-improvement preview/apply from retrospective insight with permission checks, stale preview/preconditions, audit/action evidence, future-template-version readback, UI preview/apply feedback, and no closed snapshot mutation. Do not implement E2E fixtures in this block."
+      "notes": "Accepted 2026-05-17T01:38:29.2455852+07:00. Implemented governed template-improvement preview/apply from retrospective insight across tenant-config domain helpers, P9 runtime/API routes, retrospective API client, and ClosedPortfolioRetrospectiveSurface UI. Tests prove backend permission guards for retrospective.improvement.write and tenant.config.write, dry-run-required apply, stale preview rejection, Tenant B no-leak denial, audit/action evidence, future template version readback, insight handled readback, and no closed snapshot rewrite. Matrix row remains blocked only for P9-009 E2E-083 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T01:38:29.2455852+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-008-template-improvement-governed-action --once exit 0 at startup after stale completed-claim cleanup",
+        "npm test -- packages/tenant-config/src/processTemplateRegistry.test.ts exit 1 RED: preview/apply helpers were missing before implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED: template-improvement preview route returned 404 and apply returned 501 before implementation",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 1 RED: preview/apply controls and panels were missing before UI implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- packages/action-engine packages/tenant-config apps/api/src/phase9ClosedPortfolioApi.test.ts apps/web/src exit 0: 17 files, 123 tests passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 67 files, 436 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P9-009-deterministic-phase9-fixtures-e2e",
+      "aliases": [
+        "P9-009"
+      ],
+      "title": "Implement deterministic P9 fixtures and E2E-080..083",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-008-template-improvement-governed-action"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase9/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-009-deterministic-phase9-fixtures-e2e.claim.json",
+        ".agent-bus/sessions/P9-009-deterministic-phase9-fixtures-e2e.md"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-009-deterministic-phase9-fixtures-e2e --once",
+        "npm run test:e2e:phase -- --phase 9",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx",
+        "npm run test:integration",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Seed deterministic P9 closure/snapshot/trend/template-improvement data and implement executable E2E-080..083 proving UI, API/domain readback, backend denial, audit/action evidence, projection refresh, reload persistence, and cleanup/reset."
     }
   ]
 }

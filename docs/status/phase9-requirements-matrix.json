@@ -2,7 +2,7 @@
   "phase": "P9",
   "name": "Phase 9 Closed portfolio and retrospectives requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T00:26:10.3794669+07:00",
+  "updated_at": "2026-05-17T01:33:17.9791241+07:00",
   "rows": [
     {
       "id": "P9-001",
@@ -16,7 +16,6 @@
       "required_e2e": [
         "E2E-080"
       ],
-      "evidence": [],
       "evidence": [
         "packages/project-core/src/index.ts implements ClosureChecklist, ClosureRequirement, ClosureData, LessonLearned, ProjectClosureReadiness, ProjectClosureDecision, evaluateProjectClosureReadiness, and closeManagedProjectWithClosure.",
         "Closure readiness checks tenant/project mismatch before exposing detailed closure state, validates required closure fields, blocks non-final/non-active projects, includes stage-gate blockers, and detects open required template tasks.",
@@ -185,7 +184,7 @@
       ],
       "cleanup": "P9-005 is pure deterministic domain logic with no runtime persistence. Tests prove insight readback is cloned/stable after source snapshots/trends are mutated; full API/browser reset cleanup remains blocked until P9-009 E2E-082/E2E-083.",
       "blocker": "P9 insight domain foundation is implemented, but P9-005 cannot be verified until closed portfolio/trends API/UI and executable E2E-082/E2E-083 prove insight readback, handled-state audit/action evidence, reload persistence, and cleanup/reset.",
-      "last_checked_at": "2026-05-17T00:52:54.1130250+07:00",
+      "last_checked_at": "2026-05-17T00:52:54.113025+07:00",
       "e2e_evidence": []
     },
     {
@@ -272,11 +271,37 @@
       "required_e2e": [
         "E2E-083"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. Preview/apply, audit/action readback, future-template-version readback, and reset cleanup must be proven before verification.",
-      "blocker": "P9 template-improvement action path is not implemented yet; E2E-083 is still planned.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "packages/tenant-config/src/index.ts implements ProcessTemplateImprovementPreview and version-only apply helpers for future process template configuration refs without mutating the source template.",
+        "packages/tenant-config/src/processTemplateRegistry.test.ts proves governed template improvement preview/apply, stale preview rejection, cross-tenant rejection, and source template immutability.",
+        "apps/api/src/phase9Runtime.ts implements tenant-scoped template-improvement preview/apply state, handled-insight overlay, future process-template version readback, stale preview validation, audit/action execution evidence, and closed snapshot immutability.",
+        "apps/api/src/app.ts exposes POST /api/retrospectives/insights/:insightId/template-improvement/preview and /apply with backend guards for retrospective.improvement.write and tenant.config.write before mutation.",
+        "apps/api/src/phase9ClosedPortfolioApi.test.ts proves preview does not mutate insight/snapshots, apply handles insight and creates template_improvement.apply audit/action evidence, read-only/cross-tenant denial leaves no partial writes, direct apply requires preview, stale apply is rejected, and closed snapshots remain unchanged.",
+        "apps/web/src/retrospectiveApiClient.ts adds typed preview/apply methods; apps/web/src/ClosedPortfolioRetrospectiveSurface.tsx adds the Template Improvement flow with preview-before-apply, mutation result/audit evidence, readback invalidation, read-only denial, and stale-preview recovery.",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx proves authorized preview/apply, no apply before preview, result/audit feedback, insight readback refresh, read-only no mutation calls, and stale preview retry."
+      ],
+      "tests": [
+        "npm test -- packages/tenant-config/src/processTemplateRegistry.test.ts exit 1 RED: previewProcessTemplateImprovement/applyProcessTemplateImprovementPreview were missing before implementation",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 1 RED: template-improvement preview route returned 404 and apply returned 501 before implementation",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 1 RED: preview/apply controls and panels were missing before UI implementation",
+        "npm test -- packages/tenant-config/src/processTemplateRegistry.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- packages/tenant-config/src/processTemplateRegistry.test.ts apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 2 files, 15 tests passed",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 0: 1 file, 6 tests passed",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- packages/action-engine packages/tenant-config apps/api/src/phase9ClosedPortfolioApi.test.ts apps/web/src exit 0: 17 files, 123 tests passed",
+        "npm test -- packages/tenant-config exit 0: 4 files, 22 tests passed",
+        "npm test -- apps/web/src exit 0: 10 files, 85 tests passed",
+        "npm run test:integration exit 0: 12 files, 73 tests passed",
+        "npm test exit 0: 67 files, 436 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0",
+        "node scripts/agent-bus-guard.mjs --task P9-008-template-improvement-governed-action --once exit 0",
+        "git diff --check exit 0"
+      ],
+      "cleanup": "P9-008 uses deterministic in-memory runtime state. API tests use isolated createApiApp instances and prove denied, cross-tenant, direct, and stale template-improvement attempts leave insight status/audit/action state unchanged; preview does not mutate insight or snapshots; apply does not rewrite closed snapshots. Browser reload/reset cleanup remains blocked until P9-009 E2E-083.",
+      "blocker": "P9-008 API/domain/UI implementation is complete, but the matrix row remains blocked until deterministic fixtures and executable E2E-083 prove the full browser write-flow with reload persistence and cleanup/reset.",
+      "last_checked_at": "2026-05-17T01:38:29.2455852+07:00",
       "e2e_evidence": []
     },
     {
