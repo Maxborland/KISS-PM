@@ -7,6 +7,7 @@ import type {
   Phase5ScheduleApiClient,
   ProjectScheduleAuditDto,
   ProjectScheduleDto,
+  ScheduleCommandResultDto,
   ScheduleActionExecutionDto,
   ScheduleValidationIssueDto
 } from "./phase5ScheduleApiClient";
@@ -130,6 +131,17 @@ function createApiClient(schedule: ProjectScheduleDto = createSchedule()): Phase
     createFinishToStartDependency: vi.fn(),
     captureBaseline: vi.fn()
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
 }
 
 function cloneSchedule(schedule: ProjectScheduleDto): ProjectScheduleDto {
@@ -310,6 +322,24 @@ describe("Gantt control surface", () => {
     expect(screen.getByTestId("gantt-wbs-table")).toHaveTextContent("project-phase4-main:stage-initiation");
     expect(screen.getByTestId("gantt-bars")).toHaveTextContent("task-phase5-kickoff");
     expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Расписание обновлено");
+  });
+
+  it("keeps the schedule visible when audit readback is temporarily unavailable", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.getProjectScheduleAudit).mockRejectedValueOnce(new Error("Audit readback unavailable"));
+
+    render(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        testUser="project-manager-a"
+      />
+    );
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toHaveTextContent("task-phase5-kickoff");
+    expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен, аудит временно недоступен");
+    expect(screen.queryByTestId("gantt-error-state")).not.toBeInTheDocument();
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Действий пока нет");
   });
 
   it("shows a denied state without calling schedule APIs when user cannot read schedule", async () => {
@@ -495,6 +525,49 @@ describe("Gantt control surface", () => {
       );
     });
     expect(screen.getByTestId("gantt-row-task-phase5-kickoff")).toHaveTextContent("2026-06-01 / 2026-06-03 / 3 / 40%");
+  });
+
+  it("shows pending command feedback and blocks project switching until API readback completes", async () => {
+    const apiClient = createApiClient();
+    const createTaskDeferred = createDeferred<ScheduleCommandResultDto>();
+    vi.mocked(apiClient.createScheduleTask).mockReturnValueOnce(createTaskDeferred.promise);
+
+    render(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant([
+          "tenant.read",
+          "project.read",
+          "task.read",
+          "task.write",
+          "audit.read"
+        ])}
+        testUser="project-manager-a"
+      />
+    );
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать задачу в Гантте" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Создание задачи через API");
+    });
+    expect(screen.getByLabelText("ID проекта для Гантта")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Открыть Гантт" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Создать задачу в Гантте" })).toBeDisabled();
+    expect(screen.getByTestId("gantt-status")).not.toHaveTextContent("Задача создана через API");
+
+    createTaskDeferred.resolve({
+      ...createSchedule(),
+      actionExecution: createAudit().actionExecutions[0]
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Задача создана через API");
+    });
+    expect(screen.getByLabelText("ID проекта для Гантта")).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Открыть Гантт" })).not.toBeDisabled();
+    expect(apiClient.getProjectSchedule).toHaveBeenCalledTimes(2);
   });
 
   it("shows denied and validation states for schedule commands without local-only mutation", async () => {
