@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T01:07:11.3735029+07:00",
+  "updated_at": "2026-05-17T01:16:26.7081566+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -3806,7 +3806,7 @@
         "P9-007"
       ],
       "title": "Implement closed portfolio and retrospective trends UI",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P9",
       "depends_on": [
@@ -3849,7 +3849,75 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P9 runnable block. Implement closed portfolio/trends management UI over the accepted P9-006 API with loading/empty/error/denied states, stable snapshot metrics, trend explanation, one clear next action entry, API readback, and reload persistence. Do not implement E2E fixtures in this block unless explicitly reached."
+      "notes": "Accepted 2026-05-17T01:16:26.7081566+07:00. Implemented closed portfolio/trends management UI and typed P9 retrospective API client. Component tests prove loading/empty/error/denied states, stable snapshot metrics, trend explanation, insight source trace, read-only action denial, and API readback refresh without local-only mutation. Matrix row remains blocked only for later deterministic E2E-082 browser reload/cleanup evidence.",
+      "completed_at": "2026-05-17T01:16:26.7081566+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-007-closed-portfolio-retrospective-trends-ui --once exit 0 at startup",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 1 RED: ClosedPortfolioRetrospectiveSurface module was missing before implementation",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 0: 1 file, 4 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm test -- apps/web/src exit 0: 10 files, 83 tests passed",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test exit 0: 67 files, 429 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 1 before review fix: unused within import",
+        "npm run lint exit 0 after review fix",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json exit 0"
+      ]
+    },
+    {
+      "id": "P9-008-template-improvement-governed-action",
+      "aliases": [
+        "P9-008"
+      ],
+      "title": "Implement template-improvement governed action",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P9",
+      "depends_on": [
+        "P9-007-closed-portfolio-retrospective-trends-ui"
+      ],
+      "write_scope": [
+        "packages/action-engine/**",
+        "packages/tenant-config/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase9-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P9-008-template-improvement-governed-action.claim.json",
+        ".agent-bus/sessions/P9-008-template-improvement-governed-action.md"
+      ],
+      "forbidden": [
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P9-008-template-improvement-governed-action --once",
+        "npm test -- packages/action-engine packages/tenant-config apps/api/src/*phase9*.test.ts apps/web/src",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase9-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P9 runnable block. Implement governed template-improvement preview/apply from retrospective insight with permission checks, stale preview/preconditions, audit/action evidence, future-template-version readback, UI preview/apply feedback, and no closed snapshot mutation. Do not implement E2E fixtures in this block."
     }
   ]
 }

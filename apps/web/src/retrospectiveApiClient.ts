@@ -1,0 +1,192 @@
+export type RetrospectiveSeverityDto = "none" | "attention" | "warning" | "critical";
+export type RetrospectiveTrendGroupByDto = "project_type" | "template" | "client" | "period";
+export type RetrospectiveTrendKeyDto = "schedule_delay" | "overload" | "kpi_drift" | "work_variance";
+
+export type RetrospectiveReadActionDto = {
+  key: string;
+  label: string;
+  actionDefinitionKey: string;
+  slotType: "primary" | "row" | "bulk" | "global";
+  targetEntityType: string;
+  dryRunRequired: boolean;
+  available: boolean;
+  unavailableReason?: "not_recommended" | "permission_denied";
+};
+
+export type RetrospectiveReadDrilldownDto = {
+  key: string;
+  label: string;
+  targetSurfaceKey: string;
+  targetEntityType: string;
+  href?: string;
+  available: boolean;
+  unavailableReason?: "missing_param" | "permission_denied";
+};
+
+export type RetrospectiveReadRowDto = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  label: string;
+  severity: RetrospectiveSeverityDto;
+  explanation: string;
+  fieldValues: Record<string, string | number | boolean | null>;
+  sourceRefs: Array<{ entityType: string; entityId: string }>;
+  drilldowns: RetrospectiveReadDrilldownDto[];
+  actions: RetrospectiveReadActionDto[];
+};
+
+export type ClosedPortfolioReadModelDto = {
+  surface: {
+    id: string;
+    tenantId: string;
+    key: string;
+    label: string;
+    viewType: string;
+    version: number;
+    updatedAt: string;
+  };
+  fields: Array<{ key: string; label: string; valueType: string; visible: boolean }>;
+  widgets: Array<{
+    key: string;
+    label: string;
+    widgetType: string;
+    value: number;
+    severity?: Exclude<RetrospectiveSeverityDto, "none">;
+  }>;
+  rows: RetrospectiveReadRowDto[];
+  pagination: { offset: number; limit: number; total: number };
+  summary: { totalSnapshots: number; trendSignalCount: number; openInsightCount: number };
+  filters: { templateId?: string; clientId?: string; period?: string };
+};
+
+export type RetrospectiveTrendDto = {
+  id: string;
+  tenantId: string;
+  trendKey: RetrospectiveTrendKeyDto;
+  groupBy: RetrospectiveTrendGroupByDto;
+  groupKey: string;
+  occurrenceCount: number;
+  severity: RetrospectiveSeverityDto;
+  averageVarianceValue: number;
+  averageVariancePercent?: number;
+  sourceSnapshotIds: string[];
+  sourceMetricIds: string[];
+};
+
+export type RetrospectiveInsightDto = {
+  id: string;
+  tenantId: string;
+  status: "open" | "handled";
+  title: string;
+  recommendation: string;
+  severity: RetrospectiveSeverityDto;
+  sourceTrendId: string;
+  sourceSnapshotIds: string[];
+  sourceMetricIds: string[];
+  sourceLessonIds: string[];
+  sourceLessons: Array<{
+    id: string;
+    snapshotId: string;
+    categoryKey: string;
+    summary: string;
+    recommendation?: string;
+    severity: "positive" | "attention" | "critical";
+  }>;
+  generatedAt: string;
+  handledBy?: string;
+  handledAt?: string;
+};
+
+export type RetrospectiveTrendsReadModelDto = {
+  trends: RetrospectiveTrendDto[];
+  insights: RetrospectiveInsightDto[];
+  pagination: { offset: number; limit: number; total: number };
+};
+
+export type RetrospectiveInsightReadModelDto = {
+  insight: RetrospectiveInsightDto;
+  allowedActions: RetrospectiveReadActionDto[];
+};
+
+export type RetrospectiveQueryFiltersDto = {
+  templateId?: string;
+  clientId?: string;
+  period?: string;
+};
+
+export type RetrospectiveApiClient = {
+  getClosedPortfolio(testUser: string, filters?: RetrospectiveQueryFiltersDto): Promise<ClosedPortfolioReadModelDto>;
+  getTrends(testUser: string, filters?: RetrospectiveQueryFiltersDto): Promise<RetrospectiveTrendsReadModelDto>;
+  getInsight(testUser: string, insightId: string): Promise<RetrospectiveInsightReadModelDto>;
+};
+
+type ApiErrorDto = {
+  code: string;
+  message: string;
+};
+
+async function requestJson<T>(path: string): Promise<T> {
+  const response = await fetch(path);
+  const body = (await response.json()) as T | ApiErrorDto;
+
+  if (!response.ok) {
+    const errorBody = body as ApiErrorDto;
+    throw Object.assign(new Error(errorBody.message), errorBody);
+  }
+
+  return body as T;
+}
+
+function withParams(path: string, params: Record<string, string | undefined>): string {
+  const url = new URL(path, window.location.origin);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  return `${url.pathname}${url.search}`;
+}
+
+export function retrospectiveSeverityLabel(severity: RetrospectiveSeverityDto): string {
+  const labels: Record<RetrospectiveSeverityDto, string> = {
+    none: "Норма",
+    attention: "Внимание",
+    warning: "Риск",
+    critical: "Критично"
+  };
+
+  return labels[severity];
+}
+
+export function retrospectiveTrendLabel(trendKey: RetrospectiveTrendKeyDto): string {
+  const labels: Record<RetrospectiveTrendKeyDto, string> = {
+    schedule_delay: "Повторяющаяся задержка",
+    overload: "Ресурсная перегрузка",
+    kpi_drift: "KPI-дрейф",
+    work_variance: "Отклонение трудозатрат"
+  };
+
+  return labels[trendKey];
+}
+
+export function createRetrospectiveApiClient(basePath = "/api/api"): RetrospectiveApiClient {
+  return {
+    getClosedPortfolio(testUser, filters = {}) {
+      return requestJson<ClosedPortfolioReadModelDto>(
+        withParams(`${basePath}/retrospectives/closed-portfolio`, { testUser, ...filters })
+      );
+    },
+    getTrends(testUser, filters = {}) {
+      return requestJson<RetrospectiveTrendsReadModelDto>(
+        withParams(`${basePath}/retrospectives/trends`, { testUser, groupBy: "template", ...filters })
+      );
+    },
+    getInsight(testUser, insightId) {
+      return requestJson<RetrospectiveInsightReadModelDto>(
+        withParams(`${basePath}/retrospectives/insights/${encodeURIComponent(insightId)}`, { testUser })
+      );
+    }
+  };
+}

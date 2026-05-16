@@ -235,11 +235,27 @@
       "required_e2e": [
         "E2E-082"
       ],
-      "evidence": [],
-      "tests": [],
-      "cleanup": "Pending implementation. UI reload/refetch and reset cleanup must be proven by component tests and E2E-082 before verification.",
-      "blocker": "P9 closed portfolio/trends UI is not implemented yet; no browser evidence exists.",
-      "last_checked_at": "2026-05-16T23:49:57.1338658+07:00",
+      "evidence": [
+        "apps/web/src/retrospectiveApiClient.ts implements typed P9 closed portfolio, trends, and insight API client methods.",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.tsx implements a management-control UI over P9-006 read models with closed snapshot rows, plan/fact fields, trend signals, insight source trace, action-entry state, loading/empty/error/denied states, and API readback refresh.",
+        "apps/web/src/App.tsx wires the P9 surface into the app shell and navigation when a RetrospectiveApiClient is available.",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx proves load, empty, denied, API error, read-only action denial, insight source trace, and refetch/readback behavior without local-only row mutation.",
+        "Review fixes removed a lint defect and kept template-improvement execution out of P9-007 because governed preview/apply belongs to P9-008."
+      ],
+      "tests": [
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 1 RED: ClosedPortfolioRetrospectiveSurface module was missing before implementation",
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx exit 0: 1 file, 4 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm test -- apps/web/src exit 0: 10 files, 83 tests passed",
+        "npm test -- apps/api/src/phase9ClosedPortfolioApi.test.ts exit 0: 1 file, 5 tests passed",
+        "npm test exit 0: 67 files, 429 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 1 before review fix: unused within import",
+        "npm run lint exit 0 after review fix"
+      ],
+      "cleanup": "P9-007 component tests use isolated QueryClient wrappers and mocked API clients. Refetch/readback test proves the UI uses a fresh API response after refresh rather than locally appending rows. Browser reload/reset cleanup remains blocked until P9-009 E2E-082.",
+      "blocker": "Closed portfolio/trends UI is implemented and component-tested, but P9-007 remains blocked until deterministic fixtures and executable E2E-082 prove browser/API readback, reload persistence, and cleanup/reset.",
+      "last_checked_at": "2026-05-17T01:16:26.7081566+07:00",
       "e2e_evidence": []
     },
     {
