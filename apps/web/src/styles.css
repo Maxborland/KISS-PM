@@ -177,7 +177,8 @@ nav a:focus-visible {
 .gantt-surface,
 .resource-load-surface,
 .kpi-definition-surface,
-.kpi-deviation-surface {
+.kpi-deviation-surface,
+.portfolio-control-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -405,6 +406,56 @@ button:focus-visible {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(440px, 0.9fr) minmax(360px, 0.7fr);
+}
+
+.portfolio-control-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(500px, 1fr) minmax(380px, 0.82fr);
+}
+
+.portfolio-overview-panel,
+.portfolio-action-panel,
+.portfolio-detail-panel {
+  min-width: 0;
+}
+
+.portfolio-widget-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.portfolio-widget {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  background: #f7faf6;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.portfolio-widget span {
+  color: #59675a;
+  font-size: 12px;
+}
+
+.portfolio-widget strong {
+  color: #17211b;
+  font-size: 24px;
+}
+
+.portfolio-row-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.portfolio-control-row {
+  min-height: 104px;
+}
+
+.portfolio-action-panel {
+  align-content: start;
 }
 
 .kpi-definition-row {
@@ -890,6 +941,7 @@ button:focus-visible {
   .resource-load-layout,
   .kpi-definition-layout,
   .kpi-deviation-layout,
+  .portfolio-control-layout,
   .kpi-trace-grid {
     grid-template-columns: 1fr;
   }

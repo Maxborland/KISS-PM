@@ -1,9 +1,9 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T21:46:31.000+07:00
+Updated: 2026-05-16T22:04:30.000+07:00
 
 - P8-000 Control surfaces and action engine phase contract completed with verdict accepted.
-- Phase 8 is now contract-ready and P8-001/P8-002/P8-003/P8-004 implementation blocks are accepted. P8 is not an accepted product phase.
+- Phase 8 is now contract-ready and P8-001/P8-002/P8-003/P8-004/P8-005 implementation blocks are accepted. P8 is not an accepted product phase.
 - New source-of-truth contract: `docs/phases/PHASE_8_CONTROL_SURFACES_ACTION_ENGINE.md`.
 - New tracking matrix: `docs/status/phase8-requirements-matrix.json` with P8-001..P8-010 blocked truthfully until implementation and E2E evidence exist.
 - Matrix verifier now knows P8 E2E-070..075 paths and required row mappings, including E2E-074 permission/action-availability coverage for P8-002 and P8-005. `--allow-blocked` tracking verification passes; strict P8 matrix verification intentionally fails while all rows are blocked.
@@ -11,5 +11,6 @@ Updated: 2026-05-16T21:46:31.000+07:00
 - P8-002 implemented control surface read DTO/data-source/API foundation. `packages/control-surfaces` now builds tenant-scoped read DTOs with source refs, severity widgets, drilldowns, backend-policy availability hooks, strict pagination guards, and no execute URLs. `apps/api` exposes `GET /api/control/surfaces`, `GET /api/control/surfaces/:surfaceId`, and `GET /api/control/surfaces/:surfaceId/view` using P6/P7 deterministic projections and backend `control.surface:read` checks. Matrix row P8-002 remains blocked for phase-exit verification until UI/E2E reload, permission visibility, and cleanup/readback evidence exists.
 - P8-003 implemented action-engine foundation: `ActionDefinition`, input schemas, command bindings, audit policy, command binding registry, source-surface action execution refs, input summaries, audit ids, permission traces, and precondition traces. P8 source-surface logs now require permission/precondition/audit evidence where material. Matrix row P8-003 remains blocked for phase-exit verification until API execution routes and E2E-071..075 prove write-flow audit/readback/cleanup.
 - P8-004 implemented governed action API foundation: action listing, preview, execute, execution readback, and audit routes. Preview validates target/input/permission and does not mutate. Execute rechecks permission against stored preview targets, rejects missing/stale previews, and returns `not_implemented` for domain bindings until P8-006/P8-007/P8-008 wire real task/resource/risk mutations. Matrix row P8-004 remains blocked for domain binding and E2E evidence.
+- P8-005 implemented Portfolio Control UI MVP in `apps/web`: typed P8 API client, TanStack Query surface, app-shell navigation/wiring, dense operational UI for P8 read rows/widgets/severity/source refs, Gantt drilldown, recommended action selection, dry-run preview, preview-before-apply, read-only/API-error states, audit panel, and API readback/refetch behavior. Review fixes aligned the web client with the real execute `{ result }` API shape, surfaced failed `/actions` and `/audit` queries, and treated missing `audit.read` as an audit visibility state rather than fake command failure. Matrix row P8-005 remains blocked for real P8-006/P8-007/P8-008 command bindings and P8-009 E2E evidence.
 - Release 2 is not ready. P8-P12 remain not accepted as implemented product phases until their implementation, executable suites, and strict matrices pass.
-- Next recommended step: claim `P8-005-portfolio-control-surface-mvp` and implement the Portfolio Control web surface against the existing P8 read/action APIs.
+- Next recommended step: claim `P8-006-corrective-action-from-kpi-deviation` and wire `create_corrective_action` to a real canonical task/project action binding with source KPI signal evidence, audit/action log, backend permission guard, and readback/projection refresh.

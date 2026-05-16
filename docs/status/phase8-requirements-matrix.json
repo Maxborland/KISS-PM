@@ -2,7 +2,7 @@
   "phase": "P8",
   "name": "Phase 8 Control surfaces and action engine requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-16T21:45:59.9284450+07:00",
+  "updated_at": "2026-05-16T22:03:04.0000000+07:00",
   "rows": [
     {
       "id": "P8-001",
@@ -154,14 +154,25 @@
         "E2E-075"
       ],
       "evidence": [
-        "Phase 8 contract requires /control/portfolio with project/resource/KPI signals, Gantt drilldown, corrective action, accept-risk flow, permission states, audit side panel, and refreshed projection."
+        "apps/web/src/portfolioControlApiClient.ts implements typed P8 Portfolio Control API client methods for GET surface view/actions/audit and POST preview/execute against existing P8 routes, including the real execute response shape { result }.",
+        "apps/web/src/PortfolioControlSurface.tsx implements a dense Portfolio Control management surface wired to TanStack Query: read model rows/widgets, severity/source refs, Gantt drilldown callback, recommended action selection, dry-run preview, preview-before-apply gating, audit side panel, read-only and API error states, action/audit API error surfacing, and API readback/refetch after failed/not-implemented execution or real successful execution.",
+        "apps/web/src/App.tsx wires PortfolioControlSurface into the app shell, navigation, runtime API client selection, and existing Gantt open callback without touching shared TanStack Query foundation.",
+        "apps/web/src/PortfolioControlSurface.test.tsx verifies deterministic row rendering, severity/source refs/actions, Gantt drilldown, dry-run no-mutation preview, not_implemented execute handling without fake success, successful execute readback/audit using the real API response shape, audit-hidden permission state, actions/audit API error states, loading/empty/error states, read-only no preview/apply, and stale-preview recovery.",
+        "P8-005 intentionally preserves P8-004 not_implemented domain execution semantics until P8-006/P8-007/P8-008 wire real corrective/risk/resource command bindings."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: contract tracking verifier passes"
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 1 RED: missing PortfolioControlSurface import before UI implementation",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 11 tests passed",
+        "npm test -- apps/web/src exit 0: 9 files, 73 tests passed",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 13 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0: blocked rows allowed",
+        "git diff --check exit 0"
       ],
-      "cleanup": "No runtime state exists yet; row is blocked until component/E2E cleanup and reload evidence exist.",
-      "blocker": "P8-005 implementation has not started. Need Portfolio Control UI/API, component tests, E2E-070/E2E-071/E2E-073/E2E-074/E2E-075 evidence including permission states, and reload/readback proof.",
-      "last_checked_at": "2026-05-16T13:41:23.000Z",
+      "cleanup": "P8-005 UI uses TanStack Query server state and no durable frontend state. Component tests prove preview does not create local success evidence, failed apply refetches API/audit readback, successful execute requires readback/audit verification when permitted, and missing audit permission is reported as an audit visibility state rather than fake failure. Phase cleanup/reset and reload persistence remain pending for P8-009 E2E.",
+      "blocker": "P8-005 UI and component evidence are implemented, but row remains blocked for phase-exit verification because E2E-070/E2E-071/E2E-073/E2E-074/E2E-075 and real domain command bindings from P8-006/P8-007/P8-008 are still missing.",
+      "last_checked_at": "2026-05-16T22:03:04.0000000+07:00",
       "e2e_evidence": []
     },
     {

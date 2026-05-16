@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T21:46:31.000+07:00",
+  "updated_at": "2026-05-16T22:04:30.000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2977,7 +2977,7 @@
         "P8-005"
       ],
       "title": "Implement Portfolio Control surface MVP",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P8",
       "depends_on": [
@@ -3024,7 +3024,79 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next P8 runnable block. Implement Portfolio Control web surface against existing P8 read/action APIs; keep domain command binding implementations and E2E fixtures for later blocks."
+      "notes": "Completed P8-005 Portfolio Control UI surface. apps/web now has a typed Portfolio Control API client, TanStack Query surface, app-shell navigation/wiring, dense operational UI for P8 read rows/widgets/severity/source refs, Gantt drilldown, dry-run preview, preview-before-apply, read-only/API-error states, audit panel, and readback/refetch after not_implemented or successful execute. Review fixes aligned the web client with the real P8 action API shape, surfaced actions/audit API failures, and avoided fake failure when audit.read is absent. Matrix row remains blocked for real P8-006/P8-007/P8-008 domain bindings and P8-009 E2E.",
+      "completed_at": "2026-05-16T22:04:30.000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-005-portfolio-control-surface-mvp --once exit 0 at startup",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 1 RED: missing PortfolioControlSurface import before UI implementation",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx exit 0: 1 file, 11 tests passed after review fixes",
+        "npm test -- apps/web/src exit 0: 9 files, 77 tests passed",
+        "npm test -- apps/api/src/phase8ActionExecutionApi.test.ts apps/api/src/phase8ControlSurfacesApi.test.ts exit 0: 2 files, 13 tests passed",
+        "npm run test:integration exit 0: 11 files, 57 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 60 files, 385 tests passed",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P8-006-corrective-action-from-kpi-deviation",
+      "aliases": [
+        "P8-006"
+      ],
+      "title": "Implement corrective action creation from KPI deviation",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P8",
+      "depends_on": [
+        "P8-005-portfolio-control-surface-mvp"
+      ],
+      "write_scope": [
+        "packages/action-engine/**",
+        "packages/project-core/**",
+        "apps/api/src/app.ts",
+        "apps/api/src/phase8Runtime.ts",
+        "apps/api/src/*phase8*.test.ts",
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/PortfolioControlSurface.test.tsx",
+        "apps/web/src/portfolioControlApiClient.ts",
+        "docs/status/phase8-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P8-006-corrective-action-from-kpi-deviation.claim.json",
+        ".agent-bus/sessions/P8-006-corrective-action-from-kpi-deviation.md"
+      ],
+      "forbidden": [
+        "packages/resource-planning/**",
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P8-006-corrective-action-from-kpi-deviation --once",
+        "npm test -- packages/action-engine apps/api/src/phase8ActionExecutionApi.test.ts apps/web/src/PortfolioControlSurface.test.tsx",
+        "npm run test:integration",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase8-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next P8 runnable block. Wire create_corrective_action to a real canonical task/project action binding with source KPI signal evidence, backend permission guard, audit/action log, readback/projection refresh, and no duplicate corrective-task model. Keep P8 E2E fixtures for P8-009."
     }
   ]
 }
