@@ -949,7 +949,7 @@
         "node scripts/agent-bus-guard.mjs --task P5-009 --once",
         "git diff --check -- packages/shared-test-fixtures e2e docs/e2e/E2E_SCENARIOS.md docs/status/phase5-requirements-matrix.json .agent-bus"
       ],
-    "notes": "Completed by Block Lead on 2026-05-16. Deterministic Phase 5 fixture contract and E2E-040..044 suite are implemented. Integration unblocker follow-up committed missing P5 scheduling foundation, Phase 5 brief/contract matrix, verifier support, and agent-bus guard artifacts into branch codex/p5-010-exit-gate so P5-010 can run from a clean worktree."
+      "notes": "Completed by Block Lead on 2026-05-16. Deterministic Phase 5 fixture contract and E2E-040..044 suite are implemented. Integration unblocker follow-up committed missing P5 scheduling foundation, Phase 5 brief/contract matrix, verifier support, and agent-bus guard artifacts into branch codex/p5-010-exit-gate so P5-010 can run from a clean worktree."
     },
     {
       "id": "P5-010",
@@ -1489,6 +1489,67 @@
         "npm run verify:matrix -- docs/status/phase5-requirements-matrix.json"
       ],
       "notes": "Completed on 2026-05-16 with final verdict rejected. P3 and P5 fresh E2E/matrix gates pass; Phase 4 remains blocking because E2E-030..034 are absent and docs/status/phase4-requirements-matrix.json fails strict verification. Report: docs/status/p3-p12-post-run-gate-report.md."
+    },
+    {
+      "id": "FIX-P4-E2E-GATE-001",
+      "title": "Close Phase 4 E2E evidence gap for P3-P12 gate",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P4",
+      "depends_on": [
+        "GATE-P3-P12-FINAL-POST-RUN-001"
+      ],
+      "write_scope": [
+        "e2e/tests/phase4/**",
+        "packages/shared-test-fixtures/**",
+        "apps/api/src/**",
+        "apps/web/src/**",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/p3-p12-post-run-gate-report.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/claims/FIX-P4-E2E-GATE-001.claim.json",
+        ".agent-bus/sessions/FIX-P4-E2E-GATE-001.md",
+        ".agent-bus/handoff/2026-05-16-fix-p4-e2e-gate.md",
+        ".agent-bus/locks/queue-json-fix-p4-e2e-gate.lock/**",
+        ".agent-bus/locks/docs-status-fix-p4-e2e-gate.lock/**",
+        ".agent-bus/locks/state-current-fix-p4-e2e-gate.lock/**",
+        ".agent-bus/events/events.jsonl"
+      ],
+      "forbidden": [
+        "packages/scheduling-engine/**",
+        "docs/status/phase5-requirements-matrix.json",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*",
+        "docs/status/*"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task FIX-P4-E2E-GATE-001 --once",
+        "npm run test:e2e:phase -- --phase 4",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test"
+      ],
+      "notes": "Corrective task created after final P3-P12 gate rejected master because Phase 4 E2E-030..034 was missing and phase4 matrix remained blocked.",
+      "completed_at": "2026-05-16T14:46:20+07:00",
+      "result": "accepted",
+      "verification": [
+        "npm run test:e2e:phase -- --phase 4 initial RED exit 1: No tests found",
+        "npm run test:e2e:phase -- --phase 4 exit 0: 5 Playwright tests passed for E2E-030..034",
+        "npm run verify:matrix -- docs/status/phase4-requirements-matrix.json exit 0",
+        "npm run typecheck from /mnt/e/KISS-PM exit 0",
+        "npm run lint exit 0",
+        "npm test exit 0: 44 files, 263 tests passed",
+        "npm run test:e2e:phase -- --phase 3 exit 0 and strict P3 matrix exit 0",
+        "npm run test:e2e:phase -- --phase 5 exit 0 and strict P5 matrix exit 0",
+        "node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json exit 0"
+      ]
     }
   ]
 }

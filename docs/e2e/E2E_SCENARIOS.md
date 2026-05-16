@@ -47,11 +47,11 @@ Each implemented scenario must define concrete steps and expected results in its
 
 | ID | Scenario | Role | Fixture | Preconditions / expected result | Domain modules | PRD refs | Test path | Status |
 |---|---|---|---|---|---|---|---|---|
-| E2E-030 | User creates project from process template | Project manager | Seed Tenant A | Project stages/tasks are instantiated from template version | project-core, tenant-config | PRD 10.4 | `e2e/tests/phase4/project-from-template.spec.ts` | planned |
-| E2E-031 | User moves project stage through required checks | Project principal | Seed Tenant A | Valid stage transition persists and records evidence | project-core, workflow-engine, audit | PRD 10.4 | `e2e/tests/phase4/stage-transition.spec.ts` | planned |
-| E2E-032 | Stage cannot close when required artifact/approval is missing | Project principal | Seed Tenant A | Missing gate requirement blocks closure with clear reason | project-core, workflow-engine | PRD 10.4 | `e2e/tests/phase4/stage-gate-block.spec.ts` | planned |
-| E2E-033 | Task appears in My Tasks for executor and controlled tasks for controller/requester | Executor/controller | Seed Tenant A | Same task appears in role-specific queues | project-core | PRD 10.5 | `e2e/tests/phase4/my-tasks-relations.spec.ts` | planned |
-| E2E-034 | Kanban status change updates the same canonical task | Executor | Seed Tenant A | Kanban move updates canonical task and reload keeps state | project-core | PRD 10.5 | `e2e/tests/phase4/kanban-canonical-task.spec.ts` | planned |
+| E2E-030 | User creates project from process template | Project manager | Seed Tenant A | Project stages/tasks are instantiated from template version | project-core, tenant-config | PRD 10.4 | `e2e/tests/phase4/project-from-template.spec.ts` | implemented |
+| E2E-031 | User moves project stage through required checks | Project principal | Seed Tenant A | Valid stage transition persists and records evidence | project-core, workflow-engine, audit | PRD 10.4 | `e2e/tests/phase4/stage-transition.spec.ts` | implemented |
+| E2E-032 | Stage cannot close when required artifact/approval is missing | Project principal | Seed Tenant A | Missing gate requirement blocks closure with clear reason | project-core, workflow-engine | PRD 10.4 | `e2e/tests/phase4/stage-gate-block.spec.ts` | implemented |
+| E2E-033 | Task appears in My Tasks for executor and controlled tasks for controller/requester | Executor/controller | Seed Tenant A | Same task appears in role-specific queues | project-core | PRD 10.5 | `e2e/tests/phase4/my-tasks-relations.spec.ts` | implemented |
+| E2E-034 | Kanban status change updates the same canonical task | Executor | Seed Tenant A | Kanban move updates canonical task and reload keeps state | project-core | PRD 10.5 | `e2e/tests/phase4/kanban-canonical-task.spec.ts` | implemented |
 
 ## Phase 5 — Scheduling and Gantt foundation
 

@@ -1,12 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-16T14:25:00+07:00
+Updated: 2026-05-16T14:46:20+07:00
 
-- Final P3-P12 post-run gate `GATE-P3-P12-FINAL-POST-RUN-001` completed with verdict `rejected`; report: `docs/status/p3-p12-post-run-gate-report.md`.
-- Fresh gate evidence: P3 E2E-020..024 pass and `docs/status/phase3-requirements-matrix.json` passes strict verification; P5 E2E-040..044 pass and `docs/status/phase5-requirements-matrix.json` passes strict verification.
-- Blocking gate issue: Phase 4 is not exit-complete in this checkout. `npm run test:e2e:phase -- --phase 4` returns `No tests found`, `docs/e2e/E2E_SCENARIOS.md` keeps E2E-030..034 planned, and `docs/status/phase4-requirements-matrix.json` fails strict verification with missing structured E2E evidence plus blocked P4-008..P4-010 rows.
-- Gate fixes applied: Windows-safe API dev-server temp path, E2E port overrides, generated API bundle ignore rules, and a flaky CRM intake component-test assertion.
-- Next recommended step: implement/restore deterministic Phase 4 E2E-030..034 and update Phase 4 matrix/ledger before any P3-P12 acceptance or Release 2/depth-hardening acceptance.
+- Corrective task `FIX-P4-E2E-GATE-001` completed with verdict `accepted`; handoff: `.agent-bus/handoff/2026-05-16-fix-p4-e2e-gate.md`.
+- P3-P12 post-run gate report is updated to `accepted` in `docs/status/p3-p12-post-run-gate-report.md`.
+- Fresh gate evidence: P3 E2E-020..024 pass and `docs/status/phase3-requirements-matrix.json` passes strict verification; P4 E2E-030..034 pass and `docs/status/phase4-requirements-matrix.json` passes strict verification; P5 E2E-040..044 pass and `docs/status/phase5-requirements-matrix.json` passes strict verification.
+- P3-P12 UX/spec screen matrix passes `node scripts/verify-ux-screen-matrix.mjs docs/status/p3-p12-ux-screen-matrix.json`.
+- P6-P12 remain product/UX-specified only in this checkout. They are not accepted as implemented product phases until their phase-detail docs, executable suites, and requirement matrices exist.
+- Next recommended step: commit `FIX-P4-E2E-GATE-001`, then plan Phase 6/resource-capacity kickoff or Release 2 hardening with the explicit P6-P12 spec-only boundary.
 
 - Phase 4 P4-001..P4-010 are completed and verified on branch codex/p4-009-e2e-suite.
 - P5-000 Phase 5 scheduling/Gantt contract is completed on branch codex/p5-contract, commit 42b31b9.
