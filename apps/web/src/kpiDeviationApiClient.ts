@@ -144,7 +144,7 @@ export function kpiRecommendedActionLabel(actionKey: string): string {
   return labels[actionKey] ?? actionKey;
 }
 
-export function createKpiDeviationApiClient(basePath = "/api"): KpiDeviationApiClient {
+export function createKpiDeviationApiClient(basePath = "/api/api"): KpiDeviationApiClient {
   return {
     async listSignals(testUser) {
       const body = await requestJson<{ signals: KpiSignalDto[] }>(withUser(`${basePath}/kpi/deviations`, testUser));

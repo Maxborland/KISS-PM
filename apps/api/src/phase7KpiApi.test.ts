@@ -97,14 +97,20 @@ describe("Phase 7 KPI API and governed commands", () => {
     const deviations = await app.request("/api/kpi/deviations?testUser=project-manager-a");
     expect(deviations.status).toBe(200);
     await expect(readJson(deviations)).resolves.toMatchObject({
-      signals: [
+      signals: expect.arrayContaining([
         expect.objectContaining({
           id: tenantASignalId,
           severity: "critical",
           sourceEvaluationId: tenantAEvaluationId,
           recommendedActionKeys: expect.arrayContaining(["create_corrective_action"])
+        }),
+        expect.objectContaining({
+          id: "signal-kpi-schedule-variance-a-warning",
+          severity: "warning",
+          sourceEvaluationId: "eval-kpi-schedule-variance-a-warning-1",
+          recommendedActionKeys: expect.arrayContaining(["request_explanation"])
         })
-      ]
+      ])
     });
   });
 
