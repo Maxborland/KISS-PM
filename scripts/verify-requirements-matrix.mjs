@@ -21,7 +21,8 @@ const requiredIdsByPhase = {
   P6: Array.from({ length: 10 }, (_, index) => `P6-${String(index + 1).padStart(3, "0")}`),
   P7: Array.from({ length: 10 }, (_, index) => `P7-${String(index + 1).padStart(3, "0")}`),
   P8: Array.from({ length: 10 }, (_, index) => `P8-${String(index + 1).padStart(3, "0")}`),
-  P9: Array.from({ length: 10 }, (_, index) => `P9-${String(index + 1).padStart(3, "0")}`)
+  P9: Array.from({ length: 10 }, (_, index) => `P9-${String(index + 1).padStart(3, "0")}`),
+  P10: Array.from({ length: 10 }, (_, index) => `P10-${String(index + 1).padStart(3, "0")}`)
 };
 const requiredE2eByPhaseRow = {
   P2: {
@@ -119,6 +120,18 @@ const requiredE2eByPhaseRow = {
     "P9-008": ["E2E-083"],
     "P9-009": ["E2E-080", "E2E-081", "E2E-082", "E2E-083"],
     "P9-010": ["E2E-080", "E2E-081", "E2E-082", "E2E-083"]
+  },
+  P10: {
+    "P10-001": ["E2E-090", "E2E-095"],
+    "P10-002": ["E2E-090"],
+    "P10-003": ["E2E-090", "E2E-095"],
+    "P10-004": ["E2E-091"],
+    "P10-005": ["E2E-092", "E2E-094"],
+    "P10-006": ["E2E-093"],
+    "P10-007": ["E2E-093", "E2E-094", "E2E-095"],
+    "P10-008": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"],
+    "P10-009": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"],
+    "P10-010": ["E2E-090", "E2E-091", "E2E-092", "E2E-093", "E2E-094", "E2E-095"]
   }
 };
 const requiredE2eTestPath = {
@@ -162,7 +175,13 @@ const requiredE2eTestPath = {
   "E2E-080": "e2e/tests/phase9/project-closure.spec.ts",
   "E2E-081": "e2e/tests/phase9/closed-snapshot-stability.spec.ts",
   "E2E-082": "e2e/tests/phase9/closed-portfolio-trends.spec.ts",
-  "E2E-083": "e2e/tests/phase9/template-improvement-action.spec.ts"
+  "E2E-083": "e2e/tests/phase9/template-improvement-action.spec.ts",
+  "E2E-090": "e2e/tests/phase10/labels-runtime.spec.ts",
+  "E2E-091": "e2e/tests/phase10/custom-field-control-surface.spec.ts",
+  "E2E-092": "e2e/tests/phase10/kpi-builder-effect.spec.ts",
+  "E2E-093": "e2e/tests/phase10/control-surface-layout-builder.spec.ts",
+  "E2E-094": "e2e/tests/phase10/config-validation.spec.ts",
+  "E2E-095": "e2e/tests/phase10/config-regression.spec.ts"
 };
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
@@ -261,7 +280,7 @@ for (const row of matrix.rows ?? []) {
       failures.push(`${row.id}: verified row missing cleanup evidence`);
     } else if (
       /no runtime cleanup yet/i.test(row.cleanup) ||
-      (["P8", "P9"].includes(matrix.phase) &&
+      (["P8", "P9", "P10"].includes(matrix.phase) &&
         /^(no runtime cleanup|no runtime state exists yet)/i.test(row.cleanup.trim()))
     ) {
       failures.push(`${row.id}: verified row cleanup evidence is still a placeholder`);
@@ -346,7 +365,7 @@ for (const row of matrix.rows ?? []) {
     if (!row.blocker) {
       failures.push(`${row.id}: blocked row missing blocker`);
     }
-    if (matrix.phase === "P9") {
+    if (["P9", "P10"].includes(matrix.phase)) {
       if (typeof row.blocker !== "string" || row.blocker.trim().length < 20) {
         failures.push(`${row.id}: blocked row requires a fresh, specific blocker reason`);
       }
