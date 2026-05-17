@@ -54,9 +54,10 @@ Updated: 2026-05-17T10:29:00.6710000+07:00
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
 - P12 final exit-gate regression verification found and fixed a Phase 6 E2E audit assertion compatibility issue caused by accepted P8 delegated resource-control action evidence:
   - task: `P12-BLOCKER-P6-e2e-audit-compatibility`
-  - file: `e2e/tests/phase6/resolution-apply-audit.spec.ts`
+  - files: `e2e/tests/phase6/resolution-apply-audit.spec.ts`, `e2e/tests/phase6/helpers.ts`
   - result: E2E-054 now requires the concrete P6 `resource_resolution.shift_work` action evidence while allowing the additional P8 delegated action execution.
-  - verification: `npm run test:e2e:phase -- --phase 6`, strict Phase 6 matrix, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
+  - follow-up task: `P12-BLOCKER-P6-e2e-audit-type` added the missing action execution `id` field to the Phase 6 E2E audit DTO type.
+  - verification: `npm run test:e2e:phase -- --phase 6`, strict Phase 6 matrix, `npm run typecheck`, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
 - P12 final exit-gate regression verification found and fixed a Phase 7 E2E selector compatibility issue caused by later control surfaces exposing duplicate accessible labels:
   - task: `P12-BLOCKER-P7-e2e-selector-compatibility`
   - files: `e2e/tests/phase7/kpi-traceability.spec.ts`, `e2e/tests/phase7/kpi-versioning.spec.ts`

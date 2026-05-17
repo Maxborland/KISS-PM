@@ -6174,6 +6174,48 @@
       ]
     },
     {
+      "id": "P12-BLOCKER-P6-e2e-audit-type",
+      "aliases": [
+        "P12-BLOCKER-P6-TYPE"
+      ],
+      "title": "Fix Phase 6 E2E audit DTO type after audit-id assertion",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-BLOCKER-P6-e2e-audit-compatibility",
+        "P12-BLOCKER-P7-e2e-selector-compatibility"
+      ],
+      "write_scope": [
+        "e2e/tests/phase6/helpers.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P12-BLOCKER-P6-e2e-audit-type.claim.json",
+        ".agent-bus/sessions/P12-BLOCKER-P6-e2e-audit-type.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/**"
+      ],
+      "required_locks": [
+        "e2e/tests/phase6/helpers.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm run typecheck",
+        "npm run test:e2e:phase -- --phase 6",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T11:02:00+07:00. Added action execution id to the Phase 6 ResourceAuditDto test helper type after the strengthened audit assertion. Verified with npm run typecheck, npm run test:e2e:phase -- --phase 6, strict phase6 matrix, git diff --check, and agent-bus guard."
+    },
+    {
       "id": "P12-BLOCKER-P7-e2e-selector-compatibility",
       "aliases": [
         "P12-BLOCKER-P7-SELECTORS"
@@ -6270,7 +6312,8 @@
       "depends_on": [
         "P12-009-deterministic-phase12-fixtures-e2e",
         "P12-BLOCKER-P6-e2e-audit-compatibility",
-        "P12-BLOCKER-P7-e2e-selector-compatibility"
+        "P12-BLOCKER-P7-e2e-selector-compatibility",
+        "P12-BLOCKER-P6-e2e-audit-type"
       ],
       "write_scope": [
         "docs/status/phase12-requirements-matrix.json",
@@ -6310,7 +6353,7 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Runnable after accepted P12-009, accepted P12-BLOCKER-P6-e2e-audit-compatibility, and accepted P12-BLOCKER-P7-e2e-selector-compatibility. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
+      "notes": "Runnable after accepted P12-009, accepted P12-BLOCKER-P6-e2e-audit-compatibility, accepted P12-BLOCKER-P7-e2e-selector-compatibility, and accepted P12-BLOCKER-P6-e2e-audit-type. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
     }
   ]
 }
