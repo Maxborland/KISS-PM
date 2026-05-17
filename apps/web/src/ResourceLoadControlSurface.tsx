@@ -465,6 +465,8 @@ export function ResourceLoadControlSurface({
         : overloadDetail?.overload.id === selectedCellOverload.id
           ? "ready"
           : "loading";
+  const selectedOverloadDetailReady =
+    selectedOverload !== null && overloadDetail !== null && overloadDetail.overload.id === selectedOverload.id;
 
   const refreshSurface = useCallback(
     async (nextStatus = "Нагрузка загружена"): Promise<RefreshReadback | null> => {
@@ -525,6 +527,7 @@ export function ResourceLoadControlSurface({
         return;
       }
 
+      setOverloadDetail(null);
       try {
         const detail = await apiClient.getOverloadDetail(testUser, selectedOverload.id);
         if (!cancelled) {
@@ -548,7 +551,7 @@ export function ResourceLoadControlSurface({
   }, [apiClient, canReadResources, selectedOverload, testUser]);
 
   async function previewRecommendedResolution() {
-    if (pendingAction !== null || !canWriteResources || overloadDetail === null) {
+    if (pendingAction !== null || !canWriteResources || !selectedOverloadDetailReady) {
       return;
     }
     const command = defaultShiftCommand(overloadDetail);
@@ -782,7 +785,7 @@ export function ResourceLoadControlSurface({
             ) : (
               <div className="button-row">
                 <button
-                  disabled={pendingAction !== null || selectedOverload === null || overloadDetail === null}
+                  disabled={pendingAction !== null || !selectedOverloadDetailReady}
                   type="button"
                   onClick={() => void previewRecommendedResolution()}
                 >
