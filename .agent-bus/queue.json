@@ -6123,7 +6123,7 @@
         "P12-009"
       ],
       "title": "Implement deterministic Phase 12 fixtures and E2E-110..115",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6155,7 +6155,23 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next runnable P12 block after accepted P12-008. Implement remaining deterministic Phase 12 E2E-111..114 and close P12-009 evidence without marking Release 2 ready before P12-010 strict exit gate."
+      "notes": "Accepted implementation block on 2026-05-17T10:29:00.6710000+07:00. Implemented remaining deterministic Phase 12 E2E-111..114 and refreshed E2E-110..115 phase suite evidence. E2E-113 now launches an isolated production_like API smoke without fixture reset, while the main deterministic server proves UI/readiness/audit/reload/reset. P12-001..P12-009 are verified in the matrix; P12-010 remains the only blocked strict exit-gate row.",
+      "completed_at": "2026-05-17T10:29:00.6710000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-009-deterministic-phase12-fixtures-e2e --once exit 0 at startup",
+        "npm run test:e2e:phase -- --phase 12 exit 1 RED: new E2E-111..114 initially exposed over-strict audit/secret assertions and an invalid Tenant B fixture shape reference",
+        "npm run test:e2e:phase -- --phase 12 exit 0: 6 tests passed, E2E-110..115 recorded in test-results/kiss-pm-e2e-last-run.json",
+        "npm test -- packages/shared-test-fixtures exit 0: 10 files, 20 tests passed",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts apps/api/src/phase12RecoveryApi.test.ts apps/api/src/phase12ReadinessApi.test.ts exit 0: 3 files, 12 tests passed",
+        "npm test -- apps/web/src/OperatorReadinessSurface.test.tsx exit 0: 1 file, 6 tests passed",
+        "npm test exit 0: 107 files, 612 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12-010 remains blocked until final strict exit gate",
+        "git diff --check exit 0 with line-ending normalization warning for docs/status/phase12-requirements-matrix.json"
+      ]
     },
     {
       "id": "P12-010-phase12-verification-matrix-market-release-exit-gate",
@@ -6163,7 +6179,7 @@
         "P12-010"
       ],
       "title": "Close Phase 12 verification matrix and market release exit gate",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6207,7 +6223,7 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Blocked until E2E-110..115 and P12-001..P12-009 evidence are complete. This is the only P12 block that may mark Phase 12 and Release 2 accepted."
+      "notes": "Runnable after accepted P12-009. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
     }
   ]
 }

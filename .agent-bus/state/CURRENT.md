@@ -1,41 +1,41 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T10:14:38.9340000+07:00
+Updated: 2026-05-17T10:29:00.6710000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
   - contract: `docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md`
   - matrix: `docs/status/phase12-requirements-matrix.json`
   - verifier support recognizes P12-001..P12-010 and E2E-110..115 paths.
-- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; P12-007 and P12-008 are verified, while P12-001..006 and P12-009..010 remain blocked for the remaining E2E/exit-gate evidence.
-- `P12-001-production-deployment-env-secret-contract` is accepted as an implementation block:
+- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; P12-001..P12-009 are verified, while P12-010 remains blocked for the final strict exit-gate aggregation.
+- `P12-001-production-deployment-env-secret-contract` is accepted and now verified in the Phase 12 matrix:
   - `.env.example` contains P12 deployment variable names with empty values only.
   - `docs/operations/PHASE_12_PRODUCTION_DEPLOYMENT_ENVIRONMENT.md` defines production-like env, secret-reference, and deployment-smoke rules.
   - `apps/api/src/phase12Deployment.ts` and `GET /health/deployment` validate required env, URLs, secret references, external-service mode, and fixture-only switches without exposing secret values.
-  - P12-001 matrix row remains blocked only for later E2E-113 evidence.
-- `P12-002-observability-readiness-runtime` is accepted as an implementation block:
+  - E2E-113 now proves isolated `production_like` deployment smoke without fixture reset plus deterministic readiness UI/API/audit/reload/reset evidence.
+- `P12-002-observability-readiness-runtime` is accepted and now verified in the Phase 12 matrix:
   - `apps/api/src/phase12Readiness.ts` builds a tenant-scoped release-readiness read model with deployment, local observability, dependency, E2E, matrix, and open-blocker evidence.
   - `GET /api/ops/release-readiness` is backend permission-checked with `release.readiness.read`, denies read-only observers, and does not expose secret references.
-  - P12-002 matrix row remains blocked only for later E2E-113/E2E-115 evidence.
-- `P12-003-recovery-smoke-backup-restore` is accepted as an implementation block:
+  - E2E-113/E2E-115 now prove readiness/no-live-dependency evidence.
+- `P12-003-recovery-smoke-backup-restore` is accepted and now verified in the Phase 12 matrix:
   - `docs/operations/PHASE_12_RECOVERY_BACKUP_POLICY.md` defines deterministic recovery smoke and production backup requirements.
   - `apps/api/src/phase12Recovery.ts` and `/api/ops/recovery-smoke` implement tenant-scoped before/failure/after recovery readback, `ops.read`/`ops.execute` backend guards, audit event evidence, malformed-scenario no-partial mutation, and reset cleanup.
-  - P12-003 matrix row remains blocked only for later E2E-114 evidence.
-- `P12-004-security-privacy-audit-review-fixes` is accepted as an implementation/review block:
+  - E2E-114 now proves deterministic recovery smoke with UI/API/audit/reload/reset evidence.
+- `P12-004-security-privacy-audit-review-fixes` is accepted and now verified in the Phase 12 matrix:
   - `docs/security/PHASE_12_SECURITY_PRIVACY_AUDIT.md` records repository-local security/privacy/audit review scope, scan evidence, fixed fixture-auth finding, and residual E2E gate.
   - `apps/api/src/app.ts` centralizes route-level fixture session resolution through `requireRouteSession` and supports `createApiApp({ allowTestFixtureAuth: false })` returning `403 test_mode_only`.
   - `apps/api/src/phase12Deployment.ts` and `apps/api/src/server.ts` now cover the backend fixture-auth switch `KISS_PM_ALLOW_TEST_FIXTURE_AUTH`; production-like/production deployment smoke fails if the switch is enabled, and server default disables fixture auth for `production_like`/`production` targets unless explicitly allowed.
-  - P12-004 matrix row remains blocked only for later E2E-111/E2E-112 permission and tenant-isolation evidence.
-- `P12-005-permission-tenant-isolation-matrix-smoke` is accepted as an implementation block:
+  - E2E-111/E2E-112 now prove permission and tenant-isolation browser/API evidence.
+- `P12-005-permission-tenant-isolation-matrix-smoke` is accepted and now verified in the Phase 12 matrix:
   - `apps/api/src/phase12PermissionSmoke.ts` implements deterministic permission-smoke and tenant-isolation scenario runners with expected/actual status, forbidden-term leak checks, summary, deterministic setup project creation/reuse for real P4/P5/project-isolation probes, and resettable tenant-scoped latest-run readback.
   - `GET /api/ops/permission-smoke`, `POST /api/ops/permission-smoke/run`, `GET /api/ops/tenant-isolation`, and `POST /api/ops/tenant-isolation/run` enforce backend `ops.read`/`ops.execute`, write ops audit events on run, and keep readback tenant-scoped.
   - `apps/api/src/phase12PermissionIsolationApi.test.ts` proves permission smoke across P3-P12 representative surfaces, P4 task write denial, P5 schedule write denial, tenant-isolation no-leak probes, read-only direct denial, audit readback, and `/test-fixtures/reset` cleanup of latestRun plus the deterministic setup project.
-  - P12-005 matrix row remains blocked only for later E2E-111/E2E-112 browser/UI evidence.
-- `P12-006-operator-readiness-surfaces` is accepted as an implementation block:
+  - E2E-111/E2E-112 now prove browser/UI, backend denial, audit/readback/reload, and reset cleanup evidence.
+- `P12-006-operator-readiness-surfaces` is accepted and now verified in the Phase 12 matrix:
   - `apps/api/src/phase12Readiness.ts` now keeps resettable tenant-scoped release-readiness run state with latestRun, immutable run snapshots, and run detail readback.
   - `apps/api/src/app.ts` exposes governed release-readiness run/readback routes and tenant-scoped `/api/ops/audit`; readiness execution is backend guarded with `release.readiness.execute`, readback with `release.readiness.read`, and audit with `ops.audit.read`.
   - `apps/web/src/OperatorReadinessSurface.tsx`, `apps/web/src/operatorReadinessApiClient.ts`, and `apps/web/src/App.tsx` provide the P12 operator readiness surface and navigation entry for readiness, permission smoke, tenant-isolation smoke, recovery smoke, command errors, denied state, API readback, latest run after remount, and ops audit evidence.
-  - P12-006 matrix row remains blocked only for later E2E-113/E2E-114 browser/API evidence.
+  - E2E-113/E2E-114 now prove deployment/readiness and recovery-smoke browser/API evidence.
 - `P12-007-demo-tenant-template-pack-onboarding` is accepted as an implementation block:
   - `packages/shared-test-fixtures/src/phase12Fixtures.ts` defines the deterministic P12 release demo tenant seed, release demo template pack, role matrix, critical journey ids, mocked external-service state, operator docs links, and Tenant B isolation-only private ids for E2E-110..115.
   - `docs/operations/PHASE_12_RELEASE_DEMO_TENANT_TEMPLATE_PACK.md` and `docs/operations/PHASE_12_OPERATOR_ONBOARDING.md` document the release demo pack, operator first-run checklist, mocked external-services rule, audit/readback/reload/cleanup expectations, and blocked-until-E2E policy.
@@ -45,8 +45,14 @@ Updated: 2026-05-17T10:14:38.9340000+07:00
   - `e2e/tests/phase12/no-live-external-dependency.spec.ts` implements E2E-115: `/health/deployment` proves `external-services-mode=mocked`, Mock CRM import uses dry-run before apply, readiness run writes ops audit evidence, reload persists latest readiness run, and reset clears mappings.
   - `playwright.config.ts` passes `KISS_PM_EXTERNAL_SERVICES_MODE=mocked` to the API E2E webServer so release-critical tests do not depend on live external services.
   - P12-008 matrix row is verified with structured E2E-110/E2E-115 evidence.
+- `P12-009-deterministic-phase12-fixtures-e2e` is accepted as an implementation block:
+  - `e2e/tests/phase12/permission-matrix-smoke.spec.ts` implements E2E-111: operator UI start state, permission smoke execution, direct read-only backend denial, read-only UI denial, API readback, ops audit evidence, reload persistence, and reset cleanup.
+  - `e2e/tests/phase12/tenant-isolation-full.spec.ts` implements E2E-112: tenant-isolation UI execution, Tenant B direct API probes, no forbidden term leakage, ops audit evidence, reload persistence, and reset cleanup.
+  - `e2e/tests/phase12/production-deploy-smoke.spec.ts` implements E2E-113: isolated `production_like` API `/health/deployment` smoke without fixture reset, deterministic readiness run, direct backend denial, read-only UI denial, audit evidence, reload persistence, and reset cleanup.
+  - `e2e/tests/phase12/recovery-smoke.spec.ts` implements E2E-114: read-only recovery run denial without mutation, before/failure/after recovery readback, audit evidence, reload persistence, and reset cleanup.
+  - P12-009 matrix row is verified with structured E2E-110..115 evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-009-deterministic-phase12-fixtures-e2e`.
+- Next runnable step: claim `P12-010-phase12-verification-matrix-market-release-exit-gate`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

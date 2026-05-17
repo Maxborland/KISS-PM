@@ -2,17 +2,17 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T10:14:38.9340000+07:00",
+  "updated_at": "2026-05-17T10:29:00.6710000+07:00",
   "rows": [
     {
       "id": "P12-001",
       "requirement": "Production deployment and environment contract",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs",
-        "scripts",
-        "deployment config"
+        ".env.example",
+        "apps/api"
       ],
       "required_e2e": [
         "E2E-113"
@@ -38,22 +38,31 @@
         "npm run typecheck exit 0 after fixing explicit string guards in apps/api/src/phase12Deployment.ts",
         "npm run lint exit 0",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0",
-        "git diff --check exit 0"
+        "git diff --check exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-113 isolated production_like deployment smoke with safe env readback, readiness command, backend denial, audit evidence, reload persistence, and reset cleanup."
       ],
-      "cleanup": "Implementation has no persistent state to clean up; final row verification still requires E2E-113 deployment-smoke cleanup/readback evidence from deterministic Phase 12 fixtures before this row can become verified.",
-      "blocker": "2026-05-17T08:44:00.0000000+07:00: P12-001 implementation evidence exists, but executable E2E-113 production-like deployment smoke is not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T08:44:00.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "Implementation has no persistent state to clean up. E2E-113 proves isolated production_like deployment-smoke readback, readiness run reload persistence, direct read-only backend denial, and /test-fixtures/reset clearing latest readiness run state.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-113",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/production-deploy-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-002",
       "requirement": "Observability, error monitoring, and release readiness read model",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
-        "apps/web",
-        "ops readiness runtime"
+        "apps/web"
       ],
       "required_e2e": [
         "E2E-113",
@@ -77,22 +86,39 @@
         "npm test exit 0: 103 files, 591 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "git diff --check exit 0"
+        "git diff --check exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-113 readiness UI/API readback and E2E-115 no-live-external-dependency mocked-service proof."
       ],
-      "cleanup": "Read model has no persistent state to clean up; final row verification still requires E2E-113/E2E-115 reload/readback evidence from deterministic Phase 12 fixtures before this row can become verified.",
-      "blocker": "2026-05-17T08:53:30.0000000+07:00: P12-002 API/read-model evidence exists, but E2E-113 production deployment smoke and E2E-115 no-live-external-dependency browser/API evidence are not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T08:53:30.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "Read model has no persistent state to clean up. E2E-113 proves readiness latestRun API readback, reload persistence, audit evidence, direct backend denial, and reset cleanup; E2E-115 proves mocked external-service mode and reset cleanup after mocked import.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-113",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/production-deploy-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-115",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/no-live-external-dependency.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-003",
       "requirement": "Backup/restore or deterministic recovery smoke",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs",
-        "apps/api",
-        "recovery runtime"
+        "apps/api"
       ],
       "required_e2e": [
         "E2E-114"
@@ -115,17 +141,27 @@
         "npm test exit 0: 104 files, 595 tests passed",
         "npm run typecheck exit 0",
         "npm run lint exit 0",
-        "git diff --check exit 0"
+        "git diff --check exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-114 recovery smoke with before/failure/after readback, read-only denial, audit evidence, reload persistence, and reset cleanup."
       ],
-      "cleanup": "API tests prove /test-fixtures/reset clears tenant recovery-smoke latestRun and audit runtime state in the deterministic test runtime; final row verification still requires E2E-114 browser/API recovery-smoke cleanup/readback evidence before this row can become verified.",
-      "blocker": "2026-05-17T09:01:30.0000000+07:00: P12-003 API/runtime/policy evidence exists, but E2E-114 recovery-smoke browser/API evidence is not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T09:01:30.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "API tests and E2E-114 prove /test-fixtures/reset clears tenant recovery-smoke latestRun and audit runtime state in the deterministic test runtime; E2E-114 also proves read-only denial causes no partial mutation before authorized recovery execution.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-114",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/recovery-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-004",
       "requirement": "Security, privacy, and audit review fixes",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/access-control",
@@ -157,17 +193,35 @@
         "npm run test:integration exit 0: 24 files, 125 tests passed",
         "npm test exit 0: 104 files, 597 tests passed",
         "npm run typecheck exit 0",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-111 permission matrix and E2E-112 tenant-isolation browser/API evidence."
       ],
-      "cleanup": "Security review and fixture-auth guard have no persistent state to clean up; integration/unit tests run in deterministic in-memory runtime. Final row verification still requires E2E-111/E2E-112 permission, tenant-isolation, audit/readback/reload, and reset cleanup evidence before this row can become verified.",
-      "blocker": "2026-05-17T09:11:30.0000000+07:00: P12-004 security/privacy/audit review and backend fixture-auth fix are complete with tests, but executable E2E-111/E2E-112 permission and tenant-isolation evidence is not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T09:11:30.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "Security review and fixture-auth guard have no persistent state to clean up; integration/unit tests run in deterministic in-memory runtime. E2E-111/E2E-112 prove permission, tenant-isolation, audit/readback/reload, and reset cleanup evidence.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-111",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/permission-matrix-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-112",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/tenant-isolation-full.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-005",
       "requirement": "Full permission and tenant-isolation matrix smoke",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
@@ -197,17 +251,35 @@
         "npm run test:integration exit 0: 25 files, 128 tests passed",
         "npm test exit 0: 105 files, 600 tests passed",
         "npm run typecheck exit 0 after fixing requester Promise type and audit details shape",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-111 permission matrix and E2E-112 tenant-isolation UI/API smoke, backend denial, audit, reload, and reset cleanup."
       ],
-      "cleanup": "API tests prove /test-fixtures/reset clears permission-smoke latestRun, tenant-isolation latestRun, and the deterministic project-p12-permission-smoke setup project; tenant-isolation readback is tenant-scoped and does not expose Tenant A latestRun to Tenant B. Final row verification still requires E2E-111/E2E-112 browser UI visibility, backend denial, audit/readback/reload, and reset cleanup evidence before this row can become verified.",
-      "blocker": "2026-05-17T09:33:39.7399302+07:00: P12-005 API-level permission and tenant-isolation smoke implementation is complete with tests, but executable E2E-111/E2E-112 browser/UI evidence is not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T09:33:39.7399302+07:00",
-      "e2e_evidence": []
+      "cleanup": "API tests and E2E-111/E2E-112 prove /test-fixtures/reset clears permission-smoke latestRun, tenant-isolation latestRun, and the deterministic project-p12-permission-smoke setup project; tenant-isolation readback is tenant-scoped and does not expose Tenant A latestRun to Tenant B.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-111",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/permission-matrix-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-112",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/tenant-isolation-full.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-006",
       "requirement": "Operator release readiness surfaces and governed ops commands",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "apps/api",
@@ -239,12 +311,30 @@
         "npm run test:integration exit 0: 25 files, 130 tests passed",
         "npm test exit 0: 106 files, 609 tests passed",
         "npm run typecheck exit 0 after typing App P12 DTO mocks explicitly",
-        "npm run lint exit 0"
+        "npm run lint exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110..115 passed, including E2E-113 deployment/readiness UI/API evidence and E2E-114 recovery-smoke UI/API evidence."
       ],
-      "cleanup": "API tests prove /test-fixtures/reset clears release-readiness latestRun/readback and readiness run detail, while component tests prove latest run survives remount through API readback rather than local state. Final row verification still requires E2E-113/E2E-114 browser evidence for deployment/readiness and recovery smoke with reload/audit/reset cleanup before this row can become verified.",
-      "blocker": "2026-05-17T09:51:20.0000000+07:00: P12-006 API and UI implementation evidence exists, but executable E2E-113 and E2E-114 browser/API evidence is not implemented yet, so the row remains blocked truthfully.",
-      "last_checked_at": "2026-05-17T09:51:20.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "API tests, component tests, E2E-113, and E2E-114 prove release-readiness/recovery latestRun survives reload through API readback and is cleared by /test-fixtures/reset; operator commands write ops audit evidence and read-only users are denied in UI and direct API.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-113",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/production-deploy-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-114",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/recovery-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-007",
@@ -350,7 +440,7 @@
     {
       "id": "P12-009",
       "requirement": "Deterministic Phase 12 fixtures and E2E-110..115",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "packages/shared-test-fixtures",
@@ -365,18 +455,77 @@
         "E2E-115"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-009 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-009 scope and acceptance criteria before implementation.",
+        "packages/shared-test-fixtures/src/phase12Fixtures.ts defines deterministic P12 fixture ids, E2E paths, role matrix, Tenant A release demo seed, Tenant B isolation seed, ops smoke ids, and mocked external-service proof.",
+        "e2e/tests/phase12/full-critical-journey.spec.ts implements E2E-110 with UI/API readback, audit, reload persistence, and cleanup.",
+        "e2e/tests/phase12/permission-matrix-smoke.spec.ts implements E2E-111 with operator UI, representative permission matrix readback, read-only UI/API denial, ops audit evidence, reload persistence, and cleanup.",
+        "e2e/tests/phase12/tenant-isolation-full.spec.ts implements E2E-112 with tenant-isolation UI, Tenant B direct API probes, no forbidden term leakage, ops audit evidence, reload persistence, and cleanup.",
+        "e2e/tests/phase12/production-deploy-smoke.spec.ts implements E2E-113 with deployment smoke readback, secret non-exposure check, readiness command, read-only UI/API denial, audit, reload persistence, and cleanup.",
+        "e2e/tests/phase12/recovery-smoke.spec.ts implements E2E-114 with read-only no-mutation denial, before/failure/after recovery readback, audit, reload persistence, and cleanup.",
+        "e2e/tests/phase12/no-live-external-dependency.spec.ts implements E2E-115 with mocked external-service mode, no live adapter dependency, ops audit evidence, reload persistence, and cleanup."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-009-deterministic-phase12-fixtures-e2e --once exit 0 at startup",
+        "npm run test:e2e:phase -- --phase 12 exit 1 RED: new E2E-111..114 initially exposed over-strict audit/secret assertions and an invalid Tenant B fixture shape reference",
+        "npm run test:e2e:phase -- --phase 12 exit 0: 6 tests passed; metadata test-results/kiss-pm-e2e-last-run.json recorded phase 12, exitCode 0, E2E-110..115 ids, and all six phase12 test paths."
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Deterministic Phase 12 fixtures and executable E2E-110..115 are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "E2E-110 verifies closure project cleanup after reset; E2E-111 verifies permission-smoke latestRun and setup project cleanup; E2E-112 verifies tenant-isolation latestRun cleanup and no Tenant B leakage; E2E-113 verifies readiness latestRun cleanup; E2E-114 verifies recovery latestRun cleanup; E2E-115 verifies integration mapping cleanup.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:29:00.6710000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-110",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/full-critical-journey.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-111",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/permission-matrix-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-112",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/tenant-isolation-full.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-113",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/production-deploy-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-114",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/recovery-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        },
+        {
+          "id": "E2E-115",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/no-live-external-dependency.spec.ts",
+          "checked_at": "2026-05-17T10:29:00.6710000+07:00"
+        }
+      ]
     },
     {
       "id": "P12-010",
