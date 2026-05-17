@@ -52,7 +52,12 @@ Updated: 2026-05-17T10:29:00.6710000+07:00
   - `e2e/tests/phase12/recovery-smoke.spec.ts` implements E2E-114: read-only recovery run denial without mutation, before/failure/after recovery readback, audit evidence, reload persistence, and reset cleanup.
   - P12-009 matrix row is verified with structured E2E-110..115 evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-010-phase12-verification-matrix-market-release-exit-gate`.
+- P12 final exit-gate regression verification found and fixed a Phase 6 E2E audit assertion compatibility issue caused by accepted P8 delegated resource-control action evidence:
+  - task: `P12-BLOCKER-P6-e2e-audit-compatibility`
+  - file: `e2e/tests/phase6/resolution-apply-audit.spec.ts`
+  - result: E2E-054 now requires the concrete P6 `resource_resolution.shift_work` action evidence while allowing the additional P8 delegated action execution.
+  - verification: `npm run test:e2e:phase -- --phase 6`, strict Phase 6 matrix, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
+- Next runnable step: resume `P12-010-phase12-verification-matrix-market-release-exit-gate`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

@@ -33,14 +33,26 @@ test("E2E-054 apply writes result, audit/action evidence, refreshed projection, 
   const loadAfterApply = await getResourceLoad(request);
   expect(loadAfterApply.overloads).toEqual([]);
   const auditAfterApply = await getResourceAudit(request);
-  expect(auditAfterApply.actionExecutions).toHaveLength(1);
-  expect(auditAfterApply.actionExecutions[0]).toMatchObject({
+  const p6ResolutionAction = auditAfterApply.actionExecutions.find(
+    (action) => action.id === `action-${tenantAOverloadId.replace("overload:", "resource-overload:")}-2`
+  );
+  expect(p6ResolutionAction).toMatchObject({
     commandType: "resource_resolution.shift_work",
     requiredPermission: "resource.write",
     status: "succeeded",
     source: { entityId: tenantAOverloadId },
     target: { entityId: "assignment-design-architect-a" }
   });
+  expect(
+    auditAfterApply.actionExecutions.filter((action) => action.source.entityId === tenantAOverloadId)
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: expect.stringMatching(/^action-resource-overload:/),
+        commandType: "resource_resolution.shift_work"
+      })
+    ])
+  );
   expect(auditAfterApply.events[0]?.actionKey).toBe("resource_resolution.shift_work");
 
   await page.reload();
