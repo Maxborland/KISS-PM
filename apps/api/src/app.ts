@@ -30,6 +30,7 @@ import {
   processTemplatePublishAuditDto,
   tenantLabelPublishAuditDto
 } from "./phase10Runtime";
+import { createPhase11RuntimeState } from "./phase11Runtime";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -53,6 +54,16 @@ import type {
 } from "@kiss-pm/project-core";
 import type { ProjectClosureBlockerOverride } from "@kiss-pm/project-core";
 import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
+import {
+  createIntegrationAdapterDefinition,
+  createIntegrationConnection,
+  IntegrationDomainError
+} from "@kiss-pm/integrations";
+import type {
+  IntegrationAdapterDefinition,
+  IntegrationConnection,
+  MockAdapterCanonicalImportPayload
+} from "@kiss-pm/integrations";
 import { createConfigurationImportPackageWithChecksum, previewConfigurationImport } from "@kiss-pm/tenant-config";
 import type { ConfigurationExportPackage, CustomFieldDefinition, CustomFieldRegistry } from "@kiss-pm/tenant-config";
 
@@ -67,6 +78,9 @@ type ApiErrorCode =
   | "precondition_failed"
   | "dry_run_required"
   | "stale_preview"
+  | "adapter_rate_limited"
+  | "adapter_unavailable"
+  | "adapter_failure"
   | "not_implemented"
   | "test_mode_only";
 
@@ -640,6 +654,34 @@ const configurationImportApplySchema = z
   })
   .strict();
 
+const integrationImportPreviewSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    adapterId: z.string().trim().min(1),
+    connectionId: z.string().trim().min(1),
+    payloadFixtureKey: z.enum(["mock-crm-valid", "mock-crm-invalid"]),
+    payloadFingerprint: z.string().trim().min(1).optional()
+  })
+  .strict();
+
+const integrationImportApplySchema = z
+  .object({
+    previewId: z.string().trim().min(1),
+    batchId: z.string().trim().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    auditEventId: z.string().trim().min(1).optional(),
+    confirmed: z.boolean()
+  })
+  .strict();
+
+const integrationFailureModeSchema = z
+  .object({
+    code: z.enum(["adapter_rate_limited", "adapter_unavailable", "adapter_failure"]),
+    message: z.string().trim().min(1),
+    retryAfterSeconds: z.number().int().positive().optional()
+  })
+  .strict();
+
 const kpiDefinitionVersionCommandSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
@@ -931,6 +973,96 @@ function assertTenantUsersExist(
   }
 }
 
+function buildPhase11Adapter(tenantId: string): IntegrationAdapterDefinition {
+  return createIntegrationAdapterDefinition({
+    id: "adapter-mock-crm",
+    tenantId,
+    systemKey: "mock-crm",
+    label: "Mock CRM",
+    sourceSystem: "mock-crm",
+    capabilities: ["import_preview", "import_apply", "health_check", "mapping_diagnostics", "failure_mode_test"],
+    active: true
+  });
+}
+
+function buildPhase11Connection(tenantId: string): IntegrationConnection {
+  return createIntegrationConnection({
+    id: tenantId === "tenant-a" ? "conn-mock-crm-a" : "conn-mock-crm-b",
+    tenantId,
+    adapterId: "adapter-mock-crm",
+    label: "Mock CRM connection",
+    sourceSystem: "mock-crm",
+    status: "healthy",
+    configuredAt: "2026-05-17T07:00:00+07:00"
+  });
+}
+
+function phase11Payload(fixtureKey: "mock-crm-valid" | "mock-crm-invalid"): MockAdapterCanonicalImportPayload {
+  const payload: MockAdapterCanonicalImportPayload = {
+    opportunity: {
+      externalId: "api-opp-100",
+      title: "Импорт: API сделка",
+      account: { externalId: "api-account-100", displayName: "API account" },
+      contacts: [{ externalId: "api-contact-100", displayName: "API contact" }],
+      plannedStartDate: "2026-12-01",
+      desiredFinishDate: "2026-12-31",
+      expectedValue: { amount: 2100000, currency: "RUB" },
+      probability: 0.73,
+      categoryKey: "implementation",
+      typologyKey: "portal"
+    },
+    project: {
+      externalId: "api-project-100",
+      title: "Импорт: API проект",
+      template: {
+        templateId: "api-template",
+        key: "implementation.integration_heavy",
+        label: "Внедрение с интеграциями",
+        version: 1,
+        matchConfidence: 0.9,
+        assumptions: []
+      },
+      demand: {
+        totalPlannedWorkHours: 112,
+        scenarioKey: "baseline",
+        scenarioLabel: "Базовый сценарий",
+        formulaKey: "phase11.api",
+        formulaVersion: 1,
+        confidence: 0.82,
+        stageRoleDemands: []
+      },
+      feasibility: {
+        status: "fit",
+        severity: "none",
+        blockerCodes: []
+      }
+    },
+    tasks: [
+      {
+        externalId: "api-task-100",
+        title: "API imported task",
+        stageKey: "initiation",
+        plannedWorkHours: 16,
+        dueDate: "2026-12-15",
+        participantRoleKeys: ["project_manager"]
+      }
+    ]
+  };
+
+  if (fixtureKey === "mock-crm-invalid") {
+    return {
+      ...payload,
+      opportunity: {
+        ...payload.opportunity,
+        title: "",
+        desiredFinishDate: "2026-11-01"
+      }
+    };
+  }
+
+  return payload;
+}
+
 export function createApiApp(options: CreateApiAppOptions = {}) {
   const app = new Hono();
   let runtime = createPhase2RuntimeState();
@@ -942,6 +1074,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase8Runtime = createPhase8RuntimeState();
   let phase9Runtime = createPhase9RuntimeState();
   let phase10Runtime = createPhase10RuntimeState();
+  let phase11Runtime = createPhase11RuntimeState();
+  let phase11ImportPreviewCounter = 0;
 
   app.get("/health", (context) =>
     context.json({
@@ -1012,6 +1146,40 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ]
       }
     };
+  }
+
+  function phase11Adapters(session: Phase2RuntimeSession): IntegrationAdapterDefinition[] {
+    return [buildPhase11Adapter(session.user.tenantId)];
+  }
+
+  function phase11Connections(session: Phase2RuntimeSession): IntegrationConnection[] {
+    return [buildPhase11Connection(session.user.tenantId)];
+  }
+
+  function requirePhase11Connection(session: Phase2RuntimeSession, adapterId: string, connectionId: string): IntegrationConnection {
+    const connection = phase11Connections(session).find((item) => item.id === connectionId && item.adapterId === adapterId);
+    if (connection === undefined) {
+      throw Object.assign(new Error("not_found"), { code: "not_found" as const });
+    }
+
+    return connection;
+  }
+
+  function phase11Diagnostics(session: Phase2RuntimeSession) {
+    return phase11Connections(session).map((connection) => {
+      const failure = phase11Runtime.getConnectionFailureMode({
+        tenantId: session.user.tenantId,
+        connectionId: connection.id
+      });
+
+      return {
+        tenantId: session.user.tenantId,
+        adapterId: connection.adapterId,
+        connectionId: connection.id,
+        status: failure?.code === "adapter_rate_limited" ? "rate_limited" : failure === undefined ? "healthy" : "failed",
+        ...(failure !== undefined ? { failure } : {})
+      };
+    });
   }
 
   function appendConfigurationImportAudit(session: Phase2RuntimeSession, result: ReturnType<typeof phase10Runtime.applyConfigurationPackageImport>) {
@@ -1210,6 +1378,258 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         },
         readback: configurationOverview(refreshedSession)
       });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/adapters", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.read", {
+        entityType: "integrationAdapter",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ adapters: phase11Adapters(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/connections", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.read", {
+        entityType: "integrationConnection",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ connections: phase11Connections(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/diagnostics", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.read", {
+        entityType: "integrationDiagnostics",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ diagnostics: phase11Diagnostics(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/integrations/connections/:connectionId/failure-mode", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.admin", {
+        entityType: "integrationConnection",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("connectionId")
+      });
+      const connection = phase11Connections(session).find((item) => item.id === context.req.param("connectionId"));
+      if (connection === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      const body = integrationFailureModeSchema.parse(await parseJson(context));
+      phase11Runtime.setConnectionFailureMode({
+        tenantId: session.user.tenantId,
+        adapterId: connection.adapterId,
+        connectionId: connection.id,
+        failure: {
+          code: body.code,
+          message: body.message,
+          retryable: body.code === "adapter_rate_limited" || body.code === "adapter_unavailable",
+          ...(body.retryAfterSeconds !== undefined ? { retryAfterSeconds: body.retryAfterSeconds } : {}),
+          occurredAt: runtime.now()
+        }
+      });
+
+      return context.json({ diagnostics: phase11Diagnostics(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.delete("/api/integrations/connections/:connectionId/failure-mode", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.admin", {
+        entityType: "integrationConnection",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("connectionId")
+      });
+      const connection = phase11Connections(session).find((item) => item.id === context.req.param("connectionId"));
+      if (connection === undefined) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+      phase11Runtime.clearConnectionFailureMode({ tenantId: session.user.tenantId, connectionId: connection.id });
+
+      return context.json({ diagnostics: phase11Diagnostics(session) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/integrations/import/preview", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.preview", {
+        entityType: "integrationImportPreview",
+        tenantId: session.user.tenantId
+      });
+      const body = integrationImportPreviewSchema.parse(await parseJson(context));
+      const connection = requirePhase11Connection(session, body.adapterId, body.connectionId);
+      const previewId =
+        body.id ??
+        `preview-api-import-${session.user.tenantId}-${String(++phase11ImportPreviewCounter).padStart(4, "0")}`;
+      const preview = phase11Runtime.previewMockImport({
+        id: previewId,
+        tenantId: session.user.tenantId,
+        adapterId: body.adapterId,
+        connectionId: connection.id,
+        sourceSystem: connection.sourceSystem,
+        payloadFingerprint: body.payloadFingerprint ?? `fingerprint-${body.payloadFixtureKey}-v1`,
+        receivedAt: runtime.now(),
+        previewedAt: runtime.now(),
+        payload: phase11Payload(body.payloadFixtureKey)
+      });
+
+      return context.json({
+        preview,
+        validationReport: phase11Runtime.getMigrationValidationReport({
+          tenantId: session.user.tenantId,
+          previewId: preview.id,
+          generatedAt: runtime.now()
+        }),
+        dryRunSummary: phase11Runtime.getImportDryRunSummary({
+          tenantId: session.user.tenantId,
+          previewId: preview.id,
+          generatedAt: runtime.now()
+        })
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/import/previews/:previewId/report", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.preview", {
+        entityType: "integrationImportPreview",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("previewId")
+      });
+
+      return context.json({
+        validationReport: phase11Runtime.getMigrationValidationReport({
+          tenantId: session.user.tenantId,
+          previewId: context.req.param("previewId"),
+          generatedAt: runtime.now()
+        })
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/import/previews/:previewId/dry-run", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.preview", {
+        entityType: "integrationImportPreview",
+        tenantId: session.user.tenantId,
+        entityId: context.req.param("previewId")
+      });
+
+      return context.json({
+        dryRunSummary: phase11Runtime.getImportDryRunSummary({
+          tenantId: session.user.tenantId,
+          previewId: context.req.param("previewId"),
+          generatedAt: runtime.now()
+        })
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/integrations/import/apply", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.apply", {
+        entityType: "integrationImportBatch",
+        tenantId: session.user.tenantId
+      });
+      const body = integrationImportApplySchema.parse(await parseJson(context));
+      const result = phase11Runtime.applyImport({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        previewId: body.previewId,
+        batchId: body.batchId ?? `batch-api-import-${session.user.tenantId}`,
+        idempotencyKey: body.idempotencyKey ?? `idem-api-import-${body.previewId}`,
+        auditEventId: body.auditEventId ?? `audit-api-import-${body.previewId}`,
+        appliedAt: runtime.now(),
+        confirmed: body.confirmed
+      });
+
+      return context.json({
+        result,
+        readback: {
+          batches: phase11Runtime.listImportBatches(session.user.tenantId),
+          mappings: phase11Runtime.listMappings(session.user.tenantId),
+          audit: phase11Runtime.listSyncAudit(session.user.tenantId)
+        }
+      });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/import/batches", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.read", {
+        entityType: "integrationImportBatch",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ batches: phase11Runtime.listImportBatches(session.user.tenantId) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/mappings", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.mapping.read", {
+        entityType: "externalMapping",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ mappings: phase11Runtime.listMappings(session.user.tenantId) });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/integrations/audit", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "integration.audit.read", {
+        entityType: "syncAuditEvent",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json({ audit: phase11Runtime.listSyncAudit(session.user.tenantId) });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -4443,6 +4863,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase8Runtime = createPhase8RuntimeState();
     phase9Runtime = createPhase9RuntimeState();
     phase10Runtime = createPhase10RuntimeState();
+    phase11Runtime = createPhase11RuntimeState();
+    phase11ImportPreviewCounter = 0;
     return context.json({ status: "reset" });
   });
 
@@ -5030,6 +5452,29 @@ function handleRouteError(context: Context, error: unknown) {
     }
     if ("code" in error && (error.code === "stale_preview" || error.code === "conflict")) {
       return context.json(errorDto("conflict", "Конфликт данных"), 409);
+    }
+
+    return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
+  }
+
+  if (error instanceof IntegrationDomainError) {
+    if (error.code === "tenant_mismatch") {
+      return context.json(errorDto("tenant_mismatch", "Доступ запрещен"), 403);
+    }
+    if (error.code === "stale_preview" || error.code === "import_preview_required") {
+      return context.json(errorDto("stale_preview", "Предпросмотр устарел"), 409);
+    }
+    if (error.code === "idempotency_conflict" || error.code === "mapping_conflict" || error.code === "conflict") {
+      return context.json(errorDto("conflict", "Конфликт данных"), 409);
+    }
+    if (error.code === "adapter_rate_limited") {
+      return context.json(errorDto("adapter_rate_limited", "Адаптер временно ограничил запросы"), 429);
+    }
+    if (error.code === "adapter_unavailable") {
+      return context.json(errorDto("adapter_unavailable", "Адаптер недоступен"), 503);
+    }
+    if (error.code === "adapter_failure") {
+      return context.json(errorDto("adapter_failure", "Адаптер вернул ошибку"), 502);
     }
 
     return context.json(errorDto("validation_error", "Некорректный запрос"), 400);
