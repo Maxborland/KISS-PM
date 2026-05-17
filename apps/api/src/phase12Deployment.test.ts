@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createApiApp } from "./app";
-import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
+import { shouldAllowPhase12TestFixtureAuth, validatePhase12DeploymentEnvironment } from "./phase12Deployment";
 
 const productionLikeEnv = {
   KISS_PM_RUNTIME_ENV: "production_like",
@@ -69,6 +69,7 @@ describe("Phase 12 deployment environment contract", () => {
     const result = validatePhase12DeploymentEnvironment({
       ...productionLikeEnv,
       KISS_PM_ALLOW_TEST_FIXTURE_RESET: "true",
+      KISS_PM_ALLOW_TEST_FIXTURE_AUTH: "true",
       VITE_KISS_PM_ALLOW_FIXTURE_AUTH: "true"
     });
 
@@ -77,6 +78,11 @@ describe("Phase 12 deployment environment contract", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "dev-only.KISS_PM_ALLOW_TEST_FIXTURE_RESET",
+          status: "failed",
+          actual: "enabled"
+        }),
+        expect.objectContaining({
+          id: "dev-only.KISS_PM_ALLOW_TEST_FIXTURE_AUTH",
           status: "failed",
           actual: "enabled"
         }),
@@ -109,5 +115,42 @@ describe("Phase 12 deployment environment contract", () => {
         ])
       })
     );
+  });
+
+  it("can deny fixture test-user authentication in production runtime", async () => {
+    const app = createApiApp({ allowTestFixtureAuth: false, deploymentEnvironment: productionLikeEnv });
+
+    const response = await app.request("/api/ops/release-readiness?testUser=tenant-admin-a");
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        code: "test_mode_only"
+      })
+    );
+  });
+
+  it("disables backend fixture auth for production-like targets unless explicitly allowed", () => {
+    expect(
+      shouldAllowPhase12TestFixtureAuth({
+        KISS_PM_RUNTIME_ENV: "production_like"
+      })
+    ).toBe(false);
+    expect(
+      shouldAllowPhase12TestFixtureAuth({
+        NODE_ENV: "production"
+      })
+    ).toBe(false);
+    expect(
+      shouldAllowPhase12TestFixtureAuth({
+        KISS_PM_RUNTIME_ENV: "production_like",
+        KISS_PM_ALLOW_TEST_FIXTURE_AUTH: "true"
+      })
+    ).toBe(true);
+    expect(
+      shouldAllowPhase12TestFixtureAuth({
+        KISS_PM_RUNTIME_ENV: "development"
+      })
+    ).toBe(true);
   });
 });

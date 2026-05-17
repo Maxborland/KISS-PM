@@ -92,6 +92,7 @@ type ApiErrorCode =
 
 export type CreateApiAppOptions = {
   allowTestFixtureReset?: boolean;
+  allowTestFixtureAuth?: boolean;
   deploymentEnvironment?: Phase12DeploymentEnvironment;
 };
 
@@ -1078,6 +1079,7 @@ function phase11Payload(fixtureKey: "mock-crm-valid" | "mock-crm-invalid"): Mock
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
   const app = new Hono();
+  const allowTestFixtureAuth = options.allowTestFixtureAuth ?? true;
   let runtime = createPhase2RuntimeState();
   let phase3Runtime = createPhase3CrmRuntimeState();
   let phase4Runtime = createPhase4RuntimeState();
@@ -1100,9 +1102,17 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/health/deployment", (context) => context.json(validatePhase12DeploymentEnvironment(options.deploymentEnvironment)));
 
+  function requireRouteSession(testUserId: string | undefined): Phase2RuntimeSession {
+    if (!allowTestFixtureAuth) {
+      throw Object.assign(new Error("test_mode_only"), { code: "test_mode_only", status: 403 });
+    }
+
+    return requireSession(runtime, testUserId);
+  }
+
   app.get("/api/ops/release-readiness", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "release.readiness.read", {
         entityType: "releaseReadiness",
         tenantId: session.user.tenantId,
@@ -1123,7 +1133,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/ops/recovery-smoke", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "ops.read", {
         entityType: "recoverySmoke",
         tenantId: session.user.tenantId
@@ -1137,7 +1147,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/ops/recovery-smoke/run", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "ops.execute", {
         entityType: "recoverySmoke",
         tenantId: session.user.tenantId
@@ -1408,7 +1418,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/configuration", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1422,7 +1432,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/configuration/versions", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1436,7 +1446,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/configuration/validate", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1465,7 +1475,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/configuration/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1486,7 +1496,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/configuration/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1506,7 +1516,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       });
       runtime.replaceLabelSet(result.importedPackage.labelSet);
       appendConfigurationImportAudit(session, result);
-      const refreshedSession = requireSession(runtime, context.req.query("testUser"));
+      const refreshedSession = requireRouteSession(context.req.query("testUser"));
 
       return context.json({
         result: {
@@ -1523,7 +1533,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/configuration/export", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.export", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1537,7 +1547,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/configuration/import/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.import", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1558,7 +1568,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/configuration/import/apply", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "tenantConfiguration",
         tenantId: session.user.tenantId
@@ -1578,7 +1588,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       });
       runtime.replaceLabelSet(result.importedPackage.labelSet);
       appendConfigurationImportAudit(session, result);
-      const refreshedSession = requireSession(runtime, context.req.query("testUser"));
+      const refreshedSession = requireRouteSession(context.req.query("testUser"));
 
       return context.json({
         result: {
@@ -1595,7 +1605,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/adapters", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.read", {
         entityType: "integrationAdapter",
         tenantId: session.user.tenantId
@@ -1609,7 +1619,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/connections", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.read", {
         entityType: "integrationConnection",
         tenantId: session.user.tenantId
@@ -1623,7 +1633,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/diagnostics", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.read", {
         entityType: "integrationDiagnostics",
         tenantId: session.user.tenantId
@@ -1637,7 +1647,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/integrations/connections/:connectionId/failure-mode", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.admin", {
         entityType: "integrationConnection",
         tenantId: session.user.tenantId,
@@ -1669,7 +1679,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.delete("/api/integrations/connections/:connectionId/failure-mode", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.admin", {
         entityType: "integrationConnection",
         tenantId: session.user.tenantId,
@@ -1689,7 +1699,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/integrations/import/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.preview", {
         entityType: "integrationImportPreview",
         tenantId: session.user.tenantId
@@ -1731,7 +1741,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/import/previews/:previewId/report", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.preview", {
         entityType: "integrationImportPreview",
         tenantId: session.user.tenantId,
@@ -1752,7 +1762,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/import/previews/:previewId/dry-run", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.preview", {
         entityType: "integrationImportPreview",
         tenantId: session.user.tenantId,
@@ -1773,7 +1783,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/integrations/import/apply", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.apply", {
         entityType: "integrationImportBatch",
         tenantId: session.user.tenantId
@@ -1819,7 +1829,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/import/batches", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.read", {
         entityType: "integrationImportBatch",
         tenantId: session.user.tenantId,
@@ -1833,7 +1843,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/mappings", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.mapping.read", {
         entityType: "externalMapping",
         tenantId: session.user.tenantId
@@ -1847,7 +1857,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/integrations/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.audit.read", {
         entityType: "syncAuditEvent",
         tenantId: session.user.tenantId
@@ -1861,7 +1871,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/tenants/current", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.read", {
         entityType: "tenant",
         tenantId: session.user.tenantId,
@@ -1889,7 +1899,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/labels", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "tenantLabelSet",
         tenantId: session.user.tenantId
@@ -1911,7 +1921,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/labels/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "tenantLabelSet",
         tenantId: session.user.tenantId
@@ -1941,7 +1951,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/labels/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "tenantLabelSet",
         tenantId: session.user.tenantId
@@ -1993,7 +2003,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/process-templates", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "processTemplate",
         tenantId: session.user.tenantId
@@ -2009,7 +2019,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/process-templates/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "processTemplate",
         tenantId: session.user.tenantId
@@ -2052,7 +2062,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/process-templates/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "processTemplate",
         tenantId: session.user.tenantId
@@ -2112,7 +2122,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/custom-fields", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "customFieldDefinition",
         tenantId: session.user.tenantId
@@ -2128,7 +2138,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/custom-fields/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "customFieldDefinition",
         tenantId: session.user.tenantId
@@ -2155,7 +2165,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/custom-fields/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "customFieldDefinition",
         tenantId: session.user.tenantId
@@ -2203,7 +2213,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/kpi-thresholds", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "kpiThresholdRuleSet",
         tenantId: session.user.tenantId
@@ -2235,7 +2245,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/kpi-thresholds/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "kpiThresholdRuleSet",
         tenantId: session.user.tenantId
@@ -2268,7 +2278,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/kpi-thresholds/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "kpiThresholdRuleSet",
         tenantId: session.user.tenantId
@@ -2333,7 +2343,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/saved-views", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId
@@ -2367,7 +2377,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/saved-views/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId
@@ -2410,7 +2420,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/saved-views/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId
@@ -2481,7 +2491,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/action-configs", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.read", {
         entityType: "actionConfiguration",
         tenantId: session.user.tenantId
@@ -2529,7 +2539,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/action-configs/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "actionConfiguration",
         tenantId: session.user.tenantId
@@ -2558,7 +2568,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tenant/action-configs/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant.config.write", {
         entityType: "actionConfiguration",
         tenantId: session.user.tenantId
@@ -2636,7 +2646,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/tenant/configuration/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -2662,7 +2672,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/admin/access-profiles", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "access_profile.read", {
         entityType: "accessProfile",
         tenantId: session.user.tenantId
@@ -2678,7 +2688,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/admin/access-profiles", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "access_profile.write", {
         entityType: "accessProfile",
         tenantId: session.user.tenantId
@@ -2731,7 +2741,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/admin/labels", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "tenant_labels.write", {
         entityType: "tenantLabelSet",
         tenantId: session.user.tenantId
@@ -2770,7 +2780,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/admin/permissions/evaluate", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "permission.diagnostics.read", {
         entityType: "permissionDiagnostics",
         tenantId: session.user.tenantId
@@ -2805,7 +2815,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/tenant-isolation-probes/:probeId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const probeId = context.req.param("probeId");
       const probe = runtime.getProbe(probeId);
       if (!probe || probe.tenantId !== session.user.tenantId) {
@@ -2830,7 +2840,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/audit/events", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -2846,7 +2856,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -2867,7 +2877,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/from-template", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "project.create_from_template", {
         entityType: "project",
         tenantId: session.user.tenantId
@@ -2903,7 +2913,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/projects/:projectId/schedule", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -2925,7 +2935,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/schedule/tasks", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3007,7 +3017,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.patch("/api/projects/:projectId/schedule/tasks/:taskId", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const taskId = context.req.param("taskId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
@@ -3067,7 +3077,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/schedule/dependencies", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3137,7 +3147,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/schedule/baseline", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3195,7 +3205,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/projects/:projectId/schedule/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3224,7 +3234,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/projects/:projectId/closure", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3251,7 +3261,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/closure/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3292,7 +3302,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/closure/apply", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -3357,7 +3367,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/snapshots", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "retrospective.read", {
         entityType: "closedProjectSnapshot",
         tenantId: session.user.tenantId
@@ -3371,7 +3381,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/snapshots/:snapshotId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const snapshotId = context.req.param("snapshotId");
       assertAllowed(runtime, session, "retrospective.read", {
         entityType: "closedProjectSnapshot",
@@ -3395,7 +3405,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/closed-portfolio", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const query = retrospectivePaginationQuerySchema.parse({
         offset: context.req.query("offset"),
         limit: context.req.query("limit"),
@@ -3426,7 +3436,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/trends", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const query = retrospectiveTrendsQuerySchema.parse({
         offset: context.req.query("offset"),
         limit: context.req.query("limit"),
@@ -3458,7 +3468,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/insights/:insightId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const insightId = context.req.param("insightId");
       assertAllowed(runtime, session, "retrospective.read", {
         entityType: "retrospectiveInsight",
@@ -3478,7 +3488,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/retrospectives/insights/:insightId/template-improvement/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const insightId = context.req.param("insightId");
       const readModel = phase9Runtime.getInsightReadModel(session.user.tenantId, insightId, session.profile.permissions);
       if (readModel === undefined) {
@@ -3510,7 +3520,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/retrospectives/insights/:insightId/template-improvement/apply", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const insightId = context.req.param("insightId");
       const readModel = phase9Runtime.getInsightReadModel(session.user.tenantId, insightId, session.profile.permissions);
       if (readModel === undefined) {
@@ -3569,7 +3579,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/retrospectives/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -3597,7 +3607,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/resources/load", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "resource.read", {
         entityType: "resourceLoadBucket",
         tenantId: session.user.tenantId
@@ -3611,7 +3621,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/resources/load/:bucketId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "resource.read", {
         entityType: "resourceLoadBucket",
         tenantId: session.user.tenantId,
@@ -3630,7 +3640,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/resources/overloads/:overloadId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const overloadId = context.req.param("overloadId");
       assertAllowed(runtime, session, "resource.read", {
         entityType: "resourceOverload",
@@ -3650,7 +3660,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/resources/reservations", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "resource.write", {
         entityType: "resourceReservation",
         tenantId: session.user.tenantId
@@ -3677,7 +3687,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/resources/overloads/:overloadId/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const overloadId = context.req.param("overloadId");
       assertAllowed(runtime, session, "resource.write", {
         entityType: "resourceOverload",
@@ -3700,7 +3710,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/resources/overloads/:overloadId/apply", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const overloadId = context.req.param("overloadId");
       assertAllowed(runtime, session, "resource.write", {
         entityType: "resourceOverload",
@@ -3745,7 +3755,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/resources/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -3775,7 +3785,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/definitions", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "kpi:read", {
         entityType: "kpiDefinition",
         tenantId: session.user.tenantId
@@ -3791,7 +3801,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/kpi/definitions/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "kpi.config:write", {
         entityType: "kpiDefinition",
         tenantId: session.user.tenantId
@@ -3807,7 +3817,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/kpi/definitions", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "kpi.config:write", {
         entityType: "kpiDefinition",
         tenantId: session.user.tenantId
@@ -3847,7 +3857,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/definitions/:definitionId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const definitionId = context.req.param("definitionId");
       assertAllowed(runtime, session, "kpi:read", {
         entityType: "kpiDefinition",
@@ -3867,7 +3877,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/kpi/definitions/:definitionId/publish", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const definitionId = context.req.param("definitionId");
       assertAllowed(runtime, session, "kpi.config:write", {
         entityType: "kpiDefinition",
@@ -3905,7 +3915,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/kpi/definitions/:definitionId/retire", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const definitionId = context.req.param("definitionId");
       assertAllowed(runtime, session, "kpi.config:write", {
         entityType: "kpiDefinition",
@@ -3943,7 +3953,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/kpi/evaluations/run", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "kpi.evaluate:execute", {
         entityType: "kpiEvaluation",
         tenantId: session.user.tenantId
@@ -3978,7 +3988,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/evaluations/:evaluationId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const evaluationId = context.req.param("evaluationId");
       assertAllowed(runtime, session, "kpi:read", {
         entityType: "kpiEvaluation",
@@ -3998,7 +4008,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/deviations", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "kpi:read", {
         entityType: "kpiDeviation",
         tenantId: session.user.tenantId
@@ -4012,7 +4022,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/deviations/:signalId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const signalId = context.req.param("signalId");
       assertAllowed(runtime, session, "kpi:read", {
         entityType: "kpiDeviation",
@@ -4032,7 +4042,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kpi/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "auditEvent",
         tenantId: session.user.tenantId
@@ -4055,7 +4065,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/surfaces", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "control.surface:read", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId
@@ -4080,7 +4090,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/surfaces/:surfaceId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "control.surface:read", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId,
@@ -4099,7 +4109,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/surfaces/:surfaceId/view", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "control.surface:read", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId,
@@ -4158,7 +4168,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/surfaces/:surfaceId/actions", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "control.surface:read", {
         entityType: "controlSurface",
         tenantId: session.user.tenantId,
@@ -4191,7 +4201,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/control/actions/:actionDefinitionId/preview", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
       if (!phase10Runtime.isActionEnabled(session.user.tenantId, actionDefinition.key)) {
         throw Object.assign(new Error("action disabled by tenant configuration"), { code: "permission_denied", status: 403 });
@@ -4228,7 +4238,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/control/actions/:actionDefinitionId/execute", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const actionDefinition = phase8Runtime.getActionDefinition(session.user.tenantId, context.req.param("actionDefinitionId"));
       if (!phase10Runtime.isActionEnabled(session.user.tenantId, actionDefinition.key)) {
         throw Object.assign(new Error("action disabled by tenant configuration"), { code: "permission_denied", status: 403 });
@@ -4311,7 +4321,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/actions/:executionId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "actionExecution",
         tenantId: session.user.tenantId,
@@ -4330,7 +4340,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/control/audit", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "audit.read", {
         entityType: "actionExecution",
         tenantId: session.user.tenantId
@@ -4344,7 +4354,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/projects/:projectId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project !== undefined) {
@@ -4376,7 +4386,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.put("/api/projects/:projectId/custom-fields/:fieldKey", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const fieldKey = context.req.param("fieldKey");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
@@ -4448,7 +4458,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/stages/:stageId/transition", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const stageId = context.req.param("stageId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
@@ -4496,7 +4506,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/stages/:stageId/artifacts", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const stageId = context.req.param("stageId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
@@ -4539,7 +4549,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/stages/:stageId/approvals", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const stageId = context.req.param("stageId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
@@ -4584,7 +4594,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/projects/:projectId/tasks", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -4604,7 +4614,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/projects/:projectId/tasks", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -4667,7 +4677,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.patch("/api/tasks/:taskId/status", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const taskId = context.req.param("taskId");
       const project = phase4Runtime.getTaskProject(session.user.tenantId, taskId);
       if (project === undefined) {
@@ -4710,7 +4720,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/tasks/:taskId/comments", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const taskId = context.req.param("taskId");
       const project = phase4Runtime.getTaskProject(session.user.tenantId, taskId);
       if (project === undefined) {
@@ -4750,7 +4760,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/my/tasks", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "task.read", {
         entityType: "task",
         tenantId: session.user.tenantId
@@ -4767,7 +4777,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/kanban/projects/:projectId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const projectId = context.req.param("projectId");
       const project = phase4Runtime.getProject(session.user.tenantId, projectId);
       if (project === undefined) {
@@ -4794,7 +4804,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/accounts", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "account",
         tenantId: session.user.tenantId
@@ -4810,7 +4820,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/accounts", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.write", {
         entityType: "account",
         tenantId: session.user.tenantId
@@ -4827,7 +4837,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/accounts/:accountId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "account",
         tenantId: session.user.tenantId,
@@ -4847,7 +4857,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/contacts", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "contact",
         tenantId: session.user.tenantId
@@ -4863,7 +4873,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/contacts", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.write", {
         entityType: "contact",
         tenantId: session.user.tenantId
@@ -4880,7 +4890,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/contacts/:contactId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "contact",
         tenantId: session.user.tenantId,
@@ -4900,7 +4910,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/opportunities", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "opportunity",
         tenantId: session.user.tenantId
@@ -4916,7 +4926,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/opportunities", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.write", {
         entityType: "opportunity",
         tenantId: session.user.tenantId
@@ -4933,7 +4943,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.get("/api/crm/opportunities/:opportunityId", (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       assertAllowed(runtime, session, "crm.opportunity.read", {
         entityType: "opportunity",
         tenantId: session.user.tenantId,
@@ -4953,7 +4963,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/opportunities/:opportunityId/readiness", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const opportunityId = context.req.param("opportunityId");
       assertAllowed(runtime, session, "crm.readiness.run", {
         entityType: "opportunity",
@@ -4978,7 +4988,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/opportunities/:opportunityId/template-match", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const opportunityId = context.req.param("opportunityId");
       assertAllowed(runtime, session, "crm.template_match.run", {
         entityType: "opportunity",
@@ -5003,7 +5013,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/opportunities/:opportunityId/feasibility", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const opportunityId = context.req.param("opportunityId");
       assertAllowed(runtime, session, "crm.feasibility.run", {
         entityType: "opportunity",
@@ -5028,7 +5038,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   app.post("/api/crm/opportunities/:opportunityId/project-draft", async (context) => {
     try {
-      const session = requireSession(runtime, context.req.query("testUser"));
+      const session = requireRouteSession(context.req.query("testUser"));
       const opportunityId = context.req.param("opportunityId");
       assertAllowed(runtime, session, "project_draft.create", {
         entityType: "opportunity",
