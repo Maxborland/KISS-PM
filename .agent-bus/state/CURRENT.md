@@ -57,6 +57,11 @@ Updated: 2026-05-17T10:29:00.6710000+07:00
   - file: `e2e/tests/phase6/resolution-apply-audit.spec.ts`
   - result: E2E-054 now requires the concrete P6 `resource_resolution.shift_work` action evidence while allowing the additional P8 delegated action execution.
   - verification: `npm run test:e2e:phase -- --phase 6`, strict Phase 6 matrix, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
+- P12 final exit-gate regression verification found and fixed a Phase 7 E2E selector compatibility issue caused by later control surfaces exposing duplicate accessible labels:
+  - task: `P12-BLOCKER-P7-e2e-selector-compatibility`
+  - files: `e2e/tests/phase7/kpi-traceability.spec.ts`, `e2e/tests/phase7/kpi-versioning.spec.ts`
+  - result: E2E-062 and E2E-063 now scope interactions to the Phase 7 surfaces under test.
+  - verification: `npm run test:e2e:phase -- --phase 7`, strict Phase 7 matrix, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
 - Next runnable step: resume `P12-010-phase12-verification-matrix-market-release-exit-gate`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 

@@ -6174,6 +6174,50 @@
       ]
     },
     {
+      "id": "P12-BLOCKER-P7-e2e-selector-compatibility",
+      "aliases": [
+        "P12-BLOCKER-P7-SELECTORS"
+      ],
+      "title": "Fix Phase 7 E2E selectors after later control surfaces add duplicate accessible controls",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-009-deterministic-phase12-fixtures-e2e",
+        "P12-BLOCKER-P6-e2e-audit-compatibility"
+      ],
+      "write_scope": [
+        "e2e/tests/phase7/kpi-traceability.spec.ts",
+        "e2e/tests/phase7/kpi-versioning.spec.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P12-BLOCKER-P7-e2e-selector-compatibility.claim.json",
+        ".agent-bus/sessions/P12-BLOCKER-P7-e2e-selector-compatibility.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/**"
+      ],
+      "required_locks": [
+        "e2e/tests/phase7/kpi-traceability.spec.ts",
+        "e2e/tests/phase7/kpi-versioning.spec.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm run test:e2e:phase -- --phase 7",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json",
+        "npm run test:e2e:phase -- --phase 12",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T10:53:00+07:00. Scoped P7 E2E selectors to the Phase 7 surfaces under test after later control surfaces introduced duplicate accessible labels. Verified with npm run test:e2e:phase -- --phase 7, strict phase7 matrix, npm run test:e2e:phase -- --phase 12, git diff --check, and agent-bus guard."
+    },
+    {
       "id": "P12-BLOCKER-P6-e2e-audit-compatibility",
       "aliases": [
         "P12-BLOCKER-P6-AUDIT"
@@ -6225,7 +6269,8 @@
       "phase": "P12",
       "depends_on": [
         "P12-009-deterministic-phase12-fixtures-e2e",
-        "P12-BLOCKER-P6-e2e-audit-compatibility"
+        "P12-BLOCKER-P6-e2e-audit-compatibility",
+        "P12-BLOCKER-P7-e2e-selector-compatibility"
       ],
       "write_scope": [
         "docs/status/phase12-requirements-matrix.json",
@@ -6265,7 +6310,7 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Runnable after accepted P12-009 and accepted P12-BLOCKER-P6-e2e-audit-compatibility. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
+      "notes": "Runnable after accepted P12-009, accepted P12-BLOCKER-P6-e2e-audit-compatibility, and accepted P12-BLOCKER-P7-e2e-selector-compatibility. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
     }
   ]
 }

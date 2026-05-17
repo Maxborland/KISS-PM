@@ -26,14 +26,15 @@ test("E2E-063 threshold change affects future evaluation without corrupting hist
   });
 
   await openKpiDefinitionAdmin(page);
-  await page.getByLabel("Критический порог KPI").fill("-30");
-  await page.getByRole("button", { name: "Проверить формулу" }).click();
+  const kpiDefinitionAdmin = page.getByTestId("kpi-definition-admin");
+  await kpiDefinitionAdmin.getByLabel("Критический порог KPI").fill("-30");
+  await kpiDefinitionAdmin.getByRole("button", { name: "Проверить формулу" }).click();
   await expect(page.getByTestId("kpi-definition-preview")).toContainText("Норма");
   await expect(page.getByTestId("kpi-definition-preview")).toContainText("Состояние еще не изменено");
 
-  await page.getByRole("button", { name: "Создать черновик" }).click();
+  await kpiDefinitionAdmin.getByRole("button", { name: "Создать черновик" }).click();
   await expect(page.getByTestId(`kpi-definition-${tenantADraftDefinitionId}`)).toContainText("Черновик");
-  await page.getByRole("button", { name: "Опубликовать версию" }).click();
+  await kpiDefinitionAdmin.getByRole("button", { name: "Опубликовать версию" }).click();
   await expect(page.getByTestId(`kpi-definition-${tenantADraftDefinitionId}`)).toContainText("Опубликована");
 
   const futureRun = await runKpiEvaluation(request, tenantADraftDefinitionId);
