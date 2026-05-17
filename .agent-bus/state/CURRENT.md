@@ -2,6 +2,14 @@
 
 Updated: 2026-05-17T14:28:27.3900000+07:00
 
+- `R2-DOC-002-br2-control-surface-pattern-transfer` is completed as a Release 2 docs/product-spec task:
+  - source input: supplied sanitized `docs/bitrixreports_surfaces_kisspm_transfer_package.zip`
+  - main spec: `docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md`
+  - decision: `docs/decisions/0003-br2-control-surface-pattern-transfer.md`
+  - updated docs: `docs/product/DESIGN_SYSTEM.md`, `docs/product/P3_P12_PRODUCT_UX_SPEC.md`, `docs/product/SCREEN_INTERACTION_CATALOG.md`, `docs/product/ROLE_BASED_JOURNEYS.md`, `docs/status/p3-p12-ux-screen-matrix.json`, `docs/backlog/FUTURE_SCOPE.md`
+  - the supplied HTML/PNG atlas was intentionally not committed because it contains legacy-style sample labels; the transferable pattern contract is captured in generic KISS PM language.
+  - no BitrixReports2.0 code, proprietary snippets, credentials, customer data, or Bitrix-specific core model changes were copied.
+  - verification: `git diff --check` passed; JSON parse for `docs/status/p3-p12-ux-screen-matrix.json` passed; `npm run verify:matrix -- docs/status/p3-p12-ux-screen-matrix.json` is unsupported for this matrix shape (`unsupported matrix phase: undefined`, `matrix.rows must be a non-empty array`); agent-bus guard passed after escalation for Node git-spawn EPERM.
 - Release 2 planning surface is being prepared after the accepted Phase 12 repository-defined market-release gate:
   - task: `R2-000-release2-planning-surface`
   - roadmap: `docs/roadmap/RELEASE_2_DEPTH_HARDENING.md`

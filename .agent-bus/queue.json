@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T14:28:27.3900000+07:00",
+  "updated_at": "2026-05-17T16:22:17.3687372+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -2413,7 +2413,7 @@
         "git diff --check"
       ],
       "notes": "Completed P7 KPI Deviation Control UI block. Implemented typed deviation API client, Russian TanStack Query control surface for signal list/detail/evaluation run/audit, App shell wiring, component/App tests, and review fixes. Matrix P7-008 has fresh UI evidence but remains blocked until P7 E2E evidence exists.",
-      "completed_at": "2026-05-16T12:41:28.040Z",
+      "completed_at": "2026-05-16T12:41:28.04Z",
       "result": "accepted",
       "verification": [
         "npm test -- apps/web/src/KpiDeviationControlSurface.test.tsx exit 0: 8 tests passed",
@@ -2677,7 +2677,7 @@
         "git diff --check"
       ],
       "notes": "Completed Phase 8 contract block. Created PHASE_8_CONTROL_SURFACES_ACTION_ENGINE.md, phase8-requirements-matrix.json with P8-001..P8-010 blocked truthfully, and verifier support/tests for E2E-070..075. Review fixes added P8 cleanup-placeholder rejection and E2E-074 permission coverage for P8-002/P8-005. Product implementation has not started.",
-      "completed_at": "2026-05-16T13:41:23.000Z",
+      "completed_at": "2026-05-16T13:41:23Z",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-000-control-surfaces-action-engine-phase-contract --once exit 0 at startup",
@@ -2743,7 +2743,7 @@
         "git diff --check"
       ],
       "notes": "Completed P8-001 domain foundation. packages/control-surfaces now defines and validates tenant-owned ControlSurfaceDefinition/View models with fields/widgets/action slots/drilldowns/saved views/permissions, duplicate rejection, runtime enum guards, malformed DTO guards, field-reference validation, and multi-surface coverage. Matrix row remains blocked only for later API/E2E evidence.",
-      "completed_at": "2026-05-16T13:59:29.000Z",
+      "completed_at": "2026-05-16T13:59:29Z",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-001-control-surface-definition-view-model-foundation --once exit 0 at startup",
@@ -2817,7 +2817,7 @@
         "git diff --check"
       ],
       "notes": "Completed P8-002 read DTO/data-source/API block. packages/control-surfaces now builds tenant-scoped read DTOs with severity widgets, source refs, drilldowns, backend-policy availability callbacks, malformed pagination guards, and no execute URL. apps/api now exposes read-only control surface routes backed by P6/P7 deterministic projections and control.surface:read policy checks. Matrix row remains blocked only for later UI/E2E reload/permission/cleanup evidence.",
-      "completed_at": "2026-05-16T21:22:28.000+07:00",
+      "completed_at": "2026-05-16T21:22:28+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-002-control-surface-data-source-read-dtos --once exit 0 at startup",
@@ -2887,7 +2887,7 @@
         "git diff --check"
       ],
       "notes": "Completed P8-003 action-engine foundation. packages/action-engine now defines ActionDefinition/InputSchema/CommandBinding/AuditPolicy, command binding registry resolution/validation, and P8 ActionExecutionLog evidence fields with strict source-surface permission/precondition/audit guards. Existing P3/P5/P6/P7 command compatibility is preserved.",
-      "completed_at": "2026-05-16T21:31:51.000+07:00",
+      "completed_at": "2026-05-16T21:31:51+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-003-action-definitions-execution-log-foundation --once exit 0 at startup",
@@ -2956,7 +2956,7 @@
         "git diff --check"
       ],
       "notes": "Completed P8-004 governed action API foundation. apps/api now exposes action list, preview, execute, execution readback, and audit routes; preview validates target/input/permission and does not mutate; execute rechecks stored preview target permission, rejects missing/stale previews, and returns not_implemented for domain bindings until P8-006/P8-007/P8-008 to avoid fake success logs. Matrix row remains blocked for real domain binding and E2E evidence.",
-      "completed_at": "2026-05-16T21:46:31.000+07:00",
+      "completed_at": "2026-05-16T21:46:31+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-004-governed-action-execution-api-dry-run-preview --once exit 0 at startup",
@@ -3025,7 +3025,7 @@
         "git diff --check"
       ],
       "notes": "Completed P8-005 Portfolio Control UI surface. apps/web now has a typed Portfolio Control API client, TanStack Query surface, app-shell navigation/wiring, dense operational UI for P8 read rows/widgets/severity/source refs, Gantt drilldown, dry-run preview, preview-before-apply, read-only/API-error states, audit panel, and readback/refetch after not_implemented or successful execute. Review fixes aligned the web client with the real P8 action API shape, surfaced actions/audit API failures, and avoided fake failure when audit.read is absent. Matrix row remains blocked for real P8-006/P8-007/P8-008 domain bindings and P8-009 E2E.",
-      "completed_at": "2026-05-16T22:04:30.000+07:00",
+      "completed_at": "2026-05-16T22:04:30+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P8-005-portfolio-control-surface-mvp --once exit 0 at startup",
@@ -3515,7 +3515,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T00:13:42.7930900+07:00. Implemented closure checklist/readiness and governed close-project domain foundation in packages/project-core plus ClosedProjectSnapshot foundation in packages/retrospectives. Review fixes tightened targeted blocker overrides and KPI summary runtime validation. P9 matrix rows P9-001/P9-002 carry fresh domain evidence but remain blocked until API/UI/E2E-080..081 prove write-flow readback, audit, permissions, reload persistence, and cleanup.",
-      "completed_at": "2026-05-17T00:13:42.7930900+07:00",
+      "completed_at": "2026-05-17T00:13:42.79309+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P9-001-project-closure-snapshot-domain --once exit 0 at startup",
@@ -3718,7 +3718,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T00:52:54.1130250+07:00. Implemented RetrospectiveInsight source snapshot/trend/lesson trace and governed handled-state domain model. Insights derive from tenant-scoped trends and snapshots, return cloned stable readback, reject cross-tenant and weak/no-source inputs, and require template_improvement.apply actionExecutionId/auditEventId evidence to mark handled. Matrix row remains blocked only for later API/UI/E2E-082/E2E-083 reload/readback/cleanup evidence.",
-      "completed_at": "2026-05-17T00:52:54.1130250+07:00",
+      "completed_at": "2026-05-17T00:52:54.113025+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P9-005-retrospective-insight-model --once exit 0 at startup",
@@ -4625,7 +4625,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T04:48:51.5246150+07:00. Implemented tenant-scoped action enable/disable and safe action-form configuration. Domain helpers validate command-schema field compatibility and typed defaults, API routes preview/publish with audit/action evidence, control-surface actions reflect configuration_disabled, direct governed action preview/execute is denied for disabled actions, and ActionConfigurationSurface publishes only through API readback. Matrix P10-007 remains blocked only for later P10-009 E2E-093/E2E-094/E2E-095 browser reload/cleanup evidence.",
-      "completed_at": "2026-05-17T04:48:51.5246150+07:00",
+      "completed_at": "2026-05-17T04:48:51.524615+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P10-007-action-enable-disable-form-configuration --once exit 0 at startup",
@@ -4771,7 +4771,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T05:37:37.1680000+07:00. Implemented deterministic Phase 10 fixtures and executable Playwright E2E-090..095. E2E proves UI + API/domain readback, backend denial, audit/action evidence, reload persistence, process-template future-version behavior, existing runtime stability, invalid configuration no-partial-mutation, and /test-fixtures/reset cleanup. P10-001..P10-009 are verified in the matrix; P10-010 strict exit gate remains the next block.",
-      "completed_at": "2026-05-17T05:37:37.1680000+07:00",
+      "completed_at": "2026-05-17T05:37:37.168+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P10-009-deterministic-phase10-fixtures-e2e --once exit 0 at startup",
@@ -4843,7 +4843,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T05:49:11.7860000+07:00. Closed the strict Phase 10 exit gate: P10-001..P10-010 are verified, E2E-090..095 pass, strict matrix verifier passes without --allow-blocked, and canonical npm run test:e2e:phase -- --phase 10 passes after moving phase E2E default ports to 4287/5287.",
-      "completed_at": "2026-05-17T05:49:11.7860000+07:00",
+      "completed_at": "2026-05-17T05:49:11.786+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P10-010-phase10-verification-matrix-exit-gate --once exit 0 at startup",
@@ -4908,7 +4908,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T06:00:02.0000000+07:00. Created the closed Phase 11 integrations/migration contract, initial blocked Phase 11 requirements matrix, and verifier support for P11-001..P11-010 plus E2E-100..104 paths. No P11 product code was changed.",
-      "completed_at": "2026-05-17T06:00:02.0000000+07:00",
+      "completed_at": "2026-05-17T06:00:02+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P11-000-integrations-migration-phase-contract --once exit 0 at startup",
@@ -4970,7 +4970,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T06:11:45.0000000+07:00. Implemented P11 adapter/domain foundation, ExternalMapping/idempotency primitives, safe diagnostics/audit-detail redaction, typed adapter failures/sync audit events, and integration permission constants. Matrix row P11-001 remains blocked only for later E2E-100/E2E-101/E2E-104 evidence.",
-      "completed_at": "2026-05-17T06:11:45.0000000+07:00",
+      "completed_at": "2026-05-17T06:11:45+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P11-001-integration-adapter-foundation-external-mapping --once exit 0 at startup",
@@ -5462,7 +5462,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T07:55:00.0000000+07:00. Implemented imported project continuity without live adapter dependency: governed P11 import apply materializes canonical Phase 4 project/task records from stored preview/mapping ids, preflights materialization before apply to avoid synced mappings without canonical readback, writes materialization audit, and proves adapter failure does not block canonical project/task readback, task status mutation, audit, tenant isolation, no raw external id leakage, UI Project Work readback, and reset cleanup. Keep E2E/shared fixtures for P11-009.",
-      "completed_at": "2026-05-17T07:55:00.0000000+07:00",
+      "completed_at": "2026-05-17T07:55:00+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P11-008-imported-project-works-without-adapter --once exit 0 at startup",
@@ -5679,7 +5679,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T08:34:30.0000000+07:00. Created the closed Phase 12 production SaaS hardening and market release contract, initial blocked requirements matrix, verifier support for P12-001..P12-010 and E2E-110..115, and the P12 implementation queue. This accepts only the P12 contract/tracking block; Phase 12 implementation and Release 2 remain blocked until P12-001..P12-010 are implemented and strict matrix verification passes.",
-      "completed_at": "2026-05-17T08:34:30.0000000+07:00",
+      "completed_at": "2026-05-17T08:34:30+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
@@ -5744,7 +5744,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T08:45:00.0000000+07:00. Implemented Phase 12 production deployment/environment/secret contract with safe .env.example variable names, docs/operations deployment runbook, deterministic env validation, /health/deployment safe deployment-smoke readback, secret-reference redaction, fixture-only switch denial, and tests. Phase 12 strict gate remains blocked until E2E-113 and P12-010.",
-      "completed_at": "2026-05-17T08:45:00.0000000+07:00",
+      "completed_at": "2026-05-17T08:45:00+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-001-production-deployment-env-secret-contract --once exit 0 at startup",
@@ -5804,7 +5804,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T08:54:00.0000000+07:00. Implemented Phase 12 observability/release-readiness API read model with typed deployment, dependency, E2E, matrix blocker, and local observability evidence; backend release.readiness.read guard; tenant-scoped readback; and no secret-reference exposure. Matrix row remains blocked for E2E-113/E2E-115.",
-      "completed_at": "2026-05-17T08:54:00.0000000+07:00",
+      "completed_at": "2026-05-17T08:54:00+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-002-observability-readiness-runtime --once exit 0 at startup after stale completed-claim cleanup",
@@ -5863,7 +5863,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T09:03:00.0000000+07:00. Implemented deterministic Phase 12 recovery smoke and backup/restore policy with GET/POST /api/ops/recovery-smoke, ops.read/ops.execute backend guards, tenant-scoped before/failure/after readback, audit event ops.recovery_smoke.run, malformed-scenario no-partial-mutation guard, and /test-fixtures/reset cleanup evidence. Matrix row remains blocked for E2E-114.",
-      "completed_at": "2026-05-17T09:03:00.0000000+07:00",
+      "completed_at": "2026-05-17T09:03:00+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-003-recovery-smoke-backup-restore --once exit 0 at startup",
@@ -5915,7 +5915,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T09:14:30.0000000+07:00. Completed repository-local Phase 12 security/privacy/audit review; fixed backend fixture-auth release risk with createApiApp allowTestFixtureAuth guard, production-target server helper, production-like deployment-smoke denial for KISS_PM_ALLOW_TEST_FIXTURE_AUTH, and docs/security audit report. P12 matrix row remains blocked only for later E2E-111/E2E-112 permission/isolation evidence.",
-      "completed_at": "2026-05-17T09:14:30.0000000+07:00",
+      "completed_at": "2026-05-17T09:14:30+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-004-security-privacy-audit-review-fixes --once exit 0 at startup",
@@ -5970,7 +5970,7 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T09:35:00.0000000+07:00. Implemented deterministic P12 permission and tenant-isolation smoke API matrix with governed ops routes, ops.read/ops.execute guards, direct representative P3-P12 checks, P4/P5 setup project probes, tenant-scoped readback, audit events, and reset cleanup evidence. P12-005 matrix row remains blocked only for later E2E-111/E2E-112 browser/UI evidence.",
-      "completed_at": "2026-05-17T09:35:00.0000000+07:00",
+      "completed_at": "2026-05-17T09:35:00+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-005-permission-tenant-isolation-matrix-smoke --once exit 0 at startup after heartbeat timestamp correction",
@@ -6102,7 +6102,7 @@
         "git diff --check"
       ],
       "notes": "Accepted implementation block on 2026-05-17T10:14:38.9340000+07:00. Implemented executable E2E-110 and E2E-115 under e2e/tests/phase12, including full critical journey orchestration, mocked external-service proof, UI/API readback, audit evidence, reload persistence, and reset cleanup. P12 strict gate remains blocked until E2E-111..114/P12-009 and P12-010.",
-      "completed_at": "2026-05-17T10:14:38.9340000+07:00",
+      "completed_at": "2026-05-17T10:14:38.934+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-008-full-critical-journey-orchestration --once exit 0 at startup",
@@ -6156,7 +6156,7 @@
         "git diff --check"
       ],
       "notes": "Accepted implementation block on 2026-05-17T10:29:00.6710000+07:00. Implemented remaining deterministic Phase 12 E2E-111..114 and refreshed E2E-110..115 phase suite evidence. E2E-113 now launches an isolated production_like API smoke without fixture reset, while the main deterministic server proves UI/readiness/audit/reload/reset. P12-001..P12-009 are verified in the matrix; P12-010 remains the only blocked strict exit-gate row.",
-      "completed_at": "2026-05-17T10:29:00.6710000+07:00",
+      "completed_at": "2026-05-17T10:29:00.671+07:00",
       "result": "accepted",
       "verification": [
         "node scripts/agent-bus-guard.mjs --task P12-009-deterministic-phase12-fixtures-e2e --once exit 0 at startup",
@@ -6684,8 +6684,62 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T14:28:27.3900000+07:00. Built standalone Project Gantt Planner v6 mock using BR2/Gun Gantt as read-only interaction reference. Added MS Project-like Excel grid mechanics, controlled dropdown editors, datalist autocomplete, command suggestions, field hints/tooltips, column hide/resize, splitter, Tracking Gantt baseline, bar drag, resource conflict workspace, dry-run preview, apply result, audit/readback, reload persistence, and screenshots. Verification: node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-v6-mock.mjs --url http://localhost:64986 exits 0 with 24/24 browser interaction checks; JSON parse and git diff --check pass; no production apps/packages changed.",
-      "completed_at": "2026-05-17T14:28:27.3900000+07:00",
+      "completed_at": "2026-05-17T14:28:27.39+07:00",
       "result": "accepted"
+    },
+    {
+      "id": "R2-DOC-002-br2-control-surface-pattern-transfer",
+      "aliases": [
+        "R2-DOC-002"
+      ],
+      "title": "Transfer sanitized BR2 surface patterns into Release 2 control surface docs",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UXSPEC-001-release2-screen-spec-matrix",
+        "R2-MOCK-002-br2-gantt-extract-v6"
+      ],
+      "write_scope": [
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip",
+        "docs/product/**",
+        "docs/status/p3-p12-ux-screen-matrix.json",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/decisions/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-DOC-002-br2-control-surface-pattern-transfer.claim.json",
+        ".agent-bus/sessions/R2-DOC-002-br2-control-surface-pattern-transfer.md",
+        ".agent-bus/tasks/active/R2-DOC-002-br2-control-surface-pattern-transfer.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        ".agent-bus/claims/R2-UXSPEC-001-release2-screen-spec-matrix.claim.json"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/product/**",
+        "docs/status/*",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/p3-p12-ux-screen-matrix.json','utf8')); console.log('screen matrix json ok')\"",
+        "npm run verify:matrix -- docs/status/p3-p12-ux-screen-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task R2-DOC-002-br2-control-surface-pattern-transfer --once"
+      ],
+      "notes": "Completed 2026-05-17. Added clean-room Release 2 control surface interaction patterns, ADR, product doc updates, p3-p12 UX matrix references/status coverage, and future-scope routing. JSON parse and git diff --check pass; repo verify:matrix is unsupported for this matrix shape.",
+      "completed_at": "2026-05-17T16:22:17.3687372+07:00",
+      "result": "completed"
     }
   ]
 }
