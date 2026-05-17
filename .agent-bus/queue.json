@@ -6961,7 +6961,7 @@
         ".agent-bus/state/*"
       ],
       "recommended_verification": [
-        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/KpiDeviationSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/KpiDeviationControlSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
         "npm run typecheck",
         "npm run lint",
         "git diff --check",

@@ -59,6 +59,24 @@ function operationalSeverity(severity: KpiSignalDto["severity"] | KpiEvaluationD
   return "ok";
 }
 
+const severityRank: Record<OperationalSeverity, number> = {
+  ok: 0,
+  attention: 1,
+  warning: 2,
+  critical: 3
+};
+
+function mostSevereSignal(signals: KpiSignalDto[], excludedSignalId?: string | null): KpiSignalDto | null {
+  return signals
+    .filter((signal) => signal.status === "open" && signal.id !== excludedSignalId)
+    .reduce<KpiSignalDto | null>((currentHighest, signal) => {
+      if (currentHighest === null) return signal;
+      return severityRank[operationalSeverity(signal.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+        ? signal
+        : currentHighest;
+    }, null);
+}
+
 function formatPeriod(evaluation: KpiEvaluationDto): string {
   return `${evaluation.period.start} - ${evaluation.period.end}`;
 }
@@ -198,19 +216,21 @@ function KpiDeviationActionContract({
   evaluation: KpiEvaluationDto;
   signal: KpiSignalDto;
 }) {
+  const recommendedActions = signal.recommendedActionKeys.map(kpiRecommendedActionLabel).join(" / ");
+
   return (
     <section className="phase2-panel kpi-deviation-action-contract" data-testid="kpi-deviation-action-contract">
-      <h3>Governed action contract</h3>
+      <h3>Контракт передачи в P8</h3>
       <div className="compact-list">
         <span>Объект: {signal.entityType}:{signal.entityId}</span>
         <span>KPI: {signal.kpiDefinitionId} v{evaluation.kpiDefinitionVersion}</span>
         <span>Формула: {evaluation.formulaDefinitionId}@{evaluation.formulaVersion}</span>
         <span>Порог: {evaluation.thresholdRuleSetId}@{evaluation.thresholdRuleSetVersion}</span>
         <span>Источник: {evaluation.sourceTrace.map((source) => `${source.sourceEntityType}:${source.sourceEntityId}.${source.sourceField}`).join(" / ")}</span>
-        <span>Создать корректирующее действие: через P8 action engine и canonical task</span>
-        <span>Принять риск: обязательна причина</span>
+        <span>Рекомендованные действия для P8: {recommendedActions || "нет"}</span>
+        <span>Причина и preview/result/readback проверяются в P8 action engine</span>
         <span>{canRunEvaluation ? "Пересчет KPI доступен" : "Пересчет KPI недоступен по правам"}</span>
-        <span>Без прямой мутации: действие выполняет P8 action engine</span>
+        <span>P7 не мутирует бизнес-состояние: он передает сигнал, трассировку и рекомендации в P8</span>
         <span>Историческая оценка остается стабильной: {evaluation.id}</span>
       </div>
     </section>
@@ -256,6 +276,8 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
   const commandInFlight = pendingCommand !== null;
   const queryLoading = signalsQuery.isFetching && signalsQuery.data === undefined;
   const activeDetail = detailQuery.data;
+  const highestOpenSignal = mostSevereSignal(signals);
+  const nextOpenSignal = mostSevereSignal(signals, activeSignalId) ?? highestOpenSignal;
   const displayStatus =
     queryLoading ? "Загрузка KPI-отклонений" : status === "Загрузка KPI-отклонений" ? "KPI-отклонения загружены" : status;
 
@@ -362,11 +384,10 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
 
       <SignalSummaryBar
         disabledReason={activeSignalId === null ? "Нет выбранного KPI-сигнала" : undefined}
-        highestSeverity={operationalSeverity(signals[0]?.severity)}
+        highestSeverity={operationalSeverity(highestOpenSignal?.severity)}
         nextActionLabel="Открыть следующий KPI риск"
         onNextAction={() => {
-          const nextSignal = signals.find((signal) => signal.id !== activeSignalId) ?? signals[0];
-          if (nextSignal) setSelectedSignalId(nextSignal.id);
+          if (nextOpenSignal) setSelectedSignalId(nextOpenSignal.id);
         }}
         requiresActionCount={signals.filter((signal) => signal.status === "open").length}
         summary={`${signals.length} KPI сигналов`}
@@ -432,7 +453,9 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
               data-testid="kpi-deviation-primary-action"
               disabled={activeSignalId === null}
               onClick={() =>
-                setHandoffMessage("P8 получит сигнал, трассировку KPI и рекомендованные действия без прямой мутации P7.")
+                setHandoffMessage(
+                  "P8 получает сигнал, трассировку KPI и рекомендованные действия; preview/result/audit выполняются в action engine."
+                )
               }
               type="button"
             >

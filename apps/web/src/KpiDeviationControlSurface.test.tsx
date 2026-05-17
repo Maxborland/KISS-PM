@@ -183,17 +183,42 @@ describe("KpiDeviationControlSurface", () => {
       "Порог: threshold-schedule-variance-a-v1@1"
     );
     expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
-      "Создать корректирующее действие"
+      "Рекомендованные действия для P8"
     );
     expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
-      "Принять риск: обязательна причина"
+      "Причина и preview/result/readback проверяются в P8 action engine"
     );
     expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
-      "Без прямой мутации: действие выполняет P8 action engine"
+      "P7 не мутирует бизнес-состояние"
     );
     expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
       "Историческая оценка остается стабильной"
     );
+  });
+
+  it("summarizes the highest open KPI risk instead of the first listed signal", async () => {
+    const warningSignal: KpiSignalDto = {
+      ...createSignal("signal-warning-first"),
+      severity: "warning",
+      explanation: "Предупреждение по KPI",
+      entityId: "project-warning-a"
+    };
+    const criticalSignal: KpiSignalDto = {
+      ...createSignal("signal-critical-second"),
+      severity: "critical",
+      explanation: "Критичный KPI риск",
+      entityId: "project-critical-a"
+    };
+    const apiClient = createApiClient([warningSignal, criticalSignal]);
+    renderSurface(apiClient);
+
+    await waitFor(() => expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("Критично"));
+    expect(await screen.findByTestId("kpi-deviation-detail")).toHaveTextContent("project-warning-a");
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть следующий KPI риск" }));
+
+    await waitFor(() => expect(apiClient.getSignalDetail).toHaveBeenCalledWith("project-manager-a", "signal-critical-second"));
+    expect(await screen.findByTestId("kpi-deviation-detail")).toHaveTextContent("project-critical-a");
   });
 
   it("loads KPI signals and opens the traceable deviation detail", async () => {
