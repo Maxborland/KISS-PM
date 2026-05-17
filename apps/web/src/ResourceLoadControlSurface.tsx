@@ -250,7 +250,8 @@ function CapacityMatrix({
   onPreview,
   onReserve,
   projection,
-  selectedCell
+  selectedCell,
+  selectedCellActionState
 }: {
   activeCell: CapacityMatrixCell | null;
   canWriteResources: boolean;
@@ -260,6 +261,7 @@ function CapacityMatrix({
   onReserve: () => void;
   projection: ResourceLoadProjectionDto;
   selectedCell: CapacityMatrixCell | null;
+  selectedCellActionState: "ready" | "loading" | "no-overload";
 }) {
   const dates = projectionDates(projection);
   const selectedBucket =
@@ -345,7 +347,11 @@ function CapacityMatrix({
                     onFocus={() => onCellFocus(cell)}
                     onMouseEnter={() => onCellFocus(cell)}
                   >
-                    <span>{bucket ? `Итого ${compactHours(bucket.totalLoadHours)}` : "Нет нагрузки"}</span>
+                    <span>
+                      {bucket
+                        ? `Итого за период ${bucket.periodStart}..${bucket.periodEnd}: ${compactHours(bucket.totalLoadHours)}`
+                        : "Нет нагрузки"}
+                    </span>
                     {overload > 0 ? <strong>Перегрузка {compactHours(overload)}</strong> : null}
                     {free > 0 ? <strong>Свободно {compactHours(free)}</strong> : null}
                     {!workingDate ? <span>Нерабочий день</span> : null}
@@ -388,11 +394,15 @@ function CapacityMatrix({
             <span>Задачи: {selectedOverload?.affectedTaskIds.join(", ") || selectedAssignments.map((assignment) => assignment.taskId).join(", ") || "нет"}</span>
             <span>Проекты: {selectedOverload?.affectedProjectIds.join(", ") || selectedAssignments.map((assignment) => assignment.projectId).join(", ") || "нет"}</span>
           </div>
-          {canWriteResources ? (
+          {canWriteResources && selectedOverload !== undefined && selectedCellActionState === "ready" ? (
             <div className="button-row">
               <button type="button" onClick={onPreview}>Предпросмотреть перенос</button>
               <button className="secondary-button" type="button" onClick={onReserve}>Создать резерв</button>
             </div>
+          ) : selectedOverload === undefined ? (
+            <p className="readonly-notice">В выбранной ячейке нет перегрузки; перенос и резерв недоступны из этого контекста.</p>
+          ) : selectedCellActionState === "loading" ? (
+            <p className="readonly-notice">Детализация перегрузки загружается; действия временно недоступны.</p>
           ) : (
             <p className="readonly-notice">Действия выключены: нет `resource.write`.</p>
           )}
@@ -432,7 +442,7 @@ export function ResourceLoadControlSurface({
     if (projection === null) return null;
     if (selectedOverloadId === null) return firstOverload(projection);
 
-    return projection.overloads.find((overload) => overload.id === selectedOverloadId) ?? firstOverload(projection);
+    return projection.overloads.find((overload) => overload.id === selectedOverloadId) ?? null;
   }, [projection, selectedOverloadId]);
   const openableGanttProjectId = useMemo(() => {
     if (selectedOverload === null || onOpenGanttProject === undefined || availableGanttProjectIds.length === 0) {
@@ -442,6 +452,19 @@ export function ResourceLoadControlSurface({
     const availableIds = new Set(availableGanttProjectIds);
     return selectedOverload.affectedProjectIds.find((projectId) => availableIds.has(projectId));
   }, [availableGanttProjectIds, onOpenGanttProject, selectedOverload]);
+  const selectedCellOverload = useMemo(() => {
+    if (projection === null || selectedMatrixCell === null) return undefined;
+
+    return overloadForResourceDate(projection, selectedMatrixCell.resourceProfileId, selectedMatrixCell.date);
+  }, [projection, selectedMatrixCell]);
+  const selectedCellActionState =
+    selectedMatrixCell === null
+      ? "loading"
+      : selectedCellOverload === undefined
+        ? "no-overload"
+        : overloadDetail?.overload.id === selectedCellOverload.id
+          ? "ready"
+          : "loading";
 
   const refreshSurface = useCallback(
     async (nextStatus = "Нагрузка загружена"): Promise<RefreshReadback | null> => {
@@ -738,9 +761,12 @@ export function ResourceLoadControlSurface({
             canWriteResources={canWriteResources}
             projection={projection}
             selectedCell={selectedMatrixCell}
+            selectedCellActionState={selectedCellActionState}
             onCellActivate={(cell) => {
               setActiveMatrixCell(cell);
               setSelectedMatrixCell(cell);
+              const cellOverload = overloadForResourceDate(projection, cell.resourceProfileId, cell.date);
+              setSelectedOverloadId(cellOverload?.id ?? "");
             }}
             onCellFocus={setActiveMatrixCell}
             onPreview={() => void previewRecommendedResolution()}

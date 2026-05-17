@@ -391,6 +391,9 @@ describe("Resource load control surface", () => {
     expect(matrix).toHaveTextContent("Егор Инженер");
     expect(screen.getByTestId("capacity-day-header-2026-06-03")).toHaveTextContent("2026-06-03");
     expect(screen.getByTestId("capacity-row-resource-architect-a")).toHaveTextContent("Перегрузка 14 ч");
+    expect(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03")).toHaveTextContent(
+      "Итого за период 2026-06-01..2026-06-05: 50 ч"
+    );
     expect(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03")).toHaveTextContent("Обучение архитектора");
     expect(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03")).toHaveTextContent("Сниженная емкость");
     expect(screen.getByTestId("capacity-cell-resource-engineer-a-2026-06-03")).toHaveTextContent("Свободно 28 ч");
@@ -422,6 +425,29 @@ describe("Resource load control surface", () => {
     expect(drilldown).toHaveTextContent("Создать резерв");
     expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
     expect(apiClient.applyGovernedResolution).not.toHaveBeenCalled();
+  });
+
+  it("does not run overload actions from a free-capacity cell context", async () => {
+    const apiClient = createMutableApiClient();
+
+    render(
+      <ResourceLoadControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        testUser="resource-manager-a"
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId("capacity-cell-resource-engineer-a-2026-06-03"));
+
+    const drilldown = await screen.findByTestId("capacity-cell-drilldown");
+    expect(drilldown).toHaveTextContent("Егор Инженер");
+    expect(drilldown).toHaveTextContent("В выбранной ячейке нет перегрузки");
+    expect(within(drilldown).queryByRole("button", { name: "Предпросмотреть перенос" })).not.toBeInTheDocument();
+    expect(within(drilldown).queryByRole("button", { name: "Создать резерв" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("Открытых перегрузок нет");
+    expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
+    expect(apiClient.createReservation).not.toHaveBeenCalled();
   });
 
   it("loads resource buckets, overload signal, affected entities, and audit evidence", async () => {
