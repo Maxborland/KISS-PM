@@ -33,6 +33,7 @@ import {
 import { createPhase11RuntimeState } from "./phase11Runtime";
 import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
 import type { Phase12DeploymentEnvironment } from "./phase12Deployment";
+import { buildPhase12ReleaseReadinessReadModel } from "./phase12Readiness";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -1090,6 +1091,27 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   );
 
   app.get("/health/deployment", (context) => context.json(validatePhase12DeploymentEnvironment(options.deploymentEnvironment)));
+
+  app.get("/api/ops/release-readiness", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "release.readiness.read", {
+        entityType: "releaseReadiness",
+        tenantId: session.user.tenantId,
+        entityId: session.user.tenantId
+      });
+
+      return context.json(
+        buildPhase12ReleaseReadinessReadModel({
+          tenantId: session.user.tenantId,
+          generatedAt: runtime.now(),
+          deployment: validatePhase12DeploymentEnvironment(options.deploymentEnvironment)
+        })
+      );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
 
   function currentConfigurationVersion(session: Phase2RuntimeSession): number {
     return Math.max(
