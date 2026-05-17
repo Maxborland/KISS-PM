@@ -242,14 +242,22 @@
         "E2E-104"
       ],
       "evidence": [
-        "Phase 11 contract defines a Russian Integration Admin Diagnostics control surface with preview/apply, mapping diagnostics, failure panel, and audit readback."
+        "Phase 11 contract defines a Russian Integration Admin Diagnostics control surface with preview/apply, mapping diagnostics, failure panel, and audit readback.",
+        "apps/web/src/integrationAdminDiagnosticsApiClient.ts implements the P11 UI API client for adapter, connection, diagnostics, import preview/apply, batches, mappings, audit, and governed failure-mode diagnostics routes through the accepted P11 API.",
+        "apps/web/src/IntegrationAdminDiagnosticsSurface.tsx implements a Russian Integration Admin Diagnostics management surface with adapter/connection health, failure diagnostics and recovery, deterministic import preview, validation report, dry-run state, guarded apply command, mapping diagnostics, audit/result feedback, stale-preview recovery, post-apply readback failure recovery, and TanStack Query readback/refetch instead of local-only mutation state.",
+        "apps/web/src/App.tsx wires the integration diagnostics surface into the KISS PM app shell and navigation when a P11 integration API client is available."
       ],
       "tests": [
-        "Pending P11-007 implementation: expected component/UI tests for loading, empty, error, denied, preview, apply readback, stale preview, failure, and mapping diagnostics."
+        "npm test -- apps/web/src/IntegrationAdminDiagnosticsSurface.test.tsx exit 1 RED: component and API client were missing before implementation",
+        "npm test -- apps/web/src/IntegrationAdminDiagnosticsSurface.test.tsx exit 0: 1 file, 6 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm test -- apps/web/src exit 0: 19 files, 121 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must prove UI reload/readback and reset for import results, failure state, and mapping diagnostics.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-007 UI is not implemented yet; no component or browser evidence exists.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11-007 UI keeps server state in TanStack Query and component tests prove preview does not create mappings, apply refreshes mapping/audit readback from API client calls, stale preview clears local preview and refetches, and failure-mode recovery refetches diagnostics. Full browser reload/reset proof remains blocked until P11-009 wires deterministic E2E-102/E2E-104.",
+      "blocker": "2026-05-17T07:38:03.8196229+07:00: P11-007 UI implementation, bug-hunt readback fix, and component/web regression are complete, but this matrix row remains blocked for strict phase exit until required E2E-102 and E2E-104 structured Playwright evidence exists.",
+      "last_checked_at": "2026-05-17T07:38:03.8196229+07:00",
       "e2e_evidence": []
     },
     {
