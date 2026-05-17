@@ -34,6 +34,7 @@ import { createPhase11RuntimeState } from "./phase11Runtime";
 import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
 import type { Phase12DeploymentEnvironment } from "./phase12Deployment";
 import { buildPhase12ReleaseReadinessReadModel } from "./phase12Readiness";
+import { createPhase12RecoveryRuntimeState } from "./phase12Recovery";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -139,6 +140,12 @@ const tenantLabelPreviewSchema = z
 const tenantLabelPublishSchema = z
   .object({
     previewId: z.string().trim().min(1)
+  })
+  .strict();
+
+const recoverySmokeRunSchema = z
+  .object({
+    scenarioKey: z.literal("release-readiness-state")
   })
   .strict();
 
@@ -1081,6 +1088,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase9Runtime = createPhase9RuntimeState();
   let phase10Runtime = createPhase10RuntimeState();
   let phase11Runtime = createPhase11RuntimeState();
+  let phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
   let phase11ImportPreviewCounter = 0;
 
   app.get("/health", (context) =>
@@ -1108,6 +1116,56 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           deployment: validatePhase12DeploymentEnvironment(options.deploymentEnvironment)
         })
       );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/ops/recovery-smoke", (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.read", {
+        entityType: "recoverySmoke",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json(phase12RecoveryRuntime.read(session.user.tenantId));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/ops/recovery-smoke/run", async (context) => {
+    try {
+      const session = requireSession(runtime, context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.execute", {
+        entityType: "recoverySmoke",
+        tenantId: session.user.tenantId
+      });
+
+      const body = recoverySmokeRunSchema.parse(await parseJson(context));
+      const run = phase12RecoveryRuntime.run({
+        tenantId: session.user.tenantId,
+        scenarioKey: body.scenarioKey,
+        now: runtime.now()
+      });
+
+      const auditEvent = runtime.appendAuditEvent({
+        session,
+        id: run.auditEventId,
+        actionKey: "ops.recovery_smoke.run",
+        target: { entityType: "recoverySmoke", entityId: run.id },
+        correlationId: `corr-${run.id}`,
+        details: {
+          before: run.before,
+          after: {
+            simulatedFailure: run.simulatedFailure,
+            restored: run.after
+          }
+        }
+      });
+
+      return context.json({ run: { ...run, auditEventId: auditEvent.id } }, 201);
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -5030,6 +5088,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase9Runtime = createPhase9RuntimeState();
     phase10Runtime = createPhase10RuntimeState();
     phase11Runtime = createPhase11RuntimeState();
+    phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
     phase11ImportPreviewCounter = 0;
     return context.json({ status: "reset" });
   });
