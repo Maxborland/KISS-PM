@@ -166,6 +166,8 @@ export type RetrospectiveQueryFiltersDto = {
   templateId?: string;
   clientId?: string;
   period?: string;
+  offset?: number;
+  limit?: number;
 };
 
 export type RetrospectiveApiClient = {
@@ -250,16 +252,28 @@ export function retrospectiveTrendLabel(trendKey: RetrospectiveTrendKeyDto): str
   return labels[trendKey];
 }
 
+function serializeRetrospectiveFilters(
+  filters: RetrospectiveQueryFiltersDto
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [key, value === undefined ? undefined : String(value)])
+  );
+}
+
 export function createRetrospectiveApiClient(basePath = "/api/api"): RetrospectiveApiClient {
   return {
     getClosedPortfolio(testUser, filters = {}) {
       return requestJson<ClosedPortfolioReadModelDto>(
-        withParams(`${basePath}/retrospectives/closed-portfolio`, { testUser, ...filters })
+        withParams(`${basePath}/retrospectives/closed-portfolio`, { testUser, ...serializeRetrospectiveFilters(filters) })
       );
     },
     getTrends(testUser, filters = {}) {
       return requestJson<RetrospectiveTrendsReadModelDto>(
-        withParams(`${basePath}/retrospectives/trends`, { testUser, groupBy: "template", ...filters })
+        withParams(`${basePath}/retrospectives/trends`, {
+          testUser,
+          groupBy: "template",
+          ...serializeRetrospectiveFilters(filters)
+        })
       );
     },
     getInsight(testUser, insightId) {

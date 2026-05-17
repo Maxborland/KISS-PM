@@ -280,6 +280,42 @@ describe("ClosedPortfolioRetrospectiveSurface", () => {
     await waitFor(() => expect(client.getInsight).toHaveBeenCalledWith("tenant-admin-a", "insight-critical-second"));
   });
 
+  it("requests later trend pages before summarizing the highest retrospective severity", async () => {
+    const base = trendsModel();
+    const warningTrend = { ...base.trends[0]!, id: "trend-warning-page-1", severity: "warning" as const };
+    const criticalTrend = { ...base.trends[0]!, id: "trend-critical-page-2", severity: "critical" as const };
+    const warningInsight = {
+      ...base.insights[0]!,
+      id: "insight-warning-page-1",
+      sourceTrendId: warningTrend.id,
+      severity: "warning" as const
+    };
+    const criticalInsight = {
+      ...base.insights[0]!,
+      id: "insight-critical-page-2",
+      sourceTrendId: criticalTrend.id,
+      severity: "critical" as const,
+      title: "Critical paged retrospective insight"
+    };
+    const client = apiClient(portfolioModel(), trendsModel(), insightModel());
+    vi.mocked(client.getTrends)
+      .mockResolvedValueOnce({
+        trends: [warningTrend],
+        insights: [warningInsight],
+        pagination: { offset: 0, limit: 1, total: 2 }
+      })
+      .mockResolvedValueOnce({
+        trends: [criticalTrend],
+        insights: [criticalInsight],
+        pagination: { offset: 1, limit: 1, total: 2 }
+      });
+    renderSurface(client);
+
+    await waitFor(() => expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("Критично"));
+    expect(client.getTrends).toHaveBeenCalledWith("tenant-admin-a", { limit: 50, offset: 0 });
+    expect(client.getTrends).toHaveBeenCalledWith("tenant-admin-a", { limit: 50, offset: 1 });
+  });
+
   it("renders an R2 template-improvement action contract from trend to preview and immutable readback", async () => {
     renderSurface(apiClient());
 

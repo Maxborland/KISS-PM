@@ -22,7 +22,8 @@ import {
   type TemplateImprovementPreviewDto,
   type RetrospectiveReadActionDto,
   type RetrospectiveReadRowDto,
-  type RetrospectiveTrendDto
+  type RetrospectiveTrendDto,
+  type RetrospectiveTrendsReadModelDto
 } from "./retrospectiveApiClient";
 
 type ClosedPortfolioRetrospectiveSurfaceProps = {
@@ -97,6 +98,28 @@ function mostSevereOpenInsight(
         ? insight
         : currentHighest;
     }, null);
+}
+
+async function loadAllTrendPages(apiClient: RetrospectiveApiClient, testUser: string): Promise<RetrospectiveTrendsReadModelDto> {
+  const pageSize = 50;
+  const firstPage = await apiClient.getTrends(testUser, { limit: pageSize, offset: 0 });
+  const allTrends = [...firstPage.trends];
+  const allInsights = [...firstPage.insights];
+  let nextOffset = firstPage.pagination.offset + firstPage.pagination.limit;
+
+  while (nextOffset < firstPage.pagination.total) {
+    const page = await apiClient.getTrends(testUser, { limit: pageSize, offset: nextOffset });
+    allTrends.push(...page.trends);
+    allInsights.push(...page.insights);
+    nextOffset = page.pagination.offset + page.pagination.limit;
+  }
+
+  return {
+    ...firstPage,
+    trends: allTrends,
+    insights: allInsights,
+    pagination: { offset: 0, limit: allTrends.length, total: firstPage.pagination.total }
+  };
 }
 
 function sourceRefsLine(row: RetrospectiveReadRowDto): string {
@@ -461,7 +484,7 @@ export function ClosedPortfolioRetrospectiveSurface({
   });
   const trendsQuery = useQuery({
     queryKey: retrospectiveQueryKeys.trends(testUser),
-    queryFn: () => apiClient.getTrends(testUser),
+    queryFn: () => loadAllTrendPages(apiClient, testUser),
     enabled: canReadRetrospectives,
     retry: false
   });
