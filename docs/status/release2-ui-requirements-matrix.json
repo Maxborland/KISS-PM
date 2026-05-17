@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release": "R2",
-  "updated_at": "2026-05-17T19:23:00+07:00",
+  "updated_at": "2026-05-17T19:43:00+07:00",
   "source_documents": [
     "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
     "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
@@ -13,7 +13,7 @@
     {
       "id": "R2-001",
       "requirement": "Release 2 shared operational shell and navigation state",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "OperationalSurfaceShell",
@@ -53,7 +53,7 @@
     {
       "id": "R2-002",
       "requirement": "OperationalDataGrid / configurable table foundation",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "OperationalDataGrid",
@@ -92,7 +92,7 @@
     {
       "id": "R2-003",
       "requirement": "KPI strip and signal summary pattern",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "KPIStrip",
@@ -132,7 +132,7 @@
     {
       "id": "R2-004",
       "requirement": "Portfolio Control surface UI hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Portfolio and KPI control implementation PR",
       "owned_scope": [
         "UX-P8-PORTFOLIO-CONTROL",
@@ -176,7 +176,7 @@
     {
       "id": "R2-005",
       "requirement": "Project Gantt desktop planning surface UI hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Gantt planning hardening implementation PR",
       "owned_scope": [
         "UX-P5-PROJECT-GANTT",
@@ -223,7 +223,7 @@
     {
       "id": "R2-006",
       "requirement": "Gantt tracking/baseline view",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Gantt planning hardening implementation PR",
       "owned_scope": [
         "UX-P5-BASELINE-PANEL",
@@ -262,7 +262,7 @@
     {
       "id": "R2-007",
       "requirement": "Resource Load / Capacity Matrix hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Resource capacity hardening implementation PR",
       "owned_scope": [
         "UX-P6-RESOURCE-LOAD",
@@ -303,7 +303,7 @@
     {
       "id": "R2-008",
       "requirement": "Resource conflict resolution flow with preview-before-apply",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Resource capacity hardening implementation PR",
       "owned_scope": [
         "UX-P6-OVERLOAD-RESOLUTION",
@@ -344,7 +344,7 @@
     {
       "id": "R2-009",
       "requirement": "KPI Deviation control surface hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Portfolio and KPI control implementation PR",
       "owned_scope": [
         "UX-P7-KPI-DEVIATION",
@@ -385,7 +385,7 @@
     {
       "id": "R2-010",
       "requirement": "Closed Portfolio / Retrospective control surface hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Retrospective control implementation PR",
       "owned_scope": [
         "UX-P9-CLOSED-PORTFOLIO",
@@ -425,7 +425,7 @@
     {
       "id": "R2-011",
       "requirement": "Tenant Admin saved views/layout/config preview hardening",
-      "status": "in_progress",
+      "status": "done",
       "owner": "Tenant admin runtime config implementation PR",
       "owned_scope": [
         "UX-P10-SAVED-VIEWS",
@@ -471,7 +471,7 @@
     {
       "id": "R2-012",
       "requirement": "Release 2 E2E, fixtures, sales-demo quality gate, and exit evidence",
-      "status": "planned",
+      "status": "done",
       "owner": "Release 2 exit evidence implementation PR",
       "owned_scope": [
         "E2E-R2-001..010",
@@ -523,7 +523,12 @@
       "risks": [
         "Exit evidence can become fragmented unless every implementation PR updates the matrix."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added release2 E2E profile in scripts/run-e2e.mjs and metadata extraction for E2E-R2-* ids.",
+        "2026-05-17: Added e2e/tests/release2 coverage for E2E-R2-001..010 across portfolio, Gantt, resource capacity, KPI deviation, retrospective, tenant admin, read-only denial, and sales-demo clarity.",
+        "2026-05-17: Added R2-aware verify-requirements-matrix support requiring done rows and passing release2 E2E metadata.",
+        "2026-05-17: node scripts/run-e2e.mjs release2 passed (10 tests, E2E-R2-001..010)."
+      ]
     }
   ]
 }

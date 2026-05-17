@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T17:20:18+07:00",
+  "updated_at": "2026-05-17T20:44:41+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -6914,6 +6914,68 @@
       "result": "completed"
     },
     {
+      "id": "R2-UI-007-release2-exit-evidence",
+      "aliases": [
+        "R2-UI-007",
+        "R2-012"
+      ],
+      "title": "Implement Release 2 E2E, sales-demo quality gate, and exit evidence",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives",
+        "R2-UI-002-gantt-planning-hardening",
+        "R2-UI-003-resource-capacity-hardening",
+        "R2-UI-004-portfolio-kpi-control-hardening",
+        "R2-UI-005-retrospective-control-hardening",
+        "R2-UI-006-tenant-admin-config-hardening"
+      ],
+      "write_scope": [
+        "e2e/tests/release2/**",
+        "scripts/run-e2e.mjs",
+        "scripts/verify-requirements-matrix.mjs",
+        "docs/status/release2-ui-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/product/UX_SALES_QUALITY_GATE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-007-release2-exit-evidence.md",
+        ".agent-bus/claims/R2-UI-007-release2-exit-evidence.claim.json",
+        ".agent-bus/sessions/R2-UI-007-release2-exit-evidence.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/src/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "node scripts/run-e2e.mjs release2",
+        "npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-007-release2-exit-evidence --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-012 exit evidence: Release 2 E2E profile/tests for E2E-R2-001..010, sales-demo gate evidence, R2 matrix verifier support, and final matrix status. No production UI/API/domain changes.",
+      "started_at": "2026-05-17T19:31:00+07:00",
+      "completed_at": "2026-05-17T19:43:00+07:00",
+      "result": "completed"
+    },
+    {
       "id": "R2-UI-006-tenant-admin-config-hardening",
       "aliases": [
         "R2-UI-006",
@@ -7149,6 +7211,67 @@
       "notes": "Completed 2026-05-17. Implemented R2-007/R2-008 Resource Load capacity matrix and governed conflict resolution UI hardening. Added hierarchy/day matrix, crosshair, reduced-capacity/free/overload states, cell drilldown, preview permission/warning trace, apply result changed ids and readback count, CSS, tests, matrix evidence, and handoff. No API/domain/package/e2e changes.",
       "started_at": "2026-05-17T17:35:00+07:00",
       "completed_at": "2026-05-17T17:43:00+07:00",
+      "result": "completed"
+    },
+    {
+      "id": "R2-UI-008-review-comment-hardening",
+      "aliases": [
+        "R2-review-fixes"
+      ],
+      "title": "Process remaining relevant Codex review comments for Release 2 UI PR stack",
+      "status": "completed",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-007-release2-exit-evidence"
+      ],
+      "write_scope": [
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/GanttControlSurface.tsx",
+        "apps/web/src/GanttControlSurface.test.tsx",
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.tsx",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx",
+        "apps/web/src/retrospectiveApiClient.ts",
+        "apps/web/src/SavedViewLayoutBuilderSurface.tsx",
+        "apps/web/src/SavedViewLayoutBuilderSurface.test.tsx",
+        "e2e/tests/release2/portfolio-control.spec.ts",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-UI-008-review-comment-hardening.claim.json",
+        ".agent-bus/sessions/R2-UI-008-review-comment-hardening.md",
+        ".agent-bus/locks/**",
+        ".superpowers/brainstorm/951-1778994612/",
+        ".superpowers/brainstorm/visual-r2-20260517121053/state/",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/operationalSurfacePrimitives.test.tsx apps/web/src/GanttControlSurface.test.tsx apps/web/src/ResourceLoadControlSurface.test.tsx apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/web/src/SavedViewLayoutBuilderSurface.test.tsx",
+        "node scripts/run-e2e.mjs release2",
+        "npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json",
+        "npm run typecheck",
+        "git diff --check",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-008-review-comment-hardening --once"
+      ],
+      "notes": "Completed 2026-05-17T21:01:25+07:00. Processed remaining relevant Codex P2 review comments across PR #3..#9. Verification passed: targeted Vitest 6 files/122 tests, Release 2 E2E 10/10, R2 matrix verifier, typecheck, git diff --check, and agent-bus guard.",
+      "started_at": "2026-05-17T20:43:41+07:00",
+      "completed_at": "2026-05-17T21:01:25+07:00",
       "result": "completed"
     }
   ]
