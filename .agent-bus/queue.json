@@ -6914,6 +6914,66 @@
       "result": "completed"
     },
     {
+      "id": "R2-UI-004-portfolio-kpi-control-hardening",
+      "aliases": [
+        "R2-UI-004",
+        "R2-004",
+        "R2-009"
+      ],
+      "title": "Implement Release 2 Portfolio and KPI deviation control UI hardening",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives",
+        "R2-UI-003-resource-capacity-hardening"
+      ],
+      "write_scope": [
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/PortfolioControlSurface.test.tsx",
+        "apps/web/src/KpiDeviationControlSurface.tsx",
+        "apps/web/src/KpiDeviationControlSurface.test.tsx",
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/release2-ui-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-004-portfolio-kpi-control-hardening.md",
+        ".agent-bus/claims/R2-UI-004-portfolio-kpi-control-hardening.claim.json",
+        ".agent-bus/sessions/R2-UI-004-portfolio-kpi-control-hardening.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/PortfolioControlSurface.test.tsx apps/web/src/KpiDeviationSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-004-portfolio-kpi-control-hardening --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-004/R2-009 Portfolio Control and KPI Deviation UI hardening only. Added Portfolio OperationalDataGrid row/action contract, KPI SignalSummaryBar/KPIStrip/action handoff contract, component tests, and matrix evidence. No API/domain/package/e2e changes.",
+      "started_at": "2026-05-17T17:47:00+07:00",
+      "completed_at": "2026-05-17T17:58:55+07:00",
+      "result": "completed"
+    },
+    {
       "id": "R2-UI-003-resource-capacity-hardening",
       "aliases": [
         "R2-UI-003",

@@ -169,7 +169,8 @@
       ],
       "done_evidence": [
         "2026-05-17: PortfolioControlSurface now consumes OperationalSurfaceShell, KPIStrip, SignalSummaryBar, and ActionAuditPreview while preserving governed preview/apply/audit/readback flow tests.",
-        "2026-05-17: This is a first consumer hardening step only; full R2-004 E2E-R2-001/E2E-R2-010 closure remains pending."
+        "2026-05-17: PortfolioControlSurface now exposes a Release 2 OperationalDataGrid with risk object, signal, source refs, next governed action, permission requirement, preview/result/readback requirement, and row selection handoff to the existing preview/apply/audit panel.",
+        "2026-05-17: This is a component-level hardening step only; full R2-004 E2E-R2-001/E2E-R2-010 closure remains pending."
       ]
     },
     {
@@ -343,7 +344,7 @@
     {
       "id": "R2-009",
       "requirement": "KPI Deviation control surface hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Portfolio and KPI control implementation PR",
       "owned_scope": [
         "UX-P7-KPI-DEVIATION",
@@ -376,7 +377,10 @@
       "risks": [
         "Deviation screens lose trust if source trace is hidden behind generic copy."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: KpiDeviationControlSurface now exposes SignalSummaryBar, KPIStrip, and a governed action handoff contract with entity, KPI definition version, formula version, threshold version, source trace, corrective-action path, accepted-risk reason requirement, permission state, and historical stability note.",
+        "2026-05-17: Component-level tests cover the Release 2 KPI signal summary, KPI metric strip, and action-contract readback; E2E-R2-006/E2E-R2-009 remain pending."
+      ]
     },
     {
       "id": "R2-010",

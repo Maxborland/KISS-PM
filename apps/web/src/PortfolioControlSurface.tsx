@@ -5,8 +5,11 @@ import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
   ActionAuditPreview,
   KPIStrip,
+  OperationalDataGrid,
   OperationalSurfaceShell,
   SignalSummaryBar,
+  type OperationalGridColumn,
+  type OperationalGridRow,
   type OperationalSeverity,
   type OperationalSurfaceState
 } from "./operationalSurfacePrimitives";
@@ -145,6 +148,105 @@ function actionLine(action: ControlSurfaceReadActionDto): string {
   if (action.unavailableReason === "permission_denied") return `${action.label}: нет права`;
   if (action.unavailableReason === "configuration_disabled") return `${action.label}: отключено конфигурацией`;
   return `${action.label}: не рекомендовано`;
+}
+
+const portfolioGridColumns: OperationalGridColumn[] = [
+  { key: "severity", label: "Риск", group: "Сигнал", sticky: "left", width: 120 },
+  { key: "object", label: "Объект", group: "Сигнал", width: 240 },
+  { key: "signal", label: "Сигнал", group: "Сигнал", width: 260 },
+  { key: "project", label: "Проект", group: "Источник", width: 180 },
+  { key: "source", label: "Источник", group: "Источник", width: 300 },
+  { key: "nextAction", label: "Следующее действие", group: "Действие", width: 220 },
+  { key: "readback", label: "Readback", group: "Действие", width: 190 }
+];
+
+function primaryRowAction(row: ControlSurfaceReadRowDto): ControlSurfaceReadActionDto | null {
+  return row.actions.find((action) => action.available) ?? row.actions[0] ?? null;
+}
+
+function sourceRefsLine(row: ControlSurfaceReadRowDto): string {
+  return row.sourceRefs.map((sourceRef) => `${sourceRef.entityType}:${sourceRef.entityId}`).join(" / ");
+}
+
+function gridSignalLabel(row: ControlSurfaceReadRowDto): string {
+  if (row.entityType === "resource_overload") {
+    const resourceName = rowStringField(row, "resourceName");
+    return `${row.explanation} / ресурс: ${resourceName || row.entityId}`;
+  }
+
+  return row.explanation;
+}
+
+function PortfolioOperationalGrid({
+  activeRowId,
+  onSelectRow,
+  rows
+}: {
+  activeRowId: string | null;
+  onSelectRow: (rowId: string) => void;
+  rows: ControlSurfaceReadRowDto[];
+}) {
+  const gridRows: OperationalGridRow[] = rows.map((row) => {
+    const nextAction = primaryRowAction(row);
+
+    return {
+      id: row.id,
+      label: row.label,
+      severity: operationalSeverity(row.severity),
+      values: {
+        severity: controlSeverityLabel(row.severity),
+        object: `${row.entityType}:${row.entityId}`,
+        signal: gridSignalLabel(row),
+        project: projectIdFromRow(row) ?? "не связан",
+        source: sourceRefsLine(row),
+        nextAction: nextAction ? actionLine(nextAction) : "нет действия",
+        readback: "Preview/result/readback обязателен"
+      },
+      actions: []
+    };
+  });
+
+  return (
+    <OperationalDataGrid
+      columns={portfolioGridColumns}
+      emptyLabel="Нет контрольных сигналов. Портфельная поверхность покажет KPI и ресурсные риски после появления данных."
+      rows={gridRows}
+      selectedRowId={activeRowId}
+      onSelectRow={onSelectRow}
+    />
+  );
+}
+
+function PortfolioNextActionContract({
+  action,
+  definition,
+  row
+}: {
+  action: ControlSurfaceReadActionDto | null;
+  definition: PortfolioActionDefinitionDto | null;
+  row: ControlSurfaceReadRowDto | null;
+}) {
+  if (row === null || action === null) {
+    return (
+      <section className="phase2-panel portfolio-next-action-contract" data-testid="portfolio-control-next-action">
+        <h3>Следующее действие</h3>
+        <p>Нет выбранного контрольного сигнала.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="phase2-panel portfolio-next-action-contract" data-testid="portfolio-control-next-action">
+      <h3>Следующее действие</h3>
+      <div className="compact-list">
+        <span>Объект: {row.entityType}:{row.entityId}</span>
+        <span>Следующее действие: {action.label}</span>
+        <span>Право: {definition?.requiredPermission ?? (action.available ? "определяется action definition" : actionLine(action))}</span>
+        <span>Источник: {sourceRefsLine(row) || "нет"}</span>
+        <span>{action.dryRunRequired ? "Dry-run preview обязателен" : "Preview/result/readback обязателен"}</span>
+      </div>
+    </section>
+  );
 }
 
 function latestAction(audit: PortfolioControlAuditDto): string {
@@ -533,10 +635,16 @@ export function PortfolioControlSurface({
               </div>
             ))}
           </div>
+          <PortfolioOperationalGrid
+            activeRowId={activeRow?.id ?? null}
+            rows={rows}
+            onSelectRow={selectRow}
+          />
           <RowList activeRowId={activeRow?.id ?? null} onSelectRow={selectRow} rows={rows} />
         </section>
 
         <section className="phase2-panel portfolio-action-panel" data-testid="portfolio-control-action-panel">
+          <PortfolioNextActionContract action={activeAction} definition={activeDefinition} row={activeRow} />
           {activeRow ? <DetailPanel onOpenGanttProject={onOpenGanttProject} row={activeRow} /> : null}
 
           {activeRow ? (

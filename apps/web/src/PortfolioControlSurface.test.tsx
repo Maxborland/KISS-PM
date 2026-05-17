@@ -343,6 +343,31 @@ function renderSurface(
 }
 
 describe("PortfolioControlSurface", () => {
+  it("renders an R2 operational grid and next-action contract for the selected risk row", async () => {
+    renderSurface(createApiClient());
+
+    const grid = await screen.findByTestId("operational-data-grid");
+    expect(grid).toHaveTextContent("Критическое отклонение трудозатрат");
+    expect(grid).toHaveTextContent("project:project-alpha-a");
+    expect(screen.getByTestId("grid-row-row-kpi-signal-kpi-schedule-variance-a")).toHaveTextContent(
+      "Создать корректирующую задачу"
+    );
+
+    const nextAction = await screen.findByTestId("portfolio-control-next-action");
+    expect(nextAction).toHaveTextContent("Объект: kpi_signal:signal-kpi-schedule-variance-a");
+    expect(nextAction).toHaveTextContent("Следующее действие: Создать корректирующую задачу");
+    expect(nextAction).toHaveTextContent("Право: control.action:write");
+    expect(nextAction).toHaveTextContent("Источник: project:project-alpha-a / kpi_signal:signal-kpi-schedule-variance-a");
+    expect(nextAction).toHaveTextContent("Preview/result/readback обязателен");
+
+    fireEvent.click(screen.getByTestId("grid-row-row-resource-overload-resource-architect-a"));
+    expect(screen.getByTestId("portfolio-control-next-action")).toHaveTextContent(
+      "Объект: resource_overload:overload:resource-architect-a:2026-06-01:2026-06-05"
+    );
+    expect(screen.getByTestId("portfolio-control-next-action")).toHaveTextContent("Следующее действие: Сдвинуть работу");
+    expect(screen.getByTestId("portfolio-control-next-action")).toHaveTextContent("Право: resource.write");
+  });
+
   it("loads portfolio rows, severity, source refs, and recommended governed actions", async () => {
     const apiClient = createApiClient();
     renderSurface(apiClient);

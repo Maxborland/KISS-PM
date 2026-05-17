@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T17:43:00+07:00
+Updated: 2026-05-17T17:58:55+07:00
+
+- `R2-UI-004-portfolio-kpi-control-hardening` is completed as the fourth Release 2 production UI slice:
+  - branch: `codex/r2-portfolio-kpi-control-hardening`, stacked on PR #5 (`codex/r2-resource-capacity-hardening`)
+  - files: `apps/web/src/PortfolioControlSurface.tsx`, `apps/web/src/PortfolioControlSurface.test.tsx`, `apps/web/src/KpiDeviationControlSurface.tsx`, `apps/web/src/KpiDeviationControlSurface.test.tsx`
+  - implemented: Portfolio OperationalDataGrid with object/signal/source/next-action/readback contract, portfolio next-action contract with permission and source trace, KPI SignalSummaryBar, KPI KPIStrip, KPI governed action handoff with formula/threshold/source trace, corrective-action path, accepted-risk reason requirement, permission state, and historical stability note.
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` records component-level evidence for `R2-004/R2-009`; E2E-R2-001/E2E-R2-006/E2E-R2-009/E2E-R2-010 remain pending.
+  - verification: RED component test run failed with 2 expected missing-behavior failures; final targeted Vitest passed (3 files, 29 tests); `npm run typecheck` passed; `npm run lint` passed; `git diff --check` passed; Release 2 matrix JSON parse passed; agent-bus guard passed after escalation for Node git-spawn access.
+  - known verifier gap remains: `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this R2 backlog shape (`unsupported matrix phase: undefined`; planned/in_progress status errors).
+  - next recommended slice: `R2-010` Closed Portfolio / Retrospective hardening or `R2-011` Tenant Admin saved views/config preview hardening, or merge/rebase stacked PRs first.
 
 - `R2-UI-003-resource-capacity-hardening` is completed as the third Release 2 production UI slice:
   - branch: `codex/r2-resource-capacity-hardening`, stacked on PR #4 (`codex/r2-gantt-planning-hardening`)
