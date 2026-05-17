@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T17:12:00+07:00
+Updated: 2026-05-17T17:28:00+07:00
+
+- `R2-UI-002-gantt-planning-hardening` is completed as the second Release 2 production UI slice:
+  - branch: `codex/r2-gantt-planning-hardening`, stacked on PR #3 (`codex/r2-shared-operational-primitives`)
+  - files: `apps/web/src/GanttControlSurface.tsx`, `apps/web/src/GanttControlSurface.test.tsx`, `apps/web/src/styles.css`
+  - implemented: shared WBS row/timeline bar selection state, selected-task and active-cell status, inline edit dirty marker, Enter-to-save, Escape-to-reset, validation blocker, pending save marker, API readback/audit evidence, Tracking Gantt overlay with baseline/live variance and today marker.
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` marks `R2-005/R2-006` as `in_progress` with evidence; E2E-R2-002/E2E-R2-003 remain pending.
+  - verification: targeted Vitest passed (2 files, 19 tests); `npm run typecheck` passed; `npm run lint` passed; `git diff --check` passed; Release 2 matrix JSON parse passed.
+  - known verifier gap remains: `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this R2 backlog shape (`unsupported matrix phase: undefined`; planned/in_progress status errors).
+  - next recommended slice: `R2-007/R2-008` Resource Load / Capacity Matrix plus conflict resolution preview/apply, or merge/rebase stacked PRs first.
 
 - `R2-UI-001-shared-operational-primitives` is completed as the first Release 2 production UI slice:
   - shared primitives: `apps/web/src/operationalSurfacePrimitives.tsx`

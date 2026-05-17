@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T17:01:16.4123963+07:00",
+  "updated_at": "2026-05-17T17:20:18+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -6855,6 +6855,62 @@
       ],
       "notes": "Completed 2026-05-17. Implemented the first Release 2 production UI slice: shared OperationalSurfaceShell, OperationalDataGrid, ConfigurableColumnLayout, KPIStrip, SignalSummaryBar, PermissionDeniedInline, ActionAuditPreview, CSS, and narrow Portfolio Control integration. R2 requirements matrix marks R2-001..R2-004 in_progress because cross-surface/E2E-R2 closure remains later scope. No API/domain/package/e2e production changes.",
       "completed_at": "2026-05-17T17:12:00+07:00",
+      "result": "completed"
+    },
+    {
+      "id": "R2-UI-002-gantt-planning-hardening",
+      "aliases": [
+        "R2-UI-002",
+        "R2-005",
+        "R2-006"
+      ],
+      "title": "Implement Release 2 Project Gantt planning and tracking UI hardening",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives"
+      ],
+      "write_scope": [
+        "apps/web/src/GanttControlSurface.tsx",
+        "apps/web/src/GanttControlSurface.test.tsx",
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/release2-ui-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-002-gantt-planning-hardening.md",
+        ".agent-bus/claims/R2-UI-002-gantt-planning-hardening.claim.json",
+        ".agent-bus/sessions/R2-UI-002-gantt-planning-hardening.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/GanttControlSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-002-gantt-planning-hardening --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-005 Project Gantt desktop planning surface hardening plus R2-006 tracking/baseline overlay over existing Phase 5 schedule API. Added selection sync, active-cell/dirty/validation/pending/readback affordances, Tracking Gantt variance, CSS, tests, matrix evidence, and handoff. No API/domain/package/e2e changes.",
+      "completed_at": "2026-05-17T17:28:00+07:00",
       "result": "completed"
     }
   ]

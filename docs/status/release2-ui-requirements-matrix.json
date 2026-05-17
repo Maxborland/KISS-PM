@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release": "R2",
-  "updated_at": "2026-05-17T17:11:00+07:00",
+  "updated_at": "2026-05-17T17:26:00+07:00",
   "source_documents": [
     "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
     "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
@@ -175,7 +175,7 @@
     {
       "id": "R2-005",
       "requirement": "Project Gantt desktop planning surface UI hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Gantt planning hardening implementation PR",
       "owned_scope": [
         "UX-P5-PROJECT-GANTT",
@@ -212,12 +212,17 @@
       "risks": [
         "Visual Gantt can appear complete before persistence/audit/readback is proven."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: GanttControlSurface now shares selection state between WBS rows and timeline bars with selected row/bar affordance.",
+        "2026-05-17: Added active-cell inline editing with Enter-to-save, Escape-to-reset, dirty marker, validation blocker, pending save marker, API readback status, and audit evidence in component tests.",
+        "2026-05-17: Read-only users keep schedule context and see disabled reason for schedule commands.",
+        "2026-05-17: npm test -- apps/web/src/GanttControlSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx passed."
+      ]
     },
     {
       "id": "R2-006",
       "requirement": "Gantt tracking/baseline view",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Gantt planning hardening implementation PR",
       "owned_scope": [
         "UX-P5-BASELINE-PANEL",
@@ -247,7 +252,11 @@
       "risks": [
         "Baseline overlay can confuse users if dirty/live/persisted states are not explicit."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added Tracking Gantt overlay with baseline id, live plan, baseline plan, start/finish variance, and today marker.",
+        "2026-05-17: Component tests prove live schedule edits do not mutate the baseline display and show variance after API readback.",
+        "2026-05-17: E2E-R2-003 remains pending for Release 2 exit evidence."
+      ]
     },
     {
       "id": "R2-007",
