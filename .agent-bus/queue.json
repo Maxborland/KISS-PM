@@ -5994,7 +5994,7 @@
         "P12-006"
       ],
       "title": "Implement operator release readiness surfaces and governed ops commands",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6025,7 +6025,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next runnable P12 block after accepted P12-005. Implement operator readiness/recovery surfaces and governed ops commands; must not mark P12 strict gate accepted before E2E-110..115 and P12-010."
+      "notes": "Accepted implementation block on 2026-05-17T09:51:20+07:00. API and UI operator readiness surfaces/governed ops commands implemented and verified; P12-006 matrix row remains blocked only for later E2E-113/E2E-114 evidence."
     },
     {
       "id": "P12-007-demo-tenant-template-pack-onboarding",
@@ -6033,7 +6033,7 @@
         "P12-007"
       ],
       "title": "Implement demo tenant/template pack and operator onboarding docs",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "high",
       "phase": "P12",
       "depends_on": [
@@ -6061,7 +6061,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Blocked until production/env contract is accepted."
+      "notes": "Next runnable P12 block after accepted P12-006. P12-001 dependency is accepted as an implementation block; keep P12 strict gate blocked until E2E-110..115 and P12-010."
     },
     {
       "id": "P12-008-full-critical-journey-orchestration",

@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T09:35:00.0000000+07:00
+Updated: 2026-05-17T09:51:20.0000000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -31,8 +31,13 @@ Updated: 2026-05-17T09:35:00.0000000+07:00
   - `GET /api/ops/permission-smoke`, `POST /api/ops/permission-smoke/run`, `GET /api/ops/tenant-isolation`, and `POST /api/ops/tenant-isolation/run` enforce backend `ops.read`/`ops.execute`, write ops audit events on run, and keep readback tenant-scoped.
   - `apps/api/src/phase12PermissionIsolationApi.test.ts` proves permission smoke across P3-P12 representative surfaces, P4 task write denial, P5 schedule write denial, tenant-isolation no-leak probes, read-only direct denial, audit readback, and `/test-fixtures/reset` cleanup of latestRun plus the deterministic setup project.
   - P12-005 matrix row remains blocked only for later E2E-111/E2E-112 browser/UI evidence.
+- `P12-006-operator-readiness-surfaces` is accepted as an implementation block:
+  - `apps/api/src/phase12Readiness.ts` now keeps resettable tenant-scoped release-readiness run state with latestRun, immutable run snapshots, and run detail readback.
+  - `apps/api/src/app.ts` exposes governed release-readiness run/readback routes and tenant-scoped `/api/ops/audit`; readiness execution is backend guarded with `release.readiness.execute`, readback with `release.readiness.read`, and audit with `ops.audit.read`.
+  - `apps/web/src/OperatorReadinessSurface.tsx`, `apps/web/src/operatorReadinessApiClient.ts`, and `apps/web/src/App.tsx` provide the P12 operator readiness surface and navigation entry for readiness, permission smoke, tenant-isolation smoke, recovery smoke, command errors, denied state, API readback, latest run after remount, and ops audit evidence.
+  - P12-006 matrix row remains blocked only for later E2E-113/E2E-114 browser/API evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-006-operator-readiness-surfaces`.
+- Next runnable step: claim `P12-007-demo-tenant-template-pack-onboarding`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

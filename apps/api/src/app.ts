@@ -33,7 +33,7 @@ import {
 import { createPhase11RuntimeState } from "./phase11Runtime";
 import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
 import type { Phase12DeploymentEnvironment } from "./phase12Deployment";
-import { buildPhase12ReleaseReadinessReadModel } from "./phase12Readiness";
+import { createPhase12ReadinessRuntimeState } from "./phase12Readiness";
 import { createPhase12PermissionIsolationSmokeRuntimeState } from "./phase12PermissionSmoke";
 import { createPhase12RecoveryRuntimeState } from "./phase12Recovery";
 import type {
@@ -1091,6 +1091,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase9Runtime = createPhase9RuntimeState();
   let phase10Runtime = createPhase10RuntimeState();
   let phase11Runtime = createPhase11RuntimeState();
+  let phase12ReadinessRuntime = createPhase12ReadinessRuntimeState();
   let phase12PermissionIsolationRuntime = createPhase12PermissionIsolationSmokeRuntimeState();
   let phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
   let phase11ImportPreviewCounter = 0;
@@ -1122,12 +1123,86 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       });
 
       return context.json(
-        buildPhase12ReleaseReadinessReadModel({
+        phase12ReadinessRuntime.read({
           tenantId: session.user.tenantId,
           generatedAt: runtime.now(),
           deployment: validatePhase12DeploymentEnvironment(options.deploymentEnvironment)
         })
       );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/ops/release-readiness/run", (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "release.readiness.execute", {
+        entityType: "releaseReadinessRun",
+        tenantId: session.user.tenantId,
+        entityId: session.user.tenantId
+      });
+
+      const run = phase12ReadinessRuntime.run({
+        tenantId: session.user.tenantId,
+        checkedAt: runtime.now(),
+        deployment: validatePhase12DeploymentEnvironment(options.deploymentEnvironment)
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: run.auditEventId,
+        actionKey: "ops.release_readiness.run",
+        target: { entityType: "releaseReadinessRun", entityId: run.id },
+        correlationId: `corr-${run.id}`,
+        details: {
+          after: {
+            summary: run.summary,
+            status: run.status
+          }
+        }
+      });
+
+      return context.json({ run }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/ops/release-readiness/runs/:runId", (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      const runId = context.req.param("runId");
+      assertAllowed(runtime, session, "release.readiness.read", {
+        entityType: "releaseReadinessRun",
+        tenantId: session.user.tenantId,
+        entityId: runId
+      });
+      const run = phase12ReadinessRuntime.getRun(session.user.tenantId, runId);
+      if (run === null) {
+        return context.json(errorDto("not_found", "Объект не найден"), 404);
+      }
+
+      return context.json({ run });
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/ops/audit", (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.audit.read", {
+        entityType: "operatorAudit",
+        tenantId: session.user.tenantId,
+        entityId: session.user.tenantId
+      });
+
+      const events = runtime.auditStore
+        .listByTenant(session.user.tenantId)
+        .filter((event) => event.actionKey.startsWith("ops."))
+        .map(auditEventDto);
+
+      return context.json({ events });
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -5194,6 +5269,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase9Runtime = createPhase9RuntimeState();
     phase10Runtime = createPhase10RuntimeState();
     phase11Runtime = createPhase11RuntimeState();
+    phase12ReadinessRuntime = createPhase12ReadinessRuntimeState();
     phase12PermissionIsolationRuntime = createPhase12PermissionIsolationSmokeRuntimeState();
     phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
     phase11ImportPreviewCounter = 0;

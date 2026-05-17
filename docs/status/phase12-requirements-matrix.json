@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T09:33:39.7399302+07:00",
+  "updated_at": "2026-05-17T09:51:20.0000000+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -218,17 +218,32 @@
         "E2E-114"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-006 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-006 scope and acceptance criteria before implementation.",
+        "apps/api/src/phase12Readiness.ts implements resettable tenant-scoped release-readiness run state with latestRun readback, run detail readback, immutable run snapshots, and deterministic run ids.",
+        "apps/api/src/app.ts exposes GET /api/ops/release-readiness, POST /api/ops/release-readiness/run, GET /api/ops/release-readiness/runs/:runId, and GET /api/ops/audit; governed run requires release.readiness.execute, readback requires release.readiness.read, audit requires ops.audit.read, and cross-tenant run reads return 404 without leaking data.",
+        "apps/web/src/OperatorReadinessSurface.tsx and apps/web/src/operatorReadinessApiClient.ts provide the operator readiness control surface for readiness, permission smoke, tenant isolation, recovery smoke, command errors, denied state, API readback, latest run after remount, and ops audit evidence through TanStack Query.",
+        "apps/web/src/App.tsx wires the P12 operator readiness surface and navigation entry without changing shared TanStack Query foundation ownership."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-006-operator-readiness-surfaces --once exit 0 at startup",
+        "npm test -- apps/api/src/phase12ReadinessApi.test.ts exit 1 RED: latestRun/run route and readonly run denial were missing before implementation",
+        "npm test -- apps/web/src/OperatorReadinessSurface.test.tsx exit 1 RED: ./OperatorReadinessSurface module was missing before implementation",
+        "npm test -- apps/web/src/App.test.tsx exit 1 RED: operator readiness surface and navigation were not wired into the shell before implementation",
+        "npm test -- apps/api/src/phase12ReadinessApi.test.ts apps/api/src/phase12RecoveryApi.test.ts apps/api/src/phase12PermissionIsolationApi.test.ts exit 0: 3 files, 12 tests passed",
+        "npm test -- apps/web/src/OperatorReadinessSurface.test.tsx apps/web/src/App.test.tsx exit 0: 2 files, 21 tests passed",
+        "npm test -- apps/web/src exit 0: 20 files, 129 tests passed",
+        "npm run test:integration exit 0: 25 files, 130 tests passed",
+        "npm test exit 0: 106 files, 609 tests passed",
+        "npm run typecheck exit 0 after typing App P12 DTO mocks explicitly",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Operator readiness/recovery UI and governed ops commands are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "API tests prove /test-fixtures/reset clears release-readiness latestRun/readback and readiness run detail, while component tests prove latest run survives remount through API readback rather than local state. Final row verification still requires E2E-113/E2E-114 browser evidence for deployment/readiness and recovery smoke with reload/audit/reset cleanup before this row can become verified.",
+      "blocker": "2026-05-17T09:51:20.0000000+07:00: P12-006 API and UI implementation evidence exists, but executable E2E-113 and E2E-114 browser/API evidence is not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T09:51:20.0000000+07:00",
       "e2e_evidence": []
     },
     {
