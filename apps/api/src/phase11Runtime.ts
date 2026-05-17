@@ -386,6 +386,7 @@ export function createPhase11RuntimeState() {
     getConnectionFailureMode,
     previewMockImport,
     applyImport,
+    getImportPreview: getStoredPreviewForRead,
     getMigrationValidationReport,
     getImportDryRunSummary,
     listImportBatches,

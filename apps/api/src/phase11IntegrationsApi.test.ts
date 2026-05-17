@@ -178,6 +178,94 @@ describe("Phase 11 integrations API", () => {
     });
   });
 
+  it("keeps imported project operable through canonical project APIs after the adapter fails", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true });
+    const preview = await app.request(
+      "/api/integrations/import/preview?testUser=tenant-admin-a",
+      jsonRequest({
+        adapterId: "adapter-mock-crm",
+        connectionId: "conn-mock-crm-a",
+        payloadFixtureKey: "mock-crm-valid"
+      })
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = (await readJson(preview)) as { preview: { id: string } };
+
+    const apply = await app.request(
+      "/api/integrations/import/apply?testUser=tenant-admin-a",
+      jsonRequest({
+        previewId: previewBody.preview.id,
+        batchId: "batch-imported-project-continuity",
+        idempotencyKey: "idem-imported-project-continuity",
+        confirmed: true
+      })
+    );
+    expect(apply.status).toBe(200);
+    const applyBody = (await readJson(apply)) as {
+      readback: {
+        mappings: Array<{
+          externalEntityId: string;
+          canonicalEntityType: string;
+          canonicalEntityId: string;
+        }>;
+      };
+    };
+    const projectMapping = applyBody.readback.mappings.find((mapping) => mapping.canonicalEntityType === "project");
+    const taskMapping = applyBody.readback.mappings.find((mapping) => mapping.canonicalEntityType === "task");
+    if (projectMapping === undefined || taskMapping === undefined) {
+      throw new Error("expected project and task mappings after import apply");
+    }
+
+    const failure = await app.request(
+      "/api/integrations/connections/conn-mock-crm-a/failure-mode?testUser=tenant-admin-a",
+      jsonRequest({
+        code: "adapter_unavailable",
+        message: "Mock CRM is offline after import"
+      })
+    );
+    expect(failure.status).toBe(200);
+
+    const project = await app.request(`/api/projects/${projectMapping.canonicalEntityId}?testUser=project-manager-a`);
+    expect(project.status).toBe(200);
+    const projectText = await project.text();
+    expect(projectText).toContain("Импорт: API проект");
+    expect(projectText).toContain(taskMapping.canonicalEntityId);
+    expect(projectText).not.toContain(projectMapping.externalEntityId);
+    expect(projectText).not.toContain(taskMapping.externalEntityId);
+
+    const taskList = await app.request(`/api/projects/${projectMapping.canonicalEntityId}/tasks?testUser=project-manager-a`);
+    expect(taskList.status).toBe(200);
+    await expect(readJson(taskList)).resolves.toMatchObject({
+      tasks: [expect.objectContaining({ id: taskMapping.canonicalEntityId, title: "API imported task" })]
+    });
+
+    const statusChange = await app.request(
+      `/api/tasks/${taskMapping.canonicalEntityId}/status?testUser=project-manager-a`,
+      jsonRequest({ toStatus: "in_progress" }, "PATCH")
+    );
+    expect(statusChange.status).toBe(200);
+    await expect(readJson(statusChange)).resolves.toMatchObject({
+      task: { id: taskMapping.canonicalEntityId, status: "in_progress" }
+    });
+
+    const audit = await app.request(`/api/audit?testUser=tenant-admin-a&targetType=task&targetId=${taskMapping.canonicalEntityId}`);
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.toMatchObject({
+      events: expect.arrayContaining([expect.objectContaining({ actionKey: "task.status.change" })])
+    });
+
+    const tenantBProject = await app.request(`/api/projects/${projectMapping.canonicalEntityId}?testUser=tenant-admin-b`);
+    expect(tenantBProject.status).toBe(404);
+    const tenantBText = await tenantBProject.text();
+    expect(tenantBText).not.toContain("Импорт: API проект");
+    expect(tenantBText).not.toContain(projectMapping.externalEntityId);
+
+    const reset = await app.request("/test-fixtures/reset", jsonRequest({}));
+    expect(reset.status).toBe(200);
+    const afterReset = await app.request(`/api/projects/${projectMapping.canonicalEntityId}?testUser=project-manager-a`);
+    expect(afterReset.status).toBe(404);
+  });
+
   it("rejects stale preview tokens when a newer dry-run exists for the same tenant and fixture", async () => {
     const app = createApiApp({ allowTestFixtureReset: true });
     const previewRequest = {
