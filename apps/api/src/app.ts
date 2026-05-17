@@ -31,6 +31,8 @@ import {
   tenantLabelPublishAuditDto
 } from "./phase10Runtime";
 import { createPhase11RuntimeState } from "./phase11Runtime";
+import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
+import type { Phase12DeploymentEnvironment } from "./phase12Deployment";
 import type {
   KpiDefinitionBundle,
   KpiDefinitionConfigInput,
@@ -88,6 +90,7 @@ type ApiErrorCode =
 
 export type CreateApiAppOptions = {
   allowTestFixtureReset?: boolean;
+  deploymentEnvironment?: Phase12DeploymentEnvironment;
 };
 
 const scopeSchema = z.enum(["own", "project", "tenant", "all"]);
@@ -1085,6 +1088,8 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       service: "kiss-pm-api"
     })
   );
+
+  app.get("/health/deployment", (context) => context.json(validatePhase12DeploymentEnvironment(options.deploymentEnvironment)));
 
   function currentConfigurationVersion(session: Phase2RuntimeSession): number {
     return Math.max(
