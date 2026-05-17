@@ -75,15 +75,24 @@ function verifyRelease2Matrix() {
 
   try {
     const runMetadata = JSON.parse(readFileSync(e2eRunMetadataPath, "utf8"));
+    const runMetadataStat = statSync(e2eRunMetadataPath);
     const metadataTestPaths = new Set(
       Array.isArray(runMetadata.testPaths)
         ? runMetadata.testPaths.map((testPath) => String(testPath).replaceAll("\\", "/"))
         : []
     );
     const metadataE2eIds = new Set(Array.isArray(runMetadata.e2eIds) ? runMetadata.e2eIds.map(String) : []);
+    const finishedAt = Date.parse(runMetadata.finishedAt);
+    const matrixUpdatedAt = Date.parse(matrix.updated_at);
+    let newestRelease2InputMtimeMs = statSync(matrixPath).mtimeMs;
 
     if (runMetadata.profile !== "release2" || runMetadata.status !== "passed" || runMetadata.exitCode !== 0) {
       failures.push("R2: E2E run metadata must come from a passing release2 profile run");
+    }
+    if (Number.isNaN(finishedAt)) {
+      failures.push("R2: E2E run metadata missing valid finishedAt");
+    } else if (!Number.isNaN(matrixUpdatedAt) && finishedAt + 120_000 < matrixUpdatedAt) {
+      failures.push("R2: E2E run metadata is older than Release 2 matrix updated_at");
     }
     for (const e2eId of release2E2eIds) {
       if (!metadataE2eIds.has(e2eId)) {
@@ -97,10 +106,18 @@ function verifyRelease2Matrix() {
         const testPathStat = statSync(testPath);
         if (!testPathStat.isFile()) {
           failures.push(`R2: required E2E test path is not a file at ${testPath}`);
+        } else {
+          newestRelease2InputMtimeMs = Math.max(newestRelease2InputMtimeMs, testPathStat.mtimeMs);
         }
       } catch {
         failures.push(`R2: required E2E test file missing at ${testPath}`);
       }
+    }
+    if (!Number.isNaN(finishedAt) && finishedAt + 120_000 < newestRelease2InputMtimeMs) {
+      failures.push("R2: E2E run metadata finishedAt is older than Release 2 matrix or required E2E tests");
+    }
+    if (runMetadataStat.mtimeMs + 120_000 < newestRelease2InputMtimeMs) {
+      failures.push("R2: E2E run metadata file is older than Release 2 matrix or required E2E tests");
     }
   } catch {
     failures.push(`R2: missing readable E2E run metadata at ${e2eRunMetadataPath}`);

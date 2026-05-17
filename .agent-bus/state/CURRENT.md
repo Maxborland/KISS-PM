@@ -1,6 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T19:43:00+07:00
+Updated: 2026-05-17T21:01:25+07:00
+
+- `R2-UI-008-review-comment-hardening` is completed as post-review hardening for the Release 2 PR stack before merge:
+  - branch: `codex/r2-exit-evidence`
+  - reviewed Codex comments across PR #3..#9 and implemented only comments still relevant after the stack fixes.
+  - closed issues: row action keyboard propagation, stale Gantt command failure after successful readback, local-clock Gantt today marker, Resource Load stale overload detail before preview, Closed Portfolio all-pages trend severity, Tenant Admin intentional layout removals as warnings, KPI Deviation E2E-R2-006 UI coverage, and Release 2 matrix stale E2E metadata rejection.
+  - verification: targeted Vitest passed (6 files, 122 tests); `node scripts/run-e2e.mjs release2` passed (10/10); `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` passed; `npm run typecheck` passed; `git diff --check` passed; final agent-bus guard passed.
+  - next recommended step: decide whether to keep these as a top-stack hardening commit or split/cherry-pick the touched files into their originating PR branches before merging in order.
 
 - `R2-UI-007-release2-exit-evidence` is completed as the final Release 2 UI control-surfaces evidence slice:
   - branch: `codex/r2-exit-evidence`, stacked on PR #8 (`codex/r2-tenant-admin-config-hardening`)
