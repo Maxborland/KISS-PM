@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { Readable } from "node:stream";
 
 import { createApiApp } from "./app";
+import { shouldAllowPhase12TestFixtureAuth } from "./phase12Deployment";
 
 function readArg(name: string, fallback: string) {
   const index = process.argv.indexOf(name);
@@ -11,7 +12,8 @@ function readArg(name: string, fallback: string) {
 const hostname = readArg("--host", "127.0.0.1");
 const port = Number(readArg("--port", process.env.PORT ?? "4173"));
 const app = createApiApp({
-  allowTestFixtureReset: process.env.KISS_PM_ALLOW_TEST_FIXTURE_RESET === "true"
+  allowTestFixtureReset: process.env.KISS_PM_ALLOW_TEST_FIXTURE_RESET === "true",
+  allowTestFixtureAuth: shouldAllowPhase12TestFixtureAuth(process.env)
 });
 
 const bunRuntime = (globalThis as typeof globalThis & {

@@ -137,17 +137,31 @@
         "E2E-112"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-004 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-004 scope and acceptance criteria before implementation.",
+        "docs/security/PHASE_12_SECURITY_PRIVACY_AUDIT.md records the Phase 12 repository-local security/privacy/audit review, scan evidence, fixed fixture-auth finding, and residual E2E gate.",
+        "apps/api/src/app.ts centralizes route-level fixture session resolution through requireRouteSession and supports createApiApp({ allowTestFixtureAuth: false }) returning 403 test_mode_only before permission evaluation.",
+        "apps/api/src/server.ts disables backend fixture auth for NODE_ENV=production, KISS_PM_RUNTIME_ENV=production_like, and KISS_PM_RUNTIME_ENV=production unless KISS_PM_ALLOW_TEST_FIXTURE_AUTH=true is explicitly set.",
+        "apps/api/src/phase12Deployment.ts fails production_like/production smoke when KISS_PM_ALLOW_TEST_FIXTURE_AUTH=true, matching frontend fixture-auth and fixture-reset denial."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-004-security-privacy-audit-review-fixes --once exit 0 at startup",
+        "rg -n \"dangerouslySetInnerHTML|innerHTML|outerHTML|insertAdjacentHTML|document\\\\.write|eval\\\\(|new Function|setTimeout\\\\(\\\\s*['\\\\\\\"]|setInterval\\\\(\\\\s*['\\\\\\\"]|localStorage|sessionStorage|postMessage|setAttribute\\\\(\\\\s*['\\\\\\\"]on\" apps packages exit 1: no unsafe sink matches found",
+        "rg -n \"secret://kiss-pm/prod/app|raw-super-secret-value|KISS_PM_SECRET_REF=.*[^=]\" apps docs .env.example -g \"!node_modules/**\" exit 0: matches limited to placeholder references and negative tests with DTO non-leak assertions",
+        "rg -n 'requireSession\\\\(runtime, context\\\\.req\\\\.query\\\\(\"testUser\"\\\\)\\\\)|requireRouteSession\\\\(' apps/api/src/app.ts exit 0: route sessions use requireRouteSession; no direct fixture session route call matched",
+        "npm test -- apps/api/src/phase12Deployment.test.ts exit 0: 1 file, 6 tests passed including backend fixture-auth denial, production-like switch failure, and production-target auth gate helper",
+        "npm test -- apps/api/src/phase12Deployment.test.ts apps/api/src/phase12ReadinessApi.test.ts apps/api/src/phase12RecoveryApi.test.ts exit 0: 3 files, 13 tests passed",
+        "npm run test:integration exit 0: 24 files, 125 tests passed",
+        "npm test exit 0: 104 files, 597 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Security/privacy/audit review fixes and P12 permission/isolation E2E evidence are not completed yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "Security review and fixture-auth guard have no persistent state to clean up; integration/unit tests run in deterministic in-memory runtime. Final row verification still requires E2E-111/E2E-112 permission, tenant-isolation, audit/readback/reload, and reset cleanup evidence before this row can become verified.",
+      "blocker": "2026-05-17T09:11:30.0000000+07:00: P12-004 security/privacy/audit review and backend fixture-auth fix are complete with tests, but executable E2E-111/E2E-112 permission and tenant-isolation evidence is not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T09:11:30.0000000+07:00",
       "e2e_evidence": []
     },
     {

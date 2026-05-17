@@ -30,7 +30,11 @@ const requiredProductionVariables = [
   "KISS_PM_EXTERNAL_SERVICES_MODE"
 ] as const;
 
-const devOnlySwitches = ["KISS_PM_ALLOW_TEST_FIXTURE_RESET", "VITE_KISS_PM_ALLOW_FIXTURE_AUTH"] as const;
+const devOnlySwitches = [
+  "KISS_PM_ALLOW_TEST_FIXTURE_RESET",
+  "KISS_PM_ALLOW_TEST_FIXTURE_AUTH",
+  "VITE_KISS_PM_ALLOW_FIXTURE_AUTH"
+] as const;
 
 function normalizeTarget(value: string | undefined): Phase12DeploymentTarget {
   if (value === "production" || value === "production_like" || value === "test" || value === "development") {
@@ -173,4 +177,11 @@ export function validatePhase12DeploymentEnvironment(
     target,
     checks
   };
+}
+
+export function shouldAllowPhase12TestFixtureAuth(environment: Phase12DeploymentEnvironment = process.env): boolean {
+  const target = normalizeTarget(environment.KISS_PM_RUNTIME_ENV ?? environment.NODE_ENV);
+  const productionLike = target === "production" || target === "production_like";
+
+  return environment.KISS_PM_ALLOW_TEST_FIXTURE_AUTH === "true" || !productionLike;
 }

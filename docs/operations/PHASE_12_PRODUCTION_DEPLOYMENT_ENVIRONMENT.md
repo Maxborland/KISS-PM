@@ -25,6 +25,7 @@ This document is the Phase 12 deployment and environment contract for the curren
 | `KISS_PM_AUDIT_RETENTION_DAYS` | yes | Positive retention period selected by deployment policy |
 | `KISS_PM_EXTERNAL_SERVICES_MODE` | yes | `mocked` for deterministic release smoke, `adapter` only for explicitly scoped live-adapter runs |
 | `KISS_PM_ALLOW_TEST_FIXTURE_RESET` | no in production | May be `true` only in deterministic test/smoke environments |
+| `KISS_PM_ALLOW_TEST_FIXTURE_AUTH` | no in production | Backend `?testUser=...` fixture authentication switch; must be disabled for production runtimes |
 | `VITE_KISS_PM_ALLOW_FIXTURE_AUTH` | no in production | Must be disabled for `production_like` and `production` smoke |
 
 ## Smoke Endpoint
@@ -37,7 +38,7 @@ This document is the Phase 12 deployment and environment contract for the curren
 
 The endpoint never returns configured values for secrets or secret references. It reports secret state as `configured`, `missing`, or `invalid-secret-reference`.
 
-The endpoint fails `production_like` and `production` smoke when fixture-only switches such as `KISS_PM_ALLOW_TEST_FIXTURE_RESET=true` or `VITE_KISS_PM_ALLOW_FIXTURE_AUTH=true` are enabled.
+The endpoint fails `production_like` and `production` smoke when fixture-only switches such as `KISS_PM_ALLOW_TEST_FIXTURE_RESET=true`, `KISS_PM_ALLOW_TEST_FIXTURE_AUTH=true`, or `VITE_KISS_PM_ALLOW_FIXTURE_AUTH=true` are enabled.
 
 ## Production-Like Smoke
 
