@@ -63,3 +63,8 @@ Keep these outside the current Release 2 docs/planning task until promoted by a 
 - Full marketplace for surface/action templates.
 - Packaged/vendor Gantt widget replacement of the custom KISS PM planning workspace.
 - Automated resource leveling that applies changes without preview, permission, and audit.
+- Full MS Project clone or proprietary UI copy.
+- External production integrations as part of Release 2 UI hardening.
+- AI autonomous management actions without explicit human preview and confirmation.
+- Arbitrary SQL or JavaScript execution in tenant formulas, layout rules, or action definitions.
+- Replacing the Release 2 E2E exit gate with screenshots or visual acceptance only.
