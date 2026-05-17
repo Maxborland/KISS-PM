@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KISS PM Release 2 - Project Gantt Planner Mockup</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #eef1f5;
+      --text: #111827;
+      --muted: #667085;
+      --line: #d8dee8;
+      --primary: #2563eb;
+      --warning: #f59e0b;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --radius: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    button, input, select { font: inherit; }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      background: var(--bg);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: #fbfcfe;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 4px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand strong { font-size: 15px; letter-spacing: 0; }
+    .tenant { color: var(--muted); font-size: 12px; }
+
+    .nav-group { display: grid; gap: 4px; }
+    .nav-title {
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 30px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: var(--surface-2);
+      box-shadow: inset 3px 0 0 var(--primary);
+      font-weight: 650;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 11px;
+      padding: 1px 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+    }
+
+    .main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      height: 100vh;
+    }
+
+    .topbar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .crumbs {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .button {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 6px;
+      min-height: 30px;
+      padding: 6px 10px;
+      cursor: default;
+    }
+
+    .button.primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+      font-weight: 650;
+    }
+
+    .button.warning {
+      border-color: rgba(245, 158, 11, .45);
+      background: rgba(245, 158, 11, .1);
+      color: #7c4a03;
+    }
+
+    .signal-band {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fffaf0;
+    }
+
+    .signal-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .severity {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 82px;
+      height: 24px;
+      border-radius: 999px;
+      color: #7c2d12;
+      background: rgba(245, 158, 11, .18);
+      border: 1px solid rgba(245, 158, 11, .42);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .signal-title { font-weight: 700; }
+    .signal-sub { color: var(--muted); font-size: 12px; }
+
+    .planner {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(520px, 44%) minmax(520px, 1fr) 310px;
+      overflow: hidden;
+    }
+
+    .pane {
+      min-width: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+      overflow: hidden;
+    }
+
+    .tool {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 6px;
+      height: 28px;
+      min-width: 28px;
+      padding: 0 8px;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .tool.icon {
+      width: 28px;
+      padding: 0;
+      font-weight: 700;
+    }
+
+    .tool.active {
+      border-color: var(--primary);
+      background: rgba(37, 99, 235, .08);
+      color: var(--primary);
+      font-weight: 650;
+    }
+
+    .splitter-label {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .grid-wrap, .timeline-wrap {
+      overflow: hidden;
+      position: relative;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      height: 32px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      color: #475467;
+      font-weight: 650;
+      text-align: left;
+      padding: 0 8px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    td {
+      height: 34px;
+      border-bottom: 1px solid #edf0f4;
+      border-right: 1px solid #edf0f4;
+      padding: 0 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      background: var(--surface);
+    }
+
+    tr.selected td {
+      background: rgba(37, 99, 235, .08);
+      box-shadow: inset 0 1px 0 rgba(37, 99, 235, .12), inset 0 -1px 0 rgba(37, 99, 235, .12);
+    }
+
+    .muted { color: var(--muted); }
+    .task-name { font-weight: 650; }
+    .summary { font-weight: 750; }
+    .indent-1 { padding-left: 22px; }
+    .indent-2 { padding-left: 38px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      height: 20px;
+      padding: 0 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--muted);
+      background: #fbfcfe;
+    }
+
+    .status.warn {
+      color: #7c4a03;
+      border-color: rgba(245, 158, 11, .35);
+      background: rgba(245, 158, 11, .08);
+    }
+
+    .status.ok {
+      color: #14532d;
+      border-color: rgba(22, 163, 74, .28);
+      background: rgba(22, 163, 74, .08);
+    }
+
+    .timeline {
+      min-width: 820px;
+      height: 100%;
+      position: relative;
+      background:
+        linear-gradient(to right, rgba(216,222,232,.7) 1px, transparent 1px) 0 32px / 86px 34px,
+        linear-gradient(to bottom, #edf0f4 1px, transparent 1px) 0 32px / 100% 34px,
+        var(--surface);
+    }
+
+    .time-head {
+      height: 32px;
+      display: grid;
+      grid-template-columns: repeat(9, 86px);
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+      color: #475467;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .time-head span {
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      border-right: 1px solid var(--line);
+    }
+
+    .today {
+      position: absolute;
+      top: 32px;
+      bottom: 0;
+      left: 342px;
+      width: 2px;
+      background: var(--danger);
+      z-index: 4;
+    }
+
+    .today::before {
+      content: "сегодня";
+      position: absolute;
+      top: 4px;
+      left: 5px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(220, 38, 38, .08);
+      color: var(--danger);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .bar {
+      position: absolute;
+      height: 18px;
+      border-radius: 5px;
+      background: var(--primary);
+      top: 42px;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,.08);
+    }
+
+    .bar.summary {
+      height: 10px;
+      border-radius: 2px;
+      background: #111827;
+      top: 46px;
+    }
+
+    .bar.warning {
+      background: var(--warning);
+    }
+
+    .bar.done {
+      background: var(--success);
+    }
+
+    .baseline {
+      position: absolute;
+      height: 4px;
+      border-radius: 999px;
+      background: #98a2b3;
+      opacity: .8;
+    }
+
+    .diamond {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      transform: rotate(45deg);
+      border-radius: 2px;
+      background: var(--primary);
+    }
+
+    .link {
+      position: absolute;
+      height: 1px;
+      background: #667085;
+    }
+
+    .side {
+      background: #fbfcfe;
+      min-width: 0;
+      overflow: auto;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 10px;
+    }
+
+    .panel h2, .panel h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 94px 1fr;
+      gap: 6px 8px;
+      font-size: 12px;
+    }
+
+    .kv .key { color: var(--muted); }
+    .callout {
+      border: 1px solid rgba(245, 158, 11, .42);
+      background: rgba(245, 158, 11, .08);
+      border-radius: var(--radius);
+      padding: 9px;
+    }
+
+    .callout strong { display: block; margin-bottom: 4px; }
+    .preview {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      background: #fbfcfe;
+    }
+
+    .metric .label { color: var(--muted); font-size: 11px; }
+    .metric .value { font-weight: 750; font-size: 15px; margin-top: 2px; }
+    .audit {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer-question {
+      position: fixed;
+      left: 250px;
+      right: 18px;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,.94);
+      box-shadow: 0 12px 30px rgba(17, 24, 39, .12);
+    }
+
+    .choice-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .choice {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      padding: 6px 10px;
+      cursor: default;
+      font-size: 12px;
+    }
+
+    .choice:hover, .choice.selected {
+      border-color: var(--primary);
+      background: rgba(37, 99, 235, .08);
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div>
+          <strong>KISS PM</strong>
+          <div class="tenant">Архитектурное бюро</div>
+        </div>
+        <span class="count">R2</span>
+      </div>
+      <div class="nav-group">
+        <div class="nav-title">Проектный контур</div>
+        <div class="nav-item">CRM intake <span class="count">4</span></div>
+        <div class="nav-item">Портфель <span class="count">12</span></div>
+        <div class="nav-item active">График проекта <span class="count">3</span></div>
+        <div class="nav-item">Ресурсы <span class="count">2</span></div>
+        <div class="nav-item">KPI сигналы <span class="count">5</span></div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-title">Исполнение</div>
+        <div class="nav-item">Мои задачи <span class="count">8</span></div>
+        <div class="nav-item">Kanban</div>
+        <div class="nav-item">Артефакты</div>
+        <div class="nav-item">Согласования <span class="count">1</span></div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-title">Контроль</div>
+        <div class="nav-item">Действия и аудит</div>
+        <div class="nav-item">Закрытые проекты</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="crumbs">Портфель / ЖК Северный / Планирование</div>
+          <h1>График проекта: ЖК Северный, стадия РДП</h1>
+        </div>
+        <div class="top-actions">
+          <button class="button">Только чтение: нет</button>
+          <button class="button">Версия плана v14</button>
+          <button class="button primary">Сохранить базовый план</button>
+        </div>
+      </header>
+
+      <section class="signal-band">
+        <div class="signal-main">
+          <span class="severity">Внимание</span>
+          <div>
+            <div class="signal-title">Сдвиг задачи “Рабочая документация / инженерные сети” создаёт перегрузку ресурсной группы на 18 ч.</div>
+            <div class="signal-sub">Рекомендуемое действие: preview переноса части работ на следующую неделю или перераспределение на свободного инженера.</div>
+          </div>
+        </div>
+        <button class="button warning">Открыть preview решения</button>
+      </section>
+
+      <section class="planner">
+        <div class="pane">
+          <div class="toolbar">
+            <button class="tool icon">+</button>
+            <button class="tool icon">↘</button>
+            <button class="tool icon">↗</button>
+            <button class="tool">Связь</button>
+            <button class="tool active">Базовый</button>
+            <span class="splitter-label">WBS grid</span>
+          </div>
+          <div class="grid-wrap">
+            <table>
+              <colgroup>
+                <col style="width:44px">
+                <col style="width:64px">
+                <col>
+                <col style="width:82px">
+                <col style="width:82px">
+                <col style="width:58px">
+                <col style="width:66px">
+                <col style="width:70px">
+                <col style="width:88px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ID</th><th>WBS</th><th>Задача</th><th>Старт</th><th>Финиш</th><th>Длит.</th><th>Работа</th><th>Готово</th><th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>12</td><td>4</td><td class="summary">РДП</td><td>18.05</td><td>27.06</td><td>30д</td><td>412ч</td><td>38%</td><td><span class="status warn">риск</span></td></tr>
+                <tr><td>13</td><td>4.1</td><td class="task-name indent-1">План производства РДП</td><td>18.05</td><td>20.05</td><td>3д</td><td>24ч</td><td>100%</td><td><span class="status ok">готово</span></td></tr>
+                <tr><td>14</td><td>4.2</td><td class="task-name indent-1">Архитектурный комплект</td><td>21.05</td><td>03.06</td><td>10д</td><td>96ч</td><td>60%</td><td><span class="status">в работе</span></td></tr>
+                <tr class="selected"><td>15</td><td>4.3</td><td class="task-name indent-1">Инженерные сети</td><td>27.05</td><td>12.06</td><td>13д</td><td>120ч</td><td>35%</td><td><span class="status warn">перегруз</span></td></tr>
+                <tr><td>16</td><td>4.3.1</td><td class="indent-2">Координация разделов</td><td>27.05</td><td>31.05</td><td>5д</td><td>32ч</td><td>40%</td><td><span class="status">в работе</span></td></tr>
+                <tr><td>17</td><td>4.3.2</td><td class="indent-2">Проверка коллизий</td><td>03.06</td><td>07.06</td><td>5д</td><td>36ч</td><td>10%</td><td><span class="status warn">поздно</span></td></tr>
+                <tr><td>18</td><td>4.4</td><td class="task-name indent-1">Сметная проверка</td><td>10.06</td><td>17.06</td><td>6д</td><td>48ч</td><td>0%</td><td><span class="status">ожидает</span></td></tr>
+                <tr><td>19</td><td>4.5</td><td class="task-name indent-1">Внутреннее согласование</td><td>18.06</td><td>21.06</td><td>4д</td><td>28ч</td><td>0%</td><td><span class="status">ожидает</span></td></tr>
+                <tr><td>20</td><td>4.6</td><td class="task-name indent-1">Выдача клиенту</td><td>24.06</td><td>24.06</td><td>0д</td><td>0ч</td><td>0%</td><td><span class="status">milestone</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pane">
+          <div class="toolbar">
+            <button class="tool">Сегодня</button>
+            <button class="tool">Недели</button>
+            <button class="tool">Критический путь</button>
+            <button class="tool active">Риски</button>
+            <button class="tool">Фильтры</button>
+            <span class="splitter-label">Timeline</span>
+          </div>
+          <div class="timeline-wrap">
+            <div class="timeline">
+              <div class="time-head">
+                <span>18 май</span><span>25 май</span><span>01 июн</span><span>08 июн</span><span>15 июн</span><span>22 июн</span><span>29 июн</span><span>06 июл</span><span>13 июл</span>
+              </div>
+              <div class="today"></div>
+              <div class="bar summary" style="left:16px;width:430px;top:46px"></div>
+              <div class="baseline" style="left:16px;width:388px;top:61px"></div>
+              <div class="bar done" style="left:18px;width:60px;top:76px"></div>
+              <div class="bar" style="left:91px;width:144px;top:110px"></div>
+              <div class="baseline" style="left:88px;width:128px;top:128px"></div>
+              <div class="bar warning" style="left:162px;width:205px;top:144px"></div>
+              <div class="baseline" style="left:148px;width:176px;top:162px"></div>
+              <div class="bar warning" style="left:162px;width:78px;top:178px"></div>
+              <div class="bar warning" style="left:248px;width:80px;top:212px"></div>
+              <div class="bar" style="left:334px;width:98px;top:246px"></div>
+              <div class="bar" style="left:438px;width:70px;top:280px"></div>
+              <div class="diamond" style="left:530px;top:316px"></div>
+              <div class="link" style="left:78px;top:85px;width:18px"></div>
+              <div class="link" style="left:235px;top:119px;width:26px"></div>
+              <div class="link" style="left:366px;top:153px;width:28px"></div>
+              <div class="link" style="left:508px;top:289px;width:28px"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="panel">
+            <h2>Выбранная задача</h2>
+            <div class="kv">
+              <div class="key">WBS</div><div>4.3 Инженерные сети</div>
+              <div class="key">Ответственный</div><div>Илья Н., инженер</div>
+              <div class="key">Период</div><div>27.05 - 12.06</div>
+              <div class="key">Работа</div><div>120 ч, готово 35%</div>
+              <div class="key">Связи</div><div>после 4.2, до 4.4</div>
+            </div>
+          </div>
+
+          <div class="callout">
+            <strong>Сигнал управления</strong>
+            Перенос задачи увеличит загрузку группы “Инженеры” до 126% на неделе 03.06.
+          </div>
+
+          <div class="panel">
+            <h3>Рекомендуемое действие</h3>
+            <p class="muted">Система предлагает split work: перенести 18 ч проверки коллизий на следующую неделю и назначить второго исполнителя.</p>
+            <button class="button primary" style="width:100%">Предпросмотр решения</button>
+          </div>
+
+          <div class="panel">
+            <h3>Preview до применения</h3>
+            <div class="preview">
+              <div class="metric">
+                <div class="label">До</div>
+                <div class="value" style="color:var(--danger)">126%</div>
+              </div>
+              <div class="metric">
+                <div class="label">После</div>
+                <div class="value" style="color:var(--success)">94%</div>
+              </div>
+            </div>
+            <p class="muted">Мутации еще нет. Будут обновлены график, Resource Load и Portfolio Control.</p>
+          </div>
+
+          <div class="panel">
+            <h3>Result / audit</h3>
+            <div class="audit">
+              <span>Последнее действие: baseline.capture</span>
+              <span>Actor: Мария П., PM</span>
+              <span>Audit: aud-2026-0517-0042</span>
+              <span>Readback: план v14, 12:04</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <div class="footer-question">
+    <div>
+      <strong>Первый дизайн-кандидат: Gantt как управленческая плоскость.</strong>
+      <span class="muted">Нужно понять: попали ли в плотность, структуру и ощущение “MS Project, но KISS PM”.</span>
+    </div>
+    <div class="choice-row">
+      <button class="choice" data-choice="approve-v1" onclick="toggleSelect(this)">Направление верное</button>
+      <button class="choice" data-choice="too-dense" onclick="toggleSelect(this)">Слишком плотно</button>
+      <button class="choice" data-choice="more-ms-project" onclick="toggleSelect(this)">Ближе к MS Project</button>
+      <button class="choice" data-choice="more-management" onclick="toggleSelect(this)">Больше управленческих подсказок</button>
+    </div>
+  </div>
+</body>
+</html>

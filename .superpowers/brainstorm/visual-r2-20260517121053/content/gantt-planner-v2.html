@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KISS PM - Project Gantt Planner v2</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #eef2f6;
+      --ink: #18202a;
+      --muted: #667085;
+      --line: #d9e0e8;
+      --primary: #2563eb;
+      --primary-ink: #ffffff;
+      --accent: #0f766e;
+      --warn: #b45309;
+      --danger: #c2410c;
+      --critical: #dc2626;
+      --radius: 7px;
+      --shadow: 0 12px 36px rgba(15, 23, 42, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input, select { font: inherit; }
+
+    .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      overflow: hidden;
+    }
+
+    .rail {
+      background: #202b37;
+      color: #d7dee8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 8px;
+      gap: 8px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #ffffff;
+      color: #202b37;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .rail-btn {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 8px;
+      color: inherit;
+      background: transparent;
+      display: grid;
+      place-items: center;
+      cursor: default;
+      font-size: 18px;
+    }
+
+    .rail-btn.active { background: rgba(255,255,255,.14); color: #fff; }
+
+    .workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .titlebar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .project-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .project-title strong {
+      font-size: 15px;
+      white-space: nowrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 24px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 10px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .btn.primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-ink);
+      font-weight: 650;
+    }
+
+    .ribbon {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 0 rgba(15,23,42,.02);
+    }
+
+    .tabs {
+      height: 34px;
+      display: flex;
+      align-items: end;
+      padding: 0 12px;
+      gap: 2px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab {
+      height: 29px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-bottom: 0;
+      border-radius: 6px 6px 0 0;
+      background: transparent;
+      color: #344054;
+      font-size: 13px;
+    }
+
+    .tab.active {
+      background: #f8fafc;
+      border-color: var(--line);
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .commands {
+      height: 82px;
+      display: flex;
+      align-items: stretch;
+      gap: 2px;
+      padding: 8px 12px 10px;
+      overflow-x: auto;
+    }
+
+    .group {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-width: 118px;
+      padding: 0 8px;
+      border-right: 1px solid var(--line);
+    }
+
+    .group.wide { min-width: 176px; }
+
+    .group-tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool {
+      min-width: 34px;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: #344054;
+      font-size: 13px;
+    }
+
+    .tool.big {
+      width: 70px;
+      height: 42px;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .group-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .view-strip {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      background: #f8fafc;
+      border-top: 1px solid #edf1f5;
+    }
+
+    .view-chip {
+      height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 9px;
+      background: #fff;
+      color: #475467;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    .view-chip.active {
+      border-color: #93c5fd;
+      color: var(--primary);
+      background: #eff6ff;
+      font-weight: 700;
+    }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(760px, 1fr) 340px;
+      gap: 12px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .planner {
+      min-width: 0;
+      min-height: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: 36px 1fr;
+      overflow: hidden;
+    }
+
+    .planner-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+
+    .planner-head .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 0;
+    }
+
+    .split {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 53% 47%;
+      overflow: hidden;
+    }
+
+    .grid-pane {
+      min-width: 0;
+      overflow: auto;
+      border-right: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      height: 30px;
+      padding: 0 6px;
+      color: #475467;
+      background: #f2f5f8;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      text-align: left;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    td {
+      height: 32px;
+      padding: 0 6px;
+      border-bottom: 1px solid #edf1f5;
+      border-right: 1px solid #edf1f5;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background: #fff;
+    }
+
+    tr.summary td {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
+    tr.selected td {
+      background: #eff6ff;
+      box-shadow: inset 0 1px #bfdbfe, inset 0 -1px #bfdbfe;
+    }
+
+    tr.new td {
+      color: #98a2b3;
+      background: #fcfcfd;
+    }
+
+    .indent-1 { padding-left: 20px; }
+    .indent-2 { padding-left: 34px; }
+    .mode {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .mode.manual { background: #fef3c7; color: #92400e; }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 5px;
+    }
+
+    .status-dot.warn { background: var(--warn); }
+    .status-dot.crit { background: var(--critical); }
+
+    .cell-edit {
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 6px;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      background: #fff;
+      min-width: 48px;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .timeline-pane {
+      min-width: 0;
+      overflow: auto;
+      background:
+        linear-gradient(90deg, rgba(217,224,232,.7) 1px, transparent 1px) 0 0 / 72px 100%,
+        linear-gradient(90deg, rgba(15,23,42,.04) 0 50%, transparent 50% 100%) 0 0 / 144px 100%,
+        #fff;
+      position: relative;
+    }
+
+    .time-header {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      height: 30px;
+      display: grid;
+      grid-template-columns: repeat(8, 72px);
+      min-width: 576px;
+      background: #f2f5f8;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .time-header div {
+      display: grid;
+      place-items: center;
+      border-right: 1px solid var(--line);
+      color: #475467;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .bars {
+      position: relative;
+      min-width: 576px;
+      height: 320px;
+    }
+
+    .today {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 286px;
+      width: 2px;
+      background: var(--critical);
+      z-index: 3;
+    }
+
+    .today::before {
+      content: "Статус";
+      position: absolute;
+      top: 4px;
+      left: 5px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--critical);
+      color: #fff;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .bar-row {
+      height: 32px;
+      position: relative;
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    .bar {
+      position: absolute;
+      top: 9px;
+      height: 14px;
+      border-radius: 4px;
+      background: var(--primary);
+      box-shadow: inset 0 -1px rgba(0,0,0,.14);
+    }
+
+    .bar.summary {
+      height: 8px;
+      top: 12px;
+      background: #475467;
+      border-radius: 2px;
+    }
+
+    .bar.critical { background: var(--critical); }
+    .bar.done { background: var(--accent); }
+    .bar.warn { background: var(--warn); }
+    .baseline {
+      position: absolute;
+      top: 23px;
+      height: 3px;
+      border-radius: 2px;
+      background: #111827;
+      opacity: .55;
+    }
+
+    .milestone {
+      position: absolute;
+      top: 8px;
+      width: 16px;
+      height: 16px;
+      background: #475467;
+      transform: rotate(45deg);
+      border-radius: 2px;
+    }
+
+    .dependency {
+      position: absolute;
+      height: 1px;
+      background: #475467;
+      opacity: .8;
+    }
+
+    .dependency::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: -3px;
+      width: 0;
+      height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 6px solid #475467;
+    }
+
+    .side {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-h {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+
+    .panel-h strong {
+      font-size: 13px;
+    }
+
+    .panel-b {
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .signal {
+      padding: 9px;
+      border: 1px solid #fed7aa;
+      background: #fff7ed;
+      border-radius: 7px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .signal.critical {
+      border-color: #fecaca;
+      background: #fff1f2;
+    }
+
+    .signal-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .kv span:nth-child(odd) { color: var(--muted); }
+
+    .action-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px;
+      display: grid;
+      gap: 8px;
+      background: #fff;
+    }
+
+    .action-card.recommended {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .action-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .action-title {
+      font-weight: 750;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      border-radius: 999px;
+      padding: 0 7px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #e5e7eb;
+      color: #374151;
+      white-space: nowrap;
+    }
+
+    .badge.warn { background: #fef3c7; color: #92400e; }
+    .badge.danger { background: #fee2e2; color: #991b1b; }
+    .badge.ok { background: #ccfbf1; color: #115e59; }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    .metric label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 3px;
+    }
+
+    .metric strong {
+      font-size: 17px;
+    }
+
+    .footer {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 12px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-left,
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .feedback {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .feedback button {
+      height: 26px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #475467;
+      padding: 0 9px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1180px) {
+      .main { grid-template-columns: 1fr; overflow: auto; }
+      .side { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+      .workspace { overflow: auto; }
+    }
+
+    @media (max-width: 760px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail { display: none; }
+      .split { grid-template-columns: 1fr; }
+      .timeline-pane { min-height: 260px; border-top: 1px solid var(--line); }
+      .side { grid-template-columns: 1fr; }
+      .commands { height: auto; }
+      .titlebar { height: auto; padding: 10px; align-items: flex-start; flex-direction: column; }
+      .footer { align-items: flex-start; flex-direction: column; padding: 8px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Навигация">
+      <div class="logo">K</div>
+      <button class="rail-btn" title="CRM">□</button>
+      <button class="rail-btn active" title="Проекты">▣</button>
+      <button class="rail-btn" title="Задачи">☑</button>
+      <button class="rail-btn" title="Ресурсы">◫</button>
+      <button class="rail-btn" title="Портфель">◬</button>
+    </aside>
+
+    <section class="workspace">
+      <header class="titlebar">
+        <div class="project-title">
+          <strong>Проект: Северный контур - стадия РД</strong>
+          <span class="pill">План от 17.05.2026</span>
+          <span class="pill">Базовый план: Baseline 0</span>
+          <span class="pill">Расчет: автоматический</span>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn">Отменить</button>
+          <button class="btn">Повторить</button>
+          <button class="btn primary">Сохранить снимок</button>
+        </div>
+      </header>
+
+      <nav class="ribbon" aria-label="Лента команд">
+        <div class="tabs">
+          <button class="tab active">Задача</button>
+          <button class="tab">Ресурс</button>
+          <button class="tab">Проект</button>
+          <button class="tab">Вид</button>
+          <button class="tab">Формат</button>
+          <button class="tab">KISS Control</button>
+        </div>
+        <div class="commands">
+          <div class="group">
+            <div class="group-tools">
+              <button class="tool big">Задача</button>
+              <button class="tool" title="Вставить">＋</button>
+            </div>
+            <div class="group-label">Вставка</div>
+          </div>
+          <div class="group wide">
+            <div class="group-tools">
+              <button class="tool" title="Авто">Auto</button>
+              <button class="tool" title="Вручную">Man</button>
+              <button class="tool" title="Веха">◆</button>
+              <button class="tool" title="Суммарная">Σ</button>
+            </div>
+            <div class="group-label">Планирование</div>
+          </div>
+          <div class="group wide">
+            <div class="group-tools">
+              <button class="tool" title="Связать FS">FS</button>
+              <button class="tool" title="Связать SS">SS</button>
+              <button class="tool" title="Разорвать связь">⛓</button>
+              <button class="tool" title="Лаг">+2д</button>
+            </div>
+            <div class="group-label">Зависимости</div>
+          </div>
+          <div class="group wide">
+            <div class="group-tools">
+              <button class="tool" title="Fixed Units">FU</button>
+              <button class="tool" title="Fixed Work">FW</button>
+              <button class="tool" title="Fixed Duration">FD</button>
+              <button class="tool" title="Effort Driven">ED</button>
+            </div>
+            <div class="group-label">Work / Duration / Units</div>
+          </div>
+          <div class="group wide">
+            <div class="group-tools">
+              <button class="tool" title="Set Baseline">BL</button>
+              <button class="tool" title="Tracking Gantt">TR</button>
+              <button class="tool" title="Level Resource">LVL</button>
+            </div>
+            <div class="group-label">Baseline и leveling</div>
+          </div>
+          <div class="group wide">
+            <div class="group-tools">
+              <button class="tool big" title="Preview">Preview</button>
+              <button class="tool" title="Apply">Apply</button>
+            </div>
+            <div class="group-label">Governed action</div>
+          </div>
+        </div>
+        <div class="view-strip">
+          <span class="view-chip active">Gantt Chart</span>
+          <span class="view-chip">Tracking Gantt</span>
+          <span class="view-chip">Task Sheet</span>
+          <span class="view-chip">Team Planner</span>
+          <span class="view-chip">Resource Graph</span>
+          <span class="view-chip">Table: Entry</span>
+          <span class="view-chip">Filter: All Tasks</span>
+          <span class="view-chip">Group: None</span>
+        </div>
+      </nav>
+
+      <main class="main">
+        <section class="planner" aria-label="План проекта">
+          <div class="planner-head">
+            <div class="meta">
+              <strong>Диаграмма Ганта</strong>
+              <span>Статусная дата 17.05.2026</span>
+              <span>Критический путь включен</span>
+            </div>
+            <div class="meta">
+              <span class="pill">Slack &lt;= 0д</span>
+              <span class="pill">Resource overallocations: 2</span>
+            </div>
+          </div>
+          <div class="split">
+            <div class="grid-pane">
+              <table>
+                <colgroup>
+                  <col style="width:34px" />
+                  <col style="width:42px" />
+                  <col style="width:44px" />
+                  <col style="width:58px" />
+                  <col style="width:190px" />
+                  <col style="width:70px" />
+                  <col style="width:86px" />
+                  <col style="width:86px" />
+                  <col style="width:86px" />
+                  <col style="width:118px" />
+                  <col style="width:70px" />
+                  <col style="width:62px" />
+                  <col style="width:92px" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>!</th>
+                    <th>ID</th>
+                    <th>Mode</th>
+                    <th>WBS</th>
+                    <th>Task Name</th>
+                    <th>Duration</th>
+                    <th>Start</th>
+                    <th>Finish</th>
+                    <th>Pred</th>
+                    <th>Resource Names</th>
+                    <th>Work</th>
+                    <th>%</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="summary">
+                    <td><span class="status-dot warn"></span></td>
+                    <td>1</td>
+                    <td><span class="mode">A</span></td>
+                    <td>1</td>
+                    <td>Северный контур - РД</td>
+                    <td>24д</td>
+                    <td>04.05</td>
+                    <td>05.06</td>
+                    <td></td>
+                    <td>Команда РД</td>
+                    <td>612ч</td>
+                    <td>42%</td>
+                    <td>Summary</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-dot"></span></td>
+                    <td>2</td>
+                    <td><span class="mode">A</span></td>
+                    <td>1.1</td>
+                    <td class="indent-1">Сбор исходных данных</td>
+                    <td>5д</td>
+                    <td>04.05</td>
+                    <td>08.05</td>
+                    <td></td>
+                    <td>Анна</td>
+                    <td>40ч</td>
+                    <td>100%</td>
+                    <td>Fixed Units</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-dot"></span></td>
+                    <td>3</td>
+                    <td><span class="mode">A</span></td>
+                    <td>1.2</td>
+                    <td class="indent-1">Модель нагрузок</td>
+                    <td>6д</td>
+                    <td>11.05</td>
+                    <td>18.05</td>
+                    <td>2FS</td>
+                    <td>Илья; Анна</td>
+                    <td>96ч</td>
+                    <td>65%</td>
+                    <td>Fixed Work</td>
+                  </tr>
+                  <tr class="selected">
+                    <td><span class="status-dot crit"></span></td>
+                    <td>4</td>
+                    <td><span class="mode">A</span></td>
+                    <td>1.3</td>
+                    <td class="indent-1">Раздел КЖ: рабочие чертежи</td>
+                    <td><span class="cell-edit">8д</span></td>
+                    <td>18.05</td>
+                    <td>27.05</td>
+                    <td>3FS</td>
+                    <td>Илья; Мария</td>
+                    <td>128ч</td>
+                    <td>20%</td>
+                    <td>Fixed Units</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-dot warn"></span></td>
+                    <td>5</td>
+                    <td><span class="mode manual">M</span></td>
+                    <td>1.4</td>
+                    <td class="indent-1">Согласование с заказчиком</td>
+                    <td>4д?</td>
+                    <td>28.05</td>
+                    <td>02.06</td>
+                    <td>4FS+1д</td>
+                    <td>РП; Заказчик</td>
+                    <td>24ч</td>
+                    <td>0%</td>
+                    <td>Fixed Duration</td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>6</td>
+                    <td><span class="mode">A</span></td>
+                    <td>1.5</td>
+                    <td class="indent-1">Веха: выпуск РД</td>
+                    <td>0д</td>
+                    <td>05.06</td>
+                    <td>05.06</td>
+                    <td>5FS</td>
+                    <td>РП</td>
+                    <td>0ч</td>
+                    <td>0%</td>
+                    <td>Milestone</td>
+                  </tr>
+                  <tr class="new">
+                    <td></td>
+                    <td>7</td>
+                    <td><span class="mode">A</span></td>
+                    <td></td>
+                    <td>Новая задача</td>
+                    <td>1д?</td>
+                    <td>Project Start</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td>8ч</td>
+                    <td>0%</td>
+                    <td>Fixed Units</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="timeline-pane">
+              <div class="time-header">
+                <div>04 Май</div><div>11 Май</div><div>18 Май</div><div>25 Май</div>
+                <div>01 Июн</div><div>08 Июн</div><div>15 Июн</div><div>22 Июн</div>
+              </div>
+              <div class="bars">
+                <div class="today"></div>
+                <div class="bar-row">
+                  <div class="bar summary" style="left:8px;width:318px"></div>
+                  <div class="baseline" style="left:8px;width:286px"></div>
+                </div>
+                <div class="bar-row">
+                  <div class="bar done" style="left:8px;width:58px"></div>
+                  <div class="baseline" style="left:8px;width:58px"></div>
+                </div>
+                <div class="bar-row">
+                  <div class="bar done" style="left:82px;width:78px"></div>
+                  <div class="baseline" style="left:82px;width:70px"></div>
+                  <div class="dependency" style="left:66px;top:15px;width:18px"></div>
+                </div>
+                <div class="bar-row">
+                  <div class="bar critical" style="left:160px;width:96px"></div>
+                  <div class="baseline" style="left:152px;width:74px"></div>
+                  <div class="dependency" style="left:156px;top:15px;width:8px"></div>
+                </div>
+                <div class="bar-row">
+                  <div class="bar warn" style="left:268px;width:54px"></div>
+                  <div class="baseline" style="left:226px;width:48px"></div>
+                  <div class="dependency" style="left:256px;top:15px;width:14px"></div>
+                </div>
+                <div class="bar-row">
+                  <div class="milestone" style="left:326px"></div>
+                  <div class="dependency" style="left:322px;top:15px;width:8px"></div>
+                </div>
+                <div class="bar-row"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side" aria-label="Управленческий контур">
+          <section class="panel">
+            <div class="panel-h">
+              <strong>Сигнал управления</strong>
+              <span class="badge danger">Critical</span>
+            </div>
+            <div class="panel-b">
+              <div class="signal critical">
+                <div class="signal-title">
+                  <span>Перегрузка ресурса + критический путь</span>
+                  <span>RSK-042</span>
+                </div>
+                <div class="small">Задача 1.3 использует Илью на 160% в неделе 18-24 мая. Запас по критическому пути: 0д. Сдвиг без компенсации двигает выпуск РД.</div>
+                <div class="kv">
+                  <span>Источник</span><strong>Task 4 / Resource Load</strong>
+                  <span>Затронуто</span><strong>Илья, Мария, веха 1.5</strong>
+                  <span>Контроль</span><strong>WBS 1.3, Baseline 0</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-h">
+              <strong>Рекомендованное действие</strong>
+              <span class="badge ok">Preview first</span>
+            </div>
+            <div class="panel-b">
+              <div class="action-card recommended">
+                <div class="action-top">
+                  <div>
+                    <div class="action-title">Перераспределить 24ч на Марию и выровнять ресурс</div>
+                    <div class="small">Команда не пишет в план до dry-run. После preview доступен governed apply с аудитом.</div>
+                  </div>
+                  <span class="badge">P6/P8</span>
+                </div>
+                <button class="btn primary">Preview влияния</button>
+              </div>
+              <div class="action-card">
+                <div class="action-title">Альтернатива: сдвиг задачи на 2д</div>
+                <div class="small">Увеличит отклонение от baseline до +3д. Нужна причина принятого риска.</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-h">
+              <strong>Dry-run preview</strong>
+              <span class="badge warn">No mutation</span>
+            </div>
+            <div class="panel-b">
+              <div class="preview-grid">
+                <div class="metric">
+                  <label>До</label>
+                  <strong>160%</strong>
+                  <div class="small">Илья / 18-24 мая</div>
+                </div>
+                <div class="metric">
+                  <label>После</label>
+                  <strong>104%</strong>
+                  <div class="small">Остаток перегрузки 4ч</div>
+                </div>
+                <div class="metric">
+                  <label>Finish</label>
+                  <strong>05.06</strong>
+                  <div class="small">без сдвига вехи</div>
+                </div>
+                <div class="metric">
+                  <label>Work</label>
+                  <strong>128ч</strong>
+                  <div class="small">Fixed Units, ED off</div>
+                </div>
+              </div>
+              <div class="small">Проверка: Work = Duration x Units. Изменение ресурсов не меняет фактический процент выполнения.</div>
+              <button class="btn primary">Применить через команду</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-h">
+              <strong>Result / audit</strong>
+              <span class="badge ok">Ready</span>
+            </div>
+            <div class="panel-b">
+              <div class="kv">
+                <span>Команда</span><strong>reassign-work.preview</strong>
+                <span>Actor</span><strong>resource.manager</strong>
+                <span>Audit</span><strong>AUD-P6-2261</strong>
+                <span>Readback</span><strong>API + reload required</strong>
+              </div>
+              <div class="small">После apply экран должен обновить таблицу, диаграмму, load buckets, сигнал и audit log из API, а не из локального состояния.</div>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer">
+        <div class="status-left">
+          <span>Готово</span>
+          <span>Auto Calculate</span>
+          <span>Last API readback: 12:18</span>
+          <span>Undo stack: 3</span>
+        </div>
+        <div class="status-right">
+          <span>Оцени v2:</span>
+          <div class="feedback">
+            <button>Ближе к MS Project</button>
+            <button>Слишком сложно</button>
+            <button>Нужен Task Inspector</button>
+            <button>Усилить KISS-подсказки</button>
+          </div>
+        </div>
+      </footer>
+    </section>
+  </div>
+</body>
+</html>

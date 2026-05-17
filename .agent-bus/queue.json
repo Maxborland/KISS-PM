@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T09:35:00.0000000+07:00",
+  "updated_at": "2026-05-17T14:28:27.3900000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -6597,6 +6597,94 @@
       ],
       "notes": "Accepted 2026-05-17T12:05:00+07:00. Created the BP-driven Release 2 screen spec pack: screen specs, interaction flows, modal/drawer/panel specs, control-surface action specs, release2 UI/UX screen matrix, and verifier/tests. The matrix treats report-like screens as interactive management planes: projection -> signal -> action -> preview -> result. No product implementation.",
       "completed_at": "2026-05-17T12:05:00+07:00",
+      "result": "accepted"
+    },
+    {
+      "id": "R2-MOCK-001-project-gantt-goal-contract",
+      "aliases": [
+        "R2-MOCK-001"
+      ],
+      "title": "Deliver full-function Project Gantt mockup goal",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UXSPEC-001-release2-screen-spec-matrix"
+      ],
+      "write_scope": [
+        "docs/design-mockups/**",
+        ".superpowers/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-MOCK-001-project-gantt-goal-contract.claim.json",
+        ".agent-bus/sessions/R2-MOCK-001-project-gantt-goal-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "rg -n \"Excel-like|MS Project|Диаграмма Ганта|audit/readback|Acceptance Matrix|Definition of Done\" docs/design-mockups/project-gantt-goal.md",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-MOCK-001-project-gantt-goal-contract --once",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T13:29:11.1824103+07:00. Delivered full-function Project Gantt Planner v5 mock per docs/design-mockups/project-gantt-goal.md, with Excel-like grid, MS Project-like dual-pane Gantt, resource conflict workspace, KISS PM preview/apply/audit/readback loop, screenshots, design notes, and acceptance matrix. Verification: node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-mock.mjs --url http://localhost:64986 exits 0 with 20/20 browser interaction checks; acceptance matrix validation passes; agent-bus guard and git diff --check pass.",
+      "completed_at": "2026-05-17T13:29:11.1824103+07:00",
+      "result": "accepted"
+    },
+    {
+      "id": "R2-MOCK-002-br2-gantt-extract-v6",
+      "aliases": [
+        "R2-MOCK-002"
+      ],
+      "title": "Extract BR2/Gun Gantt mechanics into Project Gantt v6 mock",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-MOCK-001-project-gantt-goal-contract"
+      ],
+      "write_scope": [
+        "docs/design-mockups/**",
+        ".superpowers/**",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-MOCK-002-br2-gantt-extract-v6.claim.json",
+        ".agent-bus/sessions/R2-MOCK-002-br2-gantt-extract-v6.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "rg -n \"BR2|Gun Gantt|MS Project|автозаполнение|подсказ|выпада\" docs/design-mockups .superpowers/brainstorm/visual-r2-20260517121053",
+        "node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-v6-mock.mjs --url http://localhost:64986",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-MOCK-002-br2-gantt-extract-v6 --once",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T14:28:27.3900000+07:00. Built standalone Project Gantt Planner v6 mock using BR2/Gun Gantt as read-only interaction reference. Added MS Project-like Excel grid mechanics, controlled dropdown editors, datalist autocomplete, command suggestions, field hints/tooltips, column hide/resize, splitter, Tracking Gantt baseline, bar drag, resource conflict workspace, dry-run preview, apply result, audit/readback, reload persistence, and screenshots. Verification: node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-v6-mock.mjs --url http://localhost:64986 exits 0 with 24/24 browser interaction checks; JSON parse and git diff --check pass; no production apps/packages changed.",
+      "completed_at": "2026-05-17T14:28:27.3900000+07:00",
       "result": "accepted"
     }
   ]

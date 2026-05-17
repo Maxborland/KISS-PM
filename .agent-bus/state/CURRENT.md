@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T12:05:00+07:00
+Updated: 2026-05-17T14:28:27.3900000+07:00
 
 - Release 2 planning surface is being prepared after the accepted Phase 12 repository-defined market-release gate:
   - task: `R2-000-release2-planning-surface`
@@ -18,7 +18,23 @@ Updated: 2026-05-17T12:05:00+07:00
   - matrix: `docs/status/release2-ui-ux-screen-matrix.json`
   - verifier: `scripts/verify-release2-ui-ux-matrix.mjs`
   - the matrix uses `docs/02_UNIVERSAL_PROJECT_BP.md` as the S0-S8 spine and treats report-like screens as interactive management planes: projection -> signal -> action -> preview -> result.
-- Next runnable Release 2 task is `R2-ACT-001-governed-command-audit-contract-hardening`; broad Release 2 UI implementation should still wait for finite implementation tasks that reference exact screen ids and action specs.
+- `R2-MOCK-001-project-gantt-goal-contract` is accepted as a Release 2 design-mockup gate:
+  - goal: `docs/design-mockups/project-gantt-goal.md`
+  - mock: `.superpowers/brainstorm/visual-r2-20260517121053/content/project-gantt-planner-v5.html`
+  - acceptance matrix: `docs/design-mockups/project-gantt-mock-acceptance-matrix.json`
+  - design notes: `docs/design-mockups/project-gantt-design-notes.md`
+  - browser report: `docs/design-mockups/artifacts/project-gantt-v5/browser-verification-report.json`
+  - verification: `node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-mock.mjs --url http://localhost:64986` exits 0 with 20/20 interaction checks, screenshots, no console errors, and matrix validation.
+  - scope remains mock/design only; no production `apps/**`, `packages/**`, or E2E implementation was changed.
+- `R2-MOCK-002-br2-gantt-extract-v6` is accepted as a stronger Release 2 Project Gantt mockup gate:
+  - mock: `.superpowers/brainstorm/visual-r2-20260517121053/content/project-gantt-planner-v6.html`
+  - acceptance matrix: `docs/design-mockups/project-gantt-v6-acceptance-matrix.json`
+  - browser report: `docs/design-mockups/artifacts/project-gantt-v6/browser-verification-report.json`
+  - screenshots: `docs/design-mockups/artifacts/project-gantt-v6/desktop-initial.png`, `docs/design-mockups/artifacts/project-gantt-v6/desktop-after-apply.png`, `docs/design-mockups/artifacts/project-gantt-v6/narrow-1024.png`
+  - verification: `node .superpowers/brainstorm/visual-r2-20260517121053/verify-project-gantt-v6-mock.mjs --url http://localhost:64986` exits 0 with 24/24 browser interaction checks and no console errors.
+  - v6 adds BR2/Gun Gantt-inspired interaction depth: dropdown editors, autocomplete, command suggestions, active-cell hints/tooltips, stronger Excel-like grid mechanics, Tracking Gantt, splitter/bar drag, resource-conflict workspace, dry-run/apply/audit/readback, reload persistence, and XSS-safe rendering for editable labels in suggestions/conflict cards.
+  - BR2/Gun Gantt was read-only reference only; no production `apps/**`, `packages/**`, manifests, E2E suites, or BR2 source were changed.
+- Next Release 2 step depends on design acceptance: if v6 is accepted by product, create a finite implementation task for the production Project Gantt surface; if not, continue mock iteration as `R2-MOCK-003`. `R2-ACT-001-governed-command-audit-contract-hardening` remains runnable for backend foundation work, but broad UI implementation should still wait for exact screen ids/action specs and accepted mock direction.
 - Release 2 UI/UX baseline is accepted as a pre-implementation design direction:
   - spec: `docs/product/RELEASE_2_UI_UX_SPEC.md`
   - design system: `docs/product/DESIGN_SYSTEM.md`

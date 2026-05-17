@@ -1,0 +1,297 @@
+{
+  "screen": "project-gantt-planner-v6",
+  "url": "http://localhost:64986",
+  "checked_at": "2026-05-17T07:28:27.390Z",
+  "artifacts": {
+    "desktop_initial": "docs/design-mockups/artifacts/project-gantt-v6/desktop-initial.png",
+    "desktop_after_apply": "docs/design-mockups/artifacts/project-gantt-v6/desktop-after-apply.png",
+    "narrow_1024": "docs/design-mockups/artifacts/project-gantt-v6/narrow-1024.png"
+  },
+  "console": [],
+  "rows": [
+    {
+      "id": "BROWSER-001",
+      "requirement": "page opens as Project Gantt v6",
+      "status": "passed",
+      "value": true
+    },
+    {
+      "id": "BROWSER-002",
+      "requirement": "no console errors",
+      "status": "passed",
+      "value": true
+    },
+    {
+      "id": "EXCEL-001",
+      "requirement": "cell click updates address and formula bar",
+      "status": "passed",
+      "value": {
+        "address": "F4",
+        "formula": "8"
+      }
+    },
+    {
+      "id": "EXCEL-002",
+      "requirement": "F2 edit mode and typing apply value",
+      "status": "passed",
+      "value": "10 дн."
+    },
+    {
+      "id": "SCHED-001",
+      "requirement": "duration edit updates Gantt width and scheduling projection",
+      "status": "passed",
+      "value": {
+        "duration": "10 дн.",
+        "work": "102 ч",
+        "barWidth": 340
+      }
+    },
+    {
+      "id": "EXCEL-003",
+      "requirement": "Undo and Redo restore table values",
+      "status": "passed",
+      "value": {
+        "undone": "8 дн.",
+        "redone": "10 дн."
+      }
+    },
+    {
+      "id": "EXCEL-004",
+      "requirement": "bottom blank row creates a task",
+      "status": "passed",
+      "value": {
+        "before": 6,
+        "after": 7,
+        "created": true
+      }
+    },
+    {
+      "id": "EXCEL-005",
+      "requirement": "Insert inserts above and Delete removes with undo stack",
+      "status": "passed",
+      "value": {
+        "afterInsert": 8,
+        "afterDelete": 7
+      }
+    },
+    {
+      "id": "EXCEL-006",
+      "requirement": "column hide/show works and no longer blocks toolbar",
+      "status": "passed",
+      "value": {
+        "hidden": 0,
+        "ganttHidden": 1,
+        "ganttShown": 0
+      }
+    },
+    {
+      "id": "EXCEL-007",
+      "requirement": "column resize drag handler changes width",
+      "status": "passed",
+      "value": {
+        "before": "width: 86px;",
+        "after": "width: 128px;",
+        "changed": true
+      }
+    },
+    {
+      "id": "EXCEL-008",
+      "requirement": "dropdown editor supports task type selection",
+      "status": "passed",
+      "value": {
+        "editorWasSelect": true,
+        "value": "Фикс. срок",
+        "ok": true
+      }
+    },
+    {
+      "id": "EXCEL-009",
+      "requirement": "resource autocomplete updates table and creates safe preview",
+      "status": "passed",
+      "value": {
+        "resource": "Илья, Мария",
+        "preview": "104%",
+        "applyEnabled": true
+      }
+    },
+    {
+      "id": "EXCEL-010",
+      "requirement": "command autocomplete opens relevant action",
+      "status": "passed",
+      "value": {
+        "suggestions": 1,
+        "ok": true
+      }
+    },
+    {
+      "id": "EXCEL-011",
+      "requirement": "active-cell hint and header tooltips are visible",
+      "status": "passed",
+      "value": {
+        "title": "Синтаксис: 3 Оконч.-Нач., 3 Нач.-Нач.+1д, 5 Оконч.-Оконч.",
+        "hint": "Синтаксис: 3 Оконч.-Нач., 3 Нач.-Нач.+1д, 5 Оконч.-Оконч.",
+        "ok": true
+      }
+    },
+    {
+      "id": "GANTT-001",
+      "requirement": "Tracking Gantt shows baseline bars",
+      "status": "passed",
+      "value": {
+        "tracking": 1,
+        "baselineCount": 6
+      }
+    },
+    {
+      "id": "GANTT-002",
+      "requirement": "splitter changes grid/timeline ratio",
+      "status": "passed",
+      "value": {
+        "before": "56%",
+        "after": "63.589599146110054%",
+        "changed": true
+      }
+    },
+    {
+      "id": "GANTT-003",
+      "requirement": "Gantt bar drag moves task date",
+      "status": "passed",
+      "value": {
+        "before": 10,
+        "after": 14,
+        "changed": true
+      }
+    },
+    {
+      "id": "RESOURCE-001",
+      "requirement": "resource conflict workspace opens",
+      "status": "passed",
+      "value": {
+        "conflicts": 1,
+        "cards": 2
+      }
+    },
+    {
+      "id": "KISS-001",
+      "requirement": "preview does not mutate table before apply",
+      "status": "passed",
+      "value": {
+        "before": "Илья",
+        "after": "Илья",
+        "unchanged": true,
+        "preview": "104%"
+      }
+    },
+    {
+      "id": "KISS-002",
+      "requirement": "apply writes result, audit/readback, refreshed projection",
+      "status": "passed",
+      "value": {
+        "resource": "Илья, Мария",
+        "audit": "AUD-R2-GANTT-2261",
+        "readback": "API/readback mock: задача 1.3 = Илья, Мария / 104%"
+      }
+    },
+    {
+      "id": "KISS-003",
+      "requirement": "reload persists applied mock state",
+      "status": "passed",
+      "value": {
+        "audit": "AUD-R2-GANTT-2261",
+        "resource": "Илья, Мария"
+      }
+    },
+    {
+      "id": "PANEL-001",
+      "requirement": "right management panel slides closed and open",
+      "status": "passed",
+      "value": {
+        "closed": 1,
+        "opened": 0
+      }
+    },
+    {
+      "id": "VISUAL-001",
+      "requirement": "key surfaces have non-zero boxes and no missing primary controls",
+      "status": "passed",
+      "value": [
+        {
+          "selector": "#taskTable",
+          "ok": true,
+          "box": {
+            "x": 9,
+            "y": 251,
+            "w": 1587,
+            "h": 233
+          }
+        },
+        {
+          "selector": "#ganttCanvas",
+          "ok": true,
+          "box": {
+            "x": 784,
+            "y": 280,
+            "w": 1190,
+            "h": 237
+          }
+        },
+        {
+          "selector": "#formulaInput",
+          "ok": true,
+          "box": {
+            "x": 105,
+            "y": 221,
+            "w": 826,
+            "h": 25
+          }
+        },
+        {
+          "selector": "#previewBtn",
+          "ok": true,
+          "box": {
+            "x": 1410,
+            "y": 564,
+            "w": 197,
+            "h": 30
+          }
+        },
+        {
+          "selector": "#applyBtn",
+          "ok": true,
+          "box": {
+            "x": 1410,
+            "y": 756,
+            "w": 197,
+            "h": 30
+          }
+        },
+        {
+          "selector": ".drawer",
+          "ok": true,
+          "box": {
+            "x": 1390,
+            "y": 182,
+            "w": 42,
+            "h": 682
+          }
+        },
+        {
+          "selector": ".timeline-pane",
+          "ok": true,
+          "box": {
+            "x": 784,
+            "y": 251,
+            "w": 597,
+            "h": 612
+          }
+        }
+      ]
+    },
+    {
+      "id": "RU-001",
+      "requirement": "primary user-facing labels are Russian",
+      "status": "passed",
+      "value": true
+    }
+  ]
+}
