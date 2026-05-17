@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T08:54:00.0000000+07:00
+Updated: 2026-05-17T09:03:00.0000000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -17,8 +17,12 @@ Updated: 2026-05-17T08:54:00.0000000+07:00
   - `apps/api/src/phase12Readiness.ts` builds a tenant-scoped release-readiness read model with deployment, local observability, dependency, E2E, matrix, and open-blocker evidence.
   - `GET /api/ops/release-readiness` is backend permission-checked with `release.readiness.read`, denies read-only observers, and does not expose secret references.
   - P12-002 matrix row remains blocked only for later E2E-113/E2E-115 evidence.
+- `P12-003-recovery-smoke-backup-restore` is accepted as an implementation block:
+  - `docs/operations/PHASE_12_RECOVERY_BACKUP_POLICY.md` defines deterministic recovery smoke and production backup requirements.
+  - `apps/api/src/phase12Recovery.ts` and `/api/ops/recovery-smoke` implement tenant-scoped before/failure/after recovery readback, `ops.read`/`ops.execute` backend guards, audit event evidence, malformed-scenario no-partial mutation, and reset cleanup.
+  - P12-003 matrix row remains blocked only for later E2E-114 evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-003-recovery-smoke-backup-restore`.
+- Next runnable step: claim `P12-004-security-privacy-audit-review-fixes`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

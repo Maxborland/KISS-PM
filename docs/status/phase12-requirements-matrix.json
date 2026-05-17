@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T08:53:30.0000000+07:00",
+  "updated_at": "2026-05-17T09:01:30.0000000+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -98,17 +98,28 @@
         "E2E-114"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-003 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-003 scope and acceptance criteria before implementation.",
+        "docs/operations/PHASE_12_RECOVERY_BACKUP_POLICY.md defines deterministic in-memory recovery smoke, production backup requirements, audit expectations, and non-scope for real production database backup execution.",
+        "apps/api/src/phase12Recovery.ts implements tenant-scoped deterministic recovery smoke state, before/simulated-failure/after snapshots, latest-run readback, and resettable in-memory runtime.",
+        "GET /api/ops/recovery-smoke and POST /api/ops/recovery-smoke/run enforce ops.read/ops.execute, write audit event ops.recovery_smoke.run, and expose API readback without cross-tenant leakage."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-003-recovery-smoke-backup-restore --once exit 0 at startup",
+        "npm test -- apps/api/src/phase12RecoveryApi.test.ts exit 1 RED: /api/ops/recovery-smoke returned 404 before implementation",
+        "npm test -- apps/api/src/phase12RecoveryApi.test.ts exit 0: 1 file, 4 tests passed",
+        "npm run test:integration exit 0: 24 files, 123 tests passed",
+        "npm test exit 0: 104 files, 595 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Recovery smoke runtime, policy evidence, and E2E-114 are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "API tests prove /test-fixtures/reset clears tenant recovery-smoke latestRun and audit runtime state in the deterministic test runtime; final row verification still requires E2E-114 browser/API recovery-smoke cleanup/readback evidence before this row can become verified.",
+      "blocker": "2026-05-17T09:01:30.0000000+07:00: P12-003 API/runtime/policy evidence exists, but E2E-114 recovery-smoke browser/API evidence is not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T09:01:30.0000000+07:00",
       "e2e_evidence": []
     },
     {
