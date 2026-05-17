@@ -506,6 +506,42 @@ describe("Gantt control surface", () => {
     expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Действий пока нет");
   });
 
+  it("clears a transient command audit failure after a later successful readback", async () => {
+    const apiClient = createMutableApiClient();
+    vi.mocked(apiClient.getProjectScheduleAudit)
+      .mockResolvedValueOnce(createAudit())
+      .mockRejectedValueOnce(new Error("Audit readback unavailable after save"))
+      .mockResolvedValue(createAudit([scheduleActionExecution(
+        "action-update-task-phase5-kickoff",
+        "schedule.task.update",
+        { entityType: "task", entityId: "task-phase5-kickoff" },
+        "schedule-update-task-phase5-kickoff"
+      )]));
+
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Старт task-phase5-kickoff"), { target: { value: "2026-06-02" } });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить task-phase5-kickoff" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Команда выполнена, но audit/readback недоступен")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть Гантт" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Гантт загружен");
+    });
+    expect(screen.getByTestId("gantt-status")).not.toHaveTextContent("audit/readback недоступен");
+  });
+
   it("shows a denied state without calling schedule APIs when user cannot read schedule", async () => {
     const apiClient = createApiClient();
 
