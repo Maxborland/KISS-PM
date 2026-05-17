@@ -385,7 +385,7 @@
     {
       "id": "R2-010",
       "requirement": "Closed Portfolio / Retrospective control surface hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Retrospective control implementation PR",
       "owned_scope": [
         "UX-P9-CLOSED-PORTFOLIO",
@@ -416,7 +416,11 @@
       "risks": [
         "Retrospective value is lost if snapshot immutability is only implied."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: ClosedPortfolioRetrospectiveSurface now exposes a Release 2 KPIStrip and OperationalDataGrid over ProjectSnapshot rows with plan/fact, current-vs-previous variance, quality/CSI, template/KPI versions, and immutable snapshot proof.",
+        "2026-05-17: Retrospective trend insight now exposes a template-improvement action contract with source trend/snapshots/metrics, dry-run requirement, no-snapshot-rewrite proof, mutatesState=false preview, ActionExecution/AuditEvent result, future template readback, and snapshot readback unchanged evidence.",
+        "2026-05-17: Component-level tests cover the R2 snapshot grid/proof and trend-to-template-improvement preview/result/audit contract; E2E-R2-007 remains pending."
+      ]
     },
     {
       "id": "R2-011",
