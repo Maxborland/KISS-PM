@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { kpiSeverityLabel, type KpiActionExecutionDto, type KpiThresholdRuleDto } from "./kpiDefinitionApiClient";
 import type { KpiThresholdAuditDto, KpiThresholdBuilderApiClient, KpiThresholdPreviewDto } from "./kpiThresholdBuilderApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 
 type KpiThresholdBuilderSurfaceProps = {
@@ -57,6 +58,18 @@ function PreviewPanel({ preview }: { preview: KpiThresholdPreviewDto }) {
     <section className="phase2-panel preview-panel" data-testid="kpi-threshold-preview">
       <h3>Предпросмотр влияния</h3>
       <p>Состояние еще не изменено. Новая версия порогов будет опубликована только после команды.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.version}`}
+        beforeVersion={`v${preview.before.version}`}
+        previewId={preview.id}
+        reloadEffectLabel={`Reload keeps ${preview.after.severity} threshold impact on ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="KPI threshold changes alter future KpiEvaluation severity only after publish/readback."
+        warnings={[
+          `${preview.before.severity} -> ${preview.after.severity}`,
+          `sample ${preview.sampleValue}: ${preview.before.matchedRuleId ?? "none"} -> ${preview.after.matchedRuleId ?? "none"}`
+        ]}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>

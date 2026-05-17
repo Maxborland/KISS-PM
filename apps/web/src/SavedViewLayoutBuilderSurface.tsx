@@ -9,6 +9,7 @@ import type {
   SavedViewLayoutPreviewDto
 } from "./savedViewLayoutBuilderApiClient";
 import type { TenantLabelActionExecutionDto } from "./tenantLabelsApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 
 type SavedViewLayoutBuilderSurfaceProps = {
   apiClient: SavedViewLayoutBuilderApiClient;
@@ -109,10 +110,23 @@ function buildDraft(draft: DraftState, expectedSurfaceVersion: number): SavedVie
 }
 
 function PreviewPanel({ preview }: { preview: SavedViewLayoutPreviewDto }) {
+  const savedViewSummary =
+    preview.after.savedViewKeys.length > 0 ? preview.after.savedViewKeys.join(", ") : "default surface layout";
+
   return (
     <section className="phase2-panel preview-panel" data-testid="saved-view-layout-preview">
       <h3>Предпросмотр макета</h3>
       <p>Состояние еще не изменено. Публикация пройдет через управляемую команду.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.surfaceVersion}`}
+        beforeVersion={`v${preview.before.surfaceVersion}`}
+        blockers={preview.unavailable.reasons}
+        previewId={preview.id}
+        reloadEffectLabel={`Reload keeps saved view ${savedViewSummary} on ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Saved view and column layout affect runtime control surfaces only after publish/readback."
+        warnings={preview.unavailable.fields.map((field) => `${field} will be hidden from the runtime layout`)}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>

@@ -10,6 +10,7 @@ import type {
   TenantLabelsApiClient,
   TenantLabelSetPreviewDto
 } from "./tenantLabelsApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 
 type TenantLabelsAdminSurfaceProps = {
   apiClient: TenantLabelsApiClient;
@@ -101,6 +102,15 @@ function PreviewPanel({ preview }: { preview: TenantLabelSetPreviewDto }) {
     <section className="phase2-panel preview-panel" data-testid="tenant-labels-preview">
       <h3>Предпросмотр runtime-меток</h3>
       <p>Состояние еще не изменено. Публикация пойдет только через серверную команду.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.configurationVersion}`}
+        beforeVersion={`v${preview.before.configurationVersion}`}
+        previewId={preview.id}
+        reloadEffectLabel={`Reload refreshes tenant labels on ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Tenant labels update runtime projections without changing stable system keys."
+        warnings={preview.changes.map((change) => `${change.key}: ${change.beforeLabel} -> ${change.afterLabel}`)}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>

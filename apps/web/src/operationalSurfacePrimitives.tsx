@@ -205,6 +205,66 @@ export function ActionAuditPreview({
   );
 }
 
+export function RuntimeConfigPreview({
+  affectedSurfaces,
+  afterVersion,
+  beforeVersion,
+  blockers = [],
+  previewId,
+  reloadEffectLabel,
+  summary,
+  warnings = []
+}: {
+  affectedSurfaces: string[];
+  afterVersion: string;
+  beforeVersion: string;
+  blockers?: string[];
+  previewId: string;
+  reloadEffectLabel: string;
+  summary: string;
+  warnings?: string[];
+}) {
+  return (
+    <section className="runtime-config-preview" data-testid="runtime-config-preview">
+      <div className="operational-section-heading">
+        <strong>Runtime config preview</strong>
+        <span>{previewId}</span>
+      </div>
+      <p>{summary}</p>
+      <dl className="compact-facts">
+        <div>
+          <dt>Version delta</dt>
+          <dd>
+            {beforeVersion} {"->"} {afterVersion}
+          </dd>
+        </div>
+        <div>
+          <dt>Affected surfaces</dt>
+          <dd>{affectedSurfaces.join(", ")}</dd>
+        </div>
+        <div>
+          <dt>Reload effect</dt>
+          <dd>{reloadEffectLabel}</dd>
+        </div>
+      </dl>
+      {warnings.length > 0 ? (
+        <div className="compact-list">
+          {warnings.map((warning) => (
+            <span key={warning}>Warning: {warning}</span>
+          ))}
+        </div>
+      ) : null}
+      {blockers.length > 0 ? (
+        <div className="compact-list runtime-config-blockers">
+          {blockers.map((blocker) => (
+            <span key={blocker}>Blocker: {blocker}</span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function KPIStrip({ metrics }: { metrics: KpiMetric[] }) {
   return (
     <div className="kpi-strip" data-testid="kpi-strip">

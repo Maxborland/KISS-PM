@@ -219,6 +219,11 @@ describe("SavedViewLayoutBuilderSurface", () => {
     const preview = await screen.findByTestId("saved-view-layout-preview");
     expect(preview).toHaveTextContent("Состояние еще не изменено");
     expect(preview).toHaveTextContent("suggested_resource_profile_id");
+    const runtimePreview = screen.getByTestId("runtime-config-preview");
+    expect(runtimePreview).toHaveTextContent("portfolio.control");
+    expect(runtimePreview).toHaveTextContent("v1 -> v2");
+    expect(runtimePreview).toHaveTextContent("Reload");
+    expect(runtimePreview).toHaveTextContent("critical_portfolio");
     expect(apiClient.publishLayout).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Опубликовать макет" }));

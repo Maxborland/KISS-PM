@@ -7,6 +7,7 @@ import {
   KPIStrip,
   OperationalDataGrid,
   OperationalSurfaceShell,
+  RuntimeConfigPreview,
   SignalSummaryBar,
   type OperationalGridColumn,
   type OperationalGridRow
@@ -290,5 +291,29 @@ describe("Release 2 operational surface primitives", () => {
     fireEvent.click(screen.getByRole("button", { name: "Открыть первый риск" }));
 
     expect(onNextAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders runtime config preview with version delta, affected surfaces, blockers, and reload effect", () => {
+    render(
+      <RuntimeConfigPreview
+        affectedSurfaces={["portfolio.control", "kpi.deviation.control"]}
+        afterVersion="v2"
+        beforeVersion="v1"
+        blockers={["custom.risk_level is not visible on portfolio.control"]}
+        previewId="preview-runtime-config-a"
+        reloadEffectLabel="Reload shows saved view critical_portfolio on portfolio.control"
+        summary="Runtime configuration will change only after publish command."
+        warnings={["Existing user saved views keep their own column order."]}
+      />
+    );
+
+    const preview = screen.getByTestId("runtime-config-preview");
+    expect(preview).toHaveTextContent("preview-runtime-config-a");
+    expect(preview).toHaveTextContent("v1 -> v2");
+    expect(preview).toHaveTextContent("portfolio.control");
+    expect(preview).toHaveTextContent("kpi.deviation.control");
+    expect(preview).toHaveTextContent("custom.risk_level is not visible");
+    expect(preview).toHaveTextContent("Existing user saved views");
+    expect(preview).toHaveTextContent("Reload shows saved view");
   });
 });
