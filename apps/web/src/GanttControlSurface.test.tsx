@@ -442,6 +442,31 @@ describe("Gantt control surface", () => {
     expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Действий пока нет");
   });
 
+  it("does not claim command success when post-command audit readback is unavailable", async () => {
+    const apiClient = createMutableApiClient();
+    vi.mocked(apiClient.getProjectScheduleAudit)
+      .mockResolvedValueOnce(createAudit())
+      .mockRejectedValueOnce(new Error("Audit readback unavailable after save"));
+
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Старт task-phase5-kickoff"), { target: { value: "2026-06-02" } });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить task-phase5-kickoff" }));
+
+    await waitFor(() => expect(apiClient.updateScheduleTask).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Команда выполнена, но audit/readback недоступен")
+    );
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Действий пока нет");
+  });
+
   it("shows a denied state without calling schedule APIs when user cannot read schedule", async () => {
     const apiClient = createApiClient();
 

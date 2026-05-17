@@ -8,6 +8,7 @@ import type {
   Phase5ScheduleApiClient,
   ProjectScheduleAuditDto,
   ProjectScheduleDto,
+  ScheduleActionExecutionDto,
   ScheduleValidationIssueDto,
   UpdateScheduleTaskRequestDto
 } from "./phase5ScheduleApiClient";
@@ -103,6 +104,21 @@ function draftFromNode(node: ProjectScheduleDto["schedulePlan"]["wbsNodes"][numb
   };
 }
 
+function commandActionExecution(result: unknown): ScheduleActionExecutionDto | null {
+  if (typeof result !== "object" || result === null || !("actionExecution" in result)) return null;
+  const actionExecution = (result as { actionExecution?: unknown }).actionExecution;
+  if (typeof actionExecution !== "object" || actionExecution === null || !("id" in actionExecution)) return null;
+  return actionExecution as ScheduleActionExecutionDto;
+}
+
+function auditIncludesAction(audit: ProjectScheduleAuditDto, actionExecution: ScheduleActionExecutionDto): boolean {
+  return audit.actionExecutions.some(
+    (candidate) =>
+      candidate.id === actionExecution.id ||
+      (candidate.correlationId.length > 0 && candidate.correlationId === actionExecution.correlationId)
+  );
+}
+
 export function GanttControlSurface({
   apiClient,
   currentTenant,
@@ -116,6 +132,7 @@ export function GanttControlSurface({
   const [status, setStatus] = useState("Готово к загрузке Гантта");
   const [pendingCommand, setPendingCommand] = useState<GanttCommandName | null>(null);
   const [lastCommandStatus, setLastCommandStatus] = useState<string | null>(null);
+  const [commandFailureStatus, setCommandFailureStatus] = useState<string | null>(null);
   const [commandIssues, setCommandIssues] = useState<ScheduleValidationIssueDto[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeCell, setActiveCell] = useState<ActiveScheduleCell | null>(null);
@@ -188,6 +205,7 @@ export function GanttControlSurface({
     setSelectedProjectId(projectId);
     setOpenedProjectId(projectId);
     setLastCommandStatus(null);
+    setCommandFailureStatus(null);
     setCommandIssues([]);
   }, [projectId, refreshKey]);
 
@@ -206,15 +224,17 @@ export function GanttControlSurface({
       return;
     }
     if (scheduleQuery.isSuccess) {
-      setCommandIssues([]);
+      if (commandFailureStatus === null) setCommandIssues([]);
       setStatus(
-        lastCommandStatus ??
+        commandFailureStatus ??
+          lastCommandStatus ??
           (scheduleQuery.data.audit === null && canReadAudit ? "Гантт загружен, аудит временно недоступен" : "Гантт загружен")
       );
     }
   }, [
     canReadAudit,
     canReadSchedule,
+    commandFailureStatus,
     lastCommandStatus,
     scheduleQuery.data,
     scheduleQuery.error,
@@ -293,18 +313,32 @@ export function GanttControlSurface({
     setPendingCommand(commandName);
     setPendingTaskId(options.pendingTaskId ?? null);
     setLastCommandStatus(null);
+    setCommandFailureStatus(null);
     setCommandIssues([]);
     setStatus(pendingLabel);
     try {
-      await command();
-      await scheduleQuery.refetch({ throwOnError: true });
+      const commandResult = await command();
+      const readback = await scheduleQuery.refetch({ throwOnError: true });
+      if (canReadAudit) {
+        const readbackAudit = readback.data?.audit ?? null;
+        if (readbackAudit === null) {
+          throw new Error("Команда выполнена, но audit/readback недоступен");
+        }
+        const expectedAction = commandActionExecution(commandResult);
+        if (expectedAction !== null && !auditIncludesAction(readbackAudit, expectedAction)) {
+          throw new Error("Команда выполнена, но audit/readback не подтвердил action evidence");
+        }
+      }
       if (selectedProjectId === commandProjectId) {
+        setCommandFailureStatus(null);
         setLastCommandStatus(successLabel);
         setStatus(successLabel);
       }
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
       setCommandIssues(getValidationIssues(error));
-      setStatus(getErrorMessage(error));
+      setCommandFailureStatus(errorMessage);
+      setStatus(errorMessage);
     } finally {
       setPendingCommand(null);
       setPendingTaskId(null);
