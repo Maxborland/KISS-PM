@@ -23,6 +23,10 @@ type RefreshReadback = {
   projection: ResourceLoadProjectionDto;
   audit: ResourcePlanningAuditDto;
 };
+type CapacityMatrixCell = {
+  resourceProfileId: string;
+  date: string;
+};
 
 type ResourceLoadControlSurfaceProps = {
   apiClient: ResourcePlanningApiClient;
@@ -58,8 +62,89 @@ function compactHours(value: number): string {
   return `${value} ч`;
 }
 
+function dateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T00:00:00.000Z`);
+  const final = new Date(`${end}T00:00:00.000Z`);
+
+  while (cursor <= final) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+function isDateInRange(date: string, start: string, end: string): boolean {
+  return date >= start && date <= end;
+}
+
 function resourceLabel(resourceProfiles: ResourceProfileDto[], resourceProfileId: string): string {
   return resourceProfiles.find((profile) => profile.id === resourceProfileId)?.label ?? resourceProfileId;
+}
+
+function projectionDates(projection: ResourceLoadProjectionDto): string[] {
+  const starts = projection.loadBuckets.map((bucket) => bucket.periodStart);
+  const ends = projection.loadBuckets.map((bucket) => bucket.periodEnd);
+  const start = starts.sort()[0];
+  const end = ends.sort().at(-1);
+
+  if (start === undefined || end === undefined) {
+    return [];
+  }
+
+  return dateRange(start, end);
+}
+
+function bucketForResourceDate(
+  projection: ResourceLoadProjectionDto,
+  resourceProfileId: string,
+  date: string
+): ResourceLoadBucketDto | undefined {
+  return projection.loadBuckets.find(
+    (bucket) => bucket.resourceProfileId === resourceProfileId && isDateInRange(date, bucket.periodStart, bucket.periodEnd)
+  );
+}
+
+function overloadForResourceDate(
+  projection: ResourceLoadProjectionDto,
+  resourceProfileId: string,
+  date: string
+): ResourceOverloadDto | undefined {
+  return projection.overloads.find(
+    (overload) =>
+      overload.resourceProfileId === resourceProfileId && isDateInRange(date, overload.periodStart, overload.periodEnd)
+  );
+}
+
+function exceptionForResourceDate(
+  projection: ResourceLoadProjectionDto,
+  resourceProfileId: string,
+  date: string
+) {
+  return projection.availabilityExceptions.find(
+    (exception) =>
+      exception.resourceProfileId === resourceProfileId &&
+      isDateInRange(date, exception.periodStart, exception.periodEnd)
+  );
+}
+
+function isWorkingDate(projection: ResourceLoadProjectionDto, resourceProfileId: string, date: string): boolean {
+  const calendar = projection.capacityCalendars.find((candidate) => candidate.resourceProfileId === resourceProfileId);
+  if (calendar === undefined) {
+    return true;
+  }
+
+  const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  return calendar.workingDays.includes(weekday);
+}
+
+function freeCapacityHours(bucket: ResourceLoadBucketDto | undefined): number {
+  return bucket === undefined ? 0 : Math.max(0, bucket.capacityHours - bucket.totalLoadHours);
+}
+
+function overloadHours(bucket: ResourceLoadBucketDto | undefined): number {
+  return bucket === undefined ? 0 : Math.max(0, bucket.totalLoadHours - bucket.capacityHours);
 }
 
 function firstOverload(projection: ResourceLoadProjectionDto | null): ResourceOverloadDto | null {
@@ -147,6 +232,172 @@ function PreviewPanel({ preview }: { preview: ResourceResolutionPreviewDto }) {
       <p>
         {resourceResolutionActionLabel(preview.actionKey)}: {preview.auditSummary.reason}
       </p>
+      <div className="compact-list" data-testid="resource-preview-permission-trace">
+        <span>Права: {preview.requiredPermissions.join(", ") || "не требуются"}</span>
+        <span>{preview.canConfirm ? "Можно подтверждать" : "Есть блокеры"}</span>
+        {preview.warnings.length > 0 ? <span>Предупреждения: {preview.warnings.join("; ")}</span> : null}
+        {preview.blockers.length > 0 ? <span>Блокеры: {preview.blockers.join("; ")}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function CapacityMatrix({
+  activeCell,
+  canWriteResources,
+  onCellActivate,
+  onCellFocus,
+  onPreview,
+  onReserve,
+  projection,
+  selectedCell
+}: {
+  activeCell: CapacityMatrixCell | null;
+  canWriteResources: boolean;
+  onCellActivate: (cell: CapacityMatrixCell) => void;
+  onCellFocus: (cell: CapacityMatrixCell) => void;
+  onPreview: () => void;
+  onReserve: () => void;
+  projection: ResourceLoadProjectionDto;
+  selectedCell: CapacityMatrixCell | null;
+}) {
+  const dates = projectionDates(projection);
+  const selectedBucket =
+    selectedCell === null ? undefined : bucketForResourceDate(projection, selectedCell.resourceProfileId, selectedCell.date);
+  const selectedOverload =
+    selectedCell === null ? undefined : overloadForResourceDate(projection, selectedCell.resourceProfileId, selectedCell.date);
+  const selectedAssignments =
+    selectedCell === null
+      ? []
+      : projection.assignments.filter(
+          (assignment) =>
+            assignment.resourceProfileId === selectedCell.resourceProfileId &&
+            isDateInRange(selectedCell.date, assignment.plannedStartDate, assignment.plannedFinishDate)
+        );
+  const selectedReservations =
+    selectedCell === null
+      ? []
+      : projection.reservations.filter(
+          (reservation) =>
+            reservation.resourceProfileId === selectedCell.resourceProfileId &&
+            isDateInRange(selectedCell.date, reservation.periodStart, reservation.periodEnd)
+        );
+  const activeResource =
+    activeCell === null ? "" : resourceLabel(projection.resourceProfiles, activeCell.resourceProfileId);
+  const totalFree = projection.loadBuckets.reduce((sum, bucket) => sum + freeCapacityHours(bucket), 0);
+  const totalOverload = projection.loadBuckets.reduce((sum, bucket) => sum + overloadHours(bucket), 0);
+
+  return (
+    <section className="phase2-panel capacity-matrix-panel">
+      <div className="capacity-summary-strip" data-testid="capacity-summary-strip">
+        <span>Емкость: {compactHours(projection.loadBuckets.reduce((sum, bucket) => sum + bucket.capacityHours, 0))}</span>
+        <span>Нагрузка: {compactHours(projection.loadBuckets.reduce((sum, bucket) => sum + bucket.totalLoadHours, 0))}</span>
+        <span>Перегрузка: {compactHours(totalOverload)}</span>
+        <span>Свободно: {compactHours(totalFree)}</span>
+        <span>Открытые перегрузки: {projection.overloads.length}</span>
+      </div>
+      <div aria-label="Матрица емкости" className="capacity-matrix" data-testid="capacity-matrix" role="grid">
+        <div
+          className="capacity-matrix-row capacity-matrix-header"
+          role="row"
+          style={{ gridTemplateColumns: `210px repeat(${dates.length}, minmax(132px, 1fr))` }}
+        >
+          <div className="capacity-resource-cell sticky-cell" role="columnheader">Ресурс</div>
+          {dates.map((date) => (
+            <div className="capacity-day-header" data-testid={`capacity-day-header-${date}`} key={date} role="columnheader">
+              {date}
+            </div>
+          ))}
+        </div>
+        {projection.resourceProfiles.map((profile) => {
+          const rowOverload = projection.overloads.find((overload) => overload.resourceProfileId === profile.id);
+
+          return (
+            <div
+              className="capacity-matrix-row"
+              data-testid={`capacity-row-${profile.id}`}
+              key={profile.id}
+              role="row"
+              style={{ gridTemplateColumns: `210px repeat(${dates.length}, minmax(132px, 1fr))` }}
+            >
+              <div className="capacity-resource-cell sticky-cell" role="rowheader">
+                <strong>{profile.label}</strong>
+                <span>{rowOverload ? `Перегрузка ${compactHours(rowOverload.overloadHours)}` : "Без перегрузки"}</span>
+              </div>
+              {dates.map((date) => {
+                const bucket = bucketForResourceDate(projection, profile.id, date);
+                const exception = exceptionForResourceDate(projection, profile.id, date);
+                const workingDate = isWorkingDate(projection, profile.id, date);
+                const overload = overloadHours(bucket);
+                const free = freeCapacityHours(bucket);
+                const state = !workingDate ? "non-working" : overload > 0 ? "overload" : free > 0 ? "free" : "neutral";
+                const isActive = activeCell?.resourceProfileId === profile.id && activeCell.date === date;
+                const cell: CapacityMatrixCell = { resourceProfileId: profile.id, date };
+
+                return (
+                  <button
+                    className={`capacity-matrix-cell severity-${bucket?.severity ?? "none"} state-${state} ${exception ? "has-exception" : ""} ${isActive ? "is-active" : ""}`}
+                    data-testid={`capacity-cell-${profile.id}-${date}`}
+                    key={`${profile.id}-${date}`}
+                    role="gridcell"
+                    type="button"
+                    onClick={() => onCellActivate(cell)}
+                    onFocus={() => onCellFocus(cell)}
+                    onMouseEnter={() => onCellFocus(cell)}
+                  >
+                    <span>{bucket ? `Итого ${compactHours(bucket.totalLoadHours)}` : "Нет нагрузки"}</span>
+                    {overload > 0 ? <strong>Перегрузка {compactHours(overload)}</strong> : null}
+                    {free > 0 ? <strong>Свободно {compactHours(free)}</strong> : null}
+                    {!workingDate ? <span>Нерабочий день</span> : null}
+                    {exception ? (
+                      <span>
+                        {exception.type === "reduced_capacity" ? "Сниженная емкость" : exception.type}: {exception.sourceLabel}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      <p className="capacity-crosshair" data-testid="capacity-crosshair">
+        {activeCell === null ? "Выберите ячейку" : `${activeResource} / ${activeCell.date}`}
+      </p>
+      {selectedCell !== null ? (
+        <section className="capacity-cell-drilldown" data-testid="capacity-cell-drilldown">
+          <h3>{resourceLabel(projection.resourceProfiles, selectedCell.resourceProfileId)} / {selectedCell.date}</h3>
+          <dl className="compact-facts">
+            <div>
+              <dt>Емкость</dt>
+              <dd>{selectedBucket ? compactHours(selectedBucket.capacityHours) : "нет данных"}</dd>
+            </div>
+            <div>
+              <dt>Нагрузка</dt>
+              <dd>{selectedBucket ? compactHours(selectedBucket.totalLoadHours) : "нет данных"}</dd>
+            </div>
+            <div>
+              <dt>Перегрузка</dt>
+              <dd>{compactHours(selectedOverload?.overloadHours ?? overloadHours(selectedBucket))}</dd>
+            </div>
+          </dl>
+          <div className="compact-list">
+            <span>Source refs: {selectedBucket?.sourceRefs.join(", ") || "нет"}</span>
+            <span>Назначения: {selectedAssignments.map((assignment) => assignment.id).join(", ") || "нет"}</span>
+            <span>Резервы: {selectedReservations.map((reservation) => reservation.id).join(", ") || "нет"}</span>
+            <span>Задачи: {selectedOverload?.affectedTaskIds.join(", ") || selectedAssignments.map((assignment) => assignment.taskId).join(", ") || "нет"}</span>
+            <span>Проекты: {selectedOverload?.affectedProjectIds.join(", ") || selectedAssignments.map((assignment) => assignment.projectId).join(", ") || "нет"}</span>
+          </div>
+          {canWriteResources ? (
+            <div className="button-row">
+              <button type="button" onClick={onPreview}>Предпросмотреть перенос</button>
+              <button className="secondary-button" type="button" onClick={onReserve}>Создать резерв</button>
+            </div>
+          ) : (
+            <p className="readonly-notice">Действия выключены: нет `resource.write`.</p>
+          )}
+        </section>
+      ) : null}
     </section>
   );
 }
@@ -172,6 +423,8 @@ export function ResourceLoadControlSurface({
   const [status, setStatus] = useState("Ожидание загрузки");
   const [commandError, setCommandError] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [activeMatrixCell, setActiveMatrixCell] = useState<CapacityMatrixCell | null>(null);
+  const [selectedMatrixCell, setSelectedMatrixCell] = useState<CapacityMatrixCell | null>(null);
   const requestSequence = useRef(0);
   const reservationSequence = useRef(1);
 
@@ -217,6 +470,8 @@ export function ResourceLoadControlSurface({
         setAudit(nextAudit);
         const nextOverload = nextProjection.overloads[0] ?? null;
         setSelectedOverloadId(nextOverload?.id ?? null);
+        setActiveMatrixCell(null);
+        setSelectedMatrixCell(null);
         setPreview(null);
         setLoadState(nextProjection.loadBuckets.length > 0 ? "ready" : "empty");
         setStatus(nextProjection.loadBuckets.length > 0 ? nextStatus : "Нет ресурсных бакетов");
@@ -478,6 +733,20 @@ export function ResourceLoadControlSurface({
             </section>
           </div>
 
+          <CapacityMatrix
+            activeCell={activeMatrixCell}
+            canWriteResources={canWriteResources}
+            projection={projection}
+            selectedCell={selectedMatrixCell}
+            onCellActivate={(cell) => {
+              setActiveMatrixCell(cell);
+              setSelectedMatrixCell(cell);
+            }}
+            onCellFocus={setActiveMatrixCell}
+            onPreview={() => void previewRecommendedResolution()}
+            onReserve={() => void createReservation()}
+          />
+
           <section className="phase2-panel resource-command-panel">
             <h3>Следующее действие</h3>
             {!canWriteResources ? (
@@ -539,6 +808,9 @@ export function ResourceLoadControlSurface({
               <h3>Результат команды</h3>
               <p>{actionExecutionLine(applyResult.result.actionExecution)}</p>
               <p>Статус перегрузки: {applyResult.result.overloadStatus}</p>
+              <p>Назначения: {applyResult.result.changedAssignmentIds.join(", ") || "нет"}</p>
+              <p>Резервы: {applyResult.result.changedReservationIds.join(", ") || "нет"}</p>
+              <p>Readback: {applyResult.readback.loadBuckets.length} бакета</p>
             </section>
           ) : null}
 

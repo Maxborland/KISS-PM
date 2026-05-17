@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T17:28:00+07:00
+Updated: 2026-05-17T17:43:00+07:00
+
+- `R2-UI-003-resource-capacity-hardening` is completed as the third Release 2 production UI slice:
+  - branch: `codex/r2-resource-capacity-hardening`, stacked on PR #4 (`codex/r2-gantt-planning-hardening`)
+  - files: `apps/web/src/ResourceLoadControlSurface.tsx`, `apps/web/src/ResourceLoadControlSurface.test.tsx`, `apps/web/src/styles.css`
+  - implemented: `CapacityMatrix` hierarchy rows, sticky resource/day headers, crosshair, reduced-capacity exception state, overload/free-capacity states, capacity summary strip, source-aware cell drilldown, preview permission/warning/blocker trace, apply result changed ids, overload status, audit evidence, and API readback bucket count.
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` marks `R2-007/R2-008` as `in_progress` with evidence; `E2E-R2-004` and `E2E-R2-005` remain pending.
+  - verification: RED component test run failed with 4 expected missing-behavior failures; final targeted Vitest passed (2 files, 15 tests); `npm run typecheck` passed; `npm run lint` passed; `git diff --check` passed; Release 2 matrix JSON parse passed.
+  - known verifier gap remains: `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this R2 backlog shape (`unsupported matrix phase: undefined`; planned/in_progress status errors).
+  - next recommended slice: `R2-004/R2-009` Portfolio and KPI control hardening, or merge/rebase stacked PRs first.
 
 - `R2-UI-002-gantt-planning-hardening` is completed as the second Release 2 production UI slice:
   - branch: `codex/r2-gantt-planning-hardening`, stacked on PR #3 (`codex/r2-shared-operational-primitives`)

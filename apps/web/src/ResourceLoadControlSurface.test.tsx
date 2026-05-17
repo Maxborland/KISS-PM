@@ -71,6 +71,16 @@ function createProjection(overloaded = true): ResourceLoadProjectionDto {
         defaultDailyCapacityHours: 8,
         effectiveFrom: "2026-06-01",
         effectiveTo: "2026-06-30"
+      },
+      {
+        id: "calendar-engineer-a",
+        tenantId: "tenant-a",
+        resourceProfileId: "resource-engineer-a",
+        timezone: "UTC",
+        workingDays: [1, 2, 3, 4, 5],
+        defaultDailyCapacityHours: 8,
+        effectiveFrom: "2026-06-01",
+        effectiveTo: "2026-06-30"
       }
     ],
     availabilityExceptions: [
@@ -128,6 +138,15 @@ function createProjection(overloaded = true): ResourceLoadProjectionDto {
         periodEnd: "2026-06-05",
         granularity: "week",
         capacityHours: 36
+      },
+      {
+        id: "capacity:resource-engineer-a:2026-06-01:2026-06-05",
+        tenantId: "tenant-a",
+        resourceProfileId: "resource-engineer-a",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-05",
+        granularity: "week",
+        capacityHours: 40
       }
     ],
     loadBuckets: [
@@ -145,6 +164,21 @@ function createProjection(overloaded = true): ResourceLoadProjectionDto {
         loadPercent: overloaded ? 139 : 22,
         severity: overloaded ? "critical" : "none",
         sourceRefs: ["assignment:assignment-design-architect-a", "reservation:reservation-draft-architect-a"]
+      },
+      {
+        id: "load:resource-engineer-a:2026-06-01:2026-06-05",
+        tenantId: "tenant-a",
+        resourceProfileId: "resource-engineer-a",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-05",
+        granularity: "week",
+        capacityHours: 40,
+        assignedHours: 12,
+        reservedHours: 0,
+        totalLoadHours: 12,
+        loadPercent: 30,
+        severity: "none",
+        sourceRefs: []
       }
     ],
     overloads: overloaded
@@ -224,7 +258,7 @@ function createPreview(): ResourceResolutionPreviewDto {
     affectedAssignments: [assignment],
     affectedReservations: [reservation],
     blockers: [],
-    warnings: [],
+    warnings: ["Сдвиг влияет на план проекта project-alpha-a"],
     requiredPermissions: ["resource.write"],
     auditSummary: {
       source: { entityType: "resourceOverload", entityId: overloadId },
@@ -343,6 +377,53 @@ function createDeferred<T>() {
 }
 
 describe("Resource load control surface", () => {
+  it("renders capacity matrix hierarchy, sticky headers, crosshair, reduced capacity, free capacity, and overload states", async () => {
+    render(
+      <ResourceLoadControlSurface
+        apiClient={createMutableApiClient()}
+        currentTenant={createCurrentTenant()}
+        testUser="resource-manager-a"
+      />
+    );
+
+    const matrix = await screen.findByTestId("capacity-matrix");
+    expect(matrix).toHaveTextContent("Анна Архитектор");
+    expect(matrix).toHaveTextContent("Егор Инженер");
+    expect(screen.getByTestId("capacity-day-header-2026-06-03")).toHaveTextContent("2026-06-03");
+    expect(screen.getByTestId("capacity-row-resource-architect-a")).toHaveTextContent("Перегрузка 14 ч");
+    expect(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03")).toHaveTextContent("Обучение архитектора");
+    expect(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03")).toHaveTextContent("Сниженная емкость");
+    expect(screen.getByTestId("capacity-cell-resource-engineer-a-2026-06-03")).toHaveTextContent("Свободно 28 ч");
+    fireEvent.mouseEnter(screen.getByTestId("capacity-cell-resource-architect-a-2026-06-03"));
+    expect(screen.getByTestId("capacity-crosshair")).toHaveTextContent("Анна Архитектор / 2026-06-03");
+    expect(screen.getByTestId("capacity-summary-strip")).toHaveTextContent("Открытые перегрузки: 1");
+    expect(screen.getByTestId("capacity-summary-strip")).toHaveTextContent("Свободно: 28 ч");
+  });
+
+  it("opens a capacity cell drilldown with source refs and context actions without direct mutation", async () => {
+    const apiClient = createMutableApiClient();
+
+    render(
+      <ResourceLoadControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        testUser="resource-manager-a"
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId("capacity-cell-resource-architect-a-2026-06-03"));
+    const drilldown = await screen.findByTestId("capacity-cell-drilldown");
+    expect(drilldown).toHaveTextContent("Анна Архитектор");
+    expect(drilldown).toHaveTextContent("assignment:assignment-design-architect-a");
+    expect(drilldown).toHaveTextContent("reservation:reservation-draft-architect-a");
+    expect(drilldown).toHaveTextContent("task-design-a");
+    expect(drilldown).toHaveTextContent("project-alpha-a");
+    expect(drilldown).toHaveTextContent("Предпросмотреть перенос");
+    expect(drilldown).toHaveTextContent("Создать резерв");
+    expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
+    expect(apiClient.applyGovernedResolution).not.toHaveBeenCalled();
+  });
+
   it("loads resource buckets, overload signal, affected entities, and audit evidence", async () => {
     render(
       <ResourceLoadControlSurface
@@ -472,6 +553,9 @@ describe("Resource load control surface", () => {
     expect(previewPanel).toHaveTextContent("До: 50 ч");
     expect(previewPanel).toHaveTextContent("После: 8 ч");
     expect(previewPanel).toHaveTextContent("Состояние еще не изменено");
+    expect(previewPanel).toHaveTextContent("resource.write");
+    expect(previewPanel).toHaveTextContent("Сдвиг влияет на план проекта project-alpha-a");
+    expect(previewPanel).toHaveTextContent("Можно подтверждать");
     expect(screen.getByTestId(`resource-load-bucket-${loadBucketId}`)).toHaveTextContent("50 ч");
     expect(screen.queryByTestId("resource-apply-result")).not.toBeInTheDocument();
     expect(apiClient.previewGovernedResolution).toHaveBeenCalledTimes(1);
@@ -501,6 +585,9 @@ describe("Resource load control surface", () => {
 
     expect(await screen.findByTestId("resource-apply-result")).toHaveTextContent("resource_resolution.shift_work");
     expect(screen.getByTestId("resource-apply-result")).toHaveTextContent("resource.write");
+    expect(screen.getByTestId("resource-apply-result")).toHaveTextContent("assignment-design-architect-a");
+    expect(screen.getByTestId("resource-apply-result")).toHaveTextContent("reservation-draft-architect-a");
+    expect(screen.getByTestId("resource-apply-result")).toHaveTextContent("Readback: 2 бакета");
     expect(screen.getByTestId("resource-audit-evidence")).toHaveTextContent("resource_resolution.shift_work");
     expect(apiClient.previewGovernedResolution).toHaveBeenCalledTimes(1);
     expect(apiClient.applyGovernedResolution).toHaveBeenCalledTimes(1);
