@@ -832,6 +832,10 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
   }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
+  const projectWorkProjectId = useMemo(
+    () => (typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("projectId") ?? undefined),
+    []
+  );
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
   const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
   const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
@@ -1065,6 +1069,7 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
             apiClient={projectWorkApiClient}
             currentTenant={currentTenant}
             onOpenGanttProject={openGanttProject}
+            projectId={projectWorkProjectId}
             testUser={runtimeUser}
           />
         ) : null}

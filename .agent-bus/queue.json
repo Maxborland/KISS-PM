@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T07:20:04.5500545+07:00",
+  "updated_at": "2026-05-17T08:09:46.1465239+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -5478,6 +5478,133 @@
         "node scripts/agent-bus-guard.mjs --task P11-008-imported-project-works-without-adapter --once exit 1 first final run because own locks were still present after marking the task done; locks removed",
         "node scripts/agent-bus-guard.mjs --task P11-008-imported-project-works-without-adapter --once exit 0 after lock cleanup"
       ]
+    },
+    {
+      "id": "P11-009-deterministic-phase11-fixtures-e2e",
+      "aliases": [
+        "P11-009"
+      ],
+      "title": "Implement deterministic Phase 11 fixtures and E2E-100..104",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P11",
+      "depends_on": [
+        "P11-008-imported-project-works-without-adapter"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase11/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase11-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P11-009-deterministic-phase11-fixtures-e2e.claim.json",
+        ".agent-bus/sessions/P11-009-deterministic-phase11-fixtures-e2e.md"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-009-deterministic-phase11-fixtures-e2e --once",
+        "npm test -- packages/shared-test-fixtures",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts",
+        "npm test -- apps/web/src/IntegrationAdminDiagnosticsSurface.test.tsx apps/web/src/ProjectWorkControlSurface.test.tsx",
+        "npm run test:e2e:phase -- --phase 11",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T08:09:46.1465239+07:00. Implemented deterministic Phase 11 shared fixtures and executable Playwright E2E-100..104. Tests prove UI + API readback, import dry-run non-mutation, governed apply, idempotency, safe adapter failure and recovery, backend permission denial, tenant isolation, mapping/audit evidence, imported canonical project continuity without live adapter, reload persistence, and /test-fixtures/reset cleanup. P11-010 remains next for strict exit-gate aggregation.",
+      "completed_at": "2026-05-17T08:09:46.1465239+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-009-deterministic-phase11-fixtures-e2e --once exit 0 at startup",
+        "npm test -- packages/shared-test-fixtures/src/phase11Fixtures.test.ts exit 1 RED: phase11Fixtures module missing",
+        "npm test -- packages/shared-test-fixtures/src/phase11Fixtures.test.ts exit 0: 1 file, 2 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 9 files, 17 tests passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm run test:e2e:phase -- --phase 11 exit 1 RED: E2E-102 expected stale failure copy",
+        "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/web/src/IntegrationAdminDiagnosticsSurface.test.tsx apps/web/src/ProjectWorkControlSurface.test.tsx exit 0: 2 files, 14 tests passed",
+        "npm test exit 0: 101 files, 579 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 1: unused changeTaskStatus import in E2E-103",
+        "npm run lint exit 0 after import cleanup",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 expected: P11-010 remains blocked until strict exit-gate task",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P11-010-phase11-verification-matrix-exit-gate",
+      "aliases": [
+        "P11-010"
+      ],
+      "title": "Close Phase 11 verification matrix and exit gate",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P11",
+      "depends_on": [
+        "P11-009-deterministic-phase11-fixtures-e2e"
+      ],
+      "write_scope": [
+        "docs/status/phase11-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P11-010-phase11-verification-matrix-exit-gate.claim.json",
+        ".agent-bus/sessions/P11-010-phase11-verification-matrix-exit-gate.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-010-phase11-verification-matrix-exit-gate --once",
+        "npm run test:e2e:phase -- --phase 11",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Created after accepted P11-009. Aggregate final Phase 11 evidence, mark P11-010 verified only after strict matrix passes without --allow-blocked, then mark Phase 11 accepted."
     }
   ]
 }
