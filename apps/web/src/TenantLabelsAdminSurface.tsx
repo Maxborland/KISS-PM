@@ -107,8 +107,8 @@ function PreviewPanel({ preview }: { preview: TenantLabelSetPreviewDto }) {
         afterVersion={`v${preview.after.configurationVersion}`}
         beforeVersion={`v${preview.before.configurationVersion}`}
         previewId={preview.id}
-        reloadEffectLabel={`Reload refreshes tenant labels on ${preview.affectedRuntimeSurfaces.join(", ")}`}
-        summary="Tenant labels update runtime projections without changing stable system keys."
+        reloadEffectLabel={`После reload tenant labels обновляются на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Tenant labels обновляют runtime-проекции без изменения стабильных system keys."
         warnings={preview.changes.map((change) => `${change.key}: ${change.beforeLabel} -> ${change.afterLabel}`)}
       />
       <dl className="compact-facts">

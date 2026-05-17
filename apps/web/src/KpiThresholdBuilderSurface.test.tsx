@@ -179,7 +179,7 @@ describe("KpiThresholdBuilderSurface", () => {
     const runtimePreview = screen.getByTestId("runtime-config-preview");
     expect(runtimePreview).toHaveTextContent("kpi.deviation.control");
     expect(runtimePreview).toHaveTextContent("v1 -> v2");
-    expect(runtimePreview).toHaveTextContent("Reload");
+    expect(runtimePreview).toHaveTextContent("После reload");
     expect(runtimePreview).toHaveTextContent("warning");
     expect(apiClient.publishThresholds).not.toHaveBeenCalled();
 

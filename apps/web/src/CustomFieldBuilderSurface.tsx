@@ -106,10 +106,10 @@ function PreviewPanel({ preview }: { preview: CustomFieldPreviewDto }) {
         afterVersion={`v${preview.after.registryVersion}`}
         beforeVersion={`v${preview.before.registryVersion}`}
         previewId={preview.id}
-        reloadEffectLabel={`Reload shows ${preview.definition.key} on ${preview.affectedRuntimeSurfaces.join(", ")}`}
-        summary="Custom field definition becomes available to runtime control surfaces after publish/readback."
+        reloadEffectLabel={`После reload поле ${preview.definition.key} доступно на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Custom field definition становится доступным runtime control surfaces после publish/readback."
         warnings={[
-          `${preview.definition.key} uses ${preview.definition.valueType}`,
+          `${preview.definition.key}: тип ${preview.definition.valueType}`,
           `filters=${String(preview.definition.bindingFlags.usableInFilters)} controlSurfaces=${String(
             preview.definition.bindingFlags.usableInControlSurfaces
           )}`

@@ -299,11 +299,11 @@ describe("Release 2 operational surface primitives", () => {
         affectedSurfaces={["portfolio.control", "kpi.deviation.control"]}
         afterVersion="v2"
         beforeVersion="v1"
-        blockers={["custom.risk_level is not visible on portfolio.control"]}
+        blockers={["custom.risk_level недоступен на portfolio.control"]}
         previewId="preview-runtime-config-a"
-        reloadEffectLabel="Reload shows saved view critical_portfolio on portfolio.control"
-        summary="Runtime configuration will change only after publish command."
-        warnings={["Existing user saved views keep their own column order."]}
+        reloadEffectLabel="После reload вид critical_portfolio отображается на portfolio.control"
+        summary="Runtime-конфигурация изменится только после publish-команды."
+        warnings={["Существующие пользовательские виды сохранят свой порядок колонок."]}
       />
     );
 
@@ -312,8 +312,8 @@ describe("Release 2 operational surface primitives", () => {
     expect(preview).toHaveTextContent("v1 -> v2");
     expect(preview).toHaveTextContent("portfolio.control");
     expect(preview).toHaveTextContent("kpi.deviation.control");
-    expect(preview).toHaveTextContent("custom.risk_level is not visible");
-    expect(preview).toHaveTextContent("Existing user saved views");
-    expect(preview).toHaveTextContent("Reload shows saved view");
+    expect(preview).toHaveTextContent("custom.risk_level недоступен");
+    expect(preview).toHaveTextContent("Существующие пользовательские виды");
+    expect(preview).toHaveTextContent("После reload вид");
   });
 });

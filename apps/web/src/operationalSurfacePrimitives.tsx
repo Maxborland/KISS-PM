@@ -227,37 +227,37 @@ export function RuntimeConfigPreview({
   return (
     <section className="runtime-config-preview" data-testid="runtime-config-preview">
       <div className="operational-section-heading">
-        <strong>Runtime config preview</strong>
+        <strong>Предпросмотр runtime-конфигурации</strong>
         <span>{previewId}</span>
       </div>
       <p>{summary}</p>
       <dl className="compact-facts">
         <div>
-          <dt>Version delta</dt>
+          <dt>Изменение версии</dt>
           <dd>
             {beforeVersion} {"->"} {afterVersion}
           </dd>
         </div>
         <div>
-          <dt>Affected surfaces</dt>
+          <dt>Затронутые поверхности</dt>
           <dd>{affectedSurfaces.join(", ")}</dd>
         </div>
         <div>
-          <dt>Reload effect</dt>
+          <dt>Эффект после reload</dt>
           <dd>{reloadEffectLabel}</dd>
         </div>
       </dl>
       {warnings.length > 0 ? (
         <div className="compact-list">
           {warnings.map((warning) => (
-            <span key={warning}>Warning: {warning}</span>
+            <span key={warning}>Предупреждение: {warning}</span>
           ))}
         </div>
       ) : null}
       {blockers.length > 0 ? (
         <div className="compact-list runtime-config-blockers">
           {blockers.map((blocker) => (
-            <span key={blocker}>Blocker: {blocker}</span>
+            <span key={blocker}>Блокер: {blocker}</span>
           ))}
         </div>
       ) : null}

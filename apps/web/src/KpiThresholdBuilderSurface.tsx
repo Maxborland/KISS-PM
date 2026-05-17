@@ -63,11 +63,11 @@ function PreviewPanel({ preview }: { preview: KpiThresholdPreviewDto }) {
         afterVersion={`v${preview.after.version}`}
         beforeVersion={`v${preview.before.version}`}
         previewId={preview.id}
-        reloadEffectLabel={`Reload keeps ${preview.after.severity} threshold impact on ${preview.affectedRuntimeSurfaces.join(", ")}`}
-        summary="KPI threshold changes alter future KpiEvaluation severity only after publish/readback."
+        reloadEffectLabel={`После reload влияние порога ${preview.after.severity} видно на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Изменение KPI-порогов влияет на будущие KpiEvaluation только после publish/readback."
         warnings={[
           `${preview.before.severity} -> ${preview.after.severity}`,
-          `sample ${preview.sampleValue}: ${preview.before.matchedRuleId ?? "none"} -> ${preview.after.matchedRuleId ?? "none"}`
+          `пример ${preview.sampleValue}: ${preview.before.matchedRuleId ?? "none"} -> ${preview.after.matchedRuleId ?? "none"}`
         ]}
       />
       <dl className="compact-facts">
@@ -89,7 +89,7 @@ function PreviewPanel({ preview }: { preview: KpiThresholdPreviewDto }) {
         </div>
       </dl>
       <p>
-        {kpiSeverityLabel(preview.before.severity)} {"->"} {kpiSeverityLabel(preview.after.severity)} / sample {preview.sampleValue}
+        {kpiSeverityLabel(preview.before.severity)} {"->"} {kpiSeverityLabel(preview.after.severity)} / пример {preview.sampleValue}
       </p>
     </section>
   );

@@ -109,9 +109,24 @@ function buildDraft(draft: DraftState, expectedSurfaceVersion: number): SavedVie
   };
 }
 
+function blockingPreviewReasons(preview: SavedViewLayoutPreviewDto): string[] {
+  return [
+    ...preview.unavailable.widgets.map((widget) => `Виджет ${widget} недоступен в runtime-макете`),
+    ...preview.unavailable.actionSlots.map((actionSlot) => `Действие ${actionSlot} недоступно в runtime-макете`)
+  ];
+}
+
+function warningPreviewReasons(preview: SavedViewLayoutPreviewDto): string[] {
+  return [
+    ...preview.unavailable.fields.map((field) => `Поле ${field} будет скрыто в runtime-макете`),
+    ...preview.unavailable.reasons.map((reason) => `Проверка backend: ${reason}`)
+  ];
+}
+
 function PreviewPanel({ preview }: { preview: SavedViewLayoutPreviewDto }) {
   const savedViewSummary =
-    preview.after.savedViewKeys.length > 0 ? preview.after.savedViewKeys.join(", ") : "default surface layout";
+    preview.after.savedViewKeys.length > 0 ? preview.after.savedViewKeys.join(", ") : "макет поверхности по умолчанию";
+  const blockers = blockingPreviewReasons(preview);
 
   return (
     <section className="phase2-panel preview-panel" data-testid="saved-view-layout-preview">
@@ -121,11 +136,11 @@ function PreviewPanel({ preview }: { preview: SavedViewLayoutPreviewDto }) {
         affectedSurfaces={preview.affectedRuntimeSurfaces}
         afterVersion={`v${preview.after.surfaceVersion}`}
         beforeVersion={`v${preview.before.surfaceVersion}`}
-        blockers={preview.unavailable.reasons}
+        blockers={blockers}
         previewId={preview.id}
-        reloadEffectLabel={`Reload keeps saved view ${savedViewSummary} on ${preview.affectedRuntimeSurfaces.join(", ")}`}
-        summary="Saved view and column layout affect runtime control surfaces only after publish/readback."
-        warnings={preview.unavailable.fields.map((field) => `${field} will be hidden from the runtime layout`)}
+        reloadEffectLabel={`После reload сохраненный вид ${savedViewSummary} применяется на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Сохраненный вид и макет колонок изменят runtime-поверхности только после publish/readback."
+        warnings={warningPreviewReasons(preview)}
       />
       <dl className="compact-facts">
         <div>
@@ -223,6 +238,12 @@ export function SavedViewLayoutBuilderSurface({
 
   async function publishPreview() {
     if (commandInFlight || preview === null) return;
+    const blockers = blockingPreviewReasons(preview);
+    if (blockers.length > 0) {
+      setCommandError(`Публикация заблокирована: ${blockers.join("; ")}`);
+      setStatus("Публикация заблокирована предпросмотром");
+      return;
+    }
     setPendingCommand("publish");
     setCommandError("");
     setStatus("Публикуем макет");
@@ -356,7 +377,11 @@ export function SavedViewLayoutBuilderSurface({
               <button disabled={commandInFlight || readback === undefined} type="button" onClick={() => void runPreview()}>
                 Предпросмотр макета
               </button>
-              <button disabled={commandInFlight || preview === null} type="button" onClick={() => void publishPreview()}>
+              <button
+                disabled={commandInFlight || preview === null || blockingPreviewReasons(preview).length > 0}
+                type="button"
+                onClick={() => void publishPreview()}
+              >
                 Опубликовать макет
               </button>
               <button disabled={commandInFlight} type="button" onClick={() => void refresh()}>
