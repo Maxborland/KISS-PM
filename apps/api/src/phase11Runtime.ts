@@ -1,13 +1,17 @@
 import {
   applyMockAdapterImportPreview,
   createAdapterFailure,
+  createImportDryRunSummary,
+  createMigrationValidationReport,
   createMockAdapterImportPreview,
   createSyncAuditEvent,
   type AdapterFailure,
   type AdapterFailureCode,
   type ExternalMapping,
+  type ImportDryRunSummary,
   type ImportApplyResult,
   type ImportBatch,
+  type MigrationValidationReport,
   type MockAdapterCanonicalImportPayload,
   type MockAdapterCanonicalImportPreview,
   type SyncAuditEvent,
@@ -261,6 +265,47 @@ export function createPhase11RuntimeState() {
     return clone(result);
   }
 
+  function getStoredPreviewForRead(input: { tenantId: string; previewId: string }): MockAdapterCanonicalImportPreview {
+    const storedPreview = state.previews.get(previewStorageKey(input.tenantId, input.previewId));
+    if (storedPreview !== undefined) {
+      if (storedPreview.stateVersion !== currentTenantVersion(input.tenantId)) {
+        throw new IntegrationDomainError("stale_preview", "import preview is stale");
+      }
+      return clone(storedPreview.preview);
+    }
+    const crossTenantPreview = Array.from(state.previews.values()).find((entry) => entry.preview.id === input.previewId);
+    if (crossTenantPreview !== undefined) {
+      throw new IntegrationDomainError("tenant_mismatch", "import preview tenant mismatch");
+    }
+    throw new IntegrationDomainError("stale_preview", "import preview is missing");
+  }
+
+  function getMigrationValidationReport(input: {
+    tenantId: string;
+    previewId: string;
+    generatedAt: string;
+    sampleLimit?: number;
+  }): MigrationValidationReport {
+    return createMigrationValidationReport({
+      preview: getStoredPreviewForRead(input),
+      generatedAt: input.generatedAt,
+      ...(input.sampleLimit !== undefined ? { sampleLimit: input.sampleLimit } : {})
+    });
+  }
+
+  function getImportDryRunSummary(input: {
+    tenantId: string;
+    previewId: string;
+    generatedAt: string;
+    sampleLimit?: number;
+  }): ImportDryRunSummary {
+    return createImportDryRunSummary({
+      preview: getStoredPreviewForRead(input),
+      generatedAt: input.generatedAt,
+      ...(input.sampleLimit !== undefined ? { sampleLimit: input.sampleLimit } : {})
+    });
+  }
+
   function recordFailedApply(
     input: {
       tenantId: string;
@@ -335,6 +380,8 @@ export function createPhase11RuntimeState() {
     clearConnectionFailureMode,
     previewMockImport,
     applyImport,
+    getMigrationValidationReport,
+    getImportDryRunSummary,
     listImportBatches,
     listMappings,
     listSyncAudit,

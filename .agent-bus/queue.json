@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T06:53:26.8856702+07:00",
+  "updated_at": "2026-05-17T07:02:46.4127015+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -5204,7 +5204,7 @@
         "P11-005"
       ],
       "title": "Implement migration validation report and dry-run summary",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P11",
       "depends_on": [
@@ -5249,7 +5249,75 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Next runnable Phase 11 block. Implement migration validation report and dry-run summary over preview results. Keep API route/UI/E2E rows blocked until their own blocks."
+      "notes": "Accepted 2026-05-17T07:02:46.4127015+07:00. Implemented migration validation report and import dry-run summary DTOs over stored previews, including counts, blockers/warnings, sample mappings, affected canonical refs, recovery actions, non-mutating readback, stale-preview denial, and tenant-scoped runtime accessors. Matrix row P11-005 remains blocked only for later E2E-100/E2E-102 evidence.",
+      "completed_at": "2026-05-17T07:02:46.4127015+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-005-migration-validation-report-dry-run-summary --once exit 0 at startup",
+        "npm test -- packages/integrations/src/migrationValidationReport.test.ts apps/api/src/phase11Runtime.test.ts exit 1 RED: report and runtime accessors were missing",
+        "npm test -- packages/integrations/src/migrationValidationReport.test.ts apps/api/src/phase11Runtime.test.ts exit 0: 2 files, 13 tests passed",
+        "npm test -- packages/integrations apps/api/src/phase11Runtime.test.ts exit 0: 5 files, 29 tests passed",
+        "npm test exit 0: 98 files, 562 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P11-005-migration-validation-report-dry-run-summary --once exit 0"
+      ]
+    },
+    {
+      "id": "P11-006-integrations-api-governed-import-commands",
+      "aliases": [
+        "P11-006"
+      ],
+      "title": "Implement integrations API and governed import commands",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P11",
+      "depends_on": [
+        "P11-005-migration-validation-report-dry-run-summary"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "packages/integrations/**",
+        "docs/status/phase11-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P11-006-integrations-api-governed-import-commands.claim.json",
+        ".agent-bus/sessions/P11-006-integrations-api-governed-import-commands.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "e2e/tests/**",
+        "packages/shared-test-fixtures/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P11-006-integrations-api-governed-import-commands --once",
+        "npm test -- apps/api/src/*phase11*.test.ts",
+        "npm test -- packages/integrations apps/api/src/*phase11*.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Next runnable Phase 11 block. Expose adapter list, connections, preview/apply, report/dry-run, batch, mapping, audit, diagnostics, permissions, tenant isolation, and governed command behavior through API routes."
     }
   ]
 }

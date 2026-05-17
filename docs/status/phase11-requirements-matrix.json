@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T06:53:26.8856702+07:00",
+  "updated_at": "2026-05-17T07:02:46.4127015+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -168,14 +168,24 @@
         "E2E-102"
       ],
       "evidence": [
-        "Phase 11 contract requires import preview to return validation reports with creates, updates, skips, errors, blockers, and recovery text."
+        "Phase 11 contract requires import preview to return validation reports with creates, updates, skips, errors, blockers, sample mappings, and recovery text before apply.",
+        "packages/integrations/src/index.ts implements MigrationValidationReport and ImportDryRunSummary DTOs over MockAdapterCanonicalImportPreview. Reports are mutatesState=false, include safeToApply/canApply, create/update/skip/error counts, blocking/warning issue counts, sample mappings, affected canonical refs, and recovery actions without exposing raw adapter payload or canonical payload bodies.",
+        "packages/integrations/src/migrationValidationReport.test.ts proves report counts for create/update/skip/warning cases, unsafe blocking previews, recovery blocker/warning text, sample limits, no preview mutation, no raw payload leakage, and typed validation for invalid sample limits.",
+        "apps/api/src/phase11Runtime.ts exposes tenant-scoped getMigrationValidationReport and getImportDryRunSummary readback helpers over stored previews. apps/api/src/phase11Runtime.test.ts proves readback is non-mutating, tenant scoped, stale previews are denied before dry-run evidence can greenlight an unapplyable preview, and cross-tenant/missing previews deny without batch/mapping/audit mutation."
       ],
       "tests": [
-        "Pending P11-005 implementation: expected validation report and dry-run summary tests."
+        "npm test -- packages/integrations/src/migrationValidationReport.test.ts apps/api/src/phase11Runtime.test.ts exit 1 RED: createMigrationValidationReport/createImportDryRunSummary and runtime report accessors were missing before implementation",
+        "npm test -- packages/integrations/src/migrationValidationReport.test.ts apps/api/src/phase11Runtime.test.ts exit 0: 2 files, 13 tests passed",
+        "npm test -- packages/integrations apps/api/src/phase11Runtime.test.ts exit 0: 5 files, 29 tests passed",
+        "npm test exit 1 first run: unrelated apps/web/src/App.test.tsx label expectation failed while P11 tests were green; targeted apps/web/src/App.test.tsx rerun passed",
+        "npm test -- apps/web/src/App.test.tsx exit 0: 1 file, 14 tests passed",
+        "npm test exit 0: 98 files, 562 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must reset validation reports and prove dry-run summaries did not persist canonical changes.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-005 implementation has not started; migration validation reports have no executable API evidence yet.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11-005 validation reports and dry-run summaries are derived read models over stored in-memory previews and do not persist new state; tests prove report/dry-run readback does not create batches or mappings and does not mutate the preview. Strict cleanup remains blocked until P11-009 E2E-100/E2E-102 proves API fixture reset/readback for preview validation and failure diagnostics.",
+      "blocker": "2026-05-17T07:02:46.4127015+07:00: P11-005 domain/runtime implementation is complete, but the row remains blocked for strict phase exit until required E2E-100 and E2E-102 structured evidence exists.",
+      "last_checked_at": "2026-05-17T07:02:46.4127015+07:00",
       "e2e_evidence": []
     },
     {

@@ -351,6 +351,58 @@ export type MockAdapterCanonicalImportPreview = TenantOwned & {
   };
 };
 
+export type MigrationValidationReport = TenantOwned & {
+  id: string;
+  previewId: string;
+  adapterId: string;
+  connectionId: string;
+  sourceSystem: string;
+  generatedAt: string;
+  mutatesState: false;
+  safeToApply: boolean;
+  summary: {
+    creates: number;
+    updates: number;
+    skips: number;
+    errors: number;
+    totalAffected: number;
+    blockingIssues: number;
+    warningIssues: number;
+  };
+  blockers: ImportValidationIssue[];
+  warnings: ImportValidationIssue[];
+  sampleMappings: ImportPreviewMapping[];
+  affectedCanonicalEntities: CanonicalImportEntityRef[];
+  recoveryActions: {
+    code: ImportValidationIssueCode;
+    label: string;
+    fieldPath: string;
+    externalEntityType?: ExternalEntityType;
+    externalEntityId?: string;
+  }[];
+};
+
+export type ImportDryRunSummary = TenantOwned & {
+  id: string;
+  previewId: string;
+  adapterId: string;
+  connectionId: string;
+  sourceSystem: string;
+  generatedAt: string;
+  mutatesState: false;
+  canApply: boolean;
+  expectedCreates: number;
+  expectedUpdates: number;
+  expectedSkips: number;
+  expectedErrors: number;
+  expectedTotalAffected: number;
+  blockers: ImportValidationIssue[];
+  warnings: ImportValidationIssue[];
+  mappingSample: ImportPreviewMapping[];
+  canonicalEntitySample: CanonicalImportEntityRef[];
+  recoveryText: string[];
+};
+
 export type ImportBatchResultStatus = "applied" | "idempotent_replay";
 
 export type ImportBatch = TenantOwned & {
@@ -1475,5 +1527,97 @@ export function applyMockAdapterImportPreview(input: {
     mappings,
     canonicalEntityRefs: structuredClone(input.preview.affectedCanonicalEntities),
     audit
+  };
+}
+
+function sampleLimitOrDefault(value: number | undefined): number {
+  return value === undefined ? 5 : requirePositiveInteger(value, "sampleLimit");
+}
+
+function splitValidationIssues(preview: MockAdapterCanonicalImportPreview): {
+  blockers: ImportValidationIssue[];
+  warnings: ImportValidationIssue[];
+} {
+  return {
+    blockers: preview.validationIssues.filter((issue) => issue.severity === "blocking").map((issue) => ({ ...issue })),
+    warnings: preview.validationIssues.filter((issue) => issue.severity === "warning").map((issue) => ({ ...issue }))
+  };
+}
+
+function createRecoveryActions(issues: ImportValidationIssue[]): MigrationValidationReport["recoveryActions"] {
+  return issues.map((issue) => ({
+    code: issue.code,
+    label: issue.recoveryText,
+    fieldPath: issue.fieldPath,
+    ...(issue.externalEntityType !== undefined ? { externalEntityType: issue.externalEntityType } : {}),
+    ...(issue.externalEntityId !== undefined ? { externalEntityId: issue.externalEntityId } : {})
+  }));
+}
+
+export function createMigrationValidationReport(input: {
+  preview: MockAdapterCanonicalImportPreview;
+  generatedAt: string;
+  sampleLimit?: number;
+}): MigrationValidationReport {
+  const generatedAt = requireValidTimestamp(input.generatedAt, "migrationValidationReport.generatedAt");
+  const sampleLimit = sampleLimitOrDefault(input.sampleLimit);
+  const { blockers, warnings } = splitValidationIssues(input.preview);
+
+  return {
+    id: `validation-report-${requireNonEmptyString(input.preview.id, "migrationValidationReport.preview.id")}`,
+    tenantId: requireNonEmptyString(input.preview.tenantId, "migrationValidationReport.preview.tenantId"),
+    previewId: input.preview.id,
+    adapterId: requireNonEmptyString(input.preview.adapterId, "migrationValidationReport.preview.adapterId"),
+    connectionId: requireNonEmptyString(input.preview.connectionId, "migrationValidationReport.preview.connectionId"),
+    sourceSystem: requireNonEmptyString(input.preview.sourceSystem, "migrationValidationReport.preview.sourceSystem"),
+    generatedAt,
+    mutatesState: false,
+    safeToApply: blockers.length === 0,
+    summary: {
+      creates: input.preview.report.creates,
+      updates: input.preview.report.updates,
+      skips: input.preview.report.skips,
+      errors: input.preview.report.errors,
+      totalAffected: input.preview.mappingPreview.length,
+      blockingIssues: blockers.length,
+      warningIssues: warnings.length
+    },
+    blockers,
+    warnings,
+    sampleMappings: input.preview.mappingPreview.slice(0, sampleLimit).map((mapping) => ({ ...mapping })),
+    affectedCanonicalEntities: input.preview.affectedCanonicalEntities.map((entity) => ({ ...entity })),
+    recoveryActions: createRecoveryActions([...blockers, ...warnings])
+  };
+}
+
+export function createImportDryRunSummary(input: {
+  preview: MockAdapterCanonicalImportPreview;
+  generatedAt: string;
+  sampleLimit?: number;
+}): ImportDryRunSummary {
+  const report = createMigrationValidationReport(input);
+
+  return {
+    id: `dry-run-summary-${report.previewId}`,
+    tenantId: report.tenantId,
+    previewId: report.previewId,
+    adapterId: report.adapterId,
+    connectionId: report.connectionId,
+    sourceSystem: report.sourceSystem,
+    generatedAt: report.generatedAt,
+    mutatesState: false,
+    canApply: report.safeToApply,
+    expectedCreates: report.summary.creates,
+    expectedUpdates: report.summary.updates,
+    expectedSkips: report.summary.skips,
+    expectedErrors: report.summary.errors,
+    expectedTotalAffected: report.summary.totalAffected,
+    blockers: report.blockers.map((issue) => ({ ...issue })),
+    warnings: report.warnings.map((issue) => ({ ...issue })),
+    mappingSample: report.sampleMappings.map((mapping) => ({ ...mapping })),
+    canonicalEntitySample: report.affectedCanonicalEntities.slice(0, sampleLimitOrDefault(input.sampleLimit)).map((entity) => ({
+      ...entity
+    })),
+    recoveryText: report.recoveryActions.map((action) => action.label)
   };
 }
