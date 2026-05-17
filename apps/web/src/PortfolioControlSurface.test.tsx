@@ -348,6 +348,9 @@ describe("PortfolioControlSurface", () => {
     renderSurface(apiClient);
 
     const list = await screen.findByTestId("portfolio-control-row-list");
+    expect(screen.getByTestId("operational-surface-shell")).toHaveTextContent("Портфельный контроль");
+    expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("2 сигналов в портфельной поверхности");
+    expect(screen.getByTestId("kpi-strip")).toHaveTextContent("Критичные сигналы");
     expect(within(list).getByText("Критическое отклонение трудозатрат")).toBeInTheDocument();
     expect(within(list).getByText("Перегрузка ресурса Анна Архитектор: 14 ч.")).toBeInTheDocument();
     expect(screen.getByTestId("portfolio-control-widget-critical_signal_count")).toHaveTextContent("2");
@@ -544,6 +547,7 @@ describe("PortfolioControlSurface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Применить после preview" }));
 
     expect(await screen.findByTestId("portfolio-control-result")).toHaveTextContent("risk.accept: succeeded");
+    expect(screen.getByTestId("action-audit-preview")).toHaveTextContent("risk.accept: succeeded");
     expect(screen.getByTestId("portfolio-control-status")).toHaveTextContent("Команда применена и подтверждена readback");
     expect(apiClient.getSurfaceView).toHaveBeenCalledTimes(2);
     expect(apiClient.getControlAudit).toHaveBeenCalledTimes(2);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T16:44:44.6487536+07:00",
+  "updated_at": "2026-05-17T17:01:16.4123963+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -6799,6 +6799,62 @@
       ],
       "notes": "Completed 2026-05-17. Created the Release 2 UI control surfaces contract, finite R2-001..R2-012 requirements matrix, E2E-R2 scenarios, Release 2 sales gate, screen/design annotations, and future-scope routing. No production React/API/domain code was implemented. This branch is stacked on the open BR2 pattern-transfer PR so Release 2 start remains dependent on the clean-room pattern transfer.",
       "completed_at": "2026-05-17T16:44:44.6487536+07:00",
+      "result": "completed"
+    },
+    {
+      "id": "R2-UI-001-shared-operational-primitives",
+      "aliases": [
+        "R2-UI-001",
+        "R2-001",
+        "R2-002",
+        "R2-003"
+      ],
+      "title": "Implement Release 2 shared operational UI primitives",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-CONTRACT-001-release2-ui-control-surfaces-contract"
+      ],
+      "write_scope": [
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/PortfolioControlSurface.tsx",
+        "apps/web/src/PortfolioControlSurface.test.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/release2-ui-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-001-shared-operational-primitives.md",
+        ".agent-bus/claims/R2-UI-001-shared-operational-primitives.claim.json",
+        ".agent-bus/sessions/R2-UI-001-shared-operational-primitives.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/operationalSurfacePrimitives.test.tsx apps/web/src/PortfolioControlSurface.test.tsx",
+        "npm run typecheck",
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-001-shared-operational-primitives --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented the first Release 2 production UI slice: shared OperationalSurfaceShell, OperationalDataGrid, ConfigurableColumnLayout, KPIStrip, SignalSummaryBar, PermissionDeniedInline, ActionAuditPreview, CSS, and narrow Portfolio Control integration. R2 requirements matrix marks R2-001..R2-004 in_progress because cross-surface/E2E-R2 closure remains later scope. No API/domain/package/e2e production changes.",
+      "completed_at": "2026-05-17T17:12:00+07:00",
       "result": "completed"
     }
   ]
