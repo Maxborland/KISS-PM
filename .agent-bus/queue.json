@@ -6450,16 +6450,66 @@
       "result": "accepted"
     },
     {
+      "id": "R2-UXSPEC-000-release2-ui-ux-spec-pack",
+      "aliases": [
+        "R2-UXSPEC-000"
+      ],
+      "title": "Create Release 2 UI/UX specification pack and design-craft baseline",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-FND-000-release2-foundation-contract"
+      ],
+      "write_scope": [
+        "docs/product/**",
+        "docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-UXSPEC-000-release2-ui-ux-spec-pack.claim.json",
+        ".agent-bus/sessions/R2-UXSPEC-000-release2-ui-ux-spec-pack.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/product/**",
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "rg -n \"shadcn|Radix|MS Project|Release 2 UI|Gantt|управлен\" docs/product docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md docs/backlog/FUTURE_SCOPE.md",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UXSPEC-000-release2-ui-ux-spec-pack --once",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T11:43:16.4172423+07:00. Added Release 2 UI/UX baseline using design-craft principles: shadcn/ui + Radix primitives + custom KISS PM components, MS Project-like Project Gantt direction, and decision-supporting operational UX. Updated foundation contract and future scope. Full screen-by-screen spec pack and UI/UX matrix remain planned follow-up.",
+      "completed_at": "2026-05-17T11:43:16.4172423+07:00",
+      "result": "accepted"
+    },
+    {
       "id": "R2-ACT-001-governed-command-audit-contract-hardening",
       "aliases": [
         "R2-ACT-001"
       ],
       "title": "Harden governed command and audit contract for Release 2",
-      "status": "runnable",
+      "status": "blocked",
       "priority": "critical",
       "phase": "R2",
       "depends_on": [
-        "R2-FND-000-release2-foundation-contract"
+        "R2-FND-000-release2-foundation-contract",
+        "R2-UXSPEC-000-release2-ui-ux-spec-pack",
+        "R2-UXSPEC-001-release2-screen-spec-matrix"
       ],
       "write_scope": [
         "docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md",
@@ -6495,7 +6545,57 @@
         "node scripts/agent-bus-guard.mjs --task R2-ACT-001-governed-command-audit-contract-hardening --once",
         "git diff --check"
       ],
-      "notes": "Next runnable R2 implementation-planning/code task authorized by RELEASE_2_FOUNDATION_CONTRACT.md. Start with inventorying P3-P12 governed command shapes and defining a shared command/audit/denial/preview/execution/projection-refresh contract. Do not migrate every UI surface or add E2E until the contract narrows that scope."
+      "notes": "Blocked until R2-UXSPEC-001-release2-screen-spec-matrix is accepted. After the UI/UX matrix gate, this task is authorized by RELEASE_2_FOUNDATION_CONTRACT.md. Start with inventorying P3-P12 governed command shapes and defining a shared command/audit/denial/preview/execution/projection-refresh contract. Do not migrate every UI surface or add E2E until the contract narrows that scope."
+    },
+    {
+      "id": "R2-UXSPEC-001-release2-screen-spec-matrix",
+      "aliases": [
+        "R2-UXSPEC-001"
+      ],
+      "title": "Create Release 2 screen-by-screen UI/UX specs and matrix",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UXSPEC-000-release2-ui-ux-spec-pack"
+      ],
+      "write_scope": [
+        "docs/product/**",
+        "docs/status/release2-ui-ux-screen-matrix.json",
+        "scripts/verify-release2-ui-ux-matrix.mjs",
+        "scripts/verify-release2-ui-ux-matrix.test.ts",
+        "docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-UXSPEC-001-release2-screen-spec-matrix.claim.json",
+        ".agent-bus/sessions/R2-UXSPEC-001-release2-screen-spec-matrix.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/product/**",
+        "docs/status/*",
+        "scripts/verify-release2-ui-ux-matrix.mjs",
+        "scripts/verify-release2-ui-ux-matrix.test.ts",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/verify-release2-ui-ux-matrix.mjs docs/status/release2-ui-ux-screen-matrix.json",
+        "npm test -- scripts/verify-release2-ui-ux-matrix.test.ts",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UXSPEC-001-release2-screen-spec-matrix --once",
+        "git diff --check"
+      ],
+      "notes": "Next docs gate before broad Release 2 implementation. Produce screen-by-screen specs, modal/drawer/panel specs, interaction flows, control-surface action specs, UI state specs, release2 UI/UX matrix, and verifier. No product implementation."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T11:30:03.4388292+07:00
+Updated: 2026-05-17T11:43:16.4172423+07:00
 
 - Release 2 planning surface is being prepared after the accepted Phase 12 repository-defined market-release gate:
   - task: `R2-000-release2-planning-surface`
@@ -13,7 +13,13 @@ Updated: 2026-05-17T11:30:03.4388292+07:00
   - audit findings from `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md` are now merged into the main roadmap/decomposition/future-scope planning surface.
   - default first slice is foundation/security-first unless product leadership records stronger evidence for a different first slice.
   - matrix/verifier policy, E2E truth contour, promotion rules, and first implementation recommendation are defined.
-- Next runnable Release 2 task is `R2-ACT-001-governed-command-audit-contract-hardening`.
+- Next runnable Release 2 task is `R2-UXSPEC-001-release2-screen-spec-matrix`; broad Release 2 implementation should wait for the screen-by-screen UI/UX spec pack and matrix. `R2-ACT-001-governed-command-audit-contract-hardening` now depends on that UI/UX gate.
+- Release 2 UI/UX baseline is accepted as a pre-implementation design direction:
+  - spec: `docs/product/RELEASE_2_UI_UX_SPEC.md`
+  - design system: `docs/product/DESIGN_SYSTEM.md`
+  - stack: shadcn/ui + Radix primitives + custom KISS PM product components.
+  - Project Gantt should be custom and MS Project-like in function/planner ergonomics while preserving canonical tasks, governed commands, permissions, audit, API readback, and reload persistence.
+  - UI must reduce routine and guide users toward safe management decisions; broad user-facing Release 2 work still needs the planned screen-by-screen spec pack and UI/UX matrix.
 - Do not delete Release 2 planned functionality when narrowing the first slice. The existing R2 roadmap/decomposition remain the future backlog.
 
 - Phase 12 Production SaaS Hardening and Market Release is accepted as an implemented market-release gate:

@@ -4,6 +4,16 @@
 
 KISS PM UI must feel like a mature project-control instrument: dense, calm, confident, operational, and readable. It must avoid decorative marketing composition inside the application. shadcn/ui and Radix primitives are the base interaction layer, but default visual output is not accepted without KISS PM product adaptation.
 
+Release 2 design direction: UI must help a manager make the right operational decision with the least routine friction. A screen is successful when it reduces ambiguity, exposes the next governed action, and makes the consequence of that action clear before mutation. Visual polish is subordinate to decision clarity, permission clarity, auditability, and reliable readback.
+
+Implementation stack:
+
+- Base UI kit: shadcn/ui components adapted to KISS PM density, Russian operational copy, permission states, and audit/readback patterns.
+- Interaction primitives: Radix primitives through shadcn/ui or direct Radix use when shadcn does not expose the needed behavior.
+- Product components: custom KISS PM components for management-control surfaces, Gantt planning, resource load, KPI signals, audit previews, permission-denied states, and preview-before-apply panels.
+- Styling system: Tailwind CSS plus semantic CSS variables/tokens. Direct ad hoc colors are not accepted for product surfaces.
+- Icons: Lucide or the existing icon system through stable icon buttons/tooltips; text-only toolbar buttons are allowed only when an icon would be ambiguous.
+
 ## Foundation
 
 - Typography: concise Russian operational copy, compact headings, tabular numbers for schedules and KPIs.
@@ -16,6 +26,8 @@ KISS PM UI must feel like a mature project-control instrument: dense, calm, conf
 - Shadows: minimal; use borders and contrast for structure.
 - Focus states: visible keyboard focus on every control.
 - Disabled states: explain permission or pending reason near the control.
+- Decision support: every management surface must show signal, consequence, recommended next action, preview/result state, and audit evidence where relevant.
+- Routine minimization: default values, reusable presets, remembered view density, keyboard-friendly toolbars, inline validation, and drill-downs must reduce repetitive clicks.
 
 ## Primitive Policy
 
@@ -62,7 +74,19 @@ Every primitive must define density, icon policy, Russian labels, permission sta
 
 ## Project Gantt Component Contract
 
-Project Gantt is a custom KISS PM planning surface. The top toolbar includes create task, indent/outdent, dependency mode, baseline toggle, today, zoom, filters, and view settings. The left WBS/grid area includes hierarchy, task name, planned start/end, duration, work, progress, responsible participants, status, and warning/severity markers. The right timeline includes task bars, dependencies, baseline bars, today marker, non-working days, selected row sync, hover state, and selection state. The details side panel includes canonical task fields, schedule fields, participants, dependencies, audit summary, and links to My Tasks, Kanban, resource, and KPI views.
+Project Gantt is a custom KISS PM planning surface. Functionally and tactically it should feel close to a serious desktop planning tool such as MS Project: WBS/grid and timeline stay synchronized, keyboard selection is predictable, date/work edits are fast, dependencies are visible, baseline comparison is first-class, and the user can read the plan as a management instrument rather than a decorative chart. KISS PM must not copy proprietary UI, but it should match the operational expectations of project planners who know MS Project.
+
+The top toolbar includes create task, indent/outdent, dependency mode, baseline toggle, today, zoom, filters, critical/warning visibility, and view settings. The left WBS/grid area includes hierarchy, row number/WBS code, task name, planned start/end, duration, work, progress, responsible participants, status, and warning/severity markers. The right timeline includes task bars, summary bars, milestone markers, dependencies, baseline bars, today marker, non-working days, selected row sync, hover state, and selection state. The details side panel includes canonical task fields, schedule fields, participants, dependencies, audit summary, and links to My Tasks, Kanban, resource, and KPI views.
+
+Interaction expectations:
+
+- Grid selection, timeline selection, and side panel selection are one state.
+- Inline edits must show validation before saving and API readback after saving.
+- Dependency creation must preview invalid links before mutation.
+- Baseline capture and compare must make live plan vs baseline differences obvious.
+- Read-only users see the plan and reasons actions are unavailable, not a broken or empty toolbar.
+- Overload, KPI, and lifecycle warnings are visible in context and link to their control surfaces.
+- Keyboard use must support common planner operations: row navigation, open detail, save/cancel edit, zoom/today, and command launcher entry.
 
 Mutation flows: create task, edit dates, create dependency, save baseline, open task details, and permission denied state. Persistence: API state changes, reload keeps result, and related My Tasks/Kanban/control surfaces refresh. Audit: actor, command, before/after, source surface, and result.
 

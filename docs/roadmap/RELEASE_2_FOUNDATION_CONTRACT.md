@@ -61,6 +61,17 @@ Out of scope for this contract:
 - production credentials or payment setup;
 - deleting, shrinking, or silently dropping planned Release 2 functionality.
 
+## 3.1 UI/UX Pre-Implementation Gate
+
+Release 2 implementation must pass through a UI/UX contract before user-facing code work. Current baseline:
+
+- `docs/product/RELEASE_2_UI_UX_SPEC.md`
+- `docs/product/DESIGN_SYSTEM.md`
+
+The baseline requires shadcn/ui + Radix primitives + custom KISS PM product components. It also makes the Project Gantt a custom MS Project-like planning workspace in function and planner ergonomics, while preserving KISS PM domain rules: canonical tasks, governed commands, permissions, audit, readback, and reload persistence.
+
+The UI/UX gate exists because Release 2 must make the product easier to manage with, not merely deeper. UI must reduce routine, expose the right next action, and guide users toward safe management decisions.
+
 ## 4. First Slice Decision
 
 Default first Release 2 slice: foundation/security-first.
