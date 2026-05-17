@@ -69,6 +69,36 @@ function operationalSeverity(severity: RetrospectiveReadRowDto["severity"] | Ret
   return "ok";
 }
 
+const severityRank: Record<OperationalSeverity, number> = {
+  ok: 0,
+  attention: 1,
+  warning: 2,
+  critical: 3
+};
+
+function mostSevereTrend(trends: RetrospectiveTrendDto[]): RetrospectiveTrendDto | null {
+  return trends.reduce<RetrospectiveTrendDto | null>((currentHighest, trend) => {
+    if (currentHighest === null) return trend;
+    return severityRank[operationalSeverity(trend.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+      ? trend
+      : currentHighest;
+  }, null);
+}
+
+function mostSevereOpenInsight(
+  insights: RetrospectiveInsightDto[],
+  excludedInsightId?: string | null
+): RetrospectiveInsightDto | null {
+  return insights
+    .filter((insight) => insight.status === "open" && insight.id !== excludedInsightId)
+    .reduce<RetrospectiveInsightDto | null>((currentHighest, insight) => {
+      if (currentHighest === null) return insight;
+      return severityRank[operationalSeverity(insight.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+        ? insight
+        : currentHighest;
+    }, null);
+}
+
 function sourceRefsLine(row: RetrospectiveReadRowDto): string {
   return row.sourceRefs.map((sourceRef) => `${sourceRef.entityType}:${sourceRef.entityId}`).join(" / ");
 }
@@ -78,8 +108,7 @@ const snapshotGridColumns: OperationalGridColumn[] = [
   { key: "project", label: "Проект", group: "Снимок", width: 180 },
   { key: "planFact", label: "План/факт", group: "Метрики", width: 190 },
   { key: "variance", label: "Текущий / предыдущий", group: "Метрики", width: 240 },
-  { key: "quality", label: "Качество", group: "Метрики", width: 160 },
-  { key: "versions", label: "Версии", group: "Readback", width: 170 },
+  { key: "readModel", label: "Read model", group: "Readback", width: 220 },
   { key: "proof", label: "Proof", group: "Readback", width: 190 }
 ];
 
@@ -97,10 +126,6 @@ function SnapshotOperationalGrid({
     const actual = numberField(row, "actual_work_hours") ?? 0;
     const currentVariance = numberField(row, "schedule_variance_days");
     const previousVariance = numberField(row, "previous_schedule_variance_days");
-    const quality = numberField(row, "quality_score");
-    const csi = numberField(row, "csi_score");
-    const templateVersion = numberField(row, "template_version");
-    const kpiVersion = numberField(row, "kpi_version");
 
     return {
       id: row.id,
@@ -116,12 +141,7 @@ function SnapshotOperationalGrid({
             : previousVariance === null
               ? `Текущий/предыдущий: ${currentVariance} -> no_previous`
               : `Текущий/предыдущий: ${currentVariance} -> ${previousVariance} дн.`,
-        quality: `${quality === null ? "Quality: no_previous" : `Quality: ${quality}`} / ${
-          csi === null ? "CSI: no_previous" : `CSI: ${csi}`
-        }`,
-        versions: `${templateVersion === null ? "template v?" : `template v${templateVersion}`} / ${
-          kpiVersion === null ? "KPI v?" : `KPI v${kpiVersion}`
-        }`,
+        readModel: "API: snapshot, plan/fact, schedule variance, source refs",
         proof: "Снимок immutable"
       },
       actions: []
@@ -183,8 +203,8 @@ function SnapshotProof({ row }: { row: RetrospectiveReadRowDto }) {
       <h3>Snapshot readback proof</h3>
       <div className="compact-list">
         <span>ProjectSnapshot:{snapshotId}</span>
-        <span>Snapshot version: {snapshotVersion ?? "stable"}</span>
-        <span>Closure audit: {closureAuditEventId || "closure audit unavailable"}</span>
+        <span>Snapshot version: {snapshotVersion ?? "not supplied by closed-portfolio read model"}</span>
+        <span>Closure audit: {closureAuditEventId || "not supplied by closed-portfolio read model"}</span>
         <span>Source refs: {sourceRefsLine(row)}</span>
         <span>Readback proves closed metrics are not live project state</span>
       </div>
@@ -501,6 +521,10 @@ export function ClosedPortfolioRetrospectiveSurface({
   const rows = portfolio?.rows ?? [];
   const activeRow = rows.find((row) => row.id === (selectedRowId ?? rows[0]?.id)) ?? null;
   const activeRowActions = activeRow?.actions ?? [];
+  const trendRows = trends?.trends ?? [];
+  const insightRows = trends?.insights ?? [];
+  const highestTrend = mostSevereTrend(trendRows);
+  const nextOpenInsight = mostSevereOpenInsight(insightRows, selectedInsightId) ?? mostSevereOpenInsight(insightRows);
   const status =
     portfolioQuery.isFetching && portfolio === undefined
       ? "Загрузка закрытого портфеля"
@@ -573,15 +597,14 @@ export function ClosedPortfolioRetrospectiveSurface({
       </div>
 
       <SignalSummaryBar
-        disabledReason={(trends?.insights.length ?? 0) === 0 ? "Нет открытых ретроспективных insight" : undefined}
-        highestSeverity={operationalSeverity(trends?.trends[0]?.severity ?? "none")}
+        disabledReason={insightRows.length === 0 ? "Нет открытых ретроспективных insight" : undefined}
+        highestSeverity={operationalSeverity(highestTrend?.severity ?? "none")}
         nextActionLabel="Открыть следующий trend"
         onNextAction={() => {
-          const nextInsight = trends?.insights.find((insight) => insight.id !== selectedInsightId) ?? trends?.insights[0];
-          if (nextInsight) selectInsight(nextInsight.id);
+          if (nextOpenInsight) selectInsight(nextOpenInsight.id);
         }}
-        requiresActionCount={trends?.insights.filter((insight) => insight.status === "open").length ?? 0}
-        summary={`${trends?.trends.length ?? 0} retrospective трендов`}
+        requiresActionCount={insightRows.filter((insight) => insight.status === "open").length}
+        summary={`${trendRows.length} retrospective трендов`}
       />
 
       <RetrospectiveSummaryStrip portfolio={portfolio} />
