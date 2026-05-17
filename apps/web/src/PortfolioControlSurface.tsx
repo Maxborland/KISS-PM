@@ -3,7 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
+  ActionAuditPreview,
+  KPIStrip,
+  OperationalSurfaceShell,
+  SignalSummaryBar,
+  type OperationalSeverity,
+  type OperationalSurfaceState
+} from "./operationalSurfacePrimitives";
+import {
   controlSeverityLabel,
+  type ControlSeverityDto,
   type ControlSurfaceReadActionDto,
   type ControlSurfaceReadModelDto,
   type ControlSurfaceReadRowDto,
@@ -143,6 +152,38 @@ function latestAction(audit: PortfolioControlAuditDto): string {
   if (!actionExecution) return "Нет action evidence";
   const target = actionExecution.target ?? actionExecution.source;
   return `${actionExecution.commandType}: ${actionExecution.status} / ${actionExecution.requiredPermission} / ${target.entityId}`;
+}
+
+function operationalSeverity(severity: ControlSeverityDto | undefined): OperationalSeverity {
+  if (severity === "critical" || severity === "warning" || severity === "attention") return severity;
+  return "ok";
+}
+
+function operationalState({
+  activeRow,
+  canReadSurface,
+  commandError,
+  isError,
+  isFetching,
+  lastResult,
+  rows
+}: {
+  activeRow: ControlSurfaceReadRowDto | null;
+  canReadSurface: boolean;
+  commandError: string;
+  isError: boolean;
+  isFetching: boolean;
+  lastResult: string | null;
+  rows: ControlSurfaceReadRowDto[];
+}): OperationalSurfaceState {
+  if (!canReadSurface) return "permission_denied";
+  if (isError) return "error";
+  if (commandError) return "apply_failed";
+  if (lastResult) return "applied";
+  if (isFetching && rows.length === 0) return "loading";
+  if (rows.length === 0) return "empty";
+  if (!activeRow) return "empty";
+  return "ready";
 }
 
 function RowList({
@@ -304,13 +345,16 @@ export function PortfolioControlSurface({
   if (!canReadSurface) {
     return (
       <section className="portfolio-control-surface" data-testid="portfolio-control-denied" id="portfolio-control">
-        <div className="surface-heading">
-          <div>
-            <h2>Портфельный контроль</h2>
-            <p>Нет доступа к контрольным поверхностям. Портфельные сигналы скрыты политикой доступа.</p>
-          </div>
-          <p className="status-pill">Доступ закрыт</p>
-        </div>
+        <OperationalSurfaceShell
+          description="Портфельные сигналы скрыты политикой доступа."
+          primaryActionDisabledReason="Нет права control.surface:read"
+          primaryActionLabel="Открыть поверхность"
+          state="permission_denied"
+          statusLabel="Доступ закрыт"
+          title="Портфельный контроль"
+        >
+          <span>Пользователь видит причину запрета вместо пустой или сломанной панели.</span>
+        </OperationalSurfaceShell>
       </section>
     );
   }
@@ -386,43 +430,102 @@ export function PortfolioControlSurface({
 
   return (
     <section className="portfolio-control-surface" data-testid="portfolio-control-surface" id="portfolio-control">
-      <div className="surface-heading">
-        <div>
-          <h2>Портфельный контроль</h2>
-          <p>Единая поверхность для KPI-сигналов, ресурсных конфликтов и управляемых действий.</p>
-        </div>
-        <p className="status-pill" data-testid="portfolio-control-status">
-          {displayStatus}
-        </p>
-      </div>
+      <OperationalSurfaceShell
+        audit={
+          <section className="phase2-panel" data-testid="portfolio-control-audit">
+            <h3>Action evidence</h3>
+            {canReadAudit && audit.actionExecutions.at(-1) ? (
+              <ActionAuditPreview
+                actionExecutionId={audit.actionExecutions.at(-1)?.id ?? "unknown"}
+                actorLabel={audit.actionExecutions.at(-1)?.actorId}
+                readbackLabel="Audit/readback projection refreshed"
+                resultLabel={latestAction(audit)}
+                targetLabel={(audit.actionExecutions.at(-1)?.target ?? audit.actionExecutions.at(-1)?.source)?.entityId}
+              />
+            ) : (
+              <p>{canReadAudit ? latestAction(audit) : "Аудит недоступен"}</p>
+            )}
+          </section>
+        }
+        description="Единая поверхность для KPI-сигналов, ресурсных конфликтов и управляемых действий."
+        freshnessLabel={view ? `surface v${view.surface.version} / ${view.surface.updatedAt}` : "Поверхность загружается"}
+        objectLabel="ControlSurface"
+        readbackLabel={
+          lastResult ? "Readback подтвержден после управляемой команды" : "Reload/readback обязателен после mutation"
+        }
+        signal={
+          <SignalSummaryBar
+            disabledReason={activeRow ? undefined : "Нет выбранного контрольного сигнала"}
+            highestSeverity={operationalSeverity(activeRow?.severity ?? rows[0]?.severity)}
+            nextActionLabel="Открыть следующий риск"
+            onNextAction={() => {
+              const nextRow = rows.find((row) => row.id !== activeRow?.id) ?? rows[0];
+              if (nextRow) selectRow(nextRow.id);
+            }}
+            requiresActionCount={rows.filter((row) => row.severity !== "none").length}
+            summary={
+              rows.length > 0
+                ? `${rows.length} сигналов в портфельной поверхности`
+                : "Нет контрольных сигналов для действия"
+            }
+          />
+        }
+        state={operationalState({
+          activeRow,
+          canReadSurface,
+          commandError,
+          isError: viewQuery.isError,
+          isFetching: viewQuery.isFetching,
+          lastResult,
+          rows
+        })}
+        statusLabel={displayStatus}
+        summary={
+          <KPIStrip
+            metrics={(view?.widgets ?? []).map((widget) => ({
+              id: widget.key,
+              label: widget.label,
+              requiresAction: widget.severity === "critical" || widget.severity === "warning",
+              severity: operationalSeverity(widget.severity),
+              sourceLabel: widget.widgetType,
+              value: widget.value
+            }))}
+          />
+        }
+        title="Портфельный контроль"
+        toolbar={
+          <p className="status-pill" data-testid="portfolio-control-status">
+            {displayStatus}
+          </p>
+        }
+      >
+        {viewQuery.isError ? (
+          <p className="readonly-notice" data-testid="portfolio-control-error">
+            {getErrorMessage(viewQuery.error)}
+          </p>
+        ) : null}
 
-      {viewQuery.isError ? (
-        <p className="readonly-notice" data-testid="portfolio-control-error">
-          {getErrorMessage(viewQuery.error)}
-        </p>
-      ) : null}
+        {actionsQuery.isError ? (
+          <p className="readonly-notice" data-testid="portfolio-control-actions-error">
+            {getErrorMessage(actionsQuery.error)}
+          </p>
+        ) : null}
 
-      {actionsQuery.isError ? (
-        <p className="readonly-notice" data-testid="portfolio-control-actions-error">
-          {getErrorMessage(actionsQuery.error)}
-        </p>
-      ) : null}
+        {auditQuery.isError ? (
+          <p className="readonly-notice" data-testid="portfolio-control-audit-error">
+            {getErrorMessage(auditQuery.error)}
+          </p>
+        ) : null}
 
-      {auditQuery.isError ? (
-        <p className="readonly-notice" data-testid="portfolio-control-audit-error">
-          {getErrorMessage(auditQuery.error)}
-        </p>
-      ) : null}
-
-      <div className="portfolio-control-layout">
-        <section className="phase2-panel portfolio-overview-panel">
+        <div className="portfolio-control-layout">
+          <section className="phase2-panel portfolio-overview-panel">
           <div className="surface-heading compact">
             <div>
               <h3>{view?.surface.label ?? "Контроль портфеля"}</h3>
               <p>{view ? `${view.surface.key}@${view.surface.version}` : "Поверхность загружается"}</p>
             </div>
           </div>
-          <div className="portfolio-widget-grid">
+          <div className="portfolio-widget-grid" aria-label="Legacy portfolio widget ids">
             {(view?.widgets ?? []).map((widget) => (
               <div className="portfolio-widget" data-testid={`portfolio-control-widget-${widget.key}`} key={widget.key}>
                 <span>{widget.label}</span>
@@ -517,12 +620,9 @@ export function PortfolioControlSurface({
 
           <p data-testid="portfolio-control-command-error">{commandError || "Ошибок нет"}</p>
           <p data-testid="portfolio-control-result">{lastResult ?? "Команда еще не применялась"}</p>
-          <section className="phase2-panel" data-testid="portfolio-control-audit">
-            <h3>Action evidence</h3>
-            <p>{canReadAudit ? latestAction(audit) : "Аудит недоступен"}</p>
-          </section>
         </section>
-      </div>
+        </div>
+      </OperationalSurfaceShell>
     </section>
   );
 }
