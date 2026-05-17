@@ -4,6 +4,8 @@
 
 KISS PM UI must feel like a mature project-control instrument: dense, calm, confident, operational, and readable. It must avoid decorative marketing composition inside the application. shadcn/ui and Radix primitives are the base interaction layer, but default visual output is not accepted without KISS PM product adaptation.
 
+Release 2 product-app reset rule: Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted until `RELEASE_2_APP_FOUNDATION_RESET` and product-owner smoke E2E pass. Standard app UI must use shadcn/Radix primitives by default. Custom UI is reserved for Gantt, Capacity Matrix, WBS/timeline, and similar domain instruments.
+
 Release 2 design direction: UI must help a manager make the right operational decision with the least routine friction. A screen is successful when it reduces ambiguity, exposes the next governed action, and makes the consequence of that action clear before mutation. Visual polish is subordinate to decision clarity, permission clarity, auditability, and reliable readback.
 
 Implementation stack:

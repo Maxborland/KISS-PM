@@ -1,5 +1,7 @@
 # Screen Interaction Catalog P3-P12
 
+Product-app reset blocker: Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Release 2 implementation is blocked until `docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md` is implemented and product-owner smoke E2E passes. Standard app UI must use shadcn/Radix primitives by default; custom UI is reserved for Gantt, Capacity Matrix, WBS/timeline, and similar domain instruments.
+
 Each card uses this contract: Screen ID, Phase, Route/surface, Primary role, Primary object, User goal, Primary next action, Main layout, Data shown, Primary actions, Secondary actions, Bulk actions, Modals/sheets/popovers, Empty/loading/error states, Permission states, Audit/result feedback, Reload/refetch behavior, E2E scenarios, Design notes.
 
 ## UX-P3-CRM-INTAKE

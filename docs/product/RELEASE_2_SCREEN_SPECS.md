@@ -2,6 +2,12 @@
 
 Updated: 2026-05-17
 
+## Product-app reset blocker
+
+Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Before further Release 2 implementation, KISS PM must complete `RELEASE_2_APP_FOUNDATION_RESET` and pass product-owner smoke E2E.
+
+Screen specs remain valid as component/control-surface foundation. They are not sufficient acceptance for a runnable SaaS app until login/dev-auth, real routes/pages/deep links, app shell, profile/account, tenant admin settings, demo seed/readback, and route-level permission guards are implemented.
+
 ## 1. Purpose
 
 This document turns `docs/02_UNIVERSAL_PROJECT_BP.md` into a Release 2 screen contract.

@@ -2,6 +2,14 @@
 
 Updated: 2026-05-17
 
+## Product-app reset blocker
+
+Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Release 2 implementation is blocked until `docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md` is implemented and product-owner smoke E2E passes.
+
+The merged control-surface work is reusable foundation. It must not be described as product-owner ready while login/dev-auth, real routes/pages, app shell, profile/account menu, tenant admin settings, demo seed/readback, seeded project Gantt, and product-owner smoke E2E are missing.
+
+Standard app UI must use shadcn/Radix primitives by default. Custom UI is reserved for Gantt, Capacity Matrix, WBS/timeline, portfolio control compositions, KPI/action/audit panels, and similar domain instruments.
+
 ## 1. Purpose
 
 Release 2 must not begin as a code-first feature push. Before implementation, KISS PM needs a polished UI/UX contract that turns the accepted P3-P12 product loop into a product that helps managers act, not just observe.

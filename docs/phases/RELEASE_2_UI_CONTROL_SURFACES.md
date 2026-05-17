@@ -4,6 +4,14 @@ Status: planned release contract
 Type: cross-phase UI/product hardening release
 Branch dependency: stacked on the clean-room BR2 pattern-transfer branch until PR #1 is merged
 
+## Product-app reset blocker
+
+Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Release 2 implementation is blocked until `RELEASE_2_APP_FOUNDATION_RESET` is implemented and product-owner smoke E2E passes.
+
+This document and `docs/status/release2-ui-requirements-matrix.json` now describe reusable control-surface foundation, not product-owner acceptance of a runnable SaaS application. `E2E-R2-001..010` are not sufficient app-readiness evidence unless they prove real routes/pages/session/profile/settings/demo seed/readback.
+
+Standard app UI must use shadcn/Radix primitives by default. Custom UI is reserved for Gantt, Capacity Matrix, WBS/timeline, and similar domain instruments.
+
 Release 2 is not a new domain phase and not visual polish. It is the closed implementation contract that turns the already planned P3-P10 surfaces into mature KISS PM management instruments:
 
 ```text

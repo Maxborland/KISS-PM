@@ -4,6 +4,10 @@ Record valuable ideas that are outside the active phase gate. Do not implement t
 
 ## Release 2 Depth And Hardening
 
+Product-app reset blocker: Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Further Release 2 implementation is blocked until `docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md`, `docs/status/release2-app-foundation-reset-matrix.json`, and product-owner smoke E2E are implemented.
+
+The reset backlog is not future polish; it is the next required implementation gate for real SaaS app foundation: login/dev-auth, real routes/pages/deep links, app shell, profile/account, tenant admin settings, KPI setup page, seeded Gantt, demo seed/readback, and product-owner smoke.
+
 Release 2 planning is tracked in:
 
 - `docs/product/RELEASE_2_UI_UX_SPEC.md`

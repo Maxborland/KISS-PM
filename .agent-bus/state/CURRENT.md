@@ -2,6 +2,13 @@
 
 Updated: 2026-05-17T21:01:25+07:00
 
+- Release 2 product-app reset is now the active blocker:
+  - task: `R2-RESET-001-product-app-reality-audit-and-foundation-contract`
+  - branch: `docs/release2-app-foundation-reset`
+  - verdict: Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted.
+  - blocker: Release 2 implementation is blocked until `docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md` is implemented and product-owner smoke E2E (`E2E-R2R-001`) passes.
+  - standard app UI rule: use shadcn/Radix primitives by default; custom UI is reserved for Gantt, Capacity Matrix, WBS/timeline, and similar domain instruments.
+
 - `R2-UI-008-review-comment-hardening` is completed as post-review hardening for the Release 2 PR stack before merge:
   - branch: `codex/r2-exit-evidence`
   - reviewed Codex comments across PR #3..#9 and implemented only comments still relevant after the stack fixes.

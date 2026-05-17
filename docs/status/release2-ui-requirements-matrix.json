@@ -1,9 +1,18 @@
 {
   "version": 1,
   "release": "R2",
-  "updated_at": "2026-05-17T19:43:00+07:00",
+  "updated_at": "2026-05-17T21:58:00+07:00",
+  "product_app_readiness": {
+    "status": "not_accepted",
+    "blocking_reset": "docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md",
+    "blocking_matrix": "docs/status/release2-app-foundation-reset-matrix.json",
+    "required_smoke": "E2E-R2R-001 Product owner smoke",
+    "verdict": "Release 2 control-surface components are merged, but app-level SaaS readiness is not accepted. Release 2 implementation is blocked until RELEASE_2_APP_FOUNDATION_RESET is implemented and product-owner smoke E2E passes.",
+    "evidence_note": "E2E-R2-001..010 remain useful control-surface evidence but are not sufficient app-readiness evidence when they do not prove real routes/pages/session/profile/settings/demo seed/readback."
+  },
   "source_documents": [
     "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
+    "docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md",
     "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
     "docs/product/DESIGN_SYSTEM.md",
     "docs/product/SCREEN_INTERACTION_CATALOG.md",

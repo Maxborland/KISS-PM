@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T20:44:41+07:00",
+  "updated_at": "2026-05-17T21:48:01+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -10,6 +10,68 @@
     "shared_bus_env": "AGENT_BUS_ROOT"
   },
   "tasks": [
+    {
+      "id": "R2-RESET-001-product-app-reality-audit-and-foundation-contract",
+      "aliases": [
+        "R2-RESET-001"
+      ],
+      "title": "Release 2 product-app reality audit and foundation reset contract",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [],
+      "write_scope": [
+        "docs/audits/RELEASE_2_PRODUCT_APP_REALITY_AUDIT.md",
+        "docs/audits/",
+        "docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md",
+        "docs/status/release2-app-foundation-reset-matrix.json",
+        "docs/status/release2-ui-requirements-matrix.json",
+        "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
+        "docs/product/RELEASE_2_UI_UX_SPEC.md",
+        "docs/product/RELEASE_2_SCREEN_SPECS.md",
+        "docs/product/SCREEN_INTERACTION_CATALOG.md",
+        "docs/product/DESIGN_SYSTEM.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-release2-app-foundation-reset.mjs",
+        "scripts/verify-release2-app-foundation-reset.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/tasks/active/R2-RESET-001-product-app-reality-audit-and-foundation-contract.md",
+        ".agent-bus/claims/R2-RESET-001-product-app-reality-audit-and-foundation-contract.claim.json",
+        ".agent-bus/sessions/R2-RESET-001-product-app-reality-audit-and-foundation-contract.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/locks/**",
+        ".agent-bus/artifacts/screenshots/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/src/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        "docs/phases/RELEASE_2_APP_FOUNDATION_RESET.md",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-app-foundation-reset-matrix.json','utf8')); console.log('reset matrix json ok')\"",
+        "node scripts/verify-release2-app-foundation-reset.mjs docs/status/release2-app-foundation-reset-matrix.json",
+        "npm test -- scripts/verify-release2-app-foundation-reset.test.ts",
+        "npm run typecheck",
+        "node scripts/agent-bus-guard.mjs --task R2-RESET-001-product-app-reality-audit-and-foundation-contract --once"
+      ],
+      "notes": "Completed 2026-05-17T22:02:00+07:00. Created reality audit, RELEASE_2_APP_FOUNDATION_RESET contract, R2R reset matrix, verifier/tests, Release 2 docs/status blocker updates, and live app evidence. Release 2 implementation is blocked until the reset is implemented and E2E-R2R-001 passes.",
+      "completed_at": "2026-05-17T22:02:00+07:00",
+      "result": "completed"
+    },
     {
       "id": "P4-001-process-stage-templates",
       "title": "Process and stage templates",
