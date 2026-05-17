@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import {
+  ActionAuditPreview,
+  KPIStrip,
+  OperationalDataGrid,
+  SignalSummaryBar,
+  type KpiMetric,
+  type OperationalGridColumn,
+  type OperationalGridRow,
+  type OperationalSeverity
+} from "./operationalSurfacePrimitives";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
   retrospectiveSeverityLabel,
@@ -12,7 +22,8 @@ import {
   type TemplateImprovementPreviewDto,
   type RetrospectiveReadActionDto,
   type RetrospectiveReadRowDto,
-  type RetrospectiveTrendDto
+  type RetrospectiveTrendDto,
+  type RetrospectiveTrendsReadModelDto
 } from "./retrospectiveApiClient";
 
 type ClosedPortfolioRetrospectiveSurfaceProps = {
@@ -52,6 +63,176 @@ function numberField(row: RetrospectiveReadRowDto, key: string): number | null {
 function stringField(row: RetrospectiveReadRowDto, key: string): string {
   const value = row.fieldValues[key];
   return typeof value === "string" ? value : "";
+}
+
+function operationalSeverity(severity: RetrospectiveReadRowDto["severity"] | RetrospectiveInsightDto["severity"] | RetrospectiveTrendDto["severity"]): OperationalSeverity {
+  if (severity === "critical" || severity === "warning" || severity === "attention") return severity;
+  return "ok";
+}
+
+const severityRank: Record<OperationalSeverity, number> = {
+  ok: 0,
+  attention: 1,
+  warning: 2,
+  critical: 3
+};
+
+function mostSevereTrend(trends: RetrospectiveTrendDto[]): RetrospectiveTrendDto | null {
+  return trends.reduce<RetrospectiveTrendDto | null>((currentHighest, trend) => {
+    if (currentHighest === null) return trend;
+    return severityRank[operationalSeverity(trend.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+      ? trend
+      : currentHighest;
+  }, null);
+}
+
+function mostSevereOpenInsight(
+  insights: RetrospectiveInsightDto[],
+  excludedInsightId?: string | null
+): RetrospectiveInsightDto | null {
+  return insights
+    .filter((insight) => insight.status === "open" && insight.id !== excludedInsightId)
+    .reduce<RetrospectiveInsightDto | null>((currentHighest, insight) => {
+      if (currentHighest === null) return insight;
+      return severityRank[operationalSeverity(insight.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+        ? insight
+        : currentHighest;
+    }, null);
+}
+
+async function loadAllTrendPages(apiClient: RetrospectiveApiClient, testUser: string): Promise<RetrospectiveTrendsReadModelDto> {
+  const pageSize = 50;
+  const firstPage = await apiClient.getTrends(testUser, { limit: pageSize, offset: 0 });
+  const allTrends = [...firstPage.trends];
+  const allInsights = [...firstPage.insights];
+  let nextOffset = firstPage.pagination.offset + firstPage.pagination.limit;
+
+  while (nextOffset < firstPage.pagination.total) {
+    const page = await apiClient.getTrends(testUser, { limit: pageSize, offset: nextOffset });
+    allTrends.push(...page.trends);
+    allInsights.push(...page.insights);
+    nextOffset = page.pagination.offset + page.pagination.limit;
+  }
+
+  return {
+    ...firstPage,
+    trends: allTrends,
+    insights: allInsights,
+    pagination: { offset: 0, limit: allTrends.length, total: firstPage.pagination.total }
+  };
+}
+
+function sourceRefsLine(row: RetrospectiveReadRowDto): string {
+  return row.sourceRefs.map((sourceRef) => `${sourceRef.entityType}:${sourceRef.entityId}`).join(" / ");
+}
+
+const snapshotGridColumns: OperationalGridColumn[] = [
+  { key: "snapshot", label: "Snapshot", group: "Снимок", sticky: "left", width: 210 },
+  { key: "project", label: "Проект", group: "Снимок", width: 180 },
+  { key: "planFact", label: "План/факт", group: "Метрики", width: 190 },
+  { key: "variance", label: "Текущий / предыдущий", group: "Метрики", width: 240 },
+  { key: "readModel", label: "Read model", group: "Readback", width: 220 },
+  { key: "proof", label: "Proof", group: "Readback", width: 190 }
+];
+
+function SnapshotOperationalGrid({
+  activeRowId,
+  onSelectRow,
+  rows
+}: {
+  activeRowId: string | null;
+  onSelectRow(rowId: string): void;
+  rows: RetrospectiveReadRowDto[];
+}) {
+  const gridRows: OperationalGridRow[] = rows.map((row) => {
+    const planned = numberField(row, "planned_work_hours") ?? 0;
+    const actual = numberField(row, "actual_work_hours") ?? 0;
+    const currentVariance = numberField(row, "schedule_variance_days");
+    const previousVariance = numberField(row, "previous_schedule_variance_days");
+
+    return {
+      id: row.id,
+      label: row.label,
+      severity: operationalSeverity(row.severity),
+      values: {
+        snapshot: stringField(row, "snapshot_id") || row.entityId,
+        project: stringField(row, "project_title") || row.label,
+        planFact: `План/факт: ${planned} -> ${actual} ч`,
+        variance:
+          currentVariance === null
+            ? "нет отклонения"
+            : previousVariance === null
+              ? `Текущий/предыдущий: ${currentVariance} -> no_previous`
+              : `Текущий/предыдущий: ${currentVariance} -> ${previousVariance} дн.`,
+        readModel: "API: snapshot, plan/fact, schedule variance, source refs",
+        proof: "Снимок immutable"
+      },
+      actions: []
+    };
+  });
+
+  return (
+    <OperationalDataGrid
+      columns={snapshotGridColumns}
+      emptyLabel="Закрытых снимков пока нет. После закрытия проектов здесь появятся стабильные plan/fact результаты."
+      rows={gridRows}
+      selectedRowId={activeRowId}
+      onSelectRow={onSelectRow}
+    />
+  );
+}
+
+function RetrospectiveSummaryStrip({ portfolio }: { portfolio: ClosedPortfolioReadModelDto | undefined }) {
+  const criticalTrendCount =
+    portfolio?.widgets.find((widget) => widget.key === "critical_trend_count")?.value ?? 0;
+  const attentionTrendCount =
+    portfolio?.widgets.find((widget) => widget.key === "attention_trend_count")?.value ?? 0;
+  const metrics: KpiMetric[] = [
+    {
+      id: "retrospective-snapshot-count",
+      label: "Снимки",
+      value: portfolio?.summary.totalSnapshots ?? 0,
+      severity: "ok",
+      sourceLabel: "ProjectSnapshot",
+      helpText: "Immutable closed project snapshot count"
+    },
+    {
+      id: "retrospective-critical-trends",
+      label: "Критичные тренды",
+      value: criticalTrendCount,
+      severity: criticalTrendCount > 0 ? "critical" : "ok",
+      requiresAction: criticalTrendCount > 0,
+      deltaLabel: `attention: ${attentionTrendCount}`
+    },
+    {
+      id: "retrospective-open-insights",
+      label: "Open insights",
+      value: portfolio?.summary.openInsightCount ?? 0,
+      severity: (portfolio?.summary.openInsightCount ?? 0) > 0 ? "attention" : "ok",
+      sourceLabel: "template-improvement"
+    }
+  ];
+
+  return <KPIStrip metrics={metrics} />;
+}
+
+function SnapshotProof({ row }: { row: RetrospectiveReadRowDto }) {
+  const snapshotId = stringField(row, "snapshot_id") || row.entityId;
+  const snapshotVersion = numberField(row, "snapshot_version");
+  const closureAuditEventId = stringField(row, "closure_audit_event_id");
+
+  return (
+    <section className="phase2-panel retrospective-snapshot-proof" data-testid="retrospective-snapshot-proof">
+      <h3>Snapshot readback proof</h3>
+      <div className="compact-list">
+        <span>ProjectSnapshot:{snapshotId}</span>
+        <span>Snapshot version: {snapshotVersion ?? "not supplied by closed-portfolio read model"}</span>
+        <span>Closure audit: {closureAuditEventId || "not supplied by closed-portfolio read model"}</span>
+        <span>Source refs: {sourceRefsLine(row)}</span>
+        <span>Readback proves closed metrics are not live project state</span>
+      </div>
+    </section>
+  );
 }
 
 function RowList({
@@ -224,6 +405,15 @@ function InsightPanel({
           <span key={action.key}>{actionLine(action)}</span>
         ))}
       </div>
+      <section className="compact-list retrospective-improvement-contract" data-testid="retrospective-improvement-contract">
+        <strong>Template-improvement contract</strong>
+        <span>Trend: {insight.sourceTrendId}</span>
+        <span>Source snapshots: {insight.sourceSnapshotIds.join(", ")}</span>
+        <span>Source metrics: {insight.sourceMetricIds.join(", ")}</span>
+        <span>Recommended action: {improvementAction?.actionDefinitionKey ?? "template_improvement.apply"}</span>
+        <span>{improvementAction?.dryRunRequired !== false ? "Dry-run preview required" : "Preview optional"}</span>
+        <span>No snapshot rewrite</span>
+      </section>
       {canApplyImprovement ? (
         <div className="compact-action-row">
           <button className="secondary-button" disabled={previewPending} type="button" onClick={onPreview}>
@@ -242,17 +432,28 @@ function InsightPanel({
             Версия {preview.before.templateVersion} -&gt; {preview.after.templateVersion}
           </span>
           <span>{preview.after.recommendedLabel}</span>
+          <span>mutatesState={String(preview.mutatesState)}</span>
+          <span>source snapshot immutable: {preview.sourceSnapshotIds.join(", ")}</span>
           <span>{preview.sourceSnapshotIds.join(", ")}</span>
         </div>
       ) : null}
       {applyResult ? (
-        <div className="compact-list template-improvement-result" data-testid="template-improvement-result">
-          <strong>{applyResult.actionExecution.commandType}</strong>
-          <span>
-            Версия {applyResult.template.previousVersion} -&gt; {applyResult.template.version}
-          </span>
-          <span>{applyResult.actionExecution.auditEventIds?.join(", ")}</span>
-        </div>
+        <>
+          <div className="compact-list template-improvement-result" data-testid="template-improvement-result">
+            <strong>{applyResult.actionExecution.commandType}</strong>
+            <span>
+              Версия {applyResult.template.previousVersion} -&gt; {applyResult.template.version}
+            </span>
+            <span>{applyResult.actionExecution.auditEventIds?.join(", ")}</span>
+          </div>
+          <ActionAuditPreview
+            actionExecutionId={applyResult.actionExecution.id}
+            auditEventId={applyResult.actionExecution.auditEventIds?.[0]}
+            readbackLabel={`future template v${applyResult.template.version}; snapshot readback unchanged`}
+            resultLabel={applyResult.actionExecution.commandType}
+            targetLabel={`template:${applyResult.template.id}`}
+          />
+        </>
       ) : null}
       {errorMessage ? (
         <p className="readonly-notice" data-testid="template-improvement-error">
@@ -283,7 +484,7 @@ export function ClosedPortfolioRetrospectiveSurface({
   });
   const trendsQuery = useQuery({
     queryKey: retrospectiveQueryKeys.trends(testUser),
-    queryFn: () => apiClient.getTrends(testUser),
+    queryFn: () => loadAllTrendPages(apiClient, testUser),
     enabled: canReadRetrospectives,
     retry: false
   });
@@ -343,6 +544,10 @@ export function ClosedPortfolioRetrospectiveSurface({
   const rows = portfolio?.rows ?? [];
   const activeRow = rows.find((row) => row.id === (selectedRowId ?? rows[0]?.id)) ?? null;
   const activeRowActions = activeRow?.actions ?? [];
+  const trendRows = trends?.trends ?? [];
+  const insightRows = trends?.insights ?? [];
+  const highestTrend = mostSevereTrend(trendRows);
+  const nextOpenInsight = mostSevereOpenInsight(insightRows, selectedInsightId) ?? mostSevereOpenInsight(insightRows);
   const status =
     portfolioQuery.isFetching && portfolio === undefined
       ? "Загрузка закрытого портфеля"
@@ -414,6 +619,19 @@ export function ClosedPortfolioRetrospectiveSurface({
         </button>
       </div>
 
+      <SignalSummaryBar
+        disabledReason={insightRows.length === 0 ? "Нет открытых ретроспективных insight" : undefined}
+        highestSeverity={operationalSeverity(highestTrend?.severity ?? "none")}
+        nextActionLabel="Открыть следующий trend"
+        onNextAction={() => {
+          if (nextOpenInsight) selectInsight(nextOpenInsight.id);
+        }}
+        requiresActionCount={insightRows.filter((insight) => insight.status === "open").length}
+        summary={`${trendRows.length} retrospective трендов`}
+      />
+
+      <RetrospectiveSummaryStrip portfolio={portfolio} />
+
       <div className="closed-portfolio-layout">
         <section className="phase2-panel">
           <h3>{portfolio?.surface.label ?? "Закрытый портфель"}</h3>
@@ -425,6 +643,7 @@ export function ClosedPortfolioRetrospectiveSurface({
               </div>
             ))}
           </div>
+          <SnapshotOperationalGrid activeRowId={activeRow?.id ?? null} onSelectRow={selectRow} rows={rows} />
           <RowList activeRowId={activeRow?.id ?? null} onSelectRow={selectRow} rows={rows} />
         </section>
 
@@ -446,6 +665,7 @@ export function ClosedPortfolioRetrospectiveSurface({
       {activeRow ? (
         <>
           <SnapshotDetail row={activeRow} />
+          <SnapshotProof row={activeRow} />
           <div className="compact-list" data-testid="closed-portfolio-row-action-state">
             {activeRowActions.map((action) => (
               <span key={action.key}>{actionLine(action)}</span>

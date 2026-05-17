@@ -6914,6 +6914,63 @@
       "result": "completed"
     },
     {
+      "id": "R2-UI-005-retrospective-control-hardening",
+      "aliases": [
+        "R2-UI-005",
+        "R2-010"
+      ],
+      "title": "Implement Release 2 Closed Portfolio and Retrospective control UI hardening",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives",
+        "R2-UI-004-portfolio-kpi-control-hardening"
+      ],
+      "write_scope": [
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.tsx",
+        "apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx",
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/release2-ui-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-005-retrospective-control-hardening.md",
+        ".agent-bus/claims/R2-UI-005-retrospective-control-hardening.claim.json",
+        ".agent-bus/sessions/R2-UI-005-retrospective-control-hardening.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/ClosedPortfolioRetrospectiveSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-005-retrospective-control-hardening --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-010 Closed Portfolio / Retrospective UI hardening only. Added ProjectSnapshot KPIStrip, OperationalDataGrid, immutable snapshot proof, trend-to-template-improvement action contract, preview immutability proof, ActionExecution/AuditEvent readback, tests, and matrix evidence. No API/domain/package/e2e changes.",
+      "started_at": "2026-05-17T18:05:00+07:00",
+      "completed_at": "2026-05-17T19:10:27+07:00",
+      "result": "completed"
+    },
+    {
       "id": "R2-UI-004-portfolio-kpi-control-hardening",
       "aliases": [
         "R2-UI-004",
