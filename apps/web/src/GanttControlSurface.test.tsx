@@ -151,6 +151,29 @@ function cloneSchedule(schedule: ProjectScheduleDto): ProjectScheduleDto {
   return structuredClone(schedule);
 }
 
+function scheduleActionExecution(
+  id: string,
+  commandType: string,
+  target: { entityType: string; entityId: string },
+  correlationId = id
+): ScheduleActionExecutionDto {
+  return {
+    id,
+    tenantId: "tenant-a",
+    actorId: "project-manager-a",
+    commandType,
+    requiredPermission: "task.write",
+    status: "succeeded",
+    source: { entityType: "project", entityId: projectId },
+    target,
+    before: null,
+    after: null,
+    timestamp: "2026-05-15T15:01:00.000Z",
+    correlationId,
+    trace: [`schedule:${commandType} executed`]
+  };
+}
+
 function createMutableApiClient() {
   let schedule = cloneSchedule(createSchedule());
   let actionExecutions = createAudit().actionExecutions;
@@ -160,6 +183,12 @@ function createMutableApiClient() {
     getProjectScheduleAudit: vi.fn(async () => createAudit(actionExecutions)),
     createScheduleTask: vi.fn(async (_testUser, nextProjectId, input) => {
       const taskId = input.id ?? `${nextProjectId}:schedule-task:test`;
+      const actionExecution = scheduleActionExecution(
+        `action-create-${taskId}`,
+        "schedule.task.create",
+        { entityType: "task", entityId: taskId },
+        `schedule-create-${taskId}`
+      );
       schedule = {
         ...schedule,
         schedulePlan: {
@@ -186,32 +215,21 @@ function createMutableApiClient() {
         },
         validationIssues: []
       };
-      actionExecutions = [
-        ...actionExecutions,
-        {
-          id: `action-create-${taskId}`,
-          tenantId: "tenant-a",
-          actorId: "project-manager-a",
-          commandType: "schedule.task.create",
-          requiredPermission: "task.write",
-          status: "succeeded",
-          source: { entityType: "project", entityId: nextProjectId },
-          target: { entityType: "task", entityId: taskId },
-          before: null,
-          after: { taskId },
-          timestamp: "2026-05-15T15:01:00.000Z",
-          correlationId: `schedule-create-${taskId}`,
-          trace: ["schedule:canonical task created"]
-        }
-      ];
+      actionExecutions = [...actionExecutions, actionExecution];
 
       return {
         task: { id: taskId, projectId: nextProjectId },
         ...cloneSchedule(schedule),
-        actionExecution: actionExecutions.at(-1) as ScheduleActionExecutionDto
+        actionExecution
       };
     }),
     updateScheduleTask: vi.fn(async (_testUser, nextProjectId, taskId, input) => {
+      const actionExecution = scheduleActionExecution(
+        `action-update-${taskId}`,
+        "schedule.task.update",
+        { entityType: "task", entityId: taskId },
+        `schedule-update-${taskId}`
+      );
       schedule = {
         ...schedule,
         schedulePlan: {
@@ -233,14 +251,22 @@ function createMutableApiClient() {
           )
         }
       };
+      actionExecutions = [...actionExecutions, actionExecution];
 
       return {
         task: { id: taskId, projectId: nextProjectId },
         ...cloneSchedule(schedule),
-        actionExecution: createAudit().actionExecutions[0]
+        actionExecution
       };
     }),
     createFinishToStartDependency: vi.fn(async (_testUser, nextProjectId, input) => {
+      const dependencyId = input.id ?? `dependency-${input.predecessorTaskId}-${input.successorTaskId}`;
+      const actionExecution = scheduleActionExecution(
+        `action-dependency-${dependencyId}`,
+        "schedule.dependency.create",
+        { entityType: "dependency", entityId: dependencyId },
+        `schedule-dependency-${dependencyId}`
+      );
       schedule = {
         ...schedule,
         schedulePlan: {
@@ -248,7 +274,7 @@ function createMutableApiClient() {
           dependencies: [
             ...schedule.schedulePlan.dependencies,
             {
-              id: input.id ?? `dependency-${input.predecessorTaskId}-${input.successorTaskId}`,
+              id: dependencyId,
               tenantId: "tenant-a",
               projectId: nextProjectId,
               predecessorTaskId: input.predecessorTaskId,
@@ -259,22 +285,30 @@ function createMutableApiClient() {
         },
         validationIssues: []
       };
+      actionExecutions = [...actionExecutions, actionExecution];
 
       return {
         dependency: schedule.schedulePlan.dependencies.at(-1),
         ...cloneSchedule(schedule),
-        actionExecution: createAudit().actionExecutions[0]
+        actionExecution
       };
     }),
     captureBaseline: vi.fn(async (_testUser, nextProjectId, input) => {
+      const baselineId = input.id ?? "baseline-phase5-ui";
+      const actionExecution = scheduleActionExecution(
+        `action-baseline-${baselineId}`,
+        "schedule.baseline.capture",
+        { entityType: "baseline", entityId: baselineId },
+        `schedule-baseline-${baselineId}`
+      );
       schedule = {
         ...schedule,
         schedulePlan: {
           ...schedule.schedulePlan,
-          baselineId: input.id ?? "baseline-phase5-ui"
+          baselineId
         },
         baseline: {
-          id: input.id ?? "baseline-phase5-ui",
+          id: baselineId,
           tenantId: "tenant-a",
           projectId: nextProjectId,
           schedulePlanId: schedule.schedulePlan.id,
@@ -291,10 +325,11 @@ function createMutableApiClient() {
             }))
         }
       };
+      actionExecutions = [...actionExecutions, actionExecution];
 
       return {
         ...cloneSchedule(schedule),
-        actionExecution: createAudit().actionExecutions[0]
+        actionExecution
       };
     })
   };
@@ -391,6 +426,7 @@ describe("Gantt control surface", () => {
       expect(screen.getByTestId("gantt-status")).toHaveTextContent("Расписание задачи сохранено через API");
     });
     expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Расписание обновлено");
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("action-update-task-phase5-kickoff");
     expect(screen.queryByTestId("gantt-dirty-task-phase5-kickoff")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Открыть Гантт" }));
@@ -403,6 +439,7 @@ describe("Gantt control surface", () => {
     render(withTestQueryClient(
       <GanttControlSurface
         apiClient={apiClient}
+        currentDate="2026-06-10"
         currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
         testUser="project-manager-a"
       />
@@ -411,7 +448,9 @@ describe("Gantt control surface", () => {
     expect(await screen.findByTestId("gantt-tracking-overlay")).toHaveTextContent("baseline-phase5-draft");
     expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Базовый план: 2026-06-01 / 2026-06-03");
     expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Живой план: 2026-06-01 / 2026-06-03");
-    expect(screen.getByTestId("gantt-today-marker")).toHaveTextContent("Сегодня");
+    expect(screen.getByTestId("gantt-today-marker")).toHaveTextContent("Сегодня: 2026-06-10");
+    expect(screen.getByTestId("gantt-tracking-warnings")).toHaveTextContent("finish_to_start_conflict");
+    expect(screen.getByTestId("gantt-non-working-days")).toHaveTextContent("Нерабочие дни");
 
     fireEvent.change(screen.getByLabelText("Старт task-phase5-kickoff"), { target: { value: "2026-06-04" } });
     fireEvent.change(screen.getByLabelText("Финиш task-phase5-kickoff"), { target: { value: "2026-06-05" } });
@@ -598,6 +637,7 @@ describe("Gantt control surface", () => {
     await waitFor(() => {
       expect(apiClient.getProjectSchedule).toHaveBeenCalledTimes(2);
     });
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("action-create-task-phase5-created");
 
     fireEvent.change(screen.getByLabelText("Старт task-phase5-created"), { target: { value: "2026-06-06" } });
     fireEvent.change(screen.getByLabelText("Финиш task-phase5-created"), { target: { value: "2026-06-06" } });
@@ -624,6 +664,7 @@ describe("Gantt control surface", () => {
         progressPercent: 25
       }
     );
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("action-update-task-phase5-created");
 
     fireEvent.change(screen.getByLabelText("Предшественник FS"), { target: { value: "task-phase5-kickoff" } });
     fireEvent.change(screen.getByLabelText("Последователь FS"), { target: { value: "task-phase5-created" } });
@@ -640,6 +681,9 @@ describe("Gantt control surface", () => {
         })
       );
     });
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent(
+      "action-dependency-dependency-task-phase5-kickoff-task-phase5-created"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Зафиксировать базовый план" }));
     await waitFor(() => {
@@ -649,6 +693,9 @@ describe("Gantt control surface", () => {
         expect.objectContaining({ id: "baseline-project-phase4-main-draft" })
       );
     });
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent(
+      "action-baseline-baseline-project-phase4-main-draft"
+    );
     expect(screen.getByTestId("gantt-row-task-phase5-kickoff")).toHaveTextContent("2026-06-01 / 2026-06-03 / 3 / 40%");
   });
 

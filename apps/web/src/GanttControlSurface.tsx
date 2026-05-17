@@ -15,6 +15,7 @@ import type {
 
 type GanttControlSurfaceProps = {
   apiClient: Phase5ScheduleApiClient;
+  currentDate?: string;
   currentTenant: CurrentTenantDto;
   testUser: string;
   projectId?: string;
@@ -121,6 +122,7 @@ function auditIncludesAction(audit: ProjectScheduleAuditDto, actionExecution: Sc
 
 export function GanttControlSurface({
   apiClient,
+  currentDate = new Date().toISOString().slice(0, 10),
   currentTenant,
   testUser,
   projectId = defaultProjectId,
@@ -441,10 +443,10 @@ export function GanttControlSurface({
         updateTaskMutation.mutateAsync({
           taskId,
           request: {
-          plannedStartDate: draft.plannedStartDate,
-          plannedFinishDate: draft.plannedFinishDate,
-          plannedWorkHours: Number(draft.plannedWorkHours),
-          progressPercent: Number(draft.progressPercent)
+            plannedStartDate: draft.plannedStartDate,
+            plannedFinishDate: draft.plannedFinishDate,
+            plannedWorkHours: Number(draft.plannedWorkHours),
+            progressPercent: Number(draft.progressPercent)
           }
         }),
       "Сохранение расписания задачи через API",
@@ -840,7 +842,7 @@ export function GanttControlSurface({
             <h3>Шкала</h3>
             <div className="timeline-scale">
               <span>{ganttView?.timelineStartDate ?? "—"}</span>
-              <span data-testid="gantt-today-marker">Сегодня: 2026-05-17</span>
+              <span data-testid="gantt-today-marker">Сегодня: {currentDate}</span>
               <span>{ganttView?.timelineFinishDate ?? "—"}</span>
             </div>
             <div className="gantt-bars" data-testid="gantt-bars">
@@ -871,6 +873,18 @@ export function GanttControlSurface({
         <section className="phase2-panel gantt-tracking-overlay" data-testid="gantt-tracking-overlay">
           <h3>Tracking Gantt</h3>
           <p>Baseline: {schedule.baseline?.id ?? "не зафиксирован"}</p>
+          <div className="compact-list" data-testid="gantt-tracking-warnings">
+            {schedule.validationIssues.length > 0
+              ? schedule.validationIssues.map((issue) => (
+                  <span key={`${issue.code}-${issue.dependencyId ?? issue.nodeId ?? issue.fieldRefs.join("-")}`}>
+                    {scheduleValidationIssueLabel(issue)}
+                  </span>
+                ))
+              : "Предупреждений расписания нет"}
+          </div>
+          <p data-testid="gantt-non-working-days">
+            Нерабочие дни: учитываются календарем scheduling engine при расчете duration
+          </p>
           <div className="compact-list">
             {taskRows.map((row) => {
               const baselineValue = schedule.baseline?.taskBaselineValues.find((value) => value.taskId === row.taskId);
@@ -903,7 +917,7 @@ export function GanttControlSurface({
           {audit && audit.actionExecutions.length > 0
             ? audit.actionExecutions.map((actionExecution) => (
                 <span key={actionExecution.id}>
-                  {actionLabel(actionExecution.commandType)}: {actionStatusLabel(actionExecution.status)}
+                  {actionLabel(actionExecution.commandType)}: {actionStatusLabel(actionExecution.status)} / {actionExecution.id}
                 </span>
               ))
             : "Действий пока нет"}
