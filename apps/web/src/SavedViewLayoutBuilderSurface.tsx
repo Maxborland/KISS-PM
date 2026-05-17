@@ -110,16 +110,15 @@ function buildDraft(draft: DraftState, expectedSurfaceVersion: number): SavedVie
   };
 }
 
-function blockingPreviewReasons(preview: SavedViewLayoutPreviewDto): string[] {
-  return [
-    ...preview.unavailable.widgets.map((widget) => `Виджет ${widget} недоступен в runtime-макете`),
-    ...preview.unavailable.actionSlots.map((actionSlot) => `Действие ${actionSlot} недоступно в runtime-макете`)
-  ];
+function blockingPreviewReasons(_preview: SavedViewLayoutPreviewDto): string[] {
+  return [];
 }
 
 function warningPreviewReasons(preview: SavedViewLayoutPreviewDto): string[] {
   return [
     ...preview.unavailable.fields.map((field) => `Поле ${field} будет скрыто в runtime-макете`),
+    ...preview.unavailable.widgets.map((widget) => `Виджет ${widget} будет скрыт в runtime-макете`),
+    ...preview.unavailable.actionSlots.map((actionSlot) => `Действие ${actionSlot} будет скрыто в runtime-макете`),
     ...preview.unavailable.reasons.map((reason) => `Проверка backend: ${reason}`)
   ];
 }
