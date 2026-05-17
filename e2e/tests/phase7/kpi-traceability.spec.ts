@@ -37,7 +37,7 @@ test("E2E-062 user opens KPI deviation and sees source, formula, threshold, and 
   expect(apiDetail.evaluation.formulaTrace).toContain("result:-25");
   expect(apiDetail.evaluation.thresholdTrace).toContain("matched:schedule-variance-critical:critical");
 
-  await page.getByRole("button", { name: /project-warning-a/ }).click();
+  await page.getByTestId("kpi-deviation-list").getByRole("button", { name: /project-warning-a/ }).click();
   await expect(page.getByTestId("kpi-deviation-detail")).toContainText(phase7Seed.tenantA.warningSignal.id);
   await expect(page.getByTestId("kpi-deviation-detail")).toContainText("matched:schedule-variance-warning:warning");
   await expect(page.getByTestId("kpi-deviation-detail")).toContainText("Запросить объяснение");
