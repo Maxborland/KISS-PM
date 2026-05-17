@@ -8,6 +8,19 @@ const e2eRunMetadataPath =
 
 const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
 const failures = [];
+const release2E2eIds = Array.from({ length: 10 }, (_, index) => `E2E-R2-${String(index + 1).padStart(3, "0")}`);
+const release2E2eTestPath = {
+  "E2E-R2-001": "e2e/tests/release2/portfolio-control.spec.ts",
+  "E2E-R2-002": "e2e/tests/release2/gantt-planning.spec.ts",
+  "E2E-R2-003": "e2e/tests/release2/gantt-planning.spec.ts",
+  "E2E-R2-004": "e2e/tests/release2/resource-capacity.spec.ts",
+  "E2E-R2-005": "e2e/tests/release2/resource-capacity.spec.ts",
+  "E2E-R2-006": "e2e/tests/release2/portfolio-control.spec.ts",
+  "E2E-R2-007": "e2e/tests/release2/retrospective.spec.ts",
+  "E2E-R2-008": "e2e/tests/release2/tenant-admin-config.spec.ts",
+  "E2E-R2-009": "e2e/tests/release2/tenant-admin-config.spec.ts",
+  "E2E-R2-010": "e2e/tests/release2/sales-demo-first-five-minutes.spec.ts"
+};
 const requiredIdsByPhase = {
   P1: Array.from({ length: 10 }, (_, index) => `P1-${String(index + 1).padStart(3, "0")}`),
   "P2-contract": ["P2C-001", "P2C-002", "P2C-003"],
@@ -26,6 +39,84 @@ const requiredIdsByPhase = {
   P11: Array.from({ length: 10 }, (_, index) => `P11-${String(index + 1).padStart(3, "0")}`),
   P12: Array.from({ length: 10 }, (_, index) => `P12-${String(index + 1).padStart(3, "0")}`)
 };
+
+function verifyRelease2Matrix() {
+  const rows = Array.isArray(matrix.rows) ? matrix.rows : [];
+  const requiredIds = Array.from({ length: 12 }, (_, index) => `R2-${String(index + 1).padStart(3, "0")}`);
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+
+  if (rows.length === 0) {
+    failures.push("matrix.rows must be a non-empty array");
+  }
+  for (const requiredId of requiredIds) {
+    if (!rowById.has(requiredId)) {
+      failures.push(`${requiredId}: missing required R2 row`);
+    }
+  }
+  for (const row of rows) {
+    if (!requiredIds.includes(row.id)) {
+      failures.push(`${row.id ?? "unknown"}: unexpected row id for R2 matrix`);
+    }
+    if (row.status !== "done") {
+      failures.push(`${row.id}: status must be done for Release 2 exit verification, got ${row.status}`);
+    }
+    if (!Array.isArray(row.done_evidence) || row.done_evidence.length === 0) {
+      failures.push(`${row.id}: done row missing done_evidence`);
+    }
+    if (!Array.isArray(row.owned_scope) || row.owned_scope.length === 0) {
+      failures.push(`${row.id}: row missing owned_scope`);
+    }
+  }
+
+  const exitRow = rowById.get("R2-012");
+  if (exitRow && !sameStringSet(exitRow.required_e2e, release2E2eIds)) {
+    failures.push("R2-012: required_e2e must exactly match E2E-R2-001..010");
+  }
+
+  try {
+    const runMetadata = JSON.parse(readFileSync(e2eRunMetadataPath, "utf8"));
+    const metadataTestPaths = new Set(
+      Array.isArray(runMetadata.testPaths)
+        ? runMetadata.testPaths.map((testPath) => String(testPath).replaceAll("\\", "/"))
+        : []
+    );
+    const metadataE2eIds = new Set(Array.isArray(runMetadata.e2eIds) ? runMetadata.e2eIds.map(String) : []);
+
+    if (runMetadata.profile !== "release2" || runMetadata.status !== "passed" || runMetadata.exitCode !== 0) {
+      failures.push("R2: E2E run metadata must come from a passing release2 profile run");
+    }
+    for (const e2eId of release2E2eIds) {
+      if (!metadataE2eIds.has(e2eId)) {
+        failures.push(`R2: E2E run metadata missing ${e2eId}`);
+      }
+      const testPath = release2E2eTestPath[e2eId];
+      if (!metadataTestPaths.has(testPath)) {
+        failures.push(`R2: E2E run metadata missing ${testPath}`);
+      }
+      try {
+        const testPathStat = statSync(testPath);
+        if (!testPathStat.isFile()) {
+          failures.push(`R2: required E2E test path is not a file at ${testPath}`);
+        }
+      } catch {
+        failures.push(`R2: required E2E test file missing at ${testPath}`);
+      }
+    }
+  } catch {
+    failures.push(`R2: missing readable E2E run metadata at ${e2eRunMetadataPath}`);
+  }
+
+  if (failures.length > 0) {
+    console.error(`Requirements matrix verification failed for ${matrixPath}`);
+    for (const failure of failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exit(1);
+  }
+
+  console.log(`Requirements matrix verified: ${matrixPath}`);
+  process.exit(0);
+}
 const requiredE2eByPhaseRow = {
   P2: {
     "P2-001": ["E2E-010"],
@@ -220,6 +311,10 @@ const requiredE2eTestPath = {
   "E2E-114": "e2e/tests/phase12/recovery-smoke.spec.ts",
   "E2E-115": "e2e/tests/phase12/no-live-external-dependency.spec.ts"
 };
+if (matrix.release === "R2") {
+  verifyRelease2Matrix();
+}
+
 const requiredIds = requiredIdsByPhase[matrix.phase];
 const requiredE2eByRow = requiredE2eByPhaseRow[matrix.phase] ?? {};
 const seenIds = new Set();
