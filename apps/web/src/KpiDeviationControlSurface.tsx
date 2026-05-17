@@ -3,6 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { kpiSeverityLabel, type KpiActionExecutionDto } from "./kpiDefinitionApiClient";
 import {
+  KPIStrip,
+  SignalSummaryBar,
+  type OperationalSeverity
+} from "./operationalSurfacePrimitives";
+import {
   kpiRecommendedActionLabel,
   kpiSignalStatusLabel,
   type KpiDeviationApiClient,
@@ -46,6 +51,30 @@ function actionExecutionLine(actionExecution: KpiActionExecutionDto): string {
 
 function latestAction(audit: KpiDeviationAuditDto): KpiActionExecutionDto | null {
   return audit.actionExecutions.at(-1) ?? null;
+}
+
+function operationalSeverity(severity: KpiSignalDto["severity"] | KpiEvaluationDto["severity"] | undefined): OperationalSeverity {
+  if (severity === "critical" || severity === "warning") return severity;
+  if (severity === "attention") return "attention";
+  return "ok";
+}
+
+const severityRank: Record<OperationalSeverity, number> = {
+  ok: 0,
+  attention: 1,
+  warning: 2,
+  critical: 3
+};
+
+function mostSevereSignal(signals: KpiSignalDto[], excludedSignalId?: string | null): KpiSignalDto | null {
+  return signals
+    .filter((signal) => signal.status === "open" && signal.id !== excludedSignalId)
+    .reduce<KpiSignalDto | null>((currentHighest, signal) => {
+      if (currentHighest === null) return signal;
+      return severityRank[operationalSeverity(signal.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+        ? signal
+        : currentHighest;
+    }, null);
 }
 
 function formatPeriod(evaluation: KpiEvaluationDto): string {
@@ -178,6 +207,36 @@ function SignalDetail({ evaluation, signal }: { evaluation: KpiEvaluationDto; si
   );
 }
 
+function KpiDeviationActionContract({
+  canRunEvaluation,
+  evaluation,
+  signal
+}: {
+  canRunEvaluation: boolean;
+  evaluation: KpiEvaluationDto;
+  signal: KpiSignalDto;
+}) {
+  const recommendedActions = signal.recommendedActionKeys.map(kpiRecommendedActionLabel).join(" / ");
+
+  return (
+    <section className="phase2-panel kpi-deviation-action-contract" data-testid="kpi-deviation-action-contract">
+      <h3>Контракт передачи в P8</h3>
+      <div className="compact-list">
+        <span>Объект: {signal.entityType}:{signal.entityId}</span>
+        <span>KPI: {signal.kpiDefinitionId} v{evaluation.kpiDefinitionVersion}</span>
+        <span>Формула: {evaluation.formulaDefinitionId}@{evaluation.formulaVersion}</span>
+        <span>Порог: {evaluation.thresholdRuleSetId}@{evaluation.thresholdRuleSetVersion}</span>
+        <span>Источник: {evaluation.sourceTrace.map((source) => `${source.sourceEntityType}:${source.sourceEntityId}.${source.sourceField}`).join(" / ")}</span>
+        <span>Рекомендованные действия для P8: {recommendedActions || "нет"}</span>
+        <span>Причина и preview/result/readback проверяются в P8 action engine</span>
+        <span>{canRunEvaluation ? "Пересчет KPI доступен" : "Пересчет KPI недоступен по правам"}</span>
+        <span>P7 не мутирует бизнес-состояние: он передает сигнал, трассировку и рекомендации в P8</span>
+        <span>Историческая оценка остается стабильной: {evaluation.id}</span>
+      </div>
+    </section>
+  );
+}
+
 export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser }: KpiDeviationControlSurfaceProps) {
   const queryClient = useQueryClient();
   const canReadKpi = hasPermission(currentTenant, "kpi:read");
@@ -216,6 +275,9 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
   const latestAuditAction = latestAction(audit);
   const commandInFlight = pendingCommand !== null;
   const queryLoading = signalsQuery.isFetching && signalsQuery.data === undefined;
+  const activeDetail = detailQuery.data;
+  const highestOpenSignal = mostSevereSignal(signals);
+  const nextOpenSignal = mostSevereSignal(signals, activeSignalId) ?? highestOpenSignal;
   const displayStatus =
     queryLoading ? "Загрузка KPI-отклонений" : status === "Загрузка KPI-отклонений" ? "KPI-отклонения загружены" : status;
 
@@ -320,6 +382,36 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
         </p>
       </div>
 
+      <SignalSummaryBar
+        disabledReason={activeSignalId === null ? "Нет выбранного KPI-сигнала" : undefined}
+        highestSeverity={operationalSeverity(highestOpenSignal?.severity)}
+        nextActionLabel="Открыть следующий KPI риск"
+        onNextAction={() => {
+          if (nextOpenSignal) setSelectedSignalId(nextOpenSignal.id);
+        }}
+        requiresActionCount={signals.filter((signal) => signal.status === "open").length}
+        summary={`${signals.length} KPI сигналов`}
+      />
+
+      <KPIStrip
+        metrics={
+          activeDetail
+            ? [
+                {
+                  id: "kpi-deviation-value",
+                  label: "Отклонение",
+                  value: activeDetail.evaluation.value,
+                  severity: operationalSeverity(activeDetail.evaluation.severity),
+                  deltaLabel: `${activeDetail.evaluation.period.start} - ${activeDetail.evaluation.period.end}`,
+                  helpText: activeDetail.evaluation.explanation ?? undefined,
+                  sourceLabel: activeDetail.evaluation.formulaDefinitionId,
+                  requiresAction: activeDetail.signal.status === "open"
+                }
+              ]
+            : []
+        }
+      />
+
       {!canRunEvaluation ? (
         <p className="readonly-notice" data-testid="kpi-deviation-readonly">
           Пересчет недоступен: нет права kpi.evaluate:execute. Отклонения доступны только для чтения.
@@ -361,7 +453,9 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
               data-testid="kpi-deviation-primary-action"
               disabled={activeSignalId === null}
               onClick={() =>
-                setHandoffMessage("P8 получит сигнал, трассировку KPI и рекомендованные действия без прямой мутации P7.")
+                setHandoffMessage(
+                  "P8 получает сигнал, трассировку KPI и рекомендованные действия; preview/result/audit выполняются в action engine."
+                )
               }
               type="button"
             >
@@ -378,7 +472,16 @@ export function KpiDeviationControlSurface({ apiClient, currentTenant, testUser 
         </p>
       ) : null}
 
-      {detailQuery.data ? <SignalDetail evaluation={detailQuery.data.evaluation} signal={detailQuery.data.signal} /> : null}
+      {detailQuery.data ? (
+        <>
+          <SignalDetail evaluation={detailQuery.data.evaluation} signal={detailQuery.data.signal} />
+          <KpiDeviationActionContract
+            canRunEvaluation={canRunEvaluation}
+            evaluation={detailQuery.data.evaluation}
+            signal={detailQuery.data.signal}
+          />
+        </>
+      ) : null}
 
       {commandError ? (
         <p className="readonly-notice" data-testid="kpi-deviation-command-error">
