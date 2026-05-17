@@ -1,13 +1,13 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T10:00:20.0000000+07:00
+Updated: 2026-05-17T10:14:38.9340000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
   - contract: `docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md`
   - matrix: `docs/status/phase12-requirements-matrix.json`
   - verifier support recognizes P12-001..P12-010 and E2E-110..115 paths.
-- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; all P12 rows remain blocked until implementation/E2E evidence exists.
+- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; P12-007 and P12-008 are verified, while P12-001..006 and P12-009..010 remain blocked for the remaining E2E/exit-gate evidence.
 - `P12-001-production-deployment-env-secret-contract` is accepted as an implementation block:
   - `.env.example` contains P12 deployment variable names with empty values only.
   - `docs/operations/PHASE_12_PRODUCTION_DEPLOYMENT_ENVIRONMENT.md` defines production-like env, secret-reference, and deployment-smoke rules.
@@ -39,9 +39,14 @@ Updated: 2026-05-17T10:00:20.0000000+07:00
 - `P12-007-demo-tenant-template-pack-onboarding` is accepted as an implementation block:
   - `packages/shared-test-fixtures/src/phase12Fixtures.ts` defines the deterministic P12 release demo tenant seed, release demo template pack, role matrix, critical journey ids, mocked external-service state, operator docs links, and Tenant B isolation-only private ids for E2E-110..115.
   - `docs/operations/PHASE_12_RELEASE_DEMO_TENANT_TEMPLATE_PACK.md` and `docs/operations/PHASE_12_OPERATOR_ONBOARDING.md` document the release demo pack, operator first-run checklist, mocked external-services rule, audit/readback/reload/cleanup expectations, and blocked-until-E2E policy.
-  - P12-007 matrix row remains blocked only for later E2E-110 browser/API evidence.
+  - P12-007 matrix row is now verified because E2E-110 consumes the demo seed and proves reset cleanup.
+- `P12-008-full-critical-journey-orchestration` is accepted as an implementation block:
+  - `e2e/tests/phase12/full-critical-journey.spec.ts` implements E2E-110: CRM intake UI start state, tenant configuration surface, governed portfolio corrective action with preview/API readback/audit/reload, mocked integration import, project closure preview/apply, closed portfolio retrospective readback, reload persistence, and reset cleanup.
+  - `e2e/tests/phase12/no-live-external-dependency.spec.ts` implements E2E-115: `/health/deployment` proves `external-services-mode=mocked`, Mock CRM import uses dry-run before apply, readiness run writes ops audit evidence, reload persists latest readiness run, and reset clears mappings.
+  - `playwright.config.ts` passes `KISS_PM_EXTERNAL_SERVICES_MODE=mocked` to the API E2E webServer so release-critical tests do not depend on live external services.
+  - P12-008 matrix row is verified with structured E2E-110/E2E-115 evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-008-full-critical-journey-orchestration`.
+- Next runnable step: claim `P12-009-deterministic-phase12-fixtures-e2e`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

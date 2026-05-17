@@ -6061,7 +6061,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Accepted implementation block on 2026-05-17T10:00:20+07:00. Deterministic P12 release demo tenant/template pack descriptor and operator onboarding docs implemented and verified; P12-007 matrix row remains blocked only for later E2E-110 evidence."
+      "notes": "Accepted implementation block on 2026-05-17T10:00:20+07:00. Deterministic P12 release demo tenant/template pack descriptor and operator onboarding docs implemented and verified. E2E-110 in P12-008 now consumes the seed, so the P12-007 matrix row is verified."
     },
     {
       "id": "P12-008-full-critical-journey-orchestration",
@@ -6069,7 +6069,7 @@
         "P12-008"
       ],
       "title": "Implement full critical journey orchestration without live services",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6079,6 +6079,7 @@
       "write_scope": [
         "apps/**",
         "packages/**",
+        "playwright.config.ts",
         "e2e/tests/phase12/**",
         "docs/status/phase12-requirements-matrix.json",
         ".agent-bus/**"
@@ -6100,7 +6101,21 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next runnable P12 block after accepted P12-007. Full critical journey orchestration can now consume the P12 release demo seed; keep P12 strict gate blocked until E2E-110..115 and P12-010."
+      "notes": "Accepted implementation block on 2026-05-17T10:14:38.9340000+07:00. Implemented executable E2E-110 and E2E-115 under e2e/tests/phase12, including full critical journey orchestration, mocked external-service proof, UI/API readback, audit evidence, reload persistence, and reset cleanup. P12 strict gate remains blocked until E2E-111..114/P12-009 and P12-010.",
+      "completed_at": "2026-05-17T10:14:38.9340000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-008-full-critical-journey-orchestration --once exit 0 at startup",
+        "npm run test:e2e:phase -- --phase 12 exit 1 RED: no e2e/tests/phase12 tests existed before implementation",
+        "npm run test:e2e:phase -- --phase 12 exit 1 RED: role object/testUser and UI assertion issues caught during TDD loop",
+        "npm run test:e2e:phase -- --phase 12 exit 0: E2E-110 and E2E-115 passed after review assertion strengthening",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12-001..006/P12-009/P12-010 remain blocked",
+        "npm test exit 0: 107 files, 612 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
+      ]
     },
     {
       "id": "P12-009-deterministic-phase12-fixtures-e2e",
@@ -6108,7 +6123,7 @@
         "P12-009"
       ],
       "title": "Implement deterministic Phase 12 fixtures and E2E-110..115",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6140,7 +6155,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Blocked until full critical journey orchestration is ready."
+      "notes": "Next runnable P12 block after accepted P12-008. Implement remaining deterministic Phase 12 E2E-111..114 and close P12-009 evidence without marking Release 2 ready before P12-010 strict exit gate."
     },
     {
       "id": "P12-010-phase12-verification-matrix-market-release-exit-gate",
