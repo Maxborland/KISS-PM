@@ -120,6 +120,55 @@ KISS PM must remain simple at the user-workflow level even when the platform bec
 
 A feature is not KISS-compliant if it is technically powerful but forces normal users to understand internal implementation concepts to make a routine decision.
 
+## 2.2 Product application composition rules
+
+KISS PM must present itself as a normal SaaS product, not as a phase laboratory, test fixture browser, or collection of disconnected demo surfaces.
+
+The default authenticated user journey must be:
+
+```txt
+login / authentication
+  -> tenant / workspace context
+  -> product home
+  -> primary navigation
+  -> module list or control surface
+  -> object detail
+  -> contextual governed action
+  -> preview / confirmation when needed
+  -> audit / result feedback
+  -> refreshed read model and reload-safe state
+```
+
+Agents must preserve this product-app composition before adding or polishing individual screens.
+
+Non-negotiable application shell requirements:
+
+- normal users must enter through a product login/auth guard or a dev-only fixture login that behaves like a login screen;
+- authenticated users must land on a role-aware product home, not a raw test surface;
+- primary navigation must be organized by product modules: CRM, Projects, Work, Resources, Control, Retrospectives, Tenant Admin, Integrations, and Operations where applicable;
+- module pages must lead to object pages and contextual actions, not just display standalone tables;
+- breadcrumbs, tenant/workspace context, user role, and primary next action must be visible where relevant;
+- admin, operator, diagnostic, phase, fixture, and E2E surfaces must not appear in normal user navigation unless explicitly permissioned and product-labeled;
+- dev/test utilities must live under a clearly separated operator/dev route, for example `/app/ops/dev-lab`, and must be hidden from ordinary users;
+- user-facing copy must not expose implementation language such as `Phase 2`, `fixture`, `E2E`, `test surface`, or `matrix row` in normal product screens;
+- `?testUser=` or equivalent fixture shortcuts may exist for E2E/dev support, but must not be the primary product UX path;
+- a screen that renders only because it is useful for a phase gate is not a product screen until it is placed inside a coherent user journey.
+
+A feature is incomplete if it can pass isolated E2E checks but cannot be reached through a realistic product route by an appropriate role.
+
+Product-flow E2E must exist alongside phase E2E. At minimum, a release that changes UI composition must prove:
+
+```txt
+unauthenticated user -> login/auth guard
+login as role -> product home
+home -> module navigation
+module -> object detail/control surface
+action -> preview/result/audit where applicable
+reload -> same product context remains understandable
+```
+
+Do not optimize the application around test convenience at the cost of product coherence. E2E infrastructure must support the product journey; it must not define the visible product architecture.
+
 ## 3. Source-of-truth documents
 
 Before implementing behavior, read the nearest relevant source documents. If documents conflict, resolve in this order:
@@ -133,8 +182,10 @@ Before implementing behavior, read the nearest relevant source documents. If doc
 7. `docs/02_UNIVERSAL_PROJECT_BP.md`
 8. `docs/03_START_PROMPT_FOR_CODEX.md`
 9. phase-detail documents under `docs/phases/`
-10. future architecture, API, domain-model, and data-model docs
-11. archived legacy process or prototype docs
+10. `docs/phases/RELEASE_2_PRODUCT_APP_COMPOSITION.md` when working on Release 2 app shell, navigation, or user-flow composition
+11. `docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md` when working on control-surface UX patterns
+12. future architecture, API, domain-model, and data-model docs
+13. archived legacy process or prototype docs
 
 Legacy BitrixReports materials are reference material only. They may inspire domain concepts, workflows, control surfaces, and acceptance criteria, but they must not force Bitrix-specific naming or implementation decisions into the greenfield SaaS core.
 
@@ -341,6 +392,12 @@ During an active phase:
 - do not mark the phase complete while phase-gate E2E tests are missing, skipped, flaky, or failing;
 - do not replace E2E proof with screenshots, component tests, unit tests, or optimistic manual claims for critical management loops.
 
+### Product composition is not optional
+
+Phase-gate implementation must not produce a visible app that looks like a test harness. When product UI is affected, agents must connect phase work into the normal SaaS journey: login, home, navigation, module route, object context, governed action, audit/result feedback, and reload-safe readback.
+
+If a feature is only accessible through a test URL, fixture shortcut, phase page, or dev-only surface, it may be useful for verification but it is not accepted as product UX.
+
 If a requested task conflicts with the master phase plan, document the conflict and choose the smallest safe action that keeps the phase gate coherent.
 
 ## 11. E2E truth protocol
@@ -477,6 +534,7 @@ When finishing a task, return a structured summary:
 Status:
 Changed:
 Files:
+Product app impact:
 Tests / verification:
 Decisions / assumptions:
 Risks / follow-up:
