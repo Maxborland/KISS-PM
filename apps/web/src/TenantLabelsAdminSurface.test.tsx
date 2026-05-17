@@ -177,6 +177,11 @@ describe("TenantLabelsAdminSurface", () => {
     const preview = await screen.findByTestId("tenant-labels-preview");
     expect(preview).toHaveTextContent("Состояние еще не изменено");
     expect(preview).toHaveTextContent("РП");
+    const runtimePreview = screen.getByTestId("runtime-config-preview");
+    expect(runtimePreview).toHaveTextContent("project.stage.header");
+    expect(runtimePreview).toHaveTextContent("task.participant.role");
+    expect(runtimePreview).toHaveTextContent("v1 -> v2");
+    expect(runtimePreview).toHaveTextContent("После reload");
     expect(apiClient.publishLabels).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Опубликовать" }));

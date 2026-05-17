@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { kpiSeverityLabel, type KpiActionExecutionDto, type KpiThresholdRuleDto } from "./kpiDefinitionApiClient";
 import type { KpiThresholdAuditDto, KpiThresholdBuilderApiClient, KpiThresholdPreviewDto } from "./kpiThresholdBuilderApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 
 type KpiThresholdBuilderSurfaceProps = {
@@ -57,6 +58,18 @@ function PreviewPanel({ preview }: { preview: KpiThresholdPreviewDto }) {
     <section className="phase2-panel preview-panel" data-testid="kpi-threshold-preview">
       <h3>Предпросмотр влияния</h3>
       <p>Состояние еще не изменено. Новая версия порогов будет опубликована только после команды.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.version}`}
+        beforeVersion={`v${preview.before.version}`}
+        previewId={preview.id}
+        reloadEffectLabel={`После reload влияние порога ${preview.after.severity} видно на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Изменение KPI-порогов влияет на будущие KpiEvaluation только после publish/readback."
+        warnings={[
+          `${preview.before.severity} -> ${preview.after.severity}`,
+          `пример ${preview.sampleValue}: ${preview.before.matchedRuleId ?? "none"} -> ${preview.after.matchedRuleId ?? "none"}`
+        ]}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>
@@ -76,7 +89,7 @@ function PreviewPanel({ preview }: { preview: KpiThresholdPreviewDto }) {
         </div>
       </dl>
       <p>
-        {kpiSeverityLabel(preview.before.severity)} {"->"} {kpiSeverityLabel(preview.after.severity)} / sample {preview.sampleValue}
+        {kpiSeverityLabel(preview.before.severity)} {"->"} {kpiSeverityLabel(preview.after.severity)} / пример {preview.sampleValue}
       </p>
     </section>
   );
