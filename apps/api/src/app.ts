@@ -34,6 +34,7 @@ import { createPhase11RuntimeState } from "./phase11Runtime";
 import { validatePhase12DeploymentEnvironment } from "./phase12Deployment";
 import type { Phase12DeploymentEnvironment } from "./phase12Deployment";
 import { buildPhase12ReleaseReadinessReadModel } from "./phase12Readiness";
+import { createPhase12PermissionIsolationSmokeRuntimeState } from "./phase12PermissionSmoke";
 import { createPhase12RecoveryRuntimeState } from "./phase12Recovery";
 import type {
   KpiDefinitionBundle,
@@ -1090,6 +1091,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   let phase9Runtime = createPhase9RuntimeState();
   let phase10Runtime = createPhase10RuntimeState();
   let phase11Runtime = createPhase11RuntimeState();
+  let phase12PermissionIsolationRuntime = createPhase12PermissionIsolationSmokeRuntimeState();
   let phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
   let phase11ImportPreviewCounter = 0;
 
@@ -1126,6 +1128,100 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
           deployment: validatePhase12DeploymentEnvironment(options.deploymentEnvironment)
         })
       );
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/ops/permission-smoke", (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.read", {
+        entityType: "permissionSmoke",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json(phase12PermissionIsolationRuntime.readPermissionSmoke(session.user.tenantId));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/ops/permission-smoke/run", async (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.execute", {
+        entityType: "permissionSmoke",
+        tenantId: session.user.tenantId
+      });
+
+      const run = await phase12PermissionIsolationRuntime.runPermissionSmoke({
+        tenantId: session.user.tenantId,
+        now: runtime.now(),
+        requester: (path, init) => Promise.resolve(app.request(path, init))
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: run.auditEventId,
+        actionKey: "ops.permission_smoke.run",
+        target: { entityType: "permissionSmoke", entityId: run.id },
+        correlationId: `corr-${run.id}`,
+        details: {
+          after: {
+            summary: run.summary,
+            status: run.status
+          }
+        }
+      });
+
+      return context.json({ run }, 201);
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.get("/api/ops/tenant-isolation", (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.read", {
+        entityType: "tenantIsolationSmoke",
+        tenantId: session.user.tenantId
+      });
+
+      return context.json(phase12PermissionIsolationRuntime.readTenantIsolationSmoke(session.user.tenantId));
+    } catch (error) {
+      return handleRouteError(context, error);
+    }
+  });
+
+  app.post("/api/ops/tenant-isolation/run", async (context) => {
+    try {
+      const session = requireRouteSession(context.req.query("testUser"));
+      assertAllowed(runtime, session, "ops.execute", {
+        entityType: "tenantIsolationSmoke",
+        tenantId: session.user.tenantId
+      });
+
+      const run = await phase12PermissionIsolationRuntime.runTenantIsolationSmoke({
+        tenantId: session.user.tenantId,
+        now: runtime.now(),
+        requester: (path, init) => Promise.resolve(app.request(path, init))
+      });
+      runtime.appendAuditEvent({
+        session,
+        id: run.auditEventId,
+        actionKey: "ops.tenant_isolation_smoke.run",
+        target: { entityType: "tenantIsolationSmoke", entityId: run.id },
+        correlationId: `corr-${run.id}`,
+        details: {
+          after: {
+            summary: run.summary,
+            status: run.status
+          }
+        }
+      });
+
+      return context.json({ run }, 201);
     } catch (error) {
       return handleRouteError(context, error);
     }
@@ -5098,6 +5194,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     phase9Runtime = createPhase9RuntimeState();
     phase10Runtime = createPhase10RuntimeState();
     phase11Runtime = createPhase11RuntimeState();
+    phase12PermissionIsolationRuntime = createPhase12PermissionIsolationSmokeRuntimeState();
     phase12RecoveryRuntime = createPhase12RecoveryRuntimeState();
     phase11ImportPreviewCounter = 0;
     return context.json({ status: "reset" });
