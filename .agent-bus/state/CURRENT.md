@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T08:34:30.0000000+07:00
+Updated: 2026-05-17T08:45:00.0000000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -8,8 +8,13 @@ Updated: 2026-05-17T08:34:30.0000000+07:00
   - matrix: `docs/status/phase12-requirements-matrix.json`
   - verifier support recognizes P12-001..P12-010 and E2E-110..115 paths.
 - `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; all P12 rows remain blocked until implementation/E2E evidence exists.
+- `P12-001-production-deployment-env-secret-contract` is accepted as an implementation block:
+  - `.env.example` contains P12 deployment variable names with empty values only.
+  - `docs/operations/PHASE_12_PRODUCTION_DEPLOYMENT_ENVIRONMENT.md` defines production-like env, secret-reference, and deployment-smoke rules.
+  - `apps/api/src/phase12Deployment.ts` and `GET /health/deployment` validate required env, URLs, secret references, external-service mode, and fixture-only switches without exposing secret values.
+  - P12-001 matrix row remains blocked only for later E2E-113 evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-001-production-deployment-env-secret-contract`.
+- Next runnable step: claim `P12-002-observability-readiness-runtime`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:
