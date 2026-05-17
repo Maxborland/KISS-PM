@@ -6306,7 +6306,7 @@
         "P12-010"
       ],
       "title": "Close Phase 12 verification matrix and market release exit gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6353,7 +6353,7 @@
         "npm run lint",
         "git diff --check"
       ],
-      "notes": "Runnable after accepted P12-009, accepted P12-BLOCKER-P6-e2e-audit-compatibility, accepted P12-BLOCKER-P7-e2e-selector-compatibility, and accepted P12-BLOCKER-P6-e2e-audit-type. This is the only P12 block that may mark Phase 12 and Release 2 accepted after strict matrix verification, E2E-110..115, npm test, typecheck, lint, review loop, guard, and final handoff pass."
+      "notes": "Accepted 2026-05-17T10:50:37.8320000+07:00. Closed Phase 12 market release exit gate: E2E-110..115 pass, P12 strict matrix passes without --allow-blocked, npm test/typecheck/lint pass, P3-P11 release-path E2E+strict matrix sweep passed after P6/P7 blocker fixes, git diff --check passes, and review loop has no unresolved Critical/Important/Medium findings."
     }
   ]
 }

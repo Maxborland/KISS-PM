@@ -1,13 +1,18 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T10:29:00.6710000+07:00
+Updated: 2026-05-17T10:50:37.8320000+07:00
 
-- Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
+- Phase 12 Production SaaS Hardening and Market Release is accepted as an implemented market-release gate:
   - `P12-000-production-saas-hardening-phase-contract`
   - contract: `docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md`
   - matrix: `docs/status/phase12-requirements-matrix.json`
   - verifier support recognizes P12-001..P12-010 and E2E-110..115 paths.
-- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; P12-001..P12-009 are verified, while P12-010 remains blocked for the final strict exit-gate aggregation.
+- `docs/status/phase12-requirements-matrix.json` passes strict verification without `--allow-blocked`; P12-001..P12-010 are verified and E2E-110..115 pass.
+- `P12-010-phase12-verification-matrix-market-release-exit-gate` is accepted:
+  - P12 E2E-110..115 pass through `npm run test:e2e:phase -- --phase 12`.
+  - P3-P11 release-path phase E2E + strict matrix sweep passed after P6/P7 test compatibility blockers were fixed.
+  - `npm test`, `npm run typecheck`, `npm run lint`, strict P12 matrix, `git diff --check`, and agent-bus guard pass.
+  - Phase 12 / project-defined market-release gate is accepted. Real cloud account provisioning, production credentials, billing, and external certifications remain P12 non-scope/future operational work.
 - `P12-001-production-deployment-env-secret-contract` is accepted and now verified in the Phase 12 matrix:
   - `.env.example` contains P12 deployment variable names with empty values only.
   - `docs/operations/PHASE_12_PRODUCTION_DEPLOYMENT_ENVIRONMENT.md` defines production-like env, secret-reference, and deployment-smoke rules.
@@ -63,8 +68,8 @@ Updated: 2026-05-17T10:29:00.6710000+07:00
   - files: `e2e/tests/phase7/kpi-traceability.spec.ts`, `e2e/tests/phase7/kpi-versioning.spec.ts`
   - result: E2E-062 and E2E-063 now scope interactions to the Phase 7 surfaces under test.
   - verification: `npm run test:e2e:phase -- --phase 7`, strict Phase 7 matrix, `npm run test:e2e:phase -- --phase 12`, `git diff --check`, and agent-bus guard pass.
-- Next runnable step: resume `P12-010-phase12-verification-matrix-market-release-exit-gate`.
-- Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
+- Next runnable step: no P3-P12 product phase remains open in the repository-defined release plan; recommended next work is a release handoff/branch integration decision and any out-of-repo production provisioning follow-up.
+- Release 2 / P3-P12 repository-defined market-release gate is accepted. Do not treat this as real cloud deployment completed; P12 explicitly excludes live cloud account provisioning, production credentials, payment setup, external security certification, and live production database backup execution.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:
   - `P11-000-integrations-migration-phase-contract`

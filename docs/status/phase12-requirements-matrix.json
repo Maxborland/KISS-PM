@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T10:29:00.6710000+07:00",
+  "updated_at": "2026-05-17T10:50:37.8320000+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -530,7 +530,7 @@
     {
       "id": "P12-010",
       "requirement": "Phase 12 verification matrix and market release exit gate",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -545,18 +545,85 @@
         "E2E-115"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-010 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-010 scope and exit-gate acceptance criteria.",
+        "P12-001..P12-009 are verified in docs/status/phase12-requirements-matrix.json with structured implementation, cleanup, and E2E evidence.",
+        "E2E-110..115 passed in the final P12 phase run with UI/API readback, backend denial, audit/action evidence, reload persistence, cleanup/reset, production-like smoke, recovery smoke, and mocked external-service proof.",
+        "Earlier phase release-path regression sweep ran phase E2E plus strict matrix verification for P3, P4, P5, P6, P7, P8, P9, P10, and P11; P6/P7 test compatibility blockers found during the sweep were fixed and committed before final P12 acceptance.",
+        "Full npm test, typecheck, lint, strict Phase 12 matrix verifier, git diff check, and agent-bus guard pass in the final P12-010 loop."
       ],
       "tests": [
-        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
-        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
-        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/agent-bus-guard.mjs --task P12-010-phase12-verification-matrix-market-release-exit-gate --once exit 0 at startup and after blocker-fix resume",
+        "npm run test:e2e:phase -- --phase 3 exit 0: 5 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase3-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 4 exit 0: 5 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase4-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 5 exit 0: 5 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase5-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 6 exit 1 RED before blocker fix: E2E-054 expected exactly one audit action while accepted P8 delegated action added second valid action; fixed in abf0a6e and 46352e6",
+        "npm run test:e2e:phase -- --phase 6 exit 0 after fixes: 6 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase6-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 7 exit 1 RED before blocker fix: strict-mode duplicate selectors after later surfaces; fixed in 9de1720",
+        "npm run test:e2e:phase -- --phase 7 exit 0 after fix: 5 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase7-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 8 exit 0: 6 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase8-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 9 exit 0: 4 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 10 exit 0: 6 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase10-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 11 exit 0: 5 passed; node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 0",
+        "npm run test:e2e:phase -- --phase 12 exit 0: 6 passed, E2E-110..115 recorded in test-results/kiss-pm-e2e-last-run.json",
+        "npm test exit 0: 107 files, 612 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 0 after P12-010 row verification",
+        "git diff --check exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Final Phase 12 strict exit-gate aggregation is blocked until P12-001..P12-009 and E2E-110..115 are verified.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
-      "e2e_evidence": []
+      "cleanup": "Final P12 E2E-110..115 prove deterministic cleanup/readback for release demo closure project, permission-smoke latestRun and setup project, tenant-isolation latestRun/no-leak state, readiness latestRun, recovery latestRun, and integration mappings. P12-010 itself changes only matrix/agent-bus status and creates no runtime product state.",
+      "blocker": "",
+      "last_checked_at": "2026-05-17T10:50:37.8320000+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-110",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/full-critical-journey.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        },
+        {
+          "id": "E2E-111",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/permission-matrix-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        },
+        {
+          "id": "E2E-112",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/tenant-isolation-full.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        },
+        {
+          "id": "E2E-113",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/production-deploy-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        },
+        {
+          "id": "E2E-114",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/recovery-smoke.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        },
+        {
+          "id": "E2E-115",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 12",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase12/no-live-external-dependency.spec.ts",
+          "checked_at": "2026-05-17T10:50:37.8320000+07:00"
+        }
+      ]
     }
   ]
 }
