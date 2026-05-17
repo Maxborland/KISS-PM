@@ -1,6 +1,16 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T16:44:44.6487536+07:00
+Updated: 2026-05-17T17:12:00+07:00
+
+- `R2-UI-001-shared-operational-primitives` is completed as the first Release 2 production UI slice:
+  - shared primitives: `apps/web/src/operationalSurfacePrimitives.tsx`
+  - tests: `apps/web/src/operationalSurfacePrimitives.test.tsx`
+  - first consumer: `apps/web/src/PortfolioControlSurface.tsx` now uses `OperationalSurfaceShell`, `KPIStrip`, `SignalSummaryBar`, and `ActionAuditPreview` without changing API/domain behavior.
+  - styles: `apps/web/src/styles.css`
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` marks `R2-001..R2-004` as `in_progress` with evidence; full Release 2/E2E-R2 closure is not claimed.
+  - verification: targeted Vitest passed (2 files, 19 tests); `npm run typecheck` passed; `npm run lint` passed; `git diff --check` passed; Release 2 and P3-P12 UX JSON parses passed; agent-bus guard passed before edits and final handoff after escalation for git-status access.
+  - known verifier gap: `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this R2 backlog shape (`unsupported matrix phase: undefined`; planned/in_progress status errors).
+  - next recommended implementation slice: pick one closed R2 row group, preferably `R2-005/R2-006` Project Gantt hardening or `R2-007/R2-008` Resource Load/conflict flow, with its own claim and E2E/component test scope.
 
 - `R2-CONTRACT-001-release2-ui-control-surfaces-contract` is completed as a docs-only Release 2 UI/product release contract:
   - contract: `docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md`

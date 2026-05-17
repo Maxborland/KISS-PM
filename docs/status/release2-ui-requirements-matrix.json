@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release": "R2",
-  "updated_at": "2026-05-17T16:37:37.1653841+07:00",
+  "updated_at": "2026-05-17T17:11:00+07:00",
   "source_documents": [
     "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
     "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
@@ -13,7 +13,7 @@
     {
       "id": "R2-001",
       "requirement": "Release 2 shared operational shell and navigation state",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "OperationalSurfaceShell",
@@ -43,12 +43,17 @@
       "risks": [
         "Shell can become decorative if it does not reserve space for action/result/readback state."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added apps/web/src/operationalSurfacePrimitives.tsx OperationalSurfaceShell with state/status/readback/action regions.",
+        "2026-05-17: Added component coverage in apps/web/src/operationalSurfacePrimitives.test.tsx for governed shell state, disabled primary action reason, audit preview, and readback proof.",
+        "2026-05-17: Integrated OperationalSurfaceShell into PortfolioControlSurface as the first Release 2 consumer; remaining surfaces still pending.",
+        "2026-05-17: npm test -- apps/web/src/operationalSurfacePrimitives.test.tsx apps/web/src/PortfolioControlSurface.test.tsx passed."
+      ]
     },
     {
       "id": "R2-002",
       "requirement": "OperationalDataGrid / configurable table foundation",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "OperationalDataGrid",
@@ -78,12 +83,16 @@
       "risks": [
         "Layout storage can drift if local convenience cache is treated as durable tenant configuration."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added OperationalDataGrid and ConfigurableColumnLayout primitives with grouped headers, visible column toggles, reset layout, keyboard row selection, row actions, and disabled action reason.",
+        "2026-05-17: Added component coverage in apps/web/src/operationalSurfacePrimitives.test.tsx for grid grouping, column reset, keyboard selection, and row action disabled reason.",
+        "2026-05-17: Runtime saved-view persistence and broad screen migration remain pending in later R2 slices."
+      ]
     },
     {
       "id": "R2-003",
       "requirement": "KPI strip and signal summary pattern",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Release 2 shared UI primitives implementation PR",
       "owned_scope": [
         "KPIStrip",
@@ -114,12 +123,16 @@
       "risks": [
         "KPI cards can become passive if not linked to signals and actions."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added KPIStrip and SignalSummaryBar primitives with severity, source labels, deltas, requires-action affordance, and next-action entrypoint.",
+        "2026-05-17: Integrated KPIStrip and SignalSummaryBar into PortfolioControlSurface and added regression assertions.",
+        "2026-05-17: npm test -- apps/web/src/operationalSurfacePrimitives.test.tsx apps/web/src/PortfolioControlSurface.test.tsx passed."
+      ]
     },
     {
       "id": "R2-004",
       "requirement": "Portfolio Control surface UI hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Portfolio and KPI control implementation PR",
       "owned_scope": [
         "UX-P8-PORTFOLIO-CONTROL",
@@ -154,7 +167,10 @@
       "risks": [
         "Portfolio view can regress into passive status reporting."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: PortfolioControlSurface now consumes OperationalSurfaceShell, KPIStrip, SignalSummaryBar, and ActionAuditPreview while preserving governed preview/apply/audit/readback flow tests.",
+        "2026-05-17: This is a first consumer hardening step only; full R2-004 E2E-R2-001/E2E-R2-010 closure remains pending."
+      ]
     },
     {
       "id": "R2-005",
