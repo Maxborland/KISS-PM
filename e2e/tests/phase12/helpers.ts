@@ -51,3 +51,10 @@ export async function getOpsAudit(request: APIRequestContext, testUser = phase12
     events: Array<{ actionKey: string; target: { entityId: string } }>;
   };
 }
+
+export async function getApiJson<T>(request: APIRequestContext, path: string, testUser = phase12Users.operatorAdmin): Promise<T> {
+  const separator = path.includes("?") ? "&" : "?";
+  const response = await request.get(`${phase12ApiBaseUrl()}${path}${separator}testUser=${encodeURIComponent(testUser)}`);
+  await expect(response).toBeOK();
+  return (await response.json()) as T;
+}
