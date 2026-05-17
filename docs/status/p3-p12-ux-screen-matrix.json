@@ -1,39 +1,1383 @@
 {
   "version": 1,
-  "updated_at": "2026-05-16T13:20:00+07:00",
+  "updated_at": "2026-05-17T16:07:50.5130098+07:00",
   "screens": [
-    {"id":"UX-P3-CRM-INTAKE","phase":"P3","name":"CRM Intake Control","route_or_surface":"/crm/intake","primary_role":"ProjectManager","primary_goal":"Find opportunities ready for project-control intake","primary_next_action":"Open readiness review","states":["loading","empty","ready","permission_denied","error"],"mutations":["request_missing_data","create_project_draft"],"permission_rules":["crm:read","project:create"],"audit_required":true,"reload_required":true,"e2e":["E2E-020","E2E-021"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-crm-intake"],"status":"specified"},
-    {"id":"UX-P3-OPPORTUNITY-DETAIL","phase":"P3","name":"Opportunity Detail","route_or_surface":"/crm/opportunities/:id","primary_role":"ProjectManager","primary_goal":"Inspect business and delivery readiness","primary_next_action":"Run feasibility/readiness panel","states":["loading","empty","ready","permission_denied","error"],"mutations":["update_intake_data","create_project_draft"],"permission_rules":["crm:read","crm:write","project:create"],"audit_required":true,"reload_required":true,"e2e":["E2E-020","E2E-021","E2E-023"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-opportunity-detail"],"status":"specified"},
-    {"id":"UX-P3-FEASIBILITY-PANEL","phase":"P3","name":"Feasibility / Readiness Panel","route_or_surface":"opportunity side panel","primary_role":"ProjectManager","primary_goal":"Determine if project creation is safe","primary_next_action":"Resolve blocker or approve draft creation","states":["loading","empty","ready","permission_denied","error"],"mutations":["mark_ready","request_missing_info"],"permission_rules":["feasibility:read","feasibility:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-021","E2E-022"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-feasibility-panel"],"status":"specified"},
-    {"id":"UX-P3-PROJECT-DRAFT","phase":"P3","name":"Project Draft / Create From Opportunity","route_or_surface":"/projects/drafts/:id","primary_role":"ProjectManager","primary_goal":"Review canonical project draft before activation","primary_next_action":"Activate project","states":["loading","empty","ready","permission_denied","error"],"mutations":["adjust_template_selection","activate_project"],"permission_rules":["project:create","lifecycle:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-023","E2E-024"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-project-draft"],"status":"specified"},
-    {"id":"UX-P4-PROJECT-OVERVIEW","phase":"P4","name":"Project Overview","route_or_surface":"/projects/:id","primary_role":"ProjectManager","primary_goal":"See lifecycle, work, risks, and next action","primary_next_action":"Open current stage gate or Gantt","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_task","open_stage_gate"],"permission_rules":["project:read","task:write","lifecycle:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-030","E2E-031","E2E-032"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-project-overview"],"status":"specified"},
-    {"id":"UX-P4-STAGE-GATE","phase":"P4","name":"Stage Gate / Approval View","route_or_surface":"/projects/:id/stage-gate","primary_role":"Controller","primary_goal":"Approve or block lifecycle transition","primary_next_action":"Approve or reject with reason","states":["loading","empty","ready","permission_denied","error"],"mutations":["approve_stage","reject_stage"],"permission_rules":["lifecycle:approve"],"audit_required":true,"reload_required":true,"e2e":["E2E-031","E2E-032"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-stage-gate"],"status":"specified"},
-    {"id":"UX-P4-MY-TASKS","phase":"P4","name":"My Tasks","route_or_surface":"/work/my-tasks","primary_role":"Executor","primary_goal":"Execute assigned canonical task work","primary_next_action":"Update task status","states":["loading","empty","ready","permission_denied","error"],"mutations":["start_task","complete_task","request_review"],"permission_rules":["task:read","task.status:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-033","E2E-041"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-my-tasks"],"status":"specified"},
-    {"id":"UX-P4-KANBAN","phase":"P4","name":"Kanban Board","route_or_surface":"/projects/:id/kanban","primary_role":"Executor","primary_goal":"Move canonical tasks through execution states","primary_next_action":"Move task to next allowed state","states":["loading","empty","ready","permission_denied","error"],"mutations":["move_card","update_task_status"],"permission_rules":["task:read","task:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-034","E2E-041"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-kanban"],"status":"specified"},
-    {"id":"UX-P5-PROJECT-GANTT","phase":"P5","name":"Project Gantt","route_or_surface":"/projects/:id/gantt","primary_role":"ProjectManager","primary_goal":"Plan project work using canonical tasks and schedule data","primary_next_action":"Create or adjust planned task","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_task","update_dates","create_dependency","set_baseline"],"permission_rules":["project:read","task:write","audit:read"],"audit_required":true,"reload_required":true,"e2e":["E2E-040","E2E-041","E2E-042","E2E-043","E2E-044"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-project-gantt"],"implementation_policy":"custom_kiss_pm_surface","headless_foundation":["TanStack Table for WBS/grid where useful","shadcn/Radix for controls and feedback"],"ready_gantt_widget_allowed":false,"canonical_task_required":true,"status":"specified"},
-    {"id":"UX-P5-GANTT-TASK-PANEL","phase":"P5","name":"Gantt Task Detail Panel","route_or_surface":"Gantt side panel","primary_role":"ProjectManager","primary_goal":"Edit canonical task and schedule fields","primary_next_action":"Save schedule change","states":["loading","empty","ready","permission_denied","error"],"mutations":["update_task_schedule","open_linked_view"],"permission_rules":["task:read","task:write","audit:read"],"audit_required":true,"reload_required":true,"e2e":["E2E-041","E2E-042"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-gantt-task-panel"],"status":"specified"},
-    {"id":"UX-P5-BASELINE-PANEL","phase":"P5","name":"Baseline Panel","route_or_surface":"Gantt baseline panel","primary_role":"ProjectManager","primary_goal":"Capture and compare baseline against live plan","primary_next_action":"Capture baseline","states":["loading","empty","ready","permission_denied","error"],"mutations":["capture_baseline","toggle_baseline_overlay"],"permission_rules":["schedule.baseline:write","audit:read"],"audit_required":true,"reload_required":true,"e2e":["E2E-044"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-baseline-panel"],"status":"specified"},
-    {"id":"UX-P6-RESOURCE-LOAD","phase":"P6","name":"Resource Load Control","route_or_surface":"/resources/load","primary_role":"ResourceManager","primary_goal":"Detect resource overloads","primary_next_action":"Open overload resolution","states":["loading","empty","ready","permission_denied","error"],"mutations":["reserve_capacity","open_resolution"],"permission_rules":["resource:read","resource:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-050"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p6-resource-load"],"status":"specified"},
-    {"id":"UX-P6-OVERLOAD-RESOLUTION","phase":"P6","name":"Overload Resolution Flow","route_or_surface":"resource resolution flow","primary_role":"ResourceManager","primary_goal":"Reduce or govern overload","primary_next_action":"Apply previewed resolution","states":["loading","empty","ready","permission_denied","error"],"mutations":["reassign_work","shift_dates","reserve_capacity","accept_overload"],"permission_rules":["resource:write","task:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-051"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p6-overload-resolution"],"status":"specified"},
-    {"id":"UX-P7-KPI-DEFINITION","phase":"P7","name":"KPI Definition Admin","route_or_surface":"/admin/kpi-definitions","primary_role":"TenantAdmin","primary_goal":"Configure traceable KPI formulas and thresholds","primary_next_action":"Publish definition version","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_kpi_definition","publish_kpi_definition"],"permission_rules":["kpi.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-070"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p7-kpi-definition"],"status":"specified"},
-    {"id":"UX-P7-KPI-DEVIATION","phase":"P7","name":"KPI Deviation Control","route_or_surface":"/kpi/deviations","primary_role":"Executive","primary_goal":"Handle KPI deviations","primary_next_action":"Create corrective action or accept risk","states":["loading","empty","ready","permission_denied","error"],"mutations":["open_control_action","assign_owner"],"permission_rules":["kpi:read","control.action:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-070","E2E-080"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p7-kpi-deviation"],"status":"specified"},
-    {"id":"UX-P8-PORTFOLIO-CONTROL","phase":"P8","name":"Control Surface Builder MVP / Portfolio Control","route_or_surface":"/control/portfolio","primary_role":"Executive","primary_goal":"Govern portfolio deviations","primary_next_action":"Execute recommended management action","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_corrective_action","accept_risk","escalate"],"permission_rules":["control:read","control.action:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-080"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-portfolio-control"],"status":"specified"},
-    {"id":"UX-P8-CORRECTIVE-ACTION","phase":"P8","name":"Corrective Action Dialog","route_or_surface":"corrective action dialog","primary_role":"ProjectManager","primary_goal":"Create traceable corrective action","primary_next_action":"Confirm corrective action","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_corrective_action"],"permission_rules":["control.action:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-081"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-corrective-action"],"status":"specified"},
-    {"id":"UX-P8-ACCEPT-RISK","phase":"P8","name":"Accept Risk Dialog","route_or_surface":"accept risk dialog","primary_role":"Executive","primary_goal":"Explicitly accept risk with reason","primary_next_action":"Accept risk","states":["loading","empty","ready","permission_denied","error"],"mutations":["accept_risk"],"permission_rules":["risk:accept"],"audit_required":true,"reload_required":true,"e2e":["E2E-082"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-accept-risk"],"status":"specified"},
-    {"id":"UX-P8-ACTION-AUDIT","phase":"P8","name":"Action Audit","route_or_surface":"action audit side panel","primary_role":"Controller","primary_goal":"Verify action traceability","primary_next_action":"Inspect command result and source","states":["loading","empty","ready","permission_denied","error"],"mutations":["open_source","copy_audit_id"],"permission_rules":["audit:read"],"audit_required":true,"reload_required":true,"e2e":["E2E-080","E2E-081","E2E-082"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-action-audit"],"status":"specified"},
-    {"id":"UX-P9-CLOSED-PORTFOLIO","phase":"P9","name":"Closed Portfolio / Retrospective Surface","route_or_surface":"/retrospectives/closed-portfolio","primary_role":"Executive","primary_goal":"Inspect immutable closure outcomes","primary_next_action":"Open trend analysis","states":["loading","empty","ready","permission_denied","error"],"mutations":["tag_lessons","open_trend_analysis"],"permission_rules":["retrospective:read","retrospective:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-090"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-closed-portfolio"],"status":"specified"},
-    {"id":"UX-P9-RETROSPECTIVE-TRENDS","phase":"P9","name":"Retrospective Trends","route_or_surface":"/retrospectives/trends","primary_role":"Executive","primary_goal":"Convert closure trends into improvement","primary_next_action":"Create improvement action","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_improvement_action","group_trends"],"permission_rules":["retrospective:read","retrospective:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-091"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-retrospective-trends"],"status":"specified"},
-    {"id":"UX-P9-TEMPLATE-IMPROVEMENT","phase":"P9","name":"Template Improvement Action Flow","route_or_surface":"template improvement flow","primary_role":"TenantAdmin","primary_goal":"Improve templates from retrospective evidence","primary_next_action":"Apply template change preview","states":["loading","empty","ready","permission_denied","error"],"mutations":["apply_template_improvement","send_for_review"],"permission_rules":["tenant.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-092"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-template-improvement"],"status":"specified"},
-    {"id":"UX-P10-TENANT-LABELS","phase":"P10","name":"Tenant Labels / Roles Admin","route_or_surface":"/admin/tenant/labels","primary_role":"TenantAdmin","primary_goal":"Adapt terminology safely","primary_next_action":"Preview and save label set","states":["loading","empty","ready","permission_denied","error"],"mutations":["save_labels","reset_labels"],"permission_rules":["tenant.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-060"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-tenant-labels"],"status":"specified"},
-    {"id":"UX-P10-TENANT-TAXONOMIES","phase":"P10","name":"Tenant Taxonomies Admin","route_or_surface":"/admin/tenant/taxonomies","primary_role":"TenantAdmin","primary_goal":"Define operational classifications","primary_next_action":"Publish taxonomy version","states":["loading","empty","ready","permission_denied","error"],"mutations":["publish_taxonomy","archive_value"],"permission_rules":["tenant.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-060"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-tenant-taxonomies"],"status":"specified"},
-    {"id":"UX-P10-CUSTOM-FIELDS","phase":"P10","name":"Custom Fields Admin","route_or_surface":"/admin/tenant/custom-fields","primary_role":"TenantAdmin","primary_goal":"Add tenant data without code changes","primary_next_action":"Create field with preview","states":["loading","empty","ready","permission_denied","error"],"mutations":["create_custom_field","disable_custom_field"],"permission_rules":["tenant.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-061"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-custom-fields"],"status":"specified"},
-    {"id":"UX-P10-KPI-THRESHOLDS","phase":"P10","name":"KPI Threshold Builder","route_or_surface":"/admin/tenant/kpi-thresholds","primary_role":"TenantAdmin","primary_goal":"Tune KPI signals safely","primary_next_action":"Preview threshold impact and publish","states":["loading","empty","ready","permission_denied","error"],"mutations":["publish_threshold","duplicate_rule"],"permission_rules":["kpi.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-062"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-kpi-thresholds"],"status":"specified"},
-    {"id":"UX-P10-SAVED-VIEWS","phase":"P10","name":"Saved Views / Layout Builder","route_or_surface":"/admin/tenant/saved-views","primary_role":"TenantAdmin","primary_goal":"Configure repeatable management surfaces","primary_next_action":"Publish saved view","states":["loading","empty","ready","permission_denied","error"],"mutations":["publish_saved_view","archive_saved_view"],"permission_rules":["view.config:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-062"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-saved-views"],"status":"specified"},
-    {"id":"UX-P11-INTEGRATION-IMPORT","phase":"P11","name":"Integration Import Admin","route_or_surface":"/admin/integrations/import","primary_role":"IntegrationAdmin","primary_goal":"Import external data into canonical operation","primary_next_action":"Run import preview","states":["loading","empty","ready","permission_denied","error"],"mutations":["preview_import","execute_import"],"permission_rules":["integration:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-110"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p11-integration-import"],"status":"specified"},
-    {"id":"UX-P11-EXTERNAL-MAPPING","phase":"P11","name":"External Mapping Diagnostics","route_or_surface":"/admin/integrations/mapping","primary_role":"IntegrationAdmin","primary_goal":"Diagnose mapping health","primary_next_action":"Fix broken mapping","states":["loading","empty","ready","permission_denied","error"],"mutations":["repair_mapping","retry_mapping"],"permission_rules":["integration:write"],"audit_required":true,"reload_required":true,"e2e":["E2E-111"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p11-external-mapping"],"status":"specified"},
-    {"id":"UX-P12-RELEASE-READINESS","phase":"P12","name":"Production Readiness / Operator Checklist","route_or_surface":"/ops/release-readiness","primary_role":"OperatorAdmin","primary_goal":"Prove release readiness","primary_next_action":"Run readiness check","states":["loading","empty","ready","permission_denied","error"],"mutations":["run_readiness_check","mark_blocker"],"permission_rules":["ops:execute"],"audit_required":true,"reload_required":true,"e2e":["E2E-120"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-release-readiness"],"status":"specified"},
-    {"id":"UX-P12-PERMISSION-SMOKE","phase":"P12","name":"Permission Smoke","route_or_surface":"/ops/permission-smoke","primary_role":"OperatorAdmin","primary_goal":"Prove UI and backend permission alignment","primary_next_action":"Run permission smoke","states":["loading","empty","ready","permission_denied","error"],"mutations":["run_permission_smoke","rerun_failures"],"permission_rules":["ops:execute"],"audit_required":true,"reload_required":true,"e2e":["E2E-120"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-permission-smoke"],"status":"specified"},
-    {"id":"UX-P12-TENANT-ISOLATION","phase":"P12","name":"Tenant Isolation","route_or_surface":"/ops/tenant-isolation","primary_role":"OperatorAdmin","primary_goal":"Prove tenant data boundaries","primary_next_action":"Run isolation smoke","states":["loading","empty","ready","permission_denied","error"],"mutations":["run_isolation_smoke","open_failing_request"],"permission_rules":["ops:execute"],"audit_required":true,"reload_required":true,"e2e":["E2E-121"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-tenant-isolation"],"status":"specified"},
-    {"id":"UX-P12-RECOVERY-SMOKE","phase":"P12","name":"Recovery Smoke","route_or_surface":"/ops/recovery-smoke","primary_role":"OperatorAdmin","primary_goal":"Prove recovery is understandable and controlled","primary_next_action":"Run recovery smoke","states":["loading","empty","ready","permission_denied","error"],"mutations":["run_recovery_smoke","inspect_logs"],"permission_rules":["ops:execute"],"audit_required":true,"reload_required":true,"e2e":["E2E-122"],"spec_refs":["docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-recovery-smoke"],"status":"specified"}
+    {
+      "id": "UX-P3-CRM-INTAKE",
+      "phase": "P3",
+      "name": "CRM Intake Control",
+      "route_or_surface": "/crm/intake",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Find opportunities ready for project-control intake",
+      "primary_next_action": "Open readiness review",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "request_missing_data",
+        "create_project_draft"
+      ],
+      "permission_rules": [
+        "crm:read",
+        "project:create"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-020",
+        "E2E-021"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-crm-intake"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P3-OPPORTUNITY-DETAIL",
+      "phase": "P3",
+      "name": "Opportunity Detail",
+      "route_or_surface": "/crm/opportunities/:id",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Inspect business and delivery readiness",
+      "primary_next_action": "Run feasibility/readiness panel",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "update_intake_data",
+        "create_project_draft"
+      ],
+      "permission_rules": [
+        "crm:read",
+        "crm:write",
+        "project:create"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-020",
+        "E2E-021",
+        "E2E-023"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-opportunity-detail"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P3-FEASIBILITY-PANEL",
+      "phase": "P3",
+      "name": "Feasibility / Readiness Panel",
+      "route_or_surface": "opportunity side panel",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Determine if project creation is safe",
+      "primary_next_action": "Resolve blocker or approve draft creation",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "mark_ready",
+        "request_missing_info"
+      ],
+      "permission_rules": [
+        "feasibility:read",
+        "feasibility:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-021",
+        "E2E-022"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-feasibility-panel"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P3-PROJECT-DRAFT",
+      "phase": "P3",
+      "name": "Project Draft / Create From Opportunity",
+      "route_or_surface": "/projects/drafts/:id",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Review canonical project draft before activation",
+      "primary_next_action": "Activate project",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "adjust_template_selection",
+        "activate_project"
+      ],
+      "permission_rules": [
+        "project:create",
+        "lifecycle:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-023",
+        "E2E-024"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p3-project-draft"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P4-PROJECT-OVERVIEW",
+      "phase": "P4",
+      "name": "Project Overview",
+      "route_or_surface": "/projects/:id",
+      "primary_role": "ProjectManager",
+      "primary_goal": "See lifecycle, work, risks, and next action",
+      "primary_next_action": "Open current stage gate or Gantt",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "create_task",
+        "open_stage_gate"
+      ],
+      "permission_rules": [
+        "project:read",
+        "task:write",
+        "lifecycle:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-030",
+        "E2E-031",
+        "E2E-032"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-project-overview"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P4-STAGE-GATE",
+      "phase": "P4",
+      "name": "Stage Gate / Approval View",
+      "route_or_surface": "/projects/:id/stage-gate",
+      "primary_role": "Controller",
+      "primary_goal": "Approve or block lifecycle transition",
+      "primary_next_action": "Approve or reject with reason",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "approve_stage",
+        "reject_stage"
+      ],
+      "permission_rules": [
+        "lifecycle:approve"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-031",
+        "E2E-032"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-stage-gate"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P4-MY-TASKS",
+      "phase": "P4",
+      "name": "My Tasks",
+      "route_or_surface": "/work/my-tasks",
+      "primary_role": "Executor",
+      "primary_goal": "Execute assigned canonical task work",
+      "primary_next_action": "Update task status",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "start_task",
+        "complete_task",
+        "request_review"
+      ],
+      "permission_rules": [
+        "task:read",
+        "task.status:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-033",
+        "E2E-041"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-my-tasks"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P4-KANBAN",
+      "phase": "P4",
+      "name": "Kanban Board",
+      "route_or_surface": "/projects/:id/kanban",
+      "primary_role": "Executor",
+      "primary_goal": "Move canonical tasks through execution states",
+      "primary_next_action": "Move task to next allowed state",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "move_card",
+        "update_task_status"
+      ],
+      "permission_rules": [
+        "task:read",
+        "task:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-034",
+        "E2E-041"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p4-kanban"
+      ],
+      "status": "specified"
+    },
+    {
+      "id": "UX-P5-PROJECT-GANTT",
+      "phase": "P5",
+      "name": "Project Gantt",
+      "route_or_surface": "/projects/:id/gantt",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Plan project work using canonical tasks and schedule data",
+      "primary_next_action": "Create or adjust planned task",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "fetching",
+        "cached_stale",
+        "permission_denied",
+        "readonly",
+        "validation_error",
+        "dirty",
+        "pending_save",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "create_task",
+        "update_dates",
+        "create_dependency",
+        "set_baseline"
+      ],
+      "permission_rules": [
+        "project:read",
+        "task:write",
+        "audit:read"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-040",
+        "E2E-041",
+        "E2E-042",
+        "E2E-043",
+        "E2E-044"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-project-gantt",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "implementation_policy": "custom_kiss_pm_surface",
+      "headless_foundation": [
+        "TanStack Table for WBS/grid where useful",
+        "shadcn/Radix for controls and feedback"
+      ],
+      "ready_gantt_widget_allowed": false,
+      "canonical_task_required": true,
+      "status": "specified",
+      "interaction_patterns": [
+        "ProjectGantt",
+        "OperationalDataGrid",
+        "PreviewBeforeApply",
+        "ActionAuditPreview",
+        "DrilldownDetailSheet"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P5-GANTT-TASK-PANEL",
+      "phase": "P5",
+      "name": "Gantt Task Detail Panel",
+      "route_or_surface": "Gantt side panel",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Edit canonical task and schedule fields",
+      "primary_next_action": "Save schedule change",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "validation_error",
+        "dirty",
+        "pending",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "update_task_schedule",
+        "open_linked_view"
+      ],
+      "permission_rules": [
+        "task:read",
+        "task:write",
+        "audit:read"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-041",
+        "E2E-042"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-gantt-task-panel",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "DrilldownDetailSheet",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P5-BASELINE-PANEL",
+      "phase": "P5",
+      "name": "Baseline Panel",
+      "route_or_surface": "Gantt baseline panel",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Capture and compare baseline against live plan",
+      "primary_next_action": "Capture baseline",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "validation_error",
+        "pending",
+        "applied",
+        "apply_failed",
+        "no_previous",
+        "error"
+      ],
+      "mutations": [
+        "capture_baseline",
+        "toggle_baseline_overlay"
+      ],
+      "permission_rules": [
+        "schedule.baseline:write",
+        "audit:read"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-044"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p5-baseline-panel",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "PreviewBeforeApply",
+        "ActionAuditPreview",
+        "ProjectGantt"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P6-RESOURCE-LOAD",
+      "phase": "P6",
+      "name": "Resource Load Control",
+      "route_or_surface": "/resources/load",
+      "primary_role": "ResourceManager",
+      "primary_goal": "Detect resource overloads",
+      "primary_next_action": "Open overload resolution",
+      "states": [
+        "loading",
+        "empty",
+        "filtered_empty",
+        "ready",
+        "fetching",
+        "cached_stale",
+        "permission_denied",
+        "readonly",
+        "preview_ready",
+        "applying",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "reserve_capacity",
+        "open_resolution"
+      ],
+      "permission_rules": [
+        "resource:read",
+        "resource:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-050",
+        "E2E-051",
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p6-resource-load",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "CapacityMatrix",
+        "KPIStrip",
+        "DrilldownDetailSheet",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P6-OVERLOAD-RESOLUTION",
+      "phase": "P6",
+      "name": "Overload Resolution Flow",
+      "route_or_surface": "resource resolution flow",
+      "primary_role": "ResourceManager",
+      "primary_goal": "Reduce or govern overload",
+      "primary_next_action": "Apply previewed resolution",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "calculating_preview",
+        "preview_ready",
+        "blocked_preview",
+        "applying",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "reassign_work",
+        "shift_dates",
+        "reserve_capacity",
+        "accept_overload"
+      ],
+      "permission_rules": [
+        "resource:write",
+        "task:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-052",
+        "E2E-053",
+        "E2E-054",
+        "E2E-055"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p6-overload-resolution",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "PreviewBeforeApply",
+        "ActionAuditPreview",
+        "DrilldownDetailSheet"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P7-KPI-DEFINITION",
+      "phase": "P7",
+      "name": "KPI Definition Admin",
+      "route_or_surface": "/admin/kpi-definitions",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Configure traceable KPI formulas and thresholds",
+      "primary_next_action": "Publish definition version",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "create_kpi_definition",
+        "publish_kpi_definition"
+      ],
+      "permission_rules": [
+        "kpi.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-060",
+        "E2E-063",
+        "E2E-064"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p7-kpi-definition"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P7-KPI-DEVIATION",
+      "phase": "P7",
+      "name": "KPI Deviation Control",
+      "route_or_surface": "/kpi/deviations",
+      "primary_role": "Executive",
+      "primary_goal": "Handle KPI deviations",
+      "primary_next_action": "Create corrective action or accept risk",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "fetching",
+        "cached_stale",
+        "permission_denied",
+        "readonly",
+        "preview_ready",
+        "applied",
+        "apply_failed",
+        "no_previous",
+        "error"
+      ],
+      "mutations": [
+        "open_control_action",
+        "assign_owner"
+      ],
+      "permission_rules": [
+        "kpi:read",
+        "control.action:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-061",
+        "E2E-062",
+        "E2E-063",
+        "E2E-071",
+        "E2E-073",
+        "E2E-075"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p7-kpi-deviation",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "KPIStrip",
+        "OperationalDataGrid",
+        "DrilldownDetailSheet",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P8-PORTFOLIO-CONTROL",
+      "phase": "P8",
+      "name": "Control Surface Builder MVP / Portfolio Control",
+      "route_or_surface": "/control/portfolio",
+      "primary_role": "Executive",
+      "primary_goal": "Govern portfolio deviations",
+      "primary_next_action": "Execute recommended management action",
+      "states": [
+        "loading",
+        "empty",
+        "filtered_empty",
+        "ready",
+        "fetching",
+        "cached_stale",
+        "permission_denied",
+        "readonly",
+        "preview_ready",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "create_corrective_action",
+        "accept_risk",
+        "escalate"
+      ],
+      "permission_rules": [
+        "control:read",
+        "control.action:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-070",
+        "E2E-071",
+        "E2E-072",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-portfolio-control",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "ControlSurfaceShell",
+        "KPIStrip",
+        "OperationalDataGrid",
+        "DrilldownDetailSheet",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P8-CORRECTIVE-ACTION",
+      "phase": "P8",
+      "name": "Corrective Action Dialog",
+      "route_or_surface": "corrective action dialog",
+      "primary_role": "ProjectManager",
+      "primary_goal": "Create traceable corrective action",
+      "primary_next_action": "Confirm corrective action",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "create_corrective_action"
+      ],
+      "permission_rules": [
+        "control.action:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-071",
+        "E2E-075"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-corrective-action",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P8-ACCEPT-RISK",
+      "phase": "P8",
+      "name": "Accept Risk Dialog",
+      "route_or_surface": "accept risk dialog",
+      "primary_role": "Executive",
+      "primary_goal": "Explicitly accept risk with reason",
+      "primary_next_action": "Accept risk",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "accept_risk"
+      ],
+      "permission_rules": [
+        "risk:accept"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-073",
+        "E2E-075"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-accept-risk",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P8-ACTION-AUDIT",
+      "phase": "P8",
+      "name": "Action Audit",
+      "route_or_surface": "action audit side panel",
+      "primary_role": "Controller",
+      "primary_goal": "Verify action traceability",
+      "primary_next_action": "Inspect command result and source",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "open_source",
+        "copy_audit_id"
+      ],
+      "permission_rules": [
+        "audit:read"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-070",
+        "E2E-071",
+        "E2E-072",
+        "E2E-073",
+        "E2E-074",
+        "E2E-075"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p8-action-audit",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P9-CLOSED-PORTFOLIO",
+      "phase": "P9",
+      "name": "Closed Portfolio / Retrospective Surface",
+      "route_or_surface": "/retrospectives/closed-portfolio",
+      "primary_role": "Executive",
+      "primary_goal": "Inspect immutable closure outcomes",
+      "primary_next_action": "Open trend analysis",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "no_previous",
+        "preview_ready",
+        "applied",
+        "error"
+      ],
+      "mutations": [
+        "tag_lessons",
+        "open_trend_analysis"
+      ],
+      "permission_rules": [
+        "retrospective:read",
+        "retrospective:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-080",
+        "E2E-081",
+        "E2E-082"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-closed-portfolio",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "KPIStrip",
+        "OperationalDataGrid",
+        "DrilldownDetailSheet",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P9-RETROSPECTIVE-TRENDS",
+      "phase": "P9",
+      "name": "Retrospective Trends",
+      "route_or_surface": "/retrospectives/trends",
+      "primary_role": "Executive",
+      "primary_goal": "Convert closure trends into improvement",
+      "primary_next_action": "Create improvement action",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "no_previous",
+        "preview_ready",
+        "applying",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "create_improvement_action",
+        "group_trends"
+      ],
+      "permission_rules": [
+        "retrospective:read",
+        "retrospective:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-082",
+        "E2E-083"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-retrospective-trends",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "KPIStrip",
+        "DrilldownDetailSheet",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P9-TEMPLATE-IMPROVEMENT",
+      "phase": "P9",
+      "name": "Template Improvement Action Flow",
+      "route_or_surface": "template improvement flow",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Improve templates from retrospective evidence",
+      "primary_next_action": "Apply template change preview",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "apply_template_improvement",
+        "send_for_review"
+      ],
+      "permission_rules": [
+        "tenant.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-083"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p9-template-improvement",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P10-TENANT-LABELS",
+      "phase": "P10",
+      "name": "Tenant Labels / Roles Admin",
+      "route_or_surface": "/admin/tenant/labels",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Adapt terminology safely",
+      "primary_next_action": "Preview and save label set",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "save_labels",
+        "reset_labels"
+      ],
+      "permission_rules": [
+        "tenant.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-090",
+        "E2E-095"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-tenant-labels"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P10-TENANT-TAXONOMIES",
+      "phase": "P10",
+      "name": "Tenant Taxonomies Admin",
+      "route_or_surface": "/admin/tenant/taxonomies",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Define operational classifications",
+      "primary_next_action": "Publish taxonomy version",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "publish_taxonomy",
+        "archive_value"
+      ],
+      "permission_rules": [
+        "tenant.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-090",
+        "E2E-095"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-tenant-taxonomies"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P10-CUSTOM-FIELDS",
+      "phase": "P10",
+      "name": "Custom Fields Admin",
+      "route_or_surface": "/admin/tenant/custom-fields",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Add tenant data without code changes",
+      "primary_next_action": "Create field with preview",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "create_custom_field",
+        "disable_custom_field"
+      ],
+      "permission_rules": [
+        "tenant.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-091",
+        "E2E-095"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-custom-fields"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P10-KPI-THRESHOLDS",
+      "phase": "P10",
+      "name": "KPI Threshold Builder",
+      "route_or_surface": "/admin/tenant/kpi-thresholds",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Tune KPI signals safely",
+      "primary_next_action": "Preview threshold impact and publish",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "publish_threshold",
+        "duplicate_rule"
+      ],
+      "permission_rules": [
+        "kpi.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-092",
+        "E2E-094",
+        "E2E-095"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-kpi-thresholds"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P10-SAVED-VIEWS",
+      "phase": "P10",
+      "name": "Saved Views / Layout Builder",
+      "route_or_surface": "/admin/tenant/saved-views",
+      "primary_role": "TenantAdmin",
+      "primary_goal": "Configure repeatable management surfaces",
+      "primary_next_action": "Publish saved view",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "validation_error",
+        "preview_ready",
+        "applying",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "publish_saved_view",
+        "archive_saved_view"
+      ],
+      "permission_rules": [
+        "view.config:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-093",
+        "E2E-094",
+        "E2E-095"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p10-saved-views",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "status": "specified",
+      "interaction_patterns": [
+        "OperationalDataGrid",
+        "ConfigurableColumnLayout",
+        "PreviewBeforeApply",
+        "ActionAuditPreview"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P11-INTEGRATION-IMPORT",
+      "phase": "P11",
+      "name": "Integration Import Admin",
+      "route_or_surface": "/admin/integrations/import",
+      "primary_role": "IntegrationAdmin",
+      "primary_goal": "Import external data into canonical operation",
+      "primary_next_action": "Run import preview",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "preview_import",
+        "execute_import"
+      ],
+      "permission_rules": [
+        "integration:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-100",
+        "E2E-101",
+        "E2E-103",
+        "E2E-104"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p11-integration-import"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P11-EXTERNAL-MAPPING",
+      "phase": "P11",
+      "name": "External Mapping Diagnostics",
+      "route_or_surface": "/admin/integrations/mapping",
+      "primary_role": "IntegrationAdmin",
+      "primary_goal": "Diagnose mapping health",
+      "primary_next_action": "Fix broken mapping",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "repair_mapping",
+        "retry_mapping"
+      ],
+      "permission_rules": [
+        "integration:write"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-101",
+        "E2E-102"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p11-external-mapping"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P12-RELEASE-READINESS",
+      "phase": "P12",
+      "name": "Production Readiness / Operator Checklist",
+      "route_or_surface": "/ops/release-readiness",
+      "primary_role": "OperatorAdmin",
+      "primary_goal": "Prove release readiness",
+      "primary_next_action": "Run readiness check",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "run_readiness_check",
+        "mark_blocker"
+      ],
+      "permission_rules": [
+        "ops:execute"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-113",
+        "E2E-115"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-release-readiness"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P12-PERMISSION-SMOKE",
+      "phase": "P12",
+      "name": "Permission Smoke",
+      "route_or_surface": "/ops/permission-smoke",
+      "primary_role": "OperatorAdmin",
+      "primary_goal": "Prove UI and backend permission alignment",
+      "primary_next_action": "Run permission smoke",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "run_permission_smoke",
+        "rerun_failures"
+      ],
+      "permission_rules": [
+        "ops:execute"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-111"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-permission-smoke"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P12-TENANT-ISOLATION",
+      "phase": "P12",
+      "name": "Tenant Isolation",
+      "route_or_surface": "/ops/tenant-isolation",
+      "primary_role": "OperatorAdmin",
+      "primary_goal": "Prove tenant data boundaries",
+      "primary_next_action": "Run isolation smoke",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "run_isolation_smoke",
+        "open_failing_request"
+      ],
+      "permission_rules": [
+        "ops:execute"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-112"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-tenant-isolation"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P12-RECOVERY-SMOKE",
+      "phase": "P12",
+      "name": "Recovery Smoke",
+      "route_or_surface": "/ops/recovery-smoke",
+      "primary_role": "OperatorAdmin",
+      "primary_goal": "Prove recovery is understandable and controlled",
+      "primary_next_action": "Run recovery smoke",
+      "states": [
+        "loading",
+        "empty",
+        "ready",
+        "permission_denied",
+        "error"
+      ],
+      "mutations": [
+        "run_recovery_smoke",
+        "inspect_logs"
+      ],
+      "permission_rules": [
+        "ops:execute"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-114"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p12-recovery-smoke"
+      ],
+      "status": "specified",
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+    },
+    {
+      "id": "UX-P6-FREE-CAPACITY-CALENDAR",
+      "phase": "P6/R2",
+      "name": "Free Capacity Calendar / Feasibility Surface",
+      "route_or_surface": "/resources/free-capacity or Resource Load mode",
+      "primary_role": "ResourceManager",
+      "primary_goal": "Find feasible start windows for opportunity or project draft demand",
+      "primary_next_action": "Choose recommended window or reserve capacity through preview",
+      "states": [
+        "loading",
+        "empty",
+        "no_demand",
+        "no_capacity_window",
+        "ready",
+        "permission_denied",
+        "readonly",
+        "preview_ready",
+        "applying",
+        "applied",
+        "apply_failed",
+        "error"
+      ],
+      "mutations": [
+        "reserve_capacity",
+        "create_project_draft",
+        "request_missing_demand_data"
+      ],
+      "permission_rules": [
+        "resource:read",
+        "resource:write",
+        "project:create"
+      ],
+      "audit_required": true,
+      "reload_required": true,
+      "e2e": [
+        "E2E-022"
+      ],
+      "spec_refs": [
+        "docs/product/SCREEN_INTERACTION_CATALOG.md#ux-p6-free-capacity-calendar",
+        "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md"
+      ],
+      "interaction_patterns": [
+        "CapacityMatrix",
+        "FreeCapacityCalendar",
+        "PreviewBeforeApply",
+        "ActionAuditPreview",
+        "DrilldownDetailSheet"
+      ],
+      "release2_contract_ref": "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
+      "status": "future_scope",
+      "notes": "Release 2 pattern is specified; implementation requires a finite phase/task promotion before production code."
+    }
   ]
 }

@@ -60,17 +60,69 @@ Every primitive must define density, icon policy, Russian labels, permission sta
 ## Product-Specific Components
 
 - ControlSurfaceShell: shared shell for management instruments with title, signal area, primary next action, filters, and result feedback.
+- OperationalDataGrid: dense control-surface table with persisted column widths/order, grouped headers, sticky identity/action columns, row drilldowns, permission-aware row actions, loading/empty/error/cached/refetch states, keyboard focus, and reset layout behavior through user/tenant saved views.
+- CapacityMatrix: matrix-first resource and schedule instrument with hierarchy rows, sticky time headers, crosshair hover, utilization heatmap, absence/non-working/holiday states, overload/free-capacity states, cell drilldowns, context actions, virtualized rows, summary rows, and capacity strip.
+- KPIStrip: compact decision summary with primary metrics, help/formula text, deltas, previous-period/baseline comparison, severity colors, source drilldown, and requires-action summary.
+- DrilldownDetailSheet: right-side row/cell/card detail surface that preserves source context, shows source refs, allowed actions, disabled reasons, and audit/readback history.
 - ManagementActionBar: guarded action row with primary command, secondary commands, permission messages, and pending state.
 - SignalSeverityBadge: severity token for KPI, resource, schedule, and lifecycle signals.
 - AuditTrailPreview: inline audit/result feedback with actor, command, before/after, and timestamp.
 - PermissionDeniedInline: compact explanation of missing permission and available read-only path.
 - PreviewBeforeApplyPanel: dry-run result for risky mutations.
+- ActionAuditPreview: command result panel with ActionExecution id, AuditEvent id, actor, target, before/after summary, refresh/readback timestamp, and failed/skipped object counts.
+- ConfigurableColumnLayout: saved-view editor for operational grids; supports restore system default, restore tenant default, save user layout, and shows validation before publish.
+- FreeCapacityCalendar: feasibility surface for opportunity/project draft demand, recommended start windows, limiting role/team explanation, and reservation preview.
 - GanttGrid: custom WBS grid based on canonical tasks and schedule projections.
 - GanttTimeline: custom timeline with task bars, dependencies, baseline overlay, today marker, and non-working days.
+- ProjectGantt: full planning workspace combining GanttGrid, GanttTimeline, details sheet, toolbar groups, dirty/pending/save/readback states, resource conflict overlays, baseline/tracking modes, keyboard operations, and audit/result feedback.
 - WbsTreeTable: hierarchical task/stage grid using TanStack Table where useful.
 - ResourceLoadHeatmap: capacity and overload visualization with governed resolution entry point.
 - KpiSignalCard: KPI deviation summary with next action.
 - TenantConfigPreview: shows runtime impact before saving tenant configuration.
+
+## Operational Surface Patterns
+
+Operational surfaces are dense, calm, readable, and action-oriented. They use compact spacing, tabular numbers, stable row heights, sticky context columns, explicit permission states, and visible command results. They do not use decorative hero sections, marketing cards, nested cards, or chart-only dashboards for management workflows.
+
+Reference contract: `docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md`.
+
+### OperationalDataGrid
+
+Use for Portfolio Control, Closed Portfolio, KPI Deviation lists, saved-view administration, integration diagnostics, and any surface where a manager scans many operational objects. The first columns identify the object and severity; middle groups expose schedule/resource/KPI facts; the final group contains next action, disabled reason, and audit/readback state.
+
+Every user-facing grid with management actions must support persisted column widths and order or explicitly document why the layout is fixed. Local storage is allowed as a convenience cache, but durable Release 2 layouts should be modeled as tenant/user saved views.
+
+### CapacityMatrix
+
+Use for Resource Load, free capacity, schedule feasibility, and Gantt resource overlays. Heatmap colors must encode utilization severity, absence, non-working time, overload, free capacity, or reservation state. A cell is an action target: click opens details, and permitted context actions lead to preview-before-apply.
+
+### KPIStrip
+
+Use a KPI strip only when the metrics help a decision. Each metric must offer source explanation, drilldown, comparison, or action context. Severity color without source trace is not sufficient for KPI or control-signal work.
+
+### DrilldownDetailSheet
+
+Use sheets for dense detail without losing the surface context. Detail sheets must preserve `sourceSurface`, `sourceRow`, or `sourceSignal`, and must never mutate state directly. Commands start from the sheet but execute through the action layer.
+
+### PreviewBeforeApplyPanel
+
+Preview panels are mandatory for schedule, resource, bulk, KPI threshold, accepted-risk, tenant configuration, and retrospective-template changes. They show before/after, warnings, blockers, permission, confirmation, command result, audit id, and readback status. Toasts are supplemental only.
+
+### ActionAuditPreview
+
+Any meaningful state-changing surface needs a durable result area. Show actor, command type, target, source surface, before/after summary, result, ActionExecution id, AuditEvent id, and refreshed projection timestamp.
+
+### ConfigurableColumnLayout
+
+Column layout controls belong in saved-view or view-settings panels, not random per-column menus. They should support restore default, save user layout, publish tenant view when authorized, validation, and read-only disabled reasons.
+
+### FreeCapacityCalendar
+
+Free capacity is a feasibility instrument. It recommends start windows and explains limiting roles/teams, but it must not present recommendations as production commitments. Capacity reservation uses PreviewBeforeApply and readback.
+
+### ProjectGantt
+
+Project Gantt is a custom KISS PM planning instrument, serious and desktop-like in workflow without copying proprietary UI. Left WBS/grid and right timeline share one state. Inline edits have active cell, Enter/Escape, validation, dirty marker, pending save, API readback, and audit result. Baseline/tracking, critical path, dependencies, resource conflicts, disabled reasons, and reload persistence are first-class.
 
 ## Project Gantt Component Contract
 

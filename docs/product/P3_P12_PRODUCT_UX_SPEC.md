@@ -63,8 +63,14 @@ All control surfaces must follow:
 
 A surface that only displays data is incomplete for KISS PM.
 
+Report-like screens are valid only when they are specified as control surfaces. A passive table can exist only when the screen is explicitly read-only; otherwise it must expose signal, next action, permission state, preview/result, audit, and readback. Matrix-first surfaces are first-class KISS PM management instruments: resource load, free capacity, schedule feasibility, portfolio control, KPI deviations, and retrospectives may use tables, matrices, Gantt, cards, or hybrids when that layout best supports the decision.
+
+Release 2 screen work must reference `docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md`. At minimum, state-changing control surfaces specify permission-disabled controls, dry-run preview where risk is material, command result, `ActionExecution`/`AuditEvent` evidence, reload/readback behavior, cached/stale/refetch state, and drilldown context.
+
 ## Project Gantt Product Position
 
 Project Gantt is a custom KISS PM planning surface built from product primitives. It may use TanStack Table as a headless grid foundation and shadcn/Radix primitives for toolbar, buttons, dialogs, sheets, popovers, dropdowns, command menus, tooltips, forms, badges, and feedback. It must not be specified as an embedded packaged Gantt widget.
 
 Gantt tasks are canonical tasks/projections, not a separate entity. Gantt mutations go through API/application/action layer. Baseline values must not silently change when live dates change. Visual polish is not accepted without persistence, permissions, reload evidence, and audit.
+
+The Release 2 direction is a serious desktop-like planning workspace: WBS grid plus synchronized timeline, Excel-like active-cell editing, inline validation, dirty/pending/save/readback states, baseline and tracking modes, critical path, dependencies, non-working days, resource conflict overlays, context menu actions, keyboard operations, and visible disabled reasons for read-only users. Resource conflict actions use PreviewBeforeApply and the action engine. KISS PM must not introduce a duplicated Gantt task entity or make a packaged Gantt widget the product architecture.

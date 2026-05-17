@@ -49,3 +49,17 @@ Acceptance:
 - P6 Resource Load Control is migrated in a dedicated follow-up if it was implemented before the shared query foundation.
 - Existing phase E2E gates continue to pass after each migrated surface.
 - No forbidden TanStack Router/Start/unscoped packages are introduced.
+
+## Release 2 Control Surface Future Scope
+
+The clean-room control-surface pattern transfer in `docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md` defines reusable interaction contracts, not permission to implement every advanced capability immediately.
+
+Keep these outside the current Release 2 docs/planning task until promoted by a finite implementation contract:
+
+- Full drag-and-drop control-surface builder beyond safe saved-view/layout configuration.
+- Advanced per-user free-capacity commitment engine with hard production promises.
+- Real-time multi-user Project Gantt collaboration.
+- Arbitrary user-defined formulas or arbitrary user-defined actions.
+- Full marketplace for surface/action templates.
+- Packaged/vendor Gantt widget replacement of the custom KISS PM planning workspace.
+- Automated resource leveling that applies changes without preview, permission, and audit.
