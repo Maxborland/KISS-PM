@@ -142,6 +142,60 @@ describe("Release 2 operational surface primitives", () => {
     expect(within(screen.getByTestId("operational-data-grid")).queryByText("Ответственный")).not.toBeInTheDocument();
   });
 
+  it("renders grouped headers as contiguous runs when column groups repeat", () => {
+    render(
+      <OperationalDataGrid
+        columns={[
+          { key: "project", label: "Проект", group: "Контекст" },
+          { key: "signal", label: "Сигнал", group: "Контроль" },
+          { key: "owner", label: "Ответственный", group: "Контекст" }
+        ]}
+        emptyLabel="Нет сигналов"
+        rows={[
+          {
+            id: "row-repeated-groups",
+            label: "Сигнал",
+            values: { project: "P-1", signal: "Риск", owner: "РП" }
+          }
+        ]}
+      />
+    );
+
+    const groupHeaders = within(screen.getByTestId("operational-data-grid")).getAllByRole("columnheader", {
+      name: "Контекст"
+    });
+    expect(groupHeaders).toHaveLength(2);
+    expect(groupHeaders[0]).toHaveAttribute("colspan", "1");
+    expect(groupHeaders[1]).toHaveAttribute("colspan", "1");
+  });
+
+  it("reconciles visible columns when the schema changes after runtime config readback", () => {
+    const { rerender } = render(
+      <OperationalDataGrid columns={columns} emptyLabel="Нет сигналов" rows={rows} selectedRowId="row-critical" />
+    );
+
+    const grid = screen.getByTestId("operational-data-grid");
+    expect(within(grid).queryByText("Срок")).not.toBeInTheDocument();
+
+    rerender(
+      <OperationalDataGrid
+        columns={[
+          ...columns,
+          { key: "deadline", label: "Срок", group: "Исполнение", width: 120 }
+        ]}
+        emptyLabel="Нет сигналов"
+        rows={rows.map((row) => ({
+          ...row,
+          values: { ...row.values, deadline: "2026-06-10" }
+        }))}
+        selectedRowId="row-critical"
+      />
+    );
+
+    expect(within(screen.getByTestId("operational-data-grid")).getByText("Срок")).toBeInTheDocument();
+    expect(within(screen.getByTestId("operational-data-grid")).queryByText("Ответственный")).not.toBeInTheDocument();
+  });
+
   it("exposes configurable column layout outside the grid for saved-view previews", () => {
     const onChange = vi.fn();
     const onReset = vi.fn();
