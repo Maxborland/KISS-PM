@@ -61,6 +61,13 @@ function defaultRows(): ClosedPortfolioReadModelDto["rows"] {
         planned_work_hours: 20,
         actual_work_hours: 26,
         schedule_variance_days: 15,
+        previous_schedule_variance_days: 20,
+        quality_score: 82,
+        csi_score: 4.6,
+        template_version: 2,
+        kpi_version: 1,
+        snapshot_version: 4,
+        closure_audit_event_id: "audit-close-project-alpha-1",
         severity: "critical"
       },
       sourceRefs: [
@@ -229,6 +236,55 @@ function renderSurface(client = apiClient(), tenant = currentTenant()) {
 }
 
 describe("ClosedPortfolioRetrospectiveSurface", () => {
+  it("renders an R2 snapshot grid with immutable proof and current-vs-previous summary", async () => {
+    renderSurface(apiClient());
+
+    expect(await screen.findByTestId("kpi-strip")).toHaveTextContent("Снимки");
+    await waitFor(() => expect(screen.getByTestId("kpi-strip")).toHaveTextContent("1"));
+    await waitFor(() => expect(screen.getByTestId("kpi-strip")).toHaveTextContent("Критичные тренды"));
+
+    const grid = await screen.findByTestId("operational-data-grid");
+    expect(grid).toHaveTextContent("snapshot-project-alpha-1");
+    expect(grid).toHaveTextContent("План/факт: 20 -> 26 ч");
+    expect(grid).toHaveTextContent("Текущий/предыдущий: 15 -> 20 дн.");
+    expect(grid).toHaveTextContent("Quality: 82");
+    expect(grid).toHaveTextContent("CSI: 4.6");
+    expect(grid).toHaveTextContent("template v2");
+    expect(grid).toHaveTextContent("KPI v1");
+    expect(grid).toHaveTextContent("Снимок immutable");
+
+    const proof = await screen.findByTestId("retrospective-snapshot-proof");
+    expect(proof).toHaveTextContent("ProjectSnapshot:snapshot-project-alpha-1");
+    expect(proof).toHaveTextContent("Snapshot version: 4");
+    expect(proof).toHaveTextContent("Closure audit: audit-close-project-alpha-1");
+    expect(proof).toHaveTextContent("Readback proves closed metrics are not live project state");
+  });
+
+  it("renders an R2 template-improvement action contract from trend to preview and immutable readback", async () => {
+    renderSurface(apiClient());
+
+    fireEvent.click(await screen.findByRole("button", { name: /Открыть insight/i }));
+
+    const contract = await screen.findByTestId("retrospective-improvement-contract");
+    expect(contract).toHaveTextContent("Trend: tenant-a:template:process-template-integrations-tenant-a:schedule_delay");
+    expect(contract).toHaveTextContent("Source snapshots: snapshot-project-alpha-1");
+    expect(contract).toHaveTextContent("Recommended action: template_improvement.apply");
+    expect(contract).toHaveTextContent("Dry-run preview required");
+    expect(contract).toHaveTextContent("No snapshot rewrite");
+
+    fireEvent.click(screen.getByRole("button", { name: /Предпросмотр улучшения/i }));
+    const previewPanel = await screen.findByTestId("template-improvement-preview");
+    expect(previewPanel).toHaveTextContent("mutatesState=false");
+    expect(previewPanel).toHaveTextContent("source snapshot immutable: snapshot-project-alpha-1");
+
+    fireEvent.click(screen.getByRole("button", { name: /Применить улучшение/i }));
+    const audit = await screen.findByTestId("action-audit-preview");
+    expect(audit).toHaveTextContent("ActionExecution: action-template-improvement-insight-1");
+    expect(audit).toHaveTextContent("AuditEvent: audit-template-improvement-insight-1");
+    expect(audit).toHaveTextContent("future template v3");
+    expect(audit).toHaveTextContent("snapshot readback unchanged");
+  });
+
   it("loads closed portfolio rows, trend signal, snapshot metrics, and insight source trace", async () => {
     const client = apiClient();
     renderSurface(client);

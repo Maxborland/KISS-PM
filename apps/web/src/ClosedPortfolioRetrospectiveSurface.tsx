@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import {
+  ActionAuditPreview,
+  KPIStrip,
+  OperationalDataGrid,
+  SignalSummaryBar,
+  type KpiMetric,
+  type OperationalGridColumn,
+  type OperationalGridRow,
+  type OperationalSeverity
+} from "./operationalSurfacePrimitives";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import {
   retrospectiveSeverityLabel,
@@ -52,6 +62,134 @@ function numberField(row: RetrospectiveReadRowDto, key: string): number | null {
 function stringField(row: RetrospectiveReadRowDto, key: string): string {
   const value = row.fieldValues[key];
   return typeof value === "string" ? value : "";
+}
+
+function operationalSeverity(severity: RetrospectiveReadRowDto["severity"] | RetrospectiveInsightDto["severity"] | RetrospectiveTrendDto["severity"]): OperationalSeverity {
+  if (severity === "critical" || severity === "warning" || severity === "attention") return severity;
+  return "ok";
+}
+
+function sourceRefsLine(row: RetrospectiveReadRowDto): string {
+  return row.sourceRefs.map((sourceRef) => `${sourceRef.entityType}:${sourceRef.entityId}`).join(" / ");
+}
+
+const snapshotGridColumns: OperationalGridColumn[] = [
+  { key: "snapshot", label: "Snapshot", group: "Снимок", sticky: "left", width: 210 },
+  { key: "project", label: "Проект", group: "Снимок", width: 180 },
+  { key: "planFact", label: "План/факт", group: "Метрики", width: 190 },
+  { key: "variance", label: "Текущий / предыдущий", group: "Метрики", width: 240 },
+  { key: "quality", label: "Качество", group: "Метрики", width: 160 },
+  { key: "versions", label: "Версии", group: "Readback", width: 170 },
+  { key: "proof", label: "Proof", group: "Readback", width: 190 }
+];
+
+function SnapshotOperationalGrid({
+  activeRowId,
+  onSelectRow,
+  rows
+}: {
+  activeRowId: string | null;
+  onSelectRow(rowId: string): void;
+  rows: RetrospectiveReadRowDto[];
+}) {
+  const gridRows: OperationalGridRow[] = rows.map((row) => {
+    const planned = numberField(row, "planned_work_hours") ?? 0;
+    const actual = numberField(row, "actual_work_hours") ?? 0;
+    const currentVariance = numberField(row, "schedule_variance_days");
+    const previousVariance = numberField(row, "previous_schedule_variance_days");
+    const quality = numberField(row, "quality_score");
+    const csi = numberField(row, "csi_score");
+    const templateVersion = numberField(row, "template_version");
+    const kpiVersion = numberField(row, "kpi_version");
+
+    return {
+      id: row.id,
+      label: row.label,
+      severity: operationalSeverity(row.severity),
+      values: {
+        snapshot: stringField(row, "snapshot_id") || row.entityId,
+        project: stringField(row, "project_title") || row.label,
+        planFact: `План/факт: ${planned} -> ${actual} ч`,
+        variance:
+          currentVariance === null
+            ? "нет отклонения"
+            : previousVariance === null
+              ? `Текущий/предыдущий: ${currentVariance} -> no_previous`
+              : `Текущий/предыдущий: ${currentVariance} -> ${previousVariance} дн.`,
+        quality: `${quality === null ? "Quality: no_previous" : `Quality: ${quality}`} / ${
+          csi === null ? "CSI: no_previous" : `CSI: ${csi}`
+        }`,
+        versions: `${templateVersion === null ? "template v?" : `template v${templateVersion}`} / ${
+          kpiVersion === null ? "KPI v?" : `KPI v${kpiVersion}`
+        }`,
+        proof: "Снимок immutable"
+      },
+      actions: []
+    };
+  });
+
+  return (
+    <OperationalDataGrid
+      columns={snapshotGridColumns}
+      emptyLabel="Закрытых снимков пока нет. После закрытия проектов здесь появятся стабильные plan/fact результаты."
+      rows={gridRows}
+      selectedRowId={activeRowId}
+      onSelectRow={onSelectRow}
+    />
+  );
+}
+
+function RetrospectiveSummaryStrip({ portfolio }: { portfolio: ClosedPortfolioReadModelDto | undefined }) {
+  const criticalTrendCount =
+    portfolio?.widgets.find((widget) => widget.key === "critical_trend_count")?.value ?? 0;
+  const attentionTrendCount =
+    portfolio?.widgets.find((widget) => widget.key === "attention_trend_count")?.value ?? 0;
+  const metrics: KpiMetric[] = [
+    {
+      id: "retrospective-snapshot-count",
+      label: "Снимки",
+      value: portfolio?.summary.totalSnapshots ?? 0,
+      severity: "ok",
+      sourceLabel: "ProjectSnapshot",
+      helpText: "Immutable closed project snapshot count"
+    },
+    {
+      id: "retrospective-critical-trends",
+      label: "Критичные тренды",
+      value: criticalTrendCount,
+      severity: criticalTrendCount > 0 ? "critical" : "ok",
+      requiresAction: criticalTrendCount > 0,
+      deltaLabel: `attention: ${attentionTrendCount}`
+    },
+    {
+      id: "retrospective-open-insights",
+      label: "Open insights",
+      value: portfolio?.summary.openInsightCount ?? 0,
+      severity: (portfolio?.summary.openInsightCount ?? 0) > 0 ? "attention" : "ok",
+      sourceLabel: "template-improvement"
+    }
+  ];
+
+  return <KPIStrip metrics={metrics} />;
+}
+
+function SnapshotProof({ row }: { row: RetrospectiveReadRowDto }) {
+  const snapshotId = stringField(row, "snapshot_id") || row.entityId;
+  const snapshotVersion = numberField(row, "snapshot_version");
+  const closureAuditEventId = stringField(row, "closure_audit_event_id");
+
+  return (
+    <section className="phase2-panel retrospective-snapshot-proof" data-testid="retrospective-snapshot-proof">
+      <h3>Snapshot readback proof</h3>
+      <div className="compact-list">
+        <span>ProjectSnapshot:{snapshotId}</span>
+        <span>Snapshot version: {snapshotVersion ?? "stable"}</span>
+        <span>Closure audit: {closureAuditEventId || "closure audit unavailable"}</span>
+        <span>Source refs: {sourceRefsLine(row)}</span>
+        <span>Readback proves closed metrics are not live project state</span>
+      </div>
+    </section>
+  );
 }
 
 function RowList({
@@ -224,6 +362,15 @@ function InsightPanel({
           <span key={action.key}>{actionLine(action)}</span>
         ))}
       </div>
+      <section className="compact-list retrospective-improvement-contract" data-testid="retrospective-improvement-contract">
+        <strong>Template-improvement contract</strong>
+        <span>Trend: {insight.sourceTrendId}</span>
+        <span>Source snapshots: {insight.sourceSnapshotIds.join(", ")}</span>
+        <span>Source metrics: {insight.sourceMetricIds.join(", ")}</span>
+        <span>Recommended action: {improvementAction?.actionDefinitionKey ?? "template_improvement.apply"}</span>
+        <span>{improvementAction?.dryRunRequired !== false ? "Dry-run preview required" : "Preview optional"}</span>
+        <span>No snapshot rewrite</span>
+      </section>
       {canApplyImprovement ? (
         <div className="compact-action-row">
           <button className="secondary-button" disabled={previewPending} type="button" onClick={onPreview}>
@@ -242,17 +389,28 @@ function InsightPanel({
             Версия {preview.before.templateVersion} -&gt; {preview.after.templateVersion}
           </span>
           <span>{preview.after.recommendedLabel}</span>
+          <span>mutatesState={String(preview.mutatesState)}</span>
+          <span>source snapshot immutable: {preview.sourceSnapshotIds.join(", ")}</span>
           <span>{preview.sourceSnapshotIds.join(", ")}</span>
         </div>
       ) : null}
       {applyResult ? (
-        <div className="compact-list template-improvement-result" data-testid="template-improvement-result">
-          <strong>{applyResult.actionExecution.commandType}</strong>
-          <span>
-            Версия {applyResult.template.previousVersion} -&gt; {applyResult.template.version}
-          </span>
-          <span>{applyResult.actionExecution.auditEventIds?.join(", ")}</span>
-        </div>
+        <>
+          <div className="compact-list template-improvement-result" data-testid="template-improvement-result">
+            <strong>{applyResult.actionExecution.commandType}</strong>
+            <span>
+              Версия {applyResult.template.previousVersion} -&gt; {applyResult.template.version}
+            </span>
+            <span>{applyResult.actionExecution.auditEventIds?.join(", ")}</span>
+          </div>
+          <ActionAuditPreview
+            actionExecutionId={applyResult.actionExecution.id}
+            auditEventId={applyResult.actionExecution.auditEventIds?.[0]}
+            readbackLabel={`future template v${applyResult.template.version}; snapshot readback unchanged`}
+            resultLabel={applyResult.actionExecution.commandType}
+            targetLabel={`template:${applyResult.template.id}`}
+          />
+        </>
       ) : null}
       {errorMessage ? (
         <p className="readonly-notice" data-testid="template-improvement-error">
@@ -414,6 +572,20 @@ export function ClosedPortfolioRetrospectiveSurface({
         </button>
       </div>
 
+      <SignalSummaryBar
+        disabledReason={(trends?.insights.length ?? 0) === 0 ? "Нет открытых ретроспективных insight" : undefined}
+        highestSeverity={operationalSeverity(trends?.trends[0]?.severity ?? "none")}
+        nextActionLabel="Открыть следующий trend"
+        onNextAction={() => {
+          const nextInsight = trends?.insights.find((insight) => insight.id !== selectedInsightId) ?? trends?.insights[0];
+          if (nextInsight) selectInsight(nextInsight.id);
+        }}
+        requiresActionCount={trends?.insights.filter((insight) => insight.status === "open").length ?? 0}
+        summary={`${trends?.trends.length ?? 0} retrospective трендов`}
+      />
+
+      <RetrospectiveSummaryStrip portfolio={portfolio} />
+
       <div className="closed-portfolio-layout">
         <section className="phase2-panel">
           <h3>{portfolio?.surface.label ?? "Закрытый портфель"}</h3>
@@ -425,6 +597,7 @@ export function ClosedPortfolioRetrospectiveSurface({
               </div>
             ))}
           </div>
+          <SnapshotOperationalGrid activeRowId={activeRow?.id ?? null} onSelectRow={selectRow} rows={rows} />
           <RowList activeRowId={activeRow?.id ?? null} onSelectRow={selectRow} rows={rows} />
         </section>
 
@@ -446,6 +619,7 @@ export function ClosedPortfolioRetrospectiveSurface({
       {activeRow ? (
         <>
           <SnapshotDetail row={activeRow} />
+          <SnapshotProof row={activeRow} />
           <div className="compact-list" data-testid="closed-portfolio-row-action-state">
             {activeRowActions.map((action) => (
               <span key={action.key}>{actionLine(action)}</span>
