@@ -180,7 +180,8 @@ nav a:focus-visible {
 .kpi-definition-surface,
 .kpi-deviation-surface,
 .portfolio-control-surface,
-.closed-portfolio-surface {
+.closed-portfolio-surface,
+.integration-admin-surface {
   display: grid;
   gap: 18px;
   max-width: 1180px;
@@ -235,6 +236,12 @@ nav a:focus-visible {
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
 }
 
+.integration-admin-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .tenant-label-row {
   align-items: center;
   display: grid;
@@ -283,6 +290,7 @@ nav a:focus-visible {
 }
 
 input,
+select,
 textarea {
   border: 1px solid #b8c8bb;
   border-radius: 6px;
@@ -293,6 +301,7 @@ textarea {
 }
 
 input:disabled,
+select:disabled,
 textarea:disabled,
 button:disabled {
   cursor: not-allowed;
@@ -1037,6 +1046,7 @@ button:focus-visible {
   .kpi-definition-layout,
   .kpi-deviation-layout,
   .portfolio-control-layout,
+  .integration-admin-layout,
   .saved-view-layout,
   .kpi-trace-grid {
     grid-template-columns: 1fr;

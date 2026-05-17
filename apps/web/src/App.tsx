@@ -59,6 +59,11 @@ import {
   createConfigurationOverviewApiClient,
   type ConfigurationOverviewApiClient
 } from "./configurationOverviewApiClient";
+import { IntegrationAdminDiagnosticsSurface } from "./IntegrationAdminDiagnosticsSurface";
+import {
+  createIntegrationAdminDiagnosticsApiClient,
+  type IntegrationAdminDiagnosticsApiClient
+} from "./integrationAdminDiagnosticsApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -80,7 +85,8 @@ type AppProps = {
     Partial<KpiThresholdBuilderApiClient> &
     Partial<SavedViewLayoutBuilderApiClient> &
     Partial<ActionConfigurationApiClient> &
-    Partial<ConfigurationOverviewApiClient>;
+    Partial<ConfigurationOverviewApiClient> &
+    Partial<IntegrationAdminDiagnosticsApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -93,6 +99,7 @@ const shellLabelDefaults = {
   "navigation.control_surfaces": "Контрольные поверхности",
   "navigation.my_work": "Моя работа",
   "navigation.retrospectives": "Ретроспектива",
+  "navigation.integrations": "Интеграции",
   "navigation.settings": "Настройки",
   "role.tenant_admin": "Администратор",
   "role.project_manager": "Руководитель проекта",
@@ -124,6 +131,7 @@ const navigationLabelKeys = [
   "navigation.control_surfaces",
   "navigation.my_work",
   "navigation.retrospectives",
+  "navigation.integrations",
   "navigation.settings"
 ];
 
@@ -377,6 +385,23 @@ function isConfigurationOverviewApiClient(
     typeof apiClient.previewImport === "function" &&
     typeof apiClient.applyImport === "function" &&
     typeof apiClient.getAudit === "function"
+  );
+}
+
+function isIntegrationAdminDiagnosticsApiClient(
+  apiClient: Partial<IntegrationAdminDiagnosticsApiClient> | null
+): apiClient is IntegrationAdminDiagnosticsApiClient {
+  return (
+    typeof apiClient?.listAdapters === "function" &&
+    typeof apiClient.listConnections === "function" &&
+    typeof apiClient.listDiagnostics === "function" &&
+    typeof apiClient.previewImport === "function" &&
+    typeof apiClient.applyImport === "function" &&
+    typeof apiClient.listBatches === "function" &&
+    typeof apiClient.listMappings === "function" &&
+    typeof apiClient.getAudit === "function" &&
+    typeof apiClient.setFailureMode === "function" &&
+    typeof apiClient.clearFailureMode === "function"
   );
 }
 
@@ -797,6 +822,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createConfigurationOverviewApiClient() : null;
   }, [apiClient]);
+  const integrationAdminDiagnosticsApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isIntegrationAdminDiagnosticsApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createIntegrationAdminDiagnosticsApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
@@ -918,6 +951,8 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
                       ? kpiNavigationHref
                     : labelKey === "navigation.retrospectives"
                       ? "#closed-portfolio-retrospectives"
+                    : labelKey === "navigation.integrations"
+                      ? "#integration-admin-diagnostics"
                     : "#phase-1-placeholder"
               }
               key={labelKey}
@@ -1007,6 +1042,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {configurationOverviewApiClient ? (
           <ConfigurationOverviewSurface
             apiClient={configurationOverviewApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {integrationAdminDiagnosticsApiClient ? (
+          <IntegrationAdminDiagnosticsSurface
+            apiClient={integrationAdminDiagnosticsApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />
