@@ -13,7 +13,14 @@ import {
   resetPhase8Fixtures,
   tenantA
 } from "../phase8/helpers";
-import { getEvaluation, getSignalDetail, resetPhase7Fixtures, tenantASignalId } from "../phase7/helpers";
+import {
+  getEvaluation,
+  getSignalDetail,
+  openKpiDeviationControl,
+  phase7Seed,
+  resetPhase7Fixtures,
+  tenantASignalId
+} from "../phase7/helpers";
 
 test("E2E-R2-001 Portfolio Control: signal to governed action to audit/readback", async ({ page, request }) => {
   await resetPhase8Fixtures(request);
@@ -46,8 +53,17 @@ test("E2E-R2-001 Portfolio Control: signal to governed action to audit/readback"
   await expect(page.getByTestId("portfolio-control-row-list")).toContainText(tasks[0]!.id);
 });
 
-test("E2E-R2-006 KPI Deviation: source trace to corrective action or accepted risk", async ({ request }) => {
+test("E2E-R2-006 KPI Deviation: source trace to corrective action or accepted risk", async ({ page, request }) => {
   await resetPhase7Fixtures(request);
+  await openKpiDeviationControl(page);
+
+  await expect(page.getByTestId("kpi-deviation-control")).toContainText("Контроль KPI-отклонений");
+  await expect(page.getByTestId("kpi-deviation-detail")).toContainText(tenantASignalId);
+  await expect(page.getByTestId("kpi-deviation-detail")).toContainText(
+    `${phase7Seed.tenantA.definition.formulaId}@1`
+  );
+  await expect(page.getByTestId("kpi-deviation-action-contract")).toContainText("Рекомендованные действия для P8");
+  await expect(page.getByTestId("kpi-deviation-action-contract")).toContainText("Создать корректирующее действие");
 
   const signal = await getSignalDetail(request, tenantASignalId);
   const evaluation = await getEvaluation(request, signal.evaluation.id);

@@ -198,6 +198,15 @@ const e2eTestPaths = {
   "E2E-114": "e2e/tests/phase12/recovery-smoke.spec.ts",
   "E2E-115": "e2e/tests/phase12/no-live-external-dependency.spec.ts"
 };
+const release2E2eIds = Array.from({ length: 10 }, (_, index) => `E2E-R2-${String(index + 1).padStart(3, "0")}`);
+const release2E2eTestPaths = [
+  "e2e/tests/release2/portfolio-control.spec.ts",
+  "e2e/tests/release2/gantt-planning.spec.ts",
+  "e2e/tests/release2/resource-capacity.spec.ts",
+  "e2e/tests/release2/retrospective.spec.ts",
+  "e2e/tests/release2/tenant-admin-config.spec.ts",
+  "e2e/tests/release2/sales-demo-first-five-minutes.spec.ts"
+];
 
 function writeMatrixFixture(fileName: string, firstRow: Record<string, unknown>) {
   mkdirSync(fixtureDir, { recursive: true });
@@ -269,6 +278,40 @@ function writeE2eRunMetadata(
   return artifactPath;
 }
 
+function writeRelease2RunMetadata(
+  fileName: string,
+  options: {
+    status?: string;
+    exitCode?: number;
+    profile?: string;
+    testPaths?: string[];
+    e2eIds?: string[];
+    startedAt?: string;
+    finishedAt?: string;
+  } = {}
+) {
+  mkdirSync(fixtureDir, { recursive: true });
+  const artifactPath = resolve(fixtureDir, fileName);
+  writeFileSync(
+    artifactPath,
+    JSON.stringify(
+      {
+        profile: options.profile ?? "release2",
+        status: options.status ?? "passed",
+        exitCode: options.exitCode ?? 0,
+        command: [process.execPath, "scripts/run-e2e.mjs", "release2"],
+        startedAt: options.startedAt ?? "2026-05-17T12:00:00.000Z",
+        finishedAt: options.finishedAt ?? "2026-05-17T12:01:00.000Z",
+        testPaths: options.testPaths ?? release2E2eTestPaths,
+        e2eIds: options.e2eIds ?? release2E2eIds
+      },
+      null,
+      2
+    )
+  );
+  return artifactPath;
+}
+
 function writeP2MatrixFixture(fileName: string, overrideById: Record<string, Record<string, unknown>>) {
   mkdirSync(fixtureDir, { recursive: true });
   const matrixPath = resolve(fixtureDir, fileName);
@@ -330,6 +373,45 @@ function writePhaseMatrixFixture(
     JSON.stringify(
       {
         phase,
+        rows
+      },
+      null,
+      2
+    )
+  );
+
+  return matrixPath;
+}
+
+function writeRelease2MatrixFixture(fileName: string, updatedAt = "2026-05-17T19:43:00+07:00") {
+  mkdirSync(fixtureDir, { recursive: true });
+  const matrixPath = resolve(fixtureDir, fileName);
+  const rows = Array.from({ length: 12 }, (_, index) => {
+    const id = `R2-${String(index + 1).padStart(3, "0")}`;
+
+    return {
+      id,
+      requirement: `${id} row`,
+      status: "done",
+      owner: "test",
+      owned_scope: ["docs/status/release2-ui-requirements-matrix.json"],
+      required_e2e: id === "R2-012" ? release2E2eIds : [],
+      acceptance: [`${id} accepted`],
+      non_scope: [],
+      verification: ["node scripts/run-e2e.mjs release2"],
+      dependencies: [],
+      risks: [],
+      done_evidence: [`${id} done`]
+    };
+  });
+
+  writeFileSync(
+    matrixPath,
+    JSON.stringify(
+      {
+        version: 1,
+        release: "R2",
+        updated_at: updatedAt,
         rows
       },
       null,
@@ -576,6 +658,22 @@ function writeRequiredE2eSpecFiles(projectRoot: string, e2eIds: string[]) {
 }
 
 describe("verify-requirements-matrix", () => {
+  it("rejects Release 2 exit metadata that predates the matrix update", () => {
+    const matrixPath = writeRelease2MatrixFixture("release2-stale-metadata.json", "2026-05-17T19:43:00+07:00");
+    const e2eRunMetadataPath = writeRelease2RunMetadata("release2-stale-run-metadata.json", {
+      finishedAt: "2026-05-17T10:00:00.000Z"
+    });
+
+    const result = spawnSync(process.execPath, [scriptPath, matrixPath], {
+      cwd: resolve("."),
+      env: { ...process.env, KISS_PM_E2E_RUN_METADATA_PATH: e2eRunMetadataPath },
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("R2: E2E run metadata is older than Release 2 matrix updated_at");
+  });
+
   it("rejects verified rows missing required E2E evidence", () => {
     const matrixPath = writeMatrixFixture("missing-e2e.json", {
       required_e2e: ["E2E-013"]
