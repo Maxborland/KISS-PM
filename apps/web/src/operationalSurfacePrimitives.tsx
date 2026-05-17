@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export type OperationalSeverity = "ok" | "attention" | "warning" | "critical";
 
@@ -67,6 +67,10 @@ function defaultVisibleKeys(columns: OperationalGridColumn[]): string[] {
 
 function orderedUnique(values: string[], allowed: Set<string>): string[] {
   return values.filter((value, index) => allowed.has(value) && values.indexOf(value) === index);
+}
+
+function sameStringList(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => right[index] === value);
 }
 
 export function OperationalSurfaceShell({
@@ -313,13 +317,33 @@ export function OperationalDataGrid({
   selectedRowId?: string | null;
 }) {
   const [visibleColumnKeys, setVisibleColumnKeys] = useState(() => defaultVisibleKeys(columns));
+  const previousColumnKeysRef = useRef(new Set(columns.map((column) => column.key)));
   const allowedKeys = useMemo(() => new Set(columns.map((column) => column.key)), [columns]);
   const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
-  const groups = visibleColumns.reduce<Map<string, number>>((nextGroups, column) => {
+  const groupRuns = visibleColumns.reduce<Array<{ group: string; span: number }>>((runs, column) => {
     const group = column.group ?? "Данные";
-    nextGroups.set(group, (nextGroups.get(group) ?? 0) + 1);
-    return nextGroups;
-  }, new Map());
+    const currentRun = runs.at(-1);
+    if (currentRun?.group === group) {
+      currentRun.span += 1;
+    } else {
+      runs.push({ group, span: 1 });
+    }
+    return runs;
+  }, []);
+
+  useEffect(() => {
+    const previousColumnKeys = previousColumnKeysRef.current;
+    const nextAllowedKeys = new Set(columns.map((column) => column.key));
+    const newDefaultVisibleKeys = columns
+      .filter((column) => !previousColumnKeys.has(column.key) && column.visible !== false)
+      .map((column) => column.key);
+
+    setVisibleColumnKeys((currentKeys) => {
+      const nextKeys = orderedUnique([...currentKeys, ...newDefaultVisibleKeys], nextAllowedKeys);
+      return sameStringList(currentKeys, nextKeys) ? currentKeys : nextKeys;
+    });
+    previousColumnKeysRef.current = nextAllowedKeys;
+  }, [columns]);
 
   function resetLayout() {
     setVisibleColumnKeys(defaultVisibleKeys(columns));
@@ -348,9 +372,9 @@ export function OperationalDataGrid({
         <table className="operational-data-grid" data-testid="operational-data-grid">
           <thead>
             <tr>
-              {Array.from(groups.entries()).map(([group, span]) => (
-                <th colSpan={span} key={group}>
-                  {group}
+              {groupRuns.map((run, index) => (
+                <th colSpan={run.span} key={`${run.group}-${index}`}>
+                  {run.group}
                 </th>
               ))}
               <th rowSpan={2}>Действия</th>
