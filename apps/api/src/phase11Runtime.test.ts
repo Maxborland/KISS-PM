@@ -452,4 +452,128 @@ describe("phase11 integration runtime", () => {
     );
     expect(runtime.listImportBatches("tenant-a")).toHaveLength(1);
   });
+
+  it("returns tenant-scoped migration validation report and dry-run summary without mutating import state", () => {
+    const runtime = createPhase11RuntimeState();
+    const preview = runtime.previewMockImport({
+      id: "preview-runtime-report",
+      tenantId: "tenant-a",
+      adapterId: "adapter-mock-crm",
+      connectionId: "conn-mock-crm-a",
+      sourceSystem: "mock-crm",
+      payloadFingerprint: "fingerprint-runtime-report",
+      receivedAt: "2026-05-17T07:10:00+07:00",
+      previewedAt: "2026-05-17T07:11:00+07:00",
+      payload
+    });
+
+    const report = runtime.getMigrationValidationReport({
+      tenantId: "tenant-a",
+      previewId: preview.id,
+      generatedAt: "2026-05-17T07:12:00+07:00"
+    });
+    const dryRun = runtime.getImportDryRunSummary({
+      tenantId: "tenant-a",
+      previewId: preview.id,
+      generatedAt: "2026-05-17T07:12:30+07:00"
+    });
+
+    expect(report).toMatchObject({
+      tenantId: "tenant-a",
+      previewId: preview.id,
+      mutatesState: false,
+      safeToApply: true,
+      summary: {
+        creates: preview.report.creates,
+        updates: preview.report.updates,
+        skips: preview.report.skips,
+        errors: 0
+      }
+    });
+    expect(dryRun).toMatchObject({
+      tenantId: "tenant-a",
+      previewId: preview.id,
+      mutatesState: false,
+      canApply: true,
+      expectedCreates: preview.report.creates
+    });
+    expect(runtime.listImportBatches("tenant-a")).toEqual([]);
+    expect(runtime.listMappings("tenant-a")).toEqual([]);
+  });
+
+  it("denies cross-tenant migration validation report lookup without leaking report details", () => {
+    const runtime = createPhase11RuntimeState();
+    const preview = runtime.previewMockImport({
+      id: "preview-runtime-report-cross",
+      tenantId: "tenant-a",
+      adapterId: "adapter-mock-crm",
+      connectionId: "conn-mock-crm-a",
+      sourceSystem: "mock-crm",
+      payloadFingerprint: "fingerprint-runtime-report-cross",
+      receivedAt: "2026-05-17T07:13:00+07:00",
+      previewedAt: "2026-05-17T07:14:00+07:00",
+      payload
+    });
+
+    expect(() =>
+      runtime.getMigrationValidationReport({
+        tenantId: "tenant-b",
+        previewId: preview.id,
+        generatedAt: "2026-05-17T07:15:00+07:00"
+      })
+    ).toThrow("import preview tenant mismatch");
+    expect(() =>
+      runtime.getImportDryRunSummary({
+        tenantId: "tenant-b",
+        previewId: "missing-preview",
+        generatedAt: "2026-05-17T07:16:00+07:00"
+      })
+    ).toThrow("import preview is missing");
+    expect(runtime.listImportBatches("tenant-b")).toEqual([]);
+    expect(runtime.listMappings("tenant-b")).toEqual([]);
+    expect(runtime.listSyncAudit("tenant-b")).toEqual([]);
+  });
+
+  it("rejects stale migration validation reports so dry-run evidence cannot greenlight an unapplyable preview", () => {
+    const runtime = createPhase11RuntimeState();
+    const stalePreview = runtime.previewMockImport({
+      id: "preview-runtime-report-stale",
+      tenantId: "tenant-a",
+      adapterId: "adapter-mock-crm",
+      connectionId: "conn-mock-crm-a",
+      sourceSystem: "mock-crm",
+      payloadFingerprint: "fingerprint-runtime-report-stale",
+      receivedAt: "2026-05-17T07:17:00+07:00",
+      previewedAt: "2026-05-17T07:18:00+07:00",
+      payload
+    });
+    runtime.previewMockImport({
+      id: "preview-runtime-report-fresh",
+      tenantId: "tenant-a",
+      adapterId: "adapter-mock-crm",
+      connectionId: "conn-mock-crm-a",
+      sourceSystem: "mock-crm",
+      payloadFingerprint: "fingerprint-runtime-report-fresh",
+      receivedAt: "2026-05-17T07:19:00+07:00",
+      previewedAt: "2026-05-17T07:20:00+07:00",
+      payload
+    });
+
+    expect(() =>
+      runtime.getMigrationValidationReport({
+        tenantId: "tenant-a",
+        previewId: stalePreview.id,
+        generatedAt: "2026-05-17T07:21:00+07:00"
+      })
+    ).toThrow("import preview is stale");
+    expect(() =>
+      runtime.getImportDryRunSummary({
+        tenantId: "tenant-a",
+        previewId: stalePreview.id,
+        generatedAt: "2026-05-17T07:21:30+07:00"
+      })
+    ).toThrow("import preview is stale");
+    expect(runtime.listImportBatches("tenant-a")).toEqual([]);
+    expect(runtime.listMappings("tenant-a")).toEqual([]);
+  });
 });
