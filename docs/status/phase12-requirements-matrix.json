@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T09:01:30.0000000+07:00",
+  "updated_at": "2026-05-17T09:33:39.7399302+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -179,17 +179,29 @@
         "E2E-112"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-005 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-005 scope and acceptance criteria before implementation.",
+        "apps/api/src/phase12PermissionSmoke.ts implements deterministic permission-smoke and tenant-isolation scenario runners with expected status, actual status, no-leak terms, summary, deterministic setup project creation/reuse for real P4/P5/project-isolation probes, and resettable latest-run readback.",
+        "GET /api/ops/permission-smoke and GET /api/ops/tenant-isolation enforce ops.read; POST /api/ops/permission-smoke/run and POST /api/ops/tenant-isolation/run enforce ops.execute, run direct representative P3-P12 API checks, write ops.permission_smoke.run and ops.tenant_isolation_smoke.run audit events, and keep readback tenant-scoped.",
+        "apps/api/src/phase2Runtime.ts includes the full P12 ops permission keys ops.read, ops.execute, ops.audit.read, release.readiness.read, and release.readiness.execute for release-gate policy coverage."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-005-permission-tenant-isolation-matrix-smoke --once exit 0 at startup after heartbeat timestamp correction",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 1 RED: /api/ops/permission-smoke and /api/ops/tenant-isolation routes returned 404 before implementation",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 1 RED: P12-005 review gap exposed missing P4/P5 scenario coverage after test expected >=12 release-critical scenarios",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 0: 1 file, 3 tests passed; permission smoke covers P4 project task denial and P5 schedule task denial, tenant-isolation project probe uses an existing Tenant A setup project, and reset clears deterministic setup project",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts apps/api/src/phase12ReadinessApi.test.ts apps/api/src/phase12RecoveryApi.test.ts apps/api/src/phase2Api.test.ts exit 0: 4 files, 19 tests passed",
+        "npm run test:integration exit 0: 25 files, 128 tests passed",
+        "npm test exit 0: 105 files, 600 tests passed",
+        "npm run typecheck exit 0 after fixing requester Promise type and audit details shape",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Full permission matrix and tenant-isolation smoke across P3-P11 surfaces are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "API tests prove /test-fixtures/reset clears permission-smoke latestRun, tenant-isolation latestRun, and the deterministic project-p12-permission-smoke setup project; tenant-isolation readback is tenant-scoped and does not expose Tenant A latestRun to Tenant B. Final row verification still requires E2E-111/E2E-112 browser UI visibility, backend denial, audit/readback/reload, and reset cleanup evidence before this row can become verified.",
+      "blocker": "2026-05-17T09:33:39.7399302+07:00: P12-005 API-level permission and tenant-isolation smoke implementation is complete with tests, but executable E2E-111/E2E-112 browser/UI evidence is not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T09:33:39.7399302+07:00",
       "e2e_evidence": []
     },
     {

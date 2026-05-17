@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T09:14:30.0000000+07:00
+Updated: 2026-05-17T09:35:00.0000000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -26,8 +26,13 @@ Updated: 2026-05-17T09:14:30.0000000+07:00
   - `apps/api/src/app.ts` centralizes route-level fixture session resolution through `requireRouteSession` and supports `createApiApp({ allowTestFixtureAuth: false })` returning `403 test_mode_only`.
   - `apps/api/src/phase12Deployment.ts` and `apps/api/src/server.ts` now cover the backend fixture-auth switch `KISS_PM_ALLOW_TEST_FIXTURE_AUTH`; production-like/production deployment smoke fails if the switch is enabled, and server default disables fixture auth for `production_like`/`production` targets unless explicitly allowed.
   - P12-004 matrix row remains blocked only for later E2E-111/E2E-112 permission and tenant-isolation evidence.
+- `P12-005-permission-tenant-isolation-matrix-smoke` is accepted as an implementation block:
+  - `apps/api/src/phase12PermissionSmoke.ts` implements deterministic permission-smoke and tenant-isolation scenario runners with expected/actual status, forbidden-term leak checks, summary, deterministic setup project creation/reuse for real P4/P5/project-isolation probes, and resettable tenant-scoped latest-run readback.
+  - `GET /api/ops/permission-smoke`, `POST /api/ops/permission-smoke/run`, `GET /api/ops/tenant-isolation`, and `POST /api/ops/tenant-isolation/run` enforce backend `ops.read`/`ops.execute`, write ops audit events on run, and keep readback tenant-scoped.
+  - `apps/api/src/phase12PermissionIsolationApi.test.ts` proves permission smoke across P3-P12 representative surfaces, P4 task write denial, P5 schedule write denial, tenant-isolation no-leak probes, read-only direct denial, audit readback, and `/test-fixtures/reset` cleanup of latestRun plus the deterministic setup project.
+  - P12-005 matrix row remains blocked only for later E2E-111/E2E-112 browser/UI evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-005-permission-tenant-isolation-matrix-smoke`.
+- Next runnable step: claim `P12-006-operator-readiness-surfaces`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T09:14:30.0000000+07:00",
+  "updated_at": "2026-05-17T09:35:00.0000000+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -5940,7 +5940,7 @@
         "P12-005"
       ],
       "title": "Implement full permission and tenant-isolation smoke matrix",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -5969,7 +5969,24 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next runnable P12 block after accepted P12-004. Implement full permission and tenant-isolation smoke matrix across P3-P12 surfaces; must feed E2E-111/E2E-112 evidence and not mark P12 strict gate accepted."
+      "notes": "Accepted 2026-05-17T09:35:00.0000000+07:00. Implemented deterministic P12 permission and tenant-isolation smoke API matrix with governed ops routes, ops.read/ops.execute guards, direct representative P3-P12 checks, P4/P5 setup project probes, tenant-scoped readback, audit events, and reset cleanup evidence. P12-005 matrix row remains blocked only for later E2E-111/E2E-112 browser/UI evidence.",
+      "completed_at": "2026-05-17T09:35:00.0000000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-005-permission-tenant-isolation-matrix-smoke --once exit 0 at startup after heartbeat timestamp correction",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 1 RED: routes returned 404 before implementation",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 1 RED: review gap exposed missing P4/P5 scenario coverage",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- apps/api/src/phase12PermissionIsolationApi.test.ts apps/api/src/phase12ReadinessApi.test.ts apps/api/src/phase12RecoveryApi.test.ts apps/api/src/phase2Api.test.ts exit 0: 4 files, 19 tests passed",
+        "npm run test:integration exit 0: 25 files, 128 tests passed",
+        "npm test exit 0: 105 files, 600 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 rows remain blocked until E2E-110..115 and P12-010",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P12-005-permission-tenant-isolation-matrix-smoke --once exit 0 before handoff"
+      ]
     },
     {
       "id": "P12-006-operator-readiness-surfaces",
@@ -5977,7 +5994,7 @@
         "P12-006"
       ],
       "title": "Implement operator release readiness surfaces and governed ops commands",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6008,7 +6025,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Blocked until ops/readiness, recovery, permission, and isolation runtime evidence exists."
+      "notes": "Next runnable P12 block after accepted P12-005. Implement operator readiness/recovery surfaces and governed ops commands; must not mark P12 strict gate accepted before E2E-110..115 and P12-010."
     },
     {
       "id": "P12-007-demo-tenant-template-pack-onboarding",
