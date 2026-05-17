@@ -8,6 +8,7 @@ import type {
   CustomFieldDefinitionDraftDto,
   CustomFieldPreviewDto
 } from "./customFieldBuilderApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 import type { TenantLabelActionExecutionDto } from "./tenantLabelsApiClient";
 
 type CustomFieldBuilderSurfaceProps = {
@@ -100,6 +101,20 @@ function PreviewPanel({ preview }: { preview: CustomFieldPreviewDto }) {
     <section className="phase2-panel preview-panel" data-testid="custom-field-preview">
       <h3>Предпросмотр поля</h3>
       <p>Состояние еще не изменено. Публикация пойдет через управляемую команду.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.registryVersion}`}
+        beforeVersion={`v${preview.before.registryVersion}`}
+        previewId={preview.id}
+        reloadEffectLabel={`Reload shows ${preview.definition.key} on ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Custom field definition becomes available to runtime control surfaces after publish/readback."
+        warnings={[
+          `${preview.definition.key} uses ${preview.definition.valueType}`,
+          `filters=${String(preview.definition.bindingFlags.usableInFilters)} controlSurfaces=${String(
+            preview.definition.bindingFlags.usableInControlSurfaces
+          )}`
+        ]}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>
