@@ -44,7 +44,7 @@ function createSignal(id = "signal-kpi-schedule-variance-a"): KpiSignalDto {
     period: { start: "2026-06-01", end: "2026-06-07" },
     severity: "critical",
     explanation: "Критическое отклонение трудозатрат",
-    recommendedActionKeys: ["create_corrective_action", "escalate"],
+    recommendedActionKeys: ["create_corrective_action", "accept_risk", "escalate"],
     status: "open",
     actionExecutionState: "not_executed",
     createdAt: "2026-06-08T09:01:00.000Z",
@@ -70,7 +70,7 @@ function createEvaluation(id = "eval-kpi-schedule-variance-a-1"): KpiEvaluationD
     severity: "critical",
     matchedThresholdRuleId: "schedule-variance-critical",
     explanation: "Критическое отклонение трудозатрат",
-    recommendedActionKeys: ["create_corrective_action", "escalate"],
+    recommendedActionKeys: ["create_corrective_action", "accept_risk", "escalate"],
     sourceTrace: [
       {
         tenantId: "tenant-a",
@@ -164,6 +164,38 @@ function renderSurface(apiClient = createApiClient(), currentTenant = createCurr
 }
 
 describe("KpiDeviationControlSurface", () => {
+  it("renders an R2 signal summary, KPI strip, and governed action handoff contract", async () => {
+    renderSurface(createApiClient());
+
+    await waitFor(() => expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("1 KPI сигналов"));
+    await waitFor(() => expect(screen.getByTestId("kpi-strip")).toHaveTextContent("Отклонение"));
+    await waitFor(() => expect(screen.getByTestId("kpi-strip")).toHaveTextContent("-25"));
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Объект: project:project-alpha-a"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "KPI: kpi-schedule-variance-a v1"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Формула: formula-schedule-variance-a-v1@1"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Порог: threshold-schedule-variance-a-v1@1"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Создать корректирующее действие"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Принять риск: обязательна причина"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Без прямой мутации: действие выполняет P8 action engine"
+    );
+    expect(screen.getByTestId("kpi-deviation-action-contract")).toHaveTextContent(
+      "Историческая оценка остается стабильной"
+    );
+  });
+
   it("loads KPI signals and opens the traceable deviation detail", async () => {
     const apiClient = createApiClient();
     renderSurface(apiClient);
