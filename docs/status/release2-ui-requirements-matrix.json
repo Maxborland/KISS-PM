@@ -261,7 +261,7 @@
     {
       "id": "R2-007",
       "requirement": "Resource Load / Capacity Matrix hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Resource capacity hardening implementation PR",
       "owned_scope": [
         "UX-P6-RESOURCE-LOAD",
@@ -293,12 +293,16 @@
       "risks": [
         "Heatmap can become decorative if cell drilldown and source refs are weak."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: ResourceLoadControlSurface now renders a CapacityMatrix with hierarchy rows, sticky resource/day headers, crosshair state, reduced-capacity calendar exception, free-capacity and overload states, summary strip, and source-aware cell drilldown.",
+        "2026-05-17: Added component coverage in apps/web/src/ResourceLoadControlSurface.test.tsx for matrix hierarchy, crosshair, reduced capacity, free capacity, overload state, and drilldown source refs.",
+        "2026-05-17: E2E-R2-004 remains pending for Release 2 exit evidence."
+      ]
     },
     {
       "id": "R2-008",
       "requirement": "Resource conflict resolution flow with preview-before-apply",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Resource capacity hardening implementation PR",
       "owned_scope": [
         "UX-P6-OVERLOAD-RESOLUTION",
@@ -329,7 +333,12 @@
       "risks": [
         "Preview and apply can diverge if result readback is not authoritative."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Resource conflict preview panel now exposes before/after impact, required permission trace, warnings/blockers, and confirmation availability before apply.",
+        "2026-05-17: Apply result now shows changed assignment/reservation ids, overload status, action execution permission, and API readback bucket count.",
+        "2026-05-17: Added component coverage for no-direct-mutation drilldown, preview-before-apply details, governed apply, audit evidence, and API readback refresh.",
+        "2026-05-17: E2E-R2-005 remains pending for Release 2 exit evidence."
+      ]
     },
     {
       "id": "R2-009",

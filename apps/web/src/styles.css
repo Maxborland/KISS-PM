@@ -1010,6 +1010,129 @@ button:focus-visible {
   align-items: start;
 }
 
+.capacity-matrix-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.capacity-summary-strip {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.capacity-summary-strip span,
+.capacity-crosshair {
+  border: 1px solid #d7dfd1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #27332b;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+.capacity-matrix {
+  border: 1px solid #c8d4ca;
+  border-radius: 8px;
+  display: grid;
+  overflow: auto;
+}
+
+.capacity-matrix-row {
+  display: grid;
+  grid-template-columns: 210px repeat(5, minmax(132px, 1fr));
+  min-width: 870px;
+}
+
+.capacity-matrix-row + .capacity-matrix-row {
+  border-top: 1px solid #dfe6df;
+}
+
+.capacity-matrix-header {
+  background: #f1f6f2;
+  color: #465247;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.capacity-resource-cell,
+.capacity-day-header,
+.capacity-matrix-cell {
+  border-right: 1px solid #dfe6df;
+  min-height: 64px;
+  padding: 10px;
+}
+
+.capacity-resource-cell {
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+}
+
+.capacity-resource-cell span {
+  color: #59675a;
+  font-size: 12px;
+}
+
+.sticky-cell {
+  left: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.capacity-matrix-cell {
+  background: #ffffff;
+  border-bottom: 0;
+  border-left: 0;
+  border-top: 0;
+  color: #17211b;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.capacity-matrix-cell:hover,
+.capacity-matrix-cell:focus-visible,
+.capacity-matrix-cell.is-active {
+  outline: 2px solid #2f6f5e;
+  outline-offset: -2px;
+}
+
+.capacity-matrix-cell.state-overload {
+  background: #fff0ed;
+}
+
+.capacity-matrix-cell.state-free {
+  background: #eef8f0;
+}
+
+.capacity-matrix-cell.state-non-working {
+  background: #f4f5f2;
+  color: #59675a;
+}
+
+.capacity-matrix-cell.has-exception {
+  box-shadow: inset 0 -3px 0 #d39148;
+}
+
+.capacity-matrix-cell strong {
+  font-size: 12px;
+}
+
+.capacity-cell-drilldown {
+  border: 1px solid #c8d4ca;
+  border-radius: 8px;
+  background: #fbfdfb;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
 .preview-panel {
   border-color: #7aa4aa;
   background: #f7fbfb;

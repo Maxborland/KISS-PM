@@ -6912,6 +6912,64 @@
       "notes": "Completed 2026-05-17. Implemented R2-005 Project Gantt desktop planning surface hardening plus R2-006 tracking/baseline overlay over existing Phase 5 schedule API. Added selection sync, active-cell/dirty/validation/pending/readback affordances, Tracking Gantt variance, CSS, tests, matrix evidence, and handoff. No API/domain/package/e2e changes.",
       "completed_at": "2026-05-17T17:28:00+07:00",
       "result": "completed"
+    },
+    {
+      "id": "R2-UI-003-resource-capacity-hardening",
+      "aliases": [
+        "R2-UI-003",
+        "R2-007",
+        "R2-008"
+      ],
+      "title": "Implement Release 2 Resource Load capacity matrix and conflict resolution UI hardening",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives",
+        "R2-UI-002-gantt-planning-hardening"
+      ],
+      "write_scope": [
+        "apps/web/src/ResourceLoadControlSurface.tsx",
+        "apps/web/src/ResourceLoadControlSurface.test.tsx",
+        "apps/web/src/operationalSurfacePrimitives.tsx",
+        "apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "apps/web/src/styles.css",
+        "docs/status/release2-ui-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-003-resource-capacity-hardening.md",
+        ".agent-bus/claims/R2-UI-003-resource-capacity-hardening.claim.json",
+        ".agent-bus/sessions/R2-UI-003-resource-capacity-hardening.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src/ResourceLoadControlSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-003-resource-capacity-hardening --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-007/R2-008 Resource Load capacity matrix and governed conflict resolution UI hardening. Added hierarchy/day matrix, crosshair, reduced-capacity/free/overload states, cell drilldown, preview permission/warning trace, apply result changed ids and readback count, CSS, tests, matrix evidence, and handoff. No API/domain/package/e2e changes.",
+      "started_at": "2026-05-17T17:35:00+07:00",
+      "completed_at": "2026-05-17T17:43:00+07:00",
+      "result": "completed"
     }
   ]
 }
