@@ -113,10 +113,23 @@ function createPreview(): SavedViewLayoutPreviewDto {
       fields: ["suggested_resource_profile_id"],
       widgets: [],
       actionSlots: [],
-      reasons: ["field suggested_resource_profile_id will be hidden by the published layout"]
+      reasons: ["поле suggested_resource_profile_id будет скрыто опубликованным макетом"]
     },
     affectedRuntimeSurfaces: ["portfolio.control"],
     createdAt: "2026-08-01T00:01:00.000Z"
+  };
+}
+
+function createBlockingPreview(): SavedViewLayoutPreviewDto {
+  return {
+    ...createPreview(),
+    id: "preview-layout-blocked",
+    unavailable: {
+      fields: [],
+      widgets: ["critical_signal_count"],
+      actionSlots: ["accept_risk"],
+      reasons: ["runtime configuration references unavailable controls"]
+    }
   };
 }
 
@@ -222,7 +235,7 @@ describe("SavedViewLayoutBuilderSurface", () => {
     const runtimePreview = screen.getByTestId("runtime-config-preview");
     expect(runtimePreview).toHaveTextContent("portfolio.control");
     expect(runtimePreview).toHaveTextContent("v1 -> v2");
-    expect(runtimePreview).toHaveTextContent("Reload");
+    expect(runtimePreview).toHaveTextContent("После reload");
     expect(runtimePreview).toHaveTextContent("critical_portfolio");
     expect(apiClient.publishLayout).not.toHaveBeenCalled();
 
@@ -234,6 +247,24 @@ describe("SavedViewLayoutBuilderSurface", () => {
     expect(screen.getByTestId("saved-view-layout-previous")).toHaveTextContent("v1");
     expect(screen.getByTestId("saved-view-layout-result")).toHaveTextContent("control_surface_layout.publish");
     expect(screen.getByTestId("saved-view-layout-audit")).toHaveTextContent("audit-layout");
+  });
+
+  it("blocks publish when preview reports unavailable runtime widgets or action slots", async () => {
+    const apiClient = createApiClient();
+    vi.mocked(apiClient.previewLayout).mockResolvedValueOnce(createBlockingPreview());
+    renderSurface(apiClient);
+    await waitFor(() => expect(screen.getByTestId("saved-view-layout-readback")).toHaveTextContent("v1"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Предпросмотр макета" }));
+
+    const preview = await screen.findByTestId("runtime-config-preview");
+    expect(preview).toHaveTextContent("Блокер: Виджет critical_signal_count недоступен");
+    expect(preview).toHaveTextContent("Блокер: Действие accept_risk недоступно");
+    expect(screen.getByRole("button", { name: "Опубликовать макет" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Опубликовать макет" }));
+
+    expect(apiClient.publishLayout).not.toHaveBeenCalled();
   });
 
   it("shows read-only state and recovers from stale preview", async () => {

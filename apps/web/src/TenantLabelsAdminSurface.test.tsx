@@ -181,7 +181,7 @@ describe("TenantLabelsAdminSurface", () => {
     expect(runtimePreview).toHaveTextContent("project.stage.header");
     expect(runtimePreview).toHaveTextContent("task.participant.role");
     expect(runtimePreview).toHaveTextContent("v1 -> v2");
-    expect(runtimePreview).toHaveTextContent("Reload");
+    expect(runtimePreview).toHaveTextContent("После reload");
     expect(apiClient.publishLabels).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Опубликовать" }));
