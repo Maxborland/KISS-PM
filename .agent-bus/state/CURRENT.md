@@ -1,6 +1,16 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T08:17:43.5795743+07:00
+Updated: 2026-05-17T08:34:30.0000000+07:00
+
+- Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
+  - `P12-000-production-saas-hardening-phase-contract`
+  - contract: `docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md`
+  - matrix: `docs/status/phase12-requirements-matrix.json`
+  - verifier support recognizes P12-001..P12-010 and E2E-110..115 paths.
+- `docs/status/phase12-requirements-matrix.json` currently passes only with `--allow-blocked`; all P12 rows remain blocked until implementation/E2E evidence exists.
+- Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
+- Next runnable step: claim `P12-001-production-deployment-env-secret-contract`.
+- Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:
   - `P11-000-integrations-migration-phase-contract`
@@ -30,7 +40,7 @@ Updated: 2026-05-17T08:17:43.5795743+07:00
 - `P11-009` implemented deterministic Phase 11 fixtures in `packages/shared-test-fixtures/src/phase11Fixtures.ts` and executable Playwright E2E-100..104 under `e2e/tests/phase11/`. E2E proves UI + API readback, import preview non-mutation, governed apply, idempotency, safe adapter failure/recovery, backend permission denial, tenant isolation, mapping/audit evidence, imported canonical project continuity without live adapter, reload persistence, and `/test-fixtures/reset` cleanup. Matrix rows P11-001..P11-009 are now verified with structured E2E evidence.
 - `P11-010` closed the strict Phase 11 exit gate. `node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json` passes without `--allow-blocked`.
 - P11 scope is frozen around external systems as adapters, ExternalMapping/idempotency, mock adapter import preview/apply, migration validation reports, safe failure diagnostics, Integration Admin Diagnostics UI, imported-project continuity without live adapter dependency, deterministic fixtures, and strict matrix exit.
-- Next recommended step: start Phase 12 Production SaaS Hardening and Market Release. Release 2 is still not ready because P12 remains unaccepted.
+- Previous recommended step was to start Phase 12. That has now produced the P12 closed contract/tracking block; proceed with `P12-001-production-deployment-env-secret-contract`.
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.

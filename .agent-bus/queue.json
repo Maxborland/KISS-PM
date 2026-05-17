@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T08:17:43.5795743+07:00",
+  "updated_at": "2026-05-17T08:21:35.1386940+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -5619,6 +5619,502 @@
         "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 0: strict Phase 11 matrix passed without --allow-blocked",
         "git diff --check exit 0"
       ]
+    },
+    {
+      "id": "P12-000-production-saas-hardening-phase-contract",
+      "aliases": [
+        "P12-000"
+      ],
+      "title": "Finalize Phase 12 production SaaS hardening and market release contract",
+      "status": "done",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P11-010-phase11-verification-matrix-exit-gate"
+      ],
+      "write_scope": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md",
+        "docs/status/phase12-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P12-000-production-saas-hardening-phase-contract.claim.json",
+        ".agent-bus/sessions/P12-000-production-saas-hardening-phase-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json",
+        "docs/status/phase11-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md",
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json",
+        "scripts/verify-requirements-matrix.mjs",
+        "scripts/verify-requirements-matrix.test.ts"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once",
+        "npm test -- scripts/verify-requirements-matrix.test.ts",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T08:34:30.0000000+07:00. Created the closed Phase 12 production SaaS hardening and market release contract, initial blocked requirements matrix, verifier support for P12-001..P12-010 and E2E-110..115, and the P12 implementation queue. This accepts only the P12 contract/tracking block; Phase 12 implementation and Release 2 remain blocked until P12-001..P12-010 are implemented and strict matrix verification passes.",
+      "completed_at": "2026-05-17T08:34:30.0000000+07:00",
+      "result": "accepted",
+      "verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: verifier tests pass with P12 behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 product implementation and E2E-110..115 are still blocked",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
+      ]
+    },
+    {
+      "id": "P12-001-production-deployment-env-secret-contract",
+      "aliases": [
+        "P12-001"
+      ],
+      "title": "Implement production deployment, environment, and secret contract",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-000-production-saas-hardening-phase-contract"
+      ],
+      "write_scope": [
+        "docs/**",
+        "scripts/**",
+        ".env.example",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P12-001-production-deployment-env-secret-contract.claim.json",
+        ".agent-bus/sessions/P12-001-production-deployment-env-secret-contract.md"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json",
+        "docs/status/phase11-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "node scripts/agent-bus-guard.mjs --task P12-001-production-deployment-env-secret-contract --once",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Next runnable P12 block. Implement P12-001 only; do not mark strict P12 accepted until E2E-110..115 and P12-010 pass."
+    },
+    {
+      "id": "P12-002-observability-readiness-runtime",
+      "aliases": [
+        "P12-002"
+      ],
+      "title": "Implement observability and release readiness read model",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-001-production-deployment-env-secret-contract"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json",
+        "docs/status/phase11-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until P12-001 defines production-like env/health contract."
+    },
+    {
+      "id": "P12-003-recovery-smoke-backup-restore",
+      "aliases": [
+        "P12-003"
+      ],
+      "title": "Implement deterministic recovery smoke and backup/restore policy",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-001-production-deployment-env-secret-contract"
+      ],
+      "write_scope": [
+        "docs/**",
+        "apps/api/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json",
+        "docs/status/phase11-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until P12-001 establishes production-like runtime assumptions."
+    },
+    {
+      "id": "P12-004-security-privacy-audit-review-fixes",
+      "aliases": [
+        "P12-004"
+      ],
+      "title": "Run release security/privacy/audit review and fix blockers",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-002-observability-readiness-runtime",
+        "P12-003-recovery-smoke-backup-restore"
+      ],
+      "write_scope": [
+        "apps/**",
+        "packages/**",
+        "docs/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until core ops/readiness and recovery runtime exists."
+    },
+    {
+      "id": "P12-005-permission-tenant-isolation-matrix-smoke",
+      "aliases": [
+        "P12-005"
+      ],
+      "title": "Implement full permission and tenant-isolation smoke matrix",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-004-security-privacy-audit-review-fixes"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "apps/web/**",
+        "packages/access-control/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until security/privacy/audit review fixes are complete."
+    },
+    {
+      "id": "P12-006-operator-readiness-surfaces",
+      "aliases": [
+        "P12-006"
+      ],
+      "title": "Implement operator release readiness surfaces and governed ops commands",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-002-observability-readiness-runtime",
+        "P12-003-recovery-smoke-backup-restore",
+        "P12-005-permission-tenant-isolation-matrix-smoke"
+      ],
+      "write_scope": [
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test -- apps/web/src",
+        "npm test -- apps/api/src",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until ops/readiness, recovery, permission, and isolation runtime evidence exists."
+    },
+    {
+      "id": "P12-007-demo-tenant-template-pack-onboarding",
+      "aliases": [
+        "P12-007"
+      ],
+      "title": "Implement demo tenant/template pack and operator onboarding docs",
+      "status": "blocked",
+      "priority": "high",
+      "phase": "P12",
+      "depends_on": [
+        "P12-001-production-deployment-env-secret-contract"
+      ],
+      "write_scope": [
+        "docs/**",
+        "packages/shared-test-fixtures/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/shared-test-fixtures",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until production/env contract is accepted."
+    },
+    {
+      "id": "P12-008-full-critical-journey-orchestration",
+      "aliases": [
+        "P12-008"
+      ],
+      "title": "Implement full critical journey orchestration without live services",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-006-operator-readiness-surfaces",
+        "P12-007-demo-tenant-template-pack-onboarding"
+      ],
+      "write_scope": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/phase12/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm run test:e2e:phase -- --phase 12",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until operator surfaces and demo fixtures/docs exist."
+    },
+    {
+      "id": "P12-009-deterministic-phase12-fixtures-e2e",
+      "aliases": [
+        "P12-009"
+      ],
+      "title": "Implement deterministic Phase 12 fixtures and E2E-110..115",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-008-full-critical-journey-orchestration"
+      ],
+      "write_scope": [
+        "packages/shared-test-fixtures/**",
+        "e2e/tests/phase12/**",
+        "apps/api/**",
+        "apps/web/**",
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/**"
+      ],
+      "forbidden": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/shared-test-fixtures",
+        "npm run test:e2e:phase -- --phase 12",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
+        "git diff --check"
+      ],
+      "notes": "Blocked until full critical journey orchestration is ready."
+    },
+    {
+      "id": "P12-010-phase12-verification-matrix-market-release-exit-gate",
+      "aliases": [
+        "P12-010"
+      ],
+      "title": "Close Phase 12 verification matrix and market release exit gate",
+      "status": "blocked",
+      "priority": "critical",
+      "phase": "P12",
+      "depends_on": [
+        "P12-009-deterministic-phase12-fixtures-e2e"
+      ],
+      "write_scope": [
+        "docs/status/phase12-requirements-matrix.json",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/P12-010-phase12-verification-matrix-market-release-exit-gate.claim.json",
+        ".agent-bus/sessions/P12-010-phase12-verification-matrix-market-release-exit-gate.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json",
+        "docs/status/phase3-requirements-matrix.json",
+        "docs/status/phase4-requirements-matrix.json",
+        "docs/status/phase5-requirements-matrix.json",
+        "docs/status/phase6-requirements-matrix.json",
+        "docs/status/phase7-requirements-matrix.json",
+        "docs/status/phase8-requirements-matrix.json",
+        "docs/status/phase9-requirements-matrix.json",
+        "docs/status/phase10-requirements-matrix.json",
+        "docs/status/phase11-requirements-matrix.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm run test:e2e:phase -- --phase 12",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json",
+        "npm test",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check"
+      ],
+      "notes": "Blocked until E2E-110..115 and P12-001..P12-009 evidence are complete. This is the only P12 block that may mark Phase 12 and Release 2 accepted."
     }
   ]
 }

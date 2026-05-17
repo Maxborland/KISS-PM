@@ -1,0 +1,290 @@
+{
+  "phase": "P12",
+  "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
+  "allowed_workspace_root": "E:\\KISS-PM",
+  "updated_at": "2026-05-17T08:28:17.0000000+07:00",
+  "rows": [
+    {
+      "id": "P12-001",
+      "requirement": "Production deployment and environment contract",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs",
+        "scripts",
+        "deployment config"
+      ],
+      "required_e2e": [
+        "E2E-113"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-001 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Phase 12 contract is created, but deployment/env/secret-management implementation and E2E-113 evidence are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-002",
+      "requirement": "Observability, error monitoring, and release readiness read model",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "apps/web",
+        "ops readiness runtime"
+      ],
+      "required_e2e": [
+        "E2E-113",
+        "E2E-115"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-002 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Release readiness/observability read model and no-live-dependency evidence are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-003",
+      "requirement": "Backup/restore or deterministic recovery smoke",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs",
+        "apps/api",
+        "recovery runtime"
+      ],
+      "required_e2e": [
+        "E2E-114"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-003 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Recovery smoke runtime, policy evidence, and E2E-114 are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-004",
+      "requirement": "Security, privacy, and audit review fixes",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/access-control",
+        "apps/api",
+        "docs/security"
+      ],
+      "required_e2e": [
+        "E2E-111",
+        "E2E-112"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-004 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Security/privacy/audit review fixes and P12 permission/isolation E2E evidence are not completed yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-005",
+      "requirement": "Full permission and tenant-isolation matrix smoke",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "apps/web",
+        "packages/access-control"
+      ],
+      "required_e2e": [
+        "E2E-111",
+        "E2E-112"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-005 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Full permission matrix and tenant-isolation smoke across P3-P11 surfaces are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-006",
+      "requirement": "Operator release readiness surfaces and governed ops commands",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-113",
+        "E2E-114"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-006 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Operator readiness/recovery UI and governed ops commands are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-007",
+      "requirement": "Demo tenant, sample template pack, and onboarding/operator docs",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs",
+        "packages/shared-test-fixtures",
+        "packages/tenant-config"
+      ],
+      "required_e2e": [
+        "E2E-110"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-007 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Release demo tenant/template pack and onboarding/operator docs are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-008",
+      "requirement": "Full critical journey orchestration without live services",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "e2e",
+        "apps/api",
+        "apps/web"
+      ],
+      "required_e2e": [
+        "E2E-110",
+        "E2E-115"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-008 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Full critical journey orchestration from tenant config/CRM to closure/retrospective and no-live-service proof is not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-009",
+      "requirement": "Deterministic Phase 12 fixtures and E2E-110..115",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "packages/shared-test-fixtures",
+        "e2e/tests/phase12"
+      ],
+      "required_e2e": [
+        "E2E-110",
+        "E2E-111",
+        "E2E-112",
+        "E2E-113",
+        "E2E-114",
+        "E2E-115"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-009 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Deterministic Phase 12 fixtures and executable E2E-110..115 are not implemented yet.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    },
+    {
+      "id": "P12-010",
+      "requirement": "Phase 12 verification matrix and market release exit gate",
+      "status": "blocked",
+      "owner": "codex",
+      "owned_scope": [
+        "docs/status",
+        "scripts"
+      ],
+      "required_e2e": [
+        "E2E-110",
+        "E2E-111",
+        "E2E-112",
+        "E2E-113",
+        "E2E-114",
+        "E2E-115"
+      ],
+      "evidence": [
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-010 scope and acceptance criteria before implementation."
+      ],
+      "tests": [
+        "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
+        "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+      ],
+      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
+      "blocker": "2026-05-17T08:26:19.8717799+07:00: Final Phase 12 strict exit-gate aggregation is blocked until P12-001..P12-009 and E2E-110..115 are verified.",
+      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "e2e_evidence": []
+    }
+  ]
+}
