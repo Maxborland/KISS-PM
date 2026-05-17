@@ -329,6 +329,101 @@ describe("Gantt control surface", () => {
     expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Расписание обновлено");
   });
 
+  it("shares one selection state between the WBS grid and timeline bars", async () => {
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={createApiClient()}
+        currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    expect(screen.getByTestId("gantt-selected-task")).toHaveTextContent("task-phase5-kickoff");
+    expect(screen.getByTestId("gantt-row-task-phase5-kickoff")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("gantt-bar-task-phase5-kickoff")).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByTestId("gantt-bar-task-phase5-kickoff"));
+
+    expect(screen.getByTestId("gantt-selected-task")).toHaveTextContent("task-phase5-kickoff");
+    expect(screen.getByTestId("gantt-row-task-phase5-kickoff")).toHaveClass("selected");
+  });
+
+  it("supports active-cell keyboard editing with dirty, validation, pending, readback, and audit evidence", async () => {
+    const apiClient = createMutableApiClient();
+
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-row-task-phase5-kickoff")).toBeInTheDocument();
+    const startInput = screen.getByLabelText("Старт task-phase5-kickoff");
+    fireEvent.focus(startInput);
+    expect(screen.getByTestId("gantt-active-cell")).toHaveTextContent("task-phase5-kickoff / plannedStartDate");
+
+    fireEvent.change(startInput, { target: { value: "2026-06-02" } });
+    expect(screen.getByTestId("gantt-dirty-task-phase5-kickoff")).toHaveTextContent("Есть несохраненные изменения");
+
+    fireEvent.change(screen.getByLabelText("Финиш task-phase5-kickoff"), { target: { value: "2026-06-01" } });
+    expect(screen.getByTestId("gantt-validation-task-phase5-kickoff")).toHaveTextContent("Плановый финиш раньше старта");
+    expect(screen.getByRole("button", { name: "Сохранить task-phase5-kickoff" })).toBeDisabled();
+
+    fireEvent.keyDown(screen.getByLabelText("Финиш task-phase5-kickoff"), { key: "Escape" });
+    expect(screen.getByLabelText("Финиш task-phase5-kickoff")).toHaveValue("2026-06-03");
+
+    fireEvent.change(startInput, { target: { value: "2026-06-02" } });
+    fireEvent.keyDown(startInput, { key: "Enter" });
+
+    expect(await screen.findByTestId("gantt-pending-task-phase5-kickoff")).toHaveTextContent("Сохранение");
+    await waitFor(() => {
+      expect(apiClient.updateScheduleTask).toHaveBeenCalledWith(
+        "project-manager-a",
+        projectId,
+        "task-phase5-kickoff",
+        expect.objectContaining({ plannedStartDate: "2026-06-02" })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-status")).toHaveTextContent("Расписание задачи сохранено через API");
+    });
+    expect(screen.getByTestId("gantt-action-evidence")).toHaveTextContent("Расписание обновлено");
+    expect(screen.queryByTestId("gantt-dirty-task-phase5-kickoff")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть Гантт" }));
+    expect(await screen.findByLabelText("Старт task-phase5-kickoff")).toHaveValue("2026-06-02");
+  });
+
+  it("shows tracking overlay with stable baseline, live variance, and today marker", async () => {
+    const apiClient = createMutableApiClient();
+
+    render(withTestQueryClient(
+      <GanttControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant(["tenant.read", "project.read", "task.read", "task.write", "audit.read"])}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("gantt-tracking-overlay")).toHaveTextContent("baseline-phase5-draft");
+    expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Базовый план: 2026-06-01 / 2026-06-03");
+    expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Живой план: 2026-06-01 / 2026-06-03");
+    expect(screen.getByTestId("gantt-today-marker")).toHaveTextContent("Сегодня");
+
+    fireEvent.change(screen.getByLabelText("Старт task-phase5-kickoff"), { target: { value: "2026-06-04" } });
+    fireEvent.change(screen.getByLabelText("Финиш task-phase5-kickoff"), { target: { value: "2026-06-05" } });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить task-phase5-kickoff" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Живой план: 2026-06-04 / 2026-06-05");
+    });
+    expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Базовый план: 2026-06-01 / 2026-06-03");
+    expect(screen.getByTestId("gantt-tracking-task-phase5-kickoff")).toHaveTextContent("Отклонение старта: +3 дн.");
+  });
+
   it("keeps the schedule visible when audit readback is temporarily unavailable", async () => {
     const apiClient = createApiClient();
     vi.mocked(apiClient.getProjectScheduleAudit).mockRejectedValueOnce(new Error("Audit readback unavailable"));

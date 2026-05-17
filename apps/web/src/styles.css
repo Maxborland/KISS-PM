@@ -1069,6 +1069,15 @@ button:focus-visible {
   padding: 8px 10px;
 }
 
+.gantt-row.selected {
+  border-color: #2f6f4e;
+  box-shadow: inset 3px 0 0 #2f6f4e;
+}
+
+.gantt-row.dirty {
+  background: #fffaf0;
+}
+
 .gantt-row span {
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -1078,9 +1087,39 @@ button:focus-visible {
   width: 100%;
 }
 
+.gantt-row input.active-cell {
+  border-color: #2f6f4e;
+  box-shadow: 0 0 0 2px rgba(47, 111, 78, 0.14);
+}
+
 .inline-save-button {
   margin-top: 6px;
   width: 100%;
+}
+
+.gantt-inline-warning,
+.gantt-dirty-marker,
+.gantt-pending-marker {
+  border-radius: 6px;
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  padding: 6px 8px;
+}
+
+.gantt-inline-warning {
+  background: #fff0ef;
+  color: #7b2520;
+}
+
+.gantt-dirty-marker {
+  background: #fff6e7;
+  color: #6a430c;
+}
+
+.gantt-pending-marker {
+  background: #edf7ef;
+  color: #24542d;
 }
 
 .warning-list {
@@ -1113,8 +1152,10 @@ button:focus-visible {
 .gantt-bar {
   align-items: center;
   background: #2f6f4e;
+  border: 0;
   border-radius: 5px;
   color: #ffffff;
+  cursor: pointer;
   display: flex;
   font-size: 12px;
   font-weight: 700;
@@ -1124,9 +1165,31 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.gantt-bar.selected {
+  outline: 2px solid #17211b;
+  outline-offset: 2px;
+}
+
 .gantt-bar span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.gantt-tracking-overlay {
+  grid-column: 1 / -1;
+}
+
+.gantt-tracking-row {
+  border: 1px solid #d7dfd1;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr repeat(4, minmax(130px, 0.8fr));
+  padding: 10px;
+}
+
+.gantt-planning-state-panel {
+  min-width: 0;
 }
 
 .stage-progress {
