@@ -76,7 +76,8 @@ function defaultDraft(): DraftState {
     sortKeys: "project_label",
     groupKeys: "severity",
     widgetKeys: "critical_signal_count",
-    actionSlotKeys: "create_corrective_action, accept_risk"
+    actionSlotKeys:
+      "create_corrective_action, accept_risk, escalate, request_explanation, shift_work, split_work, reassign_resource, accept_resource_overload"
   };
 }
 
