@@ -6914,6 +6914,68 @@
       "result": "completed"
     },
     {
+      "id": "R2-UI-007-release2-exit-evidence",
+      "aliases": [
+        "R2-UI-007",
+        "R2-012"
+      ],
+      "title": "Implement Release 2 E2E, sales-demo quality gate, and exit evidence",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-UI-001-shared-operational-primitives",
+        "R2-UI-002-gantt-planning-hardening",
+        "R2-UI-003-resource-capacity-hardening",
+        "R2-UI-004-portfolio-kpi-control-hardening",
+        "R2-UI-005-retrospective-control-hardening",
+        "R2-UI-006-tenant-admin-config-hardening"
+      ],
+      "write_scope": [
+        "e2e/tests/release2/**",
+        "scripts/run-e2e.mjs",
+        "scripts/verify-requirements-matrix.mjs",
+        "docs/status/release2-ui-requirements-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/product/UX_SALES_QUALITY_GATE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/tasks/active/R2-UI-007-release2-exit-evidence.md",
+        ".agent-bus/claims/R2-UI-007-release2-exit-evidence.claim.json",
+        ".agent-bus/sessions/R2-UI-007-release2-exit-evidence.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/api/**",
+        "apps/web/src/**",
+        "packages/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/status/*",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "node scripts/run-e2e.mjs release2",
+        "npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "npm run typecheck",
+        "npm run lint",
+        "git diff --check",
+        "node scripts/agent-bus-guard.mjs --task R2-UI-007-release2-exit-evidence --once"
+      ],
+      "notes": "Completed 2026-05-17. Implemented R2-012 exit evidence: Release 2 E2E profile/tests for E2E-R2-001..010, sales-demo gate evidence, R2 matrix verifier support, and final matrix status. No production UI/API/domain changes.",
+      "started_at": "2026-05-17T19:31:00+07:00",
+      "completed_at": "2026-05-17T19:43:00+07:00",
+      "result": "completed"
+    },
+    {
       "id": "R2-UI-006-tenant-admin-config-hardening",
       "aliases": [
         "R2-UI-006",

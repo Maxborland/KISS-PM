@@ -42,6 +42,8 @@ Release 2 screens must pass these additional product gates before the release ex
 - Resource conflict flow shows before/after capacity and schedule impact before confirmation.
 - Tenant Admin configuration shows preview and runtime effect after reload.
 
+Release 2 exit evidence is `node scripts/run-e2e.mjs release2`, which runs `E2E-R2-001..010` including the first-five-minutes sales-demo clarity path.
+
 ## Reject Conditions
 
 - Screen renders but no primary action.
