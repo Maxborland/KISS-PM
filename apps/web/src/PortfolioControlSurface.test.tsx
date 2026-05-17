@@ -385,6 +385,26 @@ describe("PortfolioControlSurface", () => {
     expect(apiClient.getSurfaceView).toHaveBeenCalledWith("tenant-admin-a", "portfolio-control");
   });
 
+  it("summarizes the highest portfolio risk and jumps to it even when a warning row is selected first", async () => {
+    const [kpiRow, resourceRow] = defaultRows();
+    const warningFirstRows: ControlSurfaceReadModelDto["rows"] = [
+      { ...kpiRow, severity: "warning", explanation: "Некритичный риск перед критичным" },
+      { ...resourceRow, severity: "critical" }
+    ];
+    renderSurface(createApiClient(createSurfaceView(warningFirstRows)));
+
+    await waitFor(() => expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("Критично"));
+    expect(await screen.findByTestId("portfolio-control-detail")).toHaveTextContent("row-kpi-signal-kpi-schedule-variance-a");
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть следующий риск" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("portfolio-control-detail")).toHaveTextContent(
+        "resource_overload:overload:resource-architect-a:2026-06-01:2026-06-05"
+      )
+    );
+  });
+
   it("opens related Gantt through the drilldown callback", async () => {
     const apiClient = createApiClient();
     const onOpenGanttProject = vi.fn();

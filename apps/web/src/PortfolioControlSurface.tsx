@@ -261,6 +261,24 @@ function operationalSeverity(severity: ControlSeverityDto | undefined): Operatio
   return "ok";
 }
 
+const severityRank: Record<OperationalSeverity, number> = {
+  ok: 0,
+  attention: 1,
+  warning: 2,
+  critical: 3
+};
+
+function mostSevereRow(rows: ControlSurfaceReadRowDto[], excludedRowId?: string | null): ControlSurfaceReadRowDto | null {
+  return rows
+    .filter((row) => row.id !== excludedRowId && row.severity !== "none")
+    .reduce<ControlSurfaceReadRowDto | null>((currentHighest, row) => {
+      if (currentHighest === null) return row;
+      return severityRank[operationalSeverity(row.severity)] > severityRank[operationalSeverity(currentHighest.severity)]
+        ? row
+        : currentHighest;
+    }, null);
+}
+
 function operationalState({
   activeRow,
   canReadSurface,
@@ -443,6 +461,8 @@ export function PortfolioControlSurface({
   const selectedActionAvailable = Boolean(activeAction?.available && activeDefinition);
   const displayStatus = viewQuery.isFetching && !view ? "Загрузка портфельного контроля" : status;
   const audit = auditQuery.data ?? { events: [], actionExecutions: [] };
+  const highestRiskRow = mostSevereRow(rows);
+  const nextRiskRow = mostSevereRow(rows, activeRow?.id) ?? highestRiskRow;
 
   if (!canReadSurface) {
     return (
@@ -558,11 +578,10 @@ export function PortfolioControlSurface({
         signal={
           <SignalSummaryBar
             disabledReason={activeRow ? undefined : "Нет выбранного контрольного сигнала"}
-            highestSeverity={operationalSeverity(activeRow?.severity ?? rows[0]?.severity)}
+            highestSeverity={operationalSeverity(highestRiskRow?.severity)}
             nextActionLabel="Открыть следующий риск"
             onNextAction={() => {
-              const nextRow = rows.find((row) => row.id !== activeRow?.id) ?? rows[0];
-              if (nextRow) selectRow(nextRow.id);
+              if (nextRiskRow) selectRow(nextRiskRow.id);
             }}
             requiresActionCount={rows.filter((row) => row.severity !== "none").length}
             summary={
