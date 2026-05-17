@@ -142,6 +142,34 @@ describe("Release 2 operational surface primitives", () => {
     expect(within(screen.getByTestId("operational-data-grid")).queryByText("Ответственный")).not.toBeInTheDocument();
   });
 
+  it("does not select the row when keyboard users activate a row action button", () => {
+    const onSelectRow = vi.fn();
+    const onPreview = vi.fn();
+
+    render(
+      <OperationalDataGrid
+        columns={columns}
+        emptyLabel="Нет сигналов"
+        onSelectRow={onSelectRow}
+        rows={[
+          {
+            ...rows[0]!,
+            actions: [{ key: "preview", label: "Предпросмотр", onSelect: onPreview }]
+          }
+        ]}
+        selectedRowId="row-critical"
+      />
+    );
+
+    const previewButton = screen.getByRole("button", { name: "Предпросмотр" });
+    previewButton.focus();
+    fireEvent.keyDown(previewButton, { key: "Enter" });
+    fireEvent.click(previewButton);
+
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onSelectRow).not.toHaveBeenCalled();
+  });
+
   it("renders grouped headers as contiguous runs when column groups repeat", () => {
     render(
       <OperationalDataGrid
