@@ -176,6 +176,11 @@ describe("KpiThresholdBuilderSurface", () => {
     const preview = await screen.findByTestId("kpi-threshold-preview");
     expect(preview).toHaveTextContent("Состояние еще не изменено");
     expect(preview).toHaveTextContent("warning");
+    const runtimePreview = screen.getByTestId("runtime-config-preview");
+    expect(runtimePreview).toHaveTextContent("kpi.deviation.control");
+    expect(runtimePreview).toHaveTextContent("v1 -> v2");
+    expect(runtimePreview).toHaveTextContent("После reload");
+    expect(runtimePreview).toHaveTextContent("warning");
     expect(apiClient.publishThresholds).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Опубликовать пороги" }));

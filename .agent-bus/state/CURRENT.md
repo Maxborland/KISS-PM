@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T19:10:27+07:00
+Updated: 2026-05-17T19:24:00+07:00
+
+- `R2-UI-006-tenant-admin-config-hardening` is completed as the sixth Release 2 production UI slice:
+  - branch: `codex/r2-tenant-admin-config-hardening`, stacked on PR #7 (`codex/r2-retrospective-control-hardening`)
+  - files: `apps/web/src/operationalSurfacePrimitives.tsx`, `apps/web/src/operationalSurfacePrimitives.test.tsx`, `apps/web/src/SavedViewLayoutBuilderSurface.tsx`, `apps/web/src/SavedViewLayoutBuilderSurface.test.tsx`, `apps/web/src/TenantLabelsAdminSurface.tsx`, `apps/web/src/TenantLabelsAdminSurface.test.tsx`, `apps/web/src/CustomFieldBuilderSurface.tsx`, `apps/web/src/CustomFieldBuilderSurface.test.tsx`, `apps/web/src/KpiThresholdBuilderSurface.tsx`, `apps/web/src/KpiThresholdBuilderSurface.test.tsx`, `apps/web/src/styles.css`
+  - implemented: shared `RuntimeConfigPreview` with version delta, affected runtime surfaces, warnings/blockers, and reload effect; saved views, tenant labels, custom fields, and KPI thresholds now expose runtime-impact preview before publish/readback.
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` records component-level evidence for `R2-011`; E2E-R2-008 and E2E-R2-009 remain pending.
+  - verification: RED component test run failed with 5 expected missing-runtime-preview failures; final targeted Vitest passed (5 files, 22 tests); `npm run typecheck` passed; `npm run lint` passed; `git diff --check` passed; Release 2 matrix JSON parse passed.
+  - known verifier gap remains: `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this R2 backlog shape (`unsupported matrix phase: undefined`; planned/in_progress status errors).
+  - next recommended slice: `R2-012` Release 2 E2E/fixtures/sales-demo exit evidence, or merge/rebase stacked PRs first.
 
 - `R2-UI-005-retrospective-control-hardening` is completed as the fifth Release 2 production UI slice:
   - branch: `codex/r2-retrospective-control-hardening`, stacked on PR #6 (`codex/r2-portfolio-kpi-control-hardening`)

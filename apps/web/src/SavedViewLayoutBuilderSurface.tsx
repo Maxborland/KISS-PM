@@ -9,6 +9,7 @@ import type {
   SavedViewLayoutPreviewDto
 } from "./savedViewLayoutBuilderApiClient";
 import type { TenantLabelActionExecutionDto } from "./tenantLabelsApiClient";
+import { RuntimeConfigPreview } from "./operationalSurfacePrimitives";
 
 type SavedViewLayoutBuilderSurfaceProps = {
   apiClient: SavedViewLayoutBuilderApiClient;
@@ -75,7 +76,8 @@ function defaultDraft(): DraftState {
     sortKeys: "project_label",
     groupKeys: "severity",
     widgetKeys: "critical_signal_count",
-    actionSlotKeys: "create_corrective_action, accept_risk"
+    actionSlotKeys:
+      "create_corrective_action, accept_risk, escalate, request_explanation, shift_work, split_work, reassign_resource, accept_resource_overload"
   };
 }
 
@@ -108,11 +110,38 @@ function buildDraft(draft: DraftState, expectedSurfaceVersion: number): SavedVie
   };
 }
 
+function blockingPreviewReasons(_preview: SavedViewLayoutPreviewDto): string[] {
+  return [];
+}
+
+function warningPreviewReasons(preview: SavedViewLayoutPreviewDto): string[] {
+  return [
+    ...preview.unavailable.fields.map((field) => `Поле ${field} будет скрыто в runtime-макете`),
+    ...preview.unavailable.widgets.map((widget) => `Виджет ${widget} будет скрыт в runtime-макете`),
+    ...preview.unavailable.actionSlots.map((actionSlot) => `Действие ${actionSlot} будет скрыто в runtime-макете`),
+    ...preview.unavailable.reasons.map((reason) => `Проверка backend: ${reason}`)
+  ];
+}
+
 function PreviewPanel({ preview }: { preview: SavedViewLayoutPreviewDto }) {
+  const savedViewSummary =
+    preview.after.savedViewKeys.length > 0 ? preview.after.savedViewKeys.join(", ") : "макет поверхности по умолчанию";
+  const blockers = blockingPreviewReasons(preview);
+
   return (
     <section className="phase2-panel preview-panel" data-testid="saved-view-layout-preview">
       <h3>Предпросмотр макета</h3>
       <p>Состояние еще не изменено. Публикация пройдет через управляемую команду.</p>
+      <RuntimeConfigPreview
+        affectedSurfaces={preview.affectedRuntimeSurfaces}
+        afterVersion={`v${preview.after.surfaceVersion}`}
+        beforeVersion={`v${preview.before.surfaceVersion}`}
+        blockers={blockers}
+        previewId={preview.id}
+        reloadEffectLabel={`После reload сохраненный вид ${savedViewSummary} применяется на ${preview.affectedRuntimeSurfaces.join(", ")}`}
+        summary="Сохраненный вид и макет колонок изменят runtime-поверхности только после publish/readback."
+        warnings={warningPreviewReasons(preview)}
+      />
       <dl className="compact-facts">
         <div>
           <dt>Версия до</dt>
@@ -209,6 +238,12 @@ export function SavedViewLayoutBuilderSurface({
 
   async function publishPreview() {
     if (commandInFlight || preview === null) return;
+    const blockers = blockingPreviewReasons(preview);
+    if (blockers.length > 0) {
+      setCommandError(`Публикация заблокирована: ${blockers.join("; ")}`);
+      setStatus("Публикация заблокирована предпросмотром");
+      return;
+    }
     setPendingCommand("publish");
     setCommandError("");
     setStatus("Публикуем макет");
@@ -342,7 +377,11 @@ export function SavedViewLayoutBuilderSurface({
               <button disabled={commandInFlight || readback === undefined} type="button" onClick={() => void runPreview()}>
                 Предпросмотр макета
               </button>
-              <button disabled={commandInFlight || preview === null} type="button" onClick={() => void publishPreview()}>
+              <button
+                disabled={commandInFlight || preview === null || blockingPreviewReasons(preview).length > 0}
+                type="button"
+                onClick={() => void publishPreview()}
+              >
                 Опубликовать макет
               </button>
               <button disabled={commandInFlight} type="button" onClick={() => void refresh()}>

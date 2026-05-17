@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release": "R2",
-  "updated_at": "2026-05-17T17:26:00+07:00",
+  "updated_at": "2026-05-17T19:23:00+07:00",
   "source_documents": [
     "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
     "docs/product/CONTROL_SURFACE_INTERACTION_PATTERNS.md",
@@ -425,7 +425,7 @@
     {
       "id": "R2-011",
       "requirement": "Tenant Admin saved views/layout/config preview hardening",
-      "status": "planned",
+      "status": "in_progress",
       "owner": "Tenant admin runtime config implementation PR",
       "owned_scope": [
         "UX-P10-SAVED-VIEWS",
@@ -461,7 +461,12 @@
       "risks": [
         "Admin configuration can feel powerful but unsafe without runtime preview and rollback/readback."
       ],
-      "done_evidence": []
+      "done_evidence": [
+        "2026-05-17: Added shared RuntimeConfigPreview primitive with version delta, affected runtime surfaces, warnings/blockers, and reload effect.",
+        "2026-05-17: Hardened SavedViewLayoutBuilderSurface, TenantLabelsAdminSurface, CustomFieldBuilderSurface, and KpiThresholdBuilderSurface preview panels to show runtime impact before publish.",
+        "2026-05-17: Added component coverage for saved views, tenant labels, custom fields, KPI thresholds, and RuntimeConfigPreview.",
+        "2026-05-17: npm test -- apps/web/src/SavedViewLayoutBuilderSurface.test.tsx apps/web/src/TenantLabelsAdminSurface.test.tsx apps/web/src/CustomFieldBuilderSurface.test.tsx apps/web/src/KpiThresholdBuilderSurface.test.tsx apps/web/src/operationalSurfacePrimitives.test.tsx passed."
+      ]
     },
     {
       "id": "R2-012",

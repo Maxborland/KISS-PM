@@ -367,6 +367,28 @@ nav a:focus-visible {
   font-size: 12px;
 }
 
+.runtime-config-preview {
+  border: 1px solid #cfd8d1;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.runtime-config-preview p {
+  margin: 0;
+}
+
+.runtime-config-preview .compact-list span {
+  border-color: #d7dfd1;
+}
+
+.runtime-config-blockers span {
+  border-color: #e4b8b8;
+  color: #7a2d2d;
+}
+
 .kpi-strip {
   display: grid;
   gap: 10px;

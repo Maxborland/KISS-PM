@@ -272,6 +272,11 @@ describe("CustomFieldBuilderSurface", () => {
     const preview = await screen.findByTestId("custom-field-preview");
     expect(preview).toHaveTextContent("Состояние еще не изменено");
     expect(preview).toHaveTextContent("Версия после");
+    const runtimePreview = screen.getByTestId("runtime-config-preview");
+    expect(runtimePreview).toHaveTextContent("portfolio.control");
+    expect(runtimePreview).toHaveTextContent("v1 -> v2");
+    expect(runtimePreview).toHaveTextContent("После reload");
+    expect(runtimePreview).toHaveTextContent("risk_level");
     expect(apiClient.publishCustomField).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Опубликовать" }));
