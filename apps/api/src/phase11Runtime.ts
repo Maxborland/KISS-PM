@@ -103,6 +103,11 @@ export function createPhase11RuntimeState() {
     state.failureModes.delete(connectionFailureKey(input.tenantId, input.connectionId));
   }
 
+  function getConnectionFailureMode(input: { tenantId: string; connectionId: string }): AdapterFailure | undefined {
+    const failureMode = state.failureModes.get(connectionFailureKey(input.tenantId, input.connectionId));
+    return failureMode === undefined ? undefined : clone(failureMode.failure);
+  }
+
   function previewMockImport(input: {
     id: string;
     tenantId: string;
@@ -378,6 +383,7 @@ export function createPhase11RuntimeState() {
   return {
     setConnectionFailureMode,
     clearConnectionFailureMode,
+    getConnectionFailureMode,
     previewMockImport,
     applyImport,
     getMigrationValidationReport,

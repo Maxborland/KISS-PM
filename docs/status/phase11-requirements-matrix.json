@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T07:02:46.4127015+07:00",
+  "updated_at": "2026-05-17T07:20:04.5500545+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -203,14 +203,30 @@
         "E2E-104"
       ],
       "evidence": [
-        "Phase 11 contract defines adapter, connection, import preview/apply, batch, mapping, audit, and diagnostics API contracts."
+        "Phase 11 contract defines adapter, connection, import preview/apply, batch, mapping, audit, and diagnostics API contracts.",
+        "apps/api/src/app.ts exposes tenant-scoped P11 routes: GET /api/integrations/adapters, GET /api/integrations/connections, GET /api/integrations/diagnostics, POST/DELETE failure-mode diagnostics test hooks, POST /api/integrations/import/preview, GET /api/integrations/import/previews/:previewId/report, GET /api/integrations/import/previews/:previewId/dry-run, POST /api/integrations/import/apply, GET /api/integrations/import/batches, GET /api/integrations/mappings, and GET /api/integrations/audit.",
+        "apps/api/src/app.ts routes validate request bodies, require integration.* backend permissions, scope adapters/connections/previews/batches/mappings/audit to the authenticated tenant, map IntegrationDomainError to typed HTTP errors, and reset Phase 11 runtime state through /test-fixtures/reset.",
+        "apps/api/src/phase11IntegrationsApi.test.ts proves deterministic read model routes, non-mutating preview with validation report and dry-run summary readback, governed apply with batch/mapping/audit readback, idempotent replay, stale preview denial without partial mutation, read-only preview/apply denial, Tenant B cross-tenant report/apply denial without Tenant A identifiers in the response, invalid payload diagnostics with no partial writes, rate-limit failure diagnostics, and recovery after clearing adapter failure mode.",
+        "Bug-hunt fix: API-generated preview ids are unique per preview request and reset with test fixtures, so an older dry-run token cannot silently apply a newer preview."
       ],
       "tests": [
-        "Pending P11-006 implementation: expected API integration tests for preview/apply, permissions, tenant isolation, stale preview, invalid payload, and failure recovery."
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 1 RED: P11 API routes were missing before implementation and returned 404.",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 1 RED during bug-hunt: repeated preview calls reused the same API-generated preview id instead of creating a staleable token.",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 0: 1 file, 7 tests passed",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts apps/api/src/phase11Runtime.test.ts exit 0: 2 files, 17 tests passed",
+        "npm test -- packages/integrations apps/api/src/phase11IntegrationsApi.test.ts apps/api/src/phase11Runtime.test.ts exit 0: 6 files, 36 tests passed",
+        "npm test -- apps/api/src exit 0: 21 files, 111 tests passed",
+        "npm test exit 0: 99 files, 569 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 expected: P11 rows remain blocked until P11-007..P11-010 and E2E-100..104 evidence exist",
+        "git diff --check exit 0",
+        "node scripts/agent-bus-guard.mjs --task P11-006-integrations-api-governed-import-commands --once exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must reset API runtime import state, mapping state, audit/action evidence, and adapter modes.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-006 API runtime/routes are not implemented yet; direct API evidence is unavailable.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "P11 API state is in-memory and /test-fixtures/reset recreates phase11Runtime plus the API preview-id counter. API tests prove dry-run preview does not mutate batches or mappings, failed stale/invalid apply does not create batches or mappings, failed adapter previews write failure audit only, and clearing failure mode restores healthy diagnostics. Full E2E cleanup/readback remains blocked until P11-009.",
+      "blocker": "2026-05-17T07:20:04.5500545+07:00: P11-006 API/governed-command implementation is complete and API-tested, but this matrix row remains blocked for strict phase exit until required E2E-100, E2E-101, E2E-102, and E2E-104 structured evidence exists.",
+      "last_checked_at": "2026-05-17T07:20:04.5500545+07:00",
       "e2e_evidence": []
     },
     {

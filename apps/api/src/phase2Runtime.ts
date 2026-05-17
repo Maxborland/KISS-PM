@@ -281,6 +281,36 @@ const phase2PermissionCatalog = [
     key: "schedule:read",
     description: "Open schedule and Gantt drilldowns from control surfaces",
     category: "scheduling"
+  }),
+  createPermission({
+    key: "integration.read",
+    description: "Read integration adapters and connections",
+    category: "integrations"
+  }),
+  createPermission({
+    key: "integration.preview",
+    description: "Preview integration imports and migration validation reports",
+    category: "integrations"
+  }),
+  createPermission({
+    key: "integration.apply",
+    description: "Apply governed integration import commands",
+    category: "integrations"
+  }),
+  createPermission({
+    key: "integration.mapping.read",
+    description: "Read integration external mapping diagnostics",
+    category: "integrations"
+  }),
+  createPermission({
+    key: "integration.audit.read",
+    description: "Read integration sync audit events",
+    category: "integrations"
+  }),
+  createPermission({
+    key: "integration.admin",
+    description: "Administer integration adapter diagnostics",
+    category: "integrations"
   })
 ] satisfies Permission[];
 
@@ -338,7 +368,13 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "retrospective.read",
       "retrospective.write",
       "retrospective.improvement.write",
-      "schedule:read"
+      "schedule:read",
+      "integration.read",
+      "integration.preview",
+      "integration.apply",
+      "integration.mapping.read",
+      "integration.audit.read",
+      "integration.admin"
     ],
     project_manager: [
       "crm.opportunity.read",
@@ -371,7 +407,12 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "retrospective.read",
       "retrospective.write",
       "retrospective.improvement.write",
-      "schedule:read"
+      "schedule:read",
+      "integration.read",
+      "integration.preview",
+      "integration.apply",
+      "integration.mapping.read",
+      "integration.audit.read"
     ],
     resource_manager: [
       "crm.opportunity.read",
@@ -390,7 +431,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "control.surface:read",
       "retrospective.read",
       "control.action:write",
-      "schedule:read"
+      "schedule:read",
+      "integration.read"
     ],
     executor: ["project.read", "task.read", "task.status.write", "task.comment.write"],
     readonly_observer: [
@@ -403,7 +445,10 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "kpi:read",
       "retrospective.read",
       "control.surface:read",
-      "tenant.config.read"
+      "tenant.config.read",
+      "integration.read",
+      "integration.mapping.read",
+      "integration.audit.read"
     ],
     tenant_user: [
       "crm.opportunity.read",
@@ -415,7 +460,8 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "kpi:read",
       "retrospective.read",
       "control.surface:read",
-      "tenant.config.read"
+      "tenant.config.read",
+      "integration.read"
     ]
   };
   const permissionKeys = [...new Set([...input.permissions, ...(supplementalPermissionsByProfile[input.systemKey] ?? [])])];
