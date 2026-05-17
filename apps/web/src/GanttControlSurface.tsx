@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { CurrentTenantDto } from "./phase2ApiClient";
@@ -24,6 +24,11 @@ const defaultProjectId = "project-phase4-main";
 type GanttLoadState = "idle" | "loading" | "ready" | "empty" | "denied" | "error";
 type GanttCommandName = "create-task" | "update-task" | "dependency" | "baseline";
 type ScheduleEditDraft = UpdateScheduleTaskRequestDto;
+type ScheduleEditField = keyof ScheduleEditDraft;
+type ActiveScheduleCell = {
+  taskId: string;
+  field: ScheduleEditField;
+};
 
 type ScheduleSnapshot = {
   schedule: ProjectScheduleDto;
@@ -75,6 +80,29 @@ function actionStatusLabel(status: string): string {
   return status === "succeeded" ? "успешно" : status;
 }
 
+function daysDelta(fromDate: string | undefined, toDate: string | undefined): number | null {
+  if (!fromDate || !toDate) return null;
+  const fromTime = Date.parse(`${fromDate}T00:00:00.000Z`);
+  const toTime = Date.parse(`${toDate}T00:00:00.000Z`);
+  if (Number.isNaN(fromTime) || Number.isNaN(toTime)) return null;
+  return Math.round((toTime - fromTime) / 86_400_000);
+}
+
+function deltaLabel(label: string, delta: number | null): string {
+  if (delta === null) return `${label}: нет данных`;
+  if (delta === 0) return `${label}: 0 дн.`;
+  return `${label}: ${delta > 0 ? "+" : ""}${delta} дн.`;
+}
+
+function draftFromNode(node: ProjectScheduleDto["schedulePlan"]["wbsNodes"][number]): ScheduleEditDraft {
+  return {
+    plannedStartDate: node.schedule?.plannedStartDate ?? "",
+    plannedFinishDate: node.schedule?.plannedFinishDate ?? "",
+    plannedWorkHours: node.plannedWorkHours ?? 0,
+    progressPercent: node.progressPercent ?? 0
+  };
+}
+
 export function GanttControlSurface({
   apiClient,
   currentTenant,
@@ -89,6 +117,9 @@ export function GanttControlSurface({
   const [pendingCommand, setPendingCommand] = useState<GanttCommandName | null>(null);
   const [lastCommandStatus, setLastCommandStatus] = useState<string | null>(null);
   const [commandIssues, setCommandIssues] = useState<ScheduleValidationIssueDto[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [activeCell, setActiveCell] = useState<ActiveScheduleCell | null>(null);
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
   const [createTaskDraft, setCreateTaskDraft] = useState<CreateScheduleTaskRequestDto>({
     id: "task-phase5-created",
     stageId: `${defaultProjectId}:stage-initiation`,
@@ -130,10 +161,18 @@ export function GanttControlSurface({
   const ganttView = useMemo(() => (schedule ? buildProjectScheduleGanttView(schedule) : null), [schedule]);
   const rows = ganttView?.rows ?? [];
   const taskRows = rows.filter((row) => row.taskId !== undefined);
+  const activeTaskId = selectedTaskId ?? taskRows[0]?.taskId ?? null;
   const activeProjectId = schedule?.schedulePlan.projectId ?? selectedProjectId;
   const firstStageId =
     schedule?.schedulePlan.wbsNodes.find((node) => node.stageId !== undefined)?.stageId ?? `${activeProjectId}:stage-initiation`;
   const commandInFlight = pendingCommand !== null;
+  const scheduleNodeByTaskId = useMemo(() => {
+    return new Map(
+      (schedule?.schedulePlan.wbsNodes ?? [])
+        .filter((node) => node.taskId !== undefined)
+        .map((node) => [node.taskId as string, node])
+    );
+  }, [schedule]);
 
   async function fetchScheduleSnapshot(nextProjectId: string): Promise<ScheduleSnapshot> {
     const nextSchedule = await apiClient.getProjectSchedule(testUser, nextProjectId);
@@ -214,6 +253,10 @@ export function GanttControlSurface({
       predecessorTaskId: draft.predecessorTaskId || taskIds[0] || "",
       successorTaskId: draft.successorTaskId || taskIds[1] || taskIds[0] || ""
     }));
+    setSelectedTaskId((currentTaskId) => {
+      if (currentTaskId !== null && taskIds.includes(currentTaskId)) return currentTaskId;
+      return taskIds[0] ?? null;
+    });
   }, [firstStageId, schedule]);
 
   const createTaskMutation = useMutation({
@@ -242,11 +285,13 @@ export function GanttControlSurface({
     commandName: GanttCommandName,
     command: () => Promise<unknown>,
     pendingLabel: string,
-    successLabel: string
+    successLabel: string,
+    options: { pendingTaskId?: string } = {}
   ) {
     if (commandInFlight) return;
     const commandProjectId = activeProjectId;
     setPendingCommand(commandName);
+    setPendingTaskId(options.pendingTaskId ?? null);
     setLastCommandStatus(null);
     setCommandIssues([]);
     setStatus(pendingLabel);
@@ -262,6 +307,7 @@ export function GanttControlSurface({
       setStatus(getErrorMessage(error));
     } finally {
       setPendingCommand(null);
+      setPendingTaskId(null);
     }
   }
 
@@ -275,7 +321,7 @@ export function GanttControlSurface({
     }));
   }
 
-  function updateScheduleDraft(taskId: string, field: keyof ScheduleEditDraft, value: string | number) {
+  function updateScheduleDraft(taskId: string, field: ScheduleEditField, value: string | number) {
     setScheduleEditDrafts((drafts) => ({
       ...drafts,
       [taskId]: {
@@ -283,6 +329,56 @@ export function GanttControlSurface({
         [field]: value
       }
     }));
+    setSelectedTaskId(taskId);
+  }
+
+  function resetScheduleDraft(taskId: string) {
+    const node = scheduleNodeByTaskId.get(taskId);
+    if (!node) return;
+    setScheduleEditDrafts((drafts) => ({
+      ...drafts,
+      [taskId]: draftFromNode(node)
+    }));
+  }
+
+  function taskValidationMessage(taskId: string): string | null {
+    const draft = scheduleEditDrafts[taskId];
+    if (!draft) return null;
+    if (draft.plannedStartDate && draft.plannedFinishDate && draft.plannedFinishDate < draft.plannedStartDate) {
+      return "Плановый финиш раньше старта";
+    }
+    if (Number(draft.plannedWorkHours) < 0) return "Плановая работа должна быть неотрицательной";
+    if (Number(draft.progressPercent) < 0 || Number(draft.progressPercent) > 100) return "Прогресс должен быть от 0 до 100";
+    return null;
+  }
+
+  function isTaskDirty(taskId: string): boolean {
+    const node = scheduleNodeByTaskId.get(taskId);
+    const draft = scheduleEditDrafts[taskId];
+    if (!node || !draft) return false;
+    const original = draftFromNode(node);
+    return (
+      draft.plannedStartDate !== original.plannedStartDate ||
+      draft.plannedFinishDate !== original.plannedFinishDate ||
+      Number(draft.plannedWorkHours) !== Number(original.plannedWorkHours) ||
+      Number(draft.progressPercent) !== Number(original.progressPercent)
+    );
+  }
+
+  function handleScheduleCellKeyDown(taskId: string, event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      resetScheduleDraft(taskId);
+      setActiveCell(null);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (taskValidationMessage(taskId) === null && isTaskDirty(taskId)) {
+        saveScheduleTask(taskId);
+      }
+    }
   }
 
   function createScheduleTask() {
@@ -318,7 +414,8 @@ export function GanttControlSurface({
           }
         }),
       "Сохранение расписания задачи через API",
-      "Расписание задачи сохранено через API"
+      "Расписание задачи сохранено через API",
+      { pendingTaskId: taskId }
     );
   }
 
@@ -374,6 +471,30 @@ export function GanttControlSurface({
         <button disabled={isLoading || commandInFlight} type="button" onClick={openSelectedProject}>
           Открыть Гантт
         </button>
+      </section>
+
+      <section className="phase2-panel gantt-planning-state-panel" data-testid="gantt-planning-state">
+        <h3>Планирование</h3>
+        <dl className="compact-facts">
+          <div>
+            <dt>Выбранная задача</dt>
+            <dd data-testid="gantt-selected-task">{activeTaskId ?? "нет выбранной задачи"}</dd>
+          </div>
+          <div>
+            <dt>Активная ячейка</dt>
+            <dd data-testid="gantt-active-cell">
+              {activeCell ? `${activeCell.taskId} / ${activeCell.field}` : "нет активной ячейки"}
+            </dd>
+          </div>
+          <div>
+            <dt>Readback</dt>
+            <dd>{lastCommandStatus ? "API readback обновил WBS и timeline" : "Сохранение требует API readback"}</dd>
+          </div>
+          <div>
+            <dt>Права</dt>
+            <dd>{canWriteSchedule ? "Редактирование доступно" : "Только чтение: нет права task.write"}</dd>
+          </div>
+        </dl>
       </section>
 
       {loadState === "denied" ? (
@@ -550,13 +671,34 @@ export function GanttControlSurface({
                 <span>Валидация</span>
               </div>
               {rows.map((row) => {
+                const rowTaskId = row.taskId;
+                const rowDirty = rowTaskId ? isTaskDirty(rowTaskId) : false;
+                const rowValidationMessage = rowTaskId ? taskValidationMessage(rowTaskId) : null;
+                const rowIsSelected = rowTaskId !== undefined && rowTaskId === activeTaskId;
+                const rowIsPending = rowTaskId !== undefined && rowTaskId === pendingTaskId;
                 return (
-                  <div className="gantt-row" data-testid={`gantt-row-${row.taskId ?? row.id}`} key={row.id}>
+                  <div
+                    aria-selected={rowIsSelected}
+                    className={`gantt-row ${rowIsSelected ? "selected" : ""} ${rowDirty ? "dirty" : ""}`}
+                    data-testid={`gantt-row-${row.taskId ?? row.id}`}
+                    key={row.id}
+                    onClick={() => {
+                      if (row.taskId) setSelectedTaskId(row.taskId);
+                    }}
+                    role="row"
+                    tabIndex={0}
+                  >
                     <span style={{ paddingLeft: `${row.level * 16}px` }}>{row.label}</span>
                     <span>
                       {canWriteSchedule && row.taskId && scheduleEditDrafts[row.taskId] ? (
                         <input
                           aria-label={`Старт ${row.taskId}`}
+                          className={activeCell?.taskId === row.taskId && activeCell.field === "plannedStartDate" ? "active-cell" : ""}
+                          onFocus={() => {
+                            setSelectedTaskId(row.taskId as string);
+                            setActiveCell({ taskId: row.taskId as string, field: "plannedStartDate" });
+                          }}
+                          onKeyDown={(event) => handleScheduleCellKeyDown(row.taskId as string, event)}
                           onChange={(event) => updateScheduleDraft(row.taskId as string, "plannedStartDate", event.target.value)}
                           type="date"
                           value={scheduleEditDrafts[row.taskId].plannedStartDate}
@@ -569,6 +711,12 @@ export function GanttControlSurface({
                       {canWriteSchedule && row.taskId && scheduleEditDrafts[row.taskId] ? (
                         <input
                           aria-label={`Финиш ${row.taskId}`}
+                          className={activeCell?.taskId === row.taskId && activeCell.field === "plannedFinishDate" ? "active-cell" : ""}
+                          onFocus={() => {
+                            setSelectedTaskId(row.taskId as string);
+                            setActiveCell({ taskId: row.taskId as string, field: "plannedFinishDate" });
+                          }}
+                          onKeyDown={(event) => handleScheduleCellKeyDown(row.taskId as string, event)}
                           onChange={(event) =>
                             updateScheduleDraft(row.taskId as string, "plannedFinishDate", event.target.value)
                           }
@@ -584,7 +732,13 @@ export function GanttControlSurface({
                       {canWriteSchedule && row.taskId && scheduleEditDrafts[row.taskId] ? (
                         <input
                           aria-label={`Работа ${row.taskId}`}
+                          className={activeCell?.taskId === row.taskId && activeCell.field === "plannedWorkHours" ? "active-cell" : ""}
                           min="0"
+                          onFocus={() => {
+                            setSelectedTaskId(row.taskId as string);
+                            setActiveCell({ taskId: row.taskId as string, field: "plannedWorkHours" });
+                          }}
+                          onKeyDown={(event) => handleScheduleCellKeyDown(row.taskId as string, event)}
                           onChange={(event) => updateScheduleDraft(row.taskId as string, "plannedWorkHours", Number(event.target.value))}
                           type="number"
                           value={scheduleEditDrafts[row.taskId].plannedWorkHours}
@@ -597,8 +751,14 @@ export function GanttControlSurface({
                       {canWriteSchedule && row.taskId && scheduleEditDrafts[row.taskId] ? (
                         <input
                           aria-label={`Прогресс ${row.taskId}`}
+                          className={activeCell?.taskId === row.taskId && activeCell.field === "progressPercent" ? "active-cell" : ""}
                           max="100"
                           min="0"
+                          onFocus={() => {
+                            setSelectedTaskId(row.taskId as string);
+                            setActiveCell({ taskId: row.taskId as string, field: "progressPercent" });
+                          }}
+                          onKeyDown={(event) => handleScheduleCellKeyDown(row.taskId as string, event)}
                           onChange={(event) => updateScheduleDraft(row.taskId as string, "progressPercent", Number(event.target.value))}
                           type="number"
                           value={scheduleEditDrafts[row.taskId].progressPercent}
@@ -610,10 +770,25 @@ export function GanttControlSurface({
                     <span>{row.baselineLabel}</span>
                     <span>
                       {row.validationLabel}
+                      {rowValidationMessage ? (
+                        <strong className="gantt-inline-warning" data-testid={`gantt-validation-${row.taskId}`}>
+                          {rowValidationMessage}
+                        </strong>
+                      ) : null}
+                      {rowDirty ? (
+                        <strong className="gantt-dirty-marker" data-testid={`gantt-dirty-${row.taskId}`}>
+                          Есть несохраненные изменения
+                        </strong>
+                      ) : null}
+                      {rowIsPending ? (
+                        <strong className="gantt-pending-marker" data-testid={`gantt-pending-${row.taskId}`}>
+                          Сохранение
+                        </strong>
+                      ) : null}
                       {row.taskId && canWriteSchedule ? (
                         <button
                           className="secondary-button inline-save-button"
-                          disabled={commandInFlight}
+                          disabled={commandInFlight || Boolean(rowValidationMessage) || !rowDirty}
                           type="button"
                           onClick={() => saveScheduleTask(row.taskId as string)}
                         >
@@ -631,6 +806,7 @@ export function GanttControlSurface({
             <h3>Шкала</h3>
             <div className="timeline-scale">
               <span>{ganttView?.timelineStartDate ?? "—"}</span>
+              <span data-testid="gantt-today-marker">Сегодня: 2026-05-17</span>
               <span>{ganttView?.timelineFinishDate ?? "—"}</span>
             </div>
             <div className="gantt-bars" data-testid="gantt-bars">
@@ -638,9 +814,18 @@ export function GanttControlSurface({
                 return (
                   <div className="gantt-bar-track" key={row.id}>
                     {row.bar ? (
-                      <div className="gantt-bar" style={{ marginLeft: `${row.bar.offsetPercent}%`, width: `${row.bar.widthPercent}%` }}>
+                      <button
+                        aria-pressed={row.taskId === activeTaskId}
+                        className={`gantt-bar ${row.taskId === activeTaskId ? "selected" : ""}`}
+                        data-testid={row.taskId ? `gantt-bar-${row.taskId}` : undefined}
+                        onClick={() => {
+                          if (row.taskId) setSelectedTaskId(row.taskId);
+                        }}
+                        style={{ marginLeft: `${row.bar.offsetPercent}%`, width: `${row.bar.widthPercent}%` }}
+                        type="button"
+                      >
                         <span>{row.label}</span>
-                      </div>
+                      </button>
                     ) : null}
                   </div>
                 );
@@ -648,6 +833,33 @@ export function GanttControlSurface({
             </div>
           </section>
         </div>
+        {schedule ? (
+        <section className="phase2-panel gantt-tracking-overlay" data-testid="gantt-tracking-overlay">
+          <h3>Tracking Gantt</h3>
+          <p>Baseline: {schedule.baseline?.id ?? "не зафиксирован"}</p>
+          <div className="compact-list">
+            {taskRows.map((row) => {
+              const baselineValue = schedule.baseline?.taskBaselineValues.find((value) => value.taskId === row.taskId);
+              const startDelta = daysDelta(baselineValue?.plannedStartDate, row.plannedStartDate);
+              const finishDelta = daysDelta(baselineValue?.plannedFinishDate, row.plannedFinishDate);
+
+              return (
+                <div className="gantt-tracking-row" data-testid={`gantt-tracking-${row.taskId}`} key={`tracking-${row.id}`}>
+                  <strong>{row.taskId}</strong>
+                  <span>
+                    Базовый план: {baselineValue?.plannedStartDate ?? "—"} / {baselineValue?.plannedFinishDate ?? "—"}
+                  </span>
+                  <span>
+                    Живой план: {row.plannedStartDate ?? "—"} / {row.plannedFinishDate ?? "—"}
+                  </span>
+                  <span>{deltaLabel("Отклонение старта", startDelta)}</span>
+                  <span>{deltaLabel("Отклонение финиша", finishDelta)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        ) : null}
         </>
       ) : null}
 
