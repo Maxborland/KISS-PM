@@ -1,0 +1,55 @@
+<h2>С какого Release 2 экрана начнем визуальное согласование?</h2>
+<p class="subtitle">Я бы начал с Gantt Planner: это самый сложный и самый показательный экран для KISS PM, потому что в нем сходятся план, задачи, ресурсы, KPI-сигналы и управленческие действия.</p>
+
+<div class="cards">
+  <div class="card" data-choice="gantt" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mock-nav">Project Gantt Planner</div>
+      <div style="display:grid;grid-template-columns: 38% 1fr;gap:8px;padding:10px">
+        <div>
+          <div class="placeholder" style="height:24px;margin-bottom:6px">WBS grid</div>
+          <div class="placeholder" style="height:24px;margin-bottom:6px">Dates / work / owners</div>
+          <div class="placeholder" style="height:70px">Task hierarchy</div>
+        </div>
+        <div>
+          <div class="placeholder" style="height:24px;margin-bottom:6px">Timeline toolbar</div>
+          <div class="placeholder" style="height:100px">Bars, dependencies, baseline, warnings</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Project Gantt Planner</h3>
+      <p>MS Project-like рабочая плоскость: WBS + timeline + signal/action/preview/result. Лучший первый экран, если хотим задать планку всему Release 2.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="portfolio" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mock-nav">Portfolio Control</div>
+      <div style="display:grid;grid-template-columns: repeat(3, 1fr);gap:8px;padding:10px">
+        <div class="placeholder" style="height:48px">Critical</div>
+        <div class="placeholder" style="height:48px">Attention</div>
+        <div class="placeholder" style="height:48px">Normal</div>
+      </div>
+      <div class="placeholder" style="height:82px;margin:0 10px 10px">Signals table + action panel</div>
+    </div>
+    <div class="card-body">
+      <h3>B. Portfolio Control</h3>
+      <p>Главный управленческий обзор: проекты, отклонения, корректирующие действия, риск-акцепт. Хорошо показывает “отчет как control surface”.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="crm-intake" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mock-nav">CRM Intake Control</div>
+      <div style="display:grid;grid-template-columns: 1fr 34%;gap:8px;padding:10px">
+        <div class="placeholder" style="height:110px">Opportunity readiness queue</div>
+        <div class="placeholder" style="height:110px">Feasibility / next action</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. CRM Intake Control</h3>
+      <p>Начало всего жизненного цикла: opportunity -> feasibility -> draft. Хороший экран, если хотим сначала отполировать вход в систему.</p>
+    </div>
+  </div>
+</div>

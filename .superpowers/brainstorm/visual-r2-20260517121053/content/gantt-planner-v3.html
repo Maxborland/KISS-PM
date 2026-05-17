@@ -1,0 +1,1465 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>КИСС ПМ - интерактивный план проекта v4</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --bg: #f3f5f7;
+      --surface: #ffffff;
+      --panel: #f8fafc;
+      --ink: #17202a;
+      --muted: #667085;
+      --line: #d6dde6;
+      --line-soft: #e7ecf2;
+      --primary: #1d4ed8;
+      --accent: #0f766e;
+      --warning: #b45309;
+      --danger: #c2410c;
+      --critical: #dc2626;
+      --radius: 7px;
+      --shadow: 0 8px 24px rgba(15, 23, 42, .06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+      overflow: hidden;
+    }
+
+    button, input, select { font: inherit; }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 6px;
+      height: 30px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #aab5c3; }
+
+    .primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 58px 1fr;
+    }
+
+    .rail {
+      background: #1f2933;
+      color: #d7dee8;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      justify-items: center;
+      padding: 10px 7px;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #1f2933;
+      font-weight: 850;
+    }
+
+    .rail-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .rail-btn {
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 8px;
+      color: inherit;
+      background: transparent;
+      padding: 0;
+      font-size: 17px;
+    }
+
+    .rail-btn.active { background: rgba(255,255,255,.14); color: #fff; }
+
+    .app {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .topbar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .context {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      white-space: nowrap;
+    }
+
+    .context strong { font-size: 15px; }
+
+    .chip {
+      height: 23px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chip.good { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }
+    .chip.warn { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+    .chip.bad { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+
+    .ribbon {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ribbon-tabs {
+      height: 32px;
+      display: flex;
+      align-items: end;
+      gap: 2px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ribbon-tab {
+      height: 28px;
+      border-color: transparent;
+      border-bottom: 0;
+      border-radius: 6px 6px 0 0;
+      background: transparent;
+      color: #475467;
+      font-size: 13px;
+    }
+
+    .ribbon-tab.active {
+      border-color: var(--line);
+      background: #f8fafc;
+      color: var(--primary);
+      font-weight: 750;
+    }
+
+    .commands {
+      height: 74px;
+      display: flex;
+      align-items: stretch;
+      gap: 6px;
+      padding: 8px 12px;
+      overflow-x: auto;
+    }
+
+    .cmd-group {
+      min-width: 128px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      border-right: 1px solid var(--line);
+      padding-right: 8px;
+    }
+
+    .cmd-group.wide { min-width: 190px; }
+
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cmd {
+      min-width: 34px;
+      height: 32px;
+      padding: 0 8px;
+      font-size: 12px;
+      background: #fff;
+    }
+
+    .cmd.big {
+      height: 40px;
+      min-width: 78px;
+      color: var(--primary);
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      font-weight: 750;
+    }
+
+    .cmd-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .viewbar {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .view-tabs,
+    .view-tools,
+    .status-tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .view-btn {
+      height: 28px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #475467;
+      white-space: nowrap;
+    }
+
+    .view-btn.active {
+      border-color: #93c5fd;
+      color: var(--primary);
+      background: #eff6ff;
+      font-weight: 750;
+    }
+
+    .workarea {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 342px;
+      gap: 10px;
+      padding: 10px;
+      overflow: hidden;
+      transition: grid-template-columns .18s ease;
+    }
+
+    body.panel-closed .workarea { grid-template-columns: 1fr 42px; }
+
+    .planner {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .planner-head {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 10px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .planner-head strong { font-size: 13px; }
+
+    .planner-head .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .formula-bar {
+      height: 34px;
+      display: grid;
+      grid-template-columns: 92px 1fr auto;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 8px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .name-box,
+    .formula-input {
+      height: 26px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      padding: 0 8px;
+      min-width: 0;
+    }
+
+    .name-box {
+      display: flex;
+      align-items: center;
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .formula-input {
+      width: 100%;
+      outline: none;
+    }
+
+    .formula-input:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, .12);
+    }
+
+    .formula-actions {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .formula-actions button {
+      height: 26px;
+    }
+
+    .split {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(460px, var(--grid-width, 54%)) 6px 1fr;
+      overflow: hidden;
+    }
+
+    body.hide-gantt .split { grid-template-columns: 1fr; }
+    body.hide-gantt .splitter,
+    body.hide-gantt .timeline-pane { display: none; }
+
+    .splitter {
+      cursor: col-resize;
+      background: linear-gradient(90deg, transparent 0 2px, #cfd6df 2px 4px, transparent 4px 6px);
+    }
+
+    .grid-pane {
+      min-width: 0;
+      overflow: auto;
+      background: #fff;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+
+    col[data-col="mark"] { width: 34px; }
+    col[data-col="id"] { width: 42px; }
+    col[data-col="mode"] { width: 64px; }
+    col[data-col="wbs"] { width: 66px; }
+    col[data-col="name"] { width: 240px; }
+    col[data-col="duration"] { width: 92px; }
+    col[data-col="start"] { width: 96px; }
+    col[data-col="finish"] { width: 96px; }
+    col[data-col="pred"] { width: 108px; }
+    col[data-col="resources"] { width: 152px; }
+    col[data-col="work"] { width: 86px; }
+    col[data-col="done"] { width: 76px; }
+    col[data-col="type"] { width: 126px; }
+    col[data-col="constraint"] { width: 130px; }
+
+    th, td {
+      height: 31px;
+      padding: 0 7px;
+      border-right: 1px solid var(--line-soft);
+      border-bottom: 1px solid var(--line-soft);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      outline: none;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #eef2f6;
+      color: #475467;
+      text-align: left;
+      font-weight: 750;
+      user-select: none;
+    }
+
+    .resize {
+      float: right;
+      width: 7px;
+      height: 30px;
+      margin-right: -7px;
+      cursor: col-resize;
+    }
+
+    tr.summary td {
+      background: #f8fafc;
+      font-weight: 750;
+    }
+
+    tr.selected td {
+      background: #eff6ff;
+      box-shadow: inset 0 1px #bfdbfe, inset 0 -1px #bfdbfe;
+    }
+
+    tr:hover td { background: #f8fbff; }
+
+    tr.changed td {
+      background: #fffaf0;
+    }
+
+    tr.changed td:first-child::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--warning);
+      margin-right: 4px;
+    }
+
+    td.cell-selected {
+      position: relative;
+      background: #fff !important;
+      box-shadow: inset 0 0 0 2px var(--primary);
+      z-index: 2;
+    }
+
+    td.cell-selected::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      bottom: -1px;
+      width: 7px;
+      height: 7px;
+      background: var(--primary);
+      border: 1px solid #fff;
+    }
+
+    td[contenteditable="true"] {
+      background: #fff !important;
+      box-shadow: inset 0 0 0 2px var(--accent);
+      cursor: text;
+    }
+
+    .row-number {
+      color: #344054;
+      font-weight: 750;
+      text-align: center;
+    }
+
+    tr.new td {
+      color: #98a2b3;
+      background: #fcfcfd;
+    }
+
+    .indent-1 { padding-left: 22px; }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      margin-right: 5px;
+    }
+
+    .dot.warn { background: var(--warning); }
+    .dot.bad { background: var(--critical); }
+
+    .mode {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 42px;
+      height: 20px;
+      border-radius: 5px;
+      background: #dbeafe;
+      color: #1e40af;
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .mode.manual { background: #fef3c7; color: #92400e; }
+
+    .edit-cell {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      min-width: 52px;
+      padding: 0 7px;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      background: #fff;
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .timeline-pane {
+      min-width: 0;
+      overflow: auto;
+      background:
+        linear-gradient(90deg, rgba(216,222,230,.9) 1px, transparent 1px) 0 0 / 72px 100%,
+        linear-gradient(90deg, rgba(15,23,42,.035) 0 50%, transparent 50% 100%) 0 0 / 144px 100%,
+        #fff;
+      position: relative;
+    }
+
+    .time-head {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      min-width: 648px;
+      height: 32px;
+      display: grid;
+      grid-template-columns: repeat(9, 72px);
+      background: #f1f4f8;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .time-head div {
+      display: grid;
+      place-items: center;
+      color: #475467;
+      border-right: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .bars {
+      position: relative;
+      min-width: 648px;
+      height: 320px;
+    }
+
+    .today {
+      position: absolute;
+      left: 285px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--critical);
+      z-index: 2;
+    }
+
+    .today::before {
+      content: "Статус";
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--critical);
+      color: #fff;
+      font-size: 10px;
+    }
+
+    .bar-row {
+      height: 32px;
+      position: relative;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .bar {
+      position: absolute;
+      top: 9px;
+      height: 14px;
+      border-radius: 4px;
+      background: var(--primary);
+      box-shadow: inset 0 -1px rgba(0,0,0,.14);
+    }
+
+    .bar.summary { height: 8px; top: 12px; background: #475467; border-radius: 2px; }
+    .bar.done { background: var(--accent); }
+    .bar.warn { background: var(--warning); }
+    .bar.bad { background: var(--critical); }
+
+    .bar.changed {
+      outline: 2px solid #f59e0b;
+      outline-offset: 2px;
+    }
+
+    .baseline {
+      display: none;
+      position: absolute;
+      top: 24px;
+      height: 3px;
+      border-radius: 2px;
+      background: #111827;
+      opacity: .58;
+    }
+
+    body.tracking .baseline { display: block; }
+
+    .milestone {
+      position: absolute;
+      top: 8px;
+      width: 16px;
+      height: 16px;
+      transform: rotate(45deg);
+      border-radius: 2px;
+      background: #475467;
+    }
+
+    .dependency {
+      position: absolute;
+      height: 1px;
+      background: #475467;
+      opacity: .8;
+    }
+
+    .dependency::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: -3px;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 6px solid #475467;
+    }
+
+    .conflicts {
+      display: none;
+      min-height: 0;
+      overflow: hidden;
+      grid-template-columns: 300px 1fr 292px;
+      gap: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    body.conflict-view .split { display: none; }
+    body.conflict-view .conflicts { display: grid; }
+
+    .conflict-list,
+    .resource-map,
+    .resolution-stack {
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .section-head {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .item {
+      margin: 9px;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      display: grid;
+      gap: 7px;
+      background: #fff;
+    }
+
+    .item.active { border-color: #93c5fd; background: #eff6ff; }
+
+    .item-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .resource-row {
+      min-width: 760px;
+      display: grid;
+      grid-template-columns: 128px repeat(9, 68px);
+      border-bottom: 1px solid var(--line-soft);
+      font-size: 12px;
+    }
+
+    .resource-row > div {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 7px;
+      border-right: 1px solid var(--line-soft);
+    }
+
+    .load {
+      height: 18px;
+      border-radius: 4px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      background: var(--accent);
+    }
+
+    .load.warn { background: var(--warning); }
+    .load.bad { background: var(--critical); }
+
+    .drawer {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    body.panel-closed .drawer {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .drawer-tab {
+      display: none;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      border: 0;
+      height: 100%;
+      width: 40px;
+      border-radius: 0;
+      background: #eff6ff;
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    body.panel-closed .drawer-tab { display: block; }
+    body.panel-closed .drawer-full { display: none; }
+
+    .drawer-head {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 10px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .drawer-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 9px;
+      background: #fff;
+      display: grid;
+      gap: 8px;
+    }
+
+    .card.signal { background: #fff7ed; border-color: #fed7aa; }
+    .card.danger { background: #fff1f2; border-color: #fecaca; }
+    .card.preview { background: #eff6ff; border-color: #bfdbfe; }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .kv span:nth-child(odd) { color: var(--muted); }
+
+    .columns-popover {
+      position: absolute;
+      right: 156px;
+      top: 158px;
+      width: 230px;
+      display: none;
+      z-index: 20;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 8px;
+    }
+
+    .columns-popover.open { display: grid; gap: 7px; }
+
+    .columns-popover label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #344054;
+    }
+
+    .cell-popover {
+      position: absolute;
+      z-index: 30;
+      display: none;
+      min-width: 270px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 8px;
+      gap: 7px;
+    }
+
+    .cell-popover.open { display: grid; }
+
+    .cell-popover-title {
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .cell-popover-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px;
+      background: #fff;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer .left,
+    .footer .right { display: flex; align-items: center; gap: 8px; }
+
+    @media (max-width: 1180px) {
+      .workarea { grid-template-columns: 1fr; overflow: auto; }
+      .drawer { min-height: 420px; }
+      body.panel-closed .workarea { grid-template-columns: 1fr; }
+      body.panel-closed .drawer { min-height: 42px; }
+      .conflicts { grid-template-columns: 1fr; overflow: auto; }
+    }
+  </style>
+</head>
+<body class="tracking">
+  <div class="shell">
+    <aside class="rail">
+      <div class="logo">К</div>
+      <div class="rail-nav">
+        <button class="rail-btn" title="Входящие">□</button>
+        <button class="rail-btn active" title="Проекты">▣</button>
+        <button class="rail-btn" title="Задачи">☑</button>
+        <button class="rail-btn" title="Ресурсы">◫</button>
+        <button class="rail-btn" title="Портфель">◬</button>
+      </div>
+    </aside>
+
+    <section class="app">
+      <header class="topbar">
+        <div class="context">
+          <strong>Проект: Северный контур - стадия рабочей документации</strong>
+          <span class="chip">Дата статуса: 17.05.2026</span>
+          <span class="chip">Базовый план: основной</span>
+          <span class="chip good">Авторасчет включен</span>
+        </div>
+        <div class="status-tools">
+          <button>Отменить</button>
+          <button>Повторить</button>
+          <button class="primary">Сохранить снимок</button>
+        </div>
+      </header>
+
+      <nav class="ribbon" aria-label="Лента команд">
+        <div class="ribbon-tabs">
+          <button class="ribbon-tab active">Задача</button>
+          <button class="ribbon-tab">Ресурс</button>
+          <button class="ribbon-tab">Проект</button>
+          <button class="ribbon-tab">Вид</button>
+          <button class="ribbon-tab">Контур управления</button>
+        </div>
+        <div class="commands">
+          <div class="cmd-group">
+            <div class="cmd-row">
+              <button class="cmd big">Задача</button>
+              <button class="cmd">Вставить</button>
+            </div>
+            <div class="cmd-label">Создание</div>
+          </div>
+          <div class="cmd-group wide">
+            <div class="cmd-row">
+              <button class="cmd">Авто</button>
+              <button class="cmd">Вручн.</button>
+              <button class="cmd">Веха</button>
+              <button class="cmd">Итог</button>
+            </div>
+            <div class="cmd-label">Режим планирования</div>
+          </div>
+          <div class="cmd-group wide">
+            <div class="cmd-row">
+              <button class="cmd">Оконч.-Нач.</button>
+              <button class="cmd">Нач.-Нач.</button>
+              <button class="cmd">Оконч.-Оконч.</button>
+              <button class="cmd">Нач.-Оконч.</button>
+            </div>
+            <div class="cmd-label">Типы связей</div>
+          </div>
+          <div class="cmd-group wide">
+            <div class="cmd-row">
+              <button class="cmd">Фикс. единицы</button>
+              <button class="cmd">Фикс. труд</button>
+              <button class="cmd">Фикс. срок</button>
+            </div>
+            <div class="cmd-label">Срок / труд / загрузка</div>
+          </div>
+          <div class="cmd-group wide">
+            <div class="cmd-row">
+              <button class="cmd">База</button>
+              <button class="cmd">Выровнять</button>
+              <button class="cmd big">Прогноз</button>
+            </div>
+            <div class="cmd-label">Контроль</div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="viewbar">
+        <div class="view-tabs">
+          <button class="view-btn active" data-view="gantt">Диаграмма Ганта</button>
+          <button class="view-btn" data-view="tracking">Гантт с базовым планом</button>
+          <button class="view-btn" data-view="conflicts">Решение ресурсных конфликтов</button>
+        </div>
+        <div class="view-tools">
+          <button id="toggleGantt">Скрыть Гантт</button>
+          <button id="toggleColumns">Колонки</button>
+          <button id="togglePanel">Скрыть правую панель</button>
+        </div>
+      </div>
+
+      <div class="columns-popover" id="columnsPopover">
+        <label><input type="checkbox" checked data-col-toggle="mode"> Режим</label>
+        <label><input type="checkbox" checked data-col-toggle="wbs"> Код ИСР</label>
+        <label><input type="checkbox" checked data-col-toggle="pred"> Предшественники</label>
+        <label><input type="checkbox" checked data-col-toggle="resources"> Ресурсы</label>
+        <label><input type="checkbox" checked data-col-toggle="work"> Труд</label>
+        <label><input type="checkbox" checked data-col-toggle="type"> Тип задачи</label>
+        <label><input type="checkbox" checked data-col-toggle="constraint"> Ограничение</label>
+      </div>
+
+      <div class="cell-popover" id="cellPopover">
+        <div class="cell-popover-title">Быстрые действия ячейки</div>
+        <div class="cell-popover-row"><span>Двойной щелчок</span><strong>редактировать</strong></div>
+        <div class="cell-popover-row"><span>Enter</span><strong>применить</strong></div>
+        <div class="cell-popover-row"><span>Стрелки</span><strong>перейти</strong></div>
+        <button id="openTaskInspector">Открыть инспектор задачи</button>
+      </div>
+
+      <main class="workarea">
+        <section class="planner">
+          <div class="planner-head">
+            <div>
+              <strong id="surfaceTitle">Диаграмма Ганта</strong>
+              <span class="hint">Левая часть работает как таблица: выбор ячеек, редактирование, строка ввода, ширина колонок.</span>
+            </div>
+            <div class="status-tools">
+              <span class="chip bad">2 конфликта</span>
+              <span class="chip warn">Критический путь: 0 дн.</span>
+            </div>
+          </div>
+
+          <div class="formula-bar" aria-label="Строка ввода таблицы">
+            <div class="name-box" id="cellName">F4</div>
+            <input class="formula-input" id="formulaInput" value="8 дн." aria-label="Значение выбранной ячейки" />
+            <div class="formula-actions">
+              <button id="cancelEdit" title="Отменить ввод">Отмена</button>
+              <button id="commitEdit" class="primary" title="Применить ввод">Ввод</button>
+              <button id="recalculatePlan" title="Пересчитать план">Пересчитать</button>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="grid-pane">
+              <table id="planTable">
+                <colgroup>
+                  <col data-col="mark"><col data-col="id"><col data-col="mode"><col data-col="wbs">
+                  <col data-col="name"><col data-col="duration"><col data-col="start"><col data-col="finish">
+                  <col data-col="pred"><col data-col="resources"><col data-col="work"><col data-col="done">
+                  <col data-col="type"><col data-col="constraint">
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th data-col="mark">!</th>
+                    <th data-col="id">№</th>
+                    <th data-col="mode">Режим<span class="resize"></span></th>
+                    <th data-col="wbs">ИСР<span class="resize"></span></th>
+                    <th data-col="name">Название задачи<span class="resize"></span></th>
+                    <th data-col="duration">Длит.<span class="resize"></span></th>
+                    <th data-col="start">Начало<span class="resize"></span></th>
+                    <th data-col="finish">Окончание<span class="resize"></span></th>
+                    <th data-col="pred">Предшественники<span class="resize"></span></th>
+                    <th data-col="resources">Ресурсы<span class="resize"></span></th>
+                    <th data-col="work">Труд<span class="resize"></span></th>
+                    <th data-col="done">Готово<span class="resize"></span></th>
+                    <th data-col="type">Тип задачи<span class="resize"></span></th>
+                    <th data-col="constraint">Ограничение<span class="resize"></span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="summary" data-task="Северный контур - рабочая документация">
+                    <td data-col="mark"><span class="dot warn"></span></td><td data-col="id" class="row-number">1</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs">1</td>
+                    <td data-col="name">Северный контур - рабочая документация</td><td data-col="duration">24 дн.</td><td data-col="start">04.05</td><td data-col="finish">05.06</td>
+                    <td data-col="pred"></td><td data-col="resources">Команда РД</td><td data-col="work">612 ч</td><td data-col="done">42%</td><td data-col="type">Итоговая</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                  <tr data-task="Сбор исходных данных">
+                    <td data-col="mark"><span class="dot"></span></td><td data-col="id" class="row-number">2</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs">1.1</td>
+                    <td data-col="name" class="indent-1">Сбор исходных данных</td><td data-col="duration">5 дн.</td><td data-col="start">04.05</td><td data-col="finish">08.05</td>
+                    <td data-col="pred"></td><td data-col="resources">Анна</td><td data-col="work">40 ч</td><td data-col="done">100%</td><td data-col="type">Фикс. единицы</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                  <tr data-task="Модель нагрузок">
+                    <td data-col="mark"><span class="dot"></span></td><td data-col="id" class="row-number">3</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs">1.2</td>
+                    <td data-col="name" class="indent-1">Модель нагрузок</td><td data-col="duration">6 дн.</td><td data-col="start">11.05</td><td data-col="finish">18.05</td>
+                    <td data-col="pred">2 Оконч.-Нач.</td><td data-col="resources">Илья; Анна</td><td data-col="work">96 ч</td><td data-col="done">65%</td><td data-col="type">Фикс. труд</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                  <tr class="selected" data-task="Раздел КЖ: рабочие чертежи">
+                    <td data-col="mark"><span class="dot bad"></span></td><td data-col="id" class="row-number">4</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs">1.3</td>
+                    <td data-col="name" class="indent-1">Раздел КЖ: рабочие чертежи</td><td data-col="duration"><span class="edit-cell">8 дн.</span></td><td data-col="start">18.05</td><td data-col="finish">27.05</td>
+                    <td data-col="pred">3 Оконч.-Нач.</td><td data-col="resources">Илья; Мария</td><td data-col="work">128 ч</td><td data-col="done">20%</td><td data-col="type">Фикс. единицы</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                  <tr data-task="Согласование с заказчиком">
+                    <td data-col="mark"><span class="dot warn"></span></td><td data-col="id" class="row-number">5</td><td data-col="mode"><span class="mode manual">Ручн.</span></td><td data-col="wbs">1.4</td>
+                    <td data-col="name" class="indent-1">Согласование с заказчиком</td><td data-col="duration">4 дн.?</td><td data-col="start">28.05</td><td data-col="finish">02.06</td>
+                    <td data-col="pred">4 Оконч.-Нач. +1д</td><td data-col="resources">РП; Заказчик</td><td data-col="work">24 ч</td><td data-col="done">0%</td><td data-col="type">Фикс. срок</td><td data-col="constraint">Не ранее 28.05</td>
+                  </tr>
+                  <tr data-task="Веха: выпуск РД">
+                    <td data-col="mark"></td><td data-col="id" class="row-number">6</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs">1.5</td>
+                    <td data-col="name" class="indent-1">Веха: выпуск РД</td><td data-col="duration">0 дн.</td><td data-col="start">05.06</td><td data-col="finish">05.06</td>
+                    <td data-col="pred">5 Оконч.-Нач.</td><td data-col="resources">РП</td><td data-col="work">0 ч</td><td data-col="done">0%</td><td data-col="type">Веха</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                  <tr class="new" data-task="Новая задача">
+                    <td data-col="mark"></td><td data-col="id" class="row-number">7</td><td data-col="mode"><span class="mode">Авто</span></td><td data-col="wbs"></td>
+                    <td data-col="name">Новая задача</td><td data-col="duration">1 дн.?</td><td data-col="start">Начало проекта</td><td data-col="finish"></td>
+                    <td data-col="pred"></td><td data-col="resources"></td><td data-col="work">8 ч</td><td data-col="done">0%</td><td data-col="type">Фикс. единицы</td><td data-col="constraint">Как можно раньше</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="splitter" id="splitter" title="Изменить ширину таблицы"></div>
+            <div class="timeline-pane">
+              <div class="time-head">
+                <div>04 май</div><div>11 май</div><div>18 май</div><div>25 май</div><div>01 июн</div><div>08 июн</div><div>15 июн</div><div>22 июн</div><div>29 июн</div>
+              </div>
+              <div class="bars">
+                <div class="today"></div>
+                <div class="bar-row"><div class="bar summary" style="left:8px;width:318px"></div><div class="baseline" style="left:8px;width:286px"></div></div>
+                <div class="bar-row"><div class="bar done" style="left:8px;width:58px"></div><div class="baseline" style="left:8px;width:58px"></div></div>
+                <div class="bar-row"><div class="bar done" style="left:82px;width:78px"></div><div class="baseline" style="left:82px;width:70px"></div><div class="dependency" style="left:66px;top:15px;width:18px"></div></div>
+                <div class="bar-row"><div class="bar bad" style="left:160px;width:96px"></div><div class="baseline" style="left:152px;width:74px"></div><div class="dependency" style="left:156px;top:15px;width:8px"></div></div>
+                <div class="bar-row"><div class="bar warn" style="left:268px;width:54px"></div><div class="baseline" style="left:226px;width:48px"></div><div class="dependency" style="left:256px;top:15px;width:14px"></div></div>
+                <div class="bar-row"><div class="milestone" style="left:326px"></div><div class="dependency" style="left:322px;top:15px;width:8px"></div></div>
+                <div class="bar-row"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="conflicts">
+            <div class="conflict-list">
+              <div class="section-head">Конфликты</div>
+              <div class="item active">
+                <div class="item-title"><span>Илья: 160%</span><span class="chip bad">крит.</span></div>
+                <div class="small">18-24 мая, задача 1.3, запас 0 дн.</div>
+              </div>
+              <div class="item">
+                <div class="item-title"><span>Мария: 118%</span><span class="chip warn">важн.</span></div>
+                <div class="small">25-31 мая, задача 1.4, запас 2 дн.</div>
+              </div>
+            </div>
+            <div class="resource-map">
+              <div class="section-head">Карта загрузки сотрудников</div>
+              <div class="resource-row"><div>Сотрудник</div><div>04</div><div>11</div><div>18</div><div>25</div><div>01</div><div>08</div><div>15</div><div>22</div><div>29</div></div>
+              <div class="resource-row"><div>Илья</div><div><span class="load">80%</span></div><div><span class="load warn">112%</span></div><div><span class="load bad">160%</span></div><div><span class="load warn">104%</span></div><div><span class="load">72%</span></div><div><span class="load">60%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div></div>
+              <div class="resource-row"><div>Мария</div><div><span class="load">64%</span></div><div><span class="load">88%</span></div><div><span class="load">92%</span></div><div><span class="load warn">118%</span></div><div><span class="load">76%</span></div><div><span class="load">40%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div></div>
+              <div class="resource-row"><div>Анна</div><div><span class="load">96%</span></div><div><span class="load">72%</span></div><div><span class="load">48%</span></div><div><span class="load">40%</span></div><div><span class="load">32%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div><div><span class="load">0%</span></div></div>
+            </div>
+            <div class="resolution-stack">
+              <div class="section-head">Решение</div>
+              <div class="item active">
+                <div class="item-title">Рекомендуется</div>
+                <div class="small">Перенести 24 ч с Ильи на Марию и оставить дату вехи без изменения.</div>
+                <button class="primary" id="previewFromConflict">Показать прогноз</button>
+              </div>
+              <div class="item">
+                <div class="item-title">Альтернатива</div>
+                <div class="small">Сдвиг задачи на 2 дн. снижает перегрузку, но двигает выпуск РД.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="drawer">
+          <button class="drawer-tab" id="openPanel">Управление</button>
+          <div class="drawer-full">
+            <div class="drawer-head">
+              <strong>Управленческая панель</strong>
+              <button id="closePanel">Свернуть</button>
+            </div>
+            <div class="drawer-body">
+              <div class="card signal">
+                <div class="item-title"><span>Сигнал</span><span class="chip bad">критический</span></div>
+                <div class="small" id="taskHint">Выбрана задача 1.3: перегрузка ресурса и нулевой запас критического пути.</div>
+                <div class="kv">
+                  <span>Сотрудник</span><strong>Илья</strong>
+                  <span>Период</span><strong>18-24 мая</strong>
+                  <span>Причина</span><strong>160% загрузки</strong>
+                </div>
+              </div>
+              <div class="card">
+                <div class="item-title"><span>Действие</span><span class="chip good">сначала прогноз</span></div>
+                <div class="small">Система предлагает перераспределить труд без прямой записи в план.</div>
+                <button class="primary" id="previewBtn">Показать прогноз</button>
+              </div>
+              <div class="card preview" id="previewCard">
+                <div class="item-title"><span>Прогноз</span><span class="chip warn">без записи</span></div>
+                <div class="kv">
+                  <span>До</span><strong id="beforeLoad">160%</strong>
+                  <span>После</span><strong id="afterLoad">ожидает расчета</strong>
+                  <span>Веха</span><strong id="finishImpact">без прогноза</strong>
+                  <span>Правило</span><strong>Труд = длит. x загрузка</strong>
+                </div>
+                <button id="applyBtn" disabled>Применить команду</button>
+              </div>
+              <div class="card" id="resultCard">
+                <div class="item-title"><span>Результат</span><span class="chip">ожидает</span></div>
+                <div class="small" id="resultText">После применения нужны обновление проекции, аудит и проверка после перезагрузки.</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="footer">
+        <div class="left">
+          <span>Готово</span>
+          <span>Авторасчет</span>
+          <span id="readback">Чтение сервера: 12:22</span>
+          <span>Отмена: 3 шага</span>
+        </div>
+        <div class="right">
+          <span>Удобство v4:</span>
+          <span class="chip good">таблица как лист</span>
+          <span class="chip good">сдвижная панель</span>
+          <span class="chip good">скрытие колонок</span>
+          <span class="chip good">ресурсные конфликты</span>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <script>
+    const body = document.body;
+    const title = document.getElementById("surfaceTitle");
+    const table = document.getElementById("planTable");
+    const popover = document.getElementById("columnsPopover");
+    const formulaInput = document.getElementById("formulaInput");
+    const cellName = document.getElementById("cellName");
+    const cellPopover = document.getElementById("cellPopover");
+    let selectedCell = null;
+
+    function visibleCells(row) {
+      return [...row.querySelectorAll("td")].filter((cell) => cell.offsetParent !== null);
+    }
+
+    function cellAddress(cell) {
+      const row = cell.closest("tr");
+      const rowIndex = [...table.tBodies[0].rows].indexOf(row) + 1;
+      const colIndex = visibleCells(row).indexOf(cell);
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      return `${letters[colIndex] || "Я"}${rowIndex}`;
+    }
+
+    function cellPlainText(cell) {
+      return cell.textContent.replace(/\s+/g, " ").trim();
+    }
+
+    function selectCell(cell, showPopover = false) {
+      if (!cell || cell.tagName !== "TD") return;
+      table.querySelectorAll(".cell-selected").forEach((node) => node.classList.remove("cell-selected"));
+      selectedCell = cell;
+      selectedCell.classList.add("cell-selected");
+      cellName.textContent = cellAddress(selectedCell);
+      formulaInput.value = cellPlainText(selectedCell);
+      const row = selectedCell.closest("tr");
+      table.querySelectorAll("tbody tr").forEach((r) => r.classList.remove("selected"));
+      row.classList.add("selected");
+      document.getElementById("taskHint").textContent = `Выбрана задача: ${row.dataset.task}. Можно менять ячейки как в таблице, а рискованные изменения проводить через прогноз.`;
+      if (showPopover) {
+        const rect = selectedCell.getBoundingClientRect();
+        cellPopover.style.left = `${Math.min(window.innerWidth - 290, rect.left + 8)}px`;
+        cellPopover.style.top = `${Math.min(window.innerHeight - 170, rect.bottom + 6)}px`;
+        cellPopover.classList.add("open");
+      } else {
+        cellPopover.classList.remove("open");
+      }
+    }
+
+    function commitFormula() {
+      if (!selectedCell) return;
+      const target = selectedCell.querySelector(".edit-cell") || selectedCell;
+      target.textContent = formulaInput.value;
+      selectedCell.removeAttribute("contenteditable");
+      selectedCell.blur();
+      selectedCell.closest("tr").classList.add("changed");
+      document.getElementById("readback").textContent = `Локальное изменение ${cellName.textContent}: ожидает пересчета`;
+      document.getElementById("taskHint").textContent = `Изменение ${cellName.textContent} принято в таблице. Перед управленческим действием нужен пересчет и прогноз влияния.`;
+    }
+
+    function recalculatePlan() {
+      const changedRows = [...table.querySelectorAll("tbody tr.changed")];
+      changedRows.forEach((row) => row.classList.remove("changed"));
+      document.querySelectorAll(".bar.changed").forEach((bar) => bar.classList.remove("changed"));
+      if (selectedCell) {
+        const rowIndex = [...table.tBodies[0].rows].indexOf(selectedCell.closest("tr"));
+        const barRow = document.querySelectorAll(".bars .bar-row")[rowIndex];
+        const bar = barRow?.querySelector(".bar:not(.summary)");
+        if (bar && selectedCell.dataset.col === "duration") {
+          const numeric = Number.parseInt(formulaInput.value, 10);
+          if (!Number.isNaN(numeric)) {
+            bar.style.width = `${Math.max(32, numeric * 12)}px`;
+            bar.classList.add("changed");
+          }
+        }
+      }
+      document.getElementById("readback").textContent = "План пересчитан: проверьте сигналы и прогноз";
+      document.getElementById("taskHint").textContent = "Пересчет выполнен. Если появились риски по срокам или ресурсам, применяйте только через прогноз и команду.";
+    }
+
+    document.querySelectorAll("[data-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-view]").forEach((b) => b.classList.remove("active"));
+        button.classList.add("active");
+        body.classList.toggle("tracking", button.dataset.view === "tracking");
+        body.classList.toggle("conflict-view", button.dataset.view === "conflicts");
+        if (button.dataset.view === "gantt") title.textContent = "Диаграмма Ганта";
+        if (button.dataset.view === "tracking") title.textContent = "Гантт с базовым планом";
+        if (button.dataset.view === "conflicts") title.textContent = "Решение ресурсных конфликтов";
+      });
+    });
+
+    document.getElementById("toggleGantt").addEventListener("click", (event) => {
+      body.classList.toggle("hide-gantt");
+      event.currentTarget.textContent = body.classList.contains("hide-gantt") ? "Показать Гантт" : "Скрыть Гантт";
+    });
+
+    document.getElementById("togglePanel").addEventListener("click", () => body.classList.toggle("panel-closed"));
+    document.getElementById("closePanel").addEventListener("click", () => body.classList.add("panel-closed"));
+    document.getElementById("openPanel").addEventListener("click", () => body.classList.remove("panel-closed"));
+    document.getElementById("toggleColumns").addEventListener("click", () => popover.classList.toggle("open"));
+
+    document.querySelectorAll("[data-col-toggle]").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const col = checkbox.dataset.colToggle;
+        document.querySelectorAll(`[data-col="${col}"]`).forEach((node) => {
+          node.style.display = checkbox.checked ? "" : "none";
+        });
+      });
+    });
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      row.addEventListener("click", (event) => {
+        const cell = event.target.closest("td");
+        if (cell) selectCell(cell, event.altKey);
+      });
+    });
+
+    table.querySelectorAll("tbody td").forEach((cell) => {
+      cell.addEventListener("dblclick", () => {
+        if (cell.dataset.col === "mark" || cell.dataset.col === "id") return;
+        selectCell(cell);
+        cell.setAttribute("contenteditable", "true");
+        cell.focus();
+        document.execCommand("selectAll", false, null);
+      });
+
+      cell.addEventListener("input", () => {
+        if (cell === selectedCell) formulaInput.value = cellPlainText(cell);
+      });
+
+      cell.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          formulaInput.value = cellPlainText(cell);
+          commitFormula();
+        }
+        if (event.key === "Escape") {
+          cell.removeAttribute("contenteditable");
+          cell.blur();
+        }
+      });
+    });
+
+    formulaInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") commitFormula();
+    });
+    document.getElementById("commitEdit").addEventListener("click", commitFormula);
+    document.getElementById("recalculatePlan").addEventListener("click", recalculatePlan);
+    document.getElementById("cancelEdit").addEventListener("click", () => {
+      if (!selectedCell) return;
+      formulaInput.value = cellPlainText(selectedCell);
+      selectedCell.removeAttribute("contenteditable");
+      selectedCell.blur();
+    });
+
+    document.getElementById("openTaskInspector").addEventListener("click", () => {
+      body.classList.remove("panel-closed");
+      cellPopover.classList.remove("open");
+      document.getElementById("taskHint").textContent = `Инспектор задачи открыт для ячейки ${cellName.textContent}: ${formulaInput.value}`;
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (!selectedCell || document.activeElement === formulaInput || selectedCell.isContentEditable) return;
+      const row = selectedCell.closest("tr");
+      const rows = [...table.tBodies[0].rows];
+      const cells = visibleCells(row);
+      const col = cells.indexOf(selectedCell);
+      let next = null;
+      if (event.key === "ArrowRight") next = cells[col + 1];
+      if (event.key === "ArrowLeft") next = cells[col - 1];
+      if (event.key === "ArrowDown") next = visibleCells(rows[rows.indexOf(row) + 1] || row)[col];
+      if (event.key === "ArrowUp") next = visibleCells(rows[rows.indexOf(row) - 1] || row)[col];
+      if (event.key === "F2" && selectedCell.dataset.col !== "mark" && selectedCell.dataset.col !== "id") {
+        selectedCell.setAttribute("contenteditable", "true");
+        selectedCell.focus();
+      }
+      if (next) {
+        event.preventDefault();
+        selectCell(next);
+        next.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    });
+
+    selectCell(table.querySelector('tr.selected td[data-col="duration"]'));
+
+    function makePreview() {
+      document.getElementById("afterLoad").textContent = "104%";
+      document.getElementById("finishImpact").textContent = "05.06, без сдвига";
+      const apply = document.getElementById("applyBtn");
+      apply.disabled = false;
+      apply.classList.add("primary");
+      document.getElementById("readback").textContent = "Прогноз рассчитан: 12:24";
+    }
+
+    document.getElementById("previewBtn").addEventListener("click", makePreview);
+    document.getElementById("previewFromConflict").addEventListener("click", makePreview);
+
+    document.getElementById("applyBtn").addEventListener("click", () => {
+      document.getElementById("beforeLoad").textContent = "104%";
+      document.getElementById("resultText").textContent = "Команда применена. Аудит: АУД-Р6-2261. Проекция загрузки перечитана с сервера, состояние сохранится после перезагрузки.";
+      document.getElementById("readback").textContent = "Чтение сервера после команды: 12:25";
+    });
+
+    let resizeCol = null;
+    let startX = 0;
+    let startWidth = 0;
+
+    document.querySelectorAll("th .resize").forEach((handle) => {
+      handle.addEventListener("pointerdown", (event) => {
+        const th = event.target.closest("th");
+        resizeCol = document.querySelector(`col[data-col="${th.dataset.col}"]`);
+        startX = event.clientX;
+        startWidth = resizeCol.getBoundingClientRect().width;
+        handle.setPointerCapture(event.pointerId);
+      });
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      if (!resizeCol) return;
+      const next = Math.max(44, startWidth + event.clientX - startX);
+      resizeCol.style.width = `${next}px`;
+    });
+
+    window.addEventListener("pointerup", () => {
+      resizeCol = null;
+    });
+
+    const splitter = document.getElementById("splitter");
+    let splitDrag = false;
+    splitter.addEventListener("pointerdown", (event) => {
+      splitDrag = true;
+      splitter.setPointerCapture(event.pointerId);
+    });
+    window.addEventListener("pointermove", (event) => {
+      if (!splitDrag) return;
+      const split = document.querySelector(".split");
+      const rect = split.getBoundingClientRect();
+      const percent = Math.min(72, Math.max(34, ((event.clientX - rect.left) / rect.width) * 100));
+      split.style.setProperty("--grid-width", `${percent}%`);
+    });
+    window.addEventListener("pointerup", () => {
+      splitDrag = false;
+    });
+  </script>
+</body>
+</html>
