@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T08:44:00.0000000+07:00",
+  "updated_at": "2026-05-17T08:53:30.0000000+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -60,17 +60,28 @@
         "E2E-115"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-002 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-002 scope and acceptance criteria before implementation.",
+        "apps/api/src/phase12Readiness.ts implements a typed release-readiness read model with deployment status, local observability evidence, no-live-external-dependency check, P12 E2E/matrix blockers, open blocker summaries, and redaction policy.",
+        "GET /api/ops/release-readiness returns tenant-scoped readiness state for authorized tenant admins only and does not expose secret references.",
+        "packages/access-control runtime catalog via apps/api/src/phase2Runtime.ts includes ops.read and release.readiness.read permissions for tenant admins; read-only observers are denied by backend guard."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-002-observability-readiness-runtime --once exit 0 at startup",
+        "npm test -- apps/api/src/phase12ReadinessApi.test.ts exit 1 RED: /api/ops/release-readiness returned 404 before implementation",
+        "npm test -- apps/api/src/phase12ReadinessApi.test.ts exit 0: 1 file, 3 tests passed",
+        "npm run test:integration exit 0: 23 files, 119 tests passed",
+        "npm test exit 0: 103 files, 591 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "git diff --check exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Release readiness/observability read model and no-live-dependency evidence are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "Read model has no persistent state to clean up; final row verification still requires E2E-113/E2E-115 reload/readback evidence from deterministic Phase 12 fixtures before this row can become verified.",
+      "blocker": "2026-05-17T08:53:30.0000000+07:00: P12-002 API/read-model evidence exists, but E2E-113 production deployment smoke and E2E-115 no-live-external-dependency browser/API evidence are not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T08:53:30.0000000+07:00",
       "e2e_evidence": []
     },
     {

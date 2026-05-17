@@ -311,6 +311,16 @@ const phase2PermissionCatalog = [
     key: "integration.admin",
     description: "Administer integration adapter diagnostics",
     category: "integrations"
+  }),
+  createPermission({
+    key: "ops.read",
+    description: "Read operator release-readiness and production smoke evidence",
+    category: "ops"
+  }),
+  createPermission({
+    key: "release.readiness.read",
+    description: "Read Phase 12 release-readiness state and open blockers",
+    category: "ops"
   })
 ] satisfies Permission[];
 
@@ -374,7 +384,9 @@ function createProfile(input: Phase2AccessProfileSeed): AccessProfile {
       "integration.apply",
       "integration.mapping.read",
       "integration.audit.read",
-      "integration.admin"
+      "integration.admin",
+      "ops.read",
+      "release.readiness.read"
     ],
     project_manager: [
       "crm.opportunity.read",
