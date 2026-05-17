@@ -48,6 +48,7 @@ export type ResourceResolutionPreviewDto = {
 export type ResourceAuditDto = {
   events: Array<{ actionKey: string; target: { entityId: string }; correlationId: string }>;
   actionExecutions: Array<{
+    id: string;
     commandType: string;
     requiredPermission: string;
     status: string;
