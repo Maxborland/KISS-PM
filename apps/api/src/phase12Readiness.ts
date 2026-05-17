@@ -37,6 +37,18 @@ export type Phase12ReleaseReadinessReadModel = {
   };
   checks: Phase12ReadinessCheck[];
   openBlockers: Phase12ReleaseBlocker[];
+  latestRun: Phase12ReleaseReadinessRun | null;
+};
+
+export type Phase12ReleaseReadinessRun = {
+  id: string;
+  tenantId: string;
+  status: Phase12ReadinessStatus;
+  checkedAt: string;
+  auditEventId: string;
+  summary: Phase12ReleaseReadinessReadModel["summary"];
+  checks: Phase12ReadinessCheck[];
+  openBlockers: Phase12ReleaseBlocker[];
 };
 
 function mapDeploymentStatus(deployment: Phase12DeploymentEnvironmentResult): Phase12ReadinessCheck {
@@ -69,6 +81,7 @@ export function buildPhase12ReleaseReadinessReadModel(input: {
   tenantId: string;
   generatedAt: string;
   deployment: Phase12DeploymentEnvironmentResult;
+  latestRun?: Phase12ReleaseReadinessRun | null;
 }): Phase12ReleaseReadinessReadModel {
   const checks: Phase12ReadinessCheck[] = [
     mapDeploymentStatus(input.deployment),
@@ -132,6 +145,78 @@ export function buildPhase12ReleaseReadinessReadModel(input: {
       sensitiveDataPolicy: "redacted"
     },
     checks,
-    openBlockers
+    openBlockers,
+    latestRun: input.latestRun === undefined || input.latestRun === null ? null : cloneRun(input.latestRun)
+  };
+}
+
+function cloneRun(run: Phase12ReleaseReadinessRun): Phase12ReleaseReadinessRun {
+  return {
+    ...run,
+    summary: { ...run.summary },
+    checks: run.checks.map((check) => ({ ...check })),
+    openBlockers: run.openBlockers.map((blocker) => ({ ...blocker }))
+  };
+}
+
+export function createPhase12ReadinessRuntimeState() {
+  const runs = new Map<string, Phase12ReleaseReadinessRun>();
+  const latestRunIds = new Map<string, string>();
+  let runCounter = 0;
+
+  function read(input: {
+    tenantId: string;
+    generatedAt: string;
+    deployment: Phase12DeploymentEnvironmentResult;
+  }): Phase12ReleaseReadinessReadModel {
+    const latestRunId = latestRunIds.get(input.tenantId);
+    const latestRun = latestRunId === undefined ? null : runs.get(latestRunId) ?? null;
+    return buildPhase12ReleaseReadinessReadModel({
+      ...input,
+      latestRun
+    });
+  }
+
+  function run(input: {
+    tenantId: string;
+    checkedAt: string;
+    deployment: Phase12DeploymentEnvironmentResult;
+  }): Phase12ReleaseReadinessRun {
+    runCounter += 1;
+    const readModel = buildPhase12ReleaseReadinessReadModel({
+      tenantId: input.tenantId,
+      generatedAt: input.checkedAt,
+      deployment: input.deployment
+    });
+    const id = `p12-readiness-${input.tenantId}-${runCounter.toString().padStart(4, "0")}`;
+    const runSnapshot: Phase12ReleaseReadinessRun = {
+      id,
+      tenantId: input.tenantId,
+      status: readModel.summary.status,
+      checkedAt: input.checkedAt,
+      auditEventId: `audit-${id}`,
+      summary: { ...readModel.summary },
+      checks: readModel.checks.map((check) => ({ ...check })),
+      openBlockers: readModel.openBlockers.map((blocker) => ({ ...blocker }))
+    };
+    runs.set(id, cloneRun(runSnapshot));
+    latestRunIds.set(input.tenantId, id);
+
+    return cloneRun(runSnapshot);
+  }
+
+  function getRun(tenantId: string, runId: string): Phase12ReleaseReadinessRun | null {
+    const runSnapshot = runs.get(runId);
+    if (runSnapshot === undefined || runSnapshot.tenantId !== tenantId) {
+      return null;
+    }
+
+    return cloneRun(runSnapshot);
+  }
+
+  return {
+    read,
+    run,
+    getRun
   };
 }

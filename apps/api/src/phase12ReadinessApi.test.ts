@@ -77,4 +77,99 @@ describe("Phase 12 release readiness API", () => {
       summary: { status: "blocked" }
     });
   });
+
+  it("runs governed readiness checks with audit evidence, run readback, and reset cleanup", async () => {
+    const app = createApiApp({ allowTestFixtureReset: true, deploymentEnvironment: productionLikeEnv });
+
+    const initial = await app.request("/api/ops/release-readiness?testUser=tenant-admin-a");
+    expect(initial.status).toBe(200);
+    await expect(readJson(initial)).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      latestRun: null
+    });
+
+    const run = await app.request("/api/ops/release-readiness/run?testUser=tenant-admin-a", { method: "POST" });
+    expect(run.status).toBe(201);
+    const runBody = (await readJson(run)) as {
+      run: {
+        id: string;
+        tenantId: string;
+        status: string;
+        auditEventId: string;
+        summary: { totalChecks: number; blockedChecks: number };
+        checks: Array<{ id: string; status: string }>;
+      };
+    };
+    expect(runBody.run).toMatchObject({
+      tenantId: "tenant-a",
+      status: "blocked",
+      summary: { blockedChecks: 2 }
+    });
+    expect(runBody.run.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "p12.deployment-smoke", status: "passed" }),
+        expect.objectContaining({ id: "p12.e2e-110-115", status: "blocked" })
+      ])
+    );
+
+    const readback = await app.request(`/api/ops/release-readiness/runs/${runBody.run.id}?testUser=tenant-admin-a`);
+    expect(readback.status).toBe(200);
+    await expect(readJson(readback)).resolves.toMatchObject({
+      run: {
+        id: runBody.run.id,
+        tenantId: "tenant-a",
+        auditEventId: runBody.run.auditEventId
+      }
+    });
+
+    const latest = await app.request("/api/ops/release-readiness?testUser=tenant-admin-a");
+    await expect(readJson(latest)).resolves.toMatchObject({
+      latestRun: {
+        id: runBody.run.id,
+        auditEventId: runBody.run.auditEventId
+      }
+    });
+
+    const audit = await app.request("/api/ops/audit?testUser=tenant-admin-a");
+    expect(audit.status).toBe(200);
+    await expect(readJson(audit)).resolves.toMatchObject({
+      events: [
+        expect.objectContaining({
+          id: runBody.run.auditEventId,
+          actionKey: "ops.release_readiness.run",
+          target: { entityType: "releaseReadinessRun", entityId: runBody.run.id }
+        })
+      ]
+    });
+
+    const reset = await app.request("/test-fixtures/reset", { method: "POST" });
+    expect(reset.status).toBe(200);
+
+    const afterResetRun = await app.request(`/api/ops/release-readiness/runs/${runBody.run.id}?testUser=tenant-admin-a`);
+    expect(afterResetRun.status).toBe(404);
+    const afterResetLatest = await app.request("/api/ops/release-readiness?testUser=tenant-admin-a");
+    await expect(readJson(afterResetLatest)).resolves.toMatchObject({ latestRun: null });
+  });
+
+  it("denies readiness execution and cross-tenant run readback without partial mutation", async () => {
+    const app = createApiApp({ deploymentEnvironment: productionLikeEnv });
+
+    const denied = await app.request("/api/ops/release-readiness/run?testUser=readonly-observer-a", { method: "POST" });
+    expect(denied.status).toBe(403);
+    await expect(readJson(denied)).resolves.toMatchObject({ code: "permission_denied" });
+
+    const deniedAudit = await app.request("/api/ops/audit?testUser=readonly-observer-a");
+    expect(deniedAudit.status).toBe(403);
+    await expect(readJson(deniedAudit)).resolves.toMatchObject({ code: "permission_denied" });
+
+    const tenantA = await app.request("/api/ops/release-readiness/run?testUser=tenant-admin-a", { method: "POST" });
+    expect(tenantA.status).toBe(201);
+    const tenantABody = (await readJson(tenantA)) as { run: { id: string } };
+
+    const tenantBRead = await app.request(`/api/ops/release-readiness/runs/${tenantABody.run.id}?testUser=tenant-admin-b`);
+    expect(tenantBRead.status).toBe(404);
+
+    const tenantBLatest = await app.request("/api/ops/release-readiness?testUser=tenant-admin-b");
+    await expect(readJson(tenantBLatest)).resolves.toMatchObject({ tenantId: "tenant-b", latestRun: null });
+  });
 });

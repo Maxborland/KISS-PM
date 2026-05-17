@@ -64,6 +64,11 @@ import {
   createIntegrationAdminDiagnosticsApiClient,
   type IntegrationAdminDiagnosticsApiClient
 } from "./integrationAdminDiagnosticsApiClient";
+import { OperatorReadinessSurface } from "./OperatorReadinessSurface";
+import {
+  createOperatorReadinessApiClient,
+  type OperatorReadinessApiClient
+} from "./operatorReadinessApiClient";
 import { AppQueryClientProvider } from "./queryClient";
 
 type AppProps = {
@@ -86,7 +91,8 @@ type AppProps = {
     Partial<SavedViewLayoutBuilderApiClient> &
     Partial<ActionConfigurationApiClient> &
     Partial<ConfigurationOverviewApiClient> &
-    Partial<IntegrationAdminDiagnosticsApiClient>;
+    Partial<IntegrationAdminDiagnosticsApiClient> &
+    Partial<OperatorReadinessApiClient>;
 };
 
 const shellLabelDefaults = {
@@ -100,6 +106,7 @@ const shellLabelDefaults = {
   "navigation.my_work": "Моя работа",
   "navigation.retrospectives": "Ретроспектива",
   "navigation.integrations": "Интеграции",
+  "navigation.ops": "Операторский контур",
   "navigation.settings": "Настройки",
   "role.tenant_admin": "Администратор",
   "role.project_manager": "Руководитель проекта",
@@ -132,6 +139,7 @@ const navigationLabelKeys = [
   "navigation.my_work",
   "navigation.retrospectives",
   "navigation.integrations",
+  "navigation.ops",
   "navigation.settings"
 ];
 
@@ -402,6 +410,23 @@ function isIntegrationAdminDiagnosticsApiClient(
     typeof apiClient.getAudit === "function" &&
     typeof apiClient.setFailureMode === "function" &&
     typeof apiClient.clearFailureMode === "function"
+  );
+}
+
+function isOperatorReadinessApiClient(
+  apiClient: Partial<OperatorReadinessApiClient> | null
+): apiClient is OperatorReadinessApiClient {
+  return (
+    typeof apiClient?.getReleaseReadiness === "function" &&
+    typeof apiClient.runReleaseReadiness === "function" &&
+    typeof apiClient.getReadinessRun === "function" &&
+    typeof apiClient.getPermissionSmoke === "function" &&
+    typeof apiClient.runPermissionSmoke === "function" &&
+    typeof apiClient.getTenantIsolation === "function" &&
+    typeof apiClient.runTenantIsolation === "function" &&
+    typeof apiClient.getRecoverySmoke === "function" &&
+    typeof apiClient.runRecoverySmoke === "function" &&
+    typeof apiClient.getOpsAudit === "function"
   );
 }
 
@@ -830,6 +855,14 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
 
     return shouldUseDefaultPhase2ApiClient() ? createIntegrationAdminDiagnosticsApiClient() : null;
   }, [apiClient]);
+  const operatorReadinessApiClient = useMemo(() => {
+    const providedApiClient = apiClient ?? null;
+    if (isOperatorReadinessApiClient(providedApiClient)) {
+      return providedApiClient;
+    }
+
+    return shouldUseDefaultPhase2ApiClient() ? createOperatorReadinessApiClient() : null;
+  }, [apiClient]);
   const phase2Enabled = phase2ApiClient !== null;
   const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
   const projectWorkProjectId = useMemo(
@@ -957,6 +990,8 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
                       ? "#closed-portfolio-retrospectives"
                     : labelKey === "navigation.integrations"
                       ? "#integration-admin-diagnostics"
+                    : labelKey === "navigation.ops"
+                      ? "#operator-readiness"
                     : "#phase-1-placeholder"
               }
               key={labelKey}
@@ -1053,6 +1088,13 @@ function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
         {integrationAdminDiagnosticsApiClient ? (
           <IntegrationAdminDiagnosticsSurface
             apiClient={integrationAdminDiagnosticsApiClient}
+            currentTenant={currentTenant}
+            testUser={runtimeUser}
+          />
+        ) : null}
+        {operatorReadinessApiClient ? (
+          <OperatorReadinessSurface
+            apiClient={operatorReadinessApiClient}
             currentTenant={currentTenant}
             testUser={runtimeUser}
           />

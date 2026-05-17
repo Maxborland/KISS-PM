@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import type {
+  OperatorReadinessApiClient,
+  PermissionSmokeReadModelDto,
+  RecoverySmokeReadModelDto,
+  ReleaseReadinessReadModelDto
+} from "./operatorReadinessApiClient";
 import type { Phase2ApiClient } from "./phase2ApiClient";
 
 function createAdminApiClient(): Phase2ApiClient {
@@ -397,6 +403,86 @@ describe("KISS PM web shell", () => {
     expect(await screen.findByTestId("kpi-deviation-list")).toHaveTextContent("Критическая");
     expect(await screen.findByTestId("kpi-deviation-detail")).toHaveTextContent("result:-25");
     expect(screen.getByRole("link", { name: "KPI" })).toHaveAttribute("href", "#kpi-deviation-control");
+  });
+
+  it("wires the P12 operator readiness surface into the app shell when the ops client is available", async () => {
+    const readinessRun = {
+      id: "p12-readiness-tenant-a-0001",
+      tenantId: "tenant-a",
+      status: "blocked" as const,
+      checkedAt: "2026-05-17T09:46:00+07:00",
+      auditEventId: "audit-p12-readiness-tenant-a-0001",
+      summary: { status: "blocked" as const, totalChecks: 5, passedChecks: 3, failedChecks: 0, blockedChecks: 2 },
+      checks: [],
+      openBlockers: []
+    };
+    const readinessReadModel: ReleaseReadinessReadModelDto = {
+      tenantId: "tenant-a",
+      generatedAt: "2026-05-17T09:45:00+07:00",
+      summary: readinessRun.summary,
+      deployment: { status: "passed", checks: [] },
+      observability: { mode: "local-readiness", errorBoundary: "pending-ui-surface", sensitiveDataPolicy: "redacted" },
+      checks: [],
+      openBlockers: [],
+      latestRun: readinessRun
+    };
+    const pendingSmoke: PermissionSmokeReadModelDto = { tenantId: "tenant-a", status: "not_run", latestRun: null };
+    const recoverySmoke: RecoverySmokeReadModelDto = {
+      tenantId: "tenant-a",
+      status: "not_run",
+      policy: {
+        mode: "deterministic_in_memory_smoke",
+        productionBackupRequired: true,
+        productionPolicyDoc: "docs/operations/PHASE_12_RECOVERY_BACKUP_POLICY.md"
+      },
+      latestRun: null
+    };
+    const opsClient: OperatorReadinessApiClient = {
+      getReleaseReadiness: vi.fn(async () => readinessReadModel),
+      runReleaseReadiness: vi.fn(async () => ({ run: readinessRun })),
+      getReadinessRun: vi.fn(async () => ({ run: readinessRun })),
+      getPermissionSmoke: vi.fn(async () => pendingSmoke),
+      runPermissionSmoke: vi.fn(),
+      getTenantIsolation: vi.fn(async () => pendingSmoke),
+      runTenantIsolation: vi.fn(),
+      getRecoverySmoke: vi.fn(async () => recoverySmoke),
+      runRecoverySmoke: vi.fn(),
+      getOpsAudit: vi.fn(async () => ({ events: [] }))
+    };
+    const apiClient = {
+      ...createAdminApiClient(),
+      getCurrentTenant: vi.fn(async () => ({
+        tenant: {
+          id: "tenant-a",
+          label: "Студия A",
+          configurationVersion: 1
+        },
+        actor: {
+          id: "tenant-admin-a",
+          displayName: "Администратор",
+          accessProfileId: "profile-tenant-admin-a"
+        },
+        labels: {
+          "navigation.ops": "Операторский контур",
+          "role.tenant_admin": "Администратор"
+        },
+        permissions: [
+          "tenant.read",
+          "ops.read",
+          "ops.execute",
+          "ops.audit.read",
+          "release.readiness.read",
+          "release.readiness.execute"
+        ]
+      })),
+      ...opsClient
+    };
+
+    render(<App apiClient={apiClient} testUser="tenant-admin-a" />);
+
+    expect(await screen.findByTestId("operator-readiness-surface")).toBeInTheDocument();
+    expect(await screen.findByTestId("release-readiness-summary")).toHaveTextContent("p12-readiness-tenant-a-0001");
+    expect(screen.getByRole("link", { name: "Операторский контур" })).toHaveAttribute("href", "#operator-readiness");
   });
 
   it("blocks an unknown test user instead of opening the shell", async () => {
