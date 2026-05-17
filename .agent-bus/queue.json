@@ -6033,7 +6033,7 @@
         "P12-007"
       ],
       "title": "Implement demo tenant/template pack and operator onboarding docs",
-      "status": "runnable",
+      "status": "done",
       "priority": "high",
       "phase": "P12",
       "depends_on": [
@@ -6061,7 +6061,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Next runnable P12 block after accepted P12-006. P12-001 dependency is accepted as an implementation block; keep P12 strict gate blocked until E2E-110..115 and P12-010."
+      "notes": "Accepted implementation block on 2026-05-17T10:00:20+07:00. Deterministic P12 release demo tenant/template pack descriptor and operator onboarding docs implemented and verified; P12-007 matrix row remains blocked only for later E2E-110 evidence."
     },
     {
       "id": "P12-008-full-critical-journey-orchestration",
@@ -6069,7 +6069,7 @@
         "P12-008"
       ],
       "title": "Implement full critical journey orchestration without live services",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "critical",
       "phase": "P12",
       "depends_on": [
@@ -6100,7 +6100,7 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json",
         "git diff --check"
       ],
-      "notes": "Blocked until operator surfaces and demo fixtures/docs exist."
+      "notes": "Next runnable P12 block after accepted P12-007. Full critical journey orchestration can now consume the P12 release demo seed; keep P12 strict gate blocked until E2E-110..115 and P12-010."
     },
     {
       "id": "P12-009-deterministic-phase12-fixtures-e2e",

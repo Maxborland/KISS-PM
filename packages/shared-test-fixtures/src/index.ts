@@ -12,6 +12,7 @@ export { getPhase8FixtureSeed, PHASE8_FIXTURE_TIMESTAMP } from "./phase8Fixtures
 export { getPhase9FixtureSeed, PHASE9_FIXTURE_TIMESTAMP } from "./phase9Fixtures";
 export { getPhase10FixtureSeed, PHASE10_FIXTURE_TIMESTAMP } from "./phase10Fixtures";
 export { getPhase11FixtureSeed, PHASE11_FIXTURE_TIMESTAMP } from "./phase11Fixtures";
+export { getPhase12FixtureSeed, PHASE12_FIXTURE_TIMESTAMP } from "./phase12Fixtures";
 export type {
   Phase2AccessProfileSeed,
   Phase2FixtureSeed,
@@ -55,3 +56,12 @@ export type {
   Phase10TenantCustomizationFixture
 } from "./phase10Fixtures";
 export type { Phase11FixtureSeed, Phase11TenantIntegrationFixture } from "./phase11Fixtures";
+export type {
+  Phase12CriticalJourneyFixture,
+  Phase12FixtureSeed,
+  Phase12MockExternalServicesFixture,
+  Phase12RoleFixture,
+  Phase12TemplatePackFixture,
+  Phase12TenantAReleaseDemoFixture,
+  Phase12TenantBIsolationFixture
+} from "./phase12Fixtures";

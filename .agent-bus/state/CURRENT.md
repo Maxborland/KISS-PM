@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T09:51:20.0000000+07:00
+Updated: 2026-05-17T10:00:20.0000000+07:00
 
 - Phase 12 Production SaaS Hardening and Market Release has an accepted closed contract/tracking block, but Phase 12 implementation is not accepted yet:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -36,8 +36,12 @@ Updated: 2026-05-17T09:51:20.0000000+07:00
   - `apps/api/src/app.ts` exposes governed release-readiness run/readback routes and tenant-scoped `/api/ops/audit`; readiness execution is backend guarded with `release.readiness.execute`, readback with `release.readiness.read`, and audit with `ops.audit.read`.
   - `apps/web/src/OperatorReadinessSurface.tsx`, `apps/web/src/operatorReadinessApiClient.ts`, and `apps/web/src/App.tsx` provide the P12 operator readiness surface and navigation entry for readiness, permission smoke, tenant-isolation smoke, recovery smoke, command errors, denied state, API readback, latest run after remount, and ops audit evidence.
   - P12-006 matrix row remains blocked only for later E2E-113/E2E-114 browser/API evidence.
+- `P12-007-demo-tenant-template-pack-onboarding` is accepted as an implementation block:
+  - `packages/shared-test-fixtures/src/phase12Fixtures.ts` defines the deterministic P12 release demo tenant seed, release demo template pack, role matrix, critical journey ids, mocked external-service state, operator docs links, and Tenant B isolation-only private ids for E2E-110..115.
+  - `docs/operations/PHASE_12_RELEASE_DEMO_TENANT_TEMPLATE_PACK.md` and `docs/operations/PHASE_12_OPERATOR_ONBOARDING.md` document the release demo pack, operator first-run checklist, mocked external-services rule, audit/readback/reload/cleanup expectations, and blocked-until-E2E policy.
+  - P12-007 matrix row remains blocked only for later E2E-110 browser/API evidence.
 - Canonical Phase 12 E2E ids are E2E-110..115 from `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`. Older UX catalog references to P12 E2E-120..122 are stale docs references and not the P12 phase gate.
-- Next runnable step: claim `P12-007-demo-tenant-template-pack-onboarding`.
+- Next runnable step: claim `P12-008-full-critical-journey-orchestration`.
 - Release 2 is still not ready. Only `P12-010-phase12-verification-matrix-market-release-exit-gate` may mark Phase 12 and Release 2 accepted after E2E-110..115, strict matrix verification, typecheck/lint/tests, review loop, agent-bus guard, and logical commits pass.
 
 - Phase 11 Integrations and Migration is accepted as an implemented product phase:

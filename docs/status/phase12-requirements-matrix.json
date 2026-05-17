@@ -2,7 +2,7 @@
   "phase": "P12",
   "name": "Phase 12 Production SaaS hardening and market release requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T09:51:20.0000000+07:00",
+  "updated_at": "2026-05-17T10:00:20.0000000+07:00",
   "rows": [
     {
       "id": "P12-001",
@@ -260,17 +260,27 @@
         "E2E-110"
       ],
       "evidence": [
-        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-007 scope and acceptance criteria before implementation."
+        "docs/phases/PHASE_12_PRODUCTION_SAAS_HARDENING_MARKET_RELEASE.md freezes P12-007 scope and acceptance criteria before implementation.",
+        "packages/shared-test-fixtures/src/phase12Fixtures.ts defines the deterministic P12 release demo tenant seed, release demo template pack, role matrix, critical journey ids, mocked external-service state, operator docs links, and Tenant B isolation-only private ids for E2E-110..115.",
+        "docs/operations/PHASE_12_RELEASE_DEMO_TENANT_TEMPLATE_PACK.md documents the P12 release demo tenant, sample template pack, mocked external services mode, and deterministic evidence handoff for P12-008/P12-009.",
+        "docs/operations/PHASE_12_OPERATOR_ONBOARDING.md documents the operator first-run checklist, E2E-110 path, mocked external-services rule, audit/readback/reload/cleanup expectations, and matrix blocked-until-E2E policy."
       ],
       "tests": [
         "node scripts/agent-bus-guard.mjs --task P12-000-production-saas-hardening-phase-contract --once exit 0 at startup",
         "npm test -- scripts/verify-requirements-matrix.test.ts exit 0: 70 tests passed, including P12 verifier behavior",
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase12-requirements-matrix.json exit 0: initial P12 tracking matrix passes with blocked rows allowed",
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet"
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase12-requirements-matrix.json exit 1 expected: P12 implementation and E2E-110..115 are not complete yet",
+        "node scripts/agent-bus-guard.mjs --task P12-007-demo-tenant-template-pack-onboarding --once exit 0 at startup",
+        "npm test -- packages/shared-test-fixtures/src/phase12Fixtures.test.ts exit 1 RED: missing ./phase12Fixtures module before implementation",
+        "npm test -- packages/shared-test-fixtures/src/phase12Fixtures.test.ts exit 1 RED during docs review: onboarding docs still mentioned live vendor/credential wording",
+        "npm test -- packages/shared-test-fixtures/src/phase12Fixtures.test.ts exit 0: 1 file, 3 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 10 files, 20 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0"
       ],
-      "cleanup": "Blocked before implementation; cleanup evidence must come from deterministic Phase 12 fixtures, API/domain readback, reload persistence, ops audit evidence, recovery smoke, and /test-fixtures/reset before this row can be verified.",
-      "blocker": "2026-05-17T08:26:19.8717799+07:00: Release demo tenant/template pack and onboarding/operator docs are not implemented yet.",
-      "last_checked_at": "2026-05-17T08:28:17.0000000+07:00",
+      "cleanup": "P12-007 adds deterministic static fixture/doc descriptors only and creates no runtime state. Final row verification still requires E2E-110 to consume the release demo seed and prove UI/API/domain readback, audit, reload persistence, and /test-fixtures/reset cleanup in P12-008/P12-009.",
+      "blocker": "2026-05-17T10:00:20.0000000+07:00: P12-007 fixture/docs implementation evidence exists, but executable E2E-110 browser/API evidence is not implemented yet, so the row remains blocked truthfully.",
+      "last_checked_at": "2026-05-17T10:00:20.0000000+07:00",
       "e2e_evidence": []
     },
     {
