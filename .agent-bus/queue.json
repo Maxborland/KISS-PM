@@ -6354,6 +6354,98 @@
         "git diff --check"
       ],
       "notes": "Accepted 2026-05-17T10:50:37.8320000+07:00. Closed Phase 12 market release exit gate: E2E-110..115 pass, P12 strict matrix passes without --allow-blocked, npm test/typecheck/lint pass, P3-P11 release-path E2E+strict matrix sweep passed after P6/P7 blocker fixes, git diff --check passes, and review loop has no unresolved Critical/Important/Medium findings."
+    },
+    {
+      "id": "R2-000-release2-planning-surface",
+      "aliases": [
+        "R2-000"
+      ],
+      "title": "Prepare Release 2 planning surface and roadmap audit",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "P12-010-phase12-verification-matrix-market-release-exit-gate"
+      ],
+      "write_scope": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-000-release2-planning-surface.claim.json",
+        ".agent-bus/sessions/R2-000-release2-planning-surface.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "rg -n \"Release 2|R2-|entry gate|candidate-slice|Foundation\" docs/roadmap docs/backlog/FUTURE_SCOPE.md",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-000-release2-planning-surface --once",
+        "git diff --check"
+      ],
+      "notes": "Accepted 2026-05-17T11:21:43.4228163+07:00. Restored and reconciled Release 2 roadmap/decomposition docs from prior untracked checkpoint history against the accepted P12 gate. Added Release 2 planning audit, baseline status, future-scope routing, and next recommended R2 foundation contract. Planning/docs-only; no Release 2 product implementation.",
+      "completed_at": "2026-05-17T11:21:43.4228163+07:00",
+      "result": "accepted"
+    },
+    {
+      "id": "R2-FND-000-release2-foundation-contract",
+      "aliases": [
+        "R2-FND-000"
+      ],
+      "title": "Create Release 2 foundation contract and first-slice gate",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-000-release2-planning-surface"
+      ],
+      "write_scope": [
+        "docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md",
+        "docs/roadmap/RELEASE_2_DEPTH_HARDENING.md",
+        "docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-FND-000-release2-foundation-contract.claim.json",
+        ".agent-bus/sessions/R2-FND-000-release2-foundation-contract.md"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/roadmap/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "rg -n \"R2-FND-000|Release 2 foundation|E2E|matrix|exit gate\" docs/roadmap docs/backlog/FUTURE_SCOPE.md",
+        "node -e \"JSON.parse(require('fs').readFileSync('.agent-bus/queue.json','utf8'))\"",
+        "node scripts/agent-bus-guard.mjs --task R2-FND-000-release2-foundation-contract --once",
+        "git diff --check"
+      ],
+      "notes": "Next planning task. Create a finite Release 2 foundation contract with scope/non-scope, first-slice decision, matrix/verifier policy, fixtures, E2E truth contour, write scopes, cleanup/readback rules, and exit gate. Do not implement product code or delete planned R2 functionality."
     }
   ]
 }

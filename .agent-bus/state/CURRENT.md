@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T10:50:37.8320000+07:00
+Updated: 2026-05-17T11:21:43.4228163+07:00
+
+- Release 2 planning surface is being prepared after the accepted Phase 12 repository-defined market-release gate:
+  - task: `R2-000-release2-planning-surface`
+  - roadmap: `docs/roadmap/RELEASE_2_DEPTH_HARDENING.md`
+  - decomposition: `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md`
+  - audit: `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md`
+- Current local branch is `master`; this checkout has no configured git remote, so "update main" can only be interpreted as using the current local `master` baseline unless a remote is added later.
+- Release 2 implementation has not started. The next recommended runnable planning block is `R2-FND-000-release2-foundation-contract`: create a finite Release 2 foundation contract, choose or explicitly defer the first implementation slice, define matrix/verifier policy, fixtures, E2E truth contour, write scopes, and exit gate.
+- Do not delete Release 2 planned functionality when narrowing the first slice. The existing R2 roadmap/decomposition remain the future backlog.
 
 - Phase 12 Production SaaS Hardening and Market Release is accepted as an implemented market-release gate:
   - `P12-000-production-saas-hardening-phase-contract`
@@ -99,7 +108,7 @@ Updated: 2026-05-17T10:50:37.8320000+07:00
 - `P11-009` implemented deterministic Phase 11 fixtures in `packages/shared-test-fixtures/src/phase11Fixtures.ts` and executable Playwright E2E-100..104 under `e2e/tests/phase11/`. E2E proves UI + API readback, import preview non-mutation, governed apply, idempotency, safe adapter failure/recovery, backend permission denial, tenant isolation, mapping/audit evidence, imported canonical project continuity without live adapter, reload persistence, and `/test-fixtures/reset` cleanup. Matrix rows P11-001..P11-009 are now verified with structured E2E evidence.
 - `P11-010` closed the strict Phase 11 exit gate. `node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json` passes without `--allow-blocked`.
 - P11 scope is frozen around external systems as adapters, ExternalMapping/idempotency, mock adapter import preview/apply, migration validation reports, safe failure diagnostics, Integration Admin Diagnostics UI, imported-project continuity without live adapter dependency, deterministic fixtures, and strict matrix exit.
-- Previous recommended step was to start Phase 12. That has now produced the P12 closed contract/tracking block; proceed with `P12-001-production-deployment-env-secret-contract`.
+- Previous recommendation to start Phase 12 is obsolete. Phase 12 is now accepted; proceed with Release 2 planning through `R2-FND-000-release2-foundation-contract`.
 
 - Phase 8 Control Surfaces and Action Engine is accepted as an implemented product phase. P8-001..P8-010 are verified in `docs/status/phase8-requirements-matrix.json`, E2E-070..075 pass, and the strict Phase 8 verifier passes without `--allow-blocked`.
 - Phase 9 Closed Portfolio and Retrospectives is accepted as an implemented product phase. P9-001..P9-010 are verified in `docs/status/phase9-requirements-matrix.json`, E2E-080..083 pass, and the strict Phase 9 verifier passes without `--allow-blocked`.
@@ -131,7 +140,7 @@ Updated: 2026-05-17T10:50:37.8320000+07:00
 - `P9-009` implemented deterministic Phase 9 fixtures, Project Closure Control UI, and executable E2E-080..083. Fresh E2E proves closure preview/apply, snapshot stability, closed portfolio trends, template-improvement preview/apply, backend denial for read-only/Tenant B, audit/action evidence, API readback, reload persistence, and reset cleanup.
 - `P9-010` closed the strict Phase 9 exit gate. `node scripts/verify-requirements-matrix.mjs docs/status/phase9-requirements-matrix.json` passes without `--allow-blocked`.
 - Phase 9 E2E ids follow `docs/04_MASTER_PHASE_PLAN.md` and `docs/e2e/E2E_SCENARIOS.md`: P9 owns E2E-080..083. Older screen-catalog references to P9 E2E-090..092 are stale because Phase 10 owns E2E-090..095.
-- Release 2 is not ready. P11-P12 remain not accepted as implemented product phases until their contracts, implementation, executable suites, and strict matrices pass.
+- Obsolete pre-P11/P12 warning resolved: P11 and P12 are now accepted implemented product phases in the repository-defined release plan. Release 2 implementation is still not started and requires its own finite contract before code work.
 - Phase 10 No-code Tenant Customization has an accepted closed contract and initial tracking matrix:
   - `P10-000-no-code-tenant-customization-phase-contract`
   - contract: `docs/phases/PHASE_10_NO_CODE_TENANT_CUSTOMIZATION.md`
