@@ -20,6 +20,7 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         KISS_PM_ALLOW_TEST_FIXTURE_RESET: "true",
+        KISS_PM_EXTERNAL_SERVICES_MODE: "mocked",
         NO_PROXY: localNoProxy,
         no_proxy: localNoProxy
       },
