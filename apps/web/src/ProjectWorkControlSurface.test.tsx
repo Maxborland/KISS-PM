@@ -7,7 +7,8 @@ import type {
   KanbanProjectDto,
   ManagedProjectDto,
   Phase4ProjectWorkApiClient,
-  TaskDto
+  TaskDto,
+  TaskParticipantRole
 } from "./phase4ProjectWorkApiClient";
 import type { CurrentTenantDto } from "./phase2ApiClient";
 import { withTestQueryClient } from "./testQueryClient";
@@ -184,6 +185,53 @@ function createTask(status: TaskDto["status"] = "todo"): TaskDto {
     createdAt: "2026-05-15T10:07:00.000Z",
     updatedAt: "2026-05-15T10:07:00.000Z",
     correlationId: `corr-task-create-${taskId}`
+  };
+}
+
+function createImportedProject(tasks: TaskDto[] = []): ManagedProjectDto {
+  const importedProjectId = "imported-project-p11-ui";
+  const importedStageId = `${importedProjectId}:stage-initiation`;
+
+  return {
+    ...createProject("blocked", tasks),
+    id: importedProjectId,
+    title: "Импорт: API проект",
+    sourceDraftId: "imported-draft-p11-ui",
+    sourceOpportunity: {
+      type: "crm_opportunity",
+      opportunityId: "imported-opportunity-p11-ui",
+      title: "Импорт: API сделка",
+      contactIds: ["imported-contact-p11-ui"],
+      plannedStartDate: "2026-12-01",
+      desiredFinishDate: "2026-12-31"
+    },
+    stages: createProject("blocked", []).stages.map((stage) => ({
+      ...stage,
+      projectId: importedProjectId,
+      id: stage.templateKey === "initiation" ? importedStageId : `${importedProjectId}:stage-${stage.templateKey}`
+    })),
+    currentStageId: importedStageId,
+    tasks,
+    taskParticipants: [],
+    createdBy: "tenant-admin-a",
+    correlationId: "corr-imported-project-p11-ui"
+  };
+}
+
+function createImportedTask(status: TaskDto["status"] = "todo"): TaskDto {
+  const importedProjectId = "imported-project-p11-ui";
+  const importedStageId = `${importedProjectId}:stage-initiation`;
+
+  return {
+    ...createTask(status),
+    id: "imported-task-p11-ui",
+    projectId: importedProjectId,
+    stageId: importedStageId,
+    title: "API imported task",
+    dueDate: "2026-12-15",
+    plannedWorkHours: 16,
+    createdBy: "tenant-admin-a",
+    correlationId: "corr-imported-task-p11-ui"
   };
 }
 
@@ -600,6 +648,103 @@ describe("Project Work Control surface", () => {
     expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Внедрение портала АКМЕ");
     expect(await screen.findByTestId("project-task-list")).toHaveTextContent(taskId);
     expect(screen.getByTestId("kanban-column-todo")).toHaveTextContent(taskId);
+  });
+
+  it("opens imported project work from canonical APIs and keeps status/audit readback after adapter disconnect", async () => {
+    const importedProjectId = "imported-project-p11-ui";
+    let importedTask = createImportedTask("todo");
+    let importedProject = createImportedProject([importedTask]);
+    const apiClient = {
+      ...createApiClient(),
+      getProject: vi.fn(async (_testUser: string, requestedProjectId: string) => {
+        if (requestedProjectId !== importedProjectId) {
+          throw Object.assign(new Error("Объект не найден"), { code: "not_found" });
+        }
+
+        return importedProject;
+      }),
+      listProjectTasks: vi.fn(async (_testUser: string, requestedProjectId: string) =>
+        requestedProjectId === importedProjectId ? [importedTask] : []
+      ),
+      listMyTasks: vi.fn(async (_testUser: string, roles?: TaskParticipantRole[]) => {
+        if (roles?.includes("executor")) {
+          return [{ ...importedTask, relationRoles: ["executor" as const] }];
+        }
+        if (roles?.includes("controller")) {
+          return [{ ...importedTask, relationRoles: ["controller" as const] }];
+        }
+
+        return [];
+      }),
+      getKanbanProject: vi.fn(async (_testUser: string, requestedProjectId: string) => ({
+        ...createKanban([importedTask]),
+        projectId: requestedProjectId
+      })),
+      changeTaskStatus: vi.fn(async (_testUser: string, requestedTaskId: string, toStatus: TaskDto["status"]) => {
+        importedTask = createImportedTask(toStatus);
+        importedProject = createImportedProject([importedTask]);
+        return {
+          task: importedTask,
+          statusHistory: [
+            {
+              id: "imported-task-p11-ui:status:1",
+              tenantId: "tenant-a",
+              projectId: importedProjectId,
+              stageId: `${importedProjectId}:stage-initiation`,
+              taskId: requestedTaskId,
+              fromStatus: "todo" as const,
+              toStatus,
+              actorId: "project-manager-a",
+              changedAt: "2026-05-17T07:50:00.000Z",
+              correlationId: "corr-imported-task-status-p11-ui"
+            }
+          ]
+        };
+      }),
+      listAuditEventsForTarget: vi.fn(async () =>
+        importedTask.status === "in_progress"
+          ? [
+              {
+                id: "audit-imported-task-status",
+                tenantId: "tenant-a",
+                actorId: "project-manager-a",
+                actionKey: "task.status.change",
+                target: { entityType: "task", entityId: importedTask.id },
+                result: "success",
+                timestamp: "2026-05-17T07:50:00.000Z",
+                correlationId: "corr-imported-task-status-p11-ui"
+              }
+            ]
+          : []
+      )
+    } satisfies Phase4ProjectWorkApiClient;
+
+    render(withTestQueryClient(
+      <ProjectWorkControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        projectId={importedProjectId}
+        testUser="project-manager-a"
+      />
+    ));
+
+    expect(await screen.findByTestId("managed-project-title")).toHaveTextContent("Импорт: API проект");
+    expect(apiClient.getProject).toHaveBeenCalledWith("project-manager-a", importedProjectId);
+    await waitFor(() => {
+      expect(screen.getByTestId("project-task-list")).toHaveTextContent("imported-task-p11-ui");
+      expect(screen.getByTestId("project-task-list")).toHaveTextContent("API imported task");
+      expect(screen.getByTestId("kanban-column-todo")).toHaveTextContent("imported-task-p11-ui");
+    });
+
+    fireEvent.click(within(screen.getByTestId("kanban-column-todo")).getByRole("button", { name: "В работу" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("kanban-column-in_progress")).toHaveTextContent("imported-task-p11-ui");
+      expect(screen.getByTestId("task-audit-events")).toHaveTextContent("task.status.change");
+    });
+    expect(apiClient.changeTaskStatus).toHaveBeenCalledWith("project-manager-a", "imported-task-p11-ui", "in_progress");
+    expect(apiClient.listProjectTasks).toHaveBeenCalledWith("project-manager-a", importedProjectId);
+    expect(apiClient.getKanbanProject).toHaveBeenCalledWith("project-manager-a", importedProjectId);
   });
 
   it("shows a clear denied state when a read-only actor tries the governed project command", async () => {

@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T07:20:04.5500545+07:00",
+  "updated_at": "2026-05-17T07:55:21.1590819+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -274,14 +274,26 @@
         "E2E-103"
       ],
       "evidence": [
-        "Phase 11 contract requires imported canonical projects and tasks to remain operable after the adapter is disconnected or failing."
+        "Phase 11 contract requires imported canonical projects and tasks to remain operable after the adapter is disconnected or failing.",
+        "apps/api/src/app.ts materializes a confirmed Phase 11 import into the canonical Phase 4 project/task runtime after the governed import apply command. The materialization uses the stored import preview and ExternalMapping canonical ids, not a live adapter read, preflights canonical materialization before apply to avoid synced mappings without canonical project readback, and writes integration.import.materialize_project audit evidence.",
+        "apps/api/src/phase11Runtime.ts exposes tenant-scoped getImportPreview readback for application-layer materialization while preserving stale/cross-tenant preview guards.",
+        "apps/api/src/phase11IntegrationsApi.test.ts proves apply creates canonical project/task readback, adapter failure after import does not prevent /api/projects and task status commands, canonical project responses do not leak raw external project/task ids, task status writes audit evidence, Tenant B cannot read Tenant A imported project details, and /test-fixtures/reset removes the imported canonical project.",
+        "apps/web/src/ProjectWorkControlSurface.test.tsx proves the existing Project Work control surface opens an imported project id through canonical Phase 4 API client calls, shows imported task data, changes task status, refreshes Kanban/audit readback, and does not depend on an integration adapter client."
       ],
       "tests": [
-        "Pending P11-008 implementation: expected API/UI tests proving imported project continuity without live adapter dependency."
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 1 RED: imported project mapping existed after apply, but /api/projects/:projectId returned 404 after adapter failure.",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/web/src/ProjectWorkControlSurface.test.tsx exit 0: 1 file, 8 tests passed",
+        "npm test -- apps/web/src exit 0: 19 files, 122 tests passed",
+        "npm test exit 0: 100 files, 577 tests passed",
+        "npm run typecheck exit 1: ProjectWorkControlSurface.test.tsx initially missed TaskParticipantRole type import",
+        "npm run typecheck exit 0 after TaskParticipantRole import and materialization preflight fix",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0"
       ],
-      "cleanup": "Pending implementation: cleanup must reset imported canonical entities and adapter disconnect/failure mode after continuity tests.",
-      "blocker": "2026-05-17T05:55:38.9918634+07:00: P11-008 continuity proof is not implemented yet; E2E-103 is still planned.",
-      "last_checked_at": "2026-05-17T05:55:38.9918634+07:00",
+      "cleanup": "API continuity test proves /test-fixtures/reset removes the imported canonical project from Phase 4 runtime after import/apply/failure-mode use. UI test state is local mocked TanStack Query/component state. Strict cleanup/readback remains blocked until P11-009 E2E-103 proves browser reload plus fixture reset through the full Playwright path.",
+      "blocker": "2026-05-17T07:55:21.1590819+07:00: P11-008 API/UI implementation and review fixes are complete and tested, but this row remains blocked for strict phase exit until required E2E-103 structured Playwright evidence exists.",
+      "last_checked_at": "2026-05-17T07:55:21.1590819+07:00",
       "e2e_evidence": []
     },
     {

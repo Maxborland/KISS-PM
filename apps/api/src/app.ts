@@ -52,6 +52,7 @@ import type {
   TaskParticipantRole,
   TaskStatusHistoryEntry
 } from "@kiss-pm/project-core";
+import { createProjectDraftFromOpportunity } from "@kiss-pm/project-core";
 import type { ProjectClosureBlockerOverride } from "@kiss-pm/project-core";
 import type { DependencyType, ScheduleBaselineSnapshot, SchedulePlan, ScheduleValidationIssue } from "@kiss-pm/scheduling-engine";
 import {
@@ -62,7 +63,8 @@ import {
 import type {
   IntegrationAdapterDefinition,
   IntegrationConnection,
-  MockAdapterCanonicalImportPayload
+  MockAdapterCanonicalImportPayload,
+  MockAdapterCanonicalImportPreview
 } from "@kiss-pm/integrations";
 import { createConfigurationImportPackageWithChecksum, previewConfigurationImport } from "@kiss-pm/tenant-config";
 import type { ConfigurationExportPackage, CustomFieldDefinition, CustomFieldRegistry } from "@kiss-pm/tenant-config";
@@ -1182,6 +1184,129 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     });
   }
 
+  function requirePhase11ImportedProjectMaterializationReady(
+    session: Phase2RuntimeSession,
+    preview: MockAdapterCanonicalImportPreview
+  ): void {
+    const projectDraftPreview = preview.canonical.projectDraft;
+    const projectMapping = preview.mappingPreview.find((mapping) => mapping.canonicalEntityType === "project");
+    if (projectDraftPreview === undefined || projectMapping === undefined) {
+      return;
+    }
+    if (phase4Runtime.getProject(session.user.tenantId, projectMapping.canonicalEntityId) !== undefined) {
+      return;
+    }
+
+    const processTemplate = phase4Runtime.getProcessTemplate(session.user.tenantId);
+    const tenantProjects = phase4Runtime.listProjects(session.user.tenantId);
+    for (const taskPreview of preview.canonical.tasks) {
+      const stageTemplate = processTemplate.stages.find((candidate) => candidate.key === taskPreview.stageKey);
+      const taskTemplate = stageTemplate?.taskTemplates[0];
+      if (stageTemplate === undefined || taskTemplate === undefined) {
+        throw Object.assign(new Error("imported task stage cannot be materialized into the canonical project template"), {
+          code: "precondition_failed"
+        });
+      }
+      const taskIdAlreadyExists = tenantProjects.some((project) => project.tasks.some((task) => task.id === taskPreview.id));
+      if (taskIdAlreadyExists) {
+        throw Object.assign(new Error("imported task canonical id already exists in another project"), { code: "conflict" });
+      }
+    }
+  }
+
+  function materializePhase11ImportedProject(session: Phase2RuntimeSession, preview: MockAdapterCanonicalImportPreview) {
+    const projectDraftPreview = preview.canonical.projectDraft;
+    const projectMapping = preview.mappingPreview.find((mapping) => mapping.canonicalEntityType === "project");
+    if (projectDraftPreview === undefined || projectMapping === undefined) {
+      return undefined;
+    }
+    const existingProject = phase4Runtime.getProject(session.user.tenantId, projectMapping.canonicalEntityId);
+    if (existingProject !== undefined) {
+      return existingProject;
+    }
+
+    const processTemplate = phase4Runtime.getProcessTemplate(session.user.tenantId);
+    const projectDraft = createProjectDraftFromOpportunity({
+      id: projectDraftPreview.id,
+      tenantId: session.user.tenantId,
+      title: projectDraftPreview.title,
+      createdBy: session.user.id,
+      createdAt: runtime.now(),
+      correlationId: `corr-imported-draft-${preview.id}`,
+      sourceOpportunity: projectDraftPreview.sourceOpportunity,
+      processTemplate: {
+        tenantId: session.user.tenantId,
+        templateId: processTemplate.id,
+        key: processTemplate.key,
+        label: processTemplate.label,
+        version: processTemplate.version,
+        matchConfidence: 1,
+        assumptions: []
+      },
+      demand: projectDraftPreview.demand,
+      feasibility: projectDraftPreview.feasibility
+    });
+
+    let project = phase4Runtime.createManagedProjectFromTemplate({
+      tenantId: session.user.tenantId,
+      actorId: session.user.id,
+      projectDraft,
+      projectId: projectMapping.canonicalEntityId
+    });
+
+    for (const taskPreview of preview.canonical.tasks) {
+      const stage = project.stages.find((candidate) => candidate.templateKey === taskPreview.stageKey);
+      const stageTemplate = project.processTemplateSnapshot.stageTemplates.find((candidate) => candidate.key === stage?.templateKey);
+      const taskTemplate = stageTemplate?.taskTemplates[0];
+      if (stage === undefined || taskTemplate === undefined) {
+        continue;
+      }
+      const taskExists = project.tasks.some((task) => task.id === taskPreview.id);
+      if (taskExists) {
+        continue;
+      }
+      const result = phase4Runtime.createTask({
+        tenantId: session.user.tenantId,
+        actorId: session.user.id,
+        projectId: project.id,
+        id: taskPreview.id,
+        stageId: stage.id,
+        taskTemplateId: taskTemplate.id,
+        taskTemplateKey: taskTemplate.key,
+        title: taskPreview.title,
+        status: "todo",
+        dueDate: taskPreview.dueDate,
+        plannedWorkHours: taskPreview.plannedWorkHours,
+        participants: [
+          {
+            userId: session.user.id,
+            role: "executor"
+          }
+        ]
+      });
+      project = result.project;
+    }
+
+    runtime.appendAuditEvent({
+      session,
+      id: `audit-imported-project-materialized-${preview.id}`,
+      actionKey: "integration.import.materialize_project",
+      target: { entityType: "project", entityId: project.id },
+      correlationId: `corr-imported-project-materialized-${preview.id}`,
+      details: {
+        before: { state: "not_materialized" },
+        after: {
+          projectId: project.id,
+          taskIds: project.tasks.map((task) => task.id),
+          importPreviewId: preview.id,
+          importBatchSource: "phase11"
+        }
+      }
+    });
+
+    return project;
+  }
+
   function appendConfigurationImportAudit(session: Phase2RuntimeSession, result: ReturnType<typeof phase10Runtime.applyConfigurationPackageImport>) {
     runtime.appendAuditEvent({
       session,
@@ -1569,7 +1694,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         tenantId: session.user.tenantId
       });
       const body = integrationImportApplySchema.parse(await parseJson(context));
-      const result = phase11Runtime.applyImport({
+      const applyInput = {
         tenantId: session.user.tenantId,
         actorId: session.user.id,
         previewId: body.previewId,
@@ -1578,10 +1703,24 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         auditEventId: body.auditEventId ?? `audit-api-import-${body.previewId}`,
         appliedAt: runtime.now(),
         confirmed: body.confirmed
-      });
+      };
+      let preview: MockAdapterCanonicalImportPreview;
+      try {
+        preview = phase11Runtime.getImportPreview({
+          tenantId: session.user.tenantId,
+          previewId: body.previewId
+        });
+      } catch (error) {
+        phase11Runtime.applyImport(applyInput);
+        throw error;
+      }
+      requirePhase11ImportedProjectMaterializationReady(session, preview);
+      const result = phase11Runtime.applyImport(applyInput);
+      const materializedProject = materializePhase11ImportedProject(session, preview);
 
       return context.json({
         result,
+        ...(materializedProject !== undefined ? { materializedProject: projectDto(materializedProject) } : {}),
         readback: {
           batches: phase11Runtime.listImportBatches(session.user.tenantId),
           mappings: phase11Runtime.listMappings(session.user.tenantId),
@@ -1598,7 +1737,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       const session = requireSession(runtime, context.req.query("testUser"));
       assertAllowed(runtime, session, "integration.read", {
         entityType: "integrationImportBatch",
-        tenantId: session.user.tenantId
+        tenantId: session.user.tenantId,
       });
 
       return context.json({ batches: phase11Runtime.listImportBatches(session.user.tenantId) });
