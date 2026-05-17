@@ -421,6 +421,11 @@ export function OperationalDataGrid({
                           event.stopPropagation();
                           action.onSelect?.();
                         }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.stopPropagation();
+                          }
+                        }}
                         title={action.disabledReason}
                         type="button"
                       >
