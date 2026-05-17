@@ -6503,7 +6503,7 @@
         "R2-ACT-001"
       ],
       "title": "Harden governed command and audit contract for Release 2",
-      "status": "blocked",
+      "status": "runnable",
       "priority": "critical",
       "phase": "R2",
       "depends_on": [
@@ -6545,7 +6545,7 @@
         "node scripts/agent-bus-guard.mjs --task R2-ACT-001-governed-command-audit-contract-hardening --once",
         "git diff --check"
       ],
-      "notes": "Blocked until R2-UXSPEC-001-release2-screen-spec-matrix is accepted. After the UI/UX matrix gate, this task is authorized by RELEASE_2_FOUNDATION_CONTRACT.md. Start with inventorying P3-P12 governed command shapes and defining a shared command/audit/denial/preview/execution/projection-refresh contract. Do not migrate every UI surface or add E2E until the contract narrows that scope."
+      "notes": "Runnable after R2-UXSPEC-001 accepted. Authorized by RELEASE_2_FOUNDATION_CONTRACT.md and the BP-driven UI/UX screen matrix. Start with inventorying P3-P12 governed command shapes and defining a shared command/audit/denial/preview/execution/projection-refresh contract that can serve report-like management planes. Do not migrate every UI surface or add E2E until the contract narrows that scope."
     },
     {
       "id": "R2-UXSPEC-001-release2-screen-spec-matrix",
@@ -6553,7 +6553,7 @@
         "R2-UXSPEC-001"
       ],
       "title": "Create Release 2 screen-by-screen UI/UX specs and matrix",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "R2",
       "depends_on": [
@@ -6595,7 +6595,9 @@
         "node scripts/agent-bus-guard.mjs --task R2-UXSPEC-001-release2-screen-spec-matrix --once",
         "git diff --check"
       ],
-      "notes": "Next docs gate before broad Release 2 implementation. Produce screen-by-screen specs, modal/drawer/panel specs, interaction flows, control-surface action specs, UI state specs, release2 UI/UX matrix, and verifier. No product implementation."
+      "notes": "Accepted 2026-05-17T12:05:00+07:00. Created the BP-driven Release 2 screen spec pack: screen specs, interaction flows, modal/drawer/panel specs, control-surface action specs, release2 UI/UX screen matrix, and verifier/tests. The matrix treats report-like screens as interactive management planes: projection -> signal -> action -> preview -> result. No product implementation.",
+      "completed_at": "2026-05-17T12:05:00+07:00",
+      "result": "accepted"
     }
   ]
 }

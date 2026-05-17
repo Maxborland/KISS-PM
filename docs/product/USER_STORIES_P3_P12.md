@@ -50,10 +50,10 @@ E2E: E2E-110, E2E-111. Screens: UX-P11-INTEGRATION-IMPORT, UX-P11-EXTERNAL-MAPPI
 
 As a Read-only Observer, I want to inspect project state and control signals without mutation controls, so that stakeholders can understand status without accidental changes.
 Acceptance: unavailable actions show permission explanation; backend still denies mutation; reload does not expose write controls.
-E2E: E2E-012, E2E-120. Screens: UX-P12-PERMISSION-SMOKE, UX-P12-TENANT-ISOLATION. Permissions: read scopes only. Audit: mutation audit not created.
+E2E: E2E-012, E2E-111, E2E-112. Screens: UX-P12-PERMISSION-SMOKE, UX-P12-TENANT-ISOLATION. Permissions: read scopes only. Audit: mutation audit not created.
 
 ## Operator/Admin
 
 As an Operator/Admin, I want release readiness, permission, tenant isolation, and recovery smoke surfaces, so that the release gate proves operational readiness.
 Acceptance: checks have explicit pass/fail states; failures show recovery; evidence is linked to commands and artifacts.
-E2E: E2E-120, E2E-121, E2E-122. Screens: UX-P12-RELEASE-READINESS, UX-P12-PERMISSION-SMOKE, UX-P12-TENANT-ISOLATION, UX-P12-RECOVERY-SMOKE. Permissions: ops.read, ops.execute. Audit: required for recovery commands.
+E2E: E2E-111, E2E-112, E2E-113, E2E-114, E2E-115. Screens: UX-P12-RELEASE-READINESS, UX-P12-PERMISSION-SMOKE, UX-P12-TENANT-ISOLATION, UX-P12-RECOVERY-SMOKE. Permissions: ops.read, ops.execute. Audit: required for recovery commands.

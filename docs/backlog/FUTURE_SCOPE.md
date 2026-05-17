@@ -24,20 +24,20 @@ Next recommended implementation-planning block:
 
 The selected first slice is foundation/security-first unless product leadership records stronger evidence for a different first slice. This keeps the rest of the roadmap as future planned functionality.
 
-## Release 2 UI/UX Spec Pack Follow-Up
+## Release 2 UI/UX Spec Pack
 
 `docs/product/RELEASE_2_UI_UX_SPEC.md` defines the baseline direction: shadcn/ui + Radix primitives + custom KISS PM components, MS Project-like Project Gantt behavior, and decision-supporting operational UX.
 
-Future planned docs before broad user-facing Release 2 implementation:
+The first screen-by-screen planning pack now exists:
 
 - `docs/product/RELEASE_2_SCREEN_SPECS.md`
 - `docs/product/RELEASE_2_INTERACTION_FLOWS.md`
 - `docs/product/RELEASE_2_MODAL_DRAWER_PANEL_SPECS.md`
 - `docs/product/RELEASE_2_CONTROL_SURFACE_ACTION_SPECS.md`
 - `docs/status/release2-ui-ux-screen-matrix.json`
-- verifier support for the UI/UX matrix
+- `scripts/verify-release2-ui-ux-matrix.mjs`
 
-This is planned scope, not deleted functionality.
+Future implementation tasks must reference exact screen ids and action/modal specs from this pack. This does not delete any planned Release 2 functionality; it turns the universal BP into a safer implementation planning surface.
 
 ## Frontend Server-State Migration Follow-Up
 

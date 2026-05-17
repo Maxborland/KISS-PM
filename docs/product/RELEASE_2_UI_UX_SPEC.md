@@ -31,6 +31,18 @@ signal or work state
 
 The UI is not a dashboard collection. Every major surface must be a management instrument: it shows the problem, suggests the next safe action, prevents unauthorized or risky shortcuts, and proves the result.
 
+Report-like screens are included in this rule. Schedule views, project lists, portfolio views, resource-load views, KPI deviation views, closed-project retrospectives, operator readiness views, and tenant configuration overviews may look like reports at first glance, but their product role is an interactive management plane:
+
+```txt
+report projection
+  -> signal
+  -> action
+  -> preview
+  -> result
+```
+
+A Release 2 report is rejected if it only displays data and does not expose the governed management loop appropriate for its role and permissions.
+
 ## 3. Component And Interaction Stack
 
 Release 2 implementation stack:
@@ -136,9 +148,9 @@ Every modal/sheet/panel spec must define:
 - result/audit evidence;
 - reload/readback expectations.
 
-## 8. Release 2 Screen Spec Pack To Produce Next
+## 8. Release 2 Screen Spec Pack
 
-This document is the baseline direction, not the full screen-by-screen pack. The next UX documentation task must produce:
+This document is the baseline direction. The Release 2 BP-driven screen spec pack is:
 
 - `docs/product/RELEASE_2_SCREEN_SPECS.md`
 - `docs/product/RELEASE_2_INTERACTION_FLOWS.md`
@@ -147,4 +159,4 @@ This document is the baseline direction, not the full screen-by-screen pack. The
 - `docs/status/release2-ui-ux-screen-matrix.json`
 - verifier support for the matrix
 
-No Release 2 UI implementation should be accepted without those specs or an explicit narrower decision record.
+The matrix uses `docs/02_UNIVERSAL_PROJECT_BP.md` as its spine. No Release 2 UI implementation should be accepted without those specs or an explicit narrower decision record.

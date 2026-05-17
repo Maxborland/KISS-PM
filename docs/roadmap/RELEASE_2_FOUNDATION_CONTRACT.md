@@ -67,10 +67,19 @@ Release 2 implementation must pass through a UI/UX contract before user-facing c
 
 - `docs/product/RELEASE_2_UI_UX_SPEC.md`
 - `docs/product/DESIGN_SYSTEM.md`
+- `docs/product/RELEASE_2_SCREEN_SPECS.md`
+- `docs/product/RELEASE_2_INTERACTION_FLOWS.md`
+- `docs/product/RELEASE_2_MODAL_DRAWER_PANEL_SPECS.md`
+- `docs/product/RELEASE_2_CONTROL_SURFACE_ACTION_SPECS.md`
+- `docs/status/release2-ui-ux-screen-matrix.json`
 
 The baseline requires shadcn/ui + Radix primitives + custom KISS PM product components. It also makes the Project Gantt a custom MS Project-like planning workspace in function and planner ergonomics, while preserving KISS PM domain rules: canonical tasks, governed commands, permissions, audit, readback, and reload persistence.
 
 The UI/UX gate exists because Release 2 must make the product easier to manage with, not merely deeper. UI must reduce routine, expose the right next action, and guide users toward safe management decisions.
+
+The screen matrix treats every report-like surface as an interactive management plane. Schedule, project, portfolio, resource, KPI, closed-retrospective, integration, tenant-configuration, and operator-readiness screens must all preserve the loop: report projection -> signal -> action -> preview -> result.
+
+The planning gate is accepted only when `node scripts/verify-release2-ui-ux-matrix.mjs docs/status/release2-ui-ux-screen-matrix.json` passes.
 
 ## 4. First Slice Decision
 
