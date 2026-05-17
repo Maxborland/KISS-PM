@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17T16:22:17.3687372+07:00",
+  "updated_at": "2026-05-17T16:44:44.6487536+07:00",
   "policy": {
     "max_parallel_code_agents": 2,
     "max_parallel_docs_agents": 2,
@@ -6739,6 +6739,66 @@
       ],
       "notes": "Completed 2026-05-17. Added clean-room Release 2 control surface interaction patterns, ADR, product doc updates, p3-p12 UX matrix references/status coverage, and future-scope routing. JSON parse and git diff --check pass; repo verify:matrix is unsupported for this matrix shape.",
       "completed_at": "2026-05-17T16:22:17.3687372+07:00",
+      "result": "completed"
+    },
+    {
+      "id": "R2-CONTRACT-001-release2-ui-control-surfaces-contract",
+      "aliases": [
+        "R2-CONTRACT-001"
+      ],
+      "title": "Define Release 2 UI control surface contract",
+      "status": "done",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-DOC-002-br2-control-surface-pattern-transfer",
+        "R2-UXSPEC-001-release2-screen-spec-matrix"
+      ],
+      "write_scope": [
+        "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
+        "docs/status/release2-ui-requirements-matrix.json",
+        "docs/status/p3-p12-ux-screen-matrix.json",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/product/UX_SALES_QUALITY_GATE.md",
+        "docs/product/SCREEN_INTERACTION_CATALOG.md",
+        "docs/product/DESIGN_SYSTEM.md",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-CONTRACT-001-release2-ui-control-surfaces-contract.claim.json",
+        ".agent-bus/sessions/R2-CONTRACT-001-release2-ui-control-surfaces-contract.md",
+        ".agent-bus/tasks/active/R2-CONTRACT-001-release2-ui-control-surfaces-contract.md",
+        ".agent-bus/locks/**",
+        ".superpowers/**",
+        "docs/bitrixreports_surfaces_kisspm_transfer_package.zip"
+      ],
+      "forbidden": [
+        "apps/**",
+        "packages/**",
+        "e2e/tests/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md",
+        "docs/status/*",
+        "docs/e2e/E2E_SCENARIOS.md",
+        "docs/product/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/*"
+      ],
+      "recommended_verification": [
+        "git diff --check",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/release2-ui-requirements-matrix.json','utf8')); console.log('release2 matrix json ok')\"",
+        "node -e \"JSON.parse(require('fs').readFileSync('docs/status/p3-p12-ux-screen-matrix.json','utf8')); console.log('p3-p12 ux matrix json ok')\"",
+        "npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json",
+        "node scripts/agent-bus-guard.mjs --task R2-CONTRACT-001-release2-ui-control-surfaces-contract --once"
+      ],
+      "notes": "Completed 2026-05-17. Created the Release 2 UI control surfaces contract, finite R2-001..R2-012 requirements matrix, E2E-R2 scenarios, Release 2 sales gate, screen/design annotations, and future-scope routing. No production React/API/domain code was implemented. This branch is stacked on the open BR2 pattern-transfer PR so Release 2 start remains dependent on the clean-room pattern transfer.",
+      "completed_at": "2026-05-17T16:44:44.6487536+07:00",
       "result": "completed"
     }
   ]

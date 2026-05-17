@@ -27,6 +27,21 @@ Gantt passes demo-readiness only if WBS/grid, timeline, dependencies, baseline, 
 
 Tenant Admin passes demo-readiness only if configuration change is previewed, permission-checked, audited, and reflected in runtime screens after reload.
 
+## Release 2 Gate
+
+Release 2 screens must pass these additional product gates before the release exit evidence can be accepted:
+
+- The screen identifies the object, risk or decision point, and primary next action within 5 seconds.
+- No key screen is a passive dashboard; read-only surfaces must state that they are intentionally read-only.
+- Permission state is visible before the user attempts a mutation.
+- Risky actions show preview before apply, including warnings and blockers.
+- Mutation result is not toast-only; a durable result panel or inline readback must remain visible.
+- `ActionExecution` / `AuditEvent` feedback is visible for meaningful management actions.
+- Reload/readback proof is required for state-changing flows.
+- Project Gantt feels like a serious planning instrument with synchronized WBS/grid, timeline, validation, persistence, baseline/tracking, and disabled reasons.
+- Resource conflict flow shows before/after capacity and schedule impact before confirmation.
+- Tenant Admin configuration shows preview and runtime effect after reload.
+
 ## Reject Conditions
 
 - Screen renders but no primary action.

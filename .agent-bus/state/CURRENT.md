@@ -1,6 +1,15 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T14:28:27.3900000+07:00
+Updated: 2026-05-17T16:44:44.6487536+07:00
+
+- `R2-CONTRACT-001-release2-ui-control-surfaces-contract` is completed as a docs-only Release 2 UI/product release contract:
+  - contract: `docs/phases/RELEASE_2_UI_CONTROL_SURFACES.md`
+  - matrix: `docs/status/release2-ui-requirements-matrix.json` with finite `R2-001..R2-012` rows
+  - E2E ledger: `docs/e2e/E2E_SCENARIOS.md` now includes `E2E-R2-001..010`
+  - updated docs: `docs/product/UX_SALES_QUALITY_GATE.md`, `docs/product/SCREEN_INTERACTION_CATALOG.md`, `docs/product/DESIGN_SYSTEM.md`, `docs/backlog/FUTURE_SCOPE.md`
+  - no production React/API/domain code was started; UI tasks are behavior/state/E2E contracts.
+  - verification: `git diff --check` passed; JSON parse for the new Release 2 matrix passed; JSON parse for `docs/status/p3-p12-ux-screen-matrix.json` passed; `npm run verify:matrix -- docs/status/release2-ui-requirements-matrix.json` is unsupported for this planned Release 2 matrix shape (`unsupported matrix phase: undefined` and planned-status errors); agent-bus guard passed before edits and before handoff after escalation for git-status access.
+  - branch/PR note: this work is stacked on the open clean-room BR2 pattern-transfer PR and should merge after that dependency.
 
 - `R2-DOC-002-br2-control-surface-pattern-transfer` is completed as a Release 2 docs/product-spec task:
   - source input: supplied sanitized `docs/bitrixreports_surfaces_kisspm_transfer_package.zip`
