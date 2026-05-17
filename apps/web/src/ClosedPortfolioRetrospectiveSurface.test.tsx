@@ -61,13 +61,6 @@ function defaultRows(): ClosedPortfolioReadModelDto["rows"] {
         planned_work_hours: 20,
         actual_work_hours: 26,
         schedule_variance_days: 15,
-        previous_schedule_variance_days: 20,
-        quality_score: 82,
-        csi_score: 4.6,
-        template_version: 2,
-        kpi_version: 1,
-        snapshot_version: 4,
-        closure_audit_event_id: "audit-close-project-alpha-1",
         severity: "critical"
       },
       sourceRefs: [
@@ -246,18 +239,45 @@ describe("ClosedPortfolioRetrospectiveSurface", () => {
     const grid = await screen.findByTestId("operational-data-grid");
     expect(grid).toHaveTextContent("snapshot-project-alpha-1");
     expect(grid).toHaveTextContent("План/факт: 20 -> 26 ч");
-    expect(grid).toHaveTextContent("Текущий/предыдущий: 15 -> 20 дн.");
-    expect(grid).toHaveTextContent("Quality: 82");
-    expect(grid).toHaveTextContent("CSI: 4.6");
-    expect(grid).toHaveTextContent("template v2");
-    expect(grid).toHaveTextContent("KPI v1");
+    expect(grid).toHaveTextContent("Текущий/предыдущий: 15 -> no_previous");
+    expect(grid).toHaveTextContent("API: snapshot, plan/fact, schedule variance, source refs");
     expect(grid).toHaveTextContent("Снимок immutable");
 
     const proof = await screen.findByTestId("retrospective-snapshot-proof");
     expect(proof).toHaveTextContent("ProjectSnapshot:snapshot-project-alpha-1");
-    expect(proof).toHaveTextContent("Snapshot version: 4");
-    expect(proof).toHaveTextContent("Closure audit: audit-close-project-alpha-1");
+    expect(proof).toHaveTextContent("Snapshot version: not supplied by closed-portfolio read model");
+    expect(proof).toHaveTextContent("Closure audit: not supplied by closed-portfolio read model");
     expect(proof).toHaveTextContent("Readback proves closed metrics are not live project state");
+  });
+
+  it("summarizes the highest trend severity across the full trends readback", async () => {
+    const base = trendsModel();
+    const warningTrend = { ...base.trends[0]!, id: "trend-warning-first", severity: "warning" as const };
+    const criticalTrend = { ...base.trends[0]!, id: "trend-critical-second", severity: "critical" as const };
+    const warningInsight = {
+      ...base.insights[0]!,
+      id: "insight-warning-first",
+      sourceTrendId: warningTrend.id,
+      severity: "warning" as const
+    };
+    const criticalInsight = {
+      ...base.insights[0]!,
+      id: "insight-critical-second",
+      sourceTrendId: criticalTrend.id,
+      severity: "critical" as const,
+      title: "Critical retrospective insight"
+    };
+    const client = apiClient(portfolioModel(), {
+      trends: [warningTrend, criticalTrend],
+      insights: [warningInsight, criticalInsight],
+      pagination: { offset: 0, limit: 25, total: 2 }
+    });
+    renderSurface(client);
+
+    await waitFor(() => expect(screen.getByTestId("signal-summary-bar")).toHaveTextContent("Критично"));
+    fireEvent.click(screen.getByRole("button", { name: "Открыть следующий trend" }));
+
+    await waitFor(() => expect(client.getInsight).toHaveBeenCalledWith("tenant-admin-a", "insight-critical-second"));
   });
 
   it("renders an R2 template-improvement action contract from trend to preview and immutable readback", async () => {
