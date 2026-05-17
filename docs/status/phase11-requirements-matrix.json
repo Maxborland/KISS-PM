@@ -2,7 +2,7 @@
   "phase": "P11",
   "name": "Phase 11 Integrations and migration requirements matrix",
   "allowed_workspace_root": "E:\\KISS-PM",
-  "updated_at": "2026-05-17T08:09:46.1465239+07:00",
+  "updated_at": "2026-05-17T08:15:08.3312078+07:00",
   "rows": [
     {
       "id": "P11-001",
@@ -39,8 +39,8 @@
         "npm run lint exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-100",
@@ -48,7 +48,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-101",
@@ -56,7 +56,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-idempotency.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -64,7 +64,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -97,8 +97,8 @@
         "npm run lint exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-100",
@@ -106,7 +106,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -146,8 +146,8 @@
         "node scripts/agent-bus-guard.mjs --task P11-003-idempotent-import-apply-mapping-persistence --once exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-101",
@@ -155,7 +155,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-idempotency.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -163,7 +163,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -201,8 +201,8 @@
         "node scripts/agent-bus-guard.mjs --task P11-004-sync-audit-retry-rate-limit-safe-failure-model --once exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-102",
@@ -210,7 +210,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -218,7 +218,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -252,8 +252,8 @@
         "npm run lint exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-100",
@@ -261,7 +261,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-102",
@@ -269,7 +269,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -310,8 +310,8 @@
         "node scripts/agent-bus-guard.mjs --task P11-006-integrations-api-governed-import-commands --once exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-100",
@@ -319,7 +319,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-101",
@@ -327,7 +327,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-idempotency.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-102",
@@ -335,7 +335,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -343,7 +343,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -374,8 +374,8 @@
         "npm run lint exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-102",
@@ -383,7 +383,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -391,7 +391,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -427,8 +427,8 @@
         "node scripts/verify-requirements-matrix.mjs --allow-blocked docs/status/phase11-requirements-matrix.json exit 0",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:07:42.4621906+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-103",
@@ -436,7 +436,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/imported-project-canonical.spec.ts",
-          "checked_at": "2026-05-17T08:07:42.4621906+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
@@ -466,8 +466,8 @@
         "npm test -- packages/shared-test-fixtures exit 0: 9 files, 17 tests passed, including deterministic Phase 11 fixture seed",
         "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104"
       ],
-      "cleanup": "P11-009 Playwright tests prove /test-fixtures/reset restores Phase 11 previews, import batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state. E2E-100/E2E-101/E2E-104 verify mappings reset to empty; E2E-102 verifies failure mode clears and preview recovers; E2E-103 verifies imported project is removed after reset.",
-      "last_checked_at": "2026-05-17T08:09:46.1465239+07:00",
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
       "e2e_evidence": [
         {
           "id": "E2E-100",
@@ -475,7 +475,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
-          "checked_at": "2026-05-17T08:09:46.1465239+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-101",
@@ -483,7 +483,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-idempotency.spec.ts",
-          "checked_at": "2026-05-17T08:09:46.1465239+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-102",
@@ -491,7 +491,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
-          "checked_at": "2026-05-17T08:09:46.1465239+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-103",
@@ -499,7 +499,7 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/imported-project-canonical.spec.ts",
-          "checked_at": "2026-05-17T08:09:46.1465239+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         },
         {
           "id": "E2E-104",
@@ -507,14 +507,14 @@
           "command": "npm run test:e2e:phase -- --phase 11",
           "exit_code": 0,
           "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
-          "checked_at": "2026-05-17T08:09:46.1465239+07:00"
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
         }
       ]
     },
     {
       "id": "P11-010",
       "requirement": "Phase 11 verification matrix and exit gate",
-      "status": "blocked",
+      "status": "verified",
       "owner": "codex",
       "owned_scope": [
         "docs/status",
@@ -528,15 +528,66 @@
         "E2E-104"
       ],
       "evidence": [
-        "P11-001..P11-009 are verified after deterministic fixtures and E2E-100..104 passed. P11-010 remains the next runnable strict exit-gate aggregation task, not product implementation."
+        "P11-001..P11-009 are verified with structured unit/API/UI/E2E evidence.",
+        "E2E-100..104 passed through npm run test:e2e:phase -- --phase 11 and cover import preview/apply, idempotency, safe adapter failure, imported canonical project continuity, mapping diagnostics, backend denial, tenant isolation, audit/readback/reload, and cleanup reset.",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json passes without --allow-blocked after this row was marked verified.",
+        "Phase 11 exit criteria from docs/phases/PHASE_11_INTEGRATIONS_MIGRATION.md are satisfied; Release 2 remains not ready because P12 is not accepted yet."
       ],
       "tests": [
-        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 expected for this block: P11-010 remains blocked until the final exit-gate task marks it verified after strict aggregation."
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 1 RED before P11-010 aggregation: P11-010 blocked row required --allow-blocked",
+        "npm run test:e2e:phase -- --phase 11 exit 0: 5 Playwright tests passed for E2E-100..104",
+        "npm test -- apps/api/src/phase11IntegrationsApi.test.ts exit 0: 1 file, 8 tests passed",
+        "npm test -- packages/shared-test-fixtures exit 0: 9 files, 17 tests passed",
+        "npm test exit 0: 101 files, 579 tests passed",
+        "npm run typecheck exit 0",
+        "npm run lint exit 0",
+        "node scripts/verify-requirements-matrix.mjs docs/status/phase11-requirements-matrix.json exit 0: strict Phase 11 matrix passed without --allow-blocked",
+        "git diff --check exit 0"
       ],
-      "cleanup": "Blocked for P11-010 exit-gate aggregation: final row must record full Phase 11 cleanup evidence from E2E-100..104, API/domain readback, audit/mapping readback, reload persistence, adapter failure reset, and final strict verifier pass.",
-      "blocker": "2026-05-17T08:09:46.1465239+07:00: P11-001..P11-009 are verified with fresh E2E-100..104 evidence; P11-010 remains blocked because the final Phase 11 strict exit-gate aggregation has not yet been claimed and completed.",
-      "last_checked_at": "2026-05-17T08:09:46.1465239+07:00",
-      "e2e_evidence": []
+      "cleanup": "Phase 11 exit gate is backed by E2E-100..104 cleanup/readback: /test-fixtures/reset restores import previews, batches, mappings, sync audit, adapter failure modes, and imported canonical Phase 4 project/task state; reload persistence and API/domain readback are proven before reset; post-reset readback proves mappings and imported project state are removed.",
+      "last_checked_at": "2026-05-17T08:15:08.3312078+07:00",
+      "e2e_evidence": [
+        {
+          "id": "E2E-100",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 11",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase11/adapter-import.spec.ts",
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
+        },
+        {
+          "id": "E2E-101",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 11",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase11/adapter-idempotency.spec.ts",
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
+        },
+        {
+          "id": "E2E-102",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 11",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase11/adapter-failure.spec.ts",
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
+        },
+        {
+          "id": "E2E-103",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 11",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase11/imported-project-canonical.spec.ts",
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
+        },
+        {
+          "id": "E2E-104",
+          "status": "passed",
+          "command": "npm run test:e2e:phase -- --phase 11",
+          "exit_code": 0,
+          "test_path": "e2e/tests/phase11/external-mapping-diagnostics.spec.ts",
+          "checked_at": "2026-05-17T08:15:08.3312078+07:00"
+        }
+      ]
     }
   ]
 }
