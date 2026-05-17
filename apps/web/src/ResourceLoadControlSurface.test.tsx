@@ -227,6 +227,62 @@ function createOverloadDetail(): ResourceOverloadDetailDto {
   };
 }
 
+function createProjectionWithTwoOverloads(): ResourceLoadProjectionDto {
+  const projection = createProjection(true);
+  const engineerBucket = projection.loadBuckets[1]!;
+
+  return {
+    ...projection,
+    loadBuckets: [
+      projection.loadBuckets[0]!,
+      {
+        ...engineerBucket,
+        assignedHours: 48,
+        totalLoadHours: 48,
+        loadPercent: 120,
+        severity: "warning",
+        sourceRefs: ["assignment:assignment-engineer-a"]
+      }
+    ],
+    overloads: [
+      projection.overloads[0]!,
+      {
+        id: "overload:resource-engineer-a:2026-06-01:2026-06-05",
+        tenantId: "tenant-a",
+        resourceProfileId: "resource-engineer-a",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-05",
+        capacityHours: 40,
+        totalLoadHours: 48,
+        overloadHours: 8,
+        severity: "warning",
+        status: "open",
+        sourceRefs: ["assignment:assignment-engineer-a"],
+        affectedTaskIds: ["task-build-a"],
+        affectedProjectIds: ["project-beta-a"],
+        recommendedActionKeys: ["shift_work", "reassign_resource"],
+        roleKeys: ["delivery_engineer"]
+      }
+    ]
+  };
+}
+
+function createEngineerOverloadDetail(): ResourceOverloadDetailDto {
+  const projection = createProjectionWithTwoOverloads();
+  const overload = projection.overloads[1]!;
+  const bucket = projection.loadBuckets[1]!;
+
+  return {
+    overload: {
+      ...overload,
+      explanation: "Перегрузка 8 ч. на 2026-06-01..2026-06-05"
+    },
+    loadBuckets: [bucket],
+    affectedAssignments: [],
+    affectedReservations: []
+  };
+}
+
 function createPreview(): ResourceResolutionPreviewDto {
   const beforeProjection = createProjection(true);
   const afterProjection = createProjection(false);
@@ -448,6 +504,43 @@ describe("Resource load control surface", () => {
     expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("Открытых перегрузок нет");
     expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
     expect(apiClient.createReservation).not.toHaveBeenCalled();
+  });
+
+  it("clears stale overload detail before enabling actions for another overloaded cell", async () => {
+    const apiClient = createMutableApiClient();
+    const secondDetail = createDeferred<ResourceOverloadDetailDto>();
+    vi.mocked(apiClient.getResourceLoad).mockResolvedValue(createProjectionWithTwoOverloads());
+    vi.mocked(apiClient.getOverloadDetail)
+      .mockResolvedValueOnce(createOverloadDetail())
+      .mockReturnValueOnce(secondDetail.promise);
+
+    render(
+      <ResourceLoadControlSurface
+        apiClient={apiClient}
+        currentTenant={createCurrentTenant()}
+        testUser="resource-manager-a"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("assignment-design-architect-a");
+    });
+
+    fireEvent.click(screen.getByTestId("capacity-cell-resource-engineer-a-2026-06-03"));
+
+    const previewButtonsWhileLoading = screen.queryAllByRole("button", { name: "Предпросмотреть перенос" });
+    expect(previewButtonsWhileLoading.length).toBeGreaterThan(0);
+    previewButtonsWhileLoading.forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getByTestId("resource-overload-signal")).toHaveTextContent("Детализация сигнала загружается");
+
+    fireEvent.click(previewButtonsWhileLoading[0]);
+    expect(apiClient.previewGovernedResolution).not.toHaveBeenCalled();
+
+    secondDetail.resolve(createEngineerOverloadDetail());
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "Предпросмотреть перенос" }).some((button) => !button.hasAttribute("disabled")))
+        .toBe(true);
+    });
   });
 
   it("loads resource buckets, overload signal, affected entities, and audit evidence", async () => {
