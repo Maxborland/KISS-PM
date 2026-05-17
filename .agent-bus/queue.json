@@ -6407,7 +6407,7 @@
         "R2-FND-000"
       ],
       "title": "Create Release 2 foundation contract and first-slice gate",
-      "status": "runnable",
+      "status": "done",
       "priority": "critical",
       "phase": "R2",
       "depends_on": [
@@ -6445,7 +6445,57 @@
         "node scripts/agent-bus-guard.mjs --task R2-FND-000-release2-foundation-contract --once",
         "git diff --check"
       ],
-      "notes": "Next planning task. Create a finite Release 2 foundation contract with scope/non-scope, first-slice decision, matrix/verifier policy, fixtures, E2E truth contour, write scopes, cleanup/readback rules, and exit gate. Do not implement product code or delete planned R2 functionality."
+      "notes": "Accepted 2026-05-17T11:30:03.4388292+07:00. Merged Release 2 planning-audit findings into the main implementation planning files by creating RELEASE_2_FOUNDATION_CONTRACT.md and wiring it from the roadmap/decomposition/future-scope docs. Selected foundation/security-first as the default first slice, defined matrix/verifier policy, E2E truth contour, promotion rules, and next recommended R2-ACT-001 task. Docs/planning only; no product code changed.",
+      "completed_at": "2026-05-17T11:30:03.4388292+07:00",
+      "result": "accepted"
+    },
+    {
+      "id": "R2-ACT-001-governed-command-audit-contract-hardening",
+      "aliases": [
+        "R2-ACT-001"
+      ],
+      "title": "Harden governed command and audit contract for Release 2",
+      "status": "runnable",
+      "priority": "critical",
+      "phase": "R2",
+      "depends_on": [
+        "R2-FND-000-release2-foundation-contract"
+      ],
+      "write_scope": [
+        "docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md",
+        "docs/domain/**",
+        "packages/action-engine/**",
+        "packages/access-control/**",
+        "packages/control-surfaces/**",
+        "apps/api/**",
+        "docs/backlog/FUTURE_SCOPE.md",
+        ".agent-bus/queue.json",
+        ".agent-bus/state/CURRENT.md",
+        ".agent-bus/handoff/**",
+        ".agent-bus/events/events.jsonl",
+        ".agent-bus/claims/R2-ACT-001-governed-command-audit-contract-hardening.claim.json",
+        ".agent-bus/sessions/R2-ACT-001-governed-command-audit-contract-hardening.md"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "e2e/tests/**",
+        "docs/status/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "required_locks": [
+        "docs/roadmap/**",
+        ".agent-bus/state/*",
+        ".agent-bus/queue.json"
+      ],
+      "recommended_verification": [
+        "npm test -- packages/action-engine packages/control-surfaces packages/access-control apps/api/src",
+        "npm run typecheck",
+        "npm run lint",
+        "node scripts/agent-bus-guard.mjs --task R2-ACT-001-governed-command-audit-contract-hardening --once",
+        "git diff --check"
+      ],
+      "notes": "Next runnable R2 implementation-planning/code task authorized by RELEASE_2_FOUNDATION_CONTRACT.md. Start with inventorying P3-P12 governed command shapes and defining a shared command/audit/denial/preview/execution/projection-refresh contract. Do not migrate every UI surface or add E2E until the contract narrows that scope."
     }
   ]
 }

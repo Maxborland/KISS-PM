@@ -12,7 +12,7 @@
 
 ## 1. Status And Execution Rules
 
-This document is a future backlog. It must not make Release 2 implementation runnable during the current Phase 0-12 loop.
+This document is a future backlog. It must not make Release 2 implementation runnable by itself. Use `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md` as the current operational contract for promoting the first Release 2 implementation tasks.
 
 Use these statuses when promoting items into a later release-detail document:
 
@@ -37,9 +37,9 @@ This backlog has been restored as the Release 2 planning surface after the repos
 Current interpretation:
 
 - Phase 0-12 is the baseline to deepen, not a plan to rewrite.
-- No Release 2 candidate below is automatically runnable. Each candidate still needs a finite Release 2 detail document and a queue task before implementation.
+- No Release 2 candidate below is automatically runnable. Each candidate still needs a finite contract section and a queue task before implementation.
 - Candidate statuses in this file are planning statuses, not completion statuses.
-- The current recommended first work is `R2-FND-000`, a Release 2 foundation contract that selects and hardens the first finite slice without deleting any planned future functionality.
+- The current foundation contract is `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md`; it merges the actionable audit findings into the main implementation plan and preserves all planned future functionality.
 
 ## 2. Dependency Map From Phase 0-12
 
@@ -74,7 +74,7 @@ If Phase 12 evidence does not expose a stronger blocker, start Release 2 plannin
 
 This slate hardens trust, governed state changes, tenant configurability, migration safety, and schedule correctness before adding broad UI surface area.
 
-`R2-FND-000` should not implement product behavior. It should create the closed Release 2 contract, decide whether the first implementation slice is foundation/security-first or customer-segment-first, and define the first strict matrix and E2E truth contour. All track candidates below remain planned unless explicitly superseded by a decision record; do not remove them just because the first slice is narrower.
+`R2-FND-000` creates the closed Release 2 foundation contract and does not implement product behavior. The next recommended implementation-planning task is `R2-ACT-001-governed-command-audit-contract-hardening`, because the selected foundation/security-first slice depends on consistent command, audit, denial, preview, execution, and projection-refresh semantics. All track candidates below remain planned unless explicitly superseded by a decision record; do not remove them just because the first slice is narrower.
 
 ## 4. Track R2-SCH - Scheduling Depth
 

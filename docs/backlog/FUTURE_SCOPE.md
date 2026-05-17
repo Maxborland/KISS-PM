@@ -6,17 +6,22 @@ Record valuable ideas that are outside the active phase gate. Do not implement t
 
 Release 2 planning is tracked in:
 
+- `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md`
 - `docs/roadmap/RELEASE_2_DEPTH_HARDENING.md`
 - `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md`
 - `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md`
 
-Release 2 candidates are planned functionality, not deleted scope. They remain non-runnable until promoted through a finite Release 2 detail document, queue task, matrix/verifier policy, fixtures, E2E gates, and agent-bus guard.
+Release 2 candidates are planned functionality, not deleted scope. They remain non-runnable until promoted through a finite Release 2 contract section, queue task, matrix/verifier policy, fixtures, E2E gates, and agent-bus guard.
 
-Recommended first planning block:
+Current foundation contract:
 
 - `R2-FND-000-release2-foundation-contract`
 
-This block should choose the first finite Release 2 slice and keep the rest of the roadmap as future planned functionality.
+Next recommended implementation-planning block:
+
+- `R2-ACT-001-governed-command-audit-contract-hardening`
+
+The selected first slice is foundation/security-first unless product leadership records stronger evidence for a different first slice. This keeps the rest of the roadmap as future planned functionality.
 
 ## Frontend Server-State Migration Follow-Up
 

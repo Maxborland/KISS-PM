@@ -1,6 +1,6 @@
 # Agent Bus Current State
 
-Updated: 2026-05-17T11:21:43.4228163+07:00
+Updated: 2026-05-17T11:30:03.4388292+07:00
 
 - Release 2 planning surface is being prepared after the accepted Phase 12 repository-defined market-release gate:
   - task: `R2-000-release2-planning-surface`
@@ -8,7 +8,12 @@ Updated: 2026-05-17T11:21:43.4228163+07:00
   - decomposition: `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md`
   - audit: `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md`
 - Current local branch is `master`; this checkout has no configured git remote, so "update main" can only be interpreted as using the current local `master` baseline unless a remote is added later.
-- Release 2 implementation has not started. The next recommended runnable planning block is `R2-FND-000-release2-foundation-contract`: create a finite Release 2 foundation contract, choose or explicitly defer the first implementation slice, define matrix/verifier policy, fixtures, E2E truth contour, write scopes, and exit gate.
+- Release 2 foundation contract is accepted:
+  - contract: `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md`
+  - audit findings from `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md` are now merged into the main roadmap/decomposition/future-scope planning surface.
+  - default first slice is foundation/security-first unless product leadership records stronger evidence for a different first slice.
+  - matrix/verifier policy, E2E truth contour, promotion rules, and first implementation recommendation are defined.
+- Next runnable Release 2 task is `R2-ACT-001-governed-command-audit-contract-hardening`.
 - Do not delete Release 2 planned functionality when narrowing the first slice. The existing R2 roadmap/decomposition remain the future backlog.
 
 - Phase 12 Production SaaS Hardening and Market Release is accepted as an implemented market-release gate:

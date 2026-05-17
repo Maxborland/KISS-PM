@@ -35,7 +35,7 @@ KISS PM should not copy a broad-but-shallow delivery pattern. The healthy direct
 
 Release 2 should deepen the foundations instead of multiplying disconnected surfaces.
 
-The implementation-level decomposition is tracked separately in `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md`. That file is a blocked future backlog, not active Phase 0-12 scope.
+The implementation-level decomposition is tracked separately in `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md`. The first executable Release 2 planning contract is `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md`. The audit in `docs/roadmap/RELEASE_2_PLANNING_AUDIT.md` is supporting evidence, not the operational source for implementation.
 
 ## 3. Entry Gates
 
@@ -60,7 +60,7 @@ Current gate interpretation:
 - Still pending as an explicit product/leadership decision: which Release 2 track starts first if customer or security evidence overrides the default priority order.
 - Not completed by Phase 12 and not implied by this roadmap: real cloud account provisioning, production credentials, payment/billing setup, external security certification, and live production database backup execution. Treat these as Release 2 operational/enterprise candidates, not as accepted baseline facts.
 
-If no stronger evidence or customer commitment exists, start with a foundation slice that hardens governed commands, audit, versioned migration, tenant configuration safety, API key lifecycle, and performance budgets before adding broad new product depth.
+If no stronger evidence or customer commitment exists, start with the foundation/security-first slice defined in `RELEASE_2_FOUNDATION_CONTRACT.md`: governed commands, audit, versioned migration, tenant configuration safety, API key lifecycle, and performance budgets before adding broad new product depth.
 
 ## 4. Pilot Slice Rules
 
@@ -401,6 +401,7 @@ Default priority order if no stronger evidence exists:
 When Release 2 becomes active:
 
 - create a release-detail document before implementation starts;
+- use `docs/roadmap/RELEASE_2_FOUNDATION_CONTRACT.md` as the current first release-detail contract until superseded by a narrower accepted decision record;
 - promote candidate tasks from `docs/roadmap/RELEASE_2_IMPLEMENTATION_DECOMPOSITION.md` only after entry gates pass or a decision record narrows a pilot slice;
 - apply the pilot-slice rules above before any early implementation;
 - split tracks into finite phase-like blocks with source docs, scope, non-scope, fixtures, E2E gates, and exit criteria;
