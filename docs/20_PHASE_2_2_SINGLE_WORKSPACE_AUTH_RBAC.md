@@ -34,7 +34,7 @@ Phase 2.2 фиксирует поворот реализации: сначала
 - shadcn/ui остается целевым UI-направлением. В текущем slice применены shadcn-like tokens, размеры, формы и плотность интерфейса без установки Tailwind/shadcn scaffold.
 - CRUD пользователей, ролей доступа и должностей выполняется через модальные окна создания, редактирования и подтверждения удаления. Таблица остается основным обзорным состоянием; текущий UI использует summary cards, локальный поиск, понятные empty/loading/error states и disabled-state reasons.
 - CRUD-модалки и формы имеют quality baseline уровня shadcn-like dialog/form: autofocus на первом поле, focus trap, Escape/backdrop close с блокировкой во время mutation, inline validation рядом с полями, password visibility toggle, явные pending labels и alert-style destructive confirmation.
-- Web foundation использует плотный admin-dashboard layout: сгруппированный permission-aware sidebar, sticky topbar, быстрый переход по доступным разделам, dashboard metrics и audit preview.
+- Web foundation использует плотный admin-dashboard layout: сгруппированный permission-aware sidebar, sticky topbar, честный переход по доступным разделам, dashboard metrics и real-data audit preview без фейковых фильтров, графиков и roadmap-кнопок в основной навигации.
 - Protected workspace routes принимают только session cookie. Dev `x-user-id` остается только для dev endpoints и не является заменой авторизации.
 - RBAC fail-closed: если access profile пользователя не найден, API возвращает ошибку доступа, а не подставляет admin-профиль.
 - User create/update требует transaction boundary и audit wiring; связанные user/credential/audit операции не выполняются в partially wired persistence mode.
