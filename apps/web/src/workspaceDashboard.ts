@@ -7,6 +7,11 @@ export type AuditPreviewRow = {
   createdAtLabel: string;
 };
 
+export type AuditChangeSummary = {
+  detail: string;
+  title: string;
+};
+
 const auditActionLabels: Record<string, string> = {
   "tenant.access_profile.created": "Роль доступа создана",
   "tenant.access_profile.updated": "Роль доступа обновлена",
@@ -17,9 +22,31 @@ const auditActionLabels: Record<string, string> = {
   "workspace.position.created": "Должность создана",
   "workspace.position.updated": "Должность обновлена",
   "workspace.position.deleted": "Должность удалена",
+  "workspace.custom_field.created": "Пользовательское поле создано",
+  "workspace.custom_field.updated": "Пользовательское поле обновлено",
+  "workspace.project_template.created": "Шаблон проекта создан",
+  "workspace.project_template.updated": "Шаблон проекта обновлен",
   "profile.updated": "Профиль обновлен",
   "profile.theme.updated": "Оформление обновлено"
 };
+
+const auditStateLabels: Record<string, string> = {
+  description: "Описание",
+  fieldType: "Тип",
+  required: "Обязательное",
+  status: "Статус",
+  systemKey: "Системный ключ",
+  tenantLabel: "Название"
+};
+
+const trackedStateKeys = [
+  "tenantLabel",
+  "systemKey",
+  "fieldType",
+  "required",
+  "status",
+  "description"
+];
 
 const auditDateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "2-digit",
@@ -50,4 +77,69 @@ export function buildAuditPreviewRows(
       actionLabel: auditActionLabels[event.actionType] ?? event.actionType,
       createdAtLabel: auditDateFormatter.format(new Date(event.createdAt))
     }));
+}
+
+export function buildAuditChangeSummary(event: AuditEvent): AuditChangeSummary {
+  const beforeState = event.beforeState ?? null;
+  const afterState = event.afterState ?? null;
+
+  if (!beforeState && afterState) {
+    return {
+      title: "Создано",
+      detail: summarizeState(afterState)
+    };
+  }
+
+  if (beforeState && !afterState) {
+    return {
+      title: "Удалено",
+      detail: summarizeState(beforeState)
+    };
+  }
+
+  if (!beforeState || !afterState) {
+    return {
+      title: "Без снимка",
+      detail: "Состояние до/после не передано"
+    };
+  }
+
+  const changes = trackedStateKeys
+    .filter((key) => beforeState[key] !== afterState[key])
+    .map(
+      (key) =>
+        `${auditStateLabels[key] ?? key}: ${formatStateValue(beforeState[key])} -> ${formatStateValue(afterState[key])}`
+    );
+
+  if (changes.length === 0) {
+    return {
+      title: "Без изменений",
+      detail: "Снимки до/после совпадают"
+    };
+  }
+
+  return {
+    title: `${changes.length} ${getChangeWord(changes.length)}`,
+    detail: changes.slice(0, 3).join("; ")
+  };
+}
+
+function summarizeState(state: Record<string, unknown>): string {
+  const tenantLabel = formatStateValue(state.tenantLabel);
+  const systemKey = formatStateValue(state.systemKey);
+  const status = formatStateValue(state.status);
+  return `${tenantLabel} / ${systemKey} / ${status}`;
+}
+
+function formatStateValue(value: unknown): string {
+  if (value === true) return "да";
+  if (value === false) return "нет";
+  if (value === null || value === undefined || value === "") return "не задано";
+  return String(value);
+}
+
+function getChangeWord(count: number): string {
+  if (count === 1) return "изменение";
+  if (count > 1 && count < 5) return "изменения";
+  return "изменений";
 }

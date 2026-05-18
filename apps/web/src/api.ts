@@ -45,9 +45,64 @@ export type AuditEvent = {
   tenantId: string;
   actorUserId: string;
   actionType: string;
+  sourceWorkflow?: string | null;
+  sourceEntity?: {
+    type: string;
+    id: string;
+  };
+  beforeState?: Record<string, unknown> | null;
+  afterState?: Record<string, unknown> | null;
   correlationId: string;
   createdAt: string;
 };
+
+export class ApiError extends Error {
+  readonly code: string;
+  readonly path: string;
+  readonly status: number;
+
+  constructor(path: string, status: number, code: string) {
+    super(code);
+    this.name = "ApiError";
+    this.path = path;
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export type CustomFieldDefinition = {
+  id: string;
+  tenantId: string;
+  systemKey: string;
+  tenantLabel: string;
+  targetEntity: "project";
+  fieldType: "text" | "number" | "date" | "select";
+  required: boolean;
+  status: "draft" | "active";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectTemplate = {
+  id: string;
+  tenantId: string;
+  systemKey: string;
+  tenantLabel: string;
+  description: string | null;
+  status: "draft" | "active";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomFieldInput = Omit<
+  CustomFieldDefinition,
+  "tenantId" | "createdAt" | "updatedAt"
+>;
+
+export type ProjectTemplateInput = Omit<
+  ProjectTemplate,
+  "tenantId" | "createdAt" | "updatedAt"
+>;
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
   return requestJson("/health");
@@ -205,6 +260,62 @@ export async function fetchAuditEvents(): Promise<{ auditEvents: AuditEvent[] }>
   return requestJson("/api/tenant/current/audit-events");
 }
 
+export async function fetchCustomFields(): Promise<{
+  customFields: CustomFieldDefinition[];
+}> {
+  return requestJson("/api/workspace/config/custom-fields");
+}
+
+export async function createCustomField(
+  input: CustomFieldInput
+): Promise<{ customField: CustomFieldDefinition }> {
+  return requestJson("/api/workspace/config/custom-fields", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function updateCustomField(
+  fieldId: string,
+  input: Omit<CustomFieldInput, "id">
+): Promise<{ customField: CustomFieldDefinition }> {
+  return requestJson(
+    `/api/workspace/config/custom-fields/${encodePathSegment(fieldId)}`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
+export async function fetchProjectTemplates(): Promise<{
+  projectTemplates: ProjectTemplate[];
+}> {
+  return requestJson("/api/workspace/config/project-templates");
+}
+
+export async function createProjectTemplate(
+  input: ProjectTemplateInput
+): Promise<{ projectTemplate: ProjectTemplate }> {
+  return requestJson("/api/workspace/config/project-templates", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function updateProjectTemplate(
+  templateId: string,
+  input: Omit<ProjectTemplateInput, "id">
+): Promise<{ projectTemplate: ProjectTemplate }> {
+  return requestJson(
+    `/api/workspace/config/project-templates/${encodePathSegment(templateId)}`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
 async function requestJson<T>(
   path: string,
   options: {
@@ -232,7 +343,16 @@ async function requestJson<T>(
   const response = await fetch(path, init);
 
   if (!response.ok) {
-    throw new Error(`${path} failed: ${response.status}`);
+    const errorPayload = await response.json().catch(() => null);
+    const errorCode =
+      errorPayload &&
+      typeof errorPayload === "object" &&
+      "error" in errorPayload &&
+      typeof errorPayload.error === "string"
+        ? errorPayload.error
+        : `${path} failed: ${response.status}`;
+
+    throw new ApiError(path, response.status, errorCode);
   }
 
   return response.json() as Promise<T>;

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   getNextFocusTrapIndex,
+  validateCustomFieldForm,
   validatePositionForm,
+  validateProjectTemplateForm,
   validateRoleForm,
   validateUserForm
 } from "./workspaceForms";
@@ -53,6 +55,39 @@ describe("workspace form quality baseline", () => {
   it("requires a position name", () => {
     expect(validatePositionForm({ name: "   " })).toEqual({
       name: "Укажите название должности."
+    });
+  });
+
+  it("validates custom field configuration before API mutation", () => {
+    expect(
+      validateCustomFieldForm({
+        systemKey: "Invalid Key",
+        tenantLabel: "",
+        targetEntity: "project",
+        fieldType: "money",
+        status: "archived"
+      })
+    ).toEqual({
+      systemKey: "Системный ключ: латиница, цифры и _, начинается с буквы.",
+      tenantLabel: "Укажите русское название поля.",
+      fieldType: "Выберите тип поля.",
+      status: "Выберите статус настройки."
+    });
+  });
+
+  it("validates project template configuration before API mutation", () => {
+    expect(
+      validateProjectTemplateForm({
+        systemKey: "bad key",
+        tenantLabel: "",
+        description: "x".repeat(1001),
+        status: "archived"
+      })
+    ).toEqual({
+      systemKey: "Системный ключ: латиница, цифры и _, начинается с буквы.",
+      tenantLabel: "Укажите название шаблона.",
+      description: "Описание должно быть не длиннее 1000 символов.",
+      status: "Выберите статус шаблона."
     });
   });
 

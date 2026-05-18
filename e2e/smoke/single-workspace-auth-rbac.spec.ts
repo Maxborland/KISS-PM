@@ -199,6 +199,84 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await deleteRoleDialog.getByRole("button", { name: "Удалить роль доступа" }).click();
   await expect(page.getByText(`Наблюдатель ${suffix} обновлено`)).toHaveCount(0);
 
+  await page
+    .getByRole("complementary")
+    .getByRole("button", { name: "Настройки", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { name: "Пользовательские поля" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Шаблоны проектов" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Создать поле" }).click();
+  const createFieldDialog = page.getByRole("dialog", {
+    name: "Создать пользовательское поле"
+  });
+  await expect(createFieldDialog).toBeVisible();
+  await createFieldDialog.getByLabel("Системный ключ").fill("1-invalid");
+  await createFieldDialog.getByRole("button", { name: "Сохранить поле" }).click();
+  await expect(
+    createFieldDialog.getByText("Системный ключ: латиница, цифры и _, начинается с буквы.")
+  ).toBeVisible();
+  await createFieldDialog.getByLabel("Системный ключ").fill(`priority_${suffix}`);
+  await createFieldDialog.getByLabel("Название в интерфейсе").fill(`Приоритет ${suffix}`);
+  await createFieldDialog.getByLabel("Тип поля").selectOption("select");
+  await createFieldDialog.getByLabel("Статус").selectOption("active");
+  await createFieldDialog.getByRole("button", { name: "Сохранить поле" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(`Приоритет ${suffix}`) })).toBeVisible();
+  const fieldRow = page.getByRole("row", { name: new RegExp(`Приоритет ${suffix}`) });
+  await fieldRow.getByRole("button", { name: "Редактировать" }).click();
+  const editFieldDialog = page.getByRole("dialog", {
+    name: "Редактировать пользовательское поле"
+  });
+  await expect(editFieldDialog.getByLabel("Системный ключ")).toHaveAttribute("readonly", "");
+  await editFieldDialog.getByLabel("Название в интерфейсе").fill(`Приоритет проекта ${suffix}`);
+  await editFieldDialog.getByLabel("Обязательное поле").check();
+  await editFieldDialog.getByRole("button", { name: "Сохранить поле" }).click();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Приоритет проекта ${suffix}.*Да`) })
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Создать шаблон" }).click();
+  const createTemplateDialog = page.getByRole("dialog", { name: "Создать шаблон" });
+  await expect(createTemplateDialog).toBeVisible();
+  await createTemplateDialog.getByLabel("Системный ключ").fill("1-invalid");
+  await createTemplateDialog.getByRole("button", { name: "Сохранить шаблон" }).click();
+  await expect(
+    createTemplateDialog.getByText("Системный ключ: латиница, цифры и _, начинается с буквы.")
+  ).toBeVisible();
+  await createTemplateDialog.getByLabel("Системный ключ").fill(`implementation_${suffix}`);
+  await createTemplateDialog.getByLabel("Название шаблона").fill(`Внедрение ${suffix}`);
+  await createTemplateDialog
+    .getByLabel("Описание")
+    .fill("Базовый шаблон внедрения для smoke проверки");
+  await createTemplateDialog.getByLabel("Статус").selectOption("active");
+  await createTemplateDialog.getByRole("button", { name: "Сохранить шаблон" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(`Внедрение ${suffix}`) })).toBeVisible();
+  const templateRow = page.getByRole("row", { name: new RegExp(`Внедрение ${suffix}`) });
+  await templateRow.getByRole("button", { name: "Редактировать" }).click();
+  const editTemplateDialog = page.getByRole("dialog", { name: "Редактировать шаблон" });
+  await expect(editTemplateDialog.getByLabel("Системный ключ")).toHaveAttribute("readonly", "");
+  await editTemplateDialog.getByLabel("Название шаблона").fill(`Внедрение проекта ${suffix}`);
+  await editTemplateDialog
+    .getByLabel("Описание")
+    .fill("Обновленный базовый шаблон внедрения для smoke проверки");
+  await editTemplateDialog.getByRole("button", { name: "Сохранить шаблон" }).click();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Внедрение проекта ${suffix}`) })
+  ).toBeVisible();
+
+  await page
+    .getByRole("complementary")
+    .getByRole("button", { name: "Аудит", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/audit$/);
+  await expect(page.getByText("Пользовательское поле создано").first()).toBeVisible();
+  await expect(page.getByText("Пользовательское поле обновлено").first()).toBeVisible();
+  await expect(page.getByText("Шаблон проекта создан").first()).toBeVisible();
+  await expect(page.getByText("Шаблон проекта обновлен").first()).toBeVisible();
+  await expect(page.getByText(new RegExp(`Название: Приоритет ${suffix} -> Приоритет проекта ${suffix}`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`Название: Внедрение ${suffix} -> Внедрение проекта ${suffix}`))).toBeVisible();
+
   await page.getByRole("button", { name: "Роли доступа" }).click();
   await page.getByRole("button", { name: "Создать роль доступа" }).click();
   const createLimitedRoleDialog = page.getByRole("dialog", { name: "Создать роль доступа" });
@@ -222,6 +300,85 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     page.getByRole("complementary").getByText(`Ограниченный ${suffix}`)
   ).toBeVisible();
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Аудит", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Настройки", exact: true })
+  ).toHaveCount(0);
+  await page.goto("/settings");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/audit");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  expect((await page.request.get("/api/tenant/current/audit-events")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/config/custom-fields")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/config/project-templates")).status()).toBe(403);
+  expect(
+    (
+      await page.request.post("/api/workspace/config/custom-fields", {
+        data: {
+          id: `limited_field_${suffix}`,
+          systemKey: `limited_field_${suffix}`,
+          tenantLabel: "Ограниченное поле",
+          targetEntity: "project",
+          fieldType: "text",
+          required: false,
+          status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/config/custom-fields/not-found", {
+        data: {
+          systemKey: "not_found",
+          tenantLabel: "Недоступное поле",
+          targetEntity: "project",
+          fieldType: "text",
+          required: false,
+          status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.post("/api/workspace/config/project-templates", {
+        data: {
+          id: `limited_template_${suffix}`,
+          systemKey: `limited_template_${suffix}`,
+          tenantLabel: "Ограниченный шаблон",
+          description: "",
+          status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/config/project-templates/not-found", {
+        data: {
+          systemKey: "not_found",
+          tenantLabel: "Недоступный шаблон",
+          description: "",
+          status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
   await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
   await page.getByLabel("Email").fill("admin@kiss-pm.local");
   await page.getByLabel("Пароль").fill("admin12345");

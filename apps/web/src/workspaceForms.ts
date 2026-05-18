@@ -50,6 +50,58 @@ export function validatePositionForm(input: { name: string }): FormErrors {
   return errors;
 }
 
+export function validateCustomFieldForm(input: {
+  systemKey: string;
+  tenantLabel: string;
+  targetEntity: string;
+  fieldType: string;
+  status: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!isSystemKey(input.systemKey)) {
+    errors.systemKey = "Системный ключ: латиница, цифры и _, начинается с буквы.";
+  }
+  if (!input.tenantLabel.trim() || input.tenantLabel.trim().length > 120) {
+    errors.tenantLabel = "Укажите русское название поля.";
+  }
+  if (input.targetEntity !== "project") {
+    errors.targetEntity = "Пока доступны только поля проекта.";
+  }
+  if (!["text", "number", "date", "select"].includes(input.fieldType)) {
+    errors.fieldType = "Выберите тип поля.";
+  }
+  if (!["draft", "active"].includes(input.status)) {
+    errors.status = "Выберите статус настройки.";
+  }
+
+  return errors;
+}
+
+export function validateProjectTemplateForm(input: {
+  systemKey: string;
+  tenantLabel: string;
+  description: string;
+  status: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!isSystemKey(input.systemKey)) {
+    errors.systemKey = "Системный ключ: латиница, цифры и _, начинается с буквы.";
+  }
+  if (!input.tenantLabel.trim() || input.tenantLabel.trim().length > 120) {
+    errors.tenantLabel = "Укажите название шаблона.";
+  }
+  if (input.description.length > 1000) {
+    errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+  if (!["draft", "active"].includes(input.status)) {
+    errors.status = "Выберите статус шаблона.";
+  }
+
+  return errors;
+}
+
 export function hasFormErrors(errors: FormErrors): boolean {
   return Object.keys(errors).length > 0;
 }
@@ -72,4 +124,8 @@ export function getNextFocusTrapIndex(
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isSystemKey(value: string): boolean {
+  return value.length <= 80 && /^[a-z][a-z0-9_]*$/.test(value.trim());
 }

@@ -18,6 +18,8 @@ describe("workspace route model", () => {
       "users",
       "access-roles",
       "positions",
+      "audit",
+      "settings",
       "profile",
       "theme"
     ]);
@@ -50,7 +52,7 @@ describe("workspace route model", () => {
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[4]]
+        routes: [workspaceRoutes[6]]
       }
     ]);
   });
@@ -74,11 +76,14 @@ describe("workspace route model", () => {
   it("maps real Next pathnames to workspace route ids", () => {
     expect(getRouteIdFromPathname("/users")).toBe("users");
     expect(getRouteIdFromPathname("/access-roles")).toBe("access-roles");
+    expect(getRouteIdFromPathname("/audit")).toBe("audit");
+    expect(getRouteIdFromPathname("/settings")).toBe("settings");
     expect(getRouteIdFromPathname("/unknown")).toBe("dashboard");
   });
 
   it("returns real Next paths for workspace routes", () => {
     expect(getRoutePath("dashboard")).toBe("/dashboard");
     expect(getRoutePath("users")).toBe("/users");
+    expect(getRoutePath("settings")).toBe("/settings");
   });
 });

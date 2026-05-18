@@ -41,6 +41,36 @@ describe("workspace data derivation", () => {
             createdAt: "2026-05-18T00:00:00.000Z"
           }
         ]
+      },
+      customFields: {
+        customFields: [
+          {
+            id: "field-1",
+            tenantId: "tenant-1",
+            systemKey: "priority",
+            tenantLabel: "Приоритет",
+            targetEntity: "project",
+            fieldType: "select",
+            required: false,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
+      projectTemplates: {
+        projectTemplates: [
+          {
+            id: "template-1",
+            tenantId: "tenant-1",
+            systemKey: "implementation",
+            tenantLabel: "Внедрение",
+            description: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
       }
     });
 
@@ -48,5 +78,7 @@ describe("workspace data derivation", () => {
     expect(data.positions).toEqual([]);
     expect(data.accessRoles).toEqual([]);
     expect(data.auditEvents).toEqual([]);
+    expect(data.customFields).toEqual([]);
+    expect(data.projectTemplates).toEqual([]);
   });
 });
