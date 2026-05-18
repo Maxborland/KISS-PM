@@ -199,6 +199,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -208,10 +209,10 @@ describe("API with PostgreSQL data source", () => {
       })
     });
     const profiles = await app.request("/api/tenant/current/access-profiles", {
-      headers: { cookie }
+      headers: { "x-kiss-pm-action": "same-origin", cookie }
     });
     const audit = await app.request("/api/tenant/current/audit-events", {
-      headers: { cookie }
+      headers: { "x-kiss-pm-action": "same-origin", cookie }
     });
 
     expect(response.status).toBe(201);
@@ -253,6 +254,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -284,6 +286,26 @@ describe("API with PostgreSQL data source", () => {
     expect(audit.status).toBe(401);
   });
 
+  it("rejects cookie-authenticated state changes without same-origin action header", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const response = await app.request("/api/workspace/positions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "position-without-action-header",
+        name: "Без action header"
+      })
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "same_origin_action_required"
+    });
+  });
+
   it("does not leak access profiles across tenants", async () => {
     const alphaCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
@@ -291,6 +313,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie: alphaCookie
       },
       body: JSON.stringify({
@@ -319,6 +342,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -331,6 +355,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -347,6 +372,42 @@ describe("API with PostgreSQL data source", () => {
         phone: null,
         telegram: null
       }
+    });
+  });
+
+  it("rejects unsafe profile theme values before persistence", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+
+    const invalidTheme = await app.request("/api/profile/theme", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        theme: "light injected-class",
+        accentColor: "#2563eb"
+      })
+    });
+    const invalidAccent = await app.request("/api/profile/theme", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        theme: "dark",
+        accentColor: "url(https://example.invalid/pixel)"
+      })
+    });
+
+    expect(invalidTheme.status).toBe(400);
+    await expect(invalidTheme.json()).resolves.toEqual({ error: "invalid_theme" });
+    expect(invalidAccent.status).toBe(400);
+    await expect(invalidAccent.json()).resolves.toEqual({
+      error: "invalid_accent_color"
     });
   });
 
@@ -384,6 +445,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -424,6 +486,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -458,6 +521,7 @@ describe("API with PostgreSQL data source", () => {
 
     const me = await app.request("/api/auth/me", {
       headers: {
+        "x-kiss-pm-action": "same-origin",
         cookie
       }
     });
@@ -465,6 +529,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -481,6 +546,7 @@ describe("API with PostgreSQL data source", () => {
         method: "PATCH",
         headers: {
           "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
           cookie
         },
         body: JSON.stringify({
@@ -493,6 +559,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -505,6 +572,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -524,6 +592,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -536,6 +605,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -551,6 +621,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -561,10 +632,82 @@ describe("API with PostgreSQL data source", () => {
         status: "paused"
       })
     });
+    const createUserInvalidTheme = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "user-invalid-theme",
+        email: "invalid-theme@kiss-pm.local",
+        name: "Невалидная тема",
+        accessProfileId: "access-profile-alpha-reader",
+        theme: "dark extra-class",
+        accentColor: "#2563eb",
+        password: "product12345"
+      })
+    });
+    const createUserInvalidAccent = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "user-invalid-accent",
+        email: "invalid-accent@kiss-pm.local",
+        name: "Невалидный акцент",
+        accessProfileId: "access-profile-alpha-reader",
+        theme: "dark",
+        accentColor: "rgb(37 99 235)",
+        password: "product12345"
+      })
+    });
+    const updateUserInvalidTheme = await app.request("/api/workspace/users/user-product-lead", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        email: "product@kiss-pm.local",
+        name: "Полина Продукт",
+        accessProfileId: "access-profile-alpha-reader",
+        positionId: "position-product-lead",
+        status: "active",
+        theme: "light injected-class",
+        accentColor: "#2563eb"
+      })
+    });
+    const updateUserInvalidAccent = await app.request(
+      "/api/workspace/users/user-product-lead",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          email: "product@kiss-pm.local",
+          name: "Полина Продукт",
+          accessProfileId: "access-profile-alpha-reader",
+          positionId: "position-product-lead",
+          status: "active",
+          theme: "light",
+          accentColor: "url(https://example.invalid/pixel)"
+        })
+      }
+    );
     const userWithoutPassword = await app.request("/api/workspace/users", {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -576,6 +719,7 @@ describe("API with PostgreSQL data source", () => {
     });
     const users = await app.request("/api/workspace/users", {
       headers: {
+        "x-kiss-pm-action": "same-origin",
         cookie
       }
     });
@@ -583,6 +727,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -617,6 +762,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -631,6 +777,7 @@ describe("API with PostgreSQL data source", () => {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -653,6 +800,7 @@ describe("API with PostgreSQL data source", () => {
       {
         method: "DELETE",
         headers: {
+          "x-kiss-pm-action": "same-origin",
           cookie
         }
       }
@@ -662,6 +810,7 @@ describe("API with PostgreSQL data source", () => {
       {
         method: "DELETE",
         headers: {
+          "x-kiss-pm-action": "same-origin",
           cookie
         }
       }
@@ -670,6 +819,7 @@ describe("API with PostgreSQL data source", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
         cookie
       },
       body: JSON.stringify({
@@ -684,6 +834,7 @@ describe("API with PostgreSQL data source", () => {
         method: "PATCH",
         headers: {
           "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
           cookie
         },
         body: JSON.stringify({
@@ -697,6 +848,7 @@ describe("API with PostgreSQL data source", () => {
       {
         method: "DELETE",
         headers: {
+          "x-kiss-pm-action": "same-origin",
           cookie
         }
       }
@@ -704,17 +856,20 @@ describe("API with PostgreSQL data source", () => {
     const deletedUser = await app.request("/api/workspace/users/user-product-lead", {
       method: "DELETE",
       headers: {
+        "x-kiss-pm-action": "same-origin",
         cookie
       }
     });
     const deletedPosition = await app.request("/api/workspace/positions/position-product-lead", {
       method: "DELETE",
       headers: {
+        "x-kiss-pm-action": "same-origin",
         cookie
       }
     });
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: {
+        "x-kiss-pm-action": "same-origin",
         cookie
       }
     });
@@ -764,6 +919,22 @@ describe("API with PostgreSQL data source", () => {
     expect(invalidUserStatus.status).toBe(400);
     await expect(invalidUserStatus.json()).resolves.toEqual({
       error: "invalid_user_status"
+    });
+    expect(createUserInvalidTheme.status).toBe(400);
+    await expect(createUserInvalidTheme.json()).resolves.toEqual({
+      error: "invalid_theme"
+    });
+    expect(createUserInvalidAccent.status).toBe(400);
+    await expect(createUserInvalidAccent.json()).resolves.toEqual({
+      error: "invalid_accent_color"
+    });
+    expect(updateUserInvalidTheme.status).toBe(400);
+    await expect(updateUserInvalidTheme.json()).resolves.toEqual({
+      error: "invalid_theme"
+    });
+    expect(updateUserInvalidAccent.status).toBe(400);
+    await expect(updateUserInvalidAccent.json()).resolves.toEqual({
+      error: "invalid_accent_color"
     });
     expect(userWithoutPassword.status).toBe(400);
     await expect(userWithoutPassword.json()).resolves.toEqual({
@@ -842,3 +1013,6 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 });
+
+
+

@@ -100,14 +100,14 @@ export async function updateUser(
     status: string;
   }
 ): Promise<{ user: WorkspaceUser }> {
-  return requestJson(`/api/workspace/users/${userId}`, {
+  return requestJson(`/api/workspace/users/${encodePathSegment(userId)}`, {
     method: "PATCH",
     body: input
   });
 }
 
 export async function deleteUser(userId: string): Promise<{ status: string }> {
-  return requestJson(`/api/workspace/users/${userId}`, {
+  return requestJson(`/api/workspace/users/${encodePathSegment(userId)}`, {
     method: "DELETE"
   });
 }
@@ -134,14 +134,14 @@ export async function updatePosition(
     description: string;
   }
 ): Promise<{ position: Position }> {
-  return requestJson(`/api/workspace/positions/${positionId}`, {
+  return requestJson(`/api/workspace/positions/${encodePathSegment(positionId)}`, {
     method: "PATCH",
     body: input
   });
 }
 
 export async function deletePosition(positionId: string): Promise<{ status: string }> {
-  return requestJson(`/api/workspace/positions/${positionId}`, {
+  return requestJson(`/api/workspace/positions/${encodePathSegment(positionId)}`, {
     method: "DELETE"
   });
 }
@@ -168,14 +168,14 @@ export async function updateAccessRole(
     permissions: string[];
   }
 ): Promise<{ accessRole: AccessRole }> {
-  return requestJson(`/api/workspace/access-roles/${roleId}`, {
+  return requestJson(`/api/workspace/access-roles/${encodePathSegment(roleId)}`, {
     method: "PATCH",
     body: input
   });
 }
 
 export async function deleteAccessRole(roleId: string): Promise<{ status: string }> {
-  return requestJson(`/api/workspace/access-roles/${roleId}`, {
+  return requestJson(`/api/workspace/access-roles/${encodePathSegment(roleId)}`, {
     method: "DELETE"
   });
 }
@@ -214,14 +214,19 @@ async function requestJson<T>(
 ): Promise<T> {
   const init: RequestInit = {
     method: options.method ?? "GET",
-    credentials: "include"
+    credentials: "same-origin"
   };
 
   if (options.body !== undefined) {
     init.headers = {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin"
     };
     init.body = JSON.stringify(options.body);
+  } else if (init.method && init.method !== "GET") {
+    init.headers = {
+      "x-kiss-pm-action": "same-origin"
+    };
   }
 
   const response = await fetch(path, init);
@@ -231,4 +236,8 @@ async function requestJson<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+export function encodePathSegment(value: string): string {
+  return encodeURIComponent(value);
 }
