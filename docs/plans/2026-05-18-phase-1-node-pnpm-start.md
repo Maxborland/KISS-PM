@@ -1,4 +1,6 @@
-# Phase 1 Node + pnpm Start Implementation Plan
+# Архивный план Phase 1 Node + pnpm Start Implementation Plan
+
+Этот файл оставлен как исторический план первого skeleton. Актуальный web runtime после миграции — Next.js App Router; `apps/web/vite.config.ts`, `apps/web/index.html` и `apps/web/src/main.tsx` больше не являются runtime entrypoint.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +8,7 @@
 
 **Architecture:** The first implementation slice separates pure domain types, permission evaluation, shared fixtures, API integration, and web shell. Persistence remains in-memory for Phase 1.1 only; PostgreSQL and migrations are an explicit next decision.
 
-**Tech Stack:** Node.js, pnpm, TypeScript, Hono, React, Vite, Vitest.
+**Tech Stack:** Node.js, pnpm, TypeScript, Hono, React, Next.js App Router, Vitest.
 
 ---
 
@@ -72,9 +74,9 @@
 **Files:**
 - Create: `apps/web/package.json`
 - Create: `apps/web/tsconfig.json`
-- Create: `apps/web/vite.config.ts`
-- Create: `apps/web/index.html`
-- Create: `apps/web/src/main.tsx`
+- Create: `apps/web/next.config.ts`
+- Create: `apps/web/src/app/layout.tsx`
+- Create: `apps/web/src/app/page.tsx`
 - Create: `apps/web/src/App.tsx`
 - Create: `apps/web/src/styles.css`
 

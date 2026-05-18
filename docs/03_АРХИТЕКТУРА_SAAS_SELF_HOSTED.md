@@ -6,10 +6,10 @@
 
 ## Целевой стек
 
-- Frontend: React, TypeScript, Vite или Next.js после отдельного решения.
+- Frontend: React, TypeScript, Next.js App Router.
 - UI: shadcn/ui + Tailwind CSS как стартовый вариант, если не принято другое решение.
 - Server state: TanStack Query.
-- Backend: TypeScript, Hono/Bun или Node runtime после технического spike.
+- Backend: TypeScript, Hono на отдельном Node runtime.
 - Database: PostgreSQL.
 - ORM/schema/migrations: Drizzle как стартовое решение Phase 1.2.
 - Validation: Zod или аналогичная runtime validation.

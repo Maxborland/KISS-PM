@@ -1,0 +1,49 @@
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import { describe, expect, it } from "vitest";
+
+import { clearSessionQueries, workspaceQueryKeys } from "./workspaceQueries";
+
+describe("workspace query keys", () => {
+  it("uses stable readable keys for server-state groups", () => {
+    expect(workspaceQueryKeys.health()).toEqual(["health"]);
+    expect(workspaceQueryKeys.me()).toEqual(["session", "me"]);
+    expect(workspaceQueryKeys.users()).toEqual(["workspace", "users"]);
+    expect(workspaceQueryKeys.positions()).toEqual(["workspace", "positions"]);
+    expect(workspaceQueryKeys.accessRoles()).toEqual(["workspace", "accessRoles"]);
+    expect(workspaceQueryKeys.auditEvents()).toEqual(["workspace", "auditEvents"]);
+  });
+
+  it("clears only session-bound cache on logout", async () => {
+    const queryClient = new QueryClient();
+
+    queryClient.setQueryData(workspaceQueryKeys.health(), { status: "ok" });
+    queryClient.setQueryData(workspaceQueryKeys.me(), { user: { id: "user-1" } });
+    queryClient.setQueryData(workspaceQueryKeys.users(), { users: [] });
+
+    await clearSessionQueries(queryClient);
+
+    expect(queryClient.getQueryData(workspaceQueryKeys.health())).toEqual({
+      status: "ok"
+    });
+    expect(queryClient.getQueryData(workspaceQueryKeys.me())).toBeUndefined();
+    expect(queryClient.getQueryData(workspaceQueryKeys.users())).toBeUndefined();
+  });
+
+  it("resets active session observers on logout", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(workspaceQueryKeys.me(), { user: { id: "user-1" } });
+    const observer = new QueryObserver(queryClient, {
+      queryKey: workspaceQueryKeys.me(),
+      queryFn: async () => ({ user: { id: "should-not-run" } }),
+      enabled: false
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+
+    expect(observer.getCurrentResult().data).toEqual({ user: { id: "user-1" } });
+
+    await clearSessionQueries(queryClient);
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    unsubscribe();
+  });
+});

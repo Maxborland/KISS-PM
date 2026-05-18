@@ -13,7 +13,7 @@ Phase 1 начинается после docs-first reset. Старый код н
 - Runtime: Node.js.
 - Package manager: pnpm.
 - API: Hono.
-- Web: React + Vite + TypeScript.
+- Web: React + Next.js App Router + TypeScript.
 - Tests: Vitest.
 - Database: PostgreSQL в целевой архитектуре, но не в первом skeleton-шаге.
 
@@ -37,7 +37,7 @@ Phase 1 начинается после docs-first reset. Старый код н
 7. Доказать tenant isolation:
    - пользователь tenant A видит свой tenant;
    - пользователь tenant A не может читать users tenant B.
-8. Создать минимальный web shell, который показывает русскую стартовую страницу KISS PM.
+8. Создать минимальный web shell, который показывает русскую стартовую страницу KISS PM. Текущий runtime web после миграции — Next.js App Router, а не предыдущий отдельный dev server.
 
 ## Non-scope
 

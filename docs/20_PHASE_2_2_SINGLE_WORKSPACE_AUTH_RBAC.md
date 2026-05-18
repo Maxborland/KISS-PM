@@ -23,6 +23,8 @@ Phase 2.2 фиксирует поворот реализации: сначала
 ## Выбранный подход
 
 - Runtime остается Node + pnpm + Docker Compose PostgreSQL.
+- Web runtime: Next.js App Router. Workspace shell, формы, модалки и TanStack Query provider работают как Client Components.
+- API runtime остается отдельным Node/Hono backend в `apps/api`; Next.js rewrites направляют `/api/...` и `/health` в API server в dev/browser smoke.
 - Auth пока локальный: email/password, password hash через `scrypt`, session token хранится в cookie `kiss_pm_session`.
 - Dev admin:
   - email: `admin@kiss-pm.local`;
@@ -30,7 +32,8 @@ Phase 2.2 фиксирует поворот реализации: сначала
 - В БД сохраняется `tenantId`, но UI говорит языком одного рабочего пространства.
 - Административные CRUD-действия проходят через API, permission check и audit.
 - shadcn/ui остается целевым UI-направлением. В текущем slice применены shadcn-like tokens, размеры, формы и плотность интерфейса без установки Tailwind/shadcn scaffold.
-- CRUD пользователей, ролей доступа и должностей выполняется через модальные окна создания, редактирования и подтверждения удаления. Таблица остается основным обзорным состоянием.
+- CRUD пользователей, ролей доступа и должностей выполняется через модальные окна создания, редактирования и подтверждения удаления. Таблица остается основным обзорным состоянием; текущий UI использует summary cards, локальный поиск, понятные empty/loading/error states и disabled-state reasons.
+- Web foundation использует плотный admin-dashboard layout: сгруппированный permission-aware sidebar, sticky topbar, быстрый переход по доступным разделам, dashboard metrics и audit preview.
 - Protected workspace routes принимают только session cookie. Dev `x-user-id` остается только для dev endpoints и не является заменой авторизации.
 - RBAC fail-closed: если access profile пользователя не найден, API возвращает ошибку доступа, а не подставляет admin-профиль.
 - User create/update требует transaction boundary и audit wiring; связанные user/credential/audit операции не выполняются в partially wired persistence mode.

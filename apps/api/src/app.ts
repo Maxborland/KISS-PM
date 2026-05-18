@@ -185,6 +185,17 @@ export function createApp(options: CreateAppOptions = {}) {
     return context.json({ error: "internal_error" }, 500);
   });
 
+  app.use("/api/*", async (context, next) => {
+    if (requiresSameOriginActionHeader(context.req.method, context.req.path)) {
+      const actionHeader = context.req.header("x-kiss-pm-action");
+      if (actionHeader !== "same-origin") {
+        return context.json({ error: "same_origin_action_required" }, 403);
+      }
+    }
+
+    await next();
+  });
+
   async function getActor(userId: string | null) {
     if (!userId) return undefined;
     const actor = await dataSource.findUserById(userId);
@@ -1307,11 +1318,21 @@ export function createApp(options: CreateAppOptions = {}) {
     );
     if (!current) return context.json({ error: "user_not_found" }, 404);
     const body = await context.req.json().catch(() => ({}));
+    const themeInput = getStringField(body, "theme");
+    const accentInput = getStringField(body, "accentColor");
+    const theme = themeInput === undefined || themeInput === "" ? current.theme : themeInput;
+    const accentColor =
+      accentInput === undefined || accentInput === "" ? current.accentColor : accentInput;
+
+    if (!isWorkspaceTheme(theme)) return context.json({ error: "invalid_theme" }, 400);
+    if (!isAccentColor(accentColor)) {
+      return context.json({ error: "invalid_accent_color" }, 400);
+    }
 
     const user = await dataSource.updateWorkspaceUser({
       ...current,
-      theme: getOptionalString(body, "theme") ?? current.theme,
-      accentColor: getOptionalString(body, "accentColor") ?? current.accentColor
+      theme,
+      accentColor: accentColor.toLowerCase()
     });
     await appendManagementAuditEvent({
       tenantId: actor.tenantId,
@@ -1323,8 +1344,8 @@ export function createApp(options: CreateAppOptions = {}) {
         id: actor.id
       },
       commandInput: {
-        theme: getOptionalString(body, "theme"),
-        accentColor: getOptionalString(body, "accentColor")
+        theme,
+        accentColor: accentColor.toLowerCase()
       },
       beforeState: current,
       afterState: user,
@@ -1435,6 +1456,10 @@ function parseWorkspaceUserBody(
   const password = getOptionalString(input, "password") ?? undefined;
   const status = getOptionalString(input, "status") ?? "active";
   if (!isUserStatus(status)) return { ok: false, error: "invalid_user_status" };
+  const theme = getOptionalString(input, "theme") ?? "light";
+  const accentColor = getOptionalString(input, "accentColor") ?? "#0f766e";
+  if (!isWorkspaceTheme(theme)) return { ok: false, error: "invalid_theme" };
+  if (!isAccentColor(accentColor)) return { ok: false, error: "invalid_accent_color" };
 
   return {
     ok: true,
@@ -1449,8 +1474,8 @@ function parseWorkspaceUserBody(
       phone: getOptionalString(input, "phone"),
       telegram: getOptionalString(input, "telegram"),
       status,
-      theme: getOptionalString(input, "theme") ?? "light",
-      accentColor: getOptionalString(input, "accentColor") ?? "#0f766e"
+      theme,
+      accentColor: accentColor.toLowerCase()
     }
   };
 }
@@ -1481,11 +1506,16 @@ function parseWorkspaceUserPatchBody(
   const accessProfileId =
     accessProfileInput === undefined ? current.accessProfileId : accessProfileInput;
   const status = statusInput === undefined ? current.status : statusInput || current.status;
+  const theme = themeInput === undefined || themeInput === "" ? current.theme : themeInput;
+  const accentColor =
+    accentInput === undefined || accentInput === "" ? current.accentColor : accentInput;
 
   if (!email) return { ok: false, error: "invalid_user_email" };
   if (!name) return { ok: false, error: "invalid_user_name" };
   if (!accessProfileId) return { ok: false, error: "invalid_access_role" };
   if (!isUserStatus(status)) return { ok: false, error: "invalid_user_status" };
+  if (!isWorkspaceTheme(theme)) return { ok: false, error: "invalid_theme" };
+  if (!isAccentColor(accentColor)) return { ok: false, error: "invalid_accent_color" };
 
   return {
     ok: true,
@@ -1500,9 +1530,8 @@ function parseWorkspaceUserPatchBody(
       phone: phoneInput === undefined ? current.phone : phoneInput || null,
       telegram: telegramInput === undefined ? current.telegram : telegramInput || null,
       status,
-      theme: themeInput === undefined ? current.theme : themeInput || current.theme,
-      accentColor:
-        accentInput === undefined ? current.accentColor : accentInput || current.accentColor
+      theme,
+      accentColor: accentColor.toLowerCase()
     }
   };
 }
@@ -1558,6 +1587,19 @@ function getStringField(input: unknown, key: string): string | undefined {
 
 function isUserStatus(value: string): value is "active" | "inactive" {
   return value === "active" || value === "inactive";
+}
+
+function isWorkspaceTheme(value: string): value is "light" | "dark" {
+  return value === "light" || value === "dark";
+}
+
+function isAccentColor(value: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+function requiresSameOriginActionHeader(method: string, path: string): boolean {
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return false;
+  return path !== "/api/auth/login";
 }
 
 function createInMemoryTenantDataSource(): ApiTenantDataSource {

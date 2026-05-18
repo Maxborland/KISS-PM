@@ -11,8 +11,9 @@ Phase 1.5 закрывает Phase 1 platform skeleton перед переход
 ## Выбранный подход
 
 - Playwright используется для browser smoke.
-- Vite dev server проксирует `/api` и `/health` в API server.
+- Next.js dev server проксирует `/api` и `/health` в API server через rewrites.
 - API server запускается с `DATABASE_URL`, поэтому читает PostgreSQL data source.
+- Web shell работает как Next.js App Router приложение, но authenticated workspace UI остается client-side shell поверх cookie-сессии.
 - Web shell остается простым, но показывает:
   - статус API;
   - список dev users из seeded PostgreSQL;
@@ -44,6 +45,7 @@ Phase 1.5 закрывает Phase 1 platform skeleton перед переход
 - `pnpm test:e2e:smoke` проходит против Docker PostgreSQL.
 - `pnpm test`, `pnpm test:db`, `pnpm typecheck` проходят.
 - Browser smoke не требует ручных кликов.
+- Playwright запускает отдельные процессы `apps/api` и `apps/web`; web доступен на `http://127.0.0.1:3000`, API health — на `http://127.0.0.1:4000/health`.
 
 ## Следующий шаг после Phase 1.5
 

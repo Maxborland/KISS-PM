@@ -14,13 +14,21 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     page.getByRole("heading", { name: "Вход в рабочее пространство" })
   ).toBeVisible();
+  await page.getByLabel("Пароль").fill("admin12345");
   await page.getByRole("button", { name: "Войти" }).click();
 
-  await expect(page.getByRole("heading", { name: "Главная" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Активность рабочего пространства" })
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("Анна Администратор")).toBeVisible();
+  await page.getByLabel("Быстрый поиск по рабочему пространству").fill("Должности");
+  await page.getByLabel("Быстрый поиск по рабочему пространству").press("Enter");
+  await expect(page.getByRole("heading", { name: "Должности" }).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/positions$/);
 
   await page.getByRole("button", { name: "Должности" }).click();
-  await expect(page.getByRole("heading", { name: "CRUD должностей" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Должности" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Создать должность" }).click();
   const createPositionDialog = page.getByRole("dialog", { name: "Создать должность" });
   await expect(createPositionDialog).toBeVisible();
@@ -47,7 +55,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText(`Координатор ${suffix} обновлено`)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Роли доступа" }).click();
-  await expect(page.getByRole("heading", { name: "CRUD ролей доступа" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Роли доступа" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Создать роль доступа" }).click();
   const createRoleDialog = page.getByRole("dialog", { name: "Создать роль доступа" });
   await expect(createRoleDialog).toBeVisible();
@@ -64,8 +72,12 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     page.getByRole("row", { name: new RegExp(`Наблюдатель ${suffix} обновлено`) })
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Пользователи" }).click();
-  await expect(page.getByRole("heading", { name: "CRUD пользователей" })).toBeVisible();
+  await page.getByRole("button", { name: "Быстро создать" }).click();
+  await expect(page).toHaveURL(/\/users$/);
+  const quickCreateUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
+  await expect(quickCreateUserDialog).toBeVisible();
+  await quickCreateUserDialog.getByRole("button", { name: "Закрыть" }).click();
+  await expect(page.getByRole("heading", { name: "Пользователи" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Создать пользователя" }).click();
   const createUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
   await expect(createUserDialog).toBeVisible();
@@ -120,24 +132,30 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     .getByLabel("Роль доступа")
     .selectOption({ label: `Ограниченный ${suffix}` });
   await createLimitedUserDialog.getByRole("button", { name: "Создать пользователя" }).click();
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
   await page.getByLabel("Email").fill(`limited-${suffix}@kiss-pm.local`);
   await page.getByLabel("Пароль").fill("limited12345");
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByRole("heading", { name: "Главная" })).toBeVisible();
-  await expect(page.getByText(`Ограниченный ${suffix}`)).toBeVisible();
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Активность рабочего пространства" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("complementary").getByText(`Ограниченный ${suffix}`)
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
   await page.getByLabel("Email").fill("admin@kiss-pm.local");
   await page.getByLabel("Пароль").fill("admin12345");
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByRole("heading", { name: "Главная" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Активность рабочего пространства" })
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "Профиль" }).click();
+  await page.getByRole("button", { name: "Профиль", exact: true }).click();
   await page.getByLabel("Телефон").fill("+7 999 000-00-00");
   await page.getByRole("button", { name: "Сохранить профиль" }).click();
   await expect(page.getByText("Профиль обновлен")).toBeVisible();
 
-  await page.getByRole("button", { name: "Оформление" }).click();
+  await page.getByRole("button", { name: "Оформление", exact: true }).click();
   await page.getByLabel("Акцентный цвет").fill("#2563eb");
   await page.getByRole("button", { name: "Применить тему" }).click();
   await expect(page.getByText("Тема обновлена")).toBeVisible();

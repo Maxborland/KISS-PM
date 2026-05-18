@@ -37,3 +37,5 @@
 ## Статус новой реализации
 
 Новая реализация начинается с Phase 1 Node + pnpm skeleton: `apps/api`, `apps/web`, `packages/domain`, `packages/access-control`, `packages/persistence`, `packages/test-fixtures`. PostgreSQL для разработки поднимается через Docker Compose и наполняется demo данными через `pnpm db:seed:dev`; browser smoke проверяется через `pnpm test:e2e:smoke`. Phase 2 стартовала с access profile admin flow, а затем была сужена до single-workspace foundation: вход, пользователи, роли доступа, должности, профиль, тема, RBAC и audit без отдельной SaaS-админки.
+
+Текущий web runtime: `apps/web` является Next.js App Router приложением. API остается отдельным Node/Hono backend в `apps/api`. Authenticated workspace shell остается Client Components UI поверх cookie-сессии `kiss_pm_session`, а server-state слой живет в TanStack Query внутри Next client provider. В dev web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, а `/api/...` и `/health` маршрутизируются через Next rewrites в API runtime.

@@ -11,7 +11,7 @@ export default defineConfig({
     timeout: 10_000
   },
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://127.0.0.1:3000",
     trace: "retain-on-failure"
   },
   projects: [
@@ -22,14 +22,14 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `powershell -NoProfile -Command "$env:DATABASE_URL='${databaseUrl}'; $env:PORT='4173'; pnpm --filter @kiss-pm/api dev"`,
-      url: "http://127.0.0.1:4173/health",
+      command: `powershell -NoProfile -Command "$env:DATABASE_URL='${databaseUrl}'; $env:PORT='4000'; pnpm --filter @kiss-pm/api dev"`,
+      url: "http://127.0.0.1:4000/health",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000
     },
     {
       command: "pnpm --filter @kiss-pm/web dev",
-      url: "http://127.0.0.1:5173",
+      url: "http://127.0.0.1:3000",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000
     }

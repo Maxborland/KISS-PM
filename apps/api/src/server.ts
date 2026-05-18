@@ -6,7 +6,7 @@ import {
 } from "@kiss-pm/persistence";
 import { createApp } from "./app";
 
-const port = Number.parseInt(process.env.PORT ?? "4173", 10);
+const port = Number.parseInt(process.env.PORT ?? "4000", 10);
 const databaseUrl = process.env.DATABASE_URL;
 const postgresClient = databaseUrl
   ? createPostgresClient(databaseUrl)
