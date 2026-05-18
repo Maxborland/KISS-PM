@@ -94,6 +94,7 @@ Tenant-настройки
 20. `docs/18_PHASE_1_5_BROWSER_API_E2E_SMOKE.md`
 21. `docs/19_PHASE_2_1_ACCESS_PROFILE_ADMIN.md`
 22. `docs/20_PHASE_2_2_SINGLE_WORKSPACE_AUTH_RBAC.md`
+23. `docs/21_PHASE_2_3_SINGLE_WORKSPACE_CONFIG_AUDIT.md`
 
 ## 6. Обязательные рабочие навыки
 

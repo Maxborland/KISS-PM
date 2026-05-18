@@ -126,3 +126,5 @@ Phase 2.3 должна закрепить рабочий single-workspace admin 
 - негативные browser сценарии по RBAC;
 - начальный custom fields/templates baseline;
 - решение, когда возвращаем multi-tenant UI и operator admin.
+
+Canonical scope следующего слоя описан в `docs/21_PHASE_2_3_SINGLE_WORKSPACE_CONFIG_AUDIT.md`.
