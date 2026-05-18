@@ -57,6 +57,13 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+fieldset[aria-invalid="true"] {
+  border-color: rgba(180, 35, 24, 0.72);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.08);
+}
+
 h1,
 h2,
 p {
@@ -1318,6 +1325,51 @@ input[type="color"] {
   font-weight: 700;
 }
 
+.field-error {
+  margin-top: 2px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.field-help {
+  margin-top: -2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.password-field {
+  position: relative;
+  display: grid;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  width: 34px;
+  height: 34px;
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  background: #f1f4f8;
+  color: var(--text);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1361,9 +1413,32 @@ input[type="color"] {
   transform: rotate(4deg);
 }
 
+.modal-description {
+  margin: 5px 0 0;
+  color: var(--muted-strong);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .confirm-body {
   display: grid;
   gap: 16px;
+}
+
+.danger-callout {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  border-radius: 10px;
+  background: #fff7f6;
+  color: var(--danger);
+}
+
+.danger-callout span {
+  color: #7a271a;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .eyebrow {

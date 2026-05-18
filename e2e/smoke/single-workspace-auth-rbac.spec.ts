@@ -32,6 +32,9 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByRole("button", { name: "Создать должность" }).click();
   const createPositionDialog = page.getByRole("dialog", { name: "Создать должность" });
   await expect(createPositionDialog).toBeVisible();
+  await expect(createPositionDialog.getByLabel("Название должности")).toBeFocused();
+  await createPositionDialog.getByRole("button", { name: "Создать должность" }).click();
+  await expect(createPositionDialog.getByText("Укажите название должности.")).toBeVisible();
   await createPositionDialog.getByLabel("Название должности").fill(`Координатор ${suffix}`);
   await createPositionDialog.getByLabel("Описание").fill("Помогает вести проектный контур");
   await createPositionDialog.getByRole("button", { name: "Создать должность" }).click();
@@ -51,6 +54,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     .click();
   const deletePositionDialog = page.getByRole("dialog", { name: "Удалить должность" });
   await expect(deletePositionDialog).toBeVisible();
+  await expect(deletePositionDialog.getByText("Действие необратимо")).toBeVisible();
   await deletePositionDialog.getByRole("button", { name: "Удалить должность" }).click();
   await expect(page.getByText(`Координатор ${suffix} обновлено`)).toHaveCount(0);
 
@@ -59,6 +63,9 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByRole("button", { name: "Создать роль доступа" }).click();
   const createRoleDialog = page.getByRole("dialog", { name: "Создать роль доступа" });
   await expect(createRoleDialog).toBeVisible();
+  await expect(createRoleDialog.getByLabel("Название роли")).toBeFocused();
+  await createRoleDialog.getByRole("button", { name: "Создать роль доступа" }).click();
+  await expect(createRoleDialog.getByText("Укажите название роли.")).toBeVisible();
   await createRoleDialog.getByLabel("Название роли").fill(`Наблюдатель ${suffix}`);
   await createRoleDialog.getByRole("button", { name: "Создать роль доступа" }).click();
   await expect(page.getByText(`Наблюдатель ${suffix}`)).toBeVisible();
@@ -81,9 +88,27 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByRole("button", { name: "Создать пользователя" }).click();
   const createUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
   await expect(createUserDialog).toBeVisible();
+  await expect(createUserDialog.getByLabel("Имя")).toBeFocused();
+  await createUserDialog.getByRole("button", { name: "Создать пользователя" }).click();
+  await expect(createUserDialog.getByText("Укажите имя пользователя.")).toBeVisible();
+  await expect(createUserDialog.getByText("Введите корректный email.")).toBeVisible();
+  await expect(createUserDialog.getByText("Пароль должен быть не короче 8 символов.")).toBeVisible();
   await createUserDialog.getByLabel("Имя").fill(`Пользователь ${suffix}`);
   await createUserDialog.getByLabel("Email").fill(`user-${suffix}@kiss-pm.local`);
-  await createUserDialog.getByLabel("Пароль").fill("user12345");
+  const userPasswordField = createUserDialog.getByLabel("Пароль", { exact: true });
+  await userPasswordField.fill("user12345");
+  await createUserDialog.getByRole("button", { name: "Показать пароль" }).click();
+  await expect(userPasswordField).toHaveAttribute("type", "text");
+  await createUserDialog.getByRole("button", { name: "Скрыть пароль" }).click();
+  await expect(userPasswordField).toHaveAttribute("type", "password");
+  for (let index = 0; index < 12; index += 1) {
+    await page.keyboard.press("Tab");
+  }
+  await expect
+    .poll(() =>
+      createUserDialog.evaluate((element) => element.contains(document.activeElement))
+    )
+    .toBe(true);
   await createUserDialog
     .getByLabel("Роль доступа")
     .selectOption({ label: `Наблюдатель ${suffix} обновлено` });
@@ -127,7 +152,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   const createLimitedUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
   await createLimitedUserDialog.getByLabel("Имя").fill(`Ограниченный ${suffix}`);
   await createLimitedUserDialog.getByLabel("Email").fill(`limited-${suffix}@kiss-pm.local`);
-  await createLimitedUserDialog.getByLabel("Пароль").fill("limited12345");
+  await createLimitedUserDialog.getByLabel("Пароль", { exact: true }).fill("limited12345");
   await createLimitedUserDialog
     .getByLabel("Роль доступа")
     .selectOption({ label: `Ограниченный ${suffix}` });
