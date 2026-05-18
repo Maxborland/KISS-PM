@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import {
   type AccessRole,
@@ -99,13 +100,21 @@ const routeIcons: Record<WorkspaceRouteId, LucideIcon> = {
   theme: Palette
 };
 
+const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
+
 export function App() {
   const pathname = usePathname();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [routeSearch, setRouteSearch] = useState("");
   const [isSidebarCompact, setIsSidebarCompact] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [quickCreateRequested, setQuickCreateRequested] = useState(false);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const navigationToggleRef = useRef<HTMLButtonElement | null>(null);
+  const navigationFocusRestoreTokenRef = useRef(0);
+  const navigationFocusRestoreTimersRef = useRef<number[]>([]);
   const healthQuery = useHealthQuery();
   const meQuery = useMeQuery();
   const loginMutation = useLoginMutation();
@@ -148,6 +157,74 @@ export function App() {
       setQuickCreateRequested(true);
     }
   }, [activeRouteId, pathname]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 900px)");
+    const syncViewport = () => {
+      const isNarrow = mediaQuery.matches;
+      const shouldMoveFocusFromSidebar = isNarrow && sidebarRef.current?.contains(document.activeElement);
+
+      setIsNarrowViewport(isNarrow);
+      if (isNarrow) {
+        if (shouldMoveFocusFromSidebar) {
+          queueNavigationToggleFocus();
+        }
+      } else {
+        cancelNavigationToggleFocusRestore();
+        setIsMobileSidebarOpen(false);
+      }
+    };
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelNavigationToggleFocusRestore({ clearStorage: false });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isNarrowViewport || !isMobileSidebarOpen) return;
+
+    const firstFocusable = getFocusableElements(sidebarRef.current)[0];
+    firstFocusable?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeMobileSidebar();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements(sidebarRef.current);
+      const activeIndex = focusable.findIndex((element) => element === document.activeElement);
+      const nextIndex = getNextFocusTrapIndex(activeIndex, focusable.length, event.shiftKey);
+      if (nextIndex === null) return;
+
+      event.preventDefault();
+      focusable[nextIndex]?.focus();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileSidebarOpen, isNarrowViewport]);
+
+  useEffect(() => {
+    if (!isNarrowViewport || isMobileSidebarOpen) return;
+    if (sessionStorage.getItem(navigationFocusRestoreStorageKey) !== "1") return;
+
+    restoreNavigationToggleFocus();
+  }, [isMobileSidebarOpen, isNarrowViewport, pathname]);
 
   const data = useMemo<WorkspaceData | null>(() => {
     if (!meQuery.data) return null;
@@ -221,7 +298,80 @@ export function App() {
   }
 
   function navigateRoute(routeId: WorkspaceRouteId) {
+    const shouldRestoreNavigationFocus = isNarrowViewport && isMobileSidebarOpen;
+    if (shouldRestoreNavigationFocus) {
+      if (routeId !== activeRouteId) {
+        closeMobileSidebar({ deferFocusRestore: true });
+      } else {
+        closeMobileSidebar();
+      }
+    }
     router.push(getRoutePath(routeId));
+  }
+
+  function closeMobileSidebar(options: { deferFocusRestore?: boolean } = {}) {
+    if (isNarrowViewport && isMobileSidebarOpen) {
+      flushSync(() => {
+        setIsMobileSidebarOpen(false);
+      });
+      if (options.deferFocusRestore) {
+        sessionStorage.setItem(navigationFocusRestoreStorageKey, "1");
+        return;
+      }
+      queueNavigationToggleFocus();
+      return;
+    }
+
+    setIsMobileSidebarOpen(false);
+  }
+
+  function handleNavigationToggle() {
+    if (isNarrowViewport) {
+      cancelNavigationToggleFocusRestore();
+      setIsMobileSidebarOpen((value) => !value);
+      return;
+    }
+
+    setIsSidebarCompact((value) => !value);
+  }
+
+  function queueNavigationToggleFocus() {
+    sessionStorage.setItem(navigationFocusRestoreStorageKey, "1");
+    restoreNavigationToggleFocus();
+  }
+
+  function restoreNavigationToggleFocus() {
+    cancelNavigationToggleFocusRestore({ clearStorage: false });
+    const token = navigationFocusRestoreTokenRef.current + 1;
+    navigationFocusRestoreTokenRef.current = token;
+    const delays = [0, 80, 200, 400, 800, 1200];
+
+    delays.forEach((delay) => {
+      const timerId = window.setTimeout(() => {
+        if (navigationFocusRestoreTokenRef.current !== token) return;
+        if (!window.matchMedia("(max-width: 900px)").matches) return;
+
+        const navigationToggle = navigationToggleRef.current;
+        navigationToggle?.focus();
+        if (document.activeElement === navigationToggle) {
+          cancelNavigationToggleFocusRestore();
+        }
+      }, delay);
+      navigationFocusRestoreTimersRef.current.push(timerId);
+    });
+  }
+
+  function cancelNavigationToggleFocusRestore(options: { clearStorage?: boolean } = {}) {
+    const clearStorage = options.clearStorage ?? true;
+    navigationFocusRestoreTokenRef.current += 1;
+    navigationFocusRestoreTimersRef.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    navigationFocusRestoreTimersRef.current = [];
+
+    if (clearStorage) {
+      sessionStorage.removeItem(navigationFocusRestoreStorageKey);
+    }
   }
 
   function handleRouteSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -252,14 +402,35 @@ export function App() {
     );
   }
 
+  const navigationToggleLabel = isNarrowViewport
+    ? isMobileSidebarOpen
+      ? "Закрыть навигацию"
+      : "Открыть навигацию"
+    : isSidebarCompact
+      ? "Развернуть навигацию"
+      : "Свернуть навигацию";
+
   return (
     <main
       className={`workspace-shell theme-${data.me.theme} ${
         isSidebarCompact ? "sidebar-compact" : ""
-      }`}
+      } ${isMobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
       style={cssVars}
     >
-      <aside className="sidebar">
+      {isMobileSidebarOpen ? (
+        <button
+          aria-label="Закрыть навигацию"
+          className="sidebar-backdrop"
+          type="button"
+          onClick={() => closeMobileSidebar()}
+        />
+      ) : null}
+      <aside
+        aria-hidden={isNarrowViewport && !isMobileSidebarOpen ? "true" : undefined}
+        className="sidebar"
+        inert={isNarrowViewport && !isMobileSidebarOpen ? true : undefined}
+        ref={sidebarRef}
+      >
         <div className="brand-row">
           <div className="brand-block">
             <span className="brand-mark">K</span>
@@ -272,6 +443,7 @@ export function App() {
         <div className="quick-create-row">
           <button
             className="quick-create-button"
+            title="Быстро создать пользователя"
             type="button"
             onClick={() => {
               sessionStorage.setItem("kiss-pm.quick-create", "user");
@@ -285,6 +457,7 @@ export function App() {
           <button
             aria-label="Открыть профиль"
             className="sidebar-icon-button"
+            title="Открыть профиль"
             type="button"
             onClick={() => navigateRoute("profile")}
           >
@@ -304,6 +477,7 @@ export function App() {
                     aria-current={route.id === activeRouteId ? "page" : undefined}
                     aria-label={route.label}
                     className={route.id === activeRouteId ? "nav-item active" : "nav-item"}
+                    title={route.label}
                     onClick={() => navigateRoute(route.id)}
                     type="button"
                   >
@@ -338,13 +512,17 @@ export function App() {
         </div>
       </aside>
 
-      <section className="content-shell">
+      <section
+        className="content-shell"
+        inert={isNarrowViewport && isMobileSidebarOpen ? true : undefined}
+      >
         <header className="topbar">
           <button
-            aria-label={isSidebarCompact ? "Развернуть навигацию" : "Свернуть навигацию"}
+            aria-label={navigationToggleLabel}
             className="topbar-icon-button"
+            ref={navigationToggleRef}
             type="button"
-            onClick={() => setIsSidebarCompact((value) => !value)}
+            onClick={handleNavigationToggle}
           >
             <Menu aria-hidden="true" size={17} />
           </button>
@@ -396,7 +574,10 @@ export function App() {
 
         {message ? <p className="toast">{message}</p> : null}
         {activeRouteId === "dashboard" ? (
-          <Dashboard data={data} sectionStates={sectionStates} />
+          <Dashboard
+            data={data}
+            sectionStates={sectionStates}
+          />
         ) : null}
         {activeRouteId === "users" ? (
           <UsersView
@@ -424,10 +605,16 @@ export function App() {
           />
         ) : null}
         {activeRouteId === "profile" ? (
-          <ProfileView data={data} onChanged={setMessage} />
+          <ProfileView
+            data={data}
+            onChanged={setMessage}
+          />
         ) : null}
         {activeRouteId === "theme" ? (
-          <ThemeView user={data.me} onChanged={setMessage} />
+          <ThemeView
+            user={data.me}
+            onChanged={setMessage}
+          />
         ) : null}
       </section>
     </main>
