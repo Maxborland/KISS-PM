@@ -1,0 +1,59 @@
+# 10. UX/UI референсы
+
+## Правило работы с референсами
+
+Референсы не копируются буквально. Из них извлекаются capabilities, workflow logic, плотность данных, интерактивные паттерны и ожидания пользователя.
+
+## Что берем из BR2
+
+- Матричная ресурсная загрузка.
+- Мультипроектный контроль.
+- Интерактивные действия прямо из таблиц, карточек, ячеек и drilldown.
+- Несколько естественных путей выполнить одно действие.
+- Подсказки и автозаполнения.
+- Выявление и разрешение ресурсных конфликтов.
+- KPI, deviations, control signals.
+- Плотные рабочие интерфейсы для реальной операционной работы.
+
+## Что не берем из BR2
+
+- Bitrix-specific naming.
+- Привязку к Bitrix24 как ядру продукта.
+- Hardcoded роли, стадии и KPI конкретной компании.
+- Report-first мышление.
+- Legacy layout как обязательный визуальный стиль.
+
+## Обязательные reference surfaces
+
+1. Portfolio Gantt / timeline.
+2. CRM -> project wizard.
+3. Project Gantt/WBS workspace.
+4. Project settings with budgets and roles.
+5. Role dashboard.
+6. My Tasks / Kanban with filters.
+7. Guided task creation modal.
+8. Resource load matrix.
+9. Resource cell drilldown.
+10. Availability exception editor.
+11. Free capacity heatmap.
+12. Active projects operational grid.
+13. Closed projects retrospective.
+14. Profile/help and notifications.
+
+## UX-принципы
+
+- Первый экран приложения должен вести в работу, а не в маркетинговую страницу.
+- На operational surfaces важнее сканируемость, плотность и ясные действия, чем декоративность.
+- У каждого риска должна быть причина и следующий шаг.
+- У сложного действия должен быть preview.
+- У destructive или массового действия должно быть подтверждение и audit.
+- Обычный пользователь не должен видеть внутренние технические концепции.
+- Admin/builder mode может быть сложнее, но должен иметь presets, validation и preview.
+
+## Visual density
+
+KISS PM не должен быть пустой SaaS-страницей с большими карточками. Для менеджеров и resource managers нужны плотные таблицы, матрицы, фильтры, сохраненные views, sticky headers, drilldowns и быстрые действия.
+
+## Русский UI
+
+Пользовательский интерфейс проектируется на русском языке. Tenant labels могут отличаться по компаниям. Code identifiers остаются стабильными английскими ключами.

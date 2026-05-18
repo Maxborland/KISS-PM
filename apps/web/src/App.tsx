@@ -1,1183 +1,1119 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDemoTenantSummary, getDemoTenants, getPhase9FixtureSeed } from "@kiss-pm/shared-test-fixtures";
-import { createTenantLabelSet, resolveTenantLabel } from "@kiss-pm/tenant-config";
-import type { TenantLabelSet } from "@kiss-pm/tenant-config";
+import { useEffect, useMemo, useState } from "react";
 
-import { createPhase2ApiClient } from "./phase2ApiClient";
-import type {
-  AccessProfileDto,
-  AuditEventDto,
-  CurrentTenantDto,
-  Phase2ApiClient,
-  PolicyDiagnosticsDto,
-  TenantIsolationProbeDto
-} from "./phase2ApiClient";
-import { CrmIntakeControlSurface } from "./CrmIntakeControlSurface";
-import { createCrmIntakeApiClient, type CrmIntakeApiClient } from "./crmIntakeApiClient";
-import { ProjectWorkControlSurface } from "./ProjectWorkControlSurface";
-import { createPhase4ProjectWorkApiClient, type Phase4ProjectWorkApiClient } from "./phase4ProjectWorkApiClient";
-import { GanttControlSurface } from "./GanttControlSurface";
-import { createPhase5ScheduleApiClient, type Phase5ScheduleApiClient } from "./phase5ScheduleApiClient";
-import { ResourceLoadControlSurface } from "./ResourceLoadControlSurface";
-import { createResourcePlanningApiClient, type ResourcePlanningApiClient } from "./resourcePlanningApiClient";
-import { KpiDefinitionAdminSurface } from "./KpiDefinitionAdminSurface";
-import { createKpiDefinitionApiClient, type KpiDefinitionApiClient } from "./kpiDefinitionApiClient";
-import { KpiDeviationControlSurface } from "./KpiDeviationControlSurface";
-import { createKpiDeviationApiClient, type KpiDeviationApiClient } from "./kpiDeviationApiClient";
-import { PortfolioControlSurface } from "./PortfolioControlSurface";
-import { createPortfolioControlApiClient, type PortfolioControlApiClient } from "./portfolioControlApiClient";
-import { ClosedPortfolioRetrospectiveSurface } from "./ClosedPortfolioRetrospectiveSurface";
-import { createRetrospectiveApiClient, type RetrospectiveApiClient } from "./retrospectiveApiClient";
-import { ProjectClosureControlSurface } from "./ProjectClosureControlSurface";
-import { createProjectClosureApiClient, type ProjectClosureApiClient } from "./projectClosureApiClient";
-import { TenantLabelsAdminSurface } from "./TenantLabelsAdminSurface";
-import { createTenantLabelsApiClient, type TenantLabelsApiClient } from "./tenantLabelsApiClient";
-import { ProcessTemplateBuilderSurface } from "./ProcessTemplateBuilderSurface";
 import {
-  createProcessTemplateBuilderApiClient,
-  type ProcessTemplateBuilderApiClient
-} from "./processTemplateBuilderApiClient";
-import { CustomFieldBuilderSurface } from "./CustomFieldBuilderSurface";
-import { createCustomFieldBuilderApiClient, type CustomFieldBuilderApiClient } from "./customFieldBuilderApiClient";
-import { KpiThresholdBuilderSurface } from "./KpiThresholdBuilderSurface";
-import {
-  createKpiThresholdBuilderApiClient,
-  type KpiThresholdBuilderApiClient
-} from "./kpiThresholdBuilderApiClient";
-import { SavedViewLayoutBuilderSurface } from "./SavedViewLayoutBuilderSurface";
-import {
-  createSavedViewLayoutBuilderApiClient,
-  type SavedViewLayoutBuilderApiClient
-} from "./savedViewLayoutBuilderApiClient";
-import { ActionConfigurationSurface } from "./ActionConfigurationSurface";
-import {
-  createActionConfigurationApiClient,
-  type ActionConfigurationApiClient
-} from "./actionConfigurationApiClient";
-import { ConfigurationOverviewSurface } from "./ConfigurationOverviewSurface";
-import {
-  createConfigurationOverviewApiClient,
-  type ConfigurationOverviewApiClient
-} from "./configurationOverviewApiClient";
-import { IntegrationAdminDiagnosticsSurface } from "./IntegrationAdminDiagnosticsSurface";
-import {
-  createIntegrationAdminDiagnosticsApiClient,
-  type IntegrationAdminDiagnosticsApiClient
-} from "./integrationAdminDiagnosticsApiClient";
-import { OperatorReadinessSurface } from "./OperatorReadinessSurface";
-import {
-  createOperatorReadinessApiClient,
-  type OperatorReadinessApiClient
-} from "./operatorReadinessApiClient";
-import { AppQueryClientProvider } from "./queryClient";
+  createAccessRole,
+  createPosition,
+  createUser,
+  deleteAccessRole,
+  deletePosition,
+  deleteUser,
+  fetchAccessRoles,
+  fetchApiHealth,
+  fetchAuditEvents,
+  fetchMe,
+  fetchPositions,
+  fetchUsers,
+  login,
+  logout,
+  updateAccessRole,
+  updateProfile,
+  updatePosition,
+  updateTheme,
+  updateUser,
+  type AccessRole,
+  type AuditEvent,
+  type Position,
+  type WorkspaceUser
+} from "./api";
 
-type AppProps = {
-  testUser?: string;
-  tenantLabelOverrides?: Record<string, string>;
-  apiClient?: Phase2ApiClient &
-    Partial<CrmIntakeApiClient> &
-    Partial<Phase4ProjectWorkApiClient> &
-    Partial<Phase5ScheduleApiClient> &
-    Partial<ResourcePlanningApiClient> &
-    Partial<KpiDefinitionApiClient> &
-    Partial<KpiDeviationApiClient> &
-    Partial<PortfolioControlApiClient> &
-    Partial<RetrospectiveApiClient> &
-    Partial<ProjectClosureApiClient> &
-    Partial<TenantLabelsApiClient> &
-    Partial<ProcessTemplateBuilderApiClient> &
-    Partial<CustomFieldBuilderApiClient> &
-    Partial<KpiThresholdBuilderApiClient> &
-    Partial<SavedViewLayoutBuilderApiClient> &
-    Partial<ActionConfigurationApiClient> &
-    Partial<ConfigurationOverviewApiClient> &
-    Partial<IntegrationAdminDiagnosticsApiClient> &
-    Partial<OperatorReadinessApiClient>;
+type AppData = {
+  apiStatus: string;
+  me: WorkspaceUser;
+  permissions: string[];
+  users: WorkspaceUser[];
+  positions: Position[];
+  accessRoles: AccessRole[];
+  auditEvents: AuditEvent[];
 };
 
-const shellLabelDefaults = {
-  "navigation.crm_intake": "CRM-приемка",
-  "navigation.portfolio": "Портфель",
-  "navigation.projects": "Проекты",
-  "navigation.gantt": "Гантт",
-  "navigation.resources": "Ресурсы",
-  "navigation.kpi": "KPI",
-  "navigation.control_surfaces": "Контрольные поверхности",
-  "navigation.my_work": "Моя работа",
-  "navigation.retrospectives": "Ретроспектива",
-  "navigation.integrations": "Интеграции",
-  "navigation.ops": "Операторский контур",
-  "navigation.settings": "Настройки",
-  "role.tenant_admin": "Администратор",
-  "role.project_manager": "Руководитель проекта",
-  "role.resource_manager": "Ресурсный менеджер",
-  "role.executor": "Исполнитель",
-  "role.readonly_observer": "Наблюдатель",
-  "role.tenant_user": "Пользователь",
-  "shell.demo_tenant_prefix": "Демо-тенант",
-  "shell.configuration_version_prefix": "Версия конфигурации",
-  "shell.primary_navigation_aria": "Основная навигация",
-  "shell.test_user_prefix": "Тестовый пользователь",
-  "shell.phase_scope_notice": "Фаза 8: контрольные поверхности и управляемые действия",
-  "shell.empty_state_title": "Основа готовится для управляемых сценариев",
-  "shell.empty_state_body":
-    "Здесь пока только shell, маршрутизация проверки и фикстуры. CRM, проекты, KPI, ресурсы и контрольные поверхности появятся в своих фазах.",
-  "shell.external_services_note": "Внешние сервисы не используются в smoke-режиме.",
-  "phase2.surface_title": "Администрирование доступа",
-  "phase2.surface_body": "Минимальная поверхность Фазы 2 для проверки прав, меток, изоляции и аудита.",
-  "phase2.readonly_notice": "Режим чтения: изменения профилей и меток недоступны."
-} satisfies Record<string, string>;
+const navItems = [
+  "Главная",
+  "Пользователи",
+  "Роли доступа",
+  "Должности",
+  "Профиль",
+  "Оформление"
+] as const;
 
-const navigationLabelKeys = [
-  "navigation.crm_intake",
-  "navigation.portfolio",
-  "navigation.projects",
-  "navigation.gantt",
-  "navigation.resources",
-  "navigation.kpi",
-  "navigation.control_surfaces",
-  "navigation.my_work",
-  "navigation.retrospectives",
-  "navigation.integrations",
-  "navigation.ops",
-  "navigation.settings"
-];
+type NavItem = (typeof navItems)[number];
 
-function resolveFixtureSession(testUser: string) {
-  for (const tenant of getDemoTenants()) {
-    const user = tenant.users.find((candidate) => candidate.id === testUser);
-    if (user) {
-      return { tenant, user };
-    }
-  }
+const navPermissionMap = {
+  Главная: null,
+  Пользователи: "tenant.users.read",
+  "Роли доступа": "tenant.access_profiles.read",
+  Должности: "tenant.positions.read",
+  Профиль: "profile.read",
+  Оформление: "workspace.theme.manage"
+} satisfies Record<NavItem, string | null>;
 
-  return null;
-}
+const rolePermissionOptions = [
+  { value: "tenant.users.read", label: "Читать пользователей" },
+  { value: "tenant.users.manage", label: "Управлять пользователями" },
+  { value: "tenant.access_profiles.read", label: "Читать роли доступа" },
+  { value: "tenant.access_profiles.manage", label: "Управлять ролями доступа" },
+  { value: "tenant.positions.read", label: "Читать должности" },
+  { value: "tenant.positions.manage", label: "Управлять должностями" },
+  { value: "tenant.audit_events.read", label: "Читать audit" },
+  { value: "profile.read", label: "Читать профиль" },
+  { value: "profile.update", label: "Обновлять профиль" },
+  { value: "workspace.theme.manage", label: "Управлять темой" }
+] as const;
 
-function isFixtureAuthEnabled() {
-  return import.meta.env.MODE === "test" || import.meta.env.VITE_KISS_PM_ALLOW_FIXTURE_AUTH === "true";
-}
-
-function getRuntimeTestUser(explicitUser?: string) {
-  if (explicitUser !== undefined) {
-    return explicitUser;
-  }
-
-  return new URLSearchParams(window.location.search).get("testUser") ?? "";
-}
-
-function createRuntimeLabelSet(
-  tenant: { id: string; configurationVersion: number },
-  overrides?: Record<string, string>
-): TenantLabelSet {
-  const hasOverrides = overrides !== undefined && Object.keys(overrides).length > 0;
-
-  return createTenantLabelSet({
-    tenantId: tenant.id,
-    configurationVersion: tenant.configurationVersion + (hasOverrides ? 1 : 0),
-    labels: {
-      ...shellLabelDefaults,
-      ...(overrides ?? {})
-    },
-    updatedAt: hasOverrides ? "2026-05-14T13:23:00+07:00" : "2026-05-14T09:18:00+07:00"
-  });
-}
-
-function createFallbackCurrentTenant(
-  fixtureSession: NonNullable<ReturnType<typeof resolveFixtureSession>>,
-  tenantLabelOverrides?: Record<string, string>
-): CurrentTenantDto {
-  const labelSet = createRuntimeLabelSet(fixtureSession.tenant, tenantLabelOverrides);
-
-  return {
-    tenant: {
-      id: fixtureSession.tenant.id,
-      label: fixtureSession.tenant.label,
-      configurationVersion: labelSet.configurationVersion
-    },
-    actor: {
-      id: fixtureSession.user.id,
-      displayName: fixtureSession.user.displayName,
-      ...(fixtureSession.user.accessProfileId ? { accessProfileId: fixtureSession.user.accessProfileId } : {})
-    },
-    labels: labelSet.labels,
-    permissions: ["tenant.read"]
-  };
-}
-
-function shouldUseDefaultPhase2ApiClient(): boolean {
-  return import.meta.env.MODE !== "test";
-}
-
-function isCrmIntakeApiClient(apiClient: Partial<CrmIntakeApiClient> | null): apiClient is CrmIntakeApiClient {
-  return (
-    typeof apiClient?.listOpportunities === "function" &&
-    typeof apiClient.createOpportunity === "function" &&
-    typeof apiClient.runReadiness === "function" &&
-    typeof apiClient.runFeasibility === "function" &&
-    typeof apiClient.createProjectDraft === "function" &&
-    typeof apiClient.getProjectDraft === "function" &&
-    typeof apiClient.listOpportunityAuditEvents === "function"
+export function App() {
+  const [data, setData] = useState<AppData | null>(null);
+  const [activeView, setActiveView] = useState<NavItem>("Главная");
+  const [status, setStatus] = useState<"loading" | "login" | "ready" | "error">(
+    "loading"
   );
-}
-
-function isPhase4ProjectWorkApiClient(
-  apiClient: Partial<Phase4ProjectWorkApiClient> | null
-): apiClient is Phase4ProjectWorkApiClient {
-  return (
-    typeof apiClient?.ensureProjectDraft === "function" &&
-    typeof apiClient.createProjectFromTemplate === "function" &&
-    typeof apiClient.getProject === "function" &&
-    typeof apiClient.transitionProjectStage === "function" &&
-    typeof apiClient.recordArtifact === "function" &&
-    typeof apiClient.recordApproval === "function" &&
-    typeof apiClient.listProjectTasks === "function" &&
-    typeof apiClient.createProjectTask === "function" &&
-    typeof apiClient.changeTaskStatus === "function" &&
-    typeof apiClient.addTaskComment === "function" &&
-    typeof apiClient.listMyTasks === "function" &&
-    typeof apiClient.getKanbanProject === "function" &&
-    typeof apiClient.listAuditEventsForTarget === "function"
-  );
-}
-
-function isPhase5ScheduleApiClient(
-  apiClient: Partial<Phase5ScheduleApiClient> | null
-): apiClient is Phase5ScheduleApiClient {
-  return (
-    typeof apiClient?.getProjectSchedule === "function" &&
-    typeof apiClient.getProjectScheduleAudit === "function" &&
-    typeof apiClient.createScheduleTask === "function" &&
-    typeof apiClient.updateScheduleTask === "function" &&
-    typeof apiClient.createFinishToStartDependency === "function" &&
-    typeof apiClient.captureBaseline === "function"
-  );
-}
-
-function isResourcePlanningApiClient(
-  apiClient: Partial<ResourcePlanningApiClient> | null
-): apiClient is ResourcePlanningApiClient {
-  return (
-    typeof apiClient?.getResourceLoad === "function" &&
-    typeof apiClient.getResourceLoadBucket === "function" &&
-    typeof apiClient.getOverloadDetail === "function" &&
-    typeof apiClient.previewResolution === "function" &&
-    typeof apiClient.applyResolution === "function" &&
-    typeof apiClient.createReservation === "function" &&
-    typeof apiClient.getResourceAudit === "function"
-  );
-}
-
-function isKpiDefinitionApiClient(apiClient: Partial<KpiDefinitionApiClient> | null): apiClient is KpiDefinitionApiClient {
-  return (
-    typeof apiClient?.listDefinitions === "function" &&
-    typeof apiClient.previewDefinition === "function" &&
-    typeof apiClient.createDefinition === "function" &&
-    typeof apiClient.publishDefinition === "function" &&
-    typeof apiClient.retireDefinition === "function" &&
-    typeof apiClient.getKpiAudit === "function"
-  );
-}
-
-function isKpiDeviationApiClient(apiClient: Partial<KpiDeviationApiClient> | null): apiClient is KpiDeviationApiClient {
-  return (
-    typeof apiClient?.listSignals === "function" &&
-    typeof apiClient.getSignalDetail === "function" &&
-    typeof apiClient.runEvaluation === "function" &&
-    typeof apiClient.getKpiAudit === "function"
-  );
-}
-
-function isPortfolioControlApiClient(
-  apiClient: Partial<PortfolioControlApiClient> | null
-): apiClient is PortfolioControlApiClient {
-  return (
-    typeof apiClient?.getSurfaceView === "function" &&
-    typeof apiClient.listSurfaceActions === "function" &&
-    typeof apiClient.previewAction === "function" &&
-    typeof apiClient.executeAction === "function" &&
-    typeof apiClient.getControlAudit === "function"
-  );
-}
-
-function isRetrospectiveApiClient(apiClient: Partial<RetrospectiveApiClient> | null): apiClient is RetrospectiveApiClient {
-  return (
-    typeof apiClient?.getClosedPortfolio === "function" &&
-    typeof apiClient.getTrends === "function" &&
-    typeof apiClient.getInsight === "function"
-  );
-}
-
-function isProjectClosureApiClient(apiClient: Partial<ProjectClosureApiClient> | null): apiClient is ProjectClosureApiClient {
-  return (
-    typeof apiClient?.getClosure === "function" &&
-    typeof apiClient.previewClosure === "function" &&
-    typeof apiClient.applyClosure === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isTenantLabelsApiClient(apiClient: Partial<TenantLabelsApiClient> | null): apiClient is TenantLabelsApiClient {
-  return (
-    typeof apiClient?.getLabels === "function" &&
-    typeof apiClient.previewLabels === "function" &&
-    typeof apiClient.publishLabels === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isProcessTemplateBuilderApiClient(
-  apiClient: Partial<ProcessTemplateBuilderApiClient> | null
-): apiClient is ProcessTemplateBuilderApiClient {
-  return (
-    typeof apiClient?.getProcessTemplates === "function" &&
-    typeof apiClient.previewProcessTemplate === "function" &&
-    typeof apiClient.publishProcessTemplate === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isCustomFieldBuilderApiClient(
-  apiClient: Partial<CustomFieldBuilderApiClient> | null
-): apiClient is CustomFieldBuilderApiClient {
-  return (
-    typeof apiClient?.getCustomFieldRegistry === "function" &&
-    typeof apiClient.previewCustomField === "function" &&
-    typeof apiClient.publishCustomField === "function" &&
-    typeof apiClient.setProjectCustomFieldValue === "function" &&
-    typeof apiClient.getPortfolioSurfaceView === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isKpiThresholdBuilderApiClient(
-  apiClient: Partial<KpiThresholdBuilderApiClient> | null
-): apiClient is KpiThresholdBuilderApiClient {
-  return (
-    typeof apiClient?.getThresholds === "function" &&
-    typeof apiClient.previewThresholds === "function" &&
-    typeof apiClient.publishThresholds === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isSavedViewLayoutBuilderApiClient(
-  apiClient: Partial<SavedViewLayoutBuilderApiClient> | null
-): apiClient is SavedViewLayoutBuilderApiClient {
-  return (
-    typeof apiClient?.getSavedViews === "function" &&
-    typeof apiClient.previewLayout === "function" &&
-    typeof apiClient.publishLayout === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isActionConfigurationApiClient(
-  apiClient: Partial<ActionConfigurationApiClient> | null
-): apiClient is ActionConfigurationApiClient {
-  return (
-    typeof apiClient?.getActionConfigs === "function" &&
-    typeof apiClient.previewActionConfigs === "function" &&
-    typeof apiClient.publishActionConfigs === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isConfigurationOverviewApiClient(
-  apiClient: Partial<ConfigurationOverviewApiClient> | null
-): apiClient is ConfigurationOverviewApiClient {
-  return (
-    typeof apiClient?.getConfiguration === "function" &&
-    typeof apiClient.validateConfiguration === "function" &&
-    typeof apiClient.exportConfiguration === "function" &&
-    typeof apiClient.previewImport === "function" &&
-    typeof apiClient.applyImport === "function" &&
-    typeof apiClient.getAudit === "function"
-  );
-}
-
-function isIntegrationAdminDiagnosticsApiClient(
-  apiClient: Partial<IntegrationAdminDiagnosticsApiClient> | null
-): apiClient is IntegrationAdminDiagnosticsApiClient {
-  return (
-    typeof apiClient?.listAdapters === "function" &&
-    typeof apiClient.listConnections === "function" &&
-    typeof apiClient.listDiagnostics === "function" &&
-    typeof apiClient.previewImport === "function" &&
-    typeof apiClient.applyImport === "function" &&
-    typeof apiClient.listBatches === "function" &&
-    typeof apiClient.listMappings === "function" &&
-    typeof apiClient.getAudit === "function" &&
-    typeof apiClient.setFailureMode === "function" &&
-    typeof apiClient.clearFailureMode === "function"
-  );
-}
-
-function isOperatorReadinessApiClient(
-  apiClient: Partial<OperatorReadinessApiClient> | null
-): apiClient is OperatorReadinessApiClient {
-  return (
-    typeof apiClient?.getReleaseReadiness === "function" &&
-    typeof apiClient.runReleaseReadiness === "function" &&
-    typeof apiClient.getReadinessRun === "function" &&
-    typeof apiClient.getPermissionSmoke === "function" &&
-    typeof apiClient.runPermissionSmoke === "function" &&
-    typeof apiClient.getTenantIsolation === "function" &&
-    typeof apiClient.runTenantIsolation === "function" &&
-    typeof apiClient.getRecoverySmoke === "function" &&
-    typeof apiClient.runRecoverySmoke === "function" &&
-    typeof apiClient.getOpsAudit === "function"
-  );
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return "Не удалось выполнить действие";
-}
-
-function hasPermission(currentTenant: CurrentTenantDto, permissionKey: string): boolean {
-  return currentTenant.permissions.includes(permissionKey);
-}
-
-function getPhase2ProbeIds(tenantId: string): { ownProbeId: string; foreignProbeId: string } {
-  if (tenantId === "tenant-b") {
-    return {
-      ownProbeId: "probe-b-private",
-      foreignProbeId: "probe-a-private"
-    };
-  }
-
-  return {
-    ownProbeId: "probe-a-private",
-    foreignProbeId: "probe-b-private"
-  };
-}
-
-function Phase2AdminSurface({
-  apiClient,
-  currentTenant,
-  testUser,
-  onCurrentTenantChange
-}: {
-  apiClient: Phase2ApiClient;
-  currentTenant: CurrentTenantDto;
-  testUser: string;
-  onCurrentTenantChange: (currentTenant: CurrentTenantDto) => void;
-}) {
-  const [profiles, setProfiles] = useState<AccessProfileDto[]>([]);
-  const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([]);
-  const [labelValue, setLabelValue] = useState(currentTenant.labels["navigation.admin"] ?? "");
-  const [status, setStatus] = useState("Готово");
-  const [probeResult, setProbeResult] = useState<TenantIsolationProbeDto | string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<PolicyDiagnosticsDto | null>(null);
-  const [pendingAction, setPendingAction] = useState<"profile" | "label" | "ownProbe" | "foreignProbe" | null>(null);
-  const canReadProfiles = hasPermission(currentTenant, "access_profile.read");
-  const canWriteProfiles = hasPermission(currentTenant, "access_profile.write");
-  const canWriteLabels = hasPermission(currentTenant, "tenant_labels.write");
-  const canReadAudit = hasPermission(currentTenant, "audit.read");
-  const canReadDiagnostics = hasPermission(currentTenant, "permission.diagnostics.read");
-  const isReadonly = !canWriteProfiles && !canWriteLabels;
-  const { ownProbeId, foreignProbeId } = getPhase2ProbeIds(currentTenant.tenant.id);
-
-  const refreshAudit = useCallback(async () => {
-    if (!canReadAudit) {
-      setAuditEvents([]);
-      return;
-    }
-
-    setAuditEvents(await apiClient.listAuditEvents(testUser));
-  }, [apiClient, canReadAudit, testUser]);
-
-  const refreshProfiles = useCallback(async () => {
-    if (!canReadProfiles) {
-      setProfiles([]);
-      return;
-    }
-
-    setProfiles(await apiClient.listAccessProfiles(testUser));
-  }, [apiClient, canReadProfiles, testUser]);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
+    void bootstrap();
+  }, []);
 
-    async function loadSurfaceData() {
-      try {
-        const [nextProfiles, nextAuditEvents] = await Promise.all([
-          canReadProfiles ? apiClient.listAccessProfiles(testUser) : Promise.resolve([]),
-          canReadAudit ? apiClient.listAuditEvents(testUser) : Promise.resolve([])
-        ]);
-        if (!cancelled) {
-          setProfiles(nextProfiles);
-          setAuditEvents(nextAuditEvents);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStatus(getErrorMessage(error));
-        }
-      }
-    }
-
-    void loadSurfaceData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, canReadAudit, canReadProfiles, testUser]);
-
-  useEffect(() => {
-    setLabelValue(currentTenant.labels["navigation.admin"] ?? "");
-  }, [currentTenant.labels]);
-
-  async function createReviewerProfile() {
-    if (pendingAction !== null) return;
-
-    setPendingAction("profile");
-    setStatus("Сохранение профиля доступа");
-    try {
-      await apiClient.upsertAccessProfile(testUser, {
-        systemKey: "ui_reviewer",
-        label: "Ревизор доступа",
-        permissions: ["tenant.read", "audit.read"],
-        scopeRules: [
-          { permissionKey: "tenant.read", scope: "tenant" },
-          { permissionKey: "audit.read", scope: "tenant" }
-        ],
-        active: true
-      });
-      await refreshProfiles();
-      await refreshAudit();
-      setStatus("Профиль доступа сохранен");
-    } catch (error) {
-      setStatus(getErrorMessage(error));
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function saveTenantLabel() {
-    if (pendingAction !== null) return;
-
-    setPendingAction("label");
-    setStatus("Сохранение метки");
-    try {
-      await apiClient.updateTenantLabel(testUser, {
-        key: "navigation.admin",
-        label: labelValue,
-        expectedConfigurationVersion: currentTenant.tenant.configurationVersion
-      });
-      const nextCurrentTenant = await apiClient.getCurrentTenant(testUser);
-      onCurrentTenantChange(nextCurrentTenant);
-      await refreshAudit();
-      setStatus("Метка сохранена");
-    } catch (error) {
-      setStatus(getErrorMessage(error));
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function showOwnProbe() {
-    if (pendingAction !== null) return;
-
-    setPendingAction("ownProbe");
-    setStatus("Проверка своей пробы");
-    try {
-      setProbeResult(await apiClient.getIsolationProbe(testUser, ownProbeId));
-      setStatus("Проба доступна");
-    } catch (error) {
-      setProbeResult(getErrorMessage(error));
-      setStatus("Проба недоступна");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function checkForeignProbe() {
-    if (pendingAction !== null) return;
-
-    setPendingAction("foreignProbe");
-    setStatus("Проверка изоляции");
-    try {
-      if (canReadDiagnostics) {
-        setDiagnostics(
-          await apiClient.evaluatePermission(testUser, {
-            permissionKey: "tenant_probe.read",
-            targetEntityType: "tenantIsolationProbe",
-            targetEntityId: foreignProbeId,
-            requestedScope: "tenant"
+  const cssVars = useMemo(
+    () =>
+      data
+        ? ({
+            "--accent": data.me.accentColor,
+            "--accent-soft": `${data.me.accentColor}1a`
+          } as React.CSSProperties)
+        : undefined,
+    [data]
+  );
+  const visibleNavItems = useMemo(
+    () =>
+      data
+        ? navItems.filter((item) => {
+            const permission = navPermissionMap[item];
+            return permission === null || data.permissions.includes(permission);
           })
-        );
-      }
-      await apiClient.getIsolationProbe(testUser, foreignProbeId);
-      setProbeResult("Проба доступна");
-    } catch (error) {
-      setProbeResult(getErrorMessage(error));
-    } finally {
-      setStatus("Проверка завершена");
-      setPendingAction(null);
+        : navItems,
+    [data]
+  );
+
+  async function bootstrap() {
+    try {
+      const health = await fetchApiHealth();
+      const me = await fetchMe();
+      const loaded = await loadWorkspaceData(health.status, me.user, me.permissions);
+      setData(loaded);
+      setActiveView("Главная");
+      setStatus("ready");
+    } catch {
+      setStatus("login");
     }
   }
 
+  async function loadWorkspaceData(
+    apiStatus: string,
+    me: WorkspaceUser,
+    permissions: string[]
+  ): Promise<AppData> {
+    const can = (permission: string) => permissions.includes(permission);
+    const [users, positions, accessRoles, auditEvents] = await Promise.all([
+      loadOptional(
+        can("tenant.users.read"),
+        fetchUsers,
+        { users: [] as WorkspaceUser[] }
+      ),
+      loadOptional(
+        can("tenant.positions.read"),
+        fetchPositions,
+        { positions: [] as Position[] }
+      ),
+      loadOptional(
+        can("tenant.access_profiles.read"),
+        fetchAccessRoles,
+        { accessRoles: [] as AccessRole[] }
+      ),
+      loadOptional(
+        can("tenant.audit_events.read"),
+        fetchAuditEvents,
+        { auditEvents: [] as AuditEvent[] }
+      )
+    ]);
+
+    return {
+      apiStatus,
+      me,
+      permissions,
+      users: users.users,
+      positions: positions.positions,
+      accessRoles: accessRoles.accessRoles,
+      auditEvents: auditEvents.auditEvents
+    };
+  }
+
+  async function refresh(nextMessage?: string) {
+    if (!data) return;
+    const me = await fetchMe();
+    setData(await loadWorkspaceData(data.apiStatus, me.user, me.permissions));
+    if (nextMessage) setMessage(nextMessage);
+  }
+
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setMessage("");
+
+    try {
+      const me = await login({
+        email: String(form.get("email")),
+        password: String(form.get("password"))
+      });
+      const health = await fetchApiHealth();
+      setData(await loadWorkspaceData(health.status, me.user, me.permissions));
+      setActiveView("Главная");
+      setStatus("ready");
+    } catch {
+      setMessage("Не удалось войти. Проверь email и пароль.");
+    }
+  }
+
+  async function handleLogout() {
+    await logout();
+    setData(null);
+    setActiveView("Главная");
+    setStatus("login");
+  }
+
+  if (status === "loading") {
+    return <main className="center-shell">Загружаем KISS PM...</main>;
+  }
+
+  if (status === "login" || !data) {
+    return <LoginScreen message={message} onLogin={handleLogin} />;
+  }
+
   return (
-    <section className="phase2-surface" data-testid="phase2-admin-surface">
-      <div className="surface-heading">
-        <div>
-          <h2>{currentTenant.labels["phase2.surface_title"] ?? shellLabelDefaults["phase2.surface_title"]}</h2>
-          <p>{currentTenant.labels["phase2.surface_body"] ?? shellLabelDefaults["phase2.surface_body"]}</p>
+    <main className="workspace-shell" style={cssVars}>
+      <aside className="sidebar">
+        <div className="brand-block">
+          <span className="brand-mark">K</span>
+          <div>
+            <strong>KISS PM</strong>
+            <small>Single workspace</small>
+          </div>
         </div>
-        <p className="status-pill" data-testid="phase2-status">
-          {status}
+        <nav className="nav-list" aria-label="Основная навигация">
+          {visibleNavItems.map((item) => (
+            <button
+              key={item}
+              className={item === activeView ? "nav-item active" : "nav-item"}
+              onClick={() => setActiveView(item)}
+              type="button"
+            >
+              {item}
+            </button>
+          ))}
+        </nav>
+        <button className="ghost-button" type="button" onClick={handleLogout}>
+          Выйти
+        </button>
+      </aside>
+
+      <section className="content-shell">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">API: {data.apiStatus}</p>
+            <h1>{activeView}</h1>
+          </div>
+          <div className="user-chip">
+            <span>{data.me.name}</span>
+            <small>{data.me.positionName ?? "Без должности"}</small>
+          </div>
+        </header>
+
+        {message ? <p className="toast">{message}</p> : null}
+        {activeView === "Главная" ? <Dashboard data={data} /> : null}
+        {activeView === "Пользователи" ? (
+          <UsersView data={data} onChanged={() => refresh("Пользователи обновлены")} />
+        ) : null}
+        {activeView === "Роли доступа" ? (
+          <RolesView data={data} onChanged={() => refresh("Роли доступа обновлены")} />
+        ) : null}
+        {activeView === "Должности" ? (
+          <PositionsView
+            data={data}
+            onChanged={() => refresh("Должности обновлены")}
+          />
+        ) : null}
+        {activeView === "Профиль" ? (
+          <ProfileView data={data} onChanged={() => refresh("Профиль обновлен")} />
+        ) : null}
+        {activeView === "Оформление" ? (
+          <ThemeView user={data.me} onChanged={() => refresh("Тема обновлена")} />
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+async function loadOptional<T>(
+  enabled: boolean,
+  loader: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  if (!enabled) return fallback;
+
+  try {
+    return await loader();
+  } catch {
+    return fallback;
+  }
+}
+
+function hasPermission(data: AppData, permission: string): boolean {
+  return data.permissions.includes(permission);
+}
+
+function LoginScreen(props: {
+  message: string;
+  onLogin: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <main className="login-shell">
+      <section className="login-panel">
+        <p className="eyebrow">KISS PM</p>
+        <h1>Вход в рабочее пространство</h1>
+        <p className="lead">
+          Базис продукта начинается с понятной идентичности пользователя, роли
+          доступа и управляемых действий.
         </p>
-      </div>
+        <form className="stack-form" onSubmit={props.onLogin}>
+          <label>
+            Email
+            <input name="email" defaultValue="admin@kiss-pm.local" />
+          </label>
+          <label>
+            Пароль
+            <input name="password" defaultValue="admin12345" type="password" />
+          </label>
+          <button className="primary-button" type="submit">
+            Войти
+          </button>
+          {props.message ? <p className="error">{props.message}</p> : null}
+        </form>
+      </section>
+    </main>
+  );
+}
 
-      {isReadonly ? (
-        <p className="readonly-notice" data-testid="readonly-denial">
-          {currentTenant.labels["phase2.readonly_notice"] ?? shellLabelDefaults["phase2.readonly_notice"]}
-        </p>
-      ) : null}
-
-      <div className="phase2-grid">
-        <section className="phase2-panel">
-          <h3>Профили доступа</h3>
-          <div className="compact-list" data-testid="access-profile-list">
-            {profiles.length > 0 ? profiles.map((profile) => <span key={profile.id}>{profile.label}</span>) : "Нет доступных профилей"}
-          </div>
-          {canWriteProfiles ? (
-            <button disabled={pendingAction !== null} type="button" onClick={() => void createReviewerProfile()}>
-              Создать профиль ревизора
-            </button>
-          ) : null}
-        </section>
-
-        <section className="phase2-panel">
-          <h3>Метки тенанта</h3>
-          <p data-testid="admin-navigation-label">{currentTenant.labels["navigation.admin"] ?? "Администрирование"}</p>
-          {canWriteLabels ? (
-            <label className="field-stack">
-              <span>Метка раздела администрирования</span>
-              <input
-                aria-label="Метка раздела администрирования"
-                onChange={(event) => setLabelValue(event.target.value)}
-                value={labelValue}
-              />
-              <button disabled={pendingAction !== null} type="button" onClick={() => void saveTenantLabel()}>
-                Сохранить метку
-              </button>
-            </label>
-          ) : null}
-        </section>
-
-        <section className="phase2-panel">
-          <h3>Проверка изоляции</h3>
-          <div className="button-row">
-            <button disabled={pendingAction !== null} type="button" onClick={() => void showOwnProbe()}>
-              Показать свою пробу
-            </button>
-            <button disabled={pendingAction !== null} type="button" onClick={() => void checkForeignProbe()}>
-              Проверить чужую пробу
-            </button>
-          </div>
-          <p data-testid="probe-result">
-            {typeof probeResult === "string"
-              ? probeResult
-              : probeResult
-                ? `${probeResult.tenantId}: ${probeResult.label}`
-                : "Проверка еще не запускалась"}
-          </p>
-          <p data-testid="permission-diagnostics">
-            {diagnostics ? diagnostics.reasonCode : "Диагностика еще не запускалась"}
-          </p>
-        </section>
-
-        <section className="phase2-panel">
-          <h3>{currentTenant.labels["navigation.audit"] ?? "Журнал действий"}</h3>
-          <div className="compact-list" data-testid="audit-events">
-            {auditEvents.length > 0
-              ? auditEvents.map((event) => (
-                  <span key={event.id}>
-                    {event.actionKey}: {event.actorId} - {event.target.entityId}
-                  </span>
-                ))
-              : "Пока нет событий"}
-          </div>
-        </section>
-      </div>
+function Dashboard({ data }: { data: AppData }) {
+  return (
+    <section className="grid-3">
+      <Metric title="Пользователи" value={data.users.length} />
+      <Metric title="Роли доступа" value={data.accessRoles.length} />
+      <Metric title="Должности" value={data.positions.length} />
+      <section className="panel wide-panel">
+        <h2>Последние audit events</h2>
+        <EntityList
+          items={data.auditEvents.slice(0, 5)}
+          render={(event) => (
+            <>
+              <span>{event.actionType}</span>
+              <small>{event.correlationId}</small>
+            </>
+          )}
+        />
+      </section>
     </section>
   );
 }
 
-function AppShell({ testUser, tenantLabelOverrides, apiClient }: AppProps) {
-  const runtimeUser = getRuntimeTestUser(testUser);
-  const fixtureSession = useMemo(
-    () => (runtimeUser && isFixtureAuthEnabled() ? resolveFixtureSession(runtimeUser) : null),
-    [runtimeUser]
-  );
-  const phase2ApiClient = useMemo(
-    () => apiClient ?? (shouldUseDefaultPhase2ApiClient() ? createPhase2ApiClient() : null),
-    [apiClient]
-  );
-  const crmIntakeApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isCrmIntakeApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
+function UsersView(props: { data: AppData; onChanged: () => void | Promise<void> }) {
+  const canManageUsers = hasPermission(props.data, "tenant.users.manage");
+  const [modal, setModal] = useState<
+    | { type: "create" }
+    | { type: "edit"; userId: string }
+    | { type: "delete"; userId: string }
+    | null
+  >(null);
+  const [error, setError] = useState("");
+  const editingUser =
+    modal?.type === "edit"
+      ? props.data.users.find((user) => user.id === modal.userId)
+      : null;
+  const deletingUser =
+    modal?.type === "delete"
+      ? props.data.users.find((user) => user.id === modal.userId)
+      : null;
+  const mode = editingUser ? "edit" : "create";
+  const isEditingSelf = editingUser?.id === props.data.me.id;
+  const isFormOpen = modal?.type === "create" || modal?.type === "edit";
 
-    return shouldUseDefaultPhase2ApiClient() ? createCrmIntakeApiClient() : null;
-  }, [apiClient]);
-  const projectWorkApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isPhase4ProjectWorkApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
+  function closeModal() {
+    setModal(null);
+    setError("");
+  }
 
-    return shouldUseDefaultPhase2ApiClient() ? createPhase4ProjectWorkApiClient() : null;
-  }, [apiClient]);
-  const scheduleApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isPhase5ScheduleApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setError("");
 
-    return shouldUseDefaultPhase2ApiClient() ? createPhase5ScheduleApiClient() : null;
-  }, [apiClient]);
-  const resourcePlanningApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isResourcePlanningApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
+    try {
+      const input = {
+        email: String(form.get("email")),
+        name: String(form.get("name")),
+        accessProfileId: String(form.get("accessProfileId")),
+        positionId: String(form.get("positionId")) || null,
+        status: String(form.get("status") ?? "active")
+      };
 
-    return shouldUseDefaultPhase2ApiClient() ? createResourcePlanningApiClient() : null;
-  }, [apiClient]);
-  const kpiDefinitionApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isKpiDefinitionApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createKpiDefinitionApiClient() : null;
-  }, [apiClient]);
-  const kpiDeviationApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isKpiDeviationApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createKpiDeviationApiClient() : null;
-  }, [apiClient]);
-  const portfolioControlApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isPortfolioControlApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createPortfolioControlApiClient() : null;
-  }, [apiClient]);
-  const retrospectiveApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isRetrospectiveApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createRetrospectiveApiClient() : null;
-  }, [apiClient]);
-  const projectClosureApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isProjectClosureApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createProjectClosureApiClient() : null;
-  }, [apiClient]);
-  const tenantLabelsApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isTenantLabelsApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createTenantLabelsApiClient() : null;
-  }, [apiClient]);
-  const processTemplateBuilderApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isProcessTemplateBuilderApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createProcessTemplateBuilderApiClient() : null;
-  }, [apiClient]);
-  const customFieldBuilderApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isCustomFieldBuilderApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createCustomFieldBuilderApiClient() : null;
-  }, [apiClient]);
-  const kpiThresholdBuilderApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isKpiThresholdBuilderApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createKpiThresholdBuilderApiClient() : null;
-  }, [apiClient]);
-  const savedViewLayoutBuilderApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isSavedViewLayoutBuilderApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createSavedViewLayoutBuilderApiClient() : null;
-  }, [apiClient]);
-  const actionConfigurationApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isActionConfigurationApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createActionConfigurationApiClient() : null;
-  }, [apiClient]);
-  const configurationOverviewApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isConfigurationOverviewApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createConfigurationOverviewApiClient() : null;
-  }, [apiClient]);
-  const integrationAdminDiagnosticsApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isIntegrationAdminDiagnosticsApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createIntegrationAdminDiagnosticsApiClient() : null;
-  }, [apiClient]);
-  const operatorReadinessApiClient = useMemo(() => {
-    const providedApiClient = apiClient ?? null;
-    if (isOperatorReadinessApiClient(providedApiClient)) {
-      return providedApiClient;
-    }
-
-    return shouldUseDefaultPhase2ApiClient() ? createOperatorReadinessApiClient() : null;
-  }, [apiClient]);
-  const phase2Enabled = phase2ApiClient !== null;
-  const kpiNavigationHref = kpiDefinitionApiClient ? "#kpi-definition-admin" : "#kpi-deviation-control";
-  const projectWorkProjectId = useMemo(
-    () => (typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("projectId") ?? undefined),
-    []
-  );
-  const [ganttProjectId, setGanttProjectId] = useState("project-phase4-main");
-  const [ganttRefreshKey, setGanttRefreshKey] = useState(0);
-  const [currentTenant, setCurrentTenant] = useState<CurrentTenantDto | null>(() =>
-    fixtureSession && !phase2Enabled ? createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides) : null
-  );
-  const [loadError, setLoadError] = useState("");
-  const openGanttProject = useCallback((nextProjectId: string) => {
-    setGanttProjectId(nextProjectId);
-    setGanttRefreshKey((key) => key + 1);
-    window.requestAnimationFrame(() => document.getElementById("gantt-workspace")?.scrollIntoView({ block: "start" }));
-  }, []);
-
-  useEffect(() => {
-    if (!fixtureSession || !phase2ApiClient) {
-      if (fixtureSession) {
-        setCurrentTenant(createFallbackCurrentTenant(fixtureSession, tenantLabelOverrides));
+      if (editingUser) {
+        await updateUser(editingUser.id, input);
+      } else {
+        await createUser({
+          id: `user-${Date.now().toString(36)}`,
+          ...input,
+          password: String(form.get("password"))
+        });
       }
-      return;
+
+      formElement.reset();
+      setModal(null);
+      await props.onChanged();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
     }
+  }
 
-    let cancelled = false;
-    const activeApiClient = phase2ApiClient;
-
-    async function loadCurrentTenant() {
-      try {
-        const nextCurrentTenant = await activeApiClient.getCurrentTenant(runtimeUser);
-        if (!cancelled) {
-          setCurrentTenant(nextCurrentTenant);
-          setLoadError("");
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLoadError(getErrorMessage(error));
-        }
-      }
+  async function removeUser(user: WorkspaceUser | null) {
+    if (!user) return;
+    setError("");
+    try {
+      await deleteUser(user.id);
+      setModal(null);
+      await props.onChanged();
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
     }
-
-    void loadCurrentTenant();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fixtureSession, phase2ApiClient, runtimeUser, tenantLabelOverrides]);
-
-  if (!fixtureSession) {
-    return (
-      <main className="auth-screen" data-testid="auth-guard">
-        <section className="auth-panel">
-          <h1>KISS PM</h1>
-          <p>Войдите в тестовый режим</p>
-          <a href="/?testUser=project-manager-a">Открыть smoke-shell</a>
-        </section>
-      </main>
-    );
   }
-
-  if (loadError) {
-    return (
-      <main className="auth-screen" data-testid="phase2-error">
-        <section className="auth-panel">
-          <h1>KISS PM</h1>
-          <p>{loadError}</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (!currentTenant) {
-    return (
-      <main className="auth-screen" data-testid="phase2-loading">
-        <section className="auth-panel">
-          <h1>KISS PM</h1>
-          <p>Загрузка данных тенанта</p>
-        </section>
-      </main>
-    );
-  }
-
-  const tenantLabelSet = createTenantLabelSet({
-    tenantId: currentTenant.tenant.id,
-    configurationVersion: currentTenant.tenant.configurationVersion,
-    labels: {
-      ...shellLabelDefaults,
-      ...currentTenant.labels
-    },
-    updatedAt: "2026-05-14T14:40:00+07:00"
-  });
-  const roleLabel = resolveTenantLabel(tenantLabelSet, `role.${fixtureSession.user.roleKey}`);
 
   return (
-    <div className="app-shell" data-testid="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <h1>KISS PM</h1>
-          <span data-testid="tenant-indicator">
-            {resolveTenantLabel(tenantLabelSet, "shell.demo_tenant_prefix")}: {fixtureSession.tenant.label}
-          </span>
-          <span data-testid="tenant-configuration-version">
-            {resolveTenantLabel(tenantLabelSet, "shell.configuration_version_prefix")}:{" "}
-            {tenantLabelSet.configurationVersion}
-          </span>
-        </div>
-        <nav
-          aria-label={resolveTenantLabel(tenantLabelSet, "shell.primary_navigation_aria")}
-          data-testid="primary-navigation"
-        >
-          {navigationLabelKeys.map((labelKey) => (
-            <a
-              href={
-                labelKey === "navigation.gantt"
-                  ? "#gantt-workspace"
-                  : labelKey === "navigation.portfolio"
-                    ? "#portfolio-control"
-                  : labelKey === "navigation.resources"
-                  ? "#resource-load-control"
-                  : labelKey === "navigation.kpi"
-                      ? kpiNavigationHref
-                    : labelKey === "navigation.retrospectives"
-                      ? "#closed-portfolio-retrospectives"
-                    : labelKey === "navigation.integrations"
-                      ? "#integration-admin-diagnostics"
-                    : labelKey === "navigation.ops"
-                      ? "#operator-readiness"
-                    : "#phase-1-placeholder"
-              }
-              key={labelKey}
+    <>
+      <Panel
+        title="CRUD пользователей"
+        actions={
+          canManageUsers ? (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setModal({ type: "create" })}
             >
-              {resolveTenantLabel(tenantLabelSet, labelKey)}
-            </a>
-          ))}
-        </nav>
-      </aside>
+              Создать пользователя
+            </button>
+          ) : null
+        }
+      >
+        <table className="data-table" aria-label="Пользователи">
+          <thead>
+            <tr>
+              <th>Имя</th>
+              <th>Email</th>
+              <th>Роль</th>
+              <th>Должность</th>
+              <th>Статус</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {props.data.users.map((user) => {
+              const role = props.data.accessRoles.find(
+                (item) => item.id === user.accessProfileId
+              );
 
-      <main className="workspace">
-        <header className="workspace-header">
-          <p data-testid="phase-scope-notice">
-            {resolveTenantLabel(tenantLabelSet, "shell.phase_scope_notice")}
-          </p>
-          <div className="user-stack">
-            <p className="user-chip">
-              {resolveTenantLabel(tenantLabelSet, "shell.test_user_prefix")}: {fixtureSession.user.displayName}
-            </p>
-            <p className="role-chip" data-testid="runtime-role-label">
-              {roleLabel}
-            </p>
+              return (
+                <tr key={user.id}>
+                  <td>{user.name}</td>
+                  <td>{user.email}</td>
+                  <td>{role?.name ?? user.accessProfileId}</td>
+                  <td>{user.positionName ?? "Без должности"}</td>
+                  <td>{user.status === "active" ? "Активен" : "Отключен"}</td>
+                  <td>
+                    {canManageUsers ? (
+                      <span className="table-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => setModal({ type: "edit", userId: user.id })}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          className="danger-button"
+                          disabled={user.id === props.data.me.id}
+                          type="button"
+                          onClick={() => setModal({ type: "delete", userId: user.id })}
+                        >
+                          Удалить
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="muted">Только просмотр</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Panel>
+      {isFormOpen ? (
+        <Modal
+          title={mode === "edit" ? "Редактировать пользователя" : "Создать пользователя"}
+          onClose={closeModal}
+        >
+          <form className="stack-form" key={editingUser?.id ?? "new-user"} onSubmit={submit}>
+            <label>
+              Имя
+              <input name="name" defaultValue={editingUser?.name ?? ""} required />
+            </label>
+            <label>
+              Email
+              <input name="email" defaultValue={editingUser?.email ?? ""} required />
+            </label>
+            {mode === "create" ? (
+              <label>
+                Пароль
+                <input name="password" placeholder="минимум 8 символов" required />
+              </label>
+            ) : null}
+            <label>
+              Роль доступа
+              {isEditingSelf && editingUser ? (
+                <>
+                  <input name="accessProfileId" type="hidden" value={editingUser.accessProfileId} />
+                  <input
+                    readOnly
+                    value={
+                      props.data.accessRoles.find(
+                        (role) => role.id === editingUser.accessProfileId
+                      )?.name ?? editingUser.accessProfileId
+                    }
+                  />
+                </>
+              ) : (
+                <select name="accessProfileId" defaultValue={editingUser?.accessProfileId} required>
+                  {props.data.accessRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+            <label>
+              Должность
+              <select name="positionId" defaultValue={editingUser?.positionId ?? ""}>
+                <option value="">Без должности</option>
+                {props.data.positions.map((position) => (
+                  <option key={position.id} value={position.id}>
+                    {position.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              {isEditingSelf ? (
+                <>
+                  <input name="status" type="hidden" value="active" />
+                  <input readOnly value="Активен" />
+                </>
+              ) : (
+                <select name="status" defaultValue={editingUser?.status ?? "active"}>
+                  <option value="active">Активен</option>
+                  <option value="inactive">Отключен</option>
+                </select>
+              )}
+            </label>
+            {error ? <p className="error">{error}</p> : null}
+            <div className="form-actions">
+              <button className="primary-button" type="submit">
+                {mode === "edit" ? "Сохранить пользователя" : "Создать пользователя"}
+              </button>
+              <button className="secondary-button" type="button" onClick={closeModal}>
+                Отменить
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {modal?.type === "delete" ? (
+        <ConfirmDialog
+          title="Удалить пользователя"
+          body={`Пользователь "${deletingUser?.name ?? "выбранный пользователь"}" будет удален из рабочего пространства.`}
+          confirmLabel="Удалить пользователя"
+          onCancel={closeModal}
+          onConfirm={() => removeUser(deletingUser ?? null)}
+          error={error}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function RolesView(props: { data: AppData; onChanged: () => void | Promise<void> }) {
+  const canManageRoles = hasPermission(props.data, "tenant.access_profiles.manage");
+  const [modal, setModal] = useState<
+    | { type: "create" }
+    | { type: "edit"; roleId: string }
+    | { type: "delete"; roleId: string }
+    | null
+  >(null);
+  const [error, setError] = useState("");
+  const editingRole =
+    modal?.type === "edit"
+      ? props.data.accessRoles.find((role) => role.id === modal.roleId)
+      : null;
+  const deletingRole =
+    modal?.type === "delete"
+      ? props.data.accessRoles.find((role) => role.id === modal.roleId)
+      : null;
+  const isFormOpen = modal?.type === "create" || modal?.type === "edit";
+
+  function closeModal() {
+    setModal(null);
+    setError("");
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const permissions = form.getAll("permissions").map(String);
+    setError("");
+
+    try {
+      const input = {
+        name: String(form.get("name")),
+        permissions
+      };
+
+      if (editingRole) {
+        await updateAccessRole(editingRole.id, input);
+      } else {
+        await createAccessRole({
+          id: `access-role-${Date.now().toString(36)}`,
+          ...input
+        });
+      }
+
+      formElement.reset();
+      setModal(null);
+      await props.onChanged();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    }
+  }
+
+  async function removeRole(role: AccessRole | null) {
+    if (!role) return;
+    setError("");
+    try {
+      await deleteAccessRole(role.id);
+      setModal(null);
+      await props.onChanged();
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
+    }
+  }
+
+  return (
+    <>
+      <Panel
+        title="CRUD ролей доступа"
+        actions={
+          canManageRoles ? (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setModal({ type: "create" })}
+            >
+              Создать роль доступа
+            </button>
+          ) : null
+        }
+      >
+        <table className="data-table" aria-label="Роли доступа">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Права</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {props.data.accessRoles.map((role) => {
+              const assignedUsers = props.data.users.filter(
+                (user) => user.accessProfileId === role.id
+              ).length;
+
+              return (
+                <tr key={role.id}>
+                  <td>{role.name}</td>
+                  <td>{role.permissions.join(", ")}</td>
+                  <td>
+                    {canManageRoles ? (
+                      <span className="table-actions">
+                        <button
+                          className="secondary-button"
+                          disabled={role.id === props.data.me.accessProfileId}
+                          title={
+                            role.id === props.data.me.accessProfileId
+                              ? "Нельзя редактировать собственную роль доступа"
+                              : undefined
+                          }
+                          type="button"
+                          onClick={() => setModal({ type: "edit", roleId: role.id })}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          className="danger-button"
+                          disabled={assignedUsers > 0}
+                          title={
+                            assignedUsers > 0
+                              ? "Нельзя удалить роль, пока она назначена пользователям"
+                              : undefined
+                          }
+                          type="button"
+                          onClick={() => setModal({ type: "delete", roleId: role.id })}
+                        >
+                          Удалить
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="muted">Только просмотр</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Panel>
+      {isFormOpen ? (
+        <Modal
+          title={editingRole ? "Редактировать роль доступа" : "Создать роль доступа"}
+          onClose={closeModal}
+        >
+        <form className="stack-form" key={editingRole?.id ?? "new-role"} onSubmit={submit}>
+          <label>
+            Название роли
+            <input name="name" defaultValue={editingRole?.name ?? ""} required />
+          </label>
+          <fieldset className="permission-grid">
+            <legend>Права роли</legend>
+            {rolePermissionOptions.map((permission) => (
+              <label key={permission.value} className="checkbox-row">
+                <input
+                  defaultChecked={
+                    editingRole
+                      ? editingRole.permissions.includes(permission.value)
+                      : ["tenant.users.read", "profile.read", "profile.update"].includes(
+                          permission.value
+                        )
+                  }
+                  name="permissions"
+                  type="checkbox"
+                  value={permission.value}
+                />
+                {permission.label}
+              </label>
+            ))}
+          </fieldset>
+          {error ? <p className="error">{error}</p> : null}
+          <div className="form-actions">
+            <button className="primary-button" type="submit">
+              {editingRole ? "Сохранить роль доступа" : "Создать роль доступа"}
+            </button>
+            <button className="secondary-button" type="button" onClick={closeModal}>
+              Отменить
+            </button>
           </div>
-        </header>
+        </form>
+        </Modal>
+      ) : null}
+      {modal?.type === "delete" ? (
+        <ConfirmDialog
+          title="Удалить роль доступа"
+          body={`Роль "${deletingRole?.name ?? "выбранная роль"}" будет удалена. Это возможно только если она не назначена пользователям.`}
+          confirmLabel="Удалить роль доступа"
+          onCancel={closeModal}
+          onConfirm={() => removeRole(deletingRole ?? null)}
+          error={error}
+        />
+      ) : null}
+    </>
+  );
+}
 
-        <section className="empty-state" id="phase-1-placeholder">
-          <h2>{resolveTenantLabel(tenantLabelSet, "shell.empty_state_title")}</h2>
-          <p>
-            {resolveTenantLabel(tenantLabelSet, "shell.empty_state_body")}
-          </p>
-          <p data-testid="fixture-summary">{getDemoTenantSummary()}</p>
-          <p data-testid="external-services-note">
-            {resolveTenantLabel(tenantLabelSet, "shell.external_services_note")}
-          </p>
-        </section>
-        {phase2ApiClient ? (
-          <Phase2AdminSurface
-            apiClient={phase2ApiClient}
-            currentTenant={currentTenant}
-            onCurrentTenantChange={setCurrentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {tenantLabelsApiClient ? (
-          <TenantLabelsAdminSurface
-            apiClient={tenantLabelsApiClient}
-            currentTenant={currentTenant}
-            onCurrentTenantChange={setCurrentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {processTemplateBuilderApiClient ? (
-          <ProcessTemplateBuilderSurface
-            apiClient={processTemplateBuilderApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {customFieldBuilderApiClient ? (
-          <CustomFieldBuilderSurface
-            apiClient={customFieldBuilderApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {kpiThresholdBuilderApiClient ? (
-          <KpiThresholdBuilderSurface
-            apiClient={kpiThresholdBuilderApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {savedViewLayoutBuilderApiClient ? (
-          <SavedViewLayoutBuilderSurface
-            apiClient={savedViewLayoutBuilderApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {actionConfigurationApiClient ? (
-          <ActionConfigurationSurface
-            apiClient={actionConfigurationApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {configurationOverviewApiClient ? (
-          <ConfigurationOverviewSurface
-            apiClient={configurationOverviewApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {integrationAdminDiagnosticsApiClient ? (
-          <IntegrationAdminDiagnosticsSurface
-            apiClient={integrationAdminDiagnosticsApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {operatorReadinessApiClient ? (
-          <OperatorReadinessSurface
-            apiClient={operatorReadinessApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {crmIntakeApiClient ? (
-          <CrmIntakeControlSurface
-            apiClient={crmIntakeApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {projectWorkApiClient ? (
-          <ProjectWorkControlSurface
-            apiClient={projectWorkApiClient}
-            currentTenant={currentTenant}
-            onOpenGanttProject={openGanttProject}
-            projectId={projectWorkProjectId}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {portfolioControlApiClient ? (
-          <PortfolioControlSurface
-            apiClient={portfolioControlApiClient}
-            currentTenant={currentTenant}
-            onOpenGanttProject={openGanttProject}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {scheduleApiClient ? (
-          <GanttControlSurface
-            apiClient={scheduleApiClient}
-            currentTenant={currentTenant}
-            projectId={ganttProjectId}
-            refreshKey={ganttRefreshKey}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {resourcePlanningApiClient ? (
-          <ResourceLoadControlSurface
-            apiClient={resourcePlanningApiClient}
-            currentTenant={currentTenant}
-            onOpenGanttProject={openGanttProject}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {kpiDefinitionApiClient ? (
-          <KpiDefinitionAdminSurface
-            apiClient={kpiDefinitionApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {kpiDeviationApiClient ? (
-          <KpiDeviationControlSurface
-            apiClient={kpiDeviationApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {retrospectiveApiClient ? (
-          <ClosedPortfolioRetrospectiveSurface
-            apiClient={retrospectiveApiClient}
-            currentTenant={currentTenant}
-            testUser={runtimeUser}
-          />
-        ) : null}
-        {projectClosureApiClient ? (
-          <ProjectClosureControlSurface
-            apiClient={projectClosureApiClient}
-            currentTenant={currentTenant}
-            projectId={getPhase9FixtureSeed().tenantA.closureProjectId}
-            testUser={runtimeUser}
-          />
-        ) : null}
-      </main>
+function PositionsView(props: { data: AppData; onChanged: () => void | Promise<void> }) {
+  const canManagePositions = hasPermission(props.data, "tenant.positions.manage");
+  const [modal, setModal] = useState<
+    | { type: "create" }
+    | { type: "edit"; positionId: string }
+    | { type: "delete"; positionId: string }
+    | null
+  >(null);
+  const [error, setError] = useState("");
+  const editingPosition =
+    modal?.type === "edit"
+      ? props.data.positions.find((position) => position.id === modal.positionId)
+      : null;
+  const deletingPosition =
+    modal?.type === "delete"
+      ? props.data.positions.find((position) => position.id === modal.positionId)
+      : null;
+  const isFormOpen = modal?.type === "create" || modal?.type === "edit";
+
+  function closeModal() {
+    setModal(null);
+    setError("");
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const input = {
+      name: String(form.get("name")),
+      description: String(form.get("description"))
+    };
+    setError("");
+
+    try {
+      if (editingPosition) {
+        await updatePosition(editingPosition.id, input);
+      } else {
+        await createPosition({
+          id: `position-${Date.now().toString(36)}`,
+          ...input
+        });
+      }
+
+      formElement.reset();
+      setModal(null);
+      await props.onChanged();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    }
+  }
+
+  async function removePosition(position: Position | null) {
+    if (!position) return;
+    setError("");
+    try {
+      await deletePosition(position.id);
+      setModal(null);
+      await props.onChanged();
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
+    }
+  }
+
+  return (
+    <>
+      <Panel
+        title="CRUD должностей"
+        actions={
+          canManagePositions ? (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setModal({ type: "create" })}
+            >
+              Создать должность
+            </button>
+          ) : null
+        }
+      >
+        <table className="data-table" aria-label="Должности">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Описание</th>
+              <th>Назначено пользователей</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {props.data.positions.map((position) => {
+              const assignedUsers = props.data.users.filter(
+                (user) => user.positionId === position.id
+              ).length;
+
+              return (
+                <tr key={position.id}>
+                  <td>{position.name}</td>
+                  <td>{position.description ?? "Описание не задано"}</td>
+                  <td>{assignedUsers}</td>
+                  <td>
+                    {canManagePositions ? (
+                      <span className="table-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => setModal({ type: "edit", positionId: position.id })}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          className="danger-button"
+                          disabled={assignedUsers > 0}
+                          title={
+                            assignedUsers > 0
+                              ? "Нельзя удалить должность, пока она назначена пользователям"
+                              : undefined
+                          }
+                          type="button"
+                          onClick={() => setModal({ type: "delete", positionId: position.id })}
+                        >
+                          Удалить
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="muted">Только просмотр</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Panel>
+      {isFormOpen ? (
+        <Modal
+          title={editingPosition ? "Редактировать должность" : "Создать должность"}
+          onClose={closeModal}
+        >
+        <form className="stack-form" key={editingPosition?.id ?? "new-position"} onSubmit={submit}>
+          <label>
+            Название должности
+            <input name="name" defaultValue={editingPosition?.name ?? ""} required />
+          </label>
+          <label>
+            Описание
+            <input name="description" defaultValue={editingPosition?.description ?? ""} />
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <div className="form-actions">
+            <button className="primary-button" type="submit">
+              {editingPosition ? "Сохранить должность" : "Создать должность"}
+            </button>
+            <button className="secondary-button" type="button" onClick={closeModal}>
+              Отменить
+            </button>
+          </div>
+        </form>
+        </Modal>
+      ) : null}
+      {modal?.type === "delete" ? (
+        <ConfirmDialog
+          title="Удалить должность"
+          body={`Должность "${deletingPosition?.name ?? "выбранная должность"}" будет удалена. Это возможно только если она не назначена пользователям.`}
+          confirmLabel="Удалить должность"
+          onCancel={closeModal}
+          onConfirm={() => removePosition(deletingPosition ?? null)}
+          error={error}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ProfileView(props: { data: AppData; onChanged: () => void | Promise<void> }) {
+  const canUpdate = hasPermission(props.data, "profile.update");
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await updateProfile({
+      name: String(form.get("name")),
+      phone: String(form.get("phone")),
+      telegram: String(form.get("telegram"))
+    });
+    await props.onChanged();
+  }
+
+  return (
+    <Panel title="Профиль пользователя">
+      <form className="stack-form compact-form" onSubmit={submit}>
+        <label>
+          Имя
+          <input name="name" defaultValue={props.data.me.name} disabled={!canUpdate} />
+        </label>
+        <label>
+          Телефон
+          <input name="phone" defaultValue={props.data.me.phone ?? ""} disabled={!canUpdate} />
+        </label>
+        <label>
+          Telegram
+          <input name="telegram" defaultValue={props.data.me.telegram ?? ""} disabled={!canUpdate} />
+        </label>
+        {canUpdate ? (
+          <button className="primary-button" type="submit">
+            Сохранить профиль
+          </button>
+        ) : (
+          <p className="muted">Профиль доступен только для просмотра.</p>
+        )}
+      </form>
+    </Panel>
+  );
+}
+
+function ThemeView(props: { user: WorkspaceUser; onChanged: () => void | Promise<void> }) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await updateTheme({
+      theme: String(form.get("theme")),
+      accentColor: String(form.get("accentColor"))
+    });
+    await props.onChanged();
+  }
+
+  return (
+    <Panel title="Оформление">
+      <form className="stack-form compact-form" onSubmit={submit}>
+        <label>
+          Тема
+          <select name="theme" defaultValue={props.user.theme}>
+            <option value="light">Светлая</option>
+            <option value="dark">Темная</option>
+          </select>
+        </label>
+        <label>
+          Акцентный цвет
+          <input name="accentColor" defaultValue={props.user.accentColor} type="color" />
+        </label>
+        <button className="primary-button" type="submit">
+          Применить тему
+        </button>
+      </form>
+    </Panel>
+  );
+}
+
+function Metric(props: { title: string; value: number }) {
+  return (
+    <section className="metric-card">
+      <span>{props.title}</span>
+      <strong>{props.value}</strong>
+    </section>
+  );
+}
+
+function Panel(props: {
+  title: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="panel">
+      <div className="panel-heading">
+        <h2>{props.title}</h2>
+        {props.actions ? <div className="panel-actions">{props.actions}</div> : null}
+      </div>
+      {props.children}
+    </section>
+  );
+}
+
+function Modal(props: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+      <section
+        aria-label={props.title}
+        aria-modal="true"
+        className="modal-panel"
+        role="dialog"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="modal-header">
+          <h2>{props.title}</h2>
+          <button
+            aria-label="Закрыть"
+            className="icon-button"
+            type="button"
+            onClick={props.onClose}
+          >
+            ×
+          </button>
+        </header>
+        {props.children}
+      </section>
     </div>
   );
 }
 
-export function App(props: AppProps) {
+function ConfirmDialog(props: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  error: string;
+  onCancel: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
   return (
-    <AppQueryClientProvider>
-      <AppShell {...props} />
-    </AppQueryClientProvider>
+    <Modal title={props.title} onClose={props.onCancel}>
+      <div className="confirm-body">
+        <p>{props.body}</p>
+        {props.error ? <p className="error">{props.error}</p> : null}
+        <div className="form-actions">
+          <button className="danger-button solid" type="button" onClick={props.onConfirm}>
+            {props.confirmLabel}
+          </button>
+          <button className="secondary-button" type="button" onClick={props.onCancel}>
+            Отменить
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
+}
+
+function EntityList<T>(props: {
+  items: T[];
+  render: (item: T) => React.ReactNode;
+}) {
+  if (props.items.length === 0) {
+    return <p className="muted">Пока пусто.</p>;
+  }
+
+  return (
+    <ul className="entity-list">
+      {props.items.map((item, index) => (
+        <li key={index}>{props.render(item)}</li>
+      ))}
+    </ul>
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Не удалось выполнить действие";
 }
