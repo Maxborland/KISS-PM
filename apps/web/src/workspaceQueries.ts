@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 
 import {
   createAccessRole,
+  createCustomField,
   createPosition,
+  createProjectTemplate,
   createUser,
   deleteAccessRole,
   deletePosition,
@@ -10,14 +12,18 @@ import {
   fetchAccessRoles,
   fetchApiHealth,
   fetchAuditEvents,
+  fetchCustomFields,
   fetchMe,
   fetchPositions,
+  fetchProjectTemplates,
   fetchUsers,
   login,
   logout,
   updateAccessRole,
+  updateCustomField,
   updatePosition,
   updateProfile,
+  updateProjectTemplate,
   updateTheme,
   updateUser
 } from "./api";
@@ -28,7 +34,9 @@ export const workspaceQueryKeys = {
   users: () => ["workspace", "users"] as const,
   positions: () => ["workspace", "positions"] as const,
   accessRoles: () => ["workspace", "accessRoles"] as const,
-  auditEvents: () => ["workspace", "auditEvents"] as const
+  auditEvents: () => ["workspace", "auditEvents"] as const,
+  customFields: () => ["workspace", "config", "customFields"] as const,
+  projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
 };
 
 export async function clearSessionQueries(queryClient: QueryClient): Promise<void> {
@@ -87,6 +95,22 @@ export function useAuditEventsQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.auditEvents(),
     queryFn: fetchAuditEvents,
+    enabled
+  });
+}
+
+export function useCustomFieldsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.customFields(),
+    queryFn: fetchCustomFields,
+    enabled
+  });
+}
+
+export function useProjectTemplatesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectTemplates(),
+    queryFn: fetchProjectTemplates,
     enabled
   });
 }
@@ -187,6 +211,38 @@ export function useAccessRoleMutations() {
     deleteAccessRole: useMutation({
       mutationFn: deleteAccessRole,
       onSuccess: invalidateAccessRoles
+    })
+  };
+}
+
+export function useWorkspaceConfigMutations() {
+  const queryClient = useQueryClient();
+  const invalidateWorkspaceConfig = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.customFields() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projectTemplates() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
+
+  return {
+    createCustomField: useMutation({
+      mutationFn: createCustomField,
+      onSuccess: invalidateWorkspaceConfig
+    }),
+    updateCustomField: useMutation({
+      mutationFn: ({ fieldId, input }: Parameters<typeof updateCustomField> extends [infer Id, infer Input] ? { fieldId: Id; input: Input } : never) =>
+        updateCustomField(fieldId, input),
+      onSuccess: invalidateWorkspaceConfig
+    }),
+    createProjectTemplate: useMutation({
+      mutationFn: createProjectTemplate,
+      onSuccess: invalidateWorkspaceConfig
+    }),
+    updateProjectTemplate: useMutation({
+      mutationFn: ({ templateId, input }: Parameters<typeof updateProjectTemplate> extends [infer Id, infer Input] ? { templateId: Id; input: Input } : never) =>
+        updateProjectTemplate(templateId, input),
+      onSuccess: invalidateWorkspaceConfig
     })
   };
 }

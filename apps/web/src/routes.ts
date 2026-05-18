@@ -32,6 +32,22 @@ export const workspaceRoutes = [
     description: "Рабочие должности и назначенные пользователи"
   },
   {
+    id: "audit",
+    label: "Аудит",
+    group: "admin",
+    path: "/audit",
+    permission: "tenant.audit_events.read",
+    description: "Журнал административных действий и настроек"
+  },
+  {
+    id: "settings",
+    label: "Настройки",
+    group: "admin",
+    path: "/settings",
+    permission: "tenant.workspace_config.read",
+    description: "Пользовательские поля и шаблоны проекта"
+  },
+  {
     id: "profile",
     label: "Профиль",
     group: "personal",

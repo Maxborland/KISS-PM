@@ -11,6 +11,16 @@ describe("workspace query keys", () => {
     expect(workspaceQueryKeys.positions()).toEqual(["workspace", "positions"]);
     expect(workspaceQueryKeys.accessRoles()).toEqual(["workspace", "accessRoles"]);
     expect(workspaceQueryKeys.auditEvents()).toEqual(["workspace", "auditEvents"]);
+    expect(workspaceQueryKeys.customFields()).toEqual([
+      "workspace",
+      "config",
+      "customFields"
+    ]);
+    expect(workspaceQueryKeys.projectTemplates()).toEqual([
+      "workspace",
+      "config",
+      "projectTemplates"
+    ]);
   });
 
   it("clears only session-bound cache on logout", async () => {

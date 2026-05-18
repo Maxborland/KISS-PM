@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAuditPreviewRows } from "./workspaceDashboard";
+import {
+  buildAuditChangeSummary,
+  buildAuditPreviewRows
+} from "./workspaceDashboard";
 
 describe("workspace dashboard", () => {
   it("builds audit preview rows from real audit events newest first", () => {
@@ -18,7 +21,7 @@ describe("workspace dashboard", () => {
           id: "audit-new",
           tenantId: "tenant-1",
           actorUserId: "user-1",
-          actionType: "profile.theme.updated",
+          actionType: "workspace.project_template.updated",
           correlationId: "corr-new",
           createdAt: "2026-05-18T10:00:00.000Z"
         }
@@ -45,7 +48,7 @@ describe("workspace dashboard", () => {
       {
         id: "audit-new",
         actorName: "Анна Администратор",
-        actionLabel: "Оформление обновлено",
+        actionLabel: "Шаблон проекта обновлен",
         createdAtLabel: "18.05.2026, 10:00"
       },
       {
@@ -72,5 +75,36 @@ describe("workspace dashboard", () => {
 
     expect(rows).toHaveLength(6);
     expect(rows[0]?.id).toBe("audit-7");
+  });
+
+  it("builds readable before and after summaries for config audit events", () => {
+    const summary = buildAuditChangeSummary({
+      id: "audit-config",
+      tenantId: "tenant-1",
+      actorUserId: "user-1",
+      actionType: "workspace.custom_field.updated",
+      correlationId: "corr-config",
+      createdAt: "2026-05-18T10:00:00.000Z",
+      beforeState: {
+        systemKey: "priority",
+        tenantLabel: "Приоритет",
+        fieldType: "text",
+        required: false,
+        status: "draft"
+      },
+      afterState: {
+        systemKey: "priority",
+        tenantLabel: "Приоритет проекта",
+        fieldType: "select",
+        required: true,
+        status: "active"
+      }
+    });
+
+    expect(summary).toEqual({
+      title: "4 изменения",
+      detail:
+        "Название: Приоритет -> Приоритет проекта; Тип: text -> select; Обязательное: нет -> да"
+    });
   });
 });
