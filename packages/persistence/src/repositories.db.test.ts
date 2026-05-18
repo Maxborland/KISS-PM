@@ -22,11 +22,11 @@ describe("PostgreSQL tenant data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -129,5 +129,87 @@ describe("PostgreSQL tenant data source", () => {
       }
     ]);
     await expect(dataSource.listAccessProfilesByTenantId("tenant-beta")).resolves.toEqual([]);
+  });
+
+  it("persists custom fields and project templates only inside one tenant", async () => {
+    await client`
+      INSERT INTO tenants (id, name, created_at)
+      VALUES
+        ('tenant-alpha', 'Альфа Проект', now()),
+        ('tenant-beta', 'Бета Проект', now())
+    `;
+
+    const field = await dataSource.createCustomFieldDefinition({
+      id: "field-project-priority",
+      tenantId: "tenant-alpha",
+      systemKey: "project_priority",
+      tenantLabel: "Приоритет проекта",
+      targetEntity: "project",
+      fieldType: "select",
+      required: true,
+      status: "active"
+    });
+    const template = await dataSource.createProjectTemplate({
+      id: "template-implementation",
+      tenantId: "tenant-alpha",
+      systemKey: "implementation",
+      tenantLabel: "Внедрение",
+      description: "Базовый шаблон проекта внедрения",
+      status: "draft"
+    });
+
+    expect(field).toMatchObject({
+      id: "field-project-priority",
+      tenantId: "tenant-alpha",
+      systemKey: "project_priority",
+      tenantLabel: "Приоритет проекта"
+    });
+    expect(template).toMatchObject({
+      id: "template-implementation",
+      tenantId: "tenant-alpha",
+      systemKey: "implementation",
+      tenantLabel: "Внедрение"
+    });
+    await expect(dataSource.listCustomFieldDefinitions("tenant-alpha")).resolves.toHaveLength(1);
+    await expect(dataSource.listCustomFieldDefinitions("tenant-beta")).resolves.toEqual([]);
+    await expect(dataSource.listProjectTemplates("tenant-alpha")).resolves.toHaveLength(1);
+    await expect(dataSource.listProjectTemplates("tenant-beta")).resolves.toEqual([]);
+
+    await expect(
+      dataSource.createCustomFieldDefinition({
+        id: "field-project-priority",
+        tenantId: "tenant-beta",
+        systemKey: "project_priority",
+        tenantLabel: "Приоритет проекта",
+        targetEntity: "project",
+        fieldType: "select",
+        required: false,
+        status: "draft"
+      })
+    ).resolves.toMatchObject({
+      id: "field-project-priority",
+      tenantId: "tenant-beta"
+    });
+
+    await expect(
+      dataSource.updateCustomFieldDefinition({
+        ...field,
+        tenantLabel: "Приоритет портфеля",
+        required: false
+      })
+    ).resolves.toMatchObject({
+      tenantLabel: "Приоритет портфеля",
+      required: false
+    });
+    await expect(
+      dataSource.updateProjectTemplate({
+        ...template,
+        status: "active",
+        description: null
+      })
+    ).resolves.toMatchObject({
+      status: "active",
+      description: null
+    });
   });
 });

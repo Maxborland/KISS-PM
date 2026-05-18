@@ -8,6 +8,8 @@ export const permissions = [
   "tenant.positions.read",
   "tenant.positions.manage",
   "tenant.audit_events.read",
+  "tenant.workspace_config.read",
+  "tenant.workspace_config.manage",
   "profile.read",
   "profile.update",
   "workspace.theme.manage"
@@ -104,6 +106,28 @@ export function canReadPositions(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.positions.read"
+  });
+}
+
+export function canReadWorkspaceConfig(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.workspace_config.read"
+  });
+}
+
+export function canManageWorkspaceConfig(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.workspace_config.manage"
   });
 }
 

@@ -1,8 +1,10 @@
 import {
+  boolean,
   foreignKey,
   index,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex
@@ -46,6 +48,62 @@ export const positions = pgTable(
     index("positions_tenant_id_idx").on(table.tenantId),
     uniqueIndex("positions_tenant_id_id_uidx").on(table.tenantId, table.id),
     uniqueIndex("positions_tenant_id_name_uidx").on(table.tenantId, table.name)
+  ]
+);
+
+export const customFieldDefinitions = pgTable(
+  "custom_field_definitions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    systemKey: text("system_key").notNull(),
+    tenantLabel: text("tenant_label").notNull(),
+    targetEntity: text("target_entity").notNull(),
+    fieldType: text("field_type").notNull(),
+    required: boolean("required").notNull().default(false),
+    status: text("status").notNull().default("draft"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "custom_field_definitions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("custom_field_definitions_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("custom_field_definitions_tenant_id_system_key_uidx").on(
+      table.tenantId,
+      table.systemKey
+    )
+  ]
+);
+
+export const projectTemplates = pgTable(
+  "project_templates",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    systemKey: text("system_key").notNull(),
+    tenantLabel: text("tenant_label").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("draft"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_templates_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("project_templates_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("project_templates_tenant_id_system_key_uidx").on(
+      table.tenantId,
+      table.systemKey
+    )
   ]
 );
 
@@ -159,6 +217,8 @@ export type PersistenceTableName =
   | "tenants"
   | "access_profiles"
   | "positions"
+  | "custom_field_definitions"
+  | "project_templates"
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
@@ -175,6 +235,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenants",
   "access_profiles",
   "positions",
+  "custom_field_definitions",
+  "project_templates",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -184,6 +246,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
 export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "access_profiles",
   "positions",
+  "custom_field_definitions",
+  "project_templates",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -194,6 +258,28 @@ const tableColumns = {
   tenants: ["id", "name", "created_at"],
   access_profiles: ["id", "tenant_id", "name", "permissions", "created_at"],
   positions: ["id", "tenant_id", "name", "description", "created_at"],
+  custom_field_definitions: [
+    "id",
+    "tenant_id",
+    "system_key",
+    "tenant_label",
+    "target_entity",
+    "field_type",
+    "required",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  project_templates: [
+    "id",
+    "tenant_id",
+    "system_key",
+    "tenant_label",
+    "description",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
   tenant_users: [
     "id",
     "tenant_id",

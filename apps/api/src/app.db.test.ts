@@ -33,6 +33,8 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.positions.read",
         "tenant.positions.manage",
         "tenant.audit_events.read",
+        "tenant.workspace_config.read",
+        "tenant.workspace_config.manage",
         "profile.read",
         "profile.update",
         "workspace.theme.manage"
@@ -50,6 +52,8 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.positions.read",
         "tenant.positions.manage",
         "tenant.audit_events.read",
+        "tenant.workspace_config.read",
+        "tenant.workspace_config.manage",
         "profile.read",
         "profile.update",
         "workspace.theme.manage"
@@ -129,7 +133,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       apiSeedDataset,
@@ -138,7 +142,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -280,10 +284,14 @@ describe("API with PostgreSQL data source", () => {
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { "x-user-id": "user-alpha-admin" }
     });
+    const config = await app.request("/api/workspace/config/custom-fields", {
+      headers: { "x-user-id": "user-alpha-admin" }
+    });
 
     expect(users.status).toBe(401);
     expect(accessProfiles.status).toBe(401);
     expect(audit.status).toBe(401);
+    expect(config.status).toBe(401);
   });
 
   it("rejects cookie-authenticated state changes without same-origin action header", async () => {
@@ -303,6 +311,286 @@ describe("API with PostgreSQL data source", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "same_origin_action_required"
+    });
+  });
+
+  it("manages workspace custom fields and project templates with audit trail", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const createdField = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "field-project-priority",
+        systemKey: "project_priority",
+        tenantLabel: "Приоритет проекта",
+        targetEntity: "project",
+        fieldType: "select",
+        required: true,
+        status: "draft"
+      })
+    });
+    const invalidField = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "field-invalid",
+        systemKey: "Invalid Key",
+        tenantLabel: "Некорректный ключ",
+        targetEntity: "project",
+        fieldType: "text"
+      })
+    });
+    const invalidFieldLabel = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "field-too-long-label",
+        systemKey: "too_long_label",
+        tenantLabel: "x".repeat(121),
+        targetEntity: "project",
+        fieldType: "text"
+      })
+    });
+    const updatedField = await app.request(
+      "/api/workspace/config/custom-fields/field-project-priority",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          systemKey: "project_priority",
+          tenantLabel: "Приоритет портфеля",
+          targetEntity: "project",
+          fieldType: "select",
+          required: false,
+          status: "active"
+        })
+      }
+    );
+    const renamedFieldKey = await app.request(
+      "/api/workspace/config/custom-fields/field-project-priority",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          systemKey: "project_priority_renamed",
+          tenantLabel: "Приоритет портфеля",
+          targetEntity: "project",
+          fieldType: "select",
+          required: false,
+          status: "active"
+        })
+      }
+    );
+    const createdTemplate = await app.request("/api/workspace/config/project-templates", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "template-implementation",
+        systemKey: "implementation",
+        tenantLabel: "Внедрение",
+        description: "Базовый шаблон проекта внедрения",
+        status: "draft"
+      })
+    });
+    const updatedTemplate = await app.request(
+      "/api/workspace/config/project-templates/template-implementation",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          systemKey: "implementation",
+          tenantLabel: "Внедрение обновлено",
+          description: "",
+          status: "active"
+        })
+      }
+    );
+    const renamedTemplateKey = await app.request(
+      "/api/workspace/config/project-templates/template-implementation",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          systemKey: "implementation_renamed",
+          tenantLabel: "Внедрение обновлено",
+          description: "",
+          status: "active"
+        })
+      }
+    );
+    const fields = await app.request("/api/workspace/config/custom-fields", {
+      headers: { cookie }
+    });
+    const templates = await app.request("/api/workspace/config/project-templates", {
+      headers: { cookie }
+    });
+    const betaCookie = await loginAs("beta@kiss-pm.local", "beta12345");
+    const betaFields = await app.request("/api/workspace/config/custom-fields", {
+      headers: { cookie: betaCookie }
+    });
+    const betaTemplates = await app.request("/api/workspace/config/project-templates", {
+      headers: { cookie: betaCookie }
+    });
+    const betaSameIdField = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: betaCookie
+      },
+      body: JSON.stringify({
+        id: "field-project-priority",
+        systemKey: "project_priority",
+        tenantLabel: "Приоритет проекта beta",
+        targetEntity: "project",
+        fieldType: "select",
+        required: false,
+        status: "draft"
+      })
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie }
+    });
+
+    expect(createdField.status).toBe(201);
+    await expect(createdField.json()).resolves.toMatchObject({
+      customField: {
+        id: "field-project-priority",
+        tenantId: "tenant-alpha",
+        systemKey: "project_priority",
+        tenantLabel: "Приоритет проекта",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String)
+      }
+    });
+    expect(invalidField.status).toBe(400);
+    await expect(invalidField.json()).resolves.toEqual({
+      error: "invalid_system_key"
+    });
+    expect(invalidFieldLabel.status).toBe(400);
+    await expect(invalidFieldLabel.json()).resolves.toEqual({
+      error: "invalid_tenant_label"
+    });
+    expect(updatedField.status).toBe(200);
+    await expect(updatedField.json()).resolves.toMatchObject({
+      customField: {
+        tenantLabel: "Приоритет портфеля",
+        required: false,
+        status: "active",
+        systemKey: "project_priority",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String)
+      }
+    });
+    expect(renamedFieldKey.status).toBe(400);
+    await expect(renamedFieldKey.json()).resolves.toEqual({
+      error: "system_key_immutable"
+    });
+    expect(createdTemplate.status).toBe(201);
+    expect(updatedTemplate.status).toBe(200);
+    await expect(updatedTemplate.json()).resolves.toMatchObject({
+      projectTemplate: {
+        systemKey: "implementation",
+        tenantLabel: "Внедрение обновлено",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String)
+      }
+    });
+    expect(renamedTemplateKey.status).toBe(400);
+    await expect(renamedTemplateKey.json()).resolves.toEqual({
+      error: "system_key_immutable"
+    });
+    await expect(fields.json()).resolves.toMatchObject({
+      customFields: expect.arrayContaining([
+        expect.objectContaining({ id: "field-project-priority" })
+      ])
+    });
+    await expect(templates.json()).resolves.toMatchObject({
+      projectTemplates: expect.arrayContaining([
+        expect.objectContaining({ id: "template-implementation" })
+      ])
+    });
+    await expect(betaFields.json()).resolves.toEqual({
+      customFields: []
+    });
+    await expect(betaTemplates.json()).resolves.toEqual({
+      projectTemplates: []
+    });
+    expect(betaSameIdField.status).toBe(201);
+    await expect(betaSameIdField.json()).resolves.toMatchObject({
+      customField: {
+        id: "field-project-priority",
+        tenantId: "tenant-beta"
+      }
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({ actionType: "workspace.custom_field.created" }),
+        expect.objectContaining({ actionType: "workspace.custom_field.updated" }),
+        expect.objectContaining({ actionType: "workspace.project_template.created" }),
+        expect.objectContaining({ actionType: "workspace.project_template.updated" })
+      ])
+    });
+  });
+
+  it("denies workspace config read and mutation for users without config permissions", async () => {
+    const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
+
+    const fields = await app.request("/api/workspace/config/custom-fields", {
+      headers: { cookie }
+    });
+    const templateCreate = await app.request("/api/workspace/config/project-templates", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "template-denied",
+        systemKey: "template_denied",
+        tenantLabel: "Нельзя создать",
+        status: "draft"
+      })
+    });
+
+    expect(fields.status).toBe(403);
+    await expect(fields.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(templateCreate.status).toBe(403);
+    await expect(templateCreate.json()).resolves.toEqual({
+      error: "permission_missing"
     });
   });
 
@@ -460,6 +748,61 @@ describe("API with PostgreSQL data source", () => {
 
     expect(createdUser.status).toBe(500);
     expect(users.some((user) => user.id === "user-rollback")).toBe(false);
+  });
+
+  it("rolls back workspace config creation when audit write fails inside the transaction", async () => {
+    const db = createDatabase(client);
+    const baseDataSource = createPostgresTenantDataSource(db);
+    const appWithFailingAudit = createApp({
+      dataSource: {
+        ...baseDataSource,
+        async withTransaction(operation) {
+          return db.transaction((transaction) =>
+            operation({
+              ...createPostgresTenantDataSource(transaction as unknown as typeof db),
+              async appendAuditEvent() {
+                throw new Error("audit_failed");
+              }
+            })
+          );
+        }
+      }
+    });
+    const login = await appWithFailingAudit.request("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        email: "admin@kiss-pm.local",
+        password: "admin12345"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") ?? "";
+
+    const createdField = await appWithFailingAudit.request(
+      "/api/workspace/config/custom-fields",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: "field-rollback",
+          systemKey: "field_rollback",
+          tenantLabel: "Откат аудита",
+          targetEntity: "project",
+          fieldType: "text",
+          status: "draft"
+        })
+      }
+    );
+    const fields = await baseDataSource.listCustomFieldDefinitions("tenant-alpha");
+
+    expect(createdField.status).toBe(500);
+    expect(fields.some((field) => field.id === "field-rollback")).toBe(false);
   });
 
   it("rejects user management when transaction boundary is not configured", async () => {
