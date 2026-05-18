@@ -2,30 +2,46 @@ import {
   canManageAccessProfiles,
   canManagePositions,
   canManageTenantUsers,
-  canManageWorkspaceConfig,
   canManageWorkspaceTheme,
   canReadAccessProfiles,
   canReadAuditEvents,
   canReadPositions,
   canReadTenantUsers,
-  canReadWorkspaceConfig,
   canUpdateProfile,
   createAccessProfile,
-  isPermission,
   type AccessProfile
 } from "@kiss-pm/access-control";
-import { listTenantUsers, type Tenant, type TenantId, type TenantUser, type UserId } from "@kiss-pm/domain";
+import { listTenantUsers, type TenantUser, type UserId } from "@kiss-pm/domain";
 import { hashPassword, hashSessionToken, verifyPassword } from "@kiss-pm/persistence";
 import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
 import { Hono } from "hono";
 import { randomBytes, randomUUID } from "node:crypto";
-
-const sessionCookieName = "kiss_pm_session";
-const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
-const workspaceConfigIdMaxLength = 96;
-const workspaceConfigSystemKeyMaxLength = 80;
-const workspaceConfigLabelMaxLength = 120;
-const workspaceConfigDescriptionMaxLength = 1000;
+import {
+  buildExpiredSessionCookieHeader,
+  buildSessionCookieHeader,
+  getSessionTokenFromCookie,
+  sessionTtlMs,
+  shouldUseSecureCookies
+} from "./authSession";
+import type {
+  AccessProfileRecord,
+  ApiTenantDataSource,
+  AuditEventListItem,
+  CreateAppOptions,
+  ManagementAuditEventInput
+} from "./apiTypes";
+import {
+  getStringField,
+  isAccentColor,
+  isWorkspaceTheme
+} from "./parseHelpers";
+import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
+import {
+  parseAccessProfileCreateBody,
+  parsePositionBody,
+  parseWorkspaceUserBody,
+  parseWorkspaceUserPatchBody
+} from "./workspaceParsers";
 
 const tenantAdminProfile = createAccessProfile({
   id: "tenant-admin",
@@ -45,90 +61,7 @@ const tenantAdminProfile = createAccessProfile({
   ]
 });
 
-type AccessProfileRecord = AccessProfile & {
-  tenantId: TenantId;
-  name: string;
-};
-
-type AuditEventListItem = {
-  id: string;
-  tenantId: TenantId;
-  actorUserId: UserId;
-  actionType: string;
-  sourceSurfaceId: string | null;
-  sourceWorkflow: string | null;
-  sourceEntity: Record<string, unknown>;
-  input: Record<string, unknown>;
-  beforeState: Record<string, unknown> | null;
-  afterState: Record<string, unknown> | null;
-  permissionResult: Record<string, unknown>;
-  executionResult: Record<string, unknown>;
-  correlationId: string;
-  createdAt: Date;
-};
-
-type WorkspaceUserRecord = TenantUser & {
-  email: string;
-  positionId: string | null;
-  positionName: string | null;
-  phone: string | null;
-  telegram: string | null;
-  status: string;
-  theme: string;
-  accentColor: string;
-};
-
-type PositionRecord = {
-  id: string;
-  tenantId: TenantId;
-  name: string;
-  description: string | null;
-};
-
-type CustomFieldDefinitionRecord = {
-  id: string;
-  tenantId: TenantId;
-  systemKey: string;
-  tenantLabel: string;
-  targetEntity: string;
-  fieldType: string;
-  required: boolean;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
-type CustomFieldDefinitionInput = Omit<
-  CustomFieldDefinitionRecord,
-  "createdAt" | "updatedAt"
->;
-
-type ProjectTemplateRecord = {
-  id: string;
-  tenantId: TenantId;
-  systemKey: string;
-  tenantLabel: string;
-  description: string | null;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
-type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
-
-type UserCredentialRecord = {
-  userId: UserId;
-  tenantId: TenantId;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-};
-
-type UserSessionRecord = {
-  id: string;
-  tenantId: TenantId;
-  userId: UserId;
-  tokenHash: string;
-  expiresAt: Date;
-};
+export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 
 class MissingAccessProfileError extends Error {
   constructor() {
@@ -136,99 +69,10 @@ class MissingAccessProfileError extends Error {
   }
 }
 
-export type ApiTenantDataSource = {
-  listDevUsers(): Promise<TenantUser[]>;
-  findUserById(userId: UserId): Promise<TenantUser | undefined>;
-  findTenantById(tenantId: TenantId): Promise<Tenant | undefined>;
-  findAccessProfileById?(
-    tenantId: TenantId,
-    accessProfileId: string
-  ): Promise<AccessProfile | undefined>;
-  listUsersByTenantId(tenantId: TenantId): Promise<TenantUser[]>;
-  listAccessProfilesByTenantId?(
-    tenantId: TenantId
-  ): Promise<AccessProfileRecord[]>;
-  createAccessProfile?(
-    input: AccessProfileRecord
-  ): Promise<AccessProfileRecord>;
-  updateAccessProfile?(
-    input: AccessProfileRecord
-  ): Promise<AccessProfileRecord>;
-  deleteAccessProfile?(tenantId: TenantId, accessProfileId: string): Promise<void>;
-  listWorkspaceUsers?(tenantId: TenantId): Promise<WorkspaceUserRecord[]>;
-  createWorkspaceUser?(
-    input: Omit<WorkspaceUserRecord, "positionName">
-  ): Promise<WorkspaceUserRecord>;
-  updateWorkspaceUser?(
-    input: Omit<WorkspaceUserRecord, "positionName">
-  ): Promise<WorkspaceUserRecord>;
-  deleteWorkspaceUser?(tenantId: TenantId, userId: UserId): Promise<void>;
-  listPositions?(tenantId: TenantId): Promise<PositionRecord[]>;
-  createPosition?(input: PositionRecord): Promise<PositionRecord>;
-  updatePosition?(input: PositionRecord): Promise<PositionRecord>;
-  deletePosition?(tenantId: TenantId, positionId: string): Promise<void>;
-  listCustomFieldDefinitions?(
-    tenantId: TenantId
-  ): Promise<CustomFieldDefinitionRecord[]>;
-  createCustomFieldDefinition?(
-    input: CustomFieldDefinitionInput
-  ): Promise<CustomFieldDefinitionRecord>;
-  updateCustomFieldDefinition?(
-    input: CustomFieldDefinitionInput
-  ): Promise<CustomFieldDefinitionRecord>;
-  listProjectTemplates?(tenantId: TenantId): Promise<ProjectTemplateRecord[]>;
-  createProjectTemplate?(
-    input: ProjectTemplateInput
-  ): Promise<ProjectTemplateRecord>;
-  updateProjectTemplate?(
-    input: ProjectTemplateInput
-  ): Promise<ProjectTemplateRecord>;
-  findCredentialByEmail?(
-    email: string
-  ): Promise<UserCredentialRecord | undefined>;
-  upsertCredential?(input: UserCredentialRecord): Promise<void>;
-  updateCredentialEmail?(
-    tenantId: TenantId,
-    userId: UserId,
-    email: string
-  ): Promise<void>;
-  createSession?(input: UserSessionRecord): Promise<void>;
-  findSessionByTokenHash?(
-    tokenHash: string
-  ): Promise<UserSessionRecord | undefined>;
-  deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
-  withTransaction?<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
-  ): Promise<T>;
-  appendAuditEvent?(input: {
-    id: string;
-    tenantId: TenantId;
-    actorUserId: UserId;
-    actionType: string;
-    sourceSurfaceId?: string | null;
-    sourceWorkflow?: string | null;
-    sourceEntity: {
-      type: string;
-      id: string;
-    };
-    input: Record<string, unknown>;
-    beforeState: Record<string, unknown> | null;
-    afterState: Record<string, unknown> | null;
-    permissionResult: Record<string, unknown>;
-    executionResult: Record<string, unknown>;
-    correlationId: string;
-    createdAt: Date;
-  }): Promise<void>;
-  listAuditEventsByTenantId?(tenantId: TenantId): Promise<AuditEventListItem[]>;
-};
-
-export type CreateAppOptions = {
-  dataSource?: ApiTenantDataSource;
-};
-
 export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
   const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
+  const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
 
   app.onError((error, context) => {
     if (error instanceof MissingAccessProfileError) {
@@ -259,7 +103,7 @@ export function createApp(options: CreateAppOptions = {}) {
   async function getSessionActor(cookieHeader: string | null) {
     if (!dataSource.findSessionByTokenHash) return undefined;
 
-    const token = parseCookie(cookieHeader)[sessionCookieName];
+    const token = getSessionTokenFromCookie(cookieHeader);
     if (!token) return undefined;
 
     const session = await dataSource.findSessionByTokenHash(hashSessionToken(token));
@@ -323,20 +167,10 @@ export function createApp(options: CreateAppOptions = {}) {
     return workspaceUser?.status !== "inactive";
   }
 
-  async function appendManagementAuditEvent(input: {
-    tenantId: TenantId;
-    actorUserId: UserId;
-    actionType: string;
-    sourceWorkflow: string;
-    sourceEntity: {
-      type: string;
-      id: string;
-    };
-    commandInput: Record<string, unknown>;
-    beforeState: Record<string, unknown> | null;
-    afterState: Record<string, unknown> | null;
-    permissionResult: Record<string, unknown>;
-  }, auditDataSource: ApiTenantDataSource = dataSource) {
+  async function appendManagementAuditEvent(
+    input: ManagementAuditEventInput,
+    auditDataSource: ApiTenantDataSource = dataSource
+  ) {
     if (!auditDataSource.appendAuditEvent) {
       throw new Error("audit_not_configured");
     }
@@ -412,12 +246,7 @@ export function createApp(options: CreateAppOptions = {}) {
       expiresAt: new Date(Date.now() + sessionTtlMs)
     });
 
-    context.header(
-      "Set-Cookie",
-      `${sessionCookieName}=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(
-        sessionTtlMs / 1000
-      )}`
-    );
+    context.header("Set-Cookie", buildSessionCookieHeader(rawToken, { secure: secureCookies }));
 
     return context.json({
       user: toPublicUser(actor),
@@ -429,16 +258,13 @@ export function createApp(options: CreateAppOptions = {}) {
 
   app.post("/api/auth/logout", async (context) => {
     if (dataSource.deleteSessionByTokenHash) {
-      const token = parseCookie(context.req.header("cookie") ?? null)[sessionCookieName];
+      const token = getSessionTokenFromCookie(context.req.header("cookie") ?? null);
       if (token) {
         await dataSource.deleteSessionByTokenHash(hashSessionToken(token));
       }
     }
 
-    context.header(
-      "Set-Cookie",
-      `${sessionCookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`
-    );
+    context.header("Set-Cookie", buildExpiredSessionCookieHeader({ secure: secureCookies }));
     return context.json({ status: "ok" });
   });
 
@@ -840,349 +666,12 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   });
 
-  app.get("/api/workspace/config/custom-fields", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listCustomFieldDefinitions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    return context.json({
-      customFields: await dataSource.listCustomFieldDefinitions(actor.tenantId)
-    });
-  });
-
-  app.post("/api/workspace/config/custom-fields", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createCustomFieldDefinition ||
-      !dataSource.listCustomFieldDefinitions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseCustomFieldDefinitionBody(body, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const existingFields = await dataSource.listCustomFieldDefinitions(actor.tenantId);
-    if (existingFields.some((field) => field.id === parsed.value.id)) {
-      return context.json({ error: "custom_field_id_taken" }, 409);
-    }
-    if (
-      existingFields.some((field) => field.systemKey === parsed.value.systemKey)
-    ) {
-      return context.json({ error: "custom_field_system_key_taken" }, 409);
-    }
-
-    const customField = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createCustomFieldDefinition) {
-        throw new Error("transactional_custom_field_create_not_configured");
-      }
-
-      const createdField =
-        await transactionDataSource.createCustomFieldDefinition(parsed.value);
-      await appendManagementAuditEvent(
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "workspace.custom_field.created",
-          sourceWorkflow: "single_workspace_config",
-          sourceEntity: {
-            type: "CustomFieldDefinition",
-            id: createdField.id
-          },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: createdField,
-          permissionResult: decision
-        },
-        transactionDataSource
-      );
-
-      return createdField;
-    });
-
-    return context.json({ customField }, 201);
-  });
-
-  app.patch("/api/workspace/config/custom-fields/:fieldId", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updateCustomFieldDefinition ||
-      !dataSource.listCustomFieldDefinitions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const fieldId = context.req.param("fieldId");
-    const existingFields = await dataSource.listCustomFieldDefinitions(actor.tenantId);
-    const beforeState =
-      existingFields.find((field) => field.id === fieldId) ?? null;
-    if (!beforeState) return context.json({ error: "custom_field_not_found" }, 404);
-
-    const body = await context.req.json().catch(() => null);
-    const systemKeyInput = getStringField(body, "systemKey");
-    if (systemKeyInput !== undefined && systemKeyInput !== beforeState.systemKey) {
-      return context.json({ error: "system_key_immutable" }, 400);
-    }
-    const parsed = parseCustomFieldDefinitionBody(
-      {
-        ...(body && typeof body === "object" ? body : {}),
-        systemKey: beforeState.systemKey
-      },
-      actor.tenantId,
-      fieldId
-    );
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    if (
-      existingFields.some(
-        (field) =>
-          field.id !== fieldId && field.systemKey === parsed.value.systemKey
-      )
-    ) {
-      return context.json({ error: "custom_field_system_key_taken" }, 409);
-    }
-
-    const customField = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateCustomFieldDefinition) {
-        throw new Error("transactional_custom_field_update_not_configured");
-      }
-
-      const updatedField =
-        await transactionDataSource.updateCustomFieldDefinition(parsed.value);
-      await appendManagementAuditEvent(
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "workspace.custom_field.updated",
-          sourceWorkflow: "single_workspace_config",
-          sourceEntity: {
-            type: "CustomFieldDefinition",
-            id: updatedField.id
-          },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updatedField,
-          permissionResult: decision
-        },
-        transactionDataSource
-      );
-
-      return updatedField;
-    });
-
-    return context.json({ customField });
-  });
-
-  app.get("/api/workspace/config/project-templates", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listProjectTemplates) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    return context.json({
-      projectTemplates: await dataSource.listProjectTemplates(actor.tenantId)
-    });
-  });
-
-  app.post("/api/workspace/config/project-templates", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createProjectTemplate ||
-      !dataSource.listProjectTemplates ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseProjectTemplateBody(body, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const existingTemplates = await dataSource.listProjectTemplates(actor.tenantId);
-    if (existingTemplates.some((template) => template.id === parsed.value.id)) {
-      return context.json({ error: "project_template_id_taken" }, 409);
-    }
-    if (
-      existingTemplates.some(
-        (template) => template.systemKey === parsed.value.systemKey
-      )
-    ) {
-      return context.json({ error: "project_template_system_key_taken" }, 409);
-    }
-
-    const projectTemplate = await runDataSourceTransaction(
-      async (transactionDataSource) => {
-        if (!transactionDataSource.createProjectTemplate) {
-          throw new Error("transactional_project_template_create_not_configured");
-        }
-
-        const createdTemplate =
-          await transactionDataSource.createProjectTemplate(parsed.value);
-        await appendManagementAuditEvent(
-          {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "workspace.project_template.created",
-            sourceWorkflow: "single_workspace_config",
-            sourceEntity: {
-              type: "ProjectTemplate",
-              id: createdTemplate.id
-            },
-            commandInput: parsed.value,
-            beforeState: null,
-            afterState: createdTemplate,
-            permissionResult: decision
-          },
-          transactionDataSource
-        );
-
-        return createdTemplate;
-      }
-    );
-
-    return context.json({ projectTemplate }, 201);
-  });
-
-  app.patch("/api/workspace/config/project-templates/:templateId", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updateProjectTemplate ||
-      !dataSource.listProjectTemplates ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const templateId = context.req.param("templateId");
-    const existingTemplates = await dataSource.listProjectTemplates(actor.tenantId);
-    const beforeState =
-      existingTemplates.find((template) => template.id === templateId) ?? null;
-    if (!beforeState) {
-      return context.json({ error: "project_template_not_found" }, 404);
-    }
-
-    const body = await context.req.json().catch(() => null);
-    const systemKeyInput = getStringField(body, "systemKey");
-    if (systemKeyInput !== undefined && systemKeyInput !== beforeState.systemKey) {
-      return context.json({ error: "system_key_immutable" }, 400);
-    }
-    const parsed = parseProjectTemplateBody(
-      {
-        ...(body && typeof body === "object" ? body : {}),
-        systemKey: beforeState.systemKey
-      },
-      actor.tenantId,
-      templateId
-    );
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    if (
-      existingTemplates.some(
-        (template) =>
-          template.id !== templateId &&
-          template.systemKey === parsed.value.systemKey
-      )
-    ) {
-      return context.json({ error: "project_template_system_key_taken" }, 409);
-    }
-
-    const projectTemplate = await runDataSourceTransaction(
-      async (transactionDataSource) => {
-        if (!transactionDataSource.updateProjectTemplate) {
-          throw new Error("transactional_project_template_update_not_configured");
-        }
-
-        const updatedTemplate =
-          await transactionDataSource.updateProjectTemplate(parsed.value);
-        await appendManagementAuditEvent(
-          {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "workspace.project_template.updated",
-            sourceWorkflow: "single_workspace_config",
-            sourceEntity: {
-              type: "ProjectTemplate",
-              id: updatedTemplate.id
-            },
-            commandInput: parsed.value,
-            beforeState,
-            afterState: updatedTemplate,
-            permissionResult: decision
-          },
-          transactionDataSource
-        );
-
-        return updatedTemplate;
-      }
-    );
-
-    return context.json({ projectTemplate });
+  registerWorkspaceConfigRoutes(app, {
+    appendManagementAuditEvent,
+    dataSource,
+    getActorProfile,
+    getSessionActorFromHeaders,
+    runDataSourceTransaction
   });
 
   app.get("/api/workspace/users", async (context) => {
@@ -1756,62 +1245,6 @@ export function createApp(options: CreateAppOptions = {}) {
   return app;
 }
 
-type ParseResult =
-  | {
-      ok: true;
-      value: Omit<AccessProfileRecord, "tenantId">;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function parseAccessProfileCreateBody(body: unknown): ParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-
-  const candidate = body as Record<string, unknown>;
-  const id = candidate.id;
-  const name = candidate.name;
-  const permissions = candidate.permissions;
-
-  if (typeof id !== "string" || id.trim().length === 0) {
-    return { ok: false, error: "invalid_access_profile_id" };
-  }
-
-  if (typeof name !== "string" || name.trim().length === 0) {
-    return { ok: false, error: "invalid_access_profile_name" };
-  }
-
-  if (!Array.isArray(permissions) || !permissions.every(isPermissionValue)) {
-    return { ok: false, error: "invalid_permissions" };
-  }
-
-  return {
-    ok: true,
-    value: {
-      id,
-      name,
-      permissions
-    }
-  };
-}
-
-function isPermissionValue(value: unknown): value is AccessProfile["permissions"][number] {
-  return typeof value === "string" && isPermission(value);
-}
-
-function parseCookie(cookieHeader: string | null): Record<string, string> {
-  if (!cookieHeader) return {};
-  return Object.fromEntries(
-    cookieHeader.split(";").map((part) => {
-      const [key, ...value] = part.trim().split("=");
-      return [key, value.join("=")];
-    })
-  );
-}
-
 function toPublicUser(user: TenantUser) {
   return {
     id: user.id,
@@ -1819,328 +1252,6 @@ function toPublicUser(user: TenantUser) {
     name: user.name,
     accessProfileId: user.accessProfileId
   };
-}
-
-type WorkspaceUserParseResult =
-  | {
-      ok: true;
-      value: Omit<WorkspaceUserRecord, "positionName">;
-      password?: string;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function parseWorkspaceUserBody(
-  body: unknown,
-  tenantId: TenantId,
-  userId?: string
-): WorkspaceUserParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-
-  const input = body as Record<string, unknown>;
-  const id = userId ?? getOptionalString(input, "id") ?? `user-${randomUUID()}`;
-  const email = getOptionalString(input, "email");
-  const name = getOptionalString(input, "name");
-  const accessProfileId = getOptionalString(input, "accessProfileId");
-
-  if (!email) return { ok: false, error: "invalid_user_email" };
-  if (!name) return { ok: false, error: "invalid_user_name" };
-  if (!accessProfileId) return { ok: false, error: "invalid_access_role" };
-
-  const password = getOptionalString(input, "password") ?? undefined;
-  const status = getOptionalString(input, "status") ?? "active";
-  if (!isUserStatus(status)) return { ok: false, error: "invalid_user_status" };
-  const theme = getOptionalString(input, "theme") ?? "light";
-  const accentColor = getOptionalString(input, "accentColor") ?? "#0f766e";
-  if (!isWorkspaceTheme(theme)) return { ok: false, error: "invalid_theme" };
-  if (!isAccentColor(accentColor)) return { ok: false, error: "invalid_accent_color" };
-
-  return {
-    ok: true,
-    ...(password ? { password } : {}),
-    value: {
-      id,
-      tenantId,
-      email: email.toLowerCase(),
-      name,
-      accessProfileId,
-      positionId: getOptionalString(input, "positionId"),
-      phone: getOptionalString(input, "phone"),
-      telegram: getOptionalString(input, "telegram"),
-      status,
-      theme,
-      accentColor: accentColor.toLowerCase()
-    }
-  };
-}
-
-function parseWorkspaceUserPatchBody(
-  body: unknown,
-  tenantId: TenantId,
-  userId: string,
-  current: WorkspaceUserRecord
-): WorkspaceUserParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-
-  const input = body as Record<string, unknown>;
-  const emailInput = getStringField(input, "email");
-  const nameInput = getStringField(input, "name");
-  const accessProfileInput = getStringField(input, "accessProfileId");
-  const positionInput = getStringField(input, "positionId");
-  const phoneInput = getStringField(input, "phone");
-  const telegramInput = getStringField(input, "telegram");
-  const statusInput = getStringField(input, "status");
-  const themeInput = getStringField(input, "theme");
-  const accentInput = getStringField(input, "accentColor");
-
-  const email = emailInput === undefined ? current.email : emailInput.toLowerCase();
-  const name = nameInput === undefined ? current.name : nameInput;
-  const accessProfileId =
-    accessProfileInput === undefined ? current.accessProfileId : accessProfileInput;
-  const status = statusInput === undefined ? current.status : statusInput || current.status;
-  const theme = themeInput === undefined || themeInput === "" ? current.theme : themeInput;
-  const accentColor =
-    accentInput === undefined || accentInput === "" ? current.accentColor : accentInput;
-
-  if (!email) return { ok: false, error: "invalid_user_email" };
-  if (!name) return { ok: false, error: "invalid_user_name" };
-  if (!accessProfileId) return { ok: false, error: "invalid_access_role" };
-  if (!isUserStatus(status)) return { ok: false, error: "invalid_user_status" };
-  if (!isWorkspaceTheme(theme)) return { ok: false, error: "invalid_theme" };
-  if (!isAccentColor(accentColor)) return { ok: false, error: "invalid_accent_color" };
-
-  return {
-    ok: true,
-    value: {
-      id: userId,
-      tenantId,
-      email,
-      name,
-      accessProfileId,
-      positionId:
-        positionInput === undefined ? current.positionId : positionInput || null,
-      phone: phoneInput === undefined ? current.phone : phoneInput || null,
-      telegram: telegramInput === undefined ? current.telegram : telegramInput || null,
-      status,
-      theme,
-      accentColor: accentColor.toLowerCase()
-    }
-  };
-}
-
-type PositionParseResult =
-  | {
-      ok: true;
-      value: PositionRecord;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function parsePositionBody(
-  body: unknown,
-  tenantId: TenantId,
-  positionId?: string
-): PositionParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-  const input = body as Record<string, unknown>;
-  const id = positionId ?? getOptionalString(input, "id") ?? `position-${randomUUID()}`;
-  const name = getOptionalString(input, "name");
-
-  if (!name) return { ok: false, error: "invalid_position_name" };
-
-  return {
-    ok: true,
-    value: {
-      id,
-      tenantId,
-      name,
-      description: getOptionalString(input, "description")
-    }
-  };
-}
-
-type CustomFieldDefinitionParseResult =
-  | {
-      ok: true;
-      value: CustomFieldDefinitionInput;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function parseCustomFieldDefinitionBody(
-  body: unknown,
-  tenantId: TenantId,
-  fieldId?: string
-): CustomFieldDefinitionParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-
-  const input = body as Record<string, unknown>;
-  const id = fieldId ?? getOptionalString(input, "id") ?? `field-${randomUUID()}`;
-  const systemKey = getOptionalString(input, "systemKey");
-  const tenantLabel = getOptionalString(input, "tenantLabel");
-  const targetEntity = getOptionalString(input, "targetEntity") ?? "project";
-  const fieldType = getOptionalString(input, "fieldType");
-  const status = getOptionalString(input, "status") ?? "draft";
-  const requiredInput = input.required;
-
-  if (!isWorkspaceConfigId(id)) {
-    return { ok: false, error: "invalid_config_id" };
-  }
-  if (!systemKey || !isSystemKey(systemKey)) {
-    return { ok: false, error: "invalid_system_key" };
-  }
-  if (!tenantLabel || tenantLabel.length > workspaceConfigLabelMaxLength) {
-    return { ok: false, error: "invalid_tenant_label" };
-  }
-  if (targetEntity !== "project") {
-    return { ok: false, error: "invalid_target_entity" };
-  }
-  if (!fieldType || !isCustomFieldType(fieldType)) {
-    return { ok: false, error: "invalid_field_type" };
-  }
-  if (!isWorkspaceConfigStatus(status)) {
-    return { ok: false, error: "invalid_config_status" };
-  }
-  if (requiredInput !== undefined && typeof requiredInput !== "boolean") {
-    return { ok: false, error: "invalid_required_flag" };
-  }
-
-  return {
-    ok: true,
-    value: {
-      id,
-      tenantId,
-      systemKey,
-      tenantLabel,
-      targetEntity,
-      fieldType,
-      required: requiredInput === true,
-      status
-    }
-  };
-}
-
-type ProjectTemplateParseResult =
-  | {
-      ok: true;
-      value: ProjectTemplateInput;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function parseProjectTemplateBody(
-  body: unknown,
-  tenantId: TenantId,
-  templateId?: string
-): ProjectTemplateParseResult {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "invalid_body" };
-  }
-
-  const input = body as Record<string, unknown>;
-  const id =
-    templateId ?? getOptionalString(input, "id") ?? `template-${randomUUID()}`;
-  const systemKey = getOptionalString(input, "systemKey");
-  const tenantLabel = getOptionalString(input, "tenantLabel");
-  const status = getOptionalString(input, "status") ?? "draft";
-  const description = getStringField(input, "description");
-
-  if (!isWorkspaceConfigId(id)) {
-    return { ok: false, error: "invalid_config_id" };
-  }
-  if (!systemKey || !isSystemKey(systemKey)) {
-    return { ok: false, error: "invalid_system_key" };
-  }
-  if (!tenantLabel || tenantLabel.length > workspaceConfigLabelMaxLength) {
-    return { ok: false, error: "invalid_tenant_label" };
-  }
-  if (
-    description !== undefined &&
-    description.length > workspaceConfigDescriptionMaxLength
-  ) {
-    return { ok: false, error: "invalid_description" };
-  }
-  if (!isWorkspaceConfigStatus(status)) {
-    return { ok: false, error: "invalid_config_status" };
-  }
-
-  return {
-    ok: true,
-    value: {
-      id,
-      tenantId,
-      systemKey,
-      tenantLabel,
-      description: description === undefined || description === "" ? null : description,
-      status
-    }
-  };
-}
-
-function getOptionalString(input: unknown, key: string): string | null {
-  if (!input || typeof input !== "object") return null;
-  const value = (input as Record<string, unknown>)[key];
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function getStringField(input: unknown, key: string): string | undefined {
-  if (!input || typeof input !== "object" || !(key in input)) return undefined;
-  const value = (input as Record<string, unknown>)[key];
-  return typeof value === "string" ? value.trim() : undefined;
-}
-
-function isUserStatus(value: string): value is "active" | "inactive" {
-  return value === "active" || value === "inactive";
-}
-
-function isWorkspaceTheme(value: string): value is "light" | "dark" {
-  return value === "light" || value === "dark";
-}
-
-function isAccentColor(value: string): boolean {
-  return /^#[0-9a-fA-F]{6}$/.test(value);
-}
-
-function isSystemKey(value: string): boolean {
-  return (
-    value.length <= workspaceConfigSystemKeyMaxLength &&
-    /^[a-z][a-z0-9_]*$/.test(value)
-  );
-}
-
-function isWorkspaceConfigId(value: string): boolean {
-  return (
-    value.length <= workspaceConfigIdMaxLength &&
-    /^[a-z][a-z0-9_-]*$/.test(value)
-  );
-}
-
-function isCustomFieldType(
-  value: string
-): value is "text" | "number" | "date" | "select" {
-  return value === "text" || value === "number" || value === "date" || value === "select";
-}
-
-function isWorkspaceConfigStatus(value: string): value is "draft" | "active" {
-  return value === "draft" || value === "active";
 }
 
 function requiresSameOriginActionHeader(method: string, path: string): boolean {

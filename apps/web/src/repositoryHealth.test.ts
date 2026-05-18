@@ -10,8 +10,8 @@ const sourceFileBudgets = [
   },
   {
     path: "apps/api/src/app.ts",
-    maxLines: 2200,
-    reason: "API composition may be large, but should not absorb unrelated modules"
+    maxLines: 1600,
+    reason: "API composition must delegate auth/session, parsers and config routes"
   },
   {
     path: "apps/web/src/styles.css",
