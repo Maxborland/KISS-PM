@@ -19,11 +19,66 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
 
   await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText("Анна Администратор")).toBeVisible();
+  await expect(
+    page.getByRole("complementary").getByText("Анна Администратор", { exact: true })
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Экспорт" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Проекты" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Последние события аудита" })).toBeVisible();
+  await page.getByRole("button", { name: "Свернуть навигацию" }).click();
+  await expect(page.getByRole("button", { name: "Пользователи" })).toHaveAttribute(
+    "title",
+    "Пользователи"
+  );
+  await page.getByRole("button", { name: "Пользователи" }).focus();
+  const collapsedSidebarBox = await page.locator(".sidebar").boundingBox();
+  expect(collapsedSidebarBox?.width).toBeLessThan(120);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".sidebar")).not.toBeInViewport();
+  await expect(page.locator(".sidebar")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".sidebar")).toHaveAttribute("inert", "");
+  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Открыть навигацию" })).toBeFocused();
+  await page.getByRole("button", { name: "Открыть навигацию" }).click();
+  await expect(page.locator(".sidebar")).toBeInViewport();
+  await expect(page.locator(".sidebar")).not.toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".sidebar")).not.toHaveAttribute("inert", "");
+  await expect(page.locator(".content-shell")).toHaveAttribute("inert", "");
+  await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page.getByRole("button", { name: "Выйти из рабочего пространства" })
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Открыть профиль" })).toBeFocused();
+  for (let index = 0; index < 8; index += 1) {
+    await page.keyboard.press("Tab");
+    await expect
+      .poll(() => page.locator(".sidebar").evaluate((element) => element.contains(document.activeElement)))
+      .toBe(true);
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".sidebar")).not.toBeInViewport();
+  await expect(page.locator(".sidebar")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".sidebar")).toHaveAttribute("inert", "");
+  await expect(page.locator(".content-shell")).not.toHaveAttribute("inert", "");
+  await expect(page.getByRole("button", { name: "Открыть навигацию" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Переход по разделам")).toBeFocused();
+  await page.waitForTimeout(250);
+  await expect(page.getByLabel("Переход по разделам")).toBeFocused();
+  await page.getByRole("button", { name: "Открыть навигацию" }).click();
+  await page.getByRole("button", { name: "Главная" }).click();
+  await expect(page.locator(".sidebar")).not.toBeInViewport();
+  await expect(page.getByRole("button", { name: "Открыть навигацию" })).toBeFocused();
+  await page.getByRole("button", { name: "Открыть навигацию" }).click();
+  await page.getByRole("button", { name: "Должности" }).click();
+  await expect(page.locator(".sidebar")).not.toBeInViewport();
+  await expect(page.getByRole("button", { name: "Открыть навигацию" })).toBeFocused();
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByLabel("Переход по разделам").fill("Должности");
   await page.getByLabel("Переход по разделам").press("Enter");
   await expect(page.getByRole("heading", { name: "Должности" }).first()).toBeVisible();

@@ -127,6 +127,10 @@ h2 {
   grid-template-columns: 86px minmax(0, 1fr);
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
 .theme-dark {
   --canvas: #101318;
   --panel: #161b22;
@@ -432,6 +436,9 @@ h2 {
 }
 
 .workspace-shell.sidebar-compact .sidebar {
+  width: 86px;
+  min-width: 0;
+  overflow: hidden;
   padding: 16px 12px;
 }
 
@@ -1459,8 +1466,30 @@ input[type="color"] {
   }
 
   .sidebar {
-    min-height: auto;
-    position: static;
+    width: min(312px, calc(100vw - 56px));
+    max-width: 100%;
+    min-height: 100dvh;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    overflow-y: auto;
+    box-shadow: 24px 0 50px rgba(15, 23, 42, 0.18);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+  }
+
+  .workspace-shell.mobile-sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    border: 0;
+    background: rgba(15, 23, 42, 0.22);
+    cursor: pointer;
   }
 
   .workspace-shell.sidebar-compact .brand-block div,
@@ -1471,12 +1500,39 @@ input[type="color"] {
   .workspace-shell.sidebar-compact .sidebar-note,
   .workspace-shell.sidebar-compact .sidebar-user div,
   .workspace-shell.sidebar-compact .kebab-button {
-    display: initial;
+    display: revert;
   }
 
   .workspace-shell.sidebar-compact .nav-item {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     justify-items: stretch;
+  }
+
+  .workspace-shell.sidebar-compact .sidebar {
+    width: min(312px, calc(100vw - 56px));
+    overflow-y: auto;
+  }
+
+  .workspace-shell.sidebar-compact .sidebar-note {
+    display: grid;
+  }
+
+  .workspace-shell.sidebar-compact .sidebar-user,
+  .workspace-shell.sidebar-compact .brand-block,
+  .workspace-shell.sidebar-compact .quick-create-row {
+    display: flex;
+  }
+
+  .workspace-shell.sidebar-compact .nav-group {
+    display: grid;
+  }
+
+  .workspace-shell.sidebar-compact .nav-item {
+    min-height: 44px;
+  }
+
+  .nav-item {
+    min-height: 44px;
   }
 
   .content-shell {
