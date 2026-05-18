@@ -36,3 +36,5 @@ export function listTenantUsers(
 ): TenantUser[] {
   return users.filter((user) => user.tenantId === tenantId);
 }
+
+export * from "./workspaceConfig";

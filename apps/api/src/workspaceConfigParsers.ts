@@ -1,3 +1,11 @@
+import {
+  isWorkspaceConfigFieldType,
+  isWorkspaceConfigId,
+  isWorkspaceConfigStatus,
+  isWorkspaceConfigSystemKey,
+  isWorkspaceConfigTenantLabel,
+  workspaceConfigDescriptionMaxLength
+} from "@kiss-pm/domain";
 import type { TenantId } from "@kiss-pm/domain";
 import type {
   CustomFieldDefinitionInput,
@@ -6,11 +14,6 @@ import type {
 import { getOptionalString, getStringField } from "./parseHelpers";
 
 export { getStringField } from "./parseHelpers";
-
-const workspaceConfigIdMaxLength = 96;
-const workspaceConfigSystemKeyMaxLength = 80;
-const workspaceConfigLabelMaxLength = 120;
-const workspaceConfigDescriptionMaxLength = 1000;
 
 type CustomFieldDefinitionParseResult =
   | {
@@ -43,16 +46,16 @@ export function parseCustomFieldDefinitionBody(
   if (!isWorkspaceConfigId(id)) {
     return { ok: false, error: "invalid_config_id" };
   }
-  if (!systemKey || !isSystemKey(systemKey)) {
+  if (!systemKey || !isWorkspaceConfigSystemKey(systemKey)) {
     return { ok: false, error: "invalid_system_key" };
   }
-  if (!tenantLabel || tenantLabel.length > workspaceConfigLabelMaxLength) {
+  if (!tenantLabel || !isWorkspaceConfigTenantLabel(tenantLabel)) {
     return { ok: false, error: "invalid_tenant_label" };
   }
   if (targetEntity !== "project") {
     return { ok: false, error: "invalid_target_entity" };
   }
-  if (!fieldType || !isCustomFieldType(fieldType)) {
+  if (!fieldType || !isWorkspaceConfigFieldType(fieldType)) {
     return { ok: false, error: "invalid_field_type" };
   }
   if (!isWorkspaceConfigStatus(status)) {
@@ -107,10 +110,10 @@ export function parseProjectTemplateBody(
   if (!isWorkspaceConfigId(id)) {
     return { ok: false, error: "invalid_config_id" };
   }
-  if (!systemKey || !isSystemKey(systemKey)) {
+  if (!systemKey || !isWorkspaceConfigSystemKey(systemKey)) {
     return { ok: false, error: "invalid_system_key" };
   }
-  if (!tenantLabel || tenantLabel.length > workspaceConfigLabelMaxLength) {
+  if (!tenantLabel || !isWorkspaceConfigTenantLabel(tenantLabel)) {
     return { ok: false, error: "invalid_tenant_label" };
   }
   if (
@@ -134,28 +137,4 @@ export function parseProjectTemplateBody(
       status
     }
   };
-}
-
-function isSystemKey(value: string): boolean {
-  return (
-    value.length <= workspaceConfigSystemKeyMaxLength &&
-    /^[a-z][a-z0-9_]*$/.test(value)
-  );
-}
-
-function isWorkspaceConfigId(value: string): boolean {
-  return (
-    value.length <= workspaceConfigIdMaxLength &&
-    /^[a-z][a-z0-9_-]*$/.test(value)
-  );
-}
-
-function isCustomFieldType(
-  value: string
-): value is "text" | "number" | "date" | "select" {
-  return value === "text" || value === "number" || value === "date" || value === "select";
-}
-
-function isWorkspaceConfigStatus(value: string): value is "draft" | "active" {
-  return value === "draft" || value === "active";
 }

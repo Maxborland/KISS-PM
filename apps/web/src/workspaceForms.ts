@@ -1,3 +1,11 @@
+import {
+  isWorkspaceConfigFieldType,
+  isWorkspaceConfigStatus,
+  isWorkspaceConfigSystemKeyInput,
+  isWorkspaceConfigTenantLabelInput,
+  workspaceConfigDescriptionMaxLength
+} from "@kiss-pm/domain";
+
 export type FormErrors = Record<string, string>;
 export type UserFormMode = "create" | "edit";
 
@@ -59,19 +67,19 @@ export function validateCustomFieldForm(input: {
 }): FormErrors {
   const errors: FormErrors = {};
 
-  if (!isSystemKey(input.systemKey)) {
+  if (!isWorkspaceConfigSystemKeyInput(input.systemKey)) {
     errors.systemKey = "Системный ключ: латиница, цифры и _, начинается с буквы.";
   }
-  if (!input.tenantLabel.trim() || input.tenantLabel.trim().length > 120) {
+  if (!isWorkspaceConfigTenantLabelInput(input.tenantLabel)) {
     errors.tenantLabel = "Укажите русское название поля.";
   }
   if (input.targetEntity !== "project") {
     errors.targetEntity = "Пока доступны только поля проекта.";
   }
-  if (!["text", "number", "date", "select"].includes(input.fieldType)) {
+  if (!isWorkspaceConfigFieldType(input.fieldType)) {
     errors.fieldType = "Выберите тип поля.";
   }
-  if (!["draft", "active"].includes(input.status)) {
+  if (!isWorkspaceConfigStatus(input.status)) {
     errors.status = "Выберите статус настройки.";
   }
 
@@ -86,16 +94,16 @@ export function validateProjectTemplateForm(input: {
 }): FormErrors {
   const errors: FormErrors = {};
 
-  if (!isSystemKey(input.systemKey)) {
+  if (!isWorkspaceConfigSystemKeyInput(input.systemKey)) {
     errors.systemKey = "Системный ключ: латиница, цифры и _, начинается с буквы.";
   }
-  if (!input.tenantLabel.trim() || input.tenantLabel.trim().length > 120) {
+  if (!isWorkspaceConfigTenantLabelInput(input.tenantLabel)) {
     errors.tenantLabel = "Укажите название шаблона.";
   }
-  if (input.description.length > 1000) {
+  if (input.description.length > workspaceConfigDescriptionMaxLength) {
     errors.description = "Описание должно быть не длиннее 1000 символов.";
   }
-  if (!["draft", "active"].includes(input.status)) {
+  if (!isWorkspaceConfigStatus(input.status)) {
     errors.status = "Выберите статус шаблона.";
   }
 
@@ -124,8 +132,4 @@ export function getNextFocusTrapIndex(
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
-function isSystemKey(value: string): boolean {
-  return value.length <= 80 && /^[a-z][a-z0-9_]*$/.test(value.trim());
 }
