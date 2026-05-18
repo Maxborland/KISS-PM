@@ -4,11 +4,11 @@ import {
   Activity,
   Bell,
   BriefcaseBusiness,
-  ChevronRight,
+  ChevronDown,
   Eye,
   EyeOff,
   LayoutDashboard,
-  Mail,
+  LogOut,
   Menu,
   Moon,
   Palette,
@@ -126,7 +126,10 @@ export function App() {
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [quickCreateRequested, setQuickCreateRequested] = useState(false);
+  const [openUserMenu, setOpenUserMenu] = useState<"sidebar" | "topbar" | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const sidebarUserMenuRef = useRef<HTMLDivElement | null>(null);
+  const topbarUserMenuRef = useRef<HTMLDivElement | null>(null);
   const navigationToggleRef = useRef<HTMLButtonElement | null>(null);
   const navigationFocusRestoreTokenRef = useRef(0);
   const navigationFocusRestoreTimersRef = useRef<number[]>([]);
@@ -144,6 +147,8 @@ export function App() {
     permissions,
     "tenant.workspace_config.read"
   );
+  const canOpenProfile = hasPermission(permissions, "profile.read");
+  const canOpenTheme = hasPermission(permissions, "workspace.theme.manage");
 
   const usersQuery = useUsersQuery(canReadUsers);
   const positionsQuery = usePositionsQuery(canReadPositions);
@@ -185,6 +190,7 @@ export function App() {
       const isNarrow = mediaQuery.matches;
       const shouldMoveFocusFromSidebar = isNarrow && sidebarRef.current?.contains(document.activeElement);
 
+      setOpenUserMenu(null);
       setIsNarrowViewport(isNarrow);
       if (isNarrow) {
         if (shouldMoveFocusFromSidebar) {
@@ -211,6 +217,41 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!openUserMenu) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const menuRoot =
+        openUserMenu === "sidebar"
+          ? sidebarUserMenuRef.current
+          : topbarUserMenuRef.current;
+      if (menuRoot?.contains(event.target as Node)) return;
+      setOpenUserMenu(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        const menuRoot =
+          openUserMenu === "sidebar"
+            ? sidebarUserMenuRef.current
+            : topbarUserMenuRef.current;
+        const trigger = menuRoot?.querySelector("button");
+        setOpenUserMenu(null);
+        window.setTimeout(() => {
+          trigger?.focus();
+        }, 0);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openUserMenu]);
+
+  useEffect(() => {
     if (!isNarrowViewport || !isMobileSidebarOpen) return;
 
     const firstFocusable = getFocusableElements(sidebarRef.current)[0];
@@ -218,6 +259,7 @@ export function App() {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (openUserMenu) return;
         closeMobileSidebar();
         return;
       }
@@ -238,7 +280,7 @@ export function App() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMobileSidebarOpen, isNarrowViewport]);
+  }, [isMobileSidebarOpen, isNarrowViewport, openUserMenu]);
 
   useEffect(() => {
     if (!isNarrowViewport || isMobileSidebarOpen) return;
@@ -327,6 +369,16 @@ export function App() {
     navigateRoute("dashboard");
   }
 
+  function navigateFromUserMenu(routeId: "profile" | "theme") {
+    setOpenUserMenu(null);
+    navigateRoute(routeId);
+  }
+
+  async function logoutFromUserMenu() {
+    setOpenUserMenu(null);
+    await handleLogout();
+  }
+
   function navigateRoute(routeId: WorkspaceRouteId) {
     const shouldRestoreNavigationFocus = isNarrowViewport && isMobileSidebarOpen;
     if (shouldRestoreNavigationFocus) {
@@ -340,6 +392,7 @@ export function App() {
   }
 
   function closeMobileSidebar(options: { deferFocusRestore?: boolean } = {}) {
+    setOpenUserMenu(null);
     if (isNarrowViewport && isMobileSidebarOpen) {
       flushSync(() => {
         setIsMobileSidebarOpen(false);
@@ -356,6 +409,7 @@ export function App() {
   }
 
   function handleNavigationToggle() {
+    setOpenUserMenu(null);
     if (isNarrowViewport) {
       cancelNavigationToggleFocusRestore();
       setIsMobileSidebarOpen((value) => !value);
@@ -484,15 +538,6 @@ export function App() {
             <PlusCircle aria-hidden="true" size={16} />
             <span>Быстро создать</span>
           </button>
-          <button
-            aria-label="Открыть профиль"
-            className="sidebar-icon-button"
-            title="Открыть профиль"
-            type="button"
-            onClick={() => navigateRoute("profile")}
-          >
-            <Mail aria-hidden="true" size={16} />
-          </button>
         </div>
         <nav className="nav-list" aria-label="Основная навигация">
           {visibleRouteGroups.map((group) => (
@@ -524,21 +569,31 @@ export function App() {
           <strong>Текущий слой</strong>
           <p>Вход, пользователи, роли доступа, должности, профиль, тема и события аудита.</p>
         </section>
-        <div className="sidebar-user">
-          <span className="avatar">{data.me.name.slice(0, 1).toUpperCase()}</span>
-          <div>
-            <strong>{data.me.name}</strong>
-            <small>{data.me.email}</small>
-          </div>
+        <div className="account-menu-anchor sidebar-account-menu" ref={sidebarUserMenuRef}>
           <button
-            aria-label="Выйти из рабочего пространства"
-            className="kebab-button"
-            disabled={logoutMutation.isPending}
+            aria-expanded={openUserMenu === "sidebar"}
+            aria-label="Открыть меню профиля"
+            className="sidebar-user account-trigger"
             type="button"
-            onClick={handleLogout}
+            onClick={() =>
+              setOpenUserMenu((value) => (value === "sidebar" ? null : "sidebar"))
+            }
           >
-            <ChevronRight aria-hidden="true" size={16} />
+            <span className="avatar">{data.me.name.slice(0, 1).toUpperCase()}</span>
+            <span className="account-trigger-copy">
+              <strong>{data.me.name}</strong>
+              <small>{data.me.email}</small>
+            </span>
+            <ChevronDown aria-hidden="true" className="account-trigger-icon" size={16} />
           </button>
+          {openUserMenu === "sidebar" ? (
+            <AccountMenu
+              isLogoutPending={logoutMutation.isPending}
+              onLogout={logoutFromUserMenu}
+              onProfile={canOpenProfile ? () => navigateFromUserMenu("profile") : null}
+              onTheme={canOpenTheme ? () => navigateFromUserMenu("theme") : null}
+            />
+          ) : null}
         </div>
       </aside>
 
@@ -571,22 +626,26 @@ export function App() {
               <span className={data.apiStatus === "ok" ? "status-dot ok" : "status-dot"} />
               <span>{data.apiStatus}</span>
             </div>
-            <button
-              aria-label="Открыть оформление"
-              className="topbar-icon-button"
-              type="button"
-              onClick={() => navigateRoute("theme")}
-            >
-              <Moon aria-hidden="true" size={17} />
-            </button>
-            <button
-              aria-label="Открыть настройки профиля"
-              className="topbar-icon-button"
-              type="button"
-              onClick={() => navigateRoute("profile")}
-            >
-              <Settings aria-hidden="true" size={17} />
-            </button>
+            {canOpenTheme ? (
+              <button
+                aria-label="Открыть оформление"
+                className="topbar-icon-button"
+                type="button"
+                onClick={() => navigateRoute("theme")}
+              >
+                <Moon aria-hidden="true" size={17} />
+              </button>
+            ) : null}
+            {canOpenProfile ? (
+              <button
+                aria-label="Открыть настройки профиля"
+                className="topbar-icon-button"
+                type="button"
+                onClick={() => navigateRoute("profile")}
+              >
+                <Settings aria-hidden="true" size={17} />
+              </button>
+            ) : null}
             <button
               aria-label="Уведомления"
               className="topbar-icon-button"
@@ -596,9 +655,27 @@ export function App() {
             >
               <Bell aria-hidden="true" size={17} />
             </button>
-            <button className="avatar-button" type="button" onClick={() => navigateRoute("profile")}>
-              {data.me.name.slice(0, 1).toUpperCase()}
-            </button>
+            <div className="account-menu-anchor topbar-account-menu" ref={topbarUserMenuRef}>
+              <button
+                aria-expanded={openUserMenu === "topbar"}
+                aria-label="Открыть меню пользователя"
+                className="avatar-button"
+                type="button"
+                onClick={() =>
+                  setOpenUserMenu((value) => (value === "topbar" ? null : "topbar"))
+                }
+              >
+                {data.me.name.slice(0, 1).toUpperCase()}
+              </button>
+              {openUserMenu === "topbar" ? (
+                <AccountMenu
+                  isLogoutPending={logoutMutation.isPending}
+                  onLogout={logoutFromUserMenu}
+                  onProfile={canOpenProfile ? () => navigateFromUserMenu("profile") : null}
+                  onTheme={canOpenTheme ? () => navigateFromUserMenu("theme") : null}
+                />
+              ) : null}
+            </div>
           </div>
         </header>
 
@@ -661,6 +738,48 @@ export function App() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function AccountMenu(props: {
+  isLogoutPending: boolean;
+  onLogout: () => void;
+  onProfile: (() => void) | null;
+  onTheme: (() => void) | null;
+}) {
+  return (
+    <div className="account-menu" aria-label="Меню пользователя">
+      {props.onProfile ? (
+        <button className="account-menu-item" type="button" onClick={props.onProfile}>
+          <UserCircle aria-hidden="true" size={16} />
+          <span>
+            <strong>Профиль</strong>
+            <small>Личные данные и контакты</small>
+          </span>
+        </button>
+      ) : null}
+      {props.onTheme ? (
+        <button className="account-menu-item" type="button" onClick={props.onTheme}>
+          <Palette aria-hidden="true" size={16} />
+          <span>
+            <strong>Оформление</strong>
+            <small>Тема и акцентный цвет</small>
+          </span>
+        </button>
+      ) : null}
+      <button
+        className="account-menu-item danger"
+        disabled={props.isLogoutPending}
+        type="button"
+        onClick={props.onLogout}
+      >
+        <LogOut aria-hidden="true" size={16} />
+        <span>
+          <strong>Выйти из рабочего пространства</strong>
+          <small>{props.isLogoutPending ? "Завершаем сессию..." : "Закрыть текущую сессию"}</small>
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -803,9 +922,6 @@ function Dashboard(props: {
             <table className="data-table dashboard-table" aria-label="Последние пользователи">
               <thead>
                 <tr>
-                  <th className="select-column">
-                    <span className="checkbox-visual" aria-hidden="true" />
-                  </th>
                   <th>Пользователь</th>
                   <th>Статус</th>
                   <th>Роль доступа</th>
@@ -815,7 +931,7 @@ function Dashboard(props: {
               </thead>
               <tbody>
                 {dashboardUsers.length === 0 ? (
-                  <TableEmpty colSpan={6} label="Пользователей пока нет." />
+                  <TableEmpty colSpan={5} label="Пользователей пока нет." />
                 ) : (
                   dashboardUsers.map((user) => {
                     const role = props.data.accessRoles.find(
@@ -824,9 +940,6 @@ function Dashboard(props: {
 
                     return (
                       <tr key={user.id}>
-                        <td className="select-column">
-                          <span className="checkbox-visual" aria-hidden="true" />
-                        </td>
                         <td>
                           <span className="person-cell">
                             <span className="row-avatar">{user.name.slice(0, 1).toUpperCase()}</span>
