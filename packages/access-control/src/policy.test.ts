@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createTenantUser } from "@kiss-pm/domain";
 import {
+  canManageWorkspaceConfig,
   canManageAccessProfiles,
   canManagePositions,
   canManageTenantUsers,
   canManageWorkspaceTheme,
+  canReadWorkspaceConfig,
   canReadAuditEvents,
   canReadTenantUsers,
   canUpdateProfile,
@@ -22,6 +24,8 @@ describe("access-control tenant policy", () => {
       "tenant.positions.read",
       "tenant.positions.manage",
       "tenant.audit_events.read",
+      "tenant.workspace_config.read",
+      "tenant.workspace_config.manage",
       "profile.read",
       "profile.update",
       "workspace.theme.manage"
@@ -192,5 +196,49 @@ describe("access-control tenant policy", () => {
         targetTenantId: "tenant-alpha"
       }).allowed
     ).toBe(true);
+  });
+
+  it("allows workspace config read and management only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const readonlyProfile = createAccessProfile({
+      id: "readonly",
+      permissions: ["tenant.workspace_config.read"]
+    });
+
+    expect(
+      canReadWorkspaceConfig({
+        actor,
+        profile: readonlyProfile,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageWorkspaceConfig({
+        actor,
+        profile: readonlyProfile,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageWorkspaceConfig({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
   });
 });

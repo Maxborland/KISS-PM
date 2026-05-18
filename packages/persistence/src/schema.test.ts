@@ -12,6 +12,8 @@ describe("PostgreSQL persistence schema", () => {
       "tenants",
       "access_profiles",
       "positions",
+      "custom_field_definitions",
+      "project_templates",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -23,6 +25,8 @@ describe("PostgreSQL persistence schema", () => {
     expect(tenantOwnedTableNames).toEqual([
       "access_profiles",
       "positions",
+      "custom_field_definitions",
+      "project_templates",
       "tenant_users",
       "user_credentials",
       "user_sessions",

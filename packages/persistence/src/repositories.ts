@@ -16,7 +16,9 @@ import type { KissPmDatabase } from "./connection";
 import {
   accessProfiles,
   auditEvents,
+  customFieldDefinitions,
   positions,
+  projectTemplates,
   tenants,
   tenantUsers,
   userCredentials,
@@ -45,6 +47,36 @@ export type PositionRecord = {
   name: string;
   description: string | null;
 };
+export type CustomFieldDefinitionRecord = {
+  id: string;
+  tenantId: TenantId;
+  systemKey: string;
+  tenantLabel: string;
+  targetEntity: string;
+  fieldType: string;
+  required: boolean;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type CustomFieldDefinitionInput = Omit<
+  CustomFieldDefinitionRecord,
+  "createdAt" | "updatedAt"
+>;
+export type ProjectTemplateRecord = {
+  id: string;
+  tenantId: TenantId;
+  systemKey: string;
+  tenantLabel: string;
+  description: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type ProjectTemplateInput = Omit<
+  ProjectTemplateRecord,
+  "createdAt" | "updatedAt"
+>;
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;
@@ -82,6 +114,18 @@ export type PostgresTenantDataSource = {
   createPosition(input: PositionRecord): Promise<PositionRecord>;
   updatePosition(input: PositionRecord): Promise<PositionRecord>;
   deletePosition(tenantId: TenantId, positionId: string): Promise<void>;
+  listCustomFieldDefinitions(
+    tenantId: TenantId
+  ): Promise<CustomFieldDefinitionRecord[]>;
+  createCustomFieldDefinition(
+    input: CustomFieldDefinitionInput
+  ): Promise<CustomFieldDefinitionRecord>;
+  updateCustomFieldDefinition(
+    input: CustomFieldDefinitionInput
+  ): Promise<CustomFieldDefinitionRecord>;
+  listProjectTemplates(tenantId: TenantId): Promise<ProjectTemplateRecord[]>;
+  createProjectTemplate(input: ProjectTemplateInput): Promise<ProjectTemplateRecord>;
+  updateProjectTemplate(input: ProjectTemplateInput): Promise<ProjectTemplateRecord>;
   findCredentialByEmail(email: string): Promise<UserCredentialRecord | undefined>;
   upsertCredential(input: UserCredentialRecord): Promise<void>;
   updateCredentialEmail(tenantId: TenantId, userId: UserId, email: string): Promise<void>;
@@ -346,6 +390,106 @@ export function createPostgresTenantDataSource(
         .delete(positions)
         .where(and(eq(positions.tenantId, tenantId), eq(positions.id, positionId)));
     },
+    async listCustomFieldDefinitions(tenantId) {
+      const rows = await db
+        .select()
+        .from(customFieldDefinitions)
+        .where(eq(customFieldDefinitions.tenantId, tenantId))
+        .orderBy(customFieldDefinitions.systemKey);
+
+      return rows.map(mapCustomFieldDefinitionRecord);
+    },
+    async createCustomFieldDefinition(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(customFieldDefinitions)
+        .values({
+          ...input,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+
+      if (!row) {
+        throw new Error("Custom field insert returned no row");
+      }
+
+      return mapCustomFieldDefinitionRecord(row);
+    },
+    async updateCustomFieldDefinition(input) {
+      const [row] = await db
+        .update(customFieldDefinitions)
+        .set({
+          tenantLabel: input.tenantLabel,
+          targetEntity: input.targetEntity,
+          fieldType: input.fieldType,
+          required: input.required,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(customFieldDefinitions.tenantId, input.tenantId),
+            eq(customFieldDefinitions.id, input.id)
+          )
+        )
+        .returning();
+
+      if (!row) {
+        throw new Error("Custom field update returned no row");
+      }
+
+      return mapCustomFieldDefinitionRecord(row);
+    },
+    async listProjectTemplates(tenantId) {
+      const rows = await db
+        .select()
+        .from(projectTemplates)
+        .where(eq(projectTemplates.tenantId, tenantId))
+        .orderBy(projectTemplates.systemKey);
+
+      return rows.map(mapProjectTemplateRecord);
+    },
+    async createProjectTemplate(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(projectTemplates)
+        .values({
+          ...input,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+
+      if (!row) {
+        throw new Error("Project template insert returned no row");
+      }
+
+      return mapProjectTemplateRecord(row);
+    },
+    async updateProjectTemplate(input) {
+      const [row] = await db
+        .update(projectTemplates)
+        .set({
+          tenantLabel: input.tenantLabel,
+          description: input.description,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(projectTemplates.tenantId, input.tenantId),
+            eq(projectTemplates.id, input.id)
+          )
+        )
+        .returning();
+
+      if (!row) {
+        throw new Error("Project template update returned no row");
+      }
+
+      return mapProjectTemplateRecord(row);
+    },
     async findCredentialByEmail(email) {
       const [row] = await db
         .select()
@@ -521,6 +665,38 @@ function mapPositionRecord(row: typeof positions.$inferSelect): PositionRecord {
     tenantId: row.tenantId,
     name: row.name,
     description: row.description
+  };
+}
+
+function mapCustomFieldDefinitionRecord(
+  row: typeof customFieldDefinitions.$inferSelect
+): CustomFieldDefinitionRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    systemKey: row.systemKey,
+    tenantLabel: row.tenantLabel,
+    targetEntity: row.targetEntity,
+    fieldType: row.fieldType,
+    required: row.required,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function mapProjectTemplateRecord(
+  row: typeof projectTemplates.$inferSelect
+): ProjectTemplateRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    systemKey: row.systemKey,
+    tenantLabel: row.tenantLabel,
+    description: row.description,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
   };
 }
 
