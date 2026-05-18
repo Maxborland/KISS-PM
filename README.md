@@ -38,6 +38,20 @@ pnpm dev:api
 pnpm dev:web
 ```
 
+Чтобы держать PostgreSQL, API и web включенными через Docker Compose с live reload:
+
+```bash
+pnpm dev:compose
+```
+
+Для фонового запуска:
+
+```bash
+pnpm dev:compose:detached
+```
+
+После запуска web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, PostgreSQL — на `127.0.0.1:55432`. Compose сам ставит зависимости в Linux-volume, применяет миграции и выполняет dev seed перед стартом API.
+
 Для локального PostgreSQL слоя через Docker Compose:
 
 ```bash

@@ -7,6 +7,7 @@ import {
 import { createApp } from "./app";
 
 const port = Number.parseInt(process.env.PORT ?? "4000", 10);
+const hostname = process.env.HOST ?? "127.0.0.1";
 const databaseUrl = process.env.DATABASE_URL;
 const postgresClient = databaseUrl
   ? createPostgresClient(databaseUrl)
@@ -17,10 +18,11 @@ const dataSource = postgresClient
 
 serve({
   fetch: (dataSource ? createApp({ dataSource }) : createApp()).fetch,
+  hostname,
   port
 });
 
-console.log(`KISS PM API listening on http://127.0.0.1:${port}`);
+console.log(`KISS PM API listening on http://${hostname}:${port}`);
 
 if (postgresClient) {
   console.log("KISS PM API uses PostgreSQL persistence runtime");

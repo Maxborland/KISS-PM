@@ -11,8 +11,13 @@ Phase 1.3 продолжает Phase 1.2. PostgreSQL запускается то
 ## Выбранный подход
 
 - Docker Compose service: `postgres`.
+- Для dev runtime Docker Compose также может поднимать `api` и `web`, чтобы frontend и backend были постоянно доступны с live reload.
 - Host port: `55432`, чтобы не конфликтовать с возможным локальным PostgreSQL на `5432`.
 - Runtime URL: `postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm`.
+- Dev web URL: `http://127.0.0.1:3000`.
+- Dev API URL: `http://127.0.0.1:4000`.
+- Команда `pnpm dev:compose` поднимает `postgres`, `api` и `web`; команда `pnpm dev:compose:detached` делает то же самое в фоне.
+- В Compose используется bind mount репозитория и отдельные Linux `node_modules` volumes, чтобы изменения кода были видны realtime, а зависимости не брались из Windows `node_modules`.
 - `db:migrate` применяет SQL-файлы из `packages/persistence/migrations` через явный migration runner и таблицу `kiss_pm_migrations`.
 - Unit/API tests остаются быстрыми и не требуют Docker.
 - DB integration tests запускаются отдельной командой.
