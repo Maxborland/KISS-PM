@@ -82,8 +82,6 @@ Audit viewer, negative RBAC browser coverage и первый workspace config ba
   - `pnpm test` прошел, 14 файлов / 49 тестов;
   - `pnpm test:db` прошел, 3 файла / 19 тестов.
 - Статус: отправлено на повторный Bug Hunt, Requesting Code Review и security-best-practices review.
-- Повторный Bug Hunt Critical/Important не нашел.
-- Повторный Security Review Critical/Important не нашел.
 - Повторный Requesting Code Review нашел 2 Important:
   - restricted-user smoke проверял не все mutation endpoints;
   - в user-facing copy шаблонов остались `project templates` / `process builder`.
@@ -164,3 +162,105 @@ Audit viewer, negative RBAC browser coverage и первый workspace config ba
   - `pnpm test:db` прошел, 3 файла / 20 тестов;
   - `git diff --check` прошел.
 - Статус: отправлено на повторный Bug Hunt, Requesting Code Review и security-best-practices review.
+
+## Блок 4: refactor API-slice auth/session и workspace config routes
+
+- Вынесены API-типы в `apps/api/src/apiTypes.ts`.
+- Вынесены session/cookie helpers в `apps/api/src/authSession.ts`.
+- Вынесены общие parser helpers в `apps/api/src/parseHelpers.ts`.
+- Вынесены workspace parsers в `apps/api/src/workspaceParsers.ts`.
+- Вынесены config parsers в `apps/api/src/workspaceConfigParsers.ts`.
+- Вынесены workspace config routes в `apps/api/src/workspaceConfigRoutes.ts`.
+- `apps/api/src/app.ts` оставлен application composition layer и делегирует auth/config helper-модулям.
+- Для session cookie добавлен secure-cookie guard: локальный HTTP dev остается рабочим, production/self-hosted HTTPS включает `Secure` через `KISS_PM_SECURE_COOKIES=true` или `createApp({ secureCookies: true })`.
+- Исправлен package-level test script `@kiss-pm/api`, чтобы API tests запускались без root include ambiguity.
+
+## Проверки блока 4
+
+- TDD RED: targeted tests падали на отсутствующих `authSession` и `workspaceConfigParsers`.
+- TDD RED: repository health budget падал на `apps/api/src/app.ts` как god-file.
+- GREEN targeted: `pnpm vitest run apps/api/src/authSession.test.ts apps/api/src/workspaceConfigParsers.test.ts apps/web/src/repositoryHealth.test.ts` прошел, 12 тестов.
+- `pnpm --filter @kiss-pm/api typecheck` прошел.
+- `pnpm --filter @kiss-pm/api test` прошел, 16 тестов.
+- `pnpm typecheck` прошел.
+- `pnpm test` прошел, 66 тестов на момент блока.
+- `pnpm test:db` прошел, 20 тестов.
+- `pnpm --filter @kiss-pm/web build` прошел.
+- Первый `pnpm test:e2e:smoke` был нестабилен из-за stale Docker runtime; после `docker compose up -d --force-recreate api web` повторный smoke прошел, 1 chromium test.
+- `git diff --check` прошел.
+- Коммит блока: `f32167e refactor(api): slice auth and workspace config routes`.
+
+## Review loop блока 4
+
+- Bug Hunt нашел Important: strict env typing ломал API typecheck после secure-cookie helper.
+- Requesting Code Review Critical/Important не нашел.
+- Security review нашел Important: session cookie helper не умел ставить `Secure` для HTTPS deployment.
+- Исправлено:
+  - `shouldUseSecureCookies` типизирован через `Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES">>`;
+  - `buildSessionCookieHeader` и `buildExpiredSessionCookieHeader` принимают secure option;
+  - `createApp` поддерживает `secureCookies`, а default определяется через env.
+- Повторные Bug Hunt, Requesting Code Review и Security Review Critical/Important не нашли.
+
+## Блок 5: shadcn scaffold и Tailwind foundation
+
+- Добавлен app-local `apps/web/components.json` с shadcn registry scaffold.
+- Добавлен Tailwind v4/PostCSS foundation:
+  - `apps/web/postcss.config.mjs`;
+  - `apps/web/src/shadcn.css`;
+  - импорт shadcn/Tailwind foundation из `apps/web/src/styles.css`.
+- Добавлены shadcn UI primitives для будущих CRUD surfaces:
+  - `button`;
+  - `dialog`;
+  - `dropdown-menu`;
+  - `table`.
+- Добавлен `apps/web/src/lib/utils.ts` с `cn`.
+- Добавлены aliases `@/*` в `apps/web/tsconfig.json`.
+- Добавлен `apps/web/src/shadcnFoundation.test.ts`, который фиксирует scaffold, Tailwind runtime entry, shadcn primitives, theme alignment и Next dev runtime guardrails.
+- Добавлен `apps/web/src/useDocumentThemeClass.ts`, чтобы persisted product theme синхронизировалась с корневым `.dark` для portal-компонентов.
+- Next dev runtime настроен для Docker/browser smoke:
+  - `allowedDevOrigins: ["127.0.0.1", "localhost"]`;
+  - `devIndicators: false`, чтобы Next dev portal не перекрывал интерактивный smoke.
+
+## Проверки блока 5
+
+- TDD RED: `pnpm vitest run apps/web/src/shadcnFoundation.test.ts` падал на отсутствующих `components.json`, Tailwind deps и shadcn primitives.
+- GREEN targeted: `pnpm vitest run apps/web/src/shadcnFoundation.test.ts` прошел, 5 тестов.
+- `pnpm --filter @kiss-pm/web typecheck` прошел.
+- `pnpm --filter @kiss-pm/web build` прошел.
+- `pnpm typecheck` прошел.
+- `pnpm test` прошел, 18 файлов / 71 тест.
+- `pnpm test:db` прошел, 3 файла / 20 тестов.
+- `pnpm audit --prod --audit-level moderate` прошел.
+- `pnpm test:e2e:smoke` сначала выявил два runtime blockers:
+  - Next dev resource был заблокирован для `127.0.0.1`, shell зависал на загрузке;
+  - Next dev indicator portal перекрывал клики в collapsed sidebar smoke.
+- Исправлено через `allowedDevOrigins` и `devIndicators: false`.
+- После очистки generated `test-results` от stale Windows lock повторный `pnpm test:e2e:smoke` прошел, 1 chromium test.
+- `docker compose ps` подтвердил running `postgres`, `api`, `web`.
+
+## Review loop блока 5
+
+- Bug Hunt и Requesting Code Review нашли Important:
+  - shadcn semantic tokens конфликтовали с существующими app CSS variables `--accent`, `--muted`, `--border`;
+  - shadcn dark mode был привязан только к `.dark`, тогда как продукт использует `.theme-dark`;
+  - dropdown primitives hardcoded `dark` и могли рендериться темными в светлой теме.
+- Security Review нашел Important:
+  - production dependency surface был расширен aggregate `radix-ui` и CLI-пакетом `shadcn` в runtime dependencies;
+  - `pnpm audit --prod --audit-level moderate` падал на vulnerable transitive `postcss` через Next.
+- Исправлено:
+  - shadcn semantic tokens переведены в namespace `--shadcn-*`, а Tailwind tokens смотрят на этот namespace;
+  - dark variant принимает `.dark` и `.theme-dark`;
+  - `useDocumentThemeClass` синхронизирует persisted product theme с корневым `.dark` для portal-компонентов;
+  - hardcoded `dark` удален из dropdown content/subcontent;
+  - aggregate `radix-ui` заменен на точечные `@radix-ui/react-slot`, `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`;
+  - `shadcn` перенесен в devDependencies;
+  - добавлен root `pnpm.overrides.postcss = ^8.5.14`;
+  - `pnpm audit --prod --audit-level moderate` теперь проходит.
+- Повторный Bug Hunt Critical/Important не нашел.
+- Повторный Security Review Critical/Important не нашел.
+- Повторный Requesting Code Review нашел Important: записи блока 5 были ошибочно вставлены внутрь review tail блока 2 и делали ledger неоднозначным.
+- Исправлено: записи блоков 4/5 перенесены в конец ledger после блока 3.
+- Повторный Requesting Code Review после исправления ledger Critical/Important не нашел.
+- После security follow-up выполнен `pnpm install --frozen-lockfile`; локальный `node_modules` синхронизирован с lockfile.
+- Повторный Security Review после fresh install Critical/Important не нашел: `postcss` в web dependency tree один, `8.5.14`; aggregate `radix-ui` не найден; `shadcn` остается devDependency.
+- Финальный smoke после `docker compose up -d --force-recreate web` прошел; `docker compose ps` подтвердил running `postgres`, `api`, `web`.

@@ -100,6 +100,7 @@ import {
   getFocusableElements,
   type SectionState
 } from "./components/workspace-ui";
+import { useDocumentThemeClass } from "./useDocumentThemeClass";
 
 const routeIcons: Record<WorkspaceRouteId, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -312,6 +313,8 @@ export function App() {
     positionsQuery.data?.positions,
     usersQuery.data?.users
   ]);
+
+  useDocumentThemeClass(data?.me.theme);
 
   const sectionStates = {
     users: getSectionState(canReadUsers, usersQuery.isFetching, usersQuery.error),
