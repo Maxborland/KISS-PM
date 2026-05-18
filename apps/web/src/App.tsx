@@ -9,6 +9,8 @@ import {
   ChevronRight,
   CircleCheck,
   Download,
+  Eye,
+  EyeOff,
   Gauge,
   LayoutDashboard,
   Mail,
@@ -61,6 +63,15 @@ import {
   useUsersQuery
 } from "./workspaceQueries";
 import { buildWorkspaceData, type WorkspaceData } from "./workspaceData";
+import {
+  type FormErrors,
+  getFieldErrorId,
+  getNextFocusTrapIndex,
+  hasFormErrors,
+  validatePositionForm,
+  validateRoleForm,
+  validateUserForm
+} from "./workspaceForms";
 import {
   filterPositionsForTable,
   filterRolesForTable,
@@ -707,6 +718,8 @@ function UsersView(props: {
     | null
   >(null);
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
   const editingUser =
     modal?.type === "edit"
@@ -741,8 +754,11 @@ function UsersView(props: {
   }, [canManageUsers, props.openCreateRequested, props.onQuickCreateConsumed]);
 
   function closeModal() {
+    if (isSaving) return;
     setModal(null);
     setFormError("");
+    setFieldErrors({});
+    setIsPasswordVisible(false);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -750,6 +766,7 @@ function UsersView(props: {
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     setFormError("");
+    setFieldErrors({});
 
     try {
       const input = {
@@ -759,6 +776,18 @@ function UsersView(props: {
         positionId: String(form.get("positionId")) || null,
         status: String(form.get("status") ?? "active")
       };
+      const validationErrors = validateUserForm(
+        {
+          ...input,
+          password: String(form.get("password") ?? "")
+        },
+        mode
+      );
+
+      if (hasFormErrors(validationErrors)) {
+        setFieldErrors(validationErrors);
+        return;
+      }
 
       if (editingUser) {
         await userMutations.updateUser.mutateAsync({
@@ -775,6 +804,8 @@ function UsersView(props: {
 
       formElement.reset();
       setModal(null);
+      setFieldErrors({});
+      setIsPasswordVisible(false);
       props.onChanged("Пользователи обновлены");
     } catch (submitError) {
       setFormError(getErrorMessage(submitError));
@@ -924,34 +955,90 @@ function UsersView(props: {
       {isFormOpen ? (
         <Modal
           title={mode === "edit" ? "Редактировать пользователя" : "Создать пользователя"}
+          description="Заполните обязательные поля. Изменения будут проверены правами и записаны в аудит."
+          isDismissDisabled={isSaving}
           onClose={closeModal}
         >
-          <form className="stack-form" key={editingUser?.id ?? "new-user"} onSubmit={submit}>
-            <label>
+          <form
+            className="stack-form"
+            key={editingUser?.id ?? "new-user"}
+            noValidate
+            onSubmit={submit}
+          >
+            <label htmlFor="user-form-name">
               Имя
-              <input name="name" defaultValue={editingUser?.name ?? ""} required />
+              <input
+                id="user-form-name"
+                name="name"
+                aria-describedby={
+                  fieldErrors.name ? getFieldErrorId("user-form", "name") : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.name)}
+                data-autofocus
+                defaultValue={editingUser?.name ?? ""}
+                required
+              />
+              <FieldError formId="user-form" field="name" errors={fieldErrors} />
             </label>
-            <label>
+            <label htmlFor="user-form-email">
               Email
-              <input name="email" defaultValue={editingUser?.email ?? ""} required type="email" />
+              <input
+                id="user-form-email"
+                name="email"
+                aria-describedby={
+                  fieldErrors.email ? getFieldErrorId("user-form", "email") : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.email)}
+                defaultValue={editingUser?.email ?? ""}
+                required
+                type="email"
+              />
+              <FieldError formId="user-form" field="email" errors={fieldErrors} />
             </label>
             {mode === "create" ? (
-              <label>
+              <label htmlFor="user-form-password">
                 Пароль
-                <input
-                  name="password"
-                  placeholder="минимум 8 символов"
-                  required
-                  type="password"
-                />
+                <span className="password-field">
+                  <input
+                    id="user-form-password"
+                    name="password"
+                    aria-label="Пароль"
+                    aria-describedby={
+                      fieldErrors.password
+                        ? getFieldErrorId("user-form", "password")
+                        : "user-form-password-help"
+                    }
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    placeholder="минимум 8 символов"
+                    required
+                    type={isPasswordVisible ? "text" : "password"}
+                  />
+                  <button
+                    aria-label={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+                    className="password-toggle"
+                    type="button"
+                    onClick={() => setIsPasswordVisible((value) => !value)}
+                  >
+                    {isPasswordVisible ? (
+                      <EyeOff aria-hidden="true" size={16} />
+                    ) : (
+                      <Eye aria-hidden="true" size={16} />
+                    )}
+                  </button>
+                </span>
+                <small id="user-form-password-help" className="field-help">
+                  Минимум 8 символов.
+                </small>
+                <FieldError formId="user-form" field="password" errors={fieldErrors} />
               </label>
             ) : null}
-            <label>
+            <label htmlFor="user-form-accessProfileId">
               Роль доступа
               {isEditingSelf && editingUser ? (
                 <>
                   <input name="accessProfileId" type="hidden" value={editingUser.accessProfileId} />
                   <input
+                    id="user-form-accessProfileId"
                     readOnly
                     value={
                       props.data.accessRoles.find(
@@ -961,7 +1048,18 @@ function UsersView(props: {
                   />
                 </>
               ) : (
-                <select name="accessProfileId" defaultValue={editingUser?.accessProfileId} required>
+                <select
+                  id="user-form-accessProfileId"
+                  name="accessProfileId"
+                  aria-describedby={
+                    fieldErrors.accessProfileId
+                      ? getFieldErrorId("user-form", "accessProfileId")
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.accessProfileId)}
+                  defaultValue={editingUser?.accessProfileId}
+                  required
+                >
                   {props.data.accessRoles.map((role) => (
                     <option key={role.id} value={role.id}>
                       {role.name}
@@ -969,10 +1067,15 @@ function UsersView(props: {
                   ))}
                 </select>
               )}
+              <FieldError formId="user-form" field="accessProfileId" errors={fieldErrors} />
             </label>
-            <label>
+            <label htmlFor="user-form-positionId">
               Должность
-              <select name="positionId" defaultValue={editingUser?.positionId ?? ""}>
+              <select
+                id="user-form-positionId"
+                name="positionId"
+                defaultValue={editingUser?.positionId ?? ""}
+              >
                 <option value="">Без должности</option>
                 {props.data.positions.map((position) => (
                   <option key={position.id} value={position.id}>
@@ -981,26 +1084,44 @@ function UsersView(props: {
                 ))}
               </select>
             </label>
-            <label>
+            <label htmlFor="user-form-status">
               Статус
               {isEditingSelf ? (
                 <>
                   <input name="status" type="hidden" value="active" />
-                  <input readOnly value="Активен" />
+                  <input id="user-form-status" readOnly value="Активен" />
                 </>
               ) : (
-                <select name="status" defaultValue={editingUser?.status ?? "active"}>
+                <select
+                  id="user-form-status"
+                  name="status"
+                  aria-describedby={
+                    fieldErrors.status ? getFieldErrorId("user-form", "status") : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.status)}
+                  defaultValue={editingUser?.status ?? "active"}
+                >
                   <option value="active">Активен</option>
                   <option value="inactive">Отключен</option>
                 </select>
               )}
+              <FieldError formId="user-form" field="status" errors={fieldErrors} />
             </label>
             {formError ? <p className="error">{formError}</p> : null}
             <div className="form-actions">
               <button className="primary-button" disabled={isSaving} type="submit">
-                {mode === "edit" ? "Сохранить пользователя" : "Создать пользователя"}
+                {isSaving
+                  ? "Сохраняем..."
+                  : mode === "edit"
+                    ? "Сохранить пользователя"
+                    : "Создать пользователя"}
               </button>
-              <button className="secondary-button" type="button" onClick={closeModal}>
+              <button
+                className="secondary-button"
+                disabled={isSaving}
+                type="button"
+                onClick={closeModal}
+              >
                 Отменить
               </button>
             </div>
@@ -1012,6 +1133,7 @@ function UsersView(props: {
           title="Удалить пользователя"
           body={`Пользователь "${deletingUser?.name ?? "выбранный пользователь"}" будет удален из рабочего пространства.`}
           confirmLabel="Удалить пользователя"
+          pendingLabel="Удаляем пользователя..."
           isPending={isSaving}
           onCancel={closeModal}
           onConfirm={() => removeUser(deletingUser ?? null)}
@@ -1039,6 +1161,7 @@ function RolesView(props: {
     | null
   >(null);
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [tableSearch, setTableSearch] = useState("");
   const editingRole =
     modal?.type === "edit"
@@ -1066,8 +1189,10 @@ function RolesView(props: {
   ).length;
 
   function closeModal() {
+    if (isSaving) return;
     setModal(null);
     setFormError("");
+    setFieldErrors({});
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -1076,12 +1201,19 @@ function RolesView(props: {
     const form = new FormData(formElement);
     const permissions = form.getAll("permissions").map(String);
     setFormError("");
+    setFieldErrors({});
 
     try {
       const input = {
         name: String(form.get("name")),
         permissions
       };
+      const validationErrors = validateRoleForm(input);
+
+      if (hasFormErrors(validationErrors)) {
+        setFieldErrors(validationErrors);
+        return;
+      }
 
       if (editingRole) {
         await accessRoleMutations.updateAccessRole.mutateAsync({
@@ -1097,6 +1229,7 @@ function RolesView(props: {
 
       formElement.reset();
       setModal(null);
+      setFieldErrors({});
       props.onChanged("Роли доступа обновлены");
     } catch (submitError) {
       setFormError(getErrorMessage(submitError));
@@ -1243,15 +1376,44 @@ function RolesView(props: {
       {isFormOpen ? (
         <Modal
           title={editingRole ? "Редактировать роль доступа" : "Создать роль доступа"}
+          description="Роль определяет доступные действия пользователя в рабочем пространстве."
+          isDismissDisabled={isSaving}
           onClose={closeModal}
         >
-          <form className="stack-form" key={editingRole?.id ?? "new-role"} onSubmit={submit}>
-            <label>
+          <form
+            className="stack-form"
+            key={editingRole?.id ?? "new-role"}
+            noValidate
+            onSubmit={submit}
+          >
+            <label htmlFor="role-form-name">
               Название роли
-              <input name="name" defaultValue={editingRole?.name ?? ""} required />
+              <input
+                id="role-form-name"
+                name="name"
+                aria-describedby={
+                  fieldErrors.name ? getFieldErrorId("role-form", "name") : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.name)}
+                data-autofocus
+                defaultValue={editingRole?.name ?? ""}
+                required
+              />
+              <FieldError formId="role-form" field="name" errors={fieldErrors} />
             </label>
-            <fieldset className="permission-grid">
+            <fieldset
+              className="permission-grid"
+              aria-describedby={
+                fieldErrors.permissions
+                  ? getFieldErrorId("role-form", "permissions")
+                  : "role-form-permissions-help"
+              }
+              aria-invalid={Boolean(fieldErrors.permissions)}
+            >
               <legend>Права роли</legend>
+              <p id="role-form-permissions-help" className="field-help">
+                Минимальный профиль должен иметь хотя бы одно право.
+              </p>
               {rolePermissionOptions.map((permission) => (
                 <label key={permission.value} className="checkbox-row">
                   <input
@@ -1269,13 +1431,23 @@ function RolesView(props: {
                   {permission.label}
                 </label>
               ))}
+              <FieldError formId="role-form" field="permissions" errors={fieldErrors} />
             </fieldset>
             {formError ? <p className="error">{formError}</p> : null}
             <div className="form-actions">
               <button className="primary-button" disabled={isSaving} type="submit">
-                {editingRole ? "Сохранить роль доступа" : "Создать роль доступа"}
+                {isSaving
+                  ? "Сохраняем..."
+                  : editingRole
+                    ? "Сохранить роль доступа"
+                    : "Создать роль доступа"}
               </button>
-              <button className="secondary-button" type="button" onClick={closeModal}>
+              <button
+                className="secondary-button"
+                disabled={isSaving}
+                type="button"
+                onClick={closeModal}
+              >
                 Отменить
               </button>
             </div>
@@ -1287,6 +1459,7 @@ function RolesView(props: {
           title="Удалить роль доступа"
           body={`Роль "${deletingRole?.name ?? "выбранная роль"}" будет удалена. Это возможно только если она не назначена пользователям.`}
           confirmLabel="Удалить роль доступа"
+          pendingLabel="Удаляем роль..."
           isPending={isSaving}
           onCancel={closeModal}
           onConfirm={() => removeRole(deletingRole ?? null)}
@@ -1314,6 +1487,7 @@ function PositionsView(props: {
     | null
   >(null);
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [tableSearch, setTableSearch] = useState("");
   const editingPosition =
     modal?.type === "edit"
@@ -1338,8 +1512,10 @@ function PositionsView(props: {
   const usersWithoutPosition = props.data.users.filter((user) => !user.positionId).length;
 
   function closeModal() {
+    if (isSaving) return;
     setModal(null);
     setFormError("");
+    setFieldErrors({});
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -1351,8 +1527,16 @@ function PositionsView(props: {
       description: String(form.get("description"))
     };
     setFormError("");
+    setFieldErrors({});
 
     try {
+      const validationErrors = validatePositionForm(input);
+
+      if (hasFormErrors(validationErrors)) {
+        setFieldErrors(validationErrors);
+        return;
+      }
+
       if (editingPosition) {
         await positionMutations.updatePosition.mutateAsync({
           positionId: editingPosition.id,
@@ -1367,6 +1551,7 @@ function PositionsView(props: {
 
       formElement.reset();
       setModal(null);
+      setFieldErrors({});
       props.onChanged("Должности обновлены");
     } catch (submitError) {
       setFormError(getErrorMessage(submitError));
@@ -1509,27 +1694,54 @@ function PositionsView(props: {
       {isFormOpen ? (
         <Modal
           title={editingPosition ? "Редактировать должность" : "Создать должность"}
+          description="Должность используется в карточках пользователей и будущей ресурсной модели."
+          isDismissDisabled={isSaving}
           onClose={closeModal}
         >
           <form
             className="stack-form"
             key={editingPosition?.id ?? "new-position"}
+            noValidate
             onSubmit={submit}
           >
-            <label>
+            <label htmlFor="position-form-name">
               Название должности
-              <input name="name" defaultValue={editingPosition?.name ?? ""} required />
+              <input
+                id="position-form-name"
+                name="name"
+                aria-describedby={
+                  fieldErrors.name ? getFieldErrorId("position-form", "name") : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.name)}
+                data-autofocus
+                defaultValue={editingPosition?.name ?? ""}
+                required
+              />
+              <FieldError formId="position-form" field="name" errors={fieldErrors} />
             </label>
-            <label>
+            <label htmlFor="position-form-description">
               Описание
-              <input name="description" defaultValue={editingPosition?.description ?? ""} />
+              <input
+                id="position-form-description"
+                name="description"
+                defaultValue={editingPosition?.description ?? ""}
+              />
             </label>
             {formError ? <p className="error">{formError}</p> : null}
             <div className="form-actions">
               <button className="primary-button" disabled={isSaving} type="submit">
-                {editingPosition ? "Сохранить должность" : "Создать должность"}
+                {isSaving
+                  ? "Сохраняем..."
+                  : editingPosition
+                    ? "Сохранить должность"
+                    : "Создать должность"}
               </button>
-              <button className="secondary-button" type="button" onClick={closeModal}>
+              <button
+                className="secondary-button"
+                disabled={isSaving}
+                type="button"
+                onClick={closeModal}
+              >
                 Отменить
               </button>
             </div>
@@ -1541,6 +1753,7 @@ function PositionsView(props: {
           title="Удалить должность"
           body={`Должность "${deletingPosition?.name ?? "выбранная должность"}" будет удалена. Это возможно только если она не назначена пользователям.`}
           confirmLabel="Удалить должность"
+          pendingLabel="Удаляем должность..."
           isPending={isSaving}
           onCancel={closeModal}
           onConfirm={() => removePosition(deletingPosition ?? null)}
@@ -1780,14 +1993,20 @@ function Panel(props: {
 
 function Modal(props: {
   title: string;
+  description?: string;
   children: React.ReactNode;
+  isDismissDisabled?: boolean;
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const titleId = useMemo(() => `dialog-title-${props.title.replace(/\W+/g, "-")}`, [props.title]);
+  const descriptionId = props.description ? `${titleId}-description` : undefined;
 
   useEffect(() => {
     const previousActiveElement = document.activeElement;
     const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+      "[data-autofocus]"
+    ) ?? panelRef.current?.querySelector<HTMLElement>(
       "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
     );
 
@@ -1795,6 +2014,7 @@ function Modal(props: {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (props.isDismissDisabled) return;
         props.onClose();
       }
     }
@@ -1806,23 +2026,52 @@ function Modal(props: {
         previousActiveElement.focus();
       }
     };
-  }, [props]);
+  }, [props.isDismissDisabled, props.onClose]);
+
+  function handlePanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Tab") return;
+    const focusable = getFocusableElements(panelRef.current);
+    const activeIndex = focusable.findIndex((element) => element === document.activeElement);
+    const nextIndex = getNextFocusTrapIndex(activeIndex, focusable.length, event.shiftKey);
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    focusable[nextIndex]?.focus();
+  }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={() => {
+        if (!props.isDismissDisabled) props.onClose();
+      }}
+    >
       <section
         ref={panelRef}
-        aria-label={props.title}
+        aria-describedby={descriptionId}
+        aria-labelledby={titleId}
         aria-modal="true"
         className="modal-panel"
         role="dialog"
+        tabIndex={-1}
+        onKeyDown={handlePanelKeyDown}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="modal-header">
-          <h2>{props.title}</h2>
+          <div>
+            <h2 id={titleId}>{props.title}</h2>
+            {props.description ? (
+              <p id={descriptionId} className="modal-description">
+                {props.description}
+              </p>
+            ) : null}
+          </div>
           <button
             aria-label="Закрыть"
             className="icon-button"
+            disabled={props.isDismissDisabled}
             type="button"
             onClick={props.onClose}
           >
@@ -1839,14 +2088,24 @@ function ConfirmDialog(props: {
   title: string;
   body: string;
   confirmLabel: string;
+  pendingLabel: string;
   error: string;
   isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <Modal title={props.title} onClose={props.onCancel}>
+    <Modal
+      title={props.title}
+      description="Проверьте последствия перед подтверждением."
+      isDismissDisabled={props.isPending}
+      onClose={props.onCancel}
+    >
       <div className="confirm-body">
+        <div className="danger-callout" aria-live="polite">
+          <strong>Действие необратимо</strong>
+          <span>Если API примет команду, изменение попадет в audit trail.</span>
+        </div>
         <p>{props.body}</p>
         {props.error ? <p className="error">{props.error}</p> : null}
         <div className="form-actions">
@@ -1856,15 +2115,41 @@ function ConfirmDialog(props: {
             type="button"
             onClick={props.onConfirm}
           >
-            {props.confirmLabel}
+            {props.isPending ? props.pendingLabel : props.confirmLabel}
           </button>
-          <button className="secondary-button" type="button" onClick={props.onCancel}>
+          <button
+            className="secondary-button"
+            disabled={props.isPending}
+            type="button"
+            onClick={props.onCancel}
+          >
             Отменить
           </button>
         </div>
       </div>
     </Modal>
   );
+}
+
+function FieldError(props: { formId: string; field: string; errors: FormErrors }) {
+  const error = props.errors[props.field];
+  if (!error) return null;
+
+  return (
+    <span className="field-error" id={getFieldErrorId(props.formId, props.field)} role="alert">
+      {error}
+    </span>
+  );
+}
+
+function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])"
+    )
+  ).filter((element) => !element.hasAttribute("aria-hidden"));
 }
 
 function EntityList<T>(props: {
