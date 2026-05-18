@@ -1,111 +1,62 @@
 # KISS PM
 
-**KISS PM** means **Keep It Simple, "Sonny" Project Manager**.
+KISS PM — это русскоязычная продуктовая спецификация и будущая реализация SaaS/self-hosted платформы для управления проектами, ресурсной загрузкой и управленческим контролем.
 
-This repository contains the greenfield foundation for a SaaS project-control platform. The current implementation is Phase 1 only: a running monorepo skeleton with API health, a Russian web shell, deterministic demo fixtures, and smoke E2E coverage.
+Текущий репозиторий перезапущен в режиме **docs-first**: старый код считается непригодным для продолжения и не является основой новой реализации. История Git сохраняет прежние материалы, но рабочая версия развивается заново: сначала цельная документация, затем новая реализация по утвержденному фазовому плану.
 
-No CRM, project, KPI, resource, Gantt, control-surface, or business workflow feature is implemented yet.
+## Что строим
 
-## Stack
+KISS PM — не набор отчетов и не BitrixReports-клон. Это платформа, где CRM-вход, оценка емкости, проектный план, Gantt, задачи, ресурсная матрица, KPI, управленческие действия, аудит и ретроспективы образуют один рабочий контур.
 
-- TypeScript monorepo with npm workspaces.
-- API: Bun + Hono.
-- Web: React + Vite.
-- Tests: Vitest for unit/integration smoke, Playwright for E2E.
-- UI foundation: plain CSS shell for Phase 1; shadcn/ui remains available for later phases.
-
-## Local setup
-
-```bash
-bun --version
-npm install
-npx playwright install chromium
-```
-
-`.env.example` contains variable names only. Phase 1 smoke mode does not require secrets, production credentials, Bitrix24, or any live external service.
-
-## Development
-
-```bash
-npm run dev:api -- --host 127.0.0.1 --port 4173
-$env:VITE_KISS_PM_ALLOW_FIXTURE_AUTH="true"
-npm run dev:web -- --host 127.0.0.1 --port 5173
-```
-
-Open the shell in test mode:
+Ключевая идея:
 
 ```txt
-http://127.0.0.1:5173/?testUser=project-manager-a
+увидел сигнал -> понял причину -> выбрал разрешенное действие -> система проверила действие -> действие записано в аудит -> состояние пересчитано
 ```
 
-Without `testUser`, or without `VITE_KISS_PM_ALLOW_FIXTURE_AUTH=true`, the shell shows the Phase 1 test auth guard.
+## Что находится в репозитории сейчас
 
-## Verification
+- `AGENTS.md` — правила работы для agent/агентов.
+- `docs/` — русскоязычный canonical baseline продукта.
+- `docs/references/` — обязательные референсы: BR2-скриншоты и русские выжимки по MS Project scheduling.
+- `apps/api` — первый Node/Hono API shell.
+- `apps/web` — первый React/Vite web shell.
+- `packages/domain` — минимальная tenant/user domain model.
+- `packages/access-control` — минимальная проверка tenant access.
+- `packages/persistence` — PostgreSQL/Drizzle schema, первая migration и audit event foundation.
+- `packages/test-fixtures` — детерминированные фикстуры для Phase 1.
+- Phase 2.2 runtime — single-workspace экран входа, пользователи, роли доступа, должности, профиль, тема и audit-backed CRUD через API.
+
+## Команды старта
 
 ```bash
-npm run typecheck
-npm run lint
-npm test
-npm run test:integration
-npm run test:e2e:smoke
-npm run test:e2e:critical
-npm run test:e2e:permissions
-npm run test:e2e:phase
-npm run verify:matrix
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm dev:api
+pnpm dev:web
 ```
 
-Playwright checks start fresh API/web servers on isolated test ports through `scripts/run-e2e.mjs`; local dev servers on `4173`/`5173` are not reused for phase-gate evidence. `test:e2e:phase` defaults to Phase 1 and accepts a phase selector:
+Для локального PostgreSQL слоя через Docker Compose:
 
 ```bash
-npm run test:e2e:phase -- --phase=1
-npm run test:e2e:phase -- --phase=2
+pnpm db:up
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed:dev
+pnpm test:db
+pnpm test:e2e:smoke
+pnpm db:down
 ```
 
-`test:e2e:permissions` currently runs the Phase 1 auth-guard permission smoke and must expand to Phase 2 E2E-010..014 when `e2e/tests/phase2` is implemented. At Phase 2 exit, `npm run test:e2e:phase -- --phase=2` must prove E2E-010 through E2E-014, and verified Phase 2 matrix rows must include structured `e2e_evidence` entries with the E2E ID, command, test path, exit code `0`, and checked timestamp.
+Локальный вход после seed: `admin@kiss-pm.local` / `local-admin-password`.
 
-For pre-implementation matrices that intentionally contain blocked rows, use:
+`DATABASE_URL` задается через окружение. Пример без секретов есть в `.env.example`.
 
-```bash
-npm run verify:matrix -- --allow-blocked docs/status/phase2-requirements-matrix.json
-```
+## Как работать дальше
 
-The normal `npm run verify:matrix -- docs/status/phase2-requirements-matrix.json` command is the phase-exit gate and must fail until all Phase 2 rows are verified.
-
-Current Phase 1 E2E smoke scenarios:
-
-- `E2E-001`: API health responds and web shell renders.
-- `E2E-002`: seeded demo tenant loads without external services and tenant context follows the fixture user.
-- `E2E-003`: unauthenticated and unknown fixture users are blocked by test auth design.
-- `E2E-004`: test user enters app shell and sees navigation placeholders.
-
-## Dependency notes
-
-- `hono` is the minimal API framework selected by the architecture docs.
-- `react`, `react-dom`, `vite`, and `@vitejs/plugin-react` provide the Phase 1 web shell.
-- `typescript`, `vitest`, Testing Library, ESLint, and Playwright provide deterministic verification from the foundation phase.
-- `zod` is included for the planned API validation boundary, but Phase 1 does not yet implement product DTO validation.
-
-Files:
-
-- `AGENTS.md` — autonomous agent/project-agent rules, phase discipline, and E2E verification protocol.
-- `docs/00_PROJECT_GLOBAL_GOAL.md` — global product goal, final release journey, and product law.
-- `docs/01_PRD.md` — product requirements document.
-- `docs/02_UNIVERSAL_PROJECT_BP.md` — universalized project business process.
-- `docs/03_START_PROMPT_FOR_CODEX.md` — starter prompts for agent.
-- `docs/04_MASTER_PHASE_PLAN.md` — finite phase plan from foundation to market release.
-- `docs/05_E2E_TRUTH_CONTRACT.md` — mandatory E2E testing contract.
-- `docs/06_PRODUCT_IDENTITY.md` — KISS PM naming and simplicity principles.
-- `docs/templates/PHASE_BRIEF_TEMPLATE.md` — template for detailing each phase before implementation.
-- `docs/templates/E2E_SCENARIO_TEMPLATE.md` — template for E2E scenario ledger entries.
-- `docs/e2e/E2E_SCENARIOS.md` — initial E2E scenario ledger across all phases.
-- `docs/backlog/FUTURE_SCOPE.md` — parking lot for future-scope ideas outside the active phase gate.
-- `docs/architecture/ARCHITECTURE.md` — app/package/runtime boundary contract.
-- `docs/domain/` — canonical domain and engine specs.
-- `docs/phases/PHASE_1_PLATFORM_E2E_FOUNDATION.md` — frozen Phase 1 scope.
-
-Phase discipline:
-
-1. Do not start implementation for a phase until its phase-detail document exists.
-2. Do not call a phase complete until mandatory E2E scenarios and exit gate pass.
-3. Keep tenant-specific labels and process names in configuration, not domain logic.
-4. Treat E2E as the operational truth contour for KISS PM.
+1. Сначала читать `AGENTS.md`.
+2. Затем читать `docs/README.md` и документы по порядку.
+3. Писать код только внутри утвержденной фазы и с тестами.
+4. Любая реализация должна иметь E2E-доказательство для управленческих потоков.
+5. В пользовательском языке продукт описывается по-русски. Кодовые идентификаторы в будущей реализации могут быть на английском.
