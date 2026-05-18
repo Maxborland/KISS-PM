@@ -2,16 +2,11 @@
 
 import {
   Activity,
-  ArrowUpDown,
   Bell,
   BriefcaseBusiness,
-  CalendarDays,
   ChevronRight,
-  CircleCheck,
-  Download,
   Eye,
   EyeOff,
-  Gauge,
   LayoutDashboard,
   Mail,
   Menu,
@@ -21,10 +16,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
-  TrendingUp,
   UserCircle,
-  UserPlus,
   Users,
   type LucideIcon
 } from "lucide-react";
@@ -77,6 +69,7 @@ import {
   filterRolesForTable,
   filterUsersForTable
 } from "./workspaceTables";
+import { buildAuditPreviewRows } from "./workspaceDashboard";
 
 type SectionState = {
   canRead: boolean;
@@ -91,7 +84,7 @@ const rolePermissionOptions = [
   { value: "tenant.access_profiles.manage", label: "Управлять ролями доступа" },
   { value: "tenant.positions.read", label: "Читать должности" },
   { value: "tenant.positions.manage", label: "Управлять должностями" },
-  { value: "tenant.audit_events.read", label: "Читать audit" },
+  { value: "tenant.audit_events.read", label: "Читать аудит" },
   { value: "profile.read", label: "Читать профиль" },
   { value: "profile.update", label: "Обновлять профиль" },
   { value: "workspace.theme.manage", label: "Управлять темой" }
@@ -105,13 +98,6 @@ const routeIcons: Record<WorkspaceRouteId, LucideIcon> = {
   profile: UserCircle,
   theme: Palette
 };
-
-const plannedNavigation = [
-  { label: "Проекты", icon: Gauge },
-  { label: "Ресурсы", icon: Activity },
-  { label: "Gantt", icon: CalendarDays },
-  { label: "KPI", icon: TrendingUp }
-] as const;
 
 export function App() {
   const pathname = usePathname();
@@ -279,7 +265,7 @@ export function App() {
             <span className="brand-mark">K</span>
             <div>
               <strong>KISS PM</strong>
-              <small>Control workspace</small>
+              <small>Рабочее пространство</small>
             </div>
           </div>
         </div>
@@ -326,32 +312,13 @@ export function App() {
                   </button>
                 );
               })}
-              {group.id === "workspace"
-                ? plannedNavigation.map((item) => {
-                    const PlannedIcon = item.icon;
-
-                    return (
-                      <button
-                        key={item.label}
-                        className="nav-item is-disabled"
-                        disabled
-                        title="Будет в следующих фазах продукта"
-                        type="button"
-                      >
-                        <PlannedIcon aria-hidden="true" size={16} />
-                        <span>{item.label}</span>
-                        <small className="soon-badge">Скоро</small>
-                      </button>
-                    );
-                  })
-                : null}
             </section>
           ))}
         </nav>
         <div className="sidebar-spacer" />
-        <section className="sidebar-note" aria-label="Следующий продуктовый слой">
-          <strong>Нужна следующая поверхность?</strong>
-          <p>Проекты, ресурсы и control signals подключаются поверх этого RBAC-базиса.</p>
+        <section className="sidebar-note" aria-label="Текущий слой продукта">
+          <strong>Текущий слой</strong>
+          <p>Вход, пользователи, роли доступа, должности, профиль, тема и события аудита.</p>
         </section>
         <div className="sidebar-user">
           <span className="avatar">{data.me.name.slice(0, 1).toUpperCase()}</span>
@@ -385,8 +352,8 @@ export function App() {
           <form className="quick-search" role="search" onSubmit={handleRouteSearch}>
             <Search aria-hidden="true" size={16} />
             <input
-              aria-label="Быстрый поиск по рабочему пространству"
-              placeholder="Поиск"
+              aria-label="Переход по разделам"
+              placeholder="Перейти в раздел"
               value={routeSearch}
               onChange={(event) => setRouteSearch(event.target.value)}
             />
@@ -519,7 +486,8 @@ function Dashboard(props: {
   };
 }) {
   const activeUsers = props.data.users.filter((user) => user.status === "active").length;
-  const recentUsers = props.data.users.slice(0, 7);
+  const dashboardUsers = props.data.users.slice(0, 7);
+  const auditRows = buildAuditPreviewRows(props.data.auditEvents, props.data.users);
 
   return (
     <section className="dashboard-grid">
@@ -533,7 +501,7 @@ function Dashboard(props: {
       <Metric
         icon={ShieldCheck}
         hint={getMetricHint(props.sectionStates.accessRoles)}
-        meta="Профили RBAC"
+        meta="Профили доступа"
         title="Роли доступа"
         value={props.data.accessRoles.length}
       />
@@ -548,59 +516,46 @@ function Dashboard(props: {
         icon={Activity}
         hint={getMetricHint(props.sectionStates.auditEvents)}
         meta={`${activeUsers} активных пользователей`}
-        title="Audit events"
+        title="События аудита"
         value={props.data.auditEvents.length}
       />
 
-      <section className="panel chart-panel wide-panel">
-        <div className="panel-heading chart-heading">
+      <section className="panel audit-preview-panel wide-panel">
+        <div className="panel-heading audit-heading">
           <div>
-            <h2>Активность рабочего пространства</h2>
+            <h2>Рабочее пространство</h2>
             <p className="panel-subtitle">
-              Срез действий, изменений прав и управляемых событий за последние недели.
+              Базовый контур рабочего пространства: вход, пользователи, роли,
+              должности, профиль, тема и журнал аудита.
             </p>
           </div>
-          <div className="chart-toolbar" aria-label="Фильтры активности">
-            <button className="secondary-button" type="button">
-              3 месяца
-              <ChevronRight aria-hidden="true" size={14} />
-            </button>
-            <button className="secondary-button" type="button">
-              Все события
-              <SlidersHorizontal aria-hidden="true" size={14} />
-            </button>
-          </div>
         </div>
-        <div className="chart-legend" aria-hidden="true">
-          <span><i className="legend-dot dark" /> Управляемые действия</span>
-          <span><i className="legend-dot mid" /> Пользователи</span>
-          <span><i className="legend-dot soft" /> RBAC/должности</span>
-        </div>
-        <div className="activity-chart" role="img" aria-label="График активности рабочего пространства">
-          <svg viewBox="0 0 980 260" preserveAspectRatio="none">
-            <path className="chart-grid-line" d="M0 40H980M0 100H980M0 160H980M0 220H980" />
-            <polyline
-              className="chart-line soft"
-              points="0,70 24,145 48,125 72,176 96,118 120,188 144,160 168,92 192,172 216,135 240,150 264,112 288,186 312,155 336,128 360,174 384,88 408,160 432,126 456,178 480,132 504,54 528,169 552,121 576,172 600,114 624,184 648,104 672,150 696,86 720,156 744,120 768,169 792,98 816,158 840,128 864,72 888,168 912,96 936,178 960,146 980,118"
-            />
-            <polyline
-              className="chart-line mid"
-              points="0,174 24,178 48,176 72,180 96,177 120,181 144,179 168,176 192,182 216,180 240,178 264,181 288,177 312,179 336,182 360,178 384,181 408,176 432,179 456,181 480,178 504,182 528,180 552,177 576,179 600,181 624,178 648,176 672,180 696,179 720,177 744,181 768,178 792,180 816,177 840,179 864,181 888,176 912,179 936,178 960,180 980,177"
-            />
-            <polyline
-              className="chart-line dark"
-              points="0,192 24,195 48,194 72,196 96,193 120,195 144,194 168,197 192,195 216,193 240,196 264,194 288,195 312,197 336,194 360,196 384,195 408,193 432,196 456,197 480,194 504,195 528,196 552,193 576,195 600,197 624,194 648,196 672,195 696,193 720,196 744,194 768,195 792,197 816,194 840,196 864,195 888,193 912,196 936,194 960,195 980,193"
-            />
-          </svg>
-          <div className="chart-axis">
-            <span>Фев 20</span>
-            <span>Мар 9</span>
-            <span>Мар 27</span>
-            <span>Апр 13</span>
-            <span>Апр 30</span>
-            <span>Май 18</span>
-          </div>
-        </div>
+        <section className="audit-preview" aria-label="Последние события аудита">
+          <h3>Последние события аудита</h3>
+          <SectionFeedback
+            state={props.sectionStates.auditEvents}
+            emptyLabel="События аудита недоступны для текущей роли."
+          />
+          {props.sectionStates.auditEvents.canRead && !props.sectionStates.auditEvents.error ? (
+            auditRows.length > 0 ? (
+              <ol className="audit-list">
+                {auditRows.map((event) => (
+                  <li className="audit-list-item" key={event.id}>
+                    <span className="audit-event-marker" aria-hidden="true" />
+                    <div>
+                      <strong>{event.actionLabel}</strong>
+                      <small>
+                        {event.actorName} · {event.createdAtLabel}
+                      </small>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="empty-state">Событий аудита пока нет.</p>
+            )
+          ) : null}
+        </section>
       </section>
 
       <section className="panel user-records-panel wide-panel">
@@ -608,36 +563,9 @@ function Dashboard(props: {
           <div>
             <h2>{props.data.users.length} пользователей</h2>
             <p className="panel-subtitle">
-              Последние учетные записи с ролью, должностью, статусом и рабочим контекстом.
+              Учетные записи с ролью, должностью, статусом и рабочим контекстом.
             </p>
           </div>
-          <button className="secondary-button" type="button">
-            <Download aria-hidden="true" size={15} />
-            Экспорт
-          </button>
-        </div>
-        <div className="table-toolbar">
-          <div className="table-search" aria-label="Поиск пользователей">
-            <Search aria-hidden="true" size={15} />
-            <span>Поиск пользователей...</span>
-          </div>
-          <button className="secondary-button" type="button">
-            <UserPlus aria-hidden="true" size={15} />
-            Статус
-          </button>
-          <button className="secondary-button" type="button">
-            <CalendarDays aria-hidden="true" size={15} />
-            Дата входа
-          </button>
-          <span className="toolbar-spacer" />
-          <button className="secondary-button" type="button">
-            <CircleCheck aria-hidden="true" size={15} />
-            RBAC
-          </button>
-          <button className="secondary-button" type="button">
-            <ArrowUpDown aria-hidden="true" size={15} />
-            Сортировка
-          </button>
         </div>
         <SectionFeedback state={props.sectionStates.users} emptyLabel="Пользователи недоступны." />
         {props.sectionStates.users.canRead && !props.sectionStates.users.error ? (
@@ -656,10 +584,10 @@ function Dashboard(props: {
                 </tr>
               </thead>
               <tbody>
-                {recentUsers.length === 0 ? (
+                {dashboardUsers.length === 0 ? (
                   <TableEmpty colSpan={6} label="Пользователей пока нет." />
                 ) : (
-                  recentUsers.map((user) => {
+                  dashboardUsers.map((user) => {
                     const role = props.data.accessRoles.find(
                       (item) => item.id === user.accessProfileId
                     );
@@ -687,7 +615,7 @@ function Dashboard(props: {
                         <td>{role?.name ?? user.accessProfileId}</td>
                         <td>{user.positionName ?? "Без должности"}</td>
                         <td>
-                          <span className="muted">Single workspace</span>
+                          <span className="muted">Текущее рабочее пространство</span>
                         </td>
                       </tr>
                     );
@@ -2104,7 +2032,7 @@ function ConfirmDialog(props: {
       <div className="confirm-body">
         <div className="danger-callout" aria-live="polite">
           <strong>Действие необратимо</strong>
-          <span>Если API примет команду, изменение попадет в audit trail.</span>
+          <span>Если API примет команду, изменение попадет в журнал аудита.</span>
         </div>
         <p>{props.body}</p>
         {props.error ? <p className="error">{props.error}</p> : null}

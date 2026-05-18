@@ -17,13 +17,15 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByLabel("Пароль").fill("local-admin-password");
   await page.getByRole("button", { name: "Войти" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "Активность рабочего пространства" })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("Анна Администратор")).toBeVisible();
-  await page.getByLabel("Быстрый поиск по рабочему пространству").fill("Должности");
-  await page.getByLabel("Быстрый поиск по рабочему пространству").press("Enter");
+  await expect(page.getByRole("button", { name: "Экспорт" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Проекты" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Последние события аудита" })).toBeVisible();
+  await page.getByLabel("Переход по разделам").fill("Должности");
+  await page.getByLabel("Переход по разделам").press("Enter");
   await expect(page.getByRole("heading", { name: "Должности" }).first()).toBeVisible();
   await expect(page).toHaveURL(/\/positions$/);
 
@@ -161,9 +163,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByLabel("Email").fill(`limited-${suffix}@kiss-pm.local`);
   await page.getByLabel("Пароль").fill("limited12345");
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Активность рабочего пространства" })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
   await expect(
     page.getByRole("complementary").getByText(`Ограниченный ${suffix}`)
   ).toBeVisible();
@@ -171,9 +171,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByLabel("Email").fill("admin@kiss-pm.local");
   await page.getByLabel("Пароль").fill("local-admin-password");
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Активность рабочего пространства" })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
 
   await page.getByRole("button", { name: "Профиль", exact: true }).click();
   await page.getByLabel("Телефон").fill("+7 999 000-00-00");
