@@ -160,6 +160,9 @@ h2 {
 .theme-dark .topbar-icon-button,
 .theme-dark .sidebar-icon-button,
 .theme-dark .avatar-button,
+.theme-dark .sidebar-user,
+.theme-dark .account-menu,
+.theme-dark .account-menu-item,
 .theme-dark .modal-panel {
   background: var(--panel);
   color: var(--text);
@@ -177,6 +180,13 @@ h2 {
 .theme-dark .summary-card,
 .theme-dark .settings-aside,
 .theme-dark .theme-preview {
+  background: var(--panel-subtle);
+}
+
+.theme-dark .sidebar-user:hover,
+.theme-dark .sidebar-user[aria-expanded="true"],
+.theme-dark .account-menu-item:hover:not(:disabled),
+.theme-dark .account-menu-item:focus-visible {
   background: var(--panel-subtle);
 }
 
@@ -293,7 +303,6 @@ h2 {
 .sidebar-icon-button,
 .topbar-icon-button,
 .avatar-button,
-.kebab-button,
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -419,9 +428,26 @@ h2 {
 }
 
 .sidebar-user {
+  width: 100%;
   min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding-top: 10px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
   border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.sidebar-user:hover,
+.sidebar-user[aria-expanded="true"] {
+  background: #f8fafc;
 }
 
 .avatar,
@@ -432,18 +458,106 @@ h2 {
   border-radius: 10px;
 }
 
-.kebab-button {
-  width: 30px;
-  height: 30px;
-  margin-left: auto;
-  border-radius: 8px;
+.account-trigger-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.account-trigger-icon {
+  flex: 0 0 auto;
+  color: var(--muted-strong);
+}
+
+.account-menu-anchor {
+  position: relative;
+}
+
+.account-menu {
+  position: absolute;
+  z-index: 80;
+  min-width: 244px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+}
+
+.sidebar-account-menu .account-menu {
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+}
+
+.topbar-account-menu .account-menu {
+  top: calc(100% + 8px);
+  right: 0;
+}
+
+.account-menu-item {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.account-menu-item:hover:not(:disabled),
+.account-menu-item:focus-visible {
+  background: #f1f3f5;
+}
+
+.account-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.account-menu-item svg {
+  color: var(--muted-strong);
+}
+
+.account-menu-item strong,
+.account-menu-item small {
+  display: block;
+}
+
+.account-menu-item strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.account-menu-item small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.account-menu-item.danger strong,
+.account-menu-item.danger svg {
+  color: var(--danger);
 }
 
 .workspace-shell.sidebar-compact .sidebar {
   width: 86px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 16px 12px;
+}
+
+.workspace-shell.sidebar-compact .sidebar-account-menu .account-menu {
+  bottom: 0;
+  left: calc(100% + 16px);
+  width: 244px;
 }
 
 .workspace-shell.sidebar-compact .brand-block div,
@@ -452,8 +566,8 @@ h2 {
 .workspace-shell.sidebar-compact .nav-item span,
 .workspace-shell.sidebar-compact .soon-badge,
 .workspace-shell.sidebar-compact .sidebar-note,
-.workspace-shell.sidebar-compact .sidebar-user div,
-.workspace-shell.sidebar-compact .kebab-button {
+.workspace-shell.sidebar-compact .account-trigger-copy,
+.workspace-shell.sidebar-compact .account-trigger-icon {
   display: none;
 }
 
@@ -910,20 +1024,6 @@ h2 {
 
 .dashboard-table td {
   height: 62px;
-}
-
-.select-column {
-  width: 42px;
-  text-align: center;
-}
-
-.checkbox-visual {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: #ffffff;
 }
 
 .person-cell strong {
@@ -1532,8 +1632,8 @@ input[type="color"] {
   .workspace-shell.sidebar-compact .nav-item span,
   .workspace-shell.sidebar-compact .soon-badge,
   .workspace-shell.sidebar-compact .sidebar-note,
-  .workspace-shell.sidebar-compact .sidebar-user div,
-  .workspace-shell.sidebar-compact .kebab-button {
+  .workspace-shell.sidebar-compact .account-trigger-copy,
+  .workspace-shell.sidebar-compact .account-trigger-icon {
     display: revert;
   }
 

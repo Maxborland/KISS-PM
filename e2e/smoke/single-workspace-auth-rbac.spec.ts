@@ -1,4 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function logoutThroughUserMenu(page: Page) {
+  await page.getByRole("button", { name: "Открыть меню пользователя" }).click();
+  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
+}
 
 test("single-workspace auth and RBAC scaffold works from the browser", async ({
   page,
@@ -26,11 +31,29 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Проекты" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Последние события аудита" })).toBeVisible();
+  await expect(
+    page.getByRole("table", { name: "Последние пользователи" }).locator(".checkbox-visual")
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Открыть меню профиля" }).click();
+  await expect(page.locator(".account-menu")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".account-menu")).toHaveCount(0);
+  await expect(page.locator(".sidebar-account-menu .account-menu")).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: "Свернуть навигацию" }).click();
   await expect(page.getByRole("button", { name: "Пользователи" })).toHaveAttribute(
     "title",
     "Пользователи"
   );
+  await expect(page.getByRole("button", { name: "Открыть профиль" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Открыть меню профиля" }).click();
+  await expect(page.locator(".account-menu")).toBeVisible();
+  const compactAccountMenuBox = await page.locator(".sidebar-account-menu .account-menu").boundingBox();
+  const compactSidebarBox = await page.locator(".sidebar").boundingBox();
+  expect(compactAccountMenuBox?.x).toBeGreaterThanOrEqual(
+    Math.floor((compactSidebarBox?.x ?? 0) + (compactSidebarBox?.width ?? 0))
+  );
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Пользователи" }).focus();
   const collapsedSidebarBox = await page.locator(".sidebar").boundingBox();
   expect(collapsedSidebarBox?.width).toBeLessThan(120);
@@ -48,12 +71,21 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
-    page.getByRole("button", { name: "Выйти из рабочего пространства" })
+    page.getByRole("button", { name: "Открыть меню профиля" })
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".account-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".account-menu")).toHaveCount(0);
+  await expect(page.locator(".sidebar")).toBeInViewport();
+  await expect(page.locator(".content-shell")).toHaveAttribute("inert", "");
+  await expect(
+    page.getByRole("button", { name: "Открыть меню профиля" })
   ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Открыть профиль" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Главная" })).toBeFocused();
   for (let index = 0; index < 8; index += 1) {
     await page.keyboard.press("Tab");
     await expect
@@ -292,7 +324,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     .getByLabel("Роль доступа")
     .selectOption({ label: `Ограниченный ${suffix}` });
   await createLimitedUserDialog.getByRole("button", { name: "Создать пользователя" }).click();
-  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
+  await logoutThroughUserMenu(page);
   await page.getByLabel("Email").fill(`limited-${suffix}@kiss-pm.local`);
   await page.getByLabel("Пароль").fill("limited12345");
   await page.getByRole("button", { name: "Войти" }).click();
@@ -306,6 +338,14 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     page.getByRole("complementary").getByRole("button", { name: "Настройки", exact: true })
   ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Открыть оформление" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Открыть меню пользователя" }).click();
+  const limitedAccountMenu = page.locator(".topbar-account-menu .account-menu");
+  await expect(limitedAccountMenu).toBeVisible();
+  await expect(limitedAccountMenu.getByRole("button", { name: /Профиль/ })).toBeVisible();
+  await expect(limitedAccountMenu.getByRole("button", { name: /Оформление/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".account-menu")).toHaveCount(0);
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/audit");
@@ -379,7 +419,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
       })
     ).status()
   ).toBe(403);
-  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
+  await logoutThroughUserMenu(page);
   await page.getByLabel("Email").fill("admin@kiss-pm.local");
   await page.getByLabel("Пароль").fill("local-admin-password");
   await page.getByRole("button", { name: "Войти" }).click();
