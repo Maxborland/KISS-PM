@@ -1,0 +1,179 @@
+{
+  "generated_at": "2026-05-19",
+  "scope": "safe audit-first refactor for KISS PM SaaS/self-hosted foundation",
+  "baseline": {
+    "git_status_short": ["?? phase2-2-users-crud.png"],
+    "notes": [
+      "phase2-2-users-crud.png is untracked and was not touched.",
+      "User-requested legacy English source-of-truth paths are absent; current Russian canonical docs from docs/README.md were used."
+    ]
+  },
+  "blocks": [
+    {
+      "id": "REF-001",
+      "area": "docs/source-of-truth",
+      "files": [
+        "docs/README.md",
+        "docs/00_ВИДЕНИЕ_ПРОДУКТА.md",
+        "docs/01_ПРОДУКТОВЫЙ_КОНТУР.md",
+        "docs/02_ДОМЕННАЯ_МОДЕЛЬ.md",
+        "docs/03_АРХИТЕКТУРА_SAAS_SELF_HOSTED.md",
+        "docs/05_РОЛИ_ПРАВА_АУДИТ.md",
+        "docs/11_E2E_КОНТРАКТ.md",
+        "docs/12_ФАЗОВЫЙ_ПЛАН.md"
+      ],
+      "problem": "The task referenced old English canonical document paths that no longer exist after docs-first restart.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "Get-Content docs/README.md and current Russian canonical docs"
+      ],
+      "tests_after": [
+        "Documented as source-of-truth path drift; no runtime checks required"
+      ],
+      "status": "documented",
+      "notes": "Use current Russian canonical docs as source of truth; do not recreate old filenames unless a docs decision asks for compatibility aliases."
+    },
+    {
+      "id": "REF-002",
+      "area": "domain/api/web workspace configuration validation",
+      "files": [
+        "packages/domain/src/index.ts",
+        "packages/domain/src/workspaceConfig.ts",
+        "packages/domain/src/workspaceConfig.test.ts",
+        "apps/api/src/workspaceConfigParsers.ts",
+        "apps/api/src/workspaceConfigParsers.test.ts",
+        "apps/web/src/workspaceForms.ts",
+        "apps/web/src/workspaceForms.test.ts",
+        "apps/web/package.json"
+      ],
+      "problem": "Workspace config constraints are duplicated in API parsers and web form validation instead of living in the domain boundary.",
+      "risk": "medium",
+      "refactor_type": "extract domain logic",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run packages/domain/src/workspaceConfig.test.ts apps/web/src/workspaceForms.test.ts apps/api/src/workspaceConfigParsers.test.ts"
+      ],
+      "tests_after": [
+        "pnpm vitest run packages/domain/src/workspaceConfig.test.ts apps/web/src/workspaceForms.test.ts apps/api/src/workspaceConfigParsers.test.ts",
+        "pnpm --filter @kiss-pm/domain typecheck",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "Completed in this batch. Domain now owns normalized validators and raw-input compatibility helpers; API error codes and Russian UI messages stayed unchanged."
+    },
+    {
+      "id": "REF-003",
+      "area": "web application shell",
+      "files": ["apps/web/src/App.tsx"],
+      "problem": "App.tsx is a god file with routing shell, data orchestration, CRUD views, dialogs and UI state in one 2600+ line component.",
+      "risk": "high",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 2800 lines"
+      ],
+      "tests_after": [
+        "component or route-level characterization tests before extraction",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm test:e2e:smoke for navigation-critical changes"
+      ],
+      "status": "pending",
+      "notes": "Do not split blindly. Extract one stable concern at a time: shell navigation, dialogs, then CRUD sections."
+    },
+    {
+      "id": "REF-004",
+      "area": "api application composition",
+      "files": ["apps/api/src/app.ts"],
+      "problem": "API app file is still large and combines route wiring, auth/session behavior, workspace operations and audit concerns.",
+      "risk": "high",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
+      "tests_after": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
+      "status": "pending",
+      "notes": "Proceed route group by route group; keep backend permission checks and audit evidence intact."
+    },
+    {
+      "id": "REF-005",
+      "area": "persistence repositories",
+      "files": ["packages/persistence/src/repositories.ts"],
+      "problem": "Repository layer is a broad persistence surface; tenant, user, profile, workspace config and audit operations are coupled in one file.",
+      "risk": "medium",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
+      "tests_after": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
+      "status": "pending",
+      "notes": "Split only after repository tests pin tenant isolation and audit write paths."
+    },
+    {
+      "id": "REF-006",
+      "area": "test architecture",
+      "files": [
+        "apps/api/src/app.db.test.ts",
+        "e2e/smoke/single-workspace-auth-rbac.spec.ts"
+      ],
+      "problem": "Large integration and smoke specs are valuable but hard to localize when failures happen.",
+      "risk": "medium",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm test:db", "pnpm test:e2e:smoke"],
+      "tests_after": ["pnpm test:db", "pnpm test:e2e:smoke"],
+      "status": "pending",
+      "notes": "Extract shared fixtures/helpers first; do not weaken assertions."
+    },
+    {
+      "id": "REF-007",
+      "area": "repository hygiene",
+      "files": [
+        "apps/api/dist",
+        "apps/web/.next",
+        "apps/web/dist",
+        "apps/web/node_modules/.vite",
+        "apps/web/node_modules/.vite-temp",
+        "phase2-2-users-crud.png"
+      ],
+      "problem": "Local generated artifacts and an untracked screenshot are present in the worktree; generated output can obscure refactor diffs.",
+      "risk": "low",
+      "refactor_type": "remove dead code",
+      "expected_behavior_change": "none",
+      "tests_before": ["git status --short", "git ls-files"],
+      "tests_after": ["git status --short"],
+      "status": "decision_needed",
+      "notes": "No deletion in this batch. The untracked screenshot may be user-owned."
+    },
+    {
+      "id": "REF-008",
+      "area": "package scripts",
+      "files": ["package.json"],
+      "problem": "Requested baseline commands npm run lint, npm run test:unit and npm run test:integration are absent.",
+      "risk": "medium",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "npm run lint exits 1: missing script",
+        "npm run test:unit exits 1: missing script",
+        "npm run test:integration exits 1: missing script"
+      ],
+      "tests_after": ["Decision needed before adding new script semantics"],
+      "status": "pending",
+      "notes": "Do not invent lint/unit/integration meanings until toolchain expectations are specified."
+    },
+    {
+      "id": "REF-009",
+      "area": "core domain product leakage",
+      "files": ["apps", "packages"],
+      "problem": "Search did not find Bitrix-specific leakage in active core code, but docs intentionally preserve BR2 as reference/anti-pattern context.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["rg -i \"bitrix|BR2|report|отчет\" apps packages docs"],
+      "tests_after": ["Repeat search when adding project-control domain modules"],
+      "status": "documented",
+      "notes": "Keep monitoring as new resource/KPI/control-surface modules appear."
+    }
+  ]
+}

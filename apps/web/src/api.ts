@@ -1,3 +1,8 @@
+import type {
+  WorkspaceConfigFieldType,
+  WorkspaceConfigStatus
+} from "@kiss-pm/domain";
+
 export type ApiHealth = {
   status: string;
   product: string;
@@ -76,9 +81,9 @@ export type CustomFieldDefinition = {
   systemKey: string;
   tenantLabel: string;
   targetEntity: "project";
-  fieldType: "text" | "number" | "date" | "select";
+  fieldType: WorkspaceConfigFieldType;
   required: boolean;
-  status: "draft" | "active";
+  status: WorkspaceConfigStatus;
   createdAt: string;
   updatedAt: string;
 };
@@ -89,7 +94,7 @@ export type ProjectTemplate = {
   systemKey: string;
   tenantLabel: string;
   description: string | null;
-  status: "draft" | "active";
+  status: WorkspaceConfigStatus;
   createdAt: string;
   updatedAt: string;
 };

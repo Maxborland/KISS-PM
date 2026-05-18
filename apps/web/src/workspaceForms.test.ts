@@ -91,6 +91,51 @@ describe("workspace form quality baseline", () => {
     });
   });
 
+  it("keeps workspace config form limits aligned with the domain contract", () => {
+    expect(
+      validateCustomFieldForm({
+        systemKey: `a${"x".repeat(79)}`,
+        tenantLabel: "x".repeat(120),
+        targetEntity: "project",
+        fieldType: "select",
+        status: "active"
+      })
+    ).toEqual({});
+
+    expect(
+      validateCustomFieldForm({
+        systemKey: `a${"x".repeat(80)}`,
+        tenantLabel: "x".repeat(121),
+        targetEntity: "project",
+        fieldType: "select",
+        status: "active"
+      })
+    ).toEqual({
+      systemKey: "Системный ключ: латиница, цифры и _, начинается с буквы.",
+      tenantLabel: "Укажите русское название поля."
+    });
+
+    expect(
+      validateProjectTemplateForm({
+        systemKey: "implementation",
+        tenantLabel: "Типовой проект",
+        description: "x".repeat(1000),
+        status: "draft"
+      })
+    ).toEqual({});
+
+    expect(
+      validateProjectTemplateForm({
+        systemKey: "implementation",
+        tenantLabel: "Типовой проект",
+        description: "x".repeat(1001),
+        status: "draft"
+      })
+    ).toEqual({
+      description: "Описание должно быть не длиннее 1000 символов."
+    });
+  });
+
   it("cycles focus inside the modal surface", () => {
     expect(getNextFocusTrapIndex(0, 4, true)).toBe(3);
     expect(getNextFocusTrapIndex(3, 4, false)).toBe(0);
