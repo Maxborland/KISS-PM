@@ -238,6 +238,37 @@ describe("Phase 3.1 CRM API", () => {
       }
     });
 
+    const unrelatedOpportunityResponse = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "opportunity-unrelated",
+        clientId: "client-romashka",
+        primaryContactId: "contact-irina",
+        projectTypeId: "project-type-implementation",
+        stageId: "deal-stage-new",
+        title: "Соседняя сделка",
+        description: "Нужна для проверки opportunity-scoped ленты событий",
+        plannedStart: "2026-07-01",
+        plannedFinish: "2026-07-12",
+        contractValue: 600000,
+        plannedHourlyRate: 6000,
+        probability: 50,
+        templateId: null,
+        demand: [{ positionId: "position-engineer", requiredHours: 100 }]
+      })
+    });
+    expect(unrelatedOpportunityResponse.status).toBe(201);
+    const unrelatedStageUpdate = await app.request(
+      "/api/workspace/opportunities/opportunity-unrelated/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-qualified" })
+      }
+    );
+    expect(unrelatedStageUpdate.status).toBe(200);
+
     const opportunityUpdate = await app.request(
       "/api/workspace/opportunities/opportunity-alpha",
       {
@@ -277,17 +308,56 @@ describe("Phase 3.1 CRM API", () => {
       headers: { "x-kiss-pm-action": "same-origin", cookie }
     });
     expect(audit.status).toBe(200);
-    await expect(audit.json()).resolves.toMatchObject({
+    const auditBody = await audit.json();
+    expect(auditBody).toMatchObject({
       auditEvents: expect.arrayContaining([
         expect.objectContaining({ actionType: "client.created" }),
         expect.objectContaining({ actionType: "contact.created" }),
         expect.objectContaining({ actionType: "project_type.created" }),
         expect.objectContaining({ actionType: "deal_stage.created" }),
         expect.objectContaining({ actionType: "opportunity.created" }),
-        expect.objectContaining({ actionType: "opportunity.stage_updated" }),
+        expect.objectContaining({
+          actionType: "opportunity.stage_updated",
+          sourceEntity: { type: "Opportunity", id: "opportunity-alpha" },
+          input: expect.objectContaining({
+            opportunityId: "opportunity-alpha",
+            stageId: "deal-stage-qualified"
+          })
+        }),
         expect.objectContaining({ actionType: "opportunity.updated" })
       ])
     });
+    const alphaEvents = filterAuditEventsForOpportunity(
+      auditBody.auditEvents,
+      "opportunity-alpha"
+    );
+    const unrelatedEvents = filterAuditEventsForOpportunity(
+      auditBody.auditEvents,
+      "opportunity-unrelated"
+    );
+    expect(alphaEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "opportunity.stage_updated",
+          sourceEntity: { type: "Opportunity", id: "opportunity-alpha" }
+        })
+      ])
+    );
+    expect(alphaEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceEntity: { type: "Opportunity", id: "opportunity-unrelated" }
+        })
+      ])
+    );
+    expect(unrelatedEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "opportunity.stage_updated",
+          sourceEntity: { type: "Opportunity", id: "opportunity-unrelated" }
+        })
+      ])
+    );
   });
 
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
@@ -821,3 +891,14 @@ describe("Phase 3.1 CRM API", () => {
     await expect(projects.json()).resolves.toEqual({ projects: [] });
   });
 });
+
+function filterAuditEventsForOpportunity(
+  auditEvents: Array<{ sourceEntity?: Record<string, unknown> }>,
+  opportunityId: string
+) {
+  return auditEvents.filter(
+    (event) =>
+      event.sourceEntity?.type === "Opportunity" &&
+      event.sourceEntity.id === opportunityId
+  );
+}
