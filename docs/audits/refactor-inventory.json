@@ -80,8 +80,31 @@
         "pnpm --filter @kiss-pm/web typecheck",
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
-      "status": "pending",
-      "notes": "Do not split blindly. Extract one stable concern at a time: shell navigation, dialogs, then CRUD sections."
+      "status": "in_progress",
+      "notes": "Do not split blindly. First completed sub-slice is REF-003A: pure shell state helpers extracted from App.tsx."
+    },
+    {
+      "id": "REF-003A",
+      "area": "web application shell state helpers",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/workspaceShellState.ts",
+        "apps/web/src/workspaceShellState.test.ts",
+        "apps/web/src/components/workspace-ui.tsx"
+      ],
+      "problem": "App.tsx owned pure permission checks, section loading/error state, metric hints and API error message mapping, making shell behavior harder to test outside the god-file.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/workspaceShellState.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts failed because workspaceShellState did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/workspaceShellState.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "SectionState moved to a neutral shell-state module; workspace-ui imports only its type. API error messages and permission checks are covered by characterization tests."
     },
     {
       "id": "REF-004",

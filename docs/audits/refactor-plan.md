@@ -74,9 +74,20 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-003 — разрезание `App.tsx`
 
-Статус: pending.
+Статус: in_progress.
 
 Начинать только после отдельной матрицы UI-flow рисков. Первый безопасный срез: вынести shell/navigation и shared CRUD section primitives, не меняя routes и permission gating.
+
+#### REF-003A — shell state helpers
+
+Статус: completed.
+
+Срез без изменения UI и маршрутов:
+
+- `getSectionState`, `getMetricHint`, `hasPermission`, `getErrorMessage` вынесены из `App.tsx` в `apps/web/src/workspaceShellState.ts`.
+- `SectionState` больше не принадлежит компонентному файлу `workspace-ui.tsx`; это нейтральный тип shell-state.
+- Добавлены characterization tests для permission matching, section state, metric hints и API error message mapping.
+- RED подтвержден отсутствующим модулем `workspaceShellState`; GREEN подтвержден targeted tests и web typecheck.
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
