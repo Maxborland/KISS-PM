@@ -193,7 +193,7 @@ Review notes:
 
 ## Block 6. End-to-end acceptance and UX polish
 
-- [ ] Update E2E smoke:
+- [x] Update E2E smoke:
   - login;
   - create/open deal;
   - move deal in kanban;
@@ -202,19 +202,19 @@ Review notes:
   - add and complete deal task;
   - verify audit/event appears in deal panel;
   - restricted user cannot mutate.
-- [ ] Browser smoke on desktop and narrow viewport:
+- [x] Browser smoke on desktop and narrow viewport:
   - `/opportunities`;
   - `/opportunities/:id`;
   - kanban;
   - activity panel tabs.
-- [ ] UI/UX review checklist:
+- [x] UI/UX review checklist:
   - dense Russian operational UI;
   - no fake controls;
   - no broken horizontal overflow;
   - visible focus states;
   - mutation errors near forms;
   - disabled reasons visible.
-- [ ] Run final verification:
+- [x] Run final verification:
   - `pnpm typecheck`;
   - `pnpm test`;
   - `pnpm --filter @kiss-pm/web build`;
@@ -222,7 +222,15 @@ Review notes:
   - `pnpm test:e2e:smoke`;
   - `git diff --check`;
   - `docker compose ps` with worktree ports.
-- [ ] Commit: `test: cover crm intake activity workspace`.
+
+Review notes:
+
+- Bug Hunt found three Important issues: stale generic audit assertions, missing read-only task completion denial and cross-run required custom field buildup. Fixed by suffix/sourceEntity audit checks, read-only `PATCH /tasks/:activityId` 403 coverage and deactivating stale smoke opportunity fields before tests.
+- Code Review found two Important issues: DnD coverage weakened by select fallback and serial `workers: 1` workaround. Fixed by restoring pointer-driven DnD smoke and removing serial workers after isolating smoke state.
+- Security Review found no Critical/Important findings after fixes.
+- Browser smoke on `http://127.0.0.1:3001/opportunities` and `http://127.0.0.1:3001/opportunities/:id` covered desktop and narrow viewport; E2E now asserts no mobile horizontal overflow in the deal detail workspace.
+- Full `pnpm test:e2e:smoke` passes in parallel mode: 4 tests, 3 workers.
+- [x] Commit: `test: cover crm intake activity workspace`.
 
 ## Review Gates
 
