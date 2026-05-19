@@ -191,8 +191,15 @@ export function Modal(props: {
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const isDismissDisabledRef = useRef(props.isDismissDisabled);
+  const onCloseRef = useRef(props.onClose);
   const titleId = useMemo(() => `dialog-title-${props.title.replace(/\W+/g, "-")}`, [props.title]);
   const descriptionId = props.description ? `${titleId}-description` : undefined;
+
+  useEffect(() => {
+    isDismissDisabledRef.current = props.isDismissDisabled;
+    onCloseRef.current = props.onClose;
+  }, [props.isDismissDisabled, props.onClose]);
 
   useEffect(() => {
     const previousActiveElement = document.activeElement;
@@ -206,8 +213,8 @@ export function Modal(props: {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        if (props.isDismissDisabled) return;
-        props.onClose();
+        if (isDismissDisabledRef.current) return;
+        onCloseRef.current();
       }
     }
 
@@ -218,7 +225,7 @@ export function Modal(props: {
         previousActiveElement.focus();
       }
     };
-  }, [props.isDismissDisabled, props.onClose]);
+  }, []);
 
   function handlePanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key !== "Tab") return;

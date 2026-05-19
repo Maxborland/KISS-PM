@@ -17,11 +17,15 @@ describe("workspace route model", () => {
       "dashboard",
       "opportunities",
       "projects",
+      "clients",
+      "contacts",
       "users",
       "access-roles",
       "positions",
       "audit",
       "settings",
+      "project-types",
+      "deal-stages",
       "profile",
       "theme"
     ]);
@@ -49,12 +53,39 @@ describe("workspace route model", () => {
       {
         id: "admin",
         label: "Администрирование",
-        routes: [workspaceRoutes[3], workspaceRoutes[4]]
+        routes: [workspaceRoutes[5], workspaceRoutes[6]]
       },
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[8]]
+        routes: [workspaceRoutes[12]]
+      }
+    ]);
+  });
+
+  it("keeps CRM entities outside deals and workspace dictionaries in settings", () => {
+    const routeGroups = getVisibleRouteGroups([
+      "tenant.clients.read",
+      "tenant.contacts.read",
+      "tenant.project_types.read",
+      "tenant.deal_stages.read"
+    ]);
+
+    expect(routeGroups).toEqual([
+      {
+        id: "workspace",
+        label: "Работа",
+        routes: [workspaceRoutes[0]]
+      },
+      {
+        id: "crm",
+        label: "CRM",
+        routes: [workspaceRoutes[3], workspaceRoutes[4]]
+      },
+      {
+        id: "settings",
+        label: "Настройки",
+        routes: [workspaceRoutes[10], workspaceRoutes[11]]
       }
     ]);
   });
@@ -78,10 +109,15 @@ describe("workspace route model", () => {
   it("maps real Next pathnames to workspace route ids", () => {
     expect(getRouteIdFromPathname("/users")).toBe("users");
     expect(getRouteIdFromPathname("/access-roles")).toBe("access-roles");
+    expect(getRouteIdFromPathname("/clients")).toBe("clients");
+    expect(getRouteIdFromPathname("/contacts")).toBe("contacts");
     expect(getRouteIdFromPathname("/opportunities")).toBe("opportunities");
+    expect(getRouteIdFromPathname("/opportunities/opportunity-1")).toBe("opportunities");
     expect(getRouteIdFromPathname("/projects")).toBe("projects");
     expect(getRouteIdFromPathname("/audit")).toBe("audit");
     expect(getRouteIdFromPathname("/settings")).toBe("settings");
+    expect(getRouteIdFromPathname("/settings/project-types")).toBe("project-types");
+    expect(getRouteIdFromPathname("/settings/deal-stages")).toBe("deal-stages");
     expect(getRouteIdFromPathname("/unknown")).toBe("dashboard");
   });
 
@@ -89,7 +125,11 @@ describe("workspace route model", () => {
     expect(getRoutePath("dashboard")).toBe("/dashboard");
     expect(getRoutePath("opportunities")).toBe("/opportunities");
     expect(getRoutePath("projects")).toBe("/projects");
+    expect(getRoutePath("clients")).toBe("/clients");
+    expect(getRoutePath("contacts")).toBe("/contacts");
     expect(getRoutePath("users")).toBe("/users");
     expect(getRoutePath("settings")).toBe("/settings");
+    expect(getRoutePath("project-types")).toBe("/settings/project-types");
+    expect(getRoutePath("deal-stages")).toBe("/settings/deal-stages");
   });
 });

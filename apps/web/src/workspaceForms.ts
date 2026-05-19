@@ -58,6 +58,65 @@ export function validatePositionForm(input: { name: string }): FormErrors {
   return errors;
 }
 
+export function validateClientForm(input: {
+  name: string;
+  description: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!input.name.trim()) errors.name = "Укажите клиента.";
+  if (input.description.length > 1000) {
+    errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+
+  return errors;
+}
+
+export function validateContactForm(input: {
+  clientId: string;
+  name: string;
+  email: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!input.clientId.trim()) errors.clientId = "Выберите клиента.";
+  if (!input.name.trim()) errors.name = "Укажите контакт.";
+  if (input.email.trim() && !isEmail(input.email)) {
+    errors.email = "Введите корректный email контакта.";
+  }
+
+  return errors;
+}
+
+export function validateProjectTypeForm(input: {
+  name: string;
+  description: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!input.name.trim()) errors.name = "Укажите тип проекта.";
+  if (input.description.length > 1000) {
+    errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+
+  return errors;
+}
+
+export function validateDealStageForm(input: {
+  name: string;
+  sortOrder: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+  const sortOrder = Number(input.sortOrder);
+
+  if (!input.name.trim()) errors.name = "Укажите этап сделки.";
+  if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
+    errors.sortOrder = "Порядок должен быть положительным целым числом.";
+  }
+
+  return errors;
+}
+
 export function validateCustomFieldForm(input: {
   systemKey: string;
   tenantLabel: string;
@@ -111,9 +170,11 @@ export function validateProjectTemplateForm(input: {
 }
 
 export function validateOpportunityForm(input: {
-  clientName: string;
+  clientId: string;
+  primaryContactId: string;
   title: string;
-  projectType: string;
+  projectTypeId: string;
+  stageId: string;
   plannedStart: string;
   plannedFinish: string;
   contractValue: string;
@@ -128,9 +189,13 @@ export function validateOpportunityForm(input: {
   const plannedHourlyRate = Number(input.plannedHourlyRate);
   const probability = Number(input.probability);
 
-  if (!input.clientName.trim()) errors.clientName = "Укажите клиента.";
+  if (!input.clientId.trim()) errors.clientId = "Выберите клиента.";
+  if (!input.primaryContactId.trim()) {
+    errors.primaryContactId = "Выберите контакт клиента.";
+  }
   if (!input.title.trim()) errors.title = "Укажите название входящего проекта.";
-  if (!input.projectType.trim()) errors.projectType = "Укажите тип проекта.";
+  if (!input.projectTypeId.trim()) errors.projectTypeId = "Выберите тип проекта.";
+  if (!input.stageId.trim()) errors.stageId = "Выберите этап сделки.";
   if (!start) errors.plannedStart = "Укажите дату старта.";
   if (!finish) {
     errors.plannedFinish = "Укажите плановый финиш.";

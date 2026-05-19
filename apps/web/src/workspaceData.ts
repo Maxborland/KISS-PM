@@ -2,10 +2,14 @@ import type {
   AccessRole,
   AuditEvent,
   AuthMeResponse,
+  Client,
+  Contact,
   CustomFieldDefinition,
+  DealStage,
   Opportunity,
   Position,
   Project,
+  ProjectType,
   ProjectTemplate,
   WorkspaceUser
 } from "./api";
@@ -18,6 +22,10 @@ export type WorkspaceData = {
   positions: Position[];
   accessRoles: AccessRole[];
   auditEvents: AuditEvent[];
+  clients: Client[];
+  contacts: Contact[];
+  projectTypes: ProjectType[];
+  dealStages: DealStage[];
   opportunities: Opportunity[];
   projects: Project[];
   customFields: CustomFieldDefinition[];
@@ -32,6 +40,10 @@ export function buildWorkspaceData(input: {
   positions: { positions: Position[] } | undefined;
   accessRoles: { accessRoles: AccessRole[] } | undefined;
   auditEvents: { auditEvents: AuditEvent[] } | undefined;
+  clients: { clients: Client[] } | undefined;
+  contacts: { contacts: Contact[] } | undefined;
+  projectTypes: { projectTypes: ProjectType[] } | undefined;
+  dealStages: { dealStages: DealStage[] } | undefined;
   opportunities: { opportunities: Opportunity[] } | undefined;
   projects: { projects: Project[] } | undefined;
   customFields: { customFields: CustomFieldDefinition[] } | undefined;
@@ -41,6 +53,10 @@ export function buildWorkspaceData(input: {
   const canReadPositions = input.permissions.includes("tenant.positions.read");
   const canReadAccessRoles = input.permissions.includes("tenant.access_profiles.read");
   const canReadAudit = input.permissions.includes("tenant.audit_events.read");
+  const canReadClients = input.permissions.includes("tenant.clients.read");
+  const canReadContacts = input.permissions.includes("tenant.contacts.read");
+  const canReadProjectTypes = input.permissions.includes("tenant.project_types.read");
+  const canReadDealStages = input.permissions.includes("tenant.deal_stages.read");
   const canReadOpportunities = input.permissions.includes("tenant.opportunities.read");
   const canReadProjects = input.permissions.includes("tenant.projects.read");
   const canReadWorkspaceConfig = input.permissions.includes("tenant.workspace_config.read");
@@ -53,6 +69,10 @@ export function buildWorkspaceData(input: {
     positions: canReadPositions ? input.positions?.positions ?? [] : [],
     accessRoles: canReadAccessRoles ? input.accessRoles?.accessRoles ?? [] : [],
     auditEvents: canReadAudit ? input.auditEvents?.auditEvents ?? [] : [],
+    clients: canReadClients ? input.clients?.clients ?? [] : [],
+    contacts: canReadContacts ? input.contacts?.contacts ?? [] : [],
+    projectTypes: canReadProjectTypes ? input.projectTypes?.projectTypes ?? [] : [],
+    dealStages: canReadDealStages ? input.dealStages?.dealStages ?? [] : [],
     opportunities: canReadOpportunities ? input.opportunities?.opportunities ?? [] : [],
     projects: canReadProjects ? input.projects?.projects ?? [] : [],
     customFields: canReadWorkspaceConfig ? input.customFields?.customFields ?? [] : [],

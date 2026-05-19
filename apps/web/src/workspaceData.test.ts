@@ -42,6 +42,62 @@ describe("workspace data derivation", () => {
           }
         ]
       },
+      clients: {
+        clients: [
+          {
+            id: "client-1",
+            tenantId: "tenant-1",
+            name: "Stale client",
+            description: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
+      contacts: {
+        contacts: [
+          {
+            id: "contact-1",
+            tenantId: "tenant-1",
+            clientId: "client-1",
+            name: "Stale contact",
+            email: null,
+            phone: null,
+            telegram: null,
+            role: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
+      projectTypes: {
+        projectTypes: [
+          {
+            id: "project-type-1",
+            tenantId: "tenant-1",
+            name: "Stale type",
+            description: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
+      dealStages: {
+        dealStages: [
+          {
+            id: "deal-stage-1",
+            tenantId: "tenant-1",
+            name: "Stale stage",
+            sortOrder: 10,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
       customFields: {
         customFields: [
           {
@@ -77,6 +133,10 @@ describe("workspace data derivation", () => {
           {
             id: "opportunity-1",
             tenantId: "tenant-1",
+            clientId: "client-1",
+            primaryContactId: "contact-1",
+            projectTypeId: "project-type-1",
+            stageId: "deal-stage-1",
             clientName: "Stale",
             contactName: "",
             title: "Stale",
@@ -105,6 +165,8 @@ describe("workspace data derivation", () => {
             id: "project-1",
             tenantId: "tenant-1",
             sourceOpportunityId: "opportunity-1",
+            clientId: "client-1",
+            projectTypeId: "project-type-1",
             title: "Stale",
             clientName: "Stale",
             status: "active",
@@ -125,6 +187,10 @@ describe("workspace data derivation", () => {
     expect(data.positions).toEqual([]);
     expect(data.accessRoles).toEqual([]);
     expect(data.auditEvents).toEqual([]);
+    expect(data.clients).toEqual([]);
+    expect(data.contacts).toEqual([]);
+    expect(data.projectTypes).toEqual([]);
+    expect(data.dealStages).toEqual([]);
     expect(data.customFields).toEqual([]);
     expect(data.projectTemplates).toEqual([]);
     expect(data.opportunities).toEqual([]);

@@ -11,7 +11,24 @@ describe("workspace query keys", () => {
     expect(workspaceQueryKeys.positions()).toEqual(["workspace", "positions"]);
     expect(workspaceQueryKeys.accessRoles()).toEqual(["workspace", "accessRoles"]);
     expect(workspaceQueryKeys.auditEvents()).toEqual(["workspace", "auditEvents"]);
+    expect(workspaceQueryKeys.clients()).toEqual(["workspace", "crm", "clients"]);
+    expect(workspaceQueryKeys.contacts()).toEqual(["workspace", "crm", "contacts"]);
+    expect(workspaceQueryKeys.projectTypes()).toEqual([
+      "workspace",
+      "crm",
+      "projectTypes"
+    ]);
+    expect(workspaceQueryKeys.dealStages()).toEqual([
+      "workspace",
+      "crm",
+      "dealStages"
+    ]);
     expect(workspaceQueryKeys.opportunities()).toEqual(["workspace", "opportunities"]);
+    expect(workspaceQueryKeys.opportunity("opportunity-1")).toEqual([
+      "workspace",
+      "opportunities",
+      "opportunity-1"
+    ]);
     expect(workspaceQueryKeys.projects()).toEqual(["workspace", "projects"]);
     expect(workspaceQueryKeys.customFields()).toEqual([
       "workspace",

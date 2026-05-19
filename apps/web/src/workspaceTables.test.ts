@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterClientsForTable,
+  filterContactsForTable,
+  filterDealStagesForTable,
+  filterOpportunitiesForTable,
   filterPositionsForTable,
+  filterProjectTypesForTable,
   filterRolesForTable,
   filterUsersForTable
 } from "./workspaceTables";
-import type { AccessRole, Position, WorkspaceUser } from "./api";
+import type {
+  AccessRole,
+  Client,
+  Contact,
+  DealStage,
+  Opportunity,
+  Position,
+  ProjectType,
+  WorkspaceUser
+} from "./api";
 
 const roles: AccessRole[] = [
   {
@@ -68,6 +82,88 @@ const users: WorkspaceUser[] = [
   }
 ];
 
+const opportunities: Opportunity[] = [
+  {
+    id: "opportunity-1",
+    tenantId: "tenant-alpha",
+    clientId: "client-romashka",
+    primaryContactId: "contact-irina",
+    projectTypeId: "project-type-implementation",
+    stageId: "deal-stage-qualified",
+    clientName: "ООО Ромашка",
+    contactName: "Ирина Клиент",
+    title: "Внедрение KISS PM",
+    projectType: "Внедрение",
+    description: null,
+    plannedStart: "2026-06-01T00:00:00.000Z",
+    plannedFinish: "2026-06-30T00:00:00.000Z",
+    contractValue: 960000,
+    plannedHourlyRate: 6000,
+    plannedHours: 160,
+    probability: 80,
+    status: "new",
+    templateId: null,
+    feasibilityStatus: null,
+    feasibilityResult: null,
+    feasibilityCheckedAt: null,
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z",
+    demand: []
+  }
+];
+
+const clients: Client[] = [
+  {
+    id: "client-romashka",
+    tenantId: "tenant-alpha",
+    name: "ООО Ромашка",
+    description: "Стратегический клиент",
+    status: "active",
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z"
+  }
+];
+
+const contacts: Contact[] = [
+  {
+    id: "contact-irina",
+    tenantId: "tenant-alpha",
+    clientId: "client-romashka",
+    name: "Ирина Клиент",
+    email: "irina@example.test",
+    phone: "+79990000000",
+    telegram: "@irina",
+    role: "Заказчик",
+    status: "active",
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z"
+  }
+];
+
+const projectTypes: ProjectType[] = [
+  {
+    id: "project-type-implementation",
+    tenantId: "tenant-alpha",
+    name: "Внедрение",
+    description: "Проект запуска продукта",
+    status: "active",
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z"
+  }
+];
+
+const dealStages: DealStage[] = [
+  {
+    id: "deal-stage-qualified",
+    tenantId: "tenant-alpha",
+    name: "Квалификация",
+    sortOrder: 20,
+    status: "active",
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z"
+  }
+];
+
 describe("workspace table filters", () => {
   it("filters users by person, role, position and status text", () => {
     expect(filterUsersForTable(users, roles, "админ")).toHaveLength(1);
@@ -88,5 +184,22 @@ describe("workspace table filters", () => {
     expect(filterPositionsForTable(positions, "аналитик")).toEqual([positions[1]]);
     expect(filterPositionsForTable(positions, "проектный")).toEqual([positions[0]]);
     expect(filterPositionsForTable(positions, "missing")).toEqual([]);
+  });
+
+  it("filters deals by linked CRM labels and stage id", () => {
+    expect(filterOpportunitiesForTable(opportunities, "ромашка")).toEqual(opportunities);
+    expect(filterOpportunitiesForTable(opportunities, "ирина")).toEqual(opportunities);
+    expect(filterOpportunitiesForTable(opportunities, "deal-stage-qualified")).toEqual(
+      opportunities
+    );
+    expect(filterOpportunitiesForTable(opportunities, "missing")).toEqual([]);
+  });
+
+  it("filters CRM entities on their own list pages", () => {
+    expect(filterClientsForTable(clients, "стратегический")).toEqual(clients);
+    expect(filterContactsForTable(contacts, clients, "ромашка")).toEqual(contacts);
+    expect(filterProjectTypesForTable(projectTypes, "запуска")).toEqual(projectTypes);
+    expect(filterDealStagesForTable(dealStages, "20")).toEqual(dealStages);
+    expect(filterClientsForTable(clients, "missing")).toEqual([]);
   });
 });

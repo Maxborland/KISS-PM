@@ -85,6 +85,10 @@ describe("workspace dashboard", () => {
     expect(getAuditActionLabel("opportunity.feasibility_checked")).toBe(
       "Ресурсная проверка сделки выполнена"
     );
+    expect(getAuditActionLabel("opportunity.created")).toBe("Сделка создана");
+    expect(getAuditActionLabel("opportunity.stage_updated")).toBe(
+      "Этап сделки изменен"
+    );
     expect(getAuditActionLabel("project.activated")).toBe("Проект активирован");
     expect(getAuditActionLabel("unknown.action")).toBe("unknown.action");
   });

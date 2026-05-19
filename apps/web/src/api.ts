@@ -111,6 +111,60 @@ export type ProjectTemplateInput = Omit<
   "tenantId" | "createdAt" | "updatedAt"
 >;
 
+export type CrmEntityStatus = "active" | "archived";
+
+export type Client = {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Contact = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  telegram: string | null;
+  role: string | null;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectType = {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DealStage = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sortOrder: number;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ClientInput = Pick<Client, "id" | "name" | "description">;
+export type ContactInput = Pick<
+  Contact,
+  "id" | "clientId" | "name" | "email" | "phone" | "telegram" | "role"
+>;
+export type ProjectTypeInput = Pick<ProjectType, "id" | "name" | "description">;
+export type DealStageInput = Pick<DealStage, "id" | "name" | "sortOrder">;
+
 export type PositionDemand = {
   positionId: string;
   requiredHours: number;
@@ -129,6 +183,10 @@ export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelle
 export type Opportunity = {
   id: string;
   tenantId: string;
+  clientId: string | null;
+  primaryContactId: string | null;
+  projectTypeId: string | null;
+  stageId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -154,6 +212,8 @@ export type Project = {
   id: string;
   tenantId: string;
   sourceOpportunityId: string;
+  clientId: string | null;
+  projectTypeId: string | null;
   title: string;
   clientName: string;
   status: ProjectStatus;
@@ -169,10 +229,11 @@ export type Project = {
 
 export type OpportunityInput = {
   id?: string;
-  clientName: string;
-  contactName: string;
+  clientId: string;
+  primaryContactId: string;
+  projectTypeId: string;
+  stageId: string;
   title: string;
-  projectType: string;
   description: string;
   plannedStart: string;
   plannedFinish: string;
@@ -181,6 +242,10 @@ export type OpportunityInput = {
   probability: number;
   templateId: string | null;
   demand: PositionDemand[];
+};
+
+export type OpportunityStageInput = {
+  stageId: string;
 };
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
@@ -395,8 +460,62 @@ export async function updateProjectTemplate(
   );
 }
 
+export async function fetchClients(): Promise<{ clients: Client[] }> {
+  return requestJson("/api/workspace/clients");
+}
+
+export async function createClient(input: ClientInput): Promise<{ client: Client }> {
+  return requestJson("/api/workspace/clients", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function fetchContacts(): Promise<{ contacts: Contact[] }> {
+  return requestJson("/api/workspace/contacts");
+}
+
+export async function createContact(input: ContactInput): Promise<{ contact: Contact }> {
+  return requestJson("/api/workspace/contacts", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function fetchProjectTypes(): Promise<{ projectTypes: ProjectType[] }> {
+  return requestJson("/api/workspace/project-types");
+}
+
+export async function createProjectType(
+  input: ProjectTypeInput
+): Promise<{ projectType: ProjectType }> {
+  return requestJson("/api/workspace/project-types", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function fetchDealStages(): Promise<{ dealStages: DealStage[] }> {
+  return requestJson("/api/workspace/deal-stages");
+}
+
+export async function createDealStage(
+  input: DealStageInput
+): Promise<{ dealStage: DealStage }> {
+  return requestJson("/api/workspace/deal-stages", {
+    method: "POST",
+    body: input
+  });
+}
+
 export async function fetchOpportunities(): Promise<{ opportunities: Opportunity[] }> {
   return requestJson("/api/workspace/opportunities");
+}
+
+export async function fetchOpportunity(
+  opportunityId: string
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(`/api/workspace/opportunities/${encodePathSegment(opportunityId)}`);
 }
 
 export async function createOpportunity(
@@ -415,6 +534,19 @@ export async function checkOpportunityFeasibility(
     `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/feasibility`,
     {
       method: "POST"
+    }
+  );
+}
+
+export async function updateOpportunityStage(
+  opportunityId: string,
+  input: OpportunityStageInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/stage`,
+    {
+      method: "PATCH",
+      body: input
     }
   );
 }

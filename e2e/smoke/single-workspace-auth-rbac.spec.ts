@@ -15,6 +15,13 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   expect(health.status()).toBe(200);
 
   const suffix = Date.now().toString(36);
+  const stageSortOrder = String(1000 + (Date.now() % 100000));
+  const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
+  const plannedStartDate = new Date(Date.UTC(2030, 0, 1 + (Date.now() % 2000)));
+  const plannedFinishDate = new Date(plannedStartDate);
+  plannedFinishDate.setUTCDate(plannedStartDate.getUTCDate() + 30);
+  const plannedStart = formatDateInput(plannedStartDate);
+  const plannedFinish = formatDateInput(plannedFinishDate);
 
   await page.goto("/");
 
@@ -77,11 +84,8 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     page.getByRole("row", { name: new RegExp(`Наблюдатель ${suffix} обновлено`) })
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Быстро создать" }).click();
-  await expect(page).toHaveURL(/\/users$/);
-  const quickCreateUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
-  await expect(quickCreateUserDialog).toBeVisible();
-  await quickCreateUserDialog.getByRole("button", { name: "Закрыть" }).click();
+  await expect(page.getByRole("button", { name: "Создать сделку" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Пользователи" }).click();
   await expect(page.getByRole("heading", { name: "Пользователи" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Создать пользователя" }).click();
   const createUserDialog = page.getByRole("dialog", { name: "Создать пользователя" });
@@ -142,7 +146,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
 
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "Настройки", exact: true })
+    .getByRole("button", { name: "Поля и шаблоны", exact: true })
     .click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Пользовательские поля" })).toBeVisible();
@@ -206,28 +210,98 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     page.getByRole("row", { name: new RegExp(`Внедрение проекта ${suffix}`) })
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Возможности" }).click();
+  await page.getByRole("button", { name: "Клиенты" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page.getByRole("heading", { name: "Клиенты" })).toBeVisible();
+  await page.getByRole("button", { name: "Создать клиента" }).click();
+  const createClientDialog = page.getByRole("dialog", { name: "Создать клиента" });
+  await expect(createClientDialog).toBeVisible();
+  await createClientDialog.getByRole("button", { name: "Создать клиента" }).click();
+  await expect(createClientDialog.getByText("Укажите клиента.")).toBeVisible();
+  await createClientDialog.getByLabel("Название клиента").fill(`Клиент ${suffix}`);
+  await createClientDialog.getByLabel("Описание").fill("Smoke клиент для сделки");
+  await createClientDialog.getByRole("button", { name: "Создать клиента" }).click();
+  await expect(page.getByText("Клиент создан")).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`Клиент ${suffix}`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Контакты" }).click();
+  await expect(page).toHaveURL(/\/contacts$/);
+  await expect(page.getByRole("heading", { name: "Контакты" })).toBeVisible();
+  await page.getByRole("button", { name: "Создать контакт" }).click();
+  const createContactDialog = page.getByRole("dialog", { name: "Создать контакт" });
+  await expect(createContactDialog).toBeVisible();
+  await createContactDialog.getByRole("button", { name: "Создать контакт" }).click();
+  await expect(createContactDialog.getByText("Выберите клиента.")).toBeVisible();
+  await createContactDialog.locator("#contact-client").selectOption({ label: `Клиент ${suffix}` });
+  await createContactDialog.getByLabel("Имя контакта").fill(`Контакт ${suffix}`);
+  await createContactDialog.getByLabel("Email").fill(`contact-${suffix}@example.com`);
+  await createContactDialog.getByLabel("Роль у клиента").fill("Заказчик");
+  await createContactDialog.getByRole("button", { name: "Создать контакт" }).click();
+  await expect(page.getByText("Контакт создан")).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`Контакт ${suffix}`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Типы проектов" }).click();
+  await expect(page).toHaveURL(/\/settings\/project-types$/);
+  await expect(page.getByRole("heading", { name: "Типы проектов" })).toBeVisible();
+  await page.getByRole("button", { name: "Создать тип" }).click();
+  const createProjectTypeDialog = page.getByRole("dialog", { name: "Создать тип проекта" });
+  await expect(createProjectTypeDialog).toBeVisible();
+  await createProjectTypeDialog.getByRole("button", { name: "Создать тип проекта" }).click();
+  await expect(createProjectTypeDialog.getByText("Укажите тип проекта.")).toBeVisible();
+  await createProjectTypeDialog.getByLabel("Название типа").fill(`Тип проекта ${suffix}`);
+  await createProjectTypeDialog.getByLabel("Описание").fill("Smoke тип проекта");
+  await createProjectTypeDialog.getByRole("button", { name: "Создать тип проекта" }).click();
+  await expect(page.getByText("Тип проекта создан")).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`Тип проекта ${suffix}`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Этапы сделок" }).click();
+  await expect(page).toHaveURL(/\/settings\/deal-stages$/);
+  await expect(page.getByRole("heading", { name: "Этапы сделок" })).toBeVisible();
+  await page.getByRole("button", { name: "Создать этап" }).click();
+  const createStageDialog = page.getByRole("dialog", { name: "Создать этап сделки" });
+  await expect(createStageDialog).toBeVisible();
+  await createStageDialog.getByRole("button", { name: "Создать этап" }).click();
+  await expect(createStageDialog.getByText("Укажите этап сделки.")).toBeVisible();
+  await createStageDialog.getByLabel("Название этапа").fill(`Этап ${suffix}`);
+  await createStageDialog.getByLabel("Порядок").fill(stageSortOrder);
+  await createStageDialog.getByRole("button", { name: "Создать этап" }).click();
+  await expect(page.getByText("Этап сделки создан")).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`Этап ${suffix}`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Сделки" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
-  await expect(page.getByRole("heading", { name: "Возможности" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Создать возможность" }).click();
-  const createOpportunityDialog = page.getByRole("dialog", { name: "Создать возможность" });
+  await expect(page.getByRole("heading", { name: "Сделки" }).first()).toBeVisible();
+  const dealsPanel = page.locator(".panel").filter({
+    has: page.getByRole("heading", { name: "Сделки" })
+  });
+  await expect(dealsPanel.getByRole("button", { name: "Создать сделку" })).toBeVisible();
+  await expect(dealsPanel.getByRole("button", { name: "+ Клиент" })).toHaveCount(0);
+  await expect(dealsPanel.getByRole("button", { name: "+ Тип проекта" })).toHaveCount(0);
+
+  await dealsPanel.getByRole("button", { name: "Создать сделку" }).click();
+  const createOpportunityDialog = page.getByRole("dialog", { name: "Создать сделку" });
   await expect(createOpportunityDialog).toBeVisible();
   await expect(createOpportunityDialog.getByLabel("Клиент")).toBeFocused();
-  await createOpportunityDialog.getByRole("button", { name: "Создать возможность" }).click();
-  await expect(createOpportunityDialog.getByText("Укажите клиента.")).toBeVisible();
+  await createOpportunityDialog.getByRole("button", { name: "Создать сделку" }).click();
+  await expect(createOpportunityDialog.getByText("Выберите клиента.")).toBeVisible();
   await expect(
     createOpportunityDialog.getByText("Добавьте хотя бы одну строку потребности.")
   ).toBeVisible();
-  await createOpportunityDialog.getByLabel("Клиент").fill(`Клиент ${suffix}`);
-  await createOpportunityDialog.getByLabel("Контакт").fill(`Контакт ${suffix}`);
+  await createOpportunityDialog.locator("#opportunity-clientId").selectOption({ label: `Клиент ${suffix}` });
+  await createOpportunityDialog.locator("#opportunity-primaryContactId").selectOption({ label: `Контакт ${suffix}` });
+  await createOpportunityDialog.locator("#opportunity-stageId").selectOption({ label: `Этап ${suffix}` });
   await createOpportunityDialog
     .getByLabel("Название входящего проекта")
     .fill(`Контур внедрения ${suffix}`);
-  await createOpportunityDialog.getByLabel("Тип проекта").fill("Внедрение");
-  await createOpportunityDialog.getByLabel("Старт").fill("2026-07-01");
-  await createOpportunityDialog.getByLabel("Плановый финиш").fill("2026-07-31");
-  await createOpportunityDialog.getByLabel("Стоимость контракта").fill("960000");
-  await createOpportunityDialog.getByLabel("Плановая норма часа").fill("6000");
+  await createOpportunityDialog.locator("#opportunity-projectTypeId").selectOption({ label: `Тип проекта ${suffix}` });
+  await createOpportunityDialog.getByLabel("Старт").fill(plannedStart);
+  await createOpportunityDialog.getByLabel("Плановый финиш").fill(plannedFinish);
+  const contractValueInput = createOpportunityDialog.getByLabel("Стоимость контракта");
+  await contractValueInput.fill("960000");
+  await expect(contractValueInput).toBeFocused();
+  const hourlyRateInput = createOpportunityDialog.getByLabel("Плановая норма часа");
+  await hourlyRateInput.fill("6000");
+  await expect(hourlyRateInput).toBeFocused();
   await expect(createOpportunityDialog.getByText("Плановая емкость: 160 ч")).toBeVisible();
   await createOpportunityDialog
     .getByLabel("Шаблон проекта")
@@ -243,10 +317,24 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     .selectOption({ label: "Инженер" });
   await createOpportunityDialog.getByLabel("Часы").nth(1).fill("80");
   await expect(createOpportunityDialog.getByText("Потребность по должностям: 160 ч")).toBeVisible();
-  await createOpportunityDialog.getByRole("button", { name: "Создать возможность" }).click();
+  await createOpportunityDialog.getByRole("button", { name: "Создать сделку" }).click();
   await expect(
     page.getByRole("row", { name: new RegExp(`Контур внедрения ${suffix}`) })
   ).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(`Контур внедрения ${suffix}`) }).click();
+  await expect(page).toHaveURL(/\/opportunities\/.+/);
+  await expect(page.getByRole("heading", { name: "Детали сделки" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix}` })).toBeVisible();
+  await expect(page.getByText(`Клиент ${suffix} · Контакт ${suffix}`)).toBeVisible();
+  await page.getByRole("button", { name: "К списку сделок" }).click();
+  await expect(page).toHaveURL(/\/opportunities$/);
+  await page.getByRole("button", { name: "Канбан" }).click();
+  await expect(page.getByLabel("Канбан сделок")).toBeVisible();
+  const dealCard = page.locator(".deal-card").filter({ hasText: `Контур внедрения ${suffix}` });
+  await expect(dealCard).toBeVisible();
+  await dealCard.getByLabel("Этап сделки").selectOption({ label: "Квалификация" });
+  await expect(page.getByText("Этап сделки обновлен")).toBeVisible();
+  await page.getByRole("button", { name: "Список" }).click();
   const opportunityRow = page.getByRole("row", {
     name: new RegExp(`Контур внедрения ${suffix}`)
   });
@@ -274,7 +362,12 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Пользовательское поле обновлено").first()).toBeVisible();
   await expect(page.getByText("Шаблон проекта создан").first()).toBeVisible();
   await expect(page.getByText("Шаблон проекта обновлен").first()).toBeVisible();
-  await expect(page.getByText("Возможность создана").first()).toBeVisible();
+  await expect(page.getByText("Клиент создан").first()).toBeVisible();
+  await expect(page.getByText("Контакт создан").first()).toBeVisible();
+  await expect(page.getByText("Тип проекта создан").first()).toBeVisible();
+  await expect(page.getByText("Этап сделки создан").first()).toBeVisible();
+  await expect(page.getByText("Сделка создана").first()).toBeVisible();
+  await expect(page.getByText("Этап сделки изменен").first()).toBeVisible();
   await expect(page.getByText("Ресурсная проверка сделки выполнена").first()).toBeVisible();
   await expect(page.getByText("Проект активирован").first()).toBeVisible();
   await expect(page.getByText(new RegExp(`Название: Приоритет ${suffix} -> Приоритет проекта ${suffix}`))).toBeVisible();
@@ -308,10 +401,22 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     page.getByRole("complementary").getByRole("button", { name: "Аудит", exact: true })
   ).toHaveCount(0);
   await expect(
-    page.getByRole("complementary").getByRole("button", { name: "Настройки", exact: true })
+    page.getByRole("complementary").getByRole("button", { name: "Поля и шаблоны", exact: true })
   ).toHaveCount(0);
   await expect(
-    page.getByRole("complementary").getByRole("button", { name: "Возможности", exact: true })
+    page.getByRole("complementary").getByRole("button", { name: "Клиенты", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Контакты", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Типы проектов", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Этапы сделок", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Сделки", exact: true })
   ).toHaveCount(0);
   await expect(
     page.getByRole("complementary").getByRole("button", { name: "Проекты", exact: true })
@@ -326,6 +431,14 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.locator(".account-menu")).toHaveCount(0);
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/clients");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/contacts");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/settings/project-types");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/settings/deal-stages");
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/audit");
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/opportunities");
@@ -334,6 +447,10 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page).toHaveURL(/\/dashboard$/);
   expect((await page.request.get("/api/tenant/current/audit-events")).status()).toBe(403);
   expect((await page.request.get("/api/workspace/opportunities")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/clients")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/contacts")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/project-types")).status()).toBe(403);
+  expect((await page.request.get("/api/workspace/deal-stages")).status()).toBe(403);
   expect((await page.request.get("/api/workspace/projects")).status()).toBe(403);
   expect((await page.request.get("/api/workspace/config/custom-fields")).status()).toBe(403);
   expect((await page.request.get("/api/workspace/config/project-templates")).status()).toBe(403);
@@ -393,9 +510,11 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
       await page.request.post("/api/workspace/opportunities", {
         data: {
           id: `limited-opportunity-${suffix}`,
-          clientName: "Недоступный клиент",
-          title: "Недоступная возможность",
-          projectType: "Внедрение",
+          clientId: "client-romashka",
+          primaryContactId: "contact-irina",
+          projectTypeId: "project-type-implementation",
+          stageId: "deal-stage-new",
+          title: "Недоступная сделка",
           plannedStart: "2026-07-01",
           plannedFinish: "2026-07-31",
           contractValue: 960000,
@@ -438,6 +557,87 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
           tenantLabel: "Недоступный шаблон",
           description: "",
           status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  await logoutThroughUserMenu(page);
+  await loginToWorkspace(page, {
+    email: "admin@kiss-pm.local",
+    password: "admin12345"
+  });
+  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
+
+  const readOnlyRoleId = `readonly-deals-role-${suffix}`;
+  const readOnlyUserId = `readonly-deals-user-${suffix}`;
+  const readOnlyUserEmail = `readonly-deals-${suffix}@kiss-pm.local`;
+  expect(
+    (
+      await page.request.post("/api/tenant/current/access-profiles", {
+        data: {
+          id: readOnlyRoleId,
+          name: `Чтение сделок ${suffix}`,
+          permissions: [
+            "profile.read",
+            "tenant.opportunities.read",
+            "tenant.clients.read",
+            "tenant.contacts.read",
+            "tenant.project_types.read",
+            "tenant.deal_stages.read",
+            "tenant.positions.read"
+          ]
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(201);
+  expect(
+    (
+      await page.request.post("/api/workspace/users", {
+        data: {
+          id: readOnlyUserId,
+          email: readOnlyUserEmail,
+          name: `Читатель сделок ${suffix}`,
+          accessProfileId: readOnlyRoleId,
+          positionId: null,
+          password: "readonly12345"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(201);
+  await logoutThroughUserMenu(page);
+  await loginToWorkspace(page, {
+    email: readOnlyUserEmail,
+    password: "readonly12345"
+  });
+  await page.getByRole("button", { name: "Сделки", exact: true }).click();
+  await expect(page).toHaveURL(/\/opportunities$/);
+  await expect(page.getByRole("heading", { name: "Сделки" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Создать сделку" })).toHaveCount(0);
+  await expect(
+    (
+      await page.request.post("/api/workspace/opportunities", {
+        data: {
+          id: `readonly-opportunity-${suffix}`,
+          clientId: "client-romashka",
+          primaryContactId: "contact-irina",
+          projectTypeId: "project-type-implementation",
+          stageId: "deal-stage-new",
+          title: "Read-only сделка",
+          plannedStart: "2026-07-01",
+          plannedFinish: "2026-07-31",
+          contractValue: 960000,
+          plannedHourlyRate: 6000,
+          probability: 50,
+          demand: [{ positionId: "position-engineer", requiredHours: 10 }]
         },
         headers: {
           "x-kiss-pm-action": "same-origin"

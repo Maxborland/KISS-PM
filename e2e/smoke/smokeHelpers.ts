@@ -9,6 +9,9 @@ export async function loginToWorkspace(
   }
   await page.getByLabel("Пароль").fill(input.password);
   await page.getByRole("button", { name: "Войти" }).click();
+  await expect
+    .poll(async () => (await page.request.get("/api/auth/me")).status())
+    .toBe(200);
 }
 
 export async function logoutThroughUserMenu(page: Page) {
@@ -24,8 +27,9 @@ export async function expectAdminDashboardReady(page: Page) {
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Экспорт" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Создать сделку" })).toHaveCount(0);
   await expect(
-    page.getByRole("complementary").getByRole("button", { name: "Возможности" })
+    page.getByRole("complementary").getByRole("button", { name: "Сделки" })
   ).toBeVisible();
   await expect(
     page.getByRole("complementary").getByRole("button", { name: "Проекты" })
@@ -71,7 +75,7 @@ export async function verifyResponsiveNavigation(page: Page) {
   await expect(page.locator(".sidebar")).not.toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".sidebar")).not.toHaveAttribute("inert", "");
   await expect(page.locator(".content-shell")).toHaveAttribute("inert", "");
-  await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Главная" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
     page.getByRole("button", { name: "Открыть меню профиля" })
@@ -85,8 +89,6 @@ export async function verifyResponsiveNavigation(page: Page) {
   await expect(
     page.getByRole("button", { name: "Открыть меню профиля" })
   ).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Быстро создать" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Главная" })).toBeFocused();
   for (let index = 0; index < 8; index += 1) {

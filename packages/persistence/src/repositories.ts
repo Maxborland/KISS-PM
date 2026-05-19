@@ -18,10 +18,7 @@ import {
   userCredentials,
   userSessions
 } from "./schema";
-import {
-  createProjectIntakeRepository,
-  type ProjectIntakeRepository
-} from "./projectIntakeRepository";
+import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
 import {
   createCrmRepository,
   type ClientInput,

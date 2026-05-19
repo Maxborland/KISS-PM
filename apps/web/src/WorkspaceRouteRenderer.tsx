@@ -1,6 +1,13 @@
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
+import {
+  ClientsView,
+  ContactsView,
+  DealStagesView,
+  ProjectTypesView
+} from "./CrmEntityViews";
 import { DashboardView } from "./DashboardView";
+import { OpportunityDetailView } from "./OpportunityDetailView";
 import { OpportunitiesView } from "./OpportunitiesView";
 import { PositionsView } from "./PositionsView";
 import { ProjectsView } from "./ProjectsView";
@@ -13,15 +20,22 @@ import { type SectionState } from "./workspaceShellState";
 
 export function WorkspaceRouteRenderer(props: {
   activeRouteId: WorkspaceRouteId;
+  activeOpportunityId: string | null;
   data: WorkspaceData;
   openCreateRequested: boolean;
   onChanged: (message: string) => void;
+  onBackToOpportunities: () => void;
+  onOpenOpportunity: (opportunityId: string) => void;
   onQuickCreateConsumed: () => void;
   sectionStates: {
     users: SectionState;
     positions: SectionState;
     accessRoles: SectionState;
     auditEvents: SectionState;
+    clients: SectionState;
+    contacts: SectionState;
+    projectTypes: SectionState;
+    dealStages: SectionState;
     opportunities: SectionState;
     projects: SectionState;
     workspaceConfig: SectionState;
@@ -49,10 +63,45 @@ export function WorkspaceRouteRenderer(props: {
   }
 
   if (props.activeRouteId === "opportunities") {
+    if (props.activeOpportunityId) {
+      return (
+        <OpportunityDetailView
+          data={props.data}
+          opportunityId={props.activeOpportunityId}
+          onBack={props.onBackToOpportunities}
+          onChanged={props.onChanged}
+          sectionState={props.sectionStates.opportunities}
+        />
+      );
+    }
+
     return (
       <OpportunitiesView
         data={props.data}
+        openCreateRequested={props.openCreateRequested}
+        onOpenOpportunity={props.onOpenOpportunity}
+        onQuickCreateConsumed={props.onQuickCreateConsumed}
         sectionState={props.sectionStates.opportunities}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "clients") {
+    return (
+      <ClientsView
+        data={props.data}
+        sectionState={props.sectionStates.clients}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "contacts") {
+    return (
+      <ContactsView
+        data={props.data}
+        sectionState={props.sectionStates.contacts}
         onChanged={props.onChanged}
       />
     );
@@ -101,6 +150,26 @@ export function WorkspaceRouteRenderer(props: {
       <WorkspaceSettingsView
         data={props.data}
         sectionState={props.sectionStates.workspaceConfig}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "project-types") {
+    return (
+      <ProjectTypesView
+        data={props.data}
+        sectionState={props.sectionStates.projectTypes}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "deal-stages") {
+    return (
+      <DealStagesView
+        data={props.data}
+        sectionState={props.sectionStates.dealStages}
         onChanged={props.onChanged}
       />
     );

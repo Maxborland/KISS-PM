@@ -26,7 +26,12 @@ const auditActionLabels: Record<string, string> = {
   "workspace.custom_field.updated": "Пользовательское поле обновлено",
   "workspace.project_template.created": "Шаблон проекта создан",
   "workspace.project_template.updated": "Шаблон проекта обновлен",
-  "opportunity.created": "Возможность создана",
+  "client.created": "Клиент создан",
+  "contact.created": "Контакт создан",
+  "project_type.created": "Тип проекта создан",
+  "deal_stage.created": "Этап сделки создан",
+  "opportunity.created": "Сделка создана",
+  "opportunity.stage_updated": "Этап сделки изменен",
   "opportunity.feasibility_checked": "Ресурсная проверка сделки выполнена",
   "project.activated": "Проект активирован",
   "profile.updated": "Профиль обновлен",
@@ -48,7 +53,10 @@ const trackedStateKeys = [
   "fieldType",
   "required",
   "status",
-  "description"
+  "description",
+  "name",
+  "title",
+  "stageId"
 ];
 
 const auditDateFormatter = new Intl.DateTimeFormat("ru-RU", {
