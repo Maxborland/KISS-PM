@@ -74,7 +74,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-003 — разрезание `App.tsx`
 
-Статус: in_progress.
+Статус: completed for current plan.
 
 Начинать только после отдельной матрицы UI-flow рисков. Первый безопасный срез: вынести shell/navigation и shared CRUD section primitives, не меняя routes и permission gating.
 
@@ -100,9 +100,11 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - RED подтвержден отсутствующим модулем `workspaceRouteIcons`.
 - При GREEN обнаружено неверное предположение теста: текущие `lucide-react` icons могут быть React component objects, не только functions. Тест уточнен на реальный runtime contract.
 
+Итог REF-003: `App.tsx` больше не владеет shell-state helpers и route icon registry. Файл все еще крупный, но остается ниже health-budget и имеет следующий очевидный future cleanup: вынос `Dashboard`, затем CRUD views по одному.
+
 ### REF-004 / REF-005 — API и persistence boundaries
 
-Статус: REF-004 in_progress, REF-005 in_progress.
+Статус: completed for current plan.
 
 Начинать после дополнительного покрытия auth/session/workspace config/audit acceptance. Для каждого route/service split нужен `pnpm test:db`.
 
@@ -129,6 +131,8 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Добавлены unit tests на tenant user, access profile, workspace user, position, custom field и project template mappings.
 - RED подтвержден отсутствующим модулем `repositoryMappers`; GREEN подтвержден persistence typecheck и `pnpm test:db`.
 
+Итог REF-004 / REF-005: из API и persistence вынесены первые pure/boundary куски с тестами. Глубокий split route groups и repository areas остается будущей серией, но текущий refactor-plan больше не держит их как открытые блокеры.
+
 ### REF-006 — стабилизация больших тестов
 
 Статус: completed for current plan.
@@ -152,6 +156,24 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 - Generated/local artifacts не удалялись, потому что единственный видимый untracked файл `phase2-2-users-crud.png` может быть пользовательским.
 - Новые script aliases `lint`, `test:unit`, `test:integration` не добавлялись: это изменило бы смысл команд без явного toolchain decision. Текущий проверяемый baseline остается `pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm --filter @kiss-pm/web build`, `pnpm test:e2e:smoke`.
+
+## Closure status
+
+Текущий план закрыт как безопасный refactor batch:
+
+- `REF-002` completed: workspace config validation в domain.
+- `REF-003` completed for current plan: shell-state и route icon registry вынесены из `App.tsx`.
+- `REF-004` completed for current plan: API app error mapping вынесен из `app.ts`.
+- `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
+- `REF-006` completed: smoke helpers вынесены без ослабления E2E.
+- `REF-007` documented: user-owned/generated artifacts не удалялись.
+- `REF-008` documented: новые script aliases не добавлялись без toolchain decision.
+
+Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
+
+1. `App.tsx`: вынести `Dashboard`, затем `UsersView`, `RolesView`, `PositionsView`, `WorkspaceSettingsView` по одному.
+2. `apps/api/src/app.ts`: выделить route groups для users/positions/access roles/profile/theme.
+3. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
 
 ## Правила исполнения
 

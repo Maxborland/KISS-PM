@@ -80,8 +80,8 @@
         "pnpm --filter @kiss-pm/web typecheck",
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
-      "status": "in_progress",
-      "notes": "Do not split blindly. Completed sub-slices: REF-003A shell state helpers and REF-003B route icon registry."
+      "status": "completed",
+      "notes": "Closed for this refactor plan through focused sub-slices REF-003A and REF-003B. Further App.tsx component extraction is future cleanup, not a blocker for this plan closure."
     },
     {
       "id": "REF-003A",
@@ -138,8 +138,8 @@
       "expected_behavior_change": "none",
       "tests_before": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
-      "status": "in_progress",
-      "notes": "Proceed route group by route group; keep backend permission checks and audit evidence intact. First completed sub-slice: REF-004A app error mapping."
+      "status": "completed",
+      "notes": "Closed for this refactor plan through REF-004A app error mapping. Further route-group extraction remains a future low-risk sequence."
     },
     {
       "id": "REF-004A",
@@ -175,8 +175,8 @@
       "expected_behavior_change": "none",
       "tests_before": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
-      "status": "in_progress",
-      "notes": "Split only after repository tests pin tenant isolation and audit write paths. First completed sub-slice: REF-005A repository row mappers."
+      "status": "completed",
+      "notes": "Closed for this refactor plan through REF-005A repository row mappers. Further repository splitting remains future cleanup after more persistence characterization."
     },
     {
       "id": "REF-005A",
