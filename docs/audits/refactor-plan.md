@@ -131,9 +131,27 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-006 — стабилизация больших тестов
 
-Статус: pending.
+Статус: completed for current plan.
 
 Сначала выделить fixtures/helpers, затем дробить specs. Нельзя ослаблять E2E assertions.
+
+#### REF-006A — Playwright smoke helpers
+
+Статус: completed.
+
+Срез без ослабления E2E:
+
+- `loginToWorkspace`, `logoutThroughUserMenu`, `expectAdminDashboardReady`, `verifyResponsiveNavigation` вынесены в `e2e/smoke/smokeHelpers.ts`.
+- `single-workspace-auth-rbac.spec.ts` стал короче и читабельнее: 348 строк вместо примерно 420+.
+- RED подтвержден отсутствующим `smokeHelpers` после перевода импорта.
+- GREEN подтвержден `pnpm test:e2e:smoke`.
+
+### REF-007 / REF-008 — hygiene и package scripts
+
+Статус: documented.
+
+- Generated/local artifacts не удалялись, потому что единственный видимый untracked файл `phase2-2-users-crud.png` может быть пользовательским.
+- Новые script aliases `lint`, `test:unit`, `test:integration` не добавлялись: это изменило бы смысл команд без явного toolchain decision. Текущий проверяемый baseline остается `pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm --filter @kiss-pm/web build`, `pnpm test:e2e:smoke`.
 
 ## Правила исполнения
 

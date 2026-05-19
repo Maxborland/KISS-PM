@@ -214,8 +214,30 @@
       "expected_behavior_change": "none",
       "tests_before": ["pnpm test:db", "pnpm test:e2e:smoke"],
       "tests_after": ["pnpm test:db", "pnpm test:e2e:smoke"],
-      "status": "pending",
-      "notes": "Extract shared fixtures/helpers first; do not weaken assertions."
+      "status": "completed",
+      "notes": "REF-006A extracted Playwright smoke helpers without weakening assertions; remaining future split into multiple specs is optional once flows grow further."
+    },
+    {
+      "id": "REF-006A",
+      "area": "browser smoke helper extraction",
+      "files": [
+        "e2e/smoke/single-workspace-auth-rbac.spec.ts",
+        "e2e/smoke/smokeHelpers.ts"
+      ],
+      "problem": "The smoke spec embedded login/logout and responsive navigation assertions inline, making failures harder to localize.",
+      "risk": "low",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm test:e2e:smoke failed after importing the future helper because smokeHelpers did not exist"
+      ],
+      "tests_after": [
+        "pnpm test:e2e:smoke",
+        "pnpm test",
+        "pnpm typecheck"
+      ],
+      "status": "completed",
+      "notes": "Login/logout/dashboard readiness and responsive navigation assertions now have named helper functions. Assertions were moved, not removed."
     },
     {
       "id": "REF-007",
@@ -234,8 +256,8 @@
       "expected_behavior_change": "none",
       "tests_before": ["git status --short", "git ls-files"],
       "tests_after": ["git status --short"],
-      "status": "decision_needed",
-      "notes": "No deletion in this batch. The untracked screenshot may be user-owned."
+      "status": "documented",
+      "notes": "No deletion in this refactor closure. The only visible untracked artifact is phase2-2-users-crud.png and it may be user-owned."
     },
     {
       "id": "REF-008",
@@ -251,8 +273,8 @@
         "npm run test:integration exits 1: missing script"
       ],
       "tests_after": ["Decision needed before adding new script semantics"],
-      "status": "pending",
-      "notes": "Do not invent lint/unit/integration meanings until toolchain expectations are specified."
+      "status": "documented",
+      "notes": "No new script semantics added in this refactor closure. Current canonical checks are pnpm typecheck, pnpm test, pnpm test:db, web build and smoke."
     },
     {
       "id": "REF-009",
