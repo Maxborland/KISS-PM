@@ -61,6 +61,13 @@ const phase4CrmFinalActionsMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4CrmActivityMigration = readFileSync(
+  new URL(
+    "../migrations/0012_phase_4_crm_opportunity_activities.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -225,6 +232,36 @@ describe("Phase 4 CRM final actions SQL migration", () => {
     );
     expect(phase4CrmFinalActionsMigration).toContain(
       'ADD COLUMN IF NOT EXISTS "custom_field_values" jsonb NOT NULL DEFAULT'
+    );
+  });
+});
+
+describe("Phase 4 CRM activity SQL migration", () => {
+  it("adds tenant-scoped opportunity activity with opportunity and user guards", () => {
+    expect(phase4CrmActivityMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "opportunity_activities"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'FOREIGN KEY ("tenant_id","opportunity_id")'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_author_user_fk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityMigration).toContain("ON DELETE restrict");
+    expect(phase4CrmActivityMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "opportunity_activities_tenant_opportunity_created_idx"'
     );
   });
 });

@@ -4,12 +4,14 @@ import {
   index,
   integer,
   jsonb,
+  check,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(),
@@ -527,6 +529,66 @@ export const taskParticipants = pgTable(
   ]
 );
 
+export const opportunityActivities = pgTable(
+  "opportunity_activities",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    opportunityId: text("opportunity_id").notNull(),
+    type: text("type").notNull(),
+    title: text("title"),
+    body: text("body"),
+    status: text("status"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    assigneeUserId: text("assignee_user_id"),
+    authorUserId: text("author_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "opportunity_activities_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "opportunity_activities_opportunity_fk",
+      columns: [table.tenantId, table.opportunityId],
+      foreignColumns: [opportunities.tenantId, opportunities.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunity_activities_author_user_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunity_activities_assignee_user_fk",
+      columns: [table.tenantId, table.assigneeUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("opportunity_activities_tenant_opportunity_created_idx").on(
+      table.tenantId,
+      table.opportunityId,
+      table.createdAt
+    ),
+    index("opportunity_activities_tenant_assignee_idx").on(
+      table.tenantId,
+      table.assigneeUserId
+    ),
+    check(
+      "opportunity_activities_type_chk",
+      sql`${table.type} in ('comment', 'task')`
+    ),
+    check(
+      "opportunity_activities_status_chk",
+      sql`(
+        (${table.type} = 'comment' and ${table.status} is null)
+        or
+        (${table.type} = 'task' and ${table.status} in ('todo', 'done') and ${table.title} is not null)
+      )`
+    )
+  ]
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -573,6 +635,7 @@ export type PersistenceTableName =
   | "project_position_demands"
   | "tasks"
   | "task_participants"
+  | "opportunity_activities"
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
@@ -601,6 +664,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_position_demands",
   "tasks",
   "task_participants",
+  "opportunity_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -622,6 +686,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_position_demands",
   "tasks",
   "task_participants",
+  "opportunity_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -769,6 +834,20 @@ const tableColumns = {
     "updated_at"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],
+  opportunity_activities: [
+    "id",
+    "tenant_id",
+    "opportunity_id",
+    "type",
+    "title",
+    "body",
+    "status",
+    "due_date",
+    "assignee_user_id",
+    "author_user_id",
+    "created_at",
+    "updated_at"
+  ],
   tenant_users: [
     "id",
     "tenant_id",
