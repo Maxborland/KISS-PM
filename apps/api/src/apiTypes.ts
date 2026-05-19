@@ -75,6 +75,59 @@ export type ProjectTemplateInput = Omit<
   "createdAt" | "updatedAt"
 >;
 
+export type PositionDemandRecord = {
+  positionId: string;
+  requiredHours: number;
+};
+
+export type OpportunityRecord = {
+  id: string;
+  tenantId: TenantId;
+  clientName: string;
+  contactName: string;
+  title: string;
+  projectType: string;
+  description: string | null;
+  plannedStart: Date;
+  plannedFinish: Date;
+  contractValue: number;
+  plannedHourlyRate: number;
+  plannedHours: number;
+  probability: number;
+  status: string;
+  templateId: string | null;
+  feasibilityStatus: string | null;
+  feasibilityResult: Record<string, unknown> | null;
+  feasibilityCheckedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  demand: PositionDemandRecord[];
+};
+
+export type OpportunityInput = Omit<
+  OpportunityRecord,
+  "createdAt" | "updatedAt" | "feasibilityStatus" | "feasibilityResult" | "feasibilityCheckedAt"
+>;
+
+export type ProjectRecord = {
+  id: string;
+  tenantId: TenantId;
+  sourceOpportunityId: string;
+  title: string;
+  clientName: string;
+  status: string;
+  plannedStart: Date;
+  plannedFinish: Date;
+  contractValue: number;
+  plannedHours: number;
+  templateId: string | null;
+  createdAt: Date;
+  activatedAt: Date;
+  demand: PositionDemandRecord[];
+};
+
+export type ProjectInput = Omit<ProjectRecord, "createdAt" | "activatedAt">;
+
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;
@@ -104,6 +157,7 @@ export type ManagementAuditEventInput = {
   beforeState: Record<string, unknown> | null;
   afterState: Record<string, unknown> | null;
   permissionResult: Record<string, unknown>;
+  executionResult?: Record<string, unknown>;
 };
 
 export type ApiTenantDataSource = {
@@ -153,6 +207,21 @@ export type ApiTenantDataSource = {
   updateProjectTemplate?(
     input: ProjectTemplateInput
   ): Promise<ProjectTemplateRecord>;
+  listOpportunities?(tenantId: TenantId): Promise<OpportunityRecord[]>;
+  findOpportunityById?(
+    tenantId: TenantId,
+    opportunityId: string
+  ): Promise<OpportunityRecord | undefined>;
+  createOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunityFeasibility?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    status: string;
+    feasibilityStatus: string;
+    feasibilityResult: Record<string, unknown>;
+  }): Promise<OpportunityRecord>;
+  listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
+  activateProjectFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;
@@ -170,6 +239,7 @@ export type ApiTenantDataSource = {
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
+  lockTenantResourcePlanning?(tenantId: TenantId): Promise<void>;
   appendAuditEvent?(input: {
     id: string;
     tenantId: TenantId;

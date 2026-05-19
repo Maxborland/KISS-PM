@@ -54,11 +54,15 @@ export function WorkspaceShell() {
 
   useEffect(() => {
     if (!meQuery.data) return;
+    if (pathname === "/") {
+      router.replace(getRoutePath("dashboard"));
+      return;
+    }
     const allowedRouteId = getDefaultRouteId(activeRouteId, permissions);
     if (allowedRouteId !== activeRouteId) {
       navigateRoute(allowedRouteId);
     }
-  }, [activeRouteId, meQuery.data, permissions]);
+  }, [activeRouteId, meQuery.data, pathname, permissions, router]);
 
   useEffect(() => {
     if (activeRouteId !== "users") return;

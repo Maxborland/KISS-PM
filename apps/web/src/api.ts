@@ -1,4 +1,6 @@
 import type {
+  OpportunityFeasibilityAssessment,
+  OpportunityFeasibilityStatus,
   WorkspaceConfigFieldType,
   WorkspaceConfigStatus
 } from "@kiss-pm/domain";
@@ -108,6 +110,78 @@ export type ProjectTemplateInput = Omit<
   ProjectTemplate,
   "tenantId" | "createdAt" | "updatedAt"
 >;
+
+export type PositionDemand = {
+  positionId: string;
+  requiredHours: number;
+};
+
+export type OpportunityStatus =
+  | "new"
+  | "intake"
+  | "feasibility"
+  | "ready_to_activate"
+  | "rejected"
+  | "converted";
+
+export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
+
+export type Opportunity = {
+  id: string;
+  tenantId: string;
+  clientName: string;
+  contactName: string;
+  title: string;
+  projectType: string;
+  description: string | null;
+  plannedStart: string;
+  plannedFinish: string;
+  contractValue: number;
+  plannedHourlyRate: number;
+  plannedHours: number;
+  probability: number;
+  status: OpportunityStatus;
+  templateId: string | null;
+  feasibilityStatus: OpportunityFeasibilityStatus | null;
+  feasibilityResult: OpportunityFeasibilityAssessment | null;
+  feasibilityCheckedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  demand: PositionDemand[];
+};
+
+export type Project = {
+  id: string;
+  tenantId: string;
+  sourceOpportunityId: string;
+  title: string;
+  clientName: string;
+  status: ProjectStatus;
+  plannedStart: string;
+  plannedFinish: string;
+  contractValue: number;
+  plannedHours: number;
+  templateId: string | null;
+  createdAt: string;
+  activatedAt: string;
+  demand: PositionDemand[];
+};
+
+export type OpportunityInput = {
+  id?: string;
+  clientName: string;
+  contactName: string;
+  title: string;
+  projectType: string;
+  description: string;
+  plannedStart: string;
+  plannedFinish: string;
+  contractValue: number;
+  plannedHourlyRate: number;
+  probability: number;
+  templateId: string | null;
+  demand: PositionDemand[];
+};
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
   return requestJson("/health");
@@ -319,6 +393,47 @@ export async function updateProjectTemplate(
       body: input
     }
   );
+}
+
+export async function fetchOpportunities(): Promise<{ opportunities: Opportunity[] }> {
+  return requestJson("/api/workspace/opportunities");
+}
+
+export async function createOpportunity(
+  input: OpportunityInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson("/api/workspace/opportunities", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function checkOpportunityFeasibility(
+  opportunityId: string
+): Promise<{ opportunity: Opportunity; assessment: OpportunityFeasibilityAssessment }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/feasibility`,
+    {
+      method: "POST"
+    }
+  );
+}
+
+export async function activateOpportunityProject(
+  opportunityId: string,
+  input: { id?: string; acceptedRiskReason: string | null }
+): Promise<{ project: Project }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/activate`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function fetchProjects(): Promise<{ projects: Project[] }> {
+  return requestJson("/api/workspace/projects");
 }
 
 async function requestJson<T>(

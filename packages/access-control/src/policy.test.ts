@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { createTenantUser } from "@kiss-pm/domain";
 import {
-  canManageWorkspaceConfig,
   canManageAccessProfiles,
+  canManageOpportunities,
   canManagePositions,
+  canManageProjectActivation,
+  canManageProjects,
   canManageTenantUsers,
+  canManageWorkspaceConfig,
   canManageWorkspaceTheme,
-  canReadWorkspaceConfig,
   canReadAuditEvents,
+  canReadOpportunities,
+  canReadProjects,
+  canReadResourceFeasibility,
   canReadTenantUsers,
+  canReadWorkspaceConfig,
   canUpdateProfile,
   createAccessProfile
 } from "./index";
@@ -26,6 +32,12 @@ describe("access-control tenant policy", () => {
       "tenant.audit_events.read",
       "tenant.workspace_config.read",
       "tenant.workspace_config.manage",
+      "tenant.opportunities.read",
+      "tenant.opportunities.manage",
+      "tenant.projects.read",
+      "tenant.projects.manage",
+      "tenant.project_activation.manage",
+      "tenant.resource_feasibility.read",
       "profile.read",
       "profile.update",
       "workspace.theme.manage"
@@ -232,6 +244,82 @@ describe("access-control tenant policy", () => {
     });
     expect(
       canManageWorkspaceConfig({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 3 opportunity, project and feasibility actions only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const intakeReader = createAccessProfile({
+      id: "intake-reader",
+      permissions: ["tenant.opportunities.read", "tenant.projects.read"]
+    });
+
+    expect(
+      canReadOpportunities({
+        actor,
+        profile: intakeReader,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadProjects({
+        actor,
+        profile: intakeReader,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageOpportunities({
+        actor,
+        profile: intakeReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageOpportunities({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageProjects({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageProjectActivation({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadResourceFeasibility({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadResourceFeasibility({
         actor,
         profile: adminProfile,
         targetTenantId: "tenant-beta"

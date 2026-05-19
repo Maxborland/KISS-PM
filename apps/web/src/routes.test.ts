@@ -15,6 +15,8 @@ describe("workspace route model", () => {
   it("keeps stable route ids for the single-workspace shell", () => {
     expect(workspaceRoutes.map((route) => route.id)).toEqual([
       "dashboard",
+      "opportunities",
+      "projects",
       "users",
       "access-roles",
       "positions",
@@ -47,12 +49,12 @@ describe("workspace route model", () => {
       {
         id: "admin",
         label: "Администрирование",
-        routes: [workspaceRoutes[1], workspaceRoutes[2]]
+        routes: [workspaceRoutes[3], workspaceRoutes[4]]
       },
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[6]]
+        routes: [workspaceRoutes[8]]
       }
     ]);
   });
@@ -76,6 +78,8 @@ describe("workspace route model", () => {
   it("maps real Next pathnames to workspace route ids", () => {
     expect(getRouteIdFromPathname("/users")).toBe("users");
     expect(getRouteIdFromPathname("/access-roles")).toBe("access-roles");
+    expect(getRouteIdFromPathname("/opportunities")).toBe("opportunities");
+    expect(getRouteIdFromPathname("/projects")).toBe("projects");
     expect(getRouteIdFromPathname("/audit")).toBe("audit");
     expect(getRouteIdFromPathname("/settings")).toBe("settings");
     expect(getRouteIdFromPathname("/unknown")).toBe("dashboard");
@@ -83,6 +87,8 @@ describe("workspace route model", () => {
 
   it("returns real Next paths for workspace routes", () => {
     expect(getRoutePath("dashboard")).toBe("/dashboard");
+    expect(getRoutePath("opportunities")).toBe("/opportunities");
+    expect(getRoutePath("projects")).toBe("/projects");
     expect(getRoutePath("users")).toBe("/users");
     expect(getRoutePath("settings")).toBe("/settings");
   });

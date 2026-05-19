@@ -10,6 +10,12 @@ export const rolePermissionOptions = [
   { value: "tenant.audit_events.read", label: "Читать аудит" },
   { value: "tenant.workspace_config.read", label: "Читать настройки рабочего пространства" },
   { value: "tenant.workspace_config.manage", label: "Управлять настройками рабочего пространства" },
+  { value: "tenant.opportunities.read", label: "Читать возможности" },
+  { value: "tenant.opportunities.manage", label: "Управлять возможностями" },
+  { value: "tenant.projects.read", label: "Читать проекты" },
+  { value: "tenant.projects.manage", label: "Управлять проектами" },
+  { value: "tenant.project_activation.manage", label: "Активировать проекты" },
+  { value: "tenant.resource_feasibility.read", label: "Проверять ресурсную реализуемость" },
   { value: "profile.read", label: "Читать профиль" },
   { value: "profile.update", label: "Обновлять профиль" },
   { value: "workspace.theme.manage", label: "Управлять темой" }
@@ -75,4 +81,13 @@ export function getFieldTypeLabel(fieldType: CustomFieldDefinition["fieldType"])
 
 export function formatDate(value: string): string {
   return dateFormatter.format(new Date(value));
+}
+
+export function formatDateOnly(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+    year: "numeric"
+  }).format(new Date(value));
 }

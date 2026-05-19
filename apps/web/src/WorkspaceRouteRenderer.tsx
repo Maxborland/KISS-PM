@@ -1,7 +1,9 @@
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
 import { DashboardView } from "./DashboardView";
+import { OpportunitiesView } from "./OpportunitiesView";
 import { PositionsView } from "./PositionsView";
+import { ProjectsView } from "./ProjectsView";
 import { RolesView } from "./RolesView";
 import { UsersView } from "./UsersView";
 import { WorkspaceSettingsView } from "./WorkspaceSettingsView";
@@ -20,6 +22,8 @@ export function WorkspaceRouteRenderer(props: {
     positions: SectionState;
     accessRoles: SectionState;
     auditEvents: SectionState;
+    opportunities: SectionState;
+    projects: SectionState;
     workspaceConfig: SectionState;
   };
 }) {
@@ -40,6 +44,25 @@ export function WorkspaceRouteRenderer(props: {
         onQuickCreateConsumed={props.onQuickCreateConsumed}
         sectionState={props.sectionStates.users}
         onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "opportunities") {
+    return (
+      <OpportunitiesView
+        data={props.data}
+        sectionState={props.sectionStates.opportunities}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "projects") {
+    return (
+      <ProjectsView
+        data={props.data}
+        sectionState={props.sectionStates.projects}
       />
     );
   }

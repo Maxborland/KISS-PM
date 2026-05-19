@@ -71,6 +71,53 @@ describe("workspace data derivation", () => {
             updatedAt: "2026-05-18T00:00:00.000Z"
           }
         ]
+      },
+      opportunities: {
+        opportunities: [
+          {
+            id: "opportunity-1",
+            tenantId: "tenant-1",
+            clientName: "Stale",
+            contactName: "",
+            title: "Stale",
+            projectType: "implementation",
+            description: null,
+            plannedStart: "2026-06-01T00:00:00.000Z",
+            plannedFinish: "2026-06-30T00:00:00.000Z",
+            contractValue: 600000,
+            plannedHourlyRate: 6000,
+            plannedHours: 100,
+            probability: 70,
+            status: "ready_to_activate",
+            templateId: null,
+            feasibilityStatus: "ok",
+            feasibilityResult: null,
+            feasibilityCheckedAt: null,
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z",
+            demand: []
+          }
+        ]
+      },
+      projects: {
+        projects: [
+          {
+            id: "project-1",
+            tenantId: "tenant-1",
+            sourceOpportunityId: "opportunity-1",
+            title: "Stale",
+            clientName: "Stale",
+            status: "active",
+            plannedStart: "2026-06-01T00:00:00.000Z",
+            plannedFinish: "2026-06-30T00:00:00.000Z",
+            contractValue: 600000,
+            plannedHours: 100,
+            templateId: null,
+            createdAt: "2026-05-18T00:00:00.000Z",
+            activatedAt: "2026-05-18T00:00:00.000Z",
+            demand: []
+          }
+        ]
       }
     });
 
@@ -80,5 +127,7 @@ describe("workspace data derivation", () => {
     expect(data.auditEvents).toEqual([]);
     expect(data.customFields).toEqual([]);
     expect(data.projectTemplates).toEqual([]);
+    expect(data.opportunities).toEqual([]);
+    expect(data.projects).toEqual([]);
   });
 });

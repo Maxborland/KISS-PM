@@ -1,8 +1,10 @@
 import {
   Activity,
   BriefcaseBusiness,
+  ClipboardList,
   LayoutDashboard,
   Palette,
+  PanelsTopLeft,
   Settings,
   ShieldCheck,
   UserCircle,
@@ -14,6 +16,8 @@ import type { WorkspaceRouteId } from "./routes";
 
 export const workspaceRouteIcons = {
   dashboard: LayoutDashboard,
+  opportunities: ClipboardList,
+  projects: PanelsTopLeft,
   users: Users,
   "access-roles": ShieldCheck,
   positions: BriefcaseBusiness,

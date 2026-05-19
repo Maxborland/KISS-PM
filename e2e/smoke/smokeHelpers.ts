@@ -24,7 +24,12 @@ export async function expectAdminDashboardReady(page: Page) {
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Экспорт" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Проекты" })).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Возможности" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("complementary").getByRole("button", { name: "Проекты" })
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Последние события аудита" })).toBeVisible();
   await expect(
     page.getByRole("table", { name: "Последние пользователи" }).locator(".checkbox-visual")

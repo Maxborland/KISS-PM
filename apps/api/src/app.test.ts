@@ -67,6 +67,20 @@ describe("KISS PM API Phase 1 shell", () => {
     });
   });
 
+  it("sets no-store cache headers even for early API rejections", async () => {
+    const app = createApp();
+
+    const response = await app.request("/api/workspace/opportunities", {
+      method: "POST"
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("no-store, private");
+    await expect(response.json()).resolves.toEqual({
+      error: "same_origin_action_required"
+    });
+  });
+
   it("can serve tenant users from an injected data source", async () => {
     const app = createApp({
       dataSource: {

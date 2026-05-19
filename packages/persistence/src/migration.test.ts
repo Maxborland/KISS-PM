@@ -24,6 +24,17 @@ const phase23AccessProfileScopedIdsMigration = readFileSync(
   ),
   "utf8"
 );
+const phase3IntakeMigration = readFileSync(
+  new URL("../migrations/0005_phase_3_project_intake.sql", import.meta.url),
+  "utf8"
+);
+const phase3ProjectSourceUniqueMigration = readFileSync(
+  new URL(
+    "../migrations/0006_phase_3_project_source_unique.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -90,6 +101,27 @@ describe("Phase 2.3 SQL migration", () => {
     );
     expect(phase23AccessProfileScopedIdsMigration).toContain(
       'ADD CONSTRAINT "access_profiles_pkey" PRIMARY KEY ("tenant_id","id")'
+    );
+  });
+});
+
+describe("Phase 3 SQL migration", () => {
+  it("creates tenant-scoped opportunity, demand and project tables", () => {
+    expect(phase3IntakeMigration).toContain('CREATE TABLE "opportunities"');
+    expect(phase3IntakeMigration).toContain('CREATE TABLE "opportunity_demands"');
+    expect(phase3IntakeMigration).toContain('CREATE TABLE "projects"');
+    expect(phase3IntakeMigration).toContain('CREATE TABLE "project_position_demands"');
+    expect(phase3IntakeMigration).toContain(
+      'PRIMARY KEY ("tenant_id","opportunity_id","position_id")'
+    );
+  });
+
+  it("keeps activation single-use per source opportunity", () => {
+    expect(phase3ProjectSourceUniqueMigration).toContain(
+      'CREATE UNIQUE INDEX "projects_tenant_source_opportunity_uidx"'
+    );
+    expect(phase3ProjectSourceUniqueMigration).toContain(
+      'ON "projects" USING btree ("tenant_id","source_opportunity_id")'
     );
   });
 });

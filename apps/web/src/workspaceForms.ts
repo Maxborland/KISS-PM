@@ -110,6 +110,64 @@ export function validateProjectTemplateForm(input: {
   return errors;
 }
 
+export function validateOpportunityForm(input: {
+  clientName: string;
+  title: string;
+  projectType: string;
+  plannedStart: string;
+  plannedFinish: string;
+  contractValue: string;
+  plannedHourlyRate: string;
+  probability: string;
+  demand: { positionId: string; requiredHours: string }[];
+}): FormErrors {
+  const errors: FormErrors = {};
+  const start = parseDateInput(input.plannedStart);
+  const finish = parseDateInput(input.plannedFinish);
+  const contractValue = Number(input.contractValue);
+  const plannedHourlyRate = Number(input.plannedHourlyRate);
+  const probability = Number(input.probability);
+
+  if (!input.clientName.trim()) errors.clientName = "Укажите клиента.";
+  if (!input.title.trim()) errors.title = "Укажите название входящего проекта.";
+  if (!input.projectType.trim()) errors.projectType = "Укажите тип проекта.";
+  if (!start) errors.plannedStart = "Укажите дату старта.";
+  if (!finish) {
+    errors.plannedFinish = "Укажите плановый финиш.";
+  } else if (start && finish.getTime() < start.getTime()) {
+    errors.plannedFinish = "Дата финиша не может быть раньше старта.";
+  }
+  if (!Number.isInteger(contractValue) || contractValue <= 0) {
+    errors.contractValue = "Стоимость контракта должна быть больше 0.";
+  }
+  if (!Number.isInteger(plannedHourlyRate) || plannedHourlyRate <= 0) {
+    errors.plannedHourlyRate = "Плановая норма часа должна быть больше 0.";
+  }
+  if (!Number.isInteger(probability) || probability < 0 || probability > 100) {
+    errors.probability = "Вероятность должна быть от 0 до 100.";
+  }
+
+  const filledDemand = input.demand.filter(
+    (line) => line.positionId.trim() || line.requiredHours.trim()
+  );
+  if (filledDemand.length === 0) {
+    errors.demand = "Добавьте хотя бы одну строку потребности.";
+  }
+  const hasInvalidDemand = filledDemand.some((line) => {
+    const requiredHours = Number(line.requiredHours);
+    return !line.positionId.trim() || !Number.isInteger(requiredHours) || requiredHours <= 0;
+  });
+  if (hasInvalidDemand) {
+    errors.demand = "Каждая строка потребности должна содержать должность и часы.";
+  }
+  const positionIds = filledDemand.map((line) => line.positionId).filter(Boolean);
+  if (new Set(positionIds).size !== positionIds.length) {
+    errors.demandDuplicates = "Должность в потребности нельзя дублировать.";
+  }
+
+  return errors;
+}
+
 export function hasFormErrors(errors: FormErrors): boolean {
   return Object.keys(errors).length > 0;
 }
@@ -132,4 +190,10 @@ export function getNextFocusTrapIndex(
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function parseDateInput(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }

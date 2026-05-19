@@ -8,6 +8,22 @@ export const workspaceRoutes = [
     description: "Контекст рабочего пространства и быстрые показатели"
   },
   {
+    id: "opportunities",
+    label: "Возможности",
+    group: "workspace",
+    path: "/opportunities",
+    permission: "tenant.opportunities.read",
+    description: "CRM-вход, потребность по должностям и ресурсная проверка"
+  },
+  {
+    id: "projects",
+    label: "Проекты",
+    group: "workspace",
+    path: "/projects",
+    permission: "tenant.projects.read",
+    description: "Активные проекты, плановые даты и потребность по должностям"
+  },
+  {
     id: "users",
     label: "Пользователи",
     group: "admin",

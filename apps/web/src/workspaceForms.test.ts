@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getNextFocusTrapIndex,
+  validateOpportunityForm,
   validateCustomFieldForm,
   validatePositionForm,
   validateProjectTemplateForm,
@@ -88,6 +89,36 @@ describe("workspace form quality baseline", () => {
       tenantLabel: "Укажите название шаблона.",
       description: "Описание должно быть не длиннее 1000 символов.",
       status: "Выберите статус шаблона."
+    });
+  });
+
+  it("validates manual opportunity intake before API mutation", () => {
+    expect(
+      validateOpportunityForm({
+        clientName: "",
+        title: "",
+        projectType: "",
+        plannedStart: "2026-06-30",
+        plannedFinish: "2026-06-01",
+        contractValue: "0",
+        plannedHourlyRate: "0",
+        probability: "120",
+        demand: [
+          { positionId: "", requiredHours: "0" },
+          { positionId: "position-engineer", requiredHours: "10" },
+          { positionId: "position-engineer", requiredHours: "20" }
+        ]
+      })
+    ).toEqual({
+      clientName: "Укажите клиента.",
+      title: "Укажите название входящего проекта.",
+      projectType: "Укажите тип проекта.",
+      plannedFinish: "Дата финиша не может быть раньше старта.",
+      contractValue: "Стоимость контракта должна быть больше 0.",
+      plannedHourlyRate: "Плановая норма часа должна быть больше 0.",
+      probability: "Вероятность должна быть от 0 до 100.",
+      demand: "Каждая строка потребности должна содержать должность и часы.",
+      demandDuplicates: "Должность в потребности нельзя дублировать."
     });
   });
 

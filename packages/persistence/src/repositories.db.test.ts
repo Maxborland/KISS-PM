@@ -22,11 +22,11 @@ describe("PostgreSQL tenant data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -211,5 +211,105 @@ describe("PostgreSQL tenant data source", () => {
       status: "active",
       description: null
     });
+  });
+
+  it("persists opportunities with demand and active projects inside one tenant", async () => {
+    await client`
+      INSERT INTO tenants (id, name, created_at)
+      VALUES
+        ('tenant-alpha', 'Альфа Проект', now()),
+        ('tenant-beta', 'Бета Проект', now())
+    `;
+    await client`
+      INSERT INTO positions (id, tenant_id, name, created_at)
+      VALUES
+        ('position-engineer', 'tenant-alpha', 'Инженер', now()),
+        ('position-analyst', 'tenant-alpha', 'Аналитик', now())
+    `;
+
+    const opportunity = await dataSource.createOpportunity({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      clientName: "ООО Ромашка",
+      contactName: "Ирина Клиент",
+      title: "Внедрение KISS PM",
+      projectType: "implementation",
+      description: "Первичный проект внедрения",
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-12T00:00:00.000Z"),
+      contractValue: 960_000,
+      plannedHourlyRate: 6_000,
+      plannedHours: 160,
+      probability: 80,
+      status: "new",
+      templateId: null,
+      demand: [
+        { positionId: "position-engineer", requiredHours: 120 },
+        { positionId: "position-analyst", requiredHours: 40 }
+      ]
+    });
+    const assessed = await dataSource.updateOpportunityFeasibility({
+      tenantId: "tenant-alpha",
+      opportunityId: "opportunity-alpha",
+      status: "ready_to_activate",
+      feasibilityStatus: "ok",
+      feasibilityResult: {
+        status: "ok",
+        rows: []
+      }
+    });
+    const project = await dataSource.activateProjectFromOpportunity({
+      id: "project-alpha",
+      tenantId: "tenant-alpha",
+      sourceOpportunityId: "opportunity-alpha",
+      title: assessed.title,
+      clientName: assessed.clientName,
+      status: "active",
+      plannedStart: assessed.plannedStart,
+      plannedFinish: assessed.plannedFinish,
+      contractValue: assessed.contractValue,
+      plannedHours: assessed.plannedHours,
+      templateId: assessed.templateId,
+      demand: assessed.demand
+    });
+
+    expect(opportunity).toMatchObject({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      plannedHours: 160,
+      demand: [
+        { positionId: "position-engineer", requiredHours: 120 },
+        { positionId: "position-analyst", requiredHours: 40 }
+      ]
+    });
+    await expect(dataSource.listOpportunities("tenant-alpha")).resolves.toHaveLength(1);
+    await expect(dataSource.listOpportunities("tenant-beta")).resolves.toEqual([]);
+    expect(project).toMatchObject({
+      id: "project-alpha",
+      tenantId: "tenant-alpha",
+      status: "active",
+      demand: [
+        { positionId: "position-engineer", requiredHours: 120 },
+        { positionId: "position-analyst", requiredHours: 40 }
+      ]
+    });
+    await expect(
+      dataSource.activateProjectFromOpportunity({
+        id: "project-alpha-copy",
+        tenantId: "tenant-alpha",
+        sourceOpportunityId: "opportunity-alpha",
+        title: assessed.title,
+        clientName: assessed.clientName,
+        status: "active",
+        plannedStart: assessed.plannedStart,
+        plannedFinish: assessed.plannedFinish,
+        contractValue: assessed.contractValue,
+        plannedHours: assessed.plannedHours,
+        templateId: assessed.templateId,
+        demand: assessed.demand
+      })
+    ).rejects.toThrow("source_opportunity_already_activated");
+    await expect(dataSource.listProjects("tenant-alpha")).resolves.toHaveLength(1);
+    await expect(dataSource.listProjects("tenant-beta")).resolves.toEqual([]);
   });
 });

@@ -26,6 +26,7 @@
 20. `19_PHASE_2_1_ACCESS_PROFILE_ADMIN.md` — первый Phase 2 tenant admin flow для access profiles, прав и audit.
 21. `20_PHASE_2_2_SINGLE_WORKSPACE_AUTH_RBAC.md` — single-workspace auth/RBAC/user foundation после решения отложить SaaS-админку.
 22. `21_PHASE_2_3_SINGLE_WORKSPACE_CONFIG_AUDIT.md` — audit viewer, negative RBAC и первый custom fields/templates baseline.
+23. `22_PHASE_3_CRM_INTAKE_ACTIVE_PROJECT.md` — manual CRM intake, demand `должность + часы`, ресурсная проверка и активация проекта.
 
 ## Референсы
 
@@ -37,7 +38,7 @@
 
 ## Статус новой реализации
 
-Новая реализация начинается с Phase 1 Node + pnpm skeleton: `apps/api`, `apps/web`, `packages/domain`, `packages/access-control`, `packages/persistence`, `packages/test-fixtures`. PostgreSQL для разработки поднимается через Docker Compose и наполняется demo данными через `pnpm db:seed:dev`; browser smoke проверяется через `pnpm test:e2e:smoke`. Phase 2 стартовала с access profile admin flow, а затем была сужена до single-workspace foundation: вход, пользователи, роли доступа, должности, профиль, тема, RBAC и audit без отдельной SaaS-админки. Phase 2.3 закрыла audit viewer, negative RBAC и базовые workspace settings для custom fields/templates.
+Новая реализация начинается с Phase 1 Node + pnpm skeleton: `apps/api`, `apps/web`, `packages/domain`, `packages/access-control`, `packages/persistence`, `packages/test-fixtures`. PostgreSQL для разработки поднимается через Docker Compose и наполняется demo данными через `pnpm db:seed:dev`; browser smoke проверяется через `pnpm test:e2e:smoke`. Phase 2 стартовала с access profile admin flow, а затем была сужена до single-workspace foundation: вход, пользователи, роли доступа, должности, профиль, тема, RBAC и audit без отдельной SaaS-админки. Phase 2.3 закрыла audit viewer, negative RBAC и базовые workspace settings для custom fields/templates. Phase 3 добавляет ручные возможности, расчет плановых часов из стоимости и ставки, demand `должность + часы`, resource feasibility и активацию активного проекта.
 
 Текущий web runtime: `apps/web` является Next.js App Router приложением. API остается отдельным Node/Hono backend в `apps/api`. Authenticated workspace shell остается Client Components UI поверх cookie-сессии `kiss_pm_session`, а server-state слой живет в TanStack Query внутри Next client provider. В dev web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, а `/api/...` и `/health` маршрутизируются через Next rewrites в API runtime.
 
