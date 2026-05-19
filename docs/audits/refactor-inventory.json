@@ -68,12 +68,12 @@
       "id": "REF-003",
       "area": "web application shell",
       "files": ["apps/web/src/App.tsx"],
-      "problem": "App.tsx is a god file with routing shell, data orchestration, CRUD views, dialogs and UI state in one 1400+ line component.",
+      "problem": "App.tsx is a god file with routing shell, data orchestration, CRUD views, dialogs and UI state in one 1200+ line component.",
       "risk": "high",
       "refactor_type": "split large component",
       "expected_behavior_change": "none",
       "tests_before": [
-        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 1450 lines"
+        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 1300 lines"
       ],
       "tests_after": [
         "component or route-level characterization tests before extraction",
@@ -81,7 +81,7 @@
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
       "status": "in_progress",
-      "notes": "REF-003 is reopened after review: helper extraction was not enough. Completed sub-slices: REF-003A shell state helpers, REF-003B route icon registry, REF-003C dashboard view extraction, REF-003D users view extraction, REF-003E roles view extraction, REF-003F positions view extraction, REF-003G audit view extraction. Continue with page/view-level boundaries until App.tsx is below 500 lines."
+      "notes": "REF-003 is reopened after review: helper extraction was not enough. Completed sub-slices: REF-003A shell state helpers, REF-003B route icon registry, REF-003C dashboard view extraction, REF-003D users view extraction, REF-003E roles view extraction, REF-003F positions view extraction, REF-003G audit view extraction, REF-003H account views extraction. Continue with page/view-level boundaries until App.tsx is below 500 lines."
     },
     {
       "id": "REF-003C",
@@ -201,6 +201,30 @@
       ],
       "status": "completed",
       "notes": "AuditView extracted without changing audit preview formatting, route ids or permission gating. App.tsx line budget tightened from 1600 to 1450."
+    },
+    {
+      "id": "REF-003H",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/AccountViews.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Profile and theme forms lived inside App.tsx.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "ProfileView and ThemeView extracted without changing mutation calls, permission gating or form markup. App.tsx line budget tightened from 1450 to 1300."
     },
     {
       "id": "REF-003A",
