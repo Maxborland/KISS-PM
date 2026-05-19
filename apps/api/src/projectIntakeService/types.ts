@@ -11,6 +11,7 @@ import type {
   ManagementAuditEventInput,
   OpportunityInput,
   OpportunityRecord,
+  OpportunityUpdateInput,
   ProjectInput,
   ProjectRecord
 } from "../apiTypes";
@@ -56,6 +57,14 @@ export type ChangeOpportunityStageResult =
       opportunity: OpportunityRecord;
     };
 
+export type UpdateOpportunityResult =
+  | ServiceError
+  | {
+      ok: true;
+      status: 200;
+      opportunity: OpportunityRecord;
+    };
+
 export type CheckOpportunityFeasibilityResult =
   | ServiceError
   | {
@@ -85,6 +94,10 @@ export type ProjectIntakeService = {
     actor: TenantUser;
     opportunityId: string;
   }): Promise<AuthorizedResult>;
+  preflightUpdateOpportunity(input: {
+    actor: TenantUser;
+    opportunityId: string;
+  }): Promise<AuthorizedResult>;
   preflightProjectActivation(input: {
     actor: TenantUser;
     opportunityId: string;
@@ -98,6 +111,11 @@ export type ProjectIntakeService = {
     opportunityId: string;
     stageId: string;
   }): Promise<ChangeOpportunityStageResult>;
+  updateOpportunity(input: {
+    actor: TenantUser;
+    opportunityId: string;
+    input: OpportunityUpdateInput;
+  }): Promise<UpdateOpportunityResult>;
   checkOpportunityFeasibility(input: {
     actor: TenantUser;
     opportunityId: string;

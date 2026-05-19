@@ -176,4 +176,166 @@ describe("project intake application service", () => {
       }
     });
   });
+
+  it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    let updatedInput: OpportunityInput | null = null;
+    let transactionUsed = false;
+    const existingOpportunity = {
+      ...opportunityInput,
+      status: "ready_to_activate",
+      feasibilityStatus: "ok",
+      feasibilityResult: { rows: [] },
+      feasibilityCheckedAt: new Date("2026-05-19T00:00:00.000Z"),
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById() {
+        return undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async listOpportunities() {
+        return [existingOpportunity];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async findClientById() {
+        return {
+          id: "client-alpha",
+          tenantId: "tenant-alpha",
+          name: "Ромашка обновленная",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findContactById() {
+        return {
+          id: "contact-alpha",
+          tenantId: "tenant-alpha",
+          clientId: "client-alpha",
+          name: "Ирина Обновленная",
+          email: "irina@example.test",
+          phone: null,
+          telegram: null,
+          role: "спонсор",
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findProjectTypeById() {
+        return {
+          id: "project-type-alpha",
+          tenantId: "tenant-alpha",
+          name: "Внедрение обновленное",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findDealStageById() {
+        return {
+          id: "deal-stage-alpha",
+          tenantId: "tenant-alpha",
+          name: "Квалификация",
+          sortOrder: 10,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async updateOpportunity(input) {
+        updatedInput = input;
+        return {
+          ...input,
+          feasibilityStatus: null,
+          feasibilityResult: null,
+          feasibilityCheckedAt: null,
+          createdAt: existingOpportunity.createdAt,
+          updatedAt: new Date("2026-05-20T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        transactionUsed = true;
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+      }
+    });
+
+    const result = await service.updateOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      input: {
+        ...opportunityInput,
+        title: "Сервисный проект обновлен",
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        plannedHours: 200,
+        demand: [{ positionId: "position-analyst", requiredHours: 200 }]
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 200,
+      opportunity: {
+        id: "opportunity-service",
+        title: "Сервисный проект обновлен",
+        clientName: "Ромашка обновленная",
+        contactName: "Ирина Обновленная",
+        projectType: "Внедрение обновленное",
+        feasibilityStatus: null,
+        plannedHours: 200
+      }
+    });
+    expect(transactionUsed).toBe(true);
+    expect(updatedInput).toMatchObject({
+      clientName: "Ромашка обновленная",
+      contactName: "Ирина Обновленная",
+      projectType: "Внедрение обновленное",
+      plannedHours: 200
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      actionType: "opportunity.updated",
+      sourceWorkflow: "crm_intake",
+      beforeState: expect.objectContaining({
+        id: "opportunity-service",
+        feasibilityStatus: "ok"
+      }),
+      afterState: expect.objectContaining({
+        id: "opportunity-service",
+        feasibilityStatus: null,
+        plannedHours: 200
+      }),
+      permissionResult: {
+        allowed: true
+      }
+    });
+  });
 });

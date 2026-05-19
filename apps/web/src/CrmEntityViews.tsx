@@ -1,4 +1,4 @@
-import { PlusCircle } from "lucide-react";
+import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Client, Contact } from "./api";
@@ -45,7 +45,9 @@ import {
 type CrmModalKind = "client" | "contact";
 
 export function ClientsView(props: {
+  activeClientId?: string | null;
   data: WorkspaceData;
+  onBack?: () => void;
   sectionState: SectionState;
   onChanged: (message: string) => void;
 }) {
@@ -64,6 +66,9 @@ export function ClientsView(props: {
     [props.data.clients, search]
   );
   const activeClients = props.data.clients.filter((client) => client.status === "active").length;
+  const activeClient = props.activeClientId
+    ? props.data.clients.find((client) => client.id === props.activeClientId) ?? null
+    : null;
 
   async function submitClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,6 +117,79 @@ export function ClientsView(props: {
     setEditingClientId(clientId);
     formState.reset();
     setIsModalOpen(true);
+  }
+
+  if (props.activeClientId) {
+    return (
+      <>
+        <Panel
+          title="Карточка клиента"
+          subtitle="Source of truth клиента для сделок, контактов и будущих проектов."
+          actions={
+            <span className="table-actions">
+              {canManageClients && activeClient ? (
+                <button
+                  className="primary-button"
+                  disabled={isSaving}
+                  type="button"
+                  onClick={() => openEditClient(activeClient.id)}
+                >
+                  Редактировать
+                </button>
+              ) : null}
+              <button className="secondary-button" type="button" onClick={props.onBack}>
+                <ArrowLeft aria-hidden="true" size={14} />
+                К списку клиентов
+              </button>
+            </span>
+          }
+        >
+          <SectionFeedback state={props.sectionState} emptyLabel="Клиенты недоступны." />
+          {activeClient ? (
+            <div className="detail-card">
+              <h2>{activeClient.name}</h2>
+              <dl className="detail-list">
+                <div>
+                  <dt>Статус</dt>
+                  <dd>{renderCrmStatus(activeClient.status)}</dd>
+                </div>
+                <div>
+                  <dt>Описание</dt>
+                  <dd>{activeClient.description || "Описание не задано"}</dd>
+                </div>
+                <div>
+                  <dt>Контакты</dt>
+                  <dd>
+                    {props.data.contacts.filter((contact) => contact.clientId === activeClient.id).length}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Обновлено</dt>
+                  <dd>{formatDate(activeClient.updatedAt)}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <p className="empty-state">Клиент не найден.</p>
+          )}
+        </Panel>
+        {isModalOpen ? (
+          <ClientModal
+            client={editingClient}
+            error={formState.formError}
+            fieldErrors={formState.fieldErrors}
+            isSaving={isSaving}
+            onClose={() => {
+              if (isSaving) return;
+              setIsModalOpen(false);
+              setEditingClientId(null);
+              formState.reset();
+            }}
+            onSubmit={submitClient}
+          />
+        ) : null}
+      </>
+    );
   }
 
   return (
@@ -179,7 +257,9 @@ export function ClientsView(props: {
 }
 
 export function ContactsView(props: {
+  activeContactId?: string | null;
   data: WorkspaceData;
+  onBack?: () => void;
   sectionState: SectionState;
   onChanged: (message: string) => void;
 }) {
@@ -199,6 +279,9 @@ export function ContactsView(props: {
   );
   const activeClients = props.data.clients.filter((client) => client.status === "active");
   const activeContacts = props.data.contacts.filter((contact) => contact.status === "active").length;
+  const activeContact = props.activeContactId
+    ? props.data.contacts.find((contact) => contact.id === props.activeContactId) ?? null
+    : null;
 
   async function submitContact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -254,6 +337,82 @@ export function ContactsView(props: {
     setEditingContactId(contactId);
     formState.reset();
     setIsModalOpen(true);
+  }
+
+  if (props.activeContactId) {
+    return (
+      <>
+        <Panel
+          title="Карточка контакта"
+          subtitle="Контакт клиента для сделок и будущих коммуникаций."
+          actions={
+            <span className="table-actions">
+              {canManageContacts && activeContact ? (
+                <button
+                  className="primary-button"
+                  disabled={isSaving}
+                  type="button"
+                  onClick={() => openEditContact(activeContact.id)}
+                >
+                  Редактировать
+                </button>
+              ) : null}
+              <button className="secondary-button" type="button" onClick={props.onBack}>
+                <ArrowLeft aria-hidden="true" size={14} />
+                К списку контактов
+              </button>
+            </span>
+          }
+        >
+          <SectionFeedback state={props.sectionState} emptyLabel="Контакты недоступны." />
+          {activeContact ? (
+            <div className="detail-card">
+              <h2>{activeContact.name}</h2>
+              <dl className="detail-list">
+                <div>
+                  <dt>Клиент</dt>
+                  <dd>{getClientName(props.data.clients, activeContact.clientId)}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{activeContact.email || "Не задан"}</dd>
+                </div>
+                <div>
+                  <dt>Телефон</dt>
+                  <dd>{activeContact.phone || "Не задан"}</dd>
+                </div>
+                <div>
+                  <dt>Роль</dt>
+                  <dd>{activeContact.role || "Роль не задана"}</dd>
+                </div>
+                <div>
+                  <dt>Статус</dt>
+                  <dd>{renderCrmStatus(activeContact.status)}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <p className="empty-state">Контакт не найден.</p>
+          )}
+        </Panel>
+        {isModalOpen ? (
+          <ContactModal
+            contact={editingContact}
+            clients={props.data.clients}
+            error={formState.formError}
+            fieldErrors={formState.fieldErrors}
+            isSaving={isSaving}
+            onClose={() => {
+              if (isSaving) return;
+              setIsModalOpen(false);
+              setEditingContactId(null);
+              formState.reset();
+            }}
+            onSubmit={submitContact}
+          />
+        ) : null}
+      </>
+    );
   }
 
   return (

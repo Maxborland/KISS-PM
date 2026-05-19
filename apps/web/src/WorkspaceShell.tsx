@@ -53,6 +53,8 @@ export function WorkspaceShell() {
   } = useWorkspaceShellData();
   const activeRouteId = getRouteIdFromPathname(pathname);
   const activeOpportunityId = getOpportunityIdFromPathname(pathname);
+  const activeClientId = getClientIdFromPathname(pathname);
+  const activeContactId = getContactIdFromPathname(pathname);
   const activeProjectId = getProjectIdFromPathname(pathname);
 
   useEffect(() => {
@@ -411,6 +413,8 @@ export function WorkspaceShell() {
         <WorkspaceRouteRenderer
           activeRouteId={activeRouteId}
           activeOpportunityId={activeOpportunityId}
+          activeClientId={activeClientId}
+          activeContactId={activeContactId}
           activeProjectId={activeProjectId}
           data={data}
           openCreateRequested={quickCreateRequested}
@@ -421,11 +425,23 @@ export function WorkspaceShell() {
           onOpenOpportunity={(opportunityId) => {
             router.push(`/opportunities/${encodeURIComponent(opportunityId)}`);
           }}
+          onOpenClient={(clientId) => {
+            router.push(`/clients/${encodeURIComponent(clientId)}`);
+          }}
+          onOpenContact={(contactId) => {
+            router.push(`/contacts/${encodeURIComponent(contactId)}`);
+          }}
           onOpenProject={(projectId) => {
             router.push(`/projects/${encodeURIComponent(projectId)}`);
           }}
           onBackToOpportunities={() => {
             router.push(getRoutePath("opportunities"));
+          }}
+          onBackToClients={() => {
+            router.push(getRoutePath("clients"));
+          }}
+          onBackToContacts={() => {
+            router.push(getRoutePath("contacts"));
           }}
           onBackToProjects={() => {
             router.push(getRoutePath("projects"));
@@ -447,4 +463,16 @@ function getProjectIdFromPathname(pathname: string): string | null {
   const match = /^\/projects\/([^/]+)\/?$/.exec(pathname);
   const rawProjectId = match?.[1];
   return rawProjectId ? decodeURIComponent(rawProjectId) : null;
+}
+
+function getClientIdFromPathname(pathname: string): string | null {
+  const match = /^\/clients\/([^/]+)\/?$/.exec(pathname);
+  const rawClientId = match?.[1];
+  return rawClientId ? decodeURIComponent(rawClientId) : null;
+}
+
+function getContactIdFromPathname(pathname: string): string | null {
+  const match = /^\/contacts\/([^/]+)\/?$/.exec(pathname);
+  const rawContactId = match?.[1];
+  return rawContactId ? decodeURIComponent(rawContactId) : null;
 }

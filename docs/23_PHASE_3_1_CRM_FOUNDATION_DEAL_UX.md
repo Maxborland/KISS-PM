@@ -21,6 +21,8 @@ client -> contact -> deal -> deal stage -> project type -> demand -> feasibility
 - клиенты и контакты имеют отдельные CRM-страницы со списками, поиском и созданием;
 - типы проектов и этапы сделок имеют отдельные страницы в группе настроек, а не живут внутри страницы сделок;
 - сделку можно открыть в детали по deep link;
+- сделку можно создать и редактировать без обхода через API;
+- поля сделки как tenant-настройка доступны через `CustomFieldDefinition.targetEntity = opportunity`;
 - список и kanban показывают одну и ту же persisted модель;
 - `Quick Create` либо работает как контекстное действие текущего экрана, либо убран;
 - UI не содержит фейковых чекбоксов, сортировок, bulk/export/actions.
@@ -95,9 +97,9 @@ Kanban строится по активным этапам, отсортиров
 
 UI-владелец сущности: раздел настроек `Этапы сделок` (`/settings/deal-stages`). Страница `Сделки` строит kanban по этим persisted этапам, но не управляет справочником этапов.
 
-### AC5. Deal / Opportunity create
+### AC5. Deal / Opportunity create and update
 
-Создание сделки требует:
+Создание и редактирование сделки работает через UI и API. Сделка требует:
 
 - `clientId`;
 - `primaryContactId`;
@@ -109,6 +111,12 @@ UI-владелец сущности: раздел настроек `Этапы 
 - плановую норму часа;
 - demand `должность + часы`.
 
+`plannedHours` не вводится руками и не склеивается с экономикой в одну строку. Он считается как `contractValue / plannedHourlyRate` и показывается отдельно от:
+
+- `contractValue` — стоимость;
+- `plannedHourlyRate` — плановая норма часа;
+- `demand` — потребность по должностям.
+
 `clientName`, `contactName` и `projectType` в response допускаются как read-model snapshot labels, но source of truth — ID связанной сущности. UI обязан резолвить актуальные labels из текущих справочников, если запись справочника доступна.
 
 ### AC6. Deal detail
@@ -119,7 +127,7 @@ UI-владелец сущности: раздел настроек `Этапы 
 /opportunities/:id
 ```
 
-Страница показывает клиент, контакт, тип проекта, этап, коммерческие параметры, расчет часов, demand, feasibility result, доступные действия и связанный audit context.
+Страница показывает клиент, контакт, тип проекта, этап, коммерческие параметры, расчет часов, demand, feasibility result и доступные действия. Клиент и контакт открываются по клику на свои карточки/ссылки. Аудит не является частью карточки сделки; он остается отдельным административным разделом и backend evidence layer.
 
 ### AC7. Deal views
 
@@ -128,7 +136,7 @@ UI-владелец сущности: раздел настроек `Этапы 
 - list view;
 - kanban view.
 
-Переключатель вида не должен терять данные. Kanban показывает сделки в колонках по `DealStage`. Изменение этапа выполняется реальным API action и пишет audit.
+Переключатель вида не должен терять данные. Kanban показывает сделки в колонках по `DealStage`. Изменение этапа выполняется реальным API action и пишет audit. Для desktop baseline этап меняется через drag-and-drop; для keyboard/accessibility baseline сохраняется явное действие смены этапа без fake affordance.
 
 ### AC8. Quick Create
 
@@ -154,13 +162,17 @@ UI-владелец сущности: раздел настроек `Этапы 
 - с понятными disabled reasons;
 - с responsive layout для desktop и узкого viewport.
 
+### AC11. Deal fields settings
+
+Tenant admin с правом `tenant.workspace_config.manage` может создавать и редактировать определения кастомных полей сделки через раздел `Поля и шаблоны`, выбрав сущность `Сделка`. В Phase 3.1 это CRUD definition layer, а не runtime rendering значений в форме сделки.
+
 ## Non-goals
 
-- drag-and-drop kanban;
 - external CRM connector runtime;
 - Gantt/WBS/tasks;
 - полноценная дневная resource matrix;
 - project lifecycle beyond active project shell;
+- runtime rendering/validation значений кастомных полей сделки в форме сделки;
 - mass actions/export, если они не реализованы end-to-end.
 
 ## Traceable test plan
@@ -170,15 +182,16 @@ UI-владелец сущности: раздел настроек `Этапы 
 - AC3 -> DB/API tests: create/list project type, restricted `403`, audit.
 - AC4 -> DB/API tests: create/list deal stages, stage sort order, restricted `403`, audit.
 - AC1/AC2/AC3/AC4 update -> DB/API tests: patch client/contact/project type/deal stage, before/after audit, denied update audit, invalid contact client rejection.
-- AC5 -> DB/API tests: create deal with linked entities, reject missing linked entities, response includes labels.
+- AC5 -> DB/API tests: create and patch deal with linked entities, reject missing linked entities, reset feasibility after economics/demand changes, response includes labels.
 - AC1/AC2 UI -> E2E: клиент создается на `/clients`, контакт создается на `/contacts`, страница сделок не показывает кнопки `+ Клиент`/`+ Контакт`.
 - AC3/AC4 UI -> E2E: тип проекта создается на `/settings/project-types`, этап сделки создается на `/settings/deal-stages`, страница сделок не показывает кнопки `+ Тип проекта`/`+ Этап`.
 - AC1/AC2/AC3/AC4 UI update -> E2E: владелец справочника открывает `Редактировать`, сохраняет изменения после создания сделки, а list/detail/kanban используют обновленные labels.
-- AC6 -> Web/component and E2E: row click opens `/opportunities/:id`, detail loads persisted data.
-- AC7 -> Web/component and E2E: list/kanban switch, archived stage with existing deal remains visible, stage update persists and audit exists.
+- AC6 -> Web/component and E2E: row click opens `/opportunities/:id`, detail loads persisted data, client/contact links open `/clients/:id` and `/contacts/:id`, audit block is absent from deal card.
+- AC7 -> Web/component and E2E: list/kanban switch, archived stage with existing deal remains visible, drag-and-drop stage update persists and audit exists.
 - AC8 -> Web/component/E2E: quick create only appears where real context actions exist.
 - AC9 -> DB/API negative tests: direct API calls fail without permission and write denied audit.
 - AC10 -> Browser smoke: desktop and narrow viewport have no broken navigation/table/detail layout.
+- AC11 -> Web/component and E2E: custom field definition can be created for `Сделка`; API/parser accepts `targetEntity=opportunity`.
 
 ## Verification gate
 

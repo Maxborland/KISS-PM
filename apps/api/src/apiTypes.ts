@@ -167,6 +167,10 @@ export type OpportunityInput = Omit<
   OpportunityRecord,
   "createdAt" | "updatedAt" | "feasibilityStatus" | "feasibilityResult" | "feasibilityCheckedAt"
 >;
+export type OpportunityUpdateInput = Omit<
+  OpportunityInput,
+  "id" | "clientName" | "contactName" | "projectType" | "status"
+>;
 
 export type ProjectRecord = {
   id: string;
@@ -303,6 +307,7 @@ export type ApiTenantDataSource = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
   updateOpportunityFeasibility?(input: {
     tenantId: TenantId;
     opportunityId: string;

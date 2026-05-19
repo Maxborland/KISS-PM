@@ -19,12 +19,18 @@ import { type SectionState } from "./workspaceShellState";
 export function WorkspaceRouteRenderer(props: {
   activeRouteId: WorkspaceRouteId;
   activeOpportunityId: string | null;
+  activeClientId: string | null;
+  activeContactId: string | null;
   activeProjectId: string | null;
   data: WorkspaceData;
   openCreateRequested: boolean;
   onChanged: (message: string) => void;
   onBackToOpportunities: () => void;
   onOpenOpportunity: (opportunityId: string) => void;
+  onBackToClients: () => void;
+  onOpenClient: (clientId: string) => void;
+  onBackToContacts: () => void;
+  onOpenContact: (contactId: string) => void;
   onBackToProjects: () => void;
   onOpenProject: (projectId: string) => void;
   onQuickCreateConsumed: () => void;
@@ -72,6 +78,8 @@ export function WorkspaceRouteRenderer(props: {
           opportunityId={props.activeOpportunityId}
           onBack={props.onBackToOpportunities}
           onChanged={props.onChanged}
+          onOpenClient={props.onOpenClient}
+          onOpenContact={props.onOpenContact}
           sectionState={props.sectionStates.opportunities}
         />
       );
@@ -103,6 +111,8 @@ export function WorkspaceRouteRenderer(props: {
     return (
       <ClientsView
         data={props.data}
+        activeClientId={props.activeClientId}
+        onBack={props.onBackToClients}
         sectionState={props.sectionStates.clients}
         onChanged={props.onChanged}
       />
@@ -113,6 +123,8 @@ export function WorkspaceRouteRenderer(props: {
     return (
       <ContactsView
         data={props.data}
+        activeContactId={props.activeContactId}
+        onBack={props.onBackToContacts}
         sectionState={props.sectionStates.contacts}
         onChanged={props.onChanged}
       />

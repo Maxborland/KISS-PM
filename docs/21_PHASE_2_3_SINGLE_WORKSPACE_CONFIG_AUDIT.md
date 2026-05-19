@@ -44,7 +44,7 @@ Phase 2.3 закрыта в текущей single-workspace реализации
 - `tenantId`;
 - `systemKey`;
 - `tenantLabel`;
-- `targetEntity`: пока `project`;
+- `targetEntity`: `opportunity` или `project`;
 - `fieldType`: `text`, `number`, `date`, `select`;
 - `required`;
 - `status`: `draft` или `active`;
@@ -64,7 +64,7 @@ Phase 2.3 закрыта в текущей single-workspace реализации
 
 - удаление custom fields;
 - version history;
-- field usage в project forms;
+- field usage в project/deal forms;
 - formula fields;
 - complex validation rules.
 
