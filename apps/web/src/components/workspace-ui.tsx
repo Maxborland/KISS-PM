@@ -9,12 +9,7 @@ import { useEffect, useMemo, useRef, type FormEvent, type ReactNode } from "reac
 
 import type { FormErrors } from "../workspaceForms";
 import { getFieldErrorId, getNextFocusTrapIndex } from "../workspaceForms";
-
-export type SectionState = {
-  canRead: boolean;
-  isLoading: boolean;
-  error: string | null;
-};
+import type { SectionState } from "../workspaceShellState";
 
 export function AccountMenu(props: {
   isLogoutPending: boolean;
