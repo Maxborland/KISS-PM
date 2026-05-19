@@ -160,7 +160,8 @@ export async function authorizeProjectActivation(
 ): Promise<AuthorizedResult> {
   if (
     !deps.dataSource.findOpportunityById ||
-    !deps.dataSource.activateProjectFromOpportunity ||
+    !deps.dataSource.createProjectDraftFromOpportunity ||
+    !deps.dataSource.activateProjectDraft ||
     !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.listPositions ||
     !deps.dataSource.listWorkspaceUsers ||

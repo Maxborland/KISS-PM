@@ -30,8 +30,10 @@ manual opportunity -> intake readiness -> demand by position -> feasibility by a
 - Opportunity создается вручную в KISS PM.
 - Внешние CRM/intake-коннекторы не входят в runtime Phase 3.
 - TODO для будущих intake-коннекторов фиксируется как backlog, а не как кодовая зависимость.
-- `Project` является единой сущностью с `status`. Не вводим отдельный runtime `ProjectDraft`, если отличие только в статусе и видимости.
-- В Phase 3 проект активируется сразу из opportunity после успешной проверки или принятого риска.
+- `ProjectDraft` реализуется как `Project` со статусом `draft`, а не как отдельная таблица или отдельный aggregate.
+- `active project` — тот же `Project` после governed transition в статус `active`.
+- Для совместимости Phase 3 UI endpoint активации создает draft и сразу переводит его в active внутри governed flow.
+- Решение закреплено в `docs/decisions/2026-05-19-project-draft-lifecycle-status.md`.
 - Activation является single-use: одна opportunity может породить не более одного проекта.
 - Перед activation система повторно пересчитывает текущую ресурсную доступность, чтобы не доверять устаревшему feasibility result.
 - Финальный пересчет capacity выполняется внутри транзакции под tenant resource lock, чтобы параллельные activation не обходили ресурсный конфликт.
@@ -118,7 +120,7 @@ availableHours(position, start, finish)
 
 ## Project baseline
 
-`Project` создается при активации opportunity.
+`Project` создается как draft и затем переводится в active через governed activation.
 
 Минимальная сущность:
 
@@ -127,16 +129,16 @@ availableHours(position, start, finish)
 - `sourceOpportunityId`;
 - `title`;
 - `clientName`;
-- `status`: `active`, в будущих фазах также `draft`, `paused`, `closed`, `cancelled`;
+- `status`: `draft`, `active`, в будущих фазах также `paused`, `closed`, `cancelled`;
 - `plannedStart`;
 - `plannedFinish`;
 - `contractValue`;
 - `plannedHours`;
 - `templateId`;
 - `createdAt`;
-- `activatedAt`.
+- `activatedAt`, для draft `null`.
 
-Проект виден в разделе `Проекты`, если статус `active`.
+Проект виден в рабочем разделе `Проекты`, если статус `active`. Draft не участвует в боевой зоне и не создает резерв resource capacity.
 
 ## Governed activation
 
@@ -161,6 +163,15 @@ Preconditions:
 - critical blockers отсутствуют или явно принят риск с причиной.
 
 В Phase 3 допускается активация при `conflict`, только если передан `acceptedRiskReason`.
+
+Lifecycle transition:
+
+```txt
+Opportunity ready_to_activate
+  -> Project status=draft, activatedAt=null
+  -> Project status=active, activatedAt=now
+  -> Opportunity status=converted
+```
 
 Audit action types:
 

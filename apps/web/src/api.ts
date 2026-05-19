@@ -230,7 +230,7 @@ export type Project = {
   plannedHours: number;
   templateId: string | null;
   createdAt: string;
-  activatedAt: string;
+  activatedAt: string | null;
   demand: PositionDemand[];
 };
 

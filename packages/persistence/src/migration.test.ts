@@ -43,6 +43,13 @@ const phase31ContactClientFkMigration = readFileSync(
   new URL("../migrations/0008_phase_3_1_contact_client_fk.sql", import.meta.url),
   "utf8"
 );
+const phase32ProjectLifecycleMigration = readFileSync(
+  new URL(
+    "../migrations/0009_phase_3_2_project_lifecycle_status.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -163,6 +170,14 @@ describe("Phase 3.1 SQL migration", () => {
     );
     expect(phase31ContactClientFkMigration).toContain(
       'REFERENCES "public"."contacts"("tenant_id","client_id","id")'
+    );
+  });
+});
+
+describe("Phase 3.2 project lifecycle SQL migration", () => {
+  it("allows project drafts before governed activation", () => {
+    expect(phase32ProjectLifecycleMigration).toContain(
+      'ALTER TABLE "projects" ALTER COLUMN "activated_at" DROP NOT NULL'
     );
   });
 });

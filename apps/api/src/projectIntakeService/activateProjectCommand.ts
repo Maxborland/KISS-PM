@@ -26,9 +26,10 @@ export async function activateProjectFromOpportunity(
 
   const activation = await deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (
-      !transactionDataSource.activateProjectFromOpportunity ||
       !transactionDataSource.findOpportunityById ||
-      !transactionDataSource.lockTenantResourcePlanning
+      !transactionDataSource.lockTenantResourcePlanning ||
+      !transactionDataSource.createProjectDraftFromOpportunity ||
+      !transactionDataSource.activateProjectDraft
     ) {
       throw new Error("transactional_project_activation_not_configured");
     }
@@ -73,8 +74,8 @@ export async function activateProjectFromOpportunity(
       };
     }
 
-    const activatedProject =
-      await transactionDataSource.activateProjectFromOpportunity({
+    const draftProject =
+      await transactionDataSource.createProjectDraftFromOpportunity({
         id: input.activation.id,
         tenantId: input.actor.tenantId,
         sourceOpportunityId: currentOpportunity.id,
@@ -82,7 +83,7 @@ export async function activateProjectFromOpportunity(
         clientName: currentOpportunity.clientName,
         clientId: currentOpportunity.clientId,
         projectTypeId: currentOpportunity.projectTypeId,
-        status: "active",
+        status: "draft",
         plannedStart: currentOpportunity.plannedStart,
         plannedFinish: currentOpportunity.plannedFinish,
         contractValue: currentOpportunity.contractValue,
@@ -90,6 +91,10 @@ export async function activateProjectFromOpportunity(
         templateId: currentOpportunity.templateId,
         demand: currentOpportunity.demand
       });
+    const activatedProject = await transactionDataSource.activateProjectDraft({
+      tenantId: input.actor.tenantId,
+      projectId: draftProject.id
+    });
     await deps.appendManagementAuditEvent(
       {
         tenantId: input.actor.tenantId,
@@ -103,10 +108,11 @@ export async function activateProjectFromOpportunity(
         commandInput: {
           opportunityId: currentOpportunity.id,
           projectId: activatedProject.id,
+          draftProjectId: draftProject.id,
           acceptedRiskReason: input.activation.acceptedRiskReason,
           currentFeasibilityStatus: currentAssessment.status
         },
-        beforeState: currentOpportunity,
+        beforeState: draftProject,
         afterState: activatedProject,
         permissionResult: authorization.decision
       },

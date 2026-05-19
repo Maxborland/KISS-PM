@@ -328,7 +328,7 @@ export const projects = pgTable(
     plannedHours: integer("planned_hours").notNull(),
     templateId: text("template_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-    activatedAt: timestamp("activated_at", { withTimezone: true }).notNull()
+    activatedAt: timestamp("activated_at", { withTimezone: true })
   },
   (table) => [
     primaryKey({

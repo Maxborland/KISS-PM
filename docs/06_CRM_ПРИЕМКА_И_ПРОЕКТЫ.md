@@ -44,6 +44,8 @@ Demand forecast рассчитывает ожидаемую работу по р
 
 Project draft создается до активного проекта. Он нужен, чтобы согласовать структуру, роли, даты, стадии, резервы и риски.
 
+В текущей реализации Project draft хранится как `Project.status = "draft"`, а не как отдельная runtime-сущность. Активный проект — тот же `Project` после governed transition в `status = "active"`.
+
 Draft должен уметь:
 
 - ссылаться на opportunity;

@@ -639,7 +639,7 @@
         "pnpm test"
       ],
       "status": "completed for current slice",
-      "notes": "projectIntakeService.ts is now a thin facade. Create/stage/feasibility/activate commands, authorization, audit, link resolving and feasibility assessment live in focused modules under projectIntakeService/. Routes remain responsible for session, JSON body parsing and HTTP response mapping. ProjectDraft lifecycle remains a separate architecture decision."
+      "notes": "projectIntakeService.ts is now a thin facade. Create/stage/feasibility/activate commands, authorization, audit, link resolving and feasibility assessment live in focused modules under projectIntakeService/. Routes remain responsible for session, JSON body parsing and HTTP response mapping. ProjectDraft lifecycle is closed by REF-012 as Project.status=draft."
     },
     {
       "id": "REF-012",
@@ -647,21 +647,39 @@
       "files": [
         "docs/02_ДОМЕННАЯ_МОДЕЛЬ.md",
         "docs/06_CRM_ПРИЕМКА_И_ПРОЕКТЫ.md",
+        "docs/22_PHASE_3_CRM_INTAKE_ACTIVE_PROJECT.md",
+        "docs/decisions/2026-05-19-project-draft-lifecycle-status.md",
+        "docs/status/phase3-crm-intake-active-project-ledger.md",
+        "apps/api/src/apiTypes.ts",
+        "apps/api/src/app.db.test.ts",
+        "apps/api/src/projectIntakeService/activateProjectCommand.ts",
+        "apps/api/src/projectIntakeService/authorization.ts",
+        "apps/api/src/projectIntakeService/activationErrors.ts",
+        "packages/persistence/migrations/0009_phase_3_2_project_lifecycle_status.sql",
+        "packages/persistence/src/migration.test.ts",
+        "packages/persistence/src/projectIntakeRepository.ts",
+        "packages/persistence/src/repositories.db.test.ts",
         "packages/persistence/src/schema.ts",
         "apps/api/src/projectIntakeService.ts"
       ],
       "problem": "Canonical docs require ProjectDraft before active project, while current activation creates an active project directly from an opportunity.",
       "risk": "high",
       "refactor_type": "improve boundaries",
-      "expected_behavior_change": "none until ADR",
+      "expected_behavior_change": "yes, activation now passes through Project status draft before active while preserving the existing Phase 3 endpoint contract",
       "tests_before": [
-        "Architecture review found direct active project creation in current activation flow"
+        "Architecture review found direct active project creation in current activation flow",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts failed because createProjectDraftFromOpportunity did not exist"
       ],
       "tests_after": [
-        "Decision ADR before Phase 4; then characterization tests for draft visibility and governed activation"
+        "pnpm db:migrate",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts apps/api/src/app.db.test.ts",
+        "pnpm vitest run packages/persistence/src/migration.test.ts",
+        "pnpm typecheck",
+        "pnpm test",
+        "pnpm test:db"
       ],
-      "status": "decision needed",
-      "notes": "Decide separate ProjectDraft aggregate vs one Project table with draft/active status, readiness and visibility gating."
+      "status": "completed",
+      "notes": "Decision: ProjectDraft is Project.status=draft, not a separate aggregate. Draft has activatedAt=null, is hidden from /api/workspace/projects and does not reserve capacity. Governed activation transitions draft to active, sets activatedAt, converts the source opportunity and writes audit beforeState draft -> afterState active."
     },
     {
       "id": "REF-013",

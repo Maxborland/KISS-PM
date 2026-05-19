@@ -81,11 +81,15 @@ export type ProjectRecord = {
   plannedHours: number;
   templateId: string | null;
   createdAt: Date;
-  activatedAt: Date;
+  activatedAt: Date | null;
   demand: PositionDemandRecord[];
 };
 
 export type ProjectInput = Omit<ProjectRecord, "createdAt" | "activatedAt">;
+export type ProjectDraftActivationInput = {
+  tenantId: TenantId;
+  projectId: string;
+};
 
 export type ProjectIntakeRepository = {
   listOpportunities(tenantId: TenantId): Promise<OpportunityRecord[]>;
@@ -103,7 +107,8 @@ export type ProjectIntakeRepository = {
     stageId: string;
   }): Promise<OpportunityRecord>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
-  activateProjectFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
+  createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
+  activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
 };
 
 export function createProjectIntakeRepository(
@@ -288,7 +293,7 @@ export function createProjectIntakeRepository(
         .select()
         .from(projects)
         .where(eq(projects.tenantId, tenantId))
-        .orderBy(desc(projects.activatedAt), desc(projects.id));
+        .orderBy(desc(projects.activatedAt), desc(projects.createdAt), desc(projects.id));
       const demandByProject = await listProjectDemand(
         tenantId,
         rows.map((row) => row.id)
@@ -298,9 +303,91 @@ export function createProjectIntakeRepository(
         mapProjectRecord(row, demandByProject.get(row.id) ?? [])
       );
     },
-    async activateProjectFromOpportunity(input) {
+    async createProjectDraftFromOpportunity(input) {
       return db.transaction(async (transaction) => {
         const now = new Date();
+        if (input.status !== "draft") {
+          throw new Error("project_draft_requires_draft_status");
+        }
+
+        const [sourceOpportunity] = await transaction
+          .select({ id: opportunities.id })
+          .from(opportunities)
+          .where(
+            and(
+              eq(opportunities.tenantId, input.tenantId),
+              eq(opportunities.id, input.sourceOpportunityId),
+              ne(opportunities.status, "converted"),
+              ne(opportunities.status, "rejected")
+            )
+          )
+          .limit(1);
+        if (!sourceOpportunity) {
+          throw new Error("source_opportunity_not_draftable");
+        }
+
+        try {
+          const [row] = await transaction
+            .insert(projects)
+            .values({
+              id: input.id,
+              tenantId: input.tenantId,
+              sourceOpportunityId: input.sourceOpportunityId,
+              clientId: input.clientId,
+              projectTypeId: input.projectTypeId,
+              title: input.title,
+              clientName: input.clientName,
+              status: input.status,
+              plannedStart: input.plannedStart,
+              plannedFinish: input.plannedFinish,
+              contractValue: input.contractValue,
+              plannedHours: input.plannedHours,
+              templateId: input.templateId,
+              createdAt: now,
+              activatedAt: null
+            })
+            .returning();
+
+          if (!row) throw new Error("Project draft insert returned no row");
+
+          if (input.demand.length > 0) {
+            await transaction.insert(projectPositionDemands).values(
+              input.demand.map((line) => ({
+                tenantId: input.tenantId,
+                projectId: input.id,
+                positionId: line.positionId,
+                requiredHours: line.requiredHours
+              }))
+            );
+          }
+
+          return mapProjectRecord(row, input.demand);
+        } catch (error) {
+          if (isSingleSourceOpportunityProjectError(error)) {
+            throw new Error("source_opportunity_already_has_project");
+          }
+          throw error;
+        }
+      });
+    },
+    async activateProjectDraft(input) {
+      return db.transaction(async (transaction) => {
+        const now = new Date();
+        const [draft] = await transaction
+          .select()
+          .from(projects)
+          .where(
+            and(
+              eq(projects.tenantId, input.tenantId),
+              eq(projects.id, input.projectId),
+              eq(projects.status, "draft")
+            )
+          )
+          .limit(1);
+        if (!draft) {
+          throw new Error("project_draft_not_activatable");
+        }
+
         const [updatedOpportunity] = await transaction
           .update(opportunities)
           .set({
@@ -310,55 +397,45 @@ export function createProjectIntakeRepository(
           .where(
             and(
               eq(opportunities.tenantId, input.tenantId),
-              eq(opportunities.id, input.sourceOpportunityId),
+              eq(opportunities.id, draft.sourceOpportunityId),
               ne(opportunities.status, "converted"),
               ne(opportunities.status, "rejected")
             )
           )
           .returning({ id: opportunities.id });
-
         if (!updatedOpportunity) {
           throw new Error("source_opportunity_already_activated");
         }
 
         const [row] = await transaction
-          .insert(projects)
-          .values({
-            id: input.id,
-            tenantId: input.tenantId,
-            sourceOpportunityId: input.sourceOpportunityId,
-            clientId: input.clientId,
-            projectTypeId: input.projectTypeId,
-            title: input.title,
-            clientName: input.clientName,
-            status: input.status,
-            plannedStart: input.plannedStart,
-            plannedFinish: input.plannedFinish,
-            contractValue: input.contractValue,
-            plannedHours: input.plannedHours,
-            templateId: input.templateId,
-            createdAt: now,
+          .update(projects)
+          .set({
+            status: "active",
             activatedAt: now
           })
+          .where(
+            and(
+              eq(projects.tenantId, input.tenantId),
+              eq(projects.id, input.projectId),
+              eq(projects.status, "draft")
+            )
+          )
           .returning();
 
-        if (!row) throw new Error("Project insert returned no row");
+        if (!row) throw new Error("Project draft activation returned no row");
 
-        if (input.demand.length > 0) {
-          await transaction.insert(projectPositionDemands).values(
-            input.demand.map((line) => ({
-              tenantId: input.tenantId,
-              projectId: input.id,
-              positionId: line.positionId,
-              requiredHours: line.requiredHours
-            }))
-          );
-        }
-
-        return mapProjectRecord(row, input.demand);
+        const demandByProject = await listProjectDemand(input.tenantId, [input.projectId]);
+        return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
       });
     }
   };
+}
+
+function isSingleSourceOpportunityProjectError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("projects_tenant_source_opportunity_uidx")
+  );
 }
 
 function mapOpportunityRecord(

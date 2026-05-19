@@ -298,7 +298,7 @@ GREEN подтвержден `repositoryHealth.test.ts`, DB test и persistence 
 - После архитектурного follow-up `projectIntakeService.ts` дополнительно превращен в facade: create/stage/feasibility/activate, authorization, audit, linked-reference resolving и feasibility assessment вынесены в `apps/api/src/projectIntakeService/*`.
 - `apps/api/src/projectIntakeService.test.ts` фиксирует service contract: linked snapshot labels, transaction boundary и management audit для создания сделки.
 - `apps/web/src/repositoryHealth.test.ts` ограничивает facade 120 строками, authorization module 240 строками, activation command 160 строками.
-- `ProjectDraft` intentionally not implemented in this slice: это отдельное architecture decision перед Phase 4.
+- `ProjectDraft` intentionally closed in REF-012: это `Project.status = "draft"`, не отдельный aggregate.
 
 RED подтвержден `pnpm vitest run apps/api/src/projectIntakeService.test.ts`: отсутствовал модуль `./projectIntakeService`.
 
@@ -313,9 +313,23 @@ RED подтвержден `pnpm vitest run apps/api/src/projectIntakeService.te
 
 ### REF-012 — ProjectDraft lifecycle decision
 
-Статус: decision needed before Phase 4.
+Статус: completed.
 
-Нужно принять ADR: `ProjectDraft` как отдельный aggregate или единый `Project` со статусом `draft|active`, но с явным draft workflow, visibility gating, readiness/blockers и governed activation. Без этого Gantt/WBS/resource reservations будут пришиваться к active project без clean transition.
+Решение принято в `docs/decisions/2026-05-19-project-draft-lifecycle-status.md`: `ProjectDraft` не является отдельной таблицей или отдельным aggregate. Draft реализуется как `Project.status = "draft"`, active project как `Project.status = "active"`.
+
+Срез с изменением поведения:
+
+- `projects.activated_at` стал nullable, чтобы draft мог существовать до governed activation.
+- Persistence получил explicit lifecycle methods: `createProjectDraftFromOpportunity` и `activateProjectDraft`.
+- Совместимый Phase 3 endpoint `/api/workspace/opportunities/:id/activate` внутри проходит путь draft -> active.
+- `/api/workspace/projects` остается боевой зоной и возвращает только `active`.
+- Resource feasibility по-прежнему резервирует capacity только по `active` project.
+- Audit `project.activated` теперь фиксирует `beforeState.status = "draft"` и `afterState.status = "active"`.
+
+Проверки:
+
+- RED: `pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts` падал на отсутствующем `createProjectDraftFromOpportunity`.
+- GREEN: targeted persistence/API DB tests, migration test и typecheck.
 
 ### REF-013 — datasource port split
 
@@ -358,7 +372,7 @@ RED подтвержден `pnpm vitest run apps/api/src/projectIntakeService.te
 
 1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` дальше только при появлении новых shell responsibilities; текущий budget 500 строк должен оставаться жестким guardrail.
 2. `packages/persistence/src/repositories.ts`: выделять новые repository areas только вместе с новой бизнес-областью, например CRM intake, project draft, Gantt/resource planning или KPI/control signals.
-3. Перед Phase 4 закрыть `REF-012`: принять ProjectDraft lifecycle ADR.
+3. `REF-012` закрыт: Phase 4 строится поверх единой `Project` lifecycle model со статусами `draft|active`.
 
 ## Правила исполнения
 

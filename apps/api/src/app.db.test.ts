@@ -817,16 +817,80 @@ describe("API with PostgreSQL data source", () => {
         })
       ])
     });
-    await expect(audit.json()).resolves.toMatchObject({
+    const auditBody = await audit.json();
+    expect(auditBody).toMatchObject({
       auditEvents: expect.arrayContaining([
         expect.objectContaining({ actionType: "opportunity.created" }),
         expect.objectContaining({ actionType: "opportunity.feasibility_checked" }),
         expect.objectContaining({ actionType: "project.activated" })
       ])
     });
+    expect(auditBody.auditEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "project.activated",
+          beforeState: expect.objectContaining({ status: "draft" }),
+          afterState: expect.objectContaining({ status: "active" })
+        })
+      ])
+    );
     expect(me.headers.get("cache-control")).toBe("no-store, private");
     expect(opportunities.headers.get("cache-control")).toBe("no-store, private");
     expect(projects.headers.get("cache-control")).toBe("no-store, private");
+  });
+
+  it("keeps project drafts out of the active projects workspace API", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const opportunity = await dataSource.createOpportunity({
+      id: "opportunity-draft-hidden",
+      tenantId: "tenant-alpha",
+      clientId: "client-romashka",
+      primaryContactId: "contact-irina",
+      projectTypeId: "project-type-implementation",
+      stageId: "deal-stage-new",
+      clientName: "ООО Ромашка",
+      contactName: "Ирина Клиент",
+      title: "Черновик вне боевой зоны",
+      projectType: "Внедрение",
+      description: null,
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-12T00:00:00.000Z"),
+      contractValue: 480_000,
+      plannedHourlyRate: 6_000,
+      plannedHours: 80,
+      probability: 80,
+      status: "ready_to_activate",
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
+    });
+    const draft = await dataSource.createProjectDraftFromOpportunity({
+      id: "project-draft-hidden",
+      tenantId: opportunity.tenantId,
+      sourceOpportunityId: opportunity.id,
+      clientId: opportunity.clientId,
+      projectTypeId: opportunity.projectTypeId,
+      title: opportunity.title,
+      clientName: opportunity.clientName,
+      status: "draft",
+      plannedStart: opportunity.plannedStart,
+      plannedFinish: opportunity.plannedFinish,
+      contractValue: opportunity.contractValue,
+      plannedHours: opportunity.plannedHours,
+      templateId: opportunity.templateId,
+      demand: opportunity.demand
+    });
+    const activeProjects = await app.request("/api/workspace/projects", {
+      headers: { cookie }
+    });
+
+    expect(draft).toMatchObject({
+      id: "project-draft-hidden",
+      status: "draft",
+      activatedAt: null
+    });
+    expect(activeProjects.status).toBe(200);
+    await expect(activeProjects.json()).resolves.toEqual({ projects: [] });
   });
 
   it("rechecks current resource capacity during project activation", async () => {

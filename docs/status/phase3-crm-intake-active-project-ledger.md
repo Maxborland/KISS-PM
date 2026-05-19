@@ -6,17 +6,18 @@
 - Расчет `plannedHours = floor(contractValue / plannedHourlyRate)`.
 - Demand строками `должность + часы`.
 - Feasibility по доступным часам должностей между плановым стартом и финишем.
-- Активация opportunity в `active` project через permission-checked command.
+- Активация opportunity через permission-checked command: `Project status=draft` создается как промежуточный lifecycle state и затем переводится в `active`.
 - Audit для `opportunity.created`, `opportunity.feasibility_checked`, `project.activated`.
 - Restricted user: скрытые разделы и API `403`.
 
 ## Decisions
 
-- `ProjectDraft` не вводится как отдельная runtime сущность. В Phase 3 проект становится активным проектом из opportunity.
+- `ProjectDraft` не вводится как отдельная таблица или aggregate. Решение закрыто в `docs/decisions/2026-05-19-project-draft-lifecycle-status.md`: draft = `Project.status === "draft"`, active = `Project.status === "active"`.
 - Внешние CRM/intake-коннекторы остаются TODO backlog и не становятся core dependency.
 - `hoursPerDay = 8` для Phase 3.
 - Активные пользователи с должностью дают capacity; активные проекты создают reservations по пересечению дат.
 - Activation single-use: одна opportunity может породить только один active project.
+- Draft project не возвращается из `/api/workspace/projects` и не участвует в resource reservations.
 - Activation пересчитывает текущую capacity перед созданием проекта; stale feasibility не считается достаточным доказательством.
 - Финальный activation recheck выполняется внутри транзакции под tenant resource lock.
 - Phase 3 API ограничивает длину строк, planning horizon, demand rows и integer ranges.
