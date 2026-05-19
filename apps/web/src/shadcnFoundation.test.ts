@@ -38,6 +38,7 @@ describe("shadcn and Tailwind foundation", () => {
     };
     const styles = readText("apps/web/src/styles.css");
     const shadcnStyles = readText("apps/web/src/shadcn.css");
+    const postcssConfig = readText("apps/web/postcss.config.mjs");
     const utilsPath = "apps/web/src/lib/utils.ts";
 
     expect(dependencies.tailwindcss).toBeDefined();
@@ -51,6 +52,7 @@ describe("shadcn and Tailwind foundation", () => {
     expect(shadcnStyles).toContain("--color-accent: var(--shadcn-accent)");
     expect(shadcnStyles).toContain("--color-muted: var(--shadcn-muted)");
     expect(shadcnStyles).toContain("--color-border: var(--shadcn-border)");
+    expect(postcssConfig).toContain("@tailwindcss/postcss");
     expect(existsSync(join(process.cwd(), utilsPath))).toBe(true);
     expect(readText(utilsPath)).toContain("export function cn");
   });

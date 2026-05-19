@@ -31,7 +31,7 @@ Phase 2.2 фиксирует поворот реализации: сначала
   - пароль: `admin12345`.
 - В БД сохраняется `tenantId`, но UI говорит языком одного рабочего пространства.
 - Административные CRUD-действия проходят через API, permission check и audit.
-- shadcn/ui остается целевым UI-направлением. В текущем slice применены shadcn-like tokens, размеры, формы и плотность интерфейса без установки Tailwind/shadcn scaffold.
+- shadcn/ui остается целевым UI-направлением. Текущий web foundation уже имеет Tailwind CSS v4 / shadcn scaffold: `apps/web/components.json`, `apps/web/postcss.config.mjs`, `apps/web/src/shadcn.css`, `apps/web/src/lib/utils.ts` и базовые primitives в `apps/web/src/components/ui`.
 - CRUD пользователей, ролей доступа и должностей выполняется через модальные окна создания, редактирования и подтверждения удаления. Таблица остается основным обзорным состоянием; текущий UI использует summary cards, локальный поиск, понятные empty/loading/error states и disabled-state reasons.
 - CRUD-модалки и формы имеют quality baseline уровня shadcn-like dialog/form: autofocus на первом поле, focus trap, Escape/backdrop close с блокировкой во время mutation, inline validation рядом с полями, password visibility toggle, явные pending labels и alert-style destructive confirmation.
 - Web foundation использует плотный admin-dashboard layout: сгруппированный permission-aware sidebar, sticky topbar, честный переход по доступным разделам, dashboard metrics и real-data audit preview без фейковых фильтров, графиков и roadmap-кнопок в основной навигации.

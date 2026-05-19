@@ -33,7 +33,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - `packages/domain` — минимальное ядро tenant/user. Сейчас не владеет правилами workspace config, хотя эти правила уже используются в API и UI.
 - `packages/access-control` — модель permissions/RBAC.
 - `packages/persistence` — Postgres schema/repositories/migrations; главный риск: широкий `repositories.ts`.
-- `apps/api` — Hono API, auth/session, workspace config routes, audit. Главные риски: большой `app.ts`, часть validation сидит на API-границе.
+- `apps/api` — Hono API, auth/session, route groups, workspace config routes, audit. `app.ts` теперь является composition entrypoint; endpoint bodies вынесены в route modules.
 - `apps/web` — Next.js App Router client shell с TanStack Query. Главные риски: большой `App.tsx`, крупный `styles.css`, UI state и CRUD-поверхности в одном файле.
 - `e2e/smoke` — критичный browser smoke по Phase 2.2, но сценарий большой.
 - `scripts` — DB seed/migrate/dev helpers.
@@ -43,7 +43,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 1. Старые англоязычные source-of-truth пути из задачи отсутствуют. Текущая истина — русские canonical docs из `docs/README.md`.
 2. `apps/web/src/App.tsx` стал god-file: route shell, CRUD, dialogs, navigation и состояния находятся вместе.
 3. Workspace config validation дублируется в `apps/api/src/workspaceConfigParsers.ts` и `apps/web/src/workspaceForms.ts`.
-4. `apps/api/src/app.ts` и `packages/persistence/src/repositories.ts` требуют поэтапного разделения после characterization tests.
+4. `packages/persistence/src/repositories.ts` остается следующим крупным кандидатом для поэтапного разделения после characterization tests.
 5. Baseline scripts `lint`, `test:unit`, `test:integration` отсутствуют; это не новый регресс.
 6. Есть локальные generated artifacts и untracked screenshot; в этом батче они не удаляются.
 
@@ -203,6 +203,35 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Unknown error остается `{ error: "internal_error" }` со статусом 500.
 - RED подтвержден отсутствующим модулем `appErrors`; GREEN подтвержден unit/API/DB проверками.
 
+#### REF-004B — API route group extraction
+
+Статус: completed.
+
+Срез без изменения API contracts:
+
+- `apps/api/src/app.ts` уменьшен с 1302 до 186 строк и стал Hono composition entrypoint.
+- Auth/session endpoints вынесены в `apps/api/src/authRoutes.ts`.
+- Dev tenant/session endpoints вынесены в `apps/api/src/devTenantRoutes.ts`.
+- Access role endpoints вынесены в `apps/api/src/accessRoleRoutes.ts`.
+- Audit endpoint вынесен в `apps/api/src/auditRoutes.ts`.
+- Workspace users endpoints вынесены в `apps/api/src/workspaceUserRoutes.ts`.
+- Positions endpoints вынесены в `apps/api/src/positionRoutes.ts`.
+- Profile/theme endpoints вынесены в `apps/api/src/profileRoutes.ts`.
+- In-memory datasource и tenant admin profile вынесены в отдельные модули.
+- Repository health guardrail для `apps/api/src/app.ts` ужесточен до 500 строк.
+- Tailwind/shadcn foundation проверен guard-тестом: scaffold уже был установлен ранее, поэтому повторной установки зависимостей не было.
+
+RED подтвержден `repositoryHealth.test.ts`: `expected 1302 to be less than or equal to 500`.
+GREEN подтвержден targeted tests и typecheck по API/web.
+
+#### REF-010 — Tailwind/shadcn foundation guardrail
+
+Статус: completed.
+
+- Фактический foundation уже был создан до этого среза: `apps/web/components.json`, `apps/web/postcss.config.mjs`, `apps/web/src/shadcn.css`, `apps/web/src/lib/utils.ts`, `apps/web/src/components/ui/*`, Tailwind/shadcn dependencies в `apps/web/package.json`.
+- `apps/web/src/shadcnFoundation.test.ts` теперь явно проверяет PostCSS bridge `@tailwindcss/postcss`, Tailwind runtime import, shadcn tokens, `cn` utility, primitives и Next dev runtime expectations.
+- Поведение UI не менялось; это guardrail против повторного “псевдо-scaffold”.
+
 #### REF-005A — persistence row mappers
 
 Статус: completed.
@@ -214,7 +243,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Добавлены unit tests на tenant user, access profile, workspace user, position, custom field и project template mappings.
 - RED подтвержден отсутствующим модулем `repositoryMappers`; GREEN подтвержден persistence typecheck и `pnpm test:db`.
 
-Итог REF-004 / REF-005: из API и persistence вынесены первые pure/boundary куски с тестами. Глубокий split route groups и repository areas остается будущей серией, но текущий refactor-plan больше не держит их как открытые блокеры.
+Итог REF-004 / REF-005: API `app.ts` больше не является god-file, route groups вынесены в отдельные модули, из persistence вынесены первые pure/boundary куски с тестами. Глубокое разделение repository areas остается будущей серией, но текущий refactor-plan больше не держит API route split как открытый блокер.
 
 ### REF-006 — стабилизация больших тестов
 
@@ -246,7 +275,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 - `REF-002` completed: workspace config validation в domain.
 - `REF-003` completed: `App.tsx` стал тонким entrypoint меньше 500 строк; route views, sidebar, topbar, route renderer и auth/data orchestration вынесены.
-- `REF-004` completed for current plan: API app error mapping вынесен из `app.ts`.
+- `REF-004` completed: API app error mapping и route groups вынесены из `app.ts`.
 - `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
 - `REF-007` documented: user-owned/generated artifacts не удалялись.
@@ -255,8 +284,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
 
 1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` дальше только при появлении новых shell responsibilities; текущий budget 500 строк должен оставаться жестким guardrail.
-2. `apps/api/src/app.ts`: выделить route groups для users/positions/access roles/profile/theme.
-3. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
+2. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
 
 ## Правила исполнения
 

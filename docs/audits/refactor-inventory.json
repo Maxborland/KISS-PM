@@ -358,7 +358,7 @@
       "tests_before": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
       "status": "completed",
-      "notes": "Closed for this refactor plan through REF-004A app error mapping. Further route-group extraction remains a future low-risk sequence."
+      "notes": "Closed through REF-004A app error mapping and REF-004B route-group extraction. apps/api/src/app.ts is now a composition entrypoint under the 500-line guardrail."
     },
     {
       "id": "REF-004A",
@@ -383,6 +383,40 @@
       ],
       "status": "completed",
       "notes": "MissingAccessProfileError and resolveAppErrorResponse now live outside app.ts; Hono onError remains a thin adapter."
+    },
+    {
+      "id": "REF-004B",
+      "area": "api route group extraction",
+      "files": [
+        "apps/api/src/app.ts",
+        "apps/api/src/routeTypes.ts",
+        "apps/api/src/authRoutes.ts",
+        "apps/api/src/devTenantRoutes.ts",
+        "apps/api/src/accessRoleRoutes.ts",
+        "apps/api/src/auditRoutes.ts",
+        "apps/api/src/workspaceUserRoutes.ts",
+        "apps/api/src/positionRoutes.ts",
+        "apps/api/src/profileRoutes.ts",
+        "apps/api/src/inMemoryTenantDataSource.ts",
+        "apps/api/src/tenantAdminProfile.ts",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "apps/api/src/app.ts still owned endpoint bodies for auth, dev tenant routes, access roles, audit, workspace users, positions and profile/theme after the first error-boundary split.",
+      "risk": "medium",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts apps/web/src/shadcnFoundation.test.ts apps/api/src/app.test.ts failed because apps/api/src/app.ts had 1302 lines and the new budget is 500"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts apps/web/src/shadcnFoundation.test.ts apps/api/src/app.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm test",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "Route paths, auth cookie flow, permission checks, API error codes and audit payloads stayed unchanged; app.ts is 186 lines after extraction."
     },
     {
       "id": "REF-005",
@@ -507,6 +541,36 @@
       "tests_after": ["Repeat search when adding project-control domain modules"],
       "status": "documented",
       "notes": "Keep monitoring as new resource/KPI/control-surface modules appear."
+    },
+    {
+      "id": "REF-010",
+      "area": "web Tailwind/shadcn foundation",
+      "files": [
+        "apps/web/package.json",
+        "apps/web/components.json",
+        "apps/web/postcss.config.mjs",
+        "apps/web/src/shadcn.css",
+        "apps/web/src/lib/utils.ts",
+        "apps/web/src/components/ui/button.tsx",
+        "apps/web/src/components/ui/dialog.tsx",
+        "apps/web/src/components/ui/dropdown-menu.tsx",
+        "apps/web/src/components/ui/table.tsx",
+        "apps/web/src/shadcnFoundation.test.ts"
+      ],
+      "problem": "Documentation and tests needed to reflect the actual Tailwind CSS v4/shadcn scaffold instead of the older shadcn-like-only baseline.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "apps/web/src/shadcnFoundation.test.ts already covered most scaffold files but did not explicitly guard the PostCSS bridge"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/shadcnFoundation.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm --filter @kiss-pm/web build"
+      ],
+      "status": "completed",
+      "notes": "No second scaffold installation was needed. The existing scaffold is now guarded by tests including @tailwindcss/postcss."
     }
   ]
 }
