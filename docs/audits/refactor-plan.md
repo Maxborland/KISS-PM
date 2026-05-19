@@ -283,6 +283,64 @@ GREEN подтвержден `repositoryHealth.test.ts`, DB test и persistence 
 - Generated/local artifacts не удалялись, потому что единственный видимый untracked файл `phase2-2-users-crud.png` может быть пользовательским.
 - Новые script aliases `lint`, `test:unit`, `test:integration` не добавлялись: это изменило бы смысл команд без явного toolchain decision. Текущий проверяемый baseline остается `pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm --filter @kiss-pm/web build`, `pnpm test:e2e:smoke`.
 
+## Architecture review remediation queue
+
+Очередь принята после lead architecture review от 2026-05-19. Правило исполнения: сначала исправлять boundary issues, которые блокируют следующий продуктовый контур, затем принимать irreversible domain decisions отдельными ADR.
+
+### REF-011 — project intake application service
+
+Статус: completed for current slice.
+
+Срез без изменения API contracts:
+
+- `apps/api/src/projectIntakeService.ts` создан как application-service слой для state-changing CRM/intake commands.
+- `apps/api/src/projectIntakeRoutes.ts` стал HTTP adapter для session/body parsing и response mapping; create/stage/feasibility/activate команды делегируются service.
+- После архитектурного follow-up `projectIntakeService.ts` дополнительно превращен в facade: create/stage/feasibility/activate, authorization, audit, linked-reference resolving и feasibility assessment вынесены в `apps/api/src/projectIntakeService/*`.
+- `apps/api/src/projectIntakeService.test.ts` фиксирует service contract: linked snapshot labels, transaction boundary и management audit для создания сделки.
+- `apps/web/src/repositoryHealth.test.ts` ограничивает facade 120 строками, authorization module 240 строками, activation command 160 строками.
+- `ProjectDraft` intentionally not implemented in this slice: это отдельное architecture decision перед Phase 4.
+
+RED подтвержден `pnpm vitest run apps/api/src/projectIntakeService.test.ts`: отсутствовал модуль `./projectIntakeService`.
+
+Дополнительный RED для modularization подтвержден `pnpm vitest run apps/web/src/repositoryHealth.test.ts`: `projectIntakeService.ts` был 729 строк при лимите 120.
+
+Проверки текущего среза:
+
+- `pnpm vitest run apps/api/src/projectIntakeService.test.ts`
+- `pnpm vitest run apps/api/src/projectIntakeService.test.ts apps/api/src/app.test.ts apps/api/src/projectIntakeParsers.test.ts`
+- `pnpm vitest run apps/web/src/repositoryHealth.test.ts`
+- `pnpm --filter @kiss-pm/api typecheck`
+
+### REF-012 — ProjectDraft lifecycle decision
+
+Статус: decision needed before Phase 4.
+
+Нужно принять ADR: `ProjectDraft` как отдельный aggregate или единый `Project` со статусом `draft|active`, но с явным draft workflow, visibility gating, readiness/blockers и governed activation. Без этого Gantt/WBS/resource reservations будут пришиваться к active project без clean transition.
+
+### REF-013 — datasource port split
+
+Статус: planned.
+
+`ApiTenantDataSource` остается слишком широким портом. Следующий безопасный срез: выделять context-specific ports только вместе с новым business slice: `CrmIntakeRepository`, `ProjectIntakeRepository`, `ResourcePlanningRepository`, `AuditWriter`, `TransactionRunner`.
+
+### REF-014 — reference snapshot label contract
+
+Статус: planned.
+
+Нужно закрепить contract для `clientName`, `contactName`, `projectType`: snapshot labels vs current labels. UI уже предпочитает current reference labels, но API DTO и persistence должны явно различать historical snapshot и актуальную проекцию.
+
+### REF-015 — resource availability provider
+
+Статус: planned before resource matrix.
+
+Текущий feasibility считает demand по `positionId + requiredHours`; это корректный intake seed, но не финальная BR2-like resource matrix model. Перед Phase 4 нужен provider boundary для availability/reservations/load buckets.
+
+### REF-016 — frontend feature data boundaries
+
+Статус: planned when adding new project-control pages.
+
+`WorkspaceData` допустим для текущего shell, но новые Gantt/resource/KPI/control pages должны получать feature-specific query hooks вместо расширения одного центрального workspace object.
+
 ## Closure status
 
 Текущий план закрыт как безопасный refactor batch:
@@ -294,11 +352,13 @@ GREEN подтвержден `repositoryHealth.test.ts`, DB test и persistence 
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
 - `REF-007` documented: user-owned/generated artifacts не удалялись.
 - `REF-008` documented: новые script aliases не добавлялись без toolchain decision.
+- `REF-011` completed for current slice: state-changing project intake commands вынесены из route handlers в application service.
 
 Следующий отдельный refactor-plan можно открыть только при конкретном продуктово-техническом поводе:
 
 1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` дальше только при появлении новых shell responsibilities; текущий budget 500 строк должен оставаться жестким guardrail.
 2. `packages/persistence/src/repositories.ts`: выделять новые repository areas только вместе с новой бизнес-областью, например CRM intake, project draft, Gantt/resource planning или KPI/control signals.
+3. Перед Phase 4 закрыть `REF-012`: принять ProjectDraft lifecycle ADR.
 
 ## Правила исполнения
 

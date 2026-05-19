@@ -599,6 +599,134 @@
       ],
       "status": "completed",
       "notes": "No second scaffold installation was needed. The existing scaffold is now guarded by tests including @tailwindcss/postcss."
+    },
+    {
+      "id": "REF-011",
+      "area": "api project intake application service",
+      "files": [
+        "apps/api/src/projectIntakeRoutes.ts",
+        "apps/api/src/projectIntakeService.ts",
+        "apps/api/src/projectIntakeService/activateProjectCommand.ts",
+        "apps/api/src/projectIntakeService/activationErrors.ts",
+        "apps/api/src/projectIntakeService/audit.ts",
+        "apps/api/src/projectIntakeService/authorization.ts",
+        "apps/api/src/projectIntakeService/changeOpportunityStageCommand.ts",
+        "apps/api/src/projectIntakeService/checkOpportunityFeasibilityCommand.ts",
+        "apps/api/src/projectIntakeService/createOpportunityCommand.ts",
+        "apps/api/src/projectIntakeService/feasibilityAssessment.ts",
+        "apps/api/src/projectIntakeService/opportunityLinks.ts",
+        "apps/api/src/projectIntakeService/opportunityStatus.ts",
+        "apps/api/src/projectIntakeService/types.ts",
+        "apps/api/src/projectIntakeService.test.ts",
+        "apps/web/src/repositoryHealth.test.ts",
+        "docs/audits/refactor-plan.md",
+        "docs/audits/refactor-inventory.json"
+      ],
+      "problem": "State-changing CRM/intake use cases lived directly inside HTTP route handlers, mixing permissions, transactions, domain checks and audit with body parsing and response mapping.",
+      "risk": "high",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts failed because ./projectIntakeService did not exist",
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts failed after modularization guardrail because projectIntakeService.ts had 729 lines with a 120-line budget"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts",
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts apps/api/src/app.test.ts apps/api/src/projectIntakeParsers.test.ts",
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm test:db",
+        "pnpm test"
+      ],
+      "status": "completed for current slice",
+      "notes": "projectIntakeService.ts is now a thin facade. Create/stage/feasibility/activate commands, authorization, audit, link resolving and feasibility assessment live in focused modules under projectIntakeService/. Routes remain responsible for session, JSON body parsing and HTTP response mapping. ProjectDraft lifecycle remains a separate architecture decision."
+    },
+    {
+      "id": "REF-012",
+      "area": "project lifecycle",
+      "files": [
+        "docs/02_ДОМЕННАЯ_МОДЕЛЬ.md",
+        "docs/06_CRM_ПРИЕМКА_И_ПРОЕКТЫ.md",
+        "packages/persistence/src/schema.ts",
+        "apps/api/src/projectIntakeService.ts"
+      ],
+      "problem": "Canonical docs require ProjectDraft before active project, while current activation creates an active project directly from an opportunity.",
+      "risk": "high",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none until ADR",
+      "tests_before": [
+        "Architecture review found direct active project creation in current activation flow"
+      ],
+      "tests_after": [
+        "Decision ADR before Phase 4; then characterization tests for draft visibility and governed activation"
+      ],
+      "status": "decision needed",
+      "notes": "Decide separate ProjectDraft aggregate vs one Project table with draft/active status, readiness and visibility gating."
+    },
+    {
+      "id": "REF-013",
+      "area": "api datasource ports",
+      "files": ["apps/api/src/apiTypes.ts"],
+      "problem": "ApiTenantDataSource is a broad kitchen-sink port spanning auth, users, CRM, project intake, workspace config, audit and transactions.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["Typecheck and route/db tests before each context-specific split"],
+      "tests_after": ["Typecheck and targeted route/db tests after each context-specific split"],
+      "status": "planned",
+      "notes": "Split only with concrete business slices into context-specific ports such as CrmIntakeRepository, ProjectIntakeRepository, ResourcePlanningRepository, AuditWriter and TransactionRunner."
+    },
+    {
+      "id": "REF-014",
+      "area": "crm reference label contract",
+      "files": [
+        "apps/api/src/apiTypes.ts",
+        "packages/persistence/src/schema.ts",
+        "apps/web/src/opportunityDisplay.ts",
+        "docs/23_PHASE_3_1_CRM_FOUNDATION_DEAL_UX.md"
+      ],
+      "problem": "Opportunity stores reference ids and snapshot labels, while UI resolves current labels; the API contract does not yet name historical snapshots distinctly.",
+      "risk": "medium",
+      "refactor_type": "strengthen types",
+      "expected_behavior_change": "none until contract decision",
+      "tests_before": ["apps/web/src/opportunityDisplay.test.ts covers current-label UI preference"],
+      "tests_after": ["DTO/schema tests after snapshot/current label contract is formalized"],
+      "status": "planned",
+      "notes": "Prefer explicit snapshot fields or a DTO that separates currentLabels from snapshotLabels."
+    },
+    {
+      "id": "REF-015",
+      "area": "resource planning boundary",
+      "files": [
+        "packages/domain/src/projectIntake.ts",
+        "packages/persistence/src/schema.ts",
+        "apps/api/src/projectIntakeService.ts"
+      ],
+      "problem": "Feasibility currently uses position demand and active user counts directly; this is a valid intake seed but not the final resource matrix boundary.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none until resource matrix phase",
+      "tests_before": ["packages/domain/src/projectIntake.test.ts and app.db resource feasibility tests"],
+      "tests_after": ["Provider-level resource availability and reservation tests before Phase 4 matrix work"],
+      "status": "planned",
+      "notes": "Introduce ResourceAvailabilityProvider or equivalent before building BR2-like resource matrix, reservations and load buckets."
+    },
+    {
+      "id": "REF-016",
+      "area": "web feature data boundaries",
+      "files": [
+        "apps/web/src/useWorkspaceShellData.ts",
+        "apps/web/src/workspaceData.ts",
+        "apps/web/src/WorkspaceRouteRenderer.tsx"
+      ],
+      "problem": "WorkspaceData aggregates most workspace server state and is passed through route rendering; future heavy pages should not keep expanding the central object.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["Existing workspaceData, routes and smoke tests"],
+      "tests_after": ["Feature-specific query hook tests when adding Gantt/resource/KPI/control pages"],
+      "status": "planned",
+      "notes": "Keep shell data for session/navigation/audit preview. New project-control pages should own their query bundles through feature-specific hooks."
     }
   ]
 }

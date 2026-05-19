@@ -1076,6 +1076,15 @@ describe("API with PostgreSQL data source", () => {
         demand: [{ positionId: "position-engineer", requiredHours: 10 }]
       })
     });
+    const malformedCreateOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: "{"
+    });
     const feasibility = await app.request(
       "/api/workspace/opportunities/opportunity-denied/feasibility",
       {
@@ -1098,6 +1107,18 @@ describe("API with PostgreSQL data source", () => {
         body: JSON.stringify({ id: "project-denied" })
       }
     );
+    const malformedActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-denied/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: "{"
+      }
+    );
     const auditEvents = await createPostgresTenantDataSource(
       createDatabase(client)
     ).listAuditEventsByTenantId("tenant-alpha");
@@ -1105,8 +1126,10 @@ describe("API with PostgreSQL data source", () => {
     expect(opportunities.status).toBe(403);
     expect(projects.status).toBe(403);
     expect(createOpportunity.status).toBe(403);
+    expect(malformedCreateOpportunity.status).toBe(403);
     expect(feasibility.status).toBe(403);
     expect(activation.status).toBe(403);
+    expect(malformedActivation.status).toBe(403);
     expect(auditEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
