@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCustomField,
   createClient,
+  createProjectTask,
   fetchCustomFields,
+  fetchMyWork,
+  fetchProjectDetail,
+  fetchProjectTasks,
   fetchProjectTemplates,
   updateClient,
   updateContact,
@@ -162,6 +166,55 @@ describe("web api helpers", () => {
       5,
       "/api/workspace/deal-stages/deal-stage%2Funsafe",
       expect.objectContaining({ method: "PATCH" })
+    );
+  });
+
+  it("uses encoded project work endpoints and same-origin task mutations", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ tasks: [], project: {} }), { status: 200 })
+      );
+
+    await fetchProjectDetail("project/unsafe");
+    await fetchProjectTasks("project/unsafe");
+    await fetchMyWork();
+    await createProjectTask("project/unsafe", {
+      id: "task-alpha",
+      title: "Подготовить план",
+      description: "",
+      priority: "high",
+      plannedStart: "2026-06-02",
+      plannedFinish: "2026-06-05",
+      plannedWork: 24,
+      participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/workspace/projects/project%2Funsafe",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/workspace/projects/project%2Funsafe/tasks",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/workspace/my-work",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/workspace/projects/project%2Funsafe/tasks",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
     );
   });
 });

@@ -180,6 +180,29 @@ describe("workspace data derivation", () => {
             demand: []
           }
         ]
+      },
+      myWork: {
+        tasks: [
+          {
+            id: "task-1",
+            tenantId: "tenant-1",
+            projectId: "project-1",
+            stageId: null,
+            title: "Stale task",
+            description: null,
+            status: "todo",
+            priority: "normal",
+            plannedStart: "2026-06-01T00:00:00.000Z",
+            plannedFinish: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            actualWork: 0,
+            progress: 0,
+            source: "manual",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z",
+            participants: [{ userId: "user-1", role: "executor" }]
+          }
+        ]
       }
     });
 
@@ -195,5 +218,6 @@ describe("workspace data derivation", () => {
     expect(data.projectTemplates).toEqual([]);
     expect(data.opportunities).toEqual([]);
     expect(data.projects).toEqual([]);
+    expect(data.myWorkTasks).toEqual([]);
   });
 });

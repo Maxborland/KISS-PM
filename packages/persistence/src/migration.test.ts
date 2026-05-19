@@ -50,6 +50,10 @@ const phase32ProjectLifecycleMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4ProjectTasksMigration = readFileSync(
+  new URL("../migrations/0010_phase_4_project_tasks.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -178,6 +182,31 @@ describe("Phase 3.2 project lifecycle SQL migration", () => {
   it("allows project drafts before governed activation", () => {
     expect(phase32ProjectLifecycleMigration).toContain(
       'ALTER TABLE "projects" ALTER COLUMN "activated_at" DROP NOT NULL'
+    );
+  });
+});
+
+describe("Phase 4 project tasks SQL migration", () => {
+  it("adds tenant-scoped task and participant tables for active project work", () => {
+    expect(phase4ProjectTasksMigration).toContain('CREATE TABLE "tasks"');
+    expect(phase4ProjectTasksMigration).toContain('CREATE TABLE "task_participants"');
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "tasks_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "task_participants_pkey" PRIMARY KEY("tenant_id","task_id","user_id","role")'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "tasks_project_fk"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "task_participants_user_fk"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CREATE INDEX "tasks_tenant_project_id_idx"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CREATE INDEX "task_participants_tenant_user_id_idx"'
     );
   });
 });

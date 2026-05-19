@@ -64,6 +64,8 @@ pnpm test:e2e:smoke
 pnpm db:down
 ```
 
+Playwright smoke поднимает отдельные web/API процессы на `127.0.0.1:3100` и `127.0.0.1:4100`, чтобы не переиспользовать живой Docker/dev runtime на `3000/4000`. Порты можно переопределить через `E2E_WEB_PORT` и `E2E_API_PORT`.
+
 Локальный вход после seed: `admin@kiss-pm.local` / `local-admin-password`.
 
 `DATABASE_URL` задается через окружение. Пример без секретов есть в `.env.example`.

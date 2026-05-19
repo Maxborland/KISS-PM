@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Palette,
   PanelsTopLeft,
+  SquareCheckBig,
   Settings,
   ShieldCheck,
   UserCircle,
@@ -19,6 +20,7 @@ import type { WorkspaceRouteId } from "./routes";
 
 export const workspaceRouteIcons = {
   dashboard: LayoutDashboard,
+  "my-work": SquareCheckBig,
   opportunities: ClipboardList,
   projects: PanelsTopLeft,
   clients: Building2,

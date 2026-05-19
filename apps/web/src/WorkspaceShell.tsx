@@ -53,6 +53,7 @@ export function WorkspaceShell() {
   } = useWorkspaceShellData();
   const activeRouteId = getRouteIdFromPathname(pathname);
   const activeOpportunityId = getOpportunityIdFromPathname(pathname);
+  const activeProjectId = getProjectIdFromPathname(pathname);
 
   useEffect(() => {
     if (!meQuery.data) return;
@@ -410,6 +411,7 @@ export function WorkspaceShell() {
         <WorkspaceRouteRenderer
           activeRouteId={activeRouteId}
           activeOpportunityId={activeOpportunityId}
+          activeProjectId={activeProjectId}
           data={data}
           openCreateRequested={quickCreateRequested}
           onChanged={setMessage}
@@ -419,8 +421,14 @@ export function WorkspaceShell() {
           onOpenOpportunity={(opportunityId) => {
             router.push(`/opportunities/${encodeURIComponent(opportunityId)}`);
           }}
+          onOpenProject={(projectId) => {
+            router.push(`/projects/${encodeURIComponent(projectId)}`);
+          }}
           onBackToOpportunities={() => {
             router.push(getRoutePath("opportunities"));
+          }}
+          onBackToProjects={() => {
+            router.push(getRoutePath("projects"));
           }}
           sectionStates={sectionStates}
         />
@@ -433,4 +441,10 @@ function getOpportunityIdFromPathname(pathname: string): string | null {
   const match = /^\/opportunities\/([^/]+)\/?$/.exec(pathname);
   const rawOpportunityId = match?.[1];
   return rawOpportunityId ? decodeURIComponent(rawOpportunityId) : null;
+}
+
+function getProjectIdFromPathname(pathname: string): string | null {
+  const match = /^\/projects\/([^/]+)\/?$/.exec(pathname);
+  const rawProjectId = match?.[1];
+  return rawProjectId ? decodeURIComponent(rawProjectId) : null;
 }

@@ -7,6 +7,7 @@ import {
   createContact,
   createDealStage,
   createOpportunity,
+  createProjectTask,
   createPosition,
   createProjectType,
   createProjectTemplate,
@@ -24,12 +25,15 @@ import {
   fetchCustomFields,
   fetchDealStages,
   fetchMe,
+  fetchMyWork,
   fetchOpportunity,
   fetchOpportunities,
   fetchPositions,
   fetchProjects,
   fetchProjectTypes,
   fetchProjectTemplates,
+  fetchProjectDetail,
+  fetchProjectTasks,
   fetchUsers,
   login,
   logout,
@@ -62,6 +66,10 @@ export const workspaceQueryKeys = {
   opportunity: (opportunityId: string) =>
     ["workspace", "opportunities", opportunityId] as const,
   projects: () => ["workspace", "projects"] as const,
+  projectDetail: (projectId: string) => ["workspace", "projects", projectId] as const,
+  projectTasks: (projectId: string) =>
+    ["workspace", "projects", projectId, "tasks"] as const,
+  myWork: () => ["workspace", "myWork"] as const,
   customFields: () => ["workspace", "config", "customFields"] as const,
   projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
 };
@@ -178,6 +186,30 @@ export function useProjectsQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.projects(),
     queryFn: fetchProjects,
+    enabled
+  });
+}
+
+export function useProjectDetailQuery(projectId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectDetail(projectId ?? "unknown"),
+    queryFn: () => fetchProjectDetail(projectId ?? ""),
+    enabled: enabled && Boolean(projectId)
+  });
+}
+
+export function useProjectTasksQuery(projectId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectTasks(projectId ?? "unknown"),
+    queryFn: () => fetchProjectTasks(projectId ?? ""),
+    enabled: enabled && Boolean(projectId)
+  });
+}
+
+export function useMyWorkQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.myWork(),
+    queryFn: fetchMyWork,
     enabled
   });
 }
@@ -430,6 +462,31 @@ export function useProjectIntakeMutations() {
           queryClient.invalidateQueries({
             queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
           })
+        ]);
+      }
+    })
+  };
+}
+
+export function useProjectWorkMutations() {
+  const queryClient = useQueryClient();
+
+  return {
+    createTask: useMutation({
+      mutationFn: ({ projectId, input }: Parameters<typeof createProjectTask> extends [infer ProjectId, infer Input] ? { projectId: ProjectId; input: Input } : never) =>
+        createProjectTask(projectId, input),
+      onSuccess: async (_result, variables) => {
+        const projectId = String(variables.projectId);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.projectDetail(projectId)
+          }),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.projectTasks(projectId)
+          }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
         ]);
       }
     })
