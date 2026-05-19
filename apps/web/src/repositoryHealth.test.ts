@@ -15,8 +15,8 @@ const sourceFileBudgets = [
   },
   {
     path: "apps/api/src/app.ts",
-    maxLines: 1600,
-    reason: "API composition must delegate auth/session, parsers and config routes"
+    maxLines: 500,
+    reason: "API composition must delegate route groups instead of owning endpoint bodies"
   },
   {
     path: "apps/web/src/styles.css",
