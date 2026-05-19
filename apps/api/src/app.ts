@@ -23,6 +23,10 @@ import {
   sessionTtlMs,
   shouldUseSecureCookies
 } from "./authSession";
+import {
+  MissingAccessProfileError,
+  resolveAppErrorResponse
+} from "./appErrors";
 import type {
   AccessProfileRecord,
   ApiTenantDataSource,
@@ -63,23 +67,14 @@ const tenantAdminProfile = createAccessProfile({
 
 export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 
-class MissingAccessProfileError extends Error {
-  constructor() {
-    super("access_profile_not_found");
-  }
-}
-
 export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
   const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
 
   app.onError((error, context) => {
-    if (error instanceof MissingAccessProfileError) {
-      return context.json({ error: "access_profile_not_found" }, 403);
-    }
-
-    return context.json({ error: "internal_error" }, 500);
+    const response = resolveAppErrorResponse(error);
+    return context.json(response.body, response.status);
   });
 
   app.use("/api/*", async (context, next) => {
