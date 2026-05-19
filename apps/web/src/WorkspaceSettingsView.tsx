@@ -193,7 +193,7 @@ export function WorkspaceSettingsView(props: {
                 Создать поле
               </button>
             ) : (
-              <DisabledAction reason="Нужно право tenant.workspace_config.manage" />
+              <DisabledAction reason="Нет права изменять настройки рабочего пространства" />
             )
           }
         >
@@ -289,7 +289,7 @@ export function WorkspaceSettingsView(props: {
                 Создать шаблон
               </button>
             ) : (
-              <DisabledAction reason="Нужно право tenant.workspace_config.manage" />
+              <DisabledAction reason="Нет права изменять настройки рабочего пространства" />
             )
           }
         >

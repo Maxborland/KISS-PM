@@ -74,9 +74,13 @@ export function buildAuditPreviewRows(
     .map((event) => ({
       id: event.id,
       actorName: usersById.get(event.actorUserId) ?? `Пользователь ${event.actorUserId}`,
-      actionLabel: auditActionLabels[event.actionType] ?? event.actionType,
+      actionLabel: getAuditActionLabel(event.actionType),
       createdAtLabel: auditDateFormatter.format(new Date(event.createdAt))
     }));
+}
+
+export function getAuditActionLabel(actionType: string): string {
+  return auditActionLabels[actionType] ?? actionType;
 }
 
 export function buildAuditChangeSummary(event: AuditEvent): AuditChangeSummary {

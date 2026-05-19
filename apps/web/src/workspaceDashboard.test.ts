@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAuditChangeSummary,
-  buildAuditPreviewRows
+  buildAuditPreviewRows,
+  getAuditActionLabel
 } from "./workspaceDashboard";
 
 describe("workspace dashboard", () => {
@@ -75,6 +76,13 @@ describe("workspace dashboard", () => {
 
     expect(rows).toHaveLength(6);
     expect(rows[0]?.id).toBe("audit-7");
+  });
+
+  it("resolves audit action labels without depending on preview limits", () => {
+    expect(getAuditActionLabel("workspace.custom_field.updated")).toBe(
+      "Пользовательское поле обновлено"
+    );
+    expect(getAuditActionLabel("unknown.action")).toBe("unknown.action");
   });
 
   it("builds readable before and after summaries for config audit events", () => {

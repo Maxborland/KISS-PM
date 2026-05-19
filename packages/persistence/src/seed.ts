@@ -76,9 +76,8 @@ export async function seedTenantDataset(
           createdAt
         })
         .onConflictDoUpdate({
-          target: accessProfiles.id,
+          target: [accessProfiles.tenantId, accessProfiles.id],
           set: {
-            tenantId: sql`excluded.tenant_id`,
             name: sql`excluded.name`,
             permissions: sql`excluded.permissions`
           }

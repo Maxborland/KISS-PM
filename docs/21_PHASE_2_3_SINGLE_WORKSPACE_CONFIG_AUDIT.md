@@ -2,7 +2,7 @@
 
 ## Статус
 
-Phase 2.3 продолжает single-workspace подход Phase 2.2. Мы по-прежнему работаем как один tenant и не строим отдельную SaaS/operator admin surface. Цель фазы — закрепить рабочий admin foundation: видимый аудит, проверяемые отказы по RBAC и первый tenant-config baseline для custom fields и шаблонов.
+Phase 2.3 закрыта в текущей single-workspace реализации. Мы по-прежнему работаем как один tenant и не строим отдельную SaaS/operator admin surface. Фаза закрепила рабочий admin foundation: видимый аудит, проверяемые отказы по RBAC и первый tenant-config baseline для custom fields и шаблонов.
 
 ## Цель
 
@@ -138,6 +138,23 @@ Audit viewer не должен быть главным доменным объе
   - restricted user не видит `Аудит`/`Настройки`;
   - restricted user получает API `403` на `GET` audit/config read endpoints;
   - restricted user получает API `403` на `POST/PATCH` config mutation endpoints.
+
+## Реализованный backlog
+
+- DB-backed tenant-scoped custom fields и project templates добавлены в PostgreSQL schema, migrations и persistence repository.
+- Workspace config API добавлен с session auth, permission checks, validation, same-origin mutation header и audit write внутри transaction.
+- Permission model расширена правами `tenant.workspace_config.read` и `tenant.workspace_config.manage`.
+- Web shell получил permission-aware routes `/settings` и `/audit`.
+- `Настройки` показывает плотные таблицы, summary counters, search, create/edit modals и inline validation для `systemKey`.
+- `Аудит` показывает action label, actor, workflow, source entity, before/after summary, correlation id и время события.
+- Restricted user shell скрывает `Аудит` и `Настройки`, а прямые API вызовы получают `403`.
+- Browser smoke доказывает create/update custom field, create/update project template, validation, audit evidence и negative RBAC read/mutation endpoints.
+- CRUD ролей доступа дополнительно закреплен transaction boundary: изменение роли и audit write проходят атомарно.
+- ID ролей доступа закреплены как tenant-scoped на уровне PostgreSQL primary key: одинаковый локальный id роли допустим в разных tenant и не создает cross-tenant collision.
+
+## Последняя проверка закрытия
+
+Свежая проверка от 2026-05-19 зафиксирована в `docs/status/phase2-3-single-workspace-config-audit-ledger.md`.
 
 ## Следующий шаг после Phase 2.3
 

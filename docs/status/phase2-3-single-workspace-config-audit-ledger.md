@@ -264,3 +264,44 @@ Audit viewer, negative RBAC browser coverage и первый workspace config ba
 - После security follow-up выполнен `pnpm install --frozen-lockfile`; локальный `node_modules` синхронизирован с lockfile.
 - Повторный Security Review после fresh install Critical/Important не нашел: `postcss` в web dependency tree один, `8.5.14`; aggregate `radix-ui` не найден; `shadcn` остается devDependency.
 - Финальный smoke после `docker compose up -d --force-recreate web` прошел; `docker compose ps` подтвердил running `postgres`, `api`, `web`.
+
+## Блок 6: closure verification Phase 2.3
+
+- Выполнена сверка `docs/21_PHASE_2_3_SINGLE_WORKSPACE_CONFIG_AUDIT.md` с текущим кодом и smoke.
+- По review-loop внесены точечные правки в RBAC/audit atomicity и audit viewer labels.
+- Обновлен canonical статус фазы: Phase 2.3 закрыта в single-workspace реализации.
+- Access-role create/update/delete теперь выполняются в transaction вместе с audit write.
+- `access_profiles` переведен с глобального primary key по `id` на tenant-scoped primary key `(tenant_id, id)`.
+- Dev/test seed использует upsert по `(tenant_id, id)` и не перетирает роль другого tenant с тем же локальным id.
+- Полный audit viewer теперь получает человекочитаемый action label напрямую из helper, а не через ограниченный dashboard preview.
+- Пользовательская copy настроек очищена от raw permission key и `workspace`-англицизма.
+
+## Проверки блока 6
+
+- `pnpm vitest run apps/web/src/workspaceForms.test.ts apps/web/src/routes.test.ts apps/web/src/workspaceQueries.test.ts` прошел: 3 файла / 19 тестов.
+- `pnpm vitest run apps/api/src/workspaceConfigParsers.test.ts apps/api/src/app.test.ts` прошел: 2 файла / 11 тестов.
+- `pnpm typecheck` прошел.
+- `pnpm test` прошел: 23 файла / 95 тестов.
+- `pnpm --filter @kiss-pm/web typecheck` прошел.
+- `pnpm --filter @kiss-pm/web build` прошел; Next route list включает `/audit` и `/settings`.
+- `pnpm test:db` прошел: 3 файла / 20 тестов.
+- `pnpm test:e2e:smoke` прошел: 1 chromium test; smoke доказал login, CRUD users/roles/positions, profile/theme, config create/update/validation, audit events и restricted-user `403` checks.
+- TDD RED для RBAC atomicity: `pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t "rolls back access role"` падал, потому что новая роль сохранялась при падении audit.
+- TDD GREEN для RBAC atomicity: `pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t "rolls back access role"` прошел: 1 тест.
+- TDD RED для audit label helper: `pnpm vitest run apps/web/src/workspaceDashboard.test.ts` падал на отсутствующем `getAuditActionLabel`.
+- TDD GREEN для audit label helper: `pnpm vitest run apps/web/src/workspaceDashboard.test.ts` прошел: 4 теста.
+- TDD RED для tenant-scoped role ids: `pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t "keeps access role ids"` падал с `expected 500 to be 201`, потому что второй tenant упирался в глобальный `access_profiles.id`.
+- Миграция: `pnpm db:migrate` применил `0004_phase_2_3_access_profiles_scoped_ids.sql`.
+- TDD GREEN для tenant-scoped role ids: `pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t "keeps access role ids"` прошел: 1 тест.
+- Migration guard: `pnpm vitest run packages/persistence/src/migration.test.ts` прошел: 4 теста.
+- DB regression после правки seed: `pnpm test:db` прошел: 3 файла / 22 теста.
+
+## Review loop блока 6
+
+- Bug Hunt нашел Important: полный audit viewer терял human-readable labels после 200 событий, потому что использовал capped preview list. Исправлено через `getAuditActionLabel`.
+- Requesting Code Review Critical/Important не нашел; Minor по user-facing copy закрыт заменой raw permission wording на русский текст.
+- Security Review нашел Important: access-role create/update/delete были неатомарны с audit write. Исправлено transaction pattern по аналогии с workspace config routes и DB rollback test.
+- Повторный Security Review нашел Important: API трактовал роли как tenant-scoped, но persistence держал глобальный primary key по `access_profiles.id`. Исправлено composite primary key `(tenant_id, id)`, seed upsert target и DB/API regression test на одинаковый role id в двух tenant.
+- Финальный Bug Hunt после tenant-scoped PK Critical/Important не нашел; дополнительно прогнал `pnpm vitest run packages/persistence/src/migration.test.ts apps/web/src/workspaceDashboard.test.ts`, `pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t "keeps access role ids|rolls back access role"`, `pnpm typecheck` и `git diff --check`.
+- Финальный Requesting Code Review после tenant-scoped PK Critical/Important не нашел.
+- Финальный Security Review после tenant-scoped PK Critical/Important не нашел.

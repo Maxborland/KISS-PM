@@ -3,7 +3,8 @@ import { Activity } from "lucide-react";
 import { type WorkspaceData } from "./workspaceData";
 import {
   buildAuditChangeSummary,
-  buildAuditPreviewRows
+  buildAuditPreviewRows,
+  getAuditActionLabel
 } from "./workspaceDashboard";
 import { formatDate } from "./workspaceViewHelpers";
 import { type SectionState } from "./workspaceShellState";
@@ -62,7 +63,7 @@ export function AuditView(props: {
                         <span className="entity-name-cell">
                           <span className="row-avatar">A</span>
                           <span>
-                            <strong>{preview?.actionLabel ?? event.actionType}</strong>
+                            <strong>{getAuditActionLabel(event.actionType)}</strong>
                             <small>{event.actionType}</small>
                           </span>
                         </span>

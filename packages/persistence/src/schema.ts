@@ -19,7 +19,7 @@ export const tenants = pgTable("tenants", {
 export const accessProfiles = pgTable(
   "access_profiles",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
@@ -28,8 +28,11 @@ export const accessProfiles = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull()
   },
   (table) => [
-    index("access_profiles_tenant_id_idx").on(table.tenantId),
-    uniqueIndex("access_profiles_tenant_id_id_uidx").on(table.tenantId, table.id)
+    primaryKey({
+      name: "access_profiles_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("access_profiles_tenant_id_idx").on(table.tenantId)
   ]
 );
 

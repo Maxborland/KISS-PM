@@ -17,6 +17,13 @@ const phase23ScopedIdsMigration = readFileSync(
   ),
   "utf8"
 );
+const phase23AccessProfileScopedIdsMigration = readFileSync(
+  new URL(
+    "../migrations/0004_phase_2_3_access_profiles_scoped_ids.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -74,6 +81,15 @@ describe("Phase 2.3 SQL migration", () => {
     );
     expect(phase23ScopedIdsMigration).toContain(
       'DROP CONSTRAINT IF EXISTS "project_templates_pkey"'
+    );
+  });
+
+  it("repairs access profiles to tenant-scoped primary keys", () => {
+    expect(phase23AccessProfileScopedIdsMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "access_profiles_pkey"'
+    );
+    expect(phase23AccessProfileScopedIdsMigration).toContain(
+      'ADD CONSTRAINT "access_profiles_pkey" PRIMARY KEY ("tenant_id","id")'
     );
   });
 });
