@@ -74,7 +74,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-003 — разрезание `App.tsx`
 
-Статус: completed for current plan.
+Статус: in_progress.
 
 Начинать только после отдельной матрицы UI-flow рисков. Первый безопасный срез: вынести shell/navigation и shared CRUD section primitives, не меняя routes и permission gating.
 
@@ -100,7 +100,16 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - RED подтвержден отсутствующим модулем `workspaceRouteIcons`.
 - При GREEN обнаружено неверное предположение теста: текущие `lucide-react` icons могут быть React component objects, не только functions. Тест уточнен на реальный runtime contract.
 
-Итог REF-003: `App.tsx` больше не владеет shell-state helpers и route icon registry. Файл все еще крупный, но остается ниже health-budget и имеет следующий очевидный future cleanup: вынос `Dashboard`, затем CRUD views по одному.
+#### REF-003C — dashboard view extraction
+
+Статус: completed.
+
+- `DashboardView` вынесен из `App.tsx` в `apps/web/src/DashboardView.tsx`.
+- `App.tsx` health-budget ужесточен с 2800 до 2600 строк.
+- RED подтвержден падением `repositoryHealth.test.ts`: `expected 2732 to be less than or equal to 2600`.
+- GREEN подтвержден после extraction: `App.tsx` 2582 строки.
+
+Итог REF-003 на текущий момент: `App.tsx` больше не владеет shell-state helpers, route icon registry и dashboard presentation, но REF-003 остается открытым. Цель следующей серии — использовать Next.js App Router и page/view-level boundaries, чтобы довести `App.tsx` до shell-файла меньше 500 строк.
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
@@ -162,7 +171,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 Текущий план закрыт как безопасный refactor batch:
 
 - `REF-002` completed: workspace config validation в domain.
-- `REF-003` completed for current plan: shell-state и route icon registry вынесены из `App.tsx`.
+- `REF-003` in_progress: shell-state, route icon registry и dashboard presentation вынесены из `App.tsx`; нужны page/view-level slices до бюджета меньше 500 строк.
 - `REF-004` completed for current plan: API app error mapping вынесен из `app.ts`.
 - `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
@@ -171,7 +180,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
 
-1. `App.tsx`: вынести `Dashboard`, затем `UsersView`, `RolesView`, `PositionsView`, `WorkspaceSettingsView` по одному.
+1. `App.tsx`: вынести `UsersView`, `RolesView`, `PositionsView`, `WorkspaceSettingsView`, `AuditView`, `ProfileView`, `ThemeView` по одному; где возможно, привязать к Next.js route page boundaries.
 2. `apps/api/src/app.ts`: выделить route groups для users/positions/access roles/profile/theme.
 3. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
 
