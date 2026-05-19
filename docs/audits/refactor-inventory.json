@@ -68,12 +68,12 @@
       "id": "REF-003",
       "area": "web application shell",
       "files": ["apps/web/src/App.tsx"],
-      "problem": "App.tsx is a god file with routing shell, data orchestration, CRUD views, dialogs and UI state in one 2500+ line component.",
+      "problem": "App.tsx is a god file with routing shell, data orchestration, CRUD views, dialogs and UI state in one 2100+ line component.",
       "risk": "high",
       "refactor_type": "split large component",
       "expected_behavior_change": "none",
       "tests_before": [
-        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 2600 lines"
+        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 2200 lines"
       ],
       "tests_after": [
         "component or route-level characterization tests before extraction",
@@ -81,7 +81,7 @@
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
       "status": "in_progress",
-      "notes": "REF-003 is reopened after review: helper extraction was not enough. Completed sub-slices: REF-003A shell state helpers, REF-003B route icon registry, REF-003C dashboard view extraction. Continue with page/view-level boundaries until App.tsx is below 500 lines."
+      "notes": "REF-003 is reopened after review: helper extraction was not enough. Completed sub-slices: REF-003A shell state helpers, REF-003B route icon registry, REF-003C dashboard view extraction, REF-003D users view extraction. Continue with page/view-level boundaries until App.tsx is below 500 lines."
     },
     {
       "id": "REF-003C",
@@ -105,6 +105,30 @@
       ],
       "status": "completed",
       "notes": "DashboardView extracted as a presentation component; App.tsx line budget tightened from 2800 to 2600. Next slices should use Next App Router page/view boundaries where possible."
+    },
+    {
+      "id": "REF-003D",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/UsersView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Users CRUD view, form state, modal state and user mutations lived inside App.tsx.",
+      "risk": "medium",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "UsersView extracted without changing route ids, permissions, mutation calls or modal behavior. App.tsx line budget tightened from 2600 to 2200."
     },
     {
       "id": "REF-003A",

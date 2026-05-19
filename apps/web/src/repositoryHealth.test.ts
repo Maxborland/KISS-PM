@@ -5,7 +5,7 @@ import { join } from "node:path";
 const sourceFileBudgets = [
   {
     path: "apps/web/src/App.tsx",
-    maxLines: 2600,
+    maxLines: 2200,
     reason: "workspace shell must stay decomposed into focused components"
   },
   {
