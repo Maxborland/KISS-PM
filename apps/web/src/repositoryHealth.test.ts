@@ -10,7 +10,7 @@ const sourceFileBudgets = [
   },
   {
     path: "apps/web/src/WorkspaceShell.tsx",
-    maxLines: 750,
+    maxLines: 500,
     reason: "workspace shell orchestration must stay below the next split budget"
   },
   {

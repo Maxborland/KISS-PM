@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  Bell,
-  ChevronDown,
-  Menu,
-  Moon,
-  PlusCircle,
-  Search,
-  Settings
-} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -16,48 +7,18 @@ import { flushSync } from "react-dom";
 import {
   getDefaultRouteId,
   findRouteByQuery,
-  getRouteById,
   getRouteIdFromPathname,
   getRoutePath,
-  getVisibleRouteGroups,
-  getVisibleRoutes,
   type WorkspaceRouteId
 } from "./routes";
-import {
-  useAccessRolesQuery,
-  useAuditEventsQuery,
-  useCustomFieldsQuery,
-  useHealthQuery,
-  useLoginMutation,
-  useLogoutMutation,
-  useMeQuery,
-  usePositionsQuery,
-  useProjectTemplatesQuery,
-  useUsersQuery,
-} from "./workspaceQueries";
-import { ProfileView, ThemeView } from "./AccountViews";
-import { AuditView } from "./AuditView";
-import { WorkspaceSettingsView } from "./WorkspaceSettingsView";
-import { buildWorkspaceData, type WorkspaceData } from "./workspaceData";
-import { DashboardView } from "./DashboardView";
-import { PositionsView } from "./PositionsView";
-import { RolesView } from "./RolesView";
-import { UsersView } from "./UsersView";
+import { WorkspaceRouteRenderer } from "./WorkspaceRouteRenderer";
 import {
   getNextFocusTrapIndex
 } from "./workspaceForms";
-import {
-  AccountMenu,
-  EntityList,
-  LoginScreen,
-  getFocusableElements,
-} from "./components/workspace-ui";
-import {
-  getSectionState,
-  hasPermission
-} from "./workspaceShellState";
-import { useDocumentThemeClass } from "./useDocumentThemeClass";
-import { workspaceRouteIcons } from "./workspaceRouteIcons";
+import { LoginScreen, getFocusableElements } from "./components/workspace-ui";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
+import { WorkspaceTopbar } from "./WorkspaceTopbar";
+import { useWorkspaceShellData } from "./useWorkspaceShellData";
 
 const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
 
@@ -77,40 +38,19 @@ export function WorkspaceShell() {
   const navigationToggleRef = useRef<HTMLButtonElement | null>(null);
   const navigationFocusRestoreTokenRef = useRef(0);
   const navigationFocusRestoreTimersRef = useRef<number[]>([]);
-  const healthQuery = useHealthQuery();
-  const meQuery = useMeQuery();
-  const loginMutation = useLoginMutation();
-  const logoutMutation = useLogoutMutation();
-
-  const permissions = meQuery.data?.permissions ?? [];
-  const canReadUsers = hasPermission(permissions, "tenant.users.read");
-  const canReadPositions = hasPermission(permissions, "tenant.positions.read");
-  const canReadAccessRoles = hasPermission(permissions, "tenant.access_profiles.read");
-  const canReadAudit = hasPermission(permissions, "tenant.audit_events.read");
-  const canReadWorkspaceConfig = hasPermission(
+  const {
+    canOpenProfile,
+    canOpenTheme,
+    data,
+    loginMutation,
+    logoutMutation,
+    meQuery,
     permissions,
-    "tenant.workspace_config.read"
-  );
-  const canOpenProfile = hasPermission(permissions, "profile.read");
-  const canOpenTheme = hasPermission(permissions, "workspace.theme.manage");
-
-  const usersQuery = useUsersQuery(canReadUsers);
-  const positionsQuery = usePositionsQuery(canReadPositions);
-  const accessRolesQuery = useAccessRolesQuery(canReadAccessRoles);
-  const auditEventsQuery = useAuditEventsQuery(canReadAudit);
-  const customFieldsQuery = useCustomFieldsQuery(canReadWorkspaceConfig);
-  const projectTemplatesQuery = useProjectTemplatesQuery(canReadWorkspaceConfig);
-
-  const visibleRoutes = useMemo(
-    () => getVisibleRoutes(permissions),
-    [permissions]
-  );
-  const visibleRouteGroups = useMemo(
-    () => getVisibleRouteGroups(permissions),
-    [permissions]
-  );
+    sectionStates,
+    visibleRouteGroups,
+    visibleRoutes
+  } = useWorkspaceShellData();
   const activeRouteId = getRouteIdFromPathname(pathname);
-  const activeRoute = getRouteById(activeRouteId);
 
   useEffect(() => {
     if (!meQuery.data) return;
@@ -232,55 +172,6 @@ export function WorkspaceShell() {
 
     restoreNavigationToggleFocus();
   }, [isMobileSidebarOpen, isNarrowViewport, pathname]);
-
-  const data = useMemo<WorkspaceData | null>(() => {
-    if (!meQuery.data) return null;
-
-    return buildWorkspaceData({
-      apiStatus: healthQuery.data?.status ?? (healthQuery.isError ? "ошибка" : "проверяем"),
-      me: meQuery.data.user,
-      permissions,
-      users: usersQuery.data,
-      positions: positionsQuery.data,
-      accessRoles: accessRolesQuery.data,
-      auditEvents: auditEventsQuery.data,
-      customFields: customFieldsQuery.data,
-      projectTemplates: projectTemplatesQuery.data
-    });
-  }, [
-    accessRolesQuery.data?.accessRoles,
-    auditEventsQuery.data?.auditEvents,
-    healthQuery.data?.status,
-    healthQuery.isError,
-    meQuery.data,
-    permissions,
-    customFieldsQuery.data?.customFields,
-    projectTemplatesQuery.data?.projectTemplates,
-    positionsQuery.data?.positions,
-    usersQuery.data?.users
-  ]);
-
-  useDocumentThemeClass(data?.me.theme);
-
-  const sectionStates = {
-    users: getSectionState(canReadUsers, usersQuery.isFetching, usersQuery.error),
-    positions: getSectionState(
-      canReadPositions,
-      positionsQuery.isFetching,
-      positionsQuery.error
-    ),
-    accessRoles: getSectionState(
-      canReadAccessRoles,
-      accessRolesQuery.isFetching,
-      accessRolesQuery.error
-    ),
-    auditEvents: getSectionState(canReadAudit, auditEventsQuery.isFetching, auditEventsQuery.error),
-    workspaceConfig: getSectionState(
-      canReadWorkspaceConfig,
-      customFieldsQuery.isFetching || projectTemplatesQuery.isFetching,
-      customFieldsQuery.error ?? projectTemplatesQuery.error
-    )
-  };
 
   const cssVars = useMemo(
     () =>
@@ -455,233 +346,69 @@ export function WorkspaceShell() {
           onClick={() => closeMobileSidebar()}
         />
       ) : null}
-      <aside
-        aria-hidden={isNarrowViewport && !isMobileSidebarOpen ? "true" : undefined}
-        className="sidebar"
-        inert={isNarrowViewport && !isMobileSidebarOpen ? true : undefined}
-        ref={sidebarRef}
-      >
-        <div className="brand-row">
-          <div className="brand-block">
-            <span className="brand-mark">K</span>
-            <div>
-              <strong>KISS PM</strong>
-              <small>Рабочее пространство</small>
-            </div>
-          </div>
-        </div>
-        <div className="quick-create-row">
-          <button
-            className="quick-create-button"
-            title="Быстро создать пользователя"
-            type="button"
-            onClick={() => {
-              sessionStorage.setItem("kiss-pm.quick-create", "user");
-              setQuickCreateRequested(true);
-              navigateRoute("users");
-            }}
-          >
-            <PlusCircle aria-hidden="true" size={16} />
-            <span>Быстро создать</span>
-          </button>
-        </div>
-        <nav className="nav-list" aria-label="Основная навигация">
-          {visibleRouteGroups.map((group) => (
-            <section className="nav-group" key={group.id}>
-              <p className="nav-group-label">{group.label}</p>
-              {group.routes.map((route) => {
-                const RouteIcon = workspaceRouteIcons[route.id];
-
-                return (
-                  <button
-                    key={route.id}
-                    aria-current={route.id === activeRouteId ? "page" : undefined}
-                    aria-label={route.label}
-                    className={route.id === activeRouteId ? "nav-item active" : "nav-item"}
-                    title={route.label}
-                    onClick={() => navigateRoute(route.id)}
-                    type="button"
-                  >
-                    <RouteIcon aria-hidden="true" size={16} />
-                    <span>{route.label}</span>
-                  </button>
-                );
-              })}
-            </section>
-          ))}
-        </nav>
-        <div className="sidebar-spacer" />
-        <section className="sidebar-note" aria-label="Текущий слой продукта">
-          <strong>Текущий слой</strong>
-          <p>Вход, пользователи, роли доступа, должности, профиль, тема и события аудита.</p>
-        </section>
-        <div className="account-menu-anchor sidebar-account-menu" ref={sidebarUserMenuRef}>
-          <button
-            aria-expanded={openUserMenu === "sidebar"}
-            aria-label="Открыть меню профиля"
-            className="sidebar-user account-trigger"
-            type="button"
-            onClick={() =>
-              setOpenUserMenu((value) => (value === "sidebar" ? null : "sidebar"))
-            }
-          >
-            <span className="avatar">{data.me.name.slice(0, 1).toUpperCase()}</span>
-            <span className="account-trigger-copy">
-              <strong>{data.me.name}</strong>
-              <small>{data.me.email}</small>
-            </span>
-            <ChevronDown aria-hidden="true" className="account-trigger-icon" size={16} />
-          </button>
-          {openUserMenu === "sidebar" ? (
-            <AccountMenu
-              isLogoutPending={logoutMutation.isPending}
-              onLogout={logoutFromUserMenu}
-              onProfile={canOpenProfile ? () => navigateFromUserMenu("profile") : null}
-              onTheme={canOpenTheme ? () => navigateFromUserMenu("theme") : null}
-            />
-          ) : null}
-        </div>
-      </aside>
+      <WorkspaceSidebar
+        activeRouteId={activeRouteId}
+        canOpenProfile={canOpenProfile}
+        canOpenTheme={canOpenTheme}
+        data={data}
+        isHiddenOnMobile={isNarrowViewport && !isMobileSidebarOpen}
+        isLogoutPending={logoutMutation.isPending}
+        openUserMenu={openUserMenu}
+        sidebarRef={sidebarRef}
+        sidebarUserMenuRef={sidebarUserMenuRef}
+        visibleRouteGroups={visibleRouteGroups}
+        onLogout={logoutFromUserMenu}
+        onNavigate={navigateRoute}
+        onProfile={() => navigateFromUserMenu("profile")}
+        onQuickCreateUser={() => {
+          sessionStorage.setItem("kiss-pm.quick-create", "user");
+          setQuickCreateRequested(true);
+          navigateRoute("users");
+        }}
+        onTheme={() => navigateFromUserMenu("theme")}
+        onToggleUserMenu={() =>
+          setOpenUserMenu((value) => (value === "sidebar" ? null : "sidebar"))
+        }
+      />
 
       <section
         className="content-shell"
         inert={isNarrowViewport && isMobileSidebarOpen ? true : undefined}
       >
-        <header className="topbar">
-          <button
-            aria-label={navigationToggleLabel}
-            className="topbar-icon-button"
-            ref={navigationToggleRef}
-            type="button"
-            onClick={handleNavigationToggle}
-          >
-            <Menu aria-hidden="true" size={17} />
-          </button>
-          <span className="topbar-divider" aria-hidden="true" />
-          <form className="quick-search" role="search" onSubmit={handleRouteSearch}>
-            <Search aria-hidden="true" size={16} />
-            <input
-              aria-label="Переход по разделам"
-              placeholder="Перейти в раздел"
-              value={routeSearch}
-              onChange={(event) => setRouteSearch(event.target.value)}
-            />
-          </form>
-          <div className="topbar-context">
-            <div className="status-chip" title={`API: ${data.apiStatus}`}>
-              <span className={data.apiStatus === "ok" ? "status-dot ok" : "status-dot"} />
-              <span>{data.apiStatus}</span>
-            </div>
-            {canOpenTheme ? (
-              <button
-                aria-label="Открыть оформление"
-                className="topbar-icon-button"
-                type="button"
-                onClick={() => navigateRoute("theme")}
-              >
-                <Moon aria-hidden="true" size={17} />
-              </button>
-            ) : null}
-            {canOpenProfile ? (
-              <button
-                aria-label="Открыть настройки профиля"
-                className="topbar-icon-button"
-                type="button"
-                onClick={() => navigateRoute("profile")}
-              >
-                <Settings aria-hidden="true" size={17} />
-              </button>
-            ) : null}
-            <button
-              aria-label="Уведомления"
-              className="topbar-icon-button"
-              disabled
-              title="Уведомления появятся вместе с control signals"
-              type="button"
-            >
-              <Bell aria-hidden="true" size={17} />
-            </button>
-            <div className="account-menu-anchor topbar-account-menu" ref={topbarUserMenuRef}>
-              <button
-                aria-expanded={openUserMenu === "topbar"}
-                aria-label="Открыть меню пользователя"
-                className="avatar-button"
-                type="button"
-                onClick={() =>
-                  setOpenUserMenu((value) => (value === "topbar" ? null : "topbar"))
-                }
-              >
-                {data.me.name.slice(0, 1).toUpperCase()}
-              </button>
-              {openUserMenu === "topbar" ? (
-                <AccountMenu
-                  isLogoutPending={logoutMutation.isPending}
-                  onLogout={logoutFromUserMenu}
-                  onProfile={canOpenProfile ? () => navigateFromUserMenu("profile") : null}
-                  onTheme={canOpenTheme ? () => navigateFromUserMenu("theme") : null}
-                />
-              ) : null}
-            </div>
-          </div>
-        </header>
+        <WorkspaceTopbar
+          apiStatus={data.apiStatus}
+          canOpenProfile={canOpenProfile}
+          canOpenTheme={canOpenTheme}
+          isLogoutPending={logoutMutation.isPending}
+          navigationToggleLabel={navigationToggleLabel}
+          navigationToggleRef={navigationToggleRef}
+          openUserMenu={openUserMenu}
+          routeSearch={routeSearch}
+          topbarUserMenuRef={topbarUserMenuRef}
+          userEmail={data.me.email}
+          userName={data.me.name}
+          onLogout={logoutFromUserMenu}
+          onNavigationToggle={handleNavigationToggle}
+          onProfile={() => navigateRoute("profile")}
+          onRouteSearch={handleRouteSearch}
+          onRouteSearchChange={setRouteSearch}
+          onTheme={() => navigateRoute("theme")}
+          onToggleUserMenu={() =>
+            setOpenUserMenu((value) => (value === "topbar" ? null : "topbar"))
+          }
+        />
 
         {message ? <p className="toast">{message}</p> : null}
-        {activeRouteId === "dashboard" ? (
-          <DashboardView
-            data={data}
-            sectionStates={sectionStates}
-          />
-        ) : null}
-        {activeRouteId === "users" ? (
-          <UsersView
-            data={data}
-            openCreateRequested={quickCreateRequested}
-            onQuickCreateConsumed={() => {
-              setQuickCreateRequested(false);
-            }}
-            sectionState={sectionStates.users}
-            onChanged={setMessage}
-          />
-        ) : null}
-        {activeRouteId === "access-roles" ? (
-          <RolesView
-            data={data}
-            sectionState={sectionStates.accessRoles}
-            onChanged={setMessage}
-          />
-        ) : null}
-        {activeRouteId === "positions" ? (
-          <PositionsView
-            data={data}
-            sectionState={sectionStates.positions}
-            onChanged={setMessage}
-          />
-        ) : null}
-        {activeRouteId === "audit" ? (
-          <AuditView
-            data={data}
-            sectionState={sectionStates.auditEvents}
-          />
-        ) : null}
-        {activeRouteId === "settings" ? (
-          <WorkspaceSettingsView
-            data={data}
-            sectionState={sectionStates.workspaceConfig}
-            onChanged={setMessage}
-          />
-        ) : null}
-        {activeRouteId === "profile" ? (
-          <ProfileView
-            data={data}
-            onChanged={setMessage}
-          />
-        ) : null}
-        {activeRouteId === "theme" ? (
-          <ThemeView
-            user={data.me}
-            onChanged={setMessage}
-          />
-        ) : null}
+        <WorkspaceRouteRenderer
+          activeRouteId={activeRouteId}
+          data={data}
+          openCreateRequested={quickCreateRequested}
+          onChanged={setMessage}
+          onQuickCreateConsumed={() => {
+            setQuickCreateRequested(false);
+          }}
+          sectionStates={sectionStates}
+        />
       </section>
     </main>
   );
