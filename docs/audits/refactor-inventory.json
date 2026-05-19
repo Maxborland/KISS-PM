@@ -81,7 +81,7 @@
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
       "status": "in_progress",
-      "notes": "Do not split blindly. First completed sub-slice is REF-003A: pure shell state helpers extracted from App.tsx."
+      "notes": "Do not split blindly. Completed sub-slices: REF-003A shell state helpers and REF-003B route icon registry."
     },
     {
       "id": "REF-003A",
@@ -105,6 +105,28 @@
       ],
       "status": "completed",
       "notes": "SectionState moved to a neutral shell-state module; workspace-ui imports only its type. API error messages and permission checks are covered by characterization tests."
+    },
+    {
+      "id": "REF-003B",
+      "area": "web application route icon registry",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/workspaceRouteIcons.ts",
+        "apps/web/src/workspaceRouteIcons.test.ts"
+      ],
+      "problem": "App.tsx owned route icon metadata that belongs with shell route metadata rather than the main application component.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/workspaceRouteIcons.test.ts apps/web/src/routes.test.ts failed because workspaceRouteIcons did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/workspaceRouteIcons.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "Route icon registry now has coverage for every stable workspace route id. Test adjusted after verifying lucide icons can be React component objects, not only functions."
     },
     {
       "id": "REF-004",

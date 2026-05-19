@@ -7,17 +7,13 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
-  LayoutDashboard,
   Menu,
   Moon,
-  Palette,
   PlusCircle,
   Search,
   Settings,
   ShieldCheck,
-  UserCircle,
-  Users,
-  type LucideIcon
+  Users
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -106,17 +102,7 @@ import {
   type SectionState
 } from "./workspaceShellState";
 import { useDocumentThemeClass } from "./useDocumentThemeClass";
-
-const routeIcons: Record<WorkspaceRouteId, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  users: Users,
-  "access-roles": ShieldCheck,
-  positions: BriefcaseBusiness,
-  audit: Activity,
-  settings: Settings,
-  profile: UserCircle,
-  theme: Palette
-};
+import { workspaceRouteIcons } from "./workspaceRouteIcons";
 
 const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
 
@@ -549,7 +535,7 @@ export function App() {
             <section className="nav-group" key={group.id}>
               <p className="nav-group-label">{group.label}</p>
               {group.routes.map((route) => {
-                const RouteIcon = routeIcons[route.id];
+                const RouteIcon = workspaceRouteIcons[route.id];
 
                 return (
                   <button

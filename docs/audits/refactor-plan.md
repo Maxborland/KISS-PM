@@ -89,6 +89,17 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Добавлены characterization tests для permission matching, section state, metric hints и API error message mapping.
 - RED подтвержден отсутствующим модулем `workspaceShellState`; GREEN подтвержден targeted tests и web typecheck.
 
+#### REF-003B — route icon registry
+
+Статус: completed.
+
+Срез без изменения navigation behavior:
+
+- `workspaceRouteIcons` вынесен из `App.tsx` в `apps/web/src/workspaceRouteIcons.ts`.
+- Добавлен test, который проверяет, что каждый stable `WorkspaceRouteId` имеет icon reference.
+- RED подтвержден отсутствующим модулем `workspaceRouteIcons`.
+- При GREEN обнаружено неверное предположение теста: текущие `lucide-react` icons могут быть React component objects, не только functions. Тест уточнен на реальный runtime contract.
+
 ### REF-004 / REF-005 — API и persistence boundaries
 
 Статус: pending.
