@@ -4,10 +4,11 @@ import { parseOpportunityBody } from "./projectIntakeParsers";
 
 describe("project intake parsers", () => {
   const validOpportunityBody = {
-    clientName: "ООО Ромашка",
-    contactName: "Ирина Клиент",
+    clientId: "client-romashka",
+    primaryContactId: "contact-irina",
+    projectTypeId: "project-type-implementation",
+    stageId: "deal-stage-new",
     title: "Внедрение KISS PM",
-    projectType: "implementation",
     plannedStart: "2026-06-01",
     plannedFinish: "2026-06-12",
     contractValue: 960_000,

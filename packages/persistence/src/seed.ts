@@ -7,7 +7,11 @@ import { hashPassword } from "./auth";
 import type { KissPmDatabase } from "./connection";
 import {
   accessProfiles,
+  clients,
+  contacts,
+  dealStages,
   positions,
+  projectTypes,
   tenantUsers,
   tenants,
   userCredentials
@@ -25,6 +29,42 @@ export type SeedPosition = {
   description?: string | null;
 };
 
+export type SeedClient = {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  status?: string;
+};
+
+export type SeedContact = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  telegram?: string | null;
+  role?: string | null;
+  status?: string;
+};
+
+export type SeedProjectType = {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  status?: string;
+};
+
+export type SeedDealStage = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sortOrder: number;
+  status?: string;
+};
+
 export type SeedTenantUser = TenantUser & {
   email: string;
   positionId?: string | null;
@@ -40,6 +80,10 @@ export type SeedTenantDataset = {
   tenants: readonly Tenant[];
   accessProfiles: readonly SeedAccessProfile[];
   positions?: readonly SeedPosition[];
+  clients?: readonly SeedClient[];
+  contacts?: readonly SeedContact[];
+  projectTypes?: readonly SeedProjectType[];
+  dealStages?: readonly SeedDealStage[];
   users: readonly SeedTenantUser[];
 };
 
@@ -100,6 +144,106 @@ export async function seedTenantDataset(
             tenantId: sql`excluded.tenant_id`,
             name: sql`excluded.name`,
             description: sql`excluded.description`
+          }
+        });
+    }
+
+    for (const client of dataset.clients ?? []) {
+      await transaction
+        .insert(clients)
+        .values({
+          id: client.id,
+          tenantId: client.tenantId,
+          name: client.name,
+          description: client.description ?? null,
+          status: client.status ?? "active",
+          createdAt,
+          updatedAt: createdAt
+        })
+        .onConflictDoUpdate({
+          target: [clients.tenantId, clients.id],
+          set: {
+            name: sql`excluded.name`,
+            description: sql`excluded.description`,
+            status: sql`excluded.status`,
+            updatedAt: sql`excluded.updated_at`
+          }
+        });
+    }
+
+    for (const contact of dataset.contacts ?? []) {
+      await transaction
+        .insert(contacts)
+        .values({
+          id: contact.id,
+          tenantId: contact.tenantId,
+          clientId: contact.clientId,
+          name: contact.name,
+          email: contact.email ?? null,
+          phone: contact.phone ?? null,
+          telegram: contact.telegram ?? null,
+          role: contact.role ?? null,
+          status: contact.status ?? "active",
+          createdAt,
+          updatedAt: createdAt
+        })
+        .onConflictDoUpdate({
+          target: [contacts.tenantId, contacts.id],
+          set: {
+            clientId: sql`excluded.client_id`,
+            name: sql`excluded.name`,
+            email: sql`excluded.email`,
+            phone: sql`excluded.phone`,
+            telegram: sql`excluded.telegram`,
+            role: sql`excluded.role`,
+            status: sql`excluded.status`,
+            updatedAt: sql`excluded.updated_at`
+          }
+        });
+    }
+
+    for (const projectType of dataset.projectTypes ?? []) {
+      await transaction
+        .insert(projectTypes)
+        .values({
+          id: projectType.id,
+          tenantId: projectType.tenantId,
+          name: projectType.name,
+          description: projectType.description ?? null,
+          status: projectType.status ?? "active",
+          createdAt,
+          updatedAt: createdAt
+        })
+        .onConflictDoUpdate({
+          target: [projectTypes.tenantId, projectTypes.id],
+          set: {
+            name: sql`excluded.name`,
+            description: sql`excluded.description`,
+            status: sql`excluded.status`,
+            updatedAt: sql`excluded.updated_at`
+          }
+        });
+    }
+
+    for (const stage of dataset.dealStages ?? []) {
+      await transaction
+        .insert(dealStages)
+        .values({
+          id: stage.id,
+          tenantId: stage.tenantId,
+          name: stage.name,
+          sortOrder: stage.sortOrder,
+          status: stage.status ?? "active",
+          createdAt,
+          updatedAt: createdAt
+        })
+        .onConflictDoUpdate({
+          target: [dealStages.tenantId, dealStages.id],
+          set: {
+            name: sql`excluded.name`,
+            sortOrder: sql`excluded.sort_order`,
+            status: sql`excluded.status`,
+            updatedAt: sql`excluded.updated_at`
           }
         });
     }
@@ -179,6 +323,14 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.audit_events.read",
     "tenant.workspace_config.read",
     "tenant.workspace_config.manage",
+    "tenant.clients.read",
+    "tenant.clients.manage",
+    "tenant.contacts.read",
+    "tenant.contacts.manage",
+    "tenant.project_types.read",
+    "tenant.project_types.manage",
+    "tenant.deal_stages.read",
+    "tenant.deal_stages.manage",
     "tenant.opportunities.read",
     "tenant.opportunities.manage",
     "tenant.projects.read",

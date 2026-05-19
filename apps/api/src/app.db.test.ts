@@ -35,6 +35,14 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.audit_events.read",
         "tenant.workspace_config.read",
         "tenant.workspace_config.manage",
+        "tenant.clients.read",
+        "tenant.clients.manage",
+        "tenant.contacts.read",
+        "tenant.contacts.manage",
+        "tenant.project_types.read",
+        "tenant.project_types.manage",
+        "tenant.deal_stages.read",
+        "tenant.deal_stages.manage",
         "tenant.opportunities.read",
         "tenant.opportunities.manage",
         "tenant.projects.read",
@@ -60,6 +68,14 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.audit_events.read",
         "tenant.workspace_config.read",
         "tenant.workspace_config.manage",
+        "tenant.clients.read",
+        "tenant.clients.manage",
+        "tenant.contacts.read",
+        "tenant.contacts.manage",
+        "tenant.project_types.read",
+        "tenant.project_types.manage",
+        "tenant.deal_stages.read",
+        "tenant.deal_stages.manage",
         "tenant.opportunities.read",
         "tenant.opportunities.manage",
         "tenant.projects.read",
@@ -88,6 +104,46 @@ const apiSeedDataset: SeedTenantDataset = {
       id: "position-engineer",
       tenantId: "tenant-alpha",
       name: "Инженер"
+    }
+  ],
+  clients: [
+    {
+      id: "client-romashka",
+      tenantId: "tenant-alpha",
+      name: "ООО Ромашка",
+      description: "Клиент для Phase 3 intake"
+    }
+  ],
+  contacts: [
+    {
+      id: "contact-irina",
+      tenantId: "tenant-alpha",
+      clientId: "client-romashka",
+      name: "Ирина Клиент",
+      email: "irina@example.test",
+      role: "Заказчик"
+    }
+  ],
+  projectTypes: [
+    {
+      id: "project-type-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение",
+      description: "Проект внедрения"
+    }
+  ],
+  dealStages: [
+    {
+      id: "deal-stage-new",
+      tenantId: "tenant-alpha",
+      name: "Новая",
+      sortOrder: 10
+    },
+    {
+      id: "deal-stage-qualified",
+      tenantId: "tenant-alpha",
+      name: "Квалификация",
+      sortOrder: 20
     }
   ],
   users: [
@@ -141,12 +197,13 @@ describe("API with PostgreSQL data source", () => {
     client = createPostgresClient(databaseUrl);
     const db = createDatabase(client);
     app = createApp({
-      dataSource: createPostgresTenantDataSource(db)
+      dataSource: createPostgresTenantDataSource(db),
+      enableDevTenantRoutes: true
     });
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       apiSeedDataset,
@@ -155,7 +212,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -589,10 +646,11 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         id: "opportunity-phase-3",
-        clientName: "ООО Ромашка",
-        contactName: "Ирина Клиент",
+        clientId: "client-romashka",
+        primaryContactId: "contact-irina",
+        projectTypeId: "project-type-implementation",
+        stageId: "deal-stage-new",
         title: "Внедрение KISS PM",
-        projectType: "implementation",
         description: "Первичный проект внедрения",
         plannedStart: "2026-06-01",
         plannedFinish: "2026-06-12",
@@ -615,10 +673,11 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         id: "opportunity-invalid",
-        clientName: "ООО Ошибка",
-        contactName: "Нет Нормы",
+        clientId: "client-romashka",
+        primaryContactId: "contact-irina",
+        projectTypeId: "project-type-implementation",
+        stageId: "deal-stage-new",
         title: "Некорректная сделка",
-        projectType: "implementation",
         plannedStart: "2026-06-01",
         plannedFinish: "2026-06-12",
         contractValue: 100_000,
@@ -773,9 +832,10 @@ describe("API with PostgreSQL data source", () => {
   it("rechecks current resource capacity during project activation", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const baseOpportunity = {
-      clientName: "ООО Перегрузка",
-      contactName: "Ирина Клиент",
-      projectType: "implementation",
+      clientId: "client-romashka",
+      primaryContactId: "contact-irina",
+      projectTypeId: "project-type-implementation",
+      stageId: "deal-stage-new",
       plannedStart: "2026-06-01",
       plannedFinish: "2026-06-12",
       contractValue: 480_000,
@@ -889,9 +949,10 @@ describe("API with PostgreSQL data source", () => {
   it("serializes concurrent activations that compete for the same position capacity", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const baseOpportunity = {
-      clientName: "ООО Конкурентная Емкость",
-      contactName: "Ирина Клиент",
-      projectType: "implementation",
+      clientId: "client-romashka",
+      primaryContactId: "contact-irina",
+      projectTypeId: "project-type-implementation",
+      stageId: "deal-stage-new",
       plannedStart: "2026-06-01",
       plannedFinish: "2026-06-12",
       contractValue: 480_000,
@@ -1002,10 +1063,11 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         id: "opportunity-denied",
-        clientName: "ООО Нет Прав",
-        contactName: "Роман",
+        clientId: "client-romashka",
+        primaryContactId: "contact-irina",
+        projectTypeId: "project-type-implementation",
+        stageId: "deal-stage-new",
         title: "Недоступная сделка",
-        projectType: "implementation",
         plannedStart: "2026-06-01",
         plannedFinish: "2026-06-12",
         contractValue: 100_000,

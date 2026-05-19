@@ -15,10 +15,17 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
   ApiTenantDataSource,
+  ClientRecord,
+  ContactRecord,
+  DealStageRecord,
   ManagementAuditEventInput,
+  OpportunityInput,
   OpportunityRecord,
+  ProjectTypeRecord,
   ProjectRecord
 } from "./apiTypes";
+import { parseDealStageChangeBody } from "./crmParsers";
+import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseOpportunityBody,
   parseProjectActivationBody
@@ -68,12 +75,39 @@ export function registerProjectIntakeRoutes(
     });
   });
 
+  app.get("/api/workspace/opportunities/:opportunityId", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.findOpportunityById) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canReadOpportunities({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    const opportunity = await dataSource.findOpportunityById(
+      actor.tenantId,
+      context.req.param("opportunityId")
+    );
+    if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
+
+    return context.json({ opportunity });
+  });
+
   app.post("/api/workspace/opportunities", async (context) => {
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
       !dataSource.createOpportunity ||
       !dataSource.listOpportunities ||
+      !dataSource.findClientById ||
+      !dataSource.findContactById ||
+      !dataSource.findProjectTypeById ||
+      !dataSource.findDealStageById ||
       !dataSource.withTransaction ||
       !dataSource.appendAuditEvent
     ) {
@@ -97,9 +131,13 @@ export function registerProjectIntakeRoutes(
       return context.json({ error: decision.reason }, 403);
     }
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseOpportunityBody(body, actor.tenantId);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseOpportunityBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const linked = await resolveOpportunityLinks(dataSource, actor.tenantId, parsed.value);
+    if (!linked.ok) return context.json({ error: linked.error }, linked.status);
 
     const existing = await dataSource.listOpportunities(actor.tenantId);
     if (existing.some((opportunity) => opportunity.id === parsed.value.id)) {
@@ -112,7 +150,12 @@ export function registerProjectIntakeRoutes(
       }
 
       const createdOpportunity =
-        await transactionDataSource.createOpportunity(parsed.value);
+        await transactionDataSource.createOpportunity({
+          ...parsed.value,
+          clientName: linked.client.name,
+          contactName: linked.contact.name,
+          projectType: linked.projectType.name
+        });
       await appendManagementAuditEvent(
         {
           tenantId: actor.tenantId,
@@ -123,7 +166,12 @@ export function registerProjectIntakeRoutes(
             type: "Opportunity",
             id: createdOpportunity.id
           },
-          commandInput: parsed.value,
+          commandInput: {
+            ...parsed.value,
+            clientName: linked.client.name,
+            contactName: linked.contact.name,
+            projectType: linked.projectType.name
+          },
           beforeState: null,
           afterState: createdOpportunity,
           permissionResult: decision
@@ -135,6 +183,97 @@ export function registerProjectIntakeRoutes(
     });
 
     return context.json({ opportunity }, 201);
+  });
+
+  app.patch("/api/workspace/opportunities/:opportunityId/stage", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findOpportunityById ||
+      !dataSource.findDealStageById ||
+      !dataSource.updateOpportunityStage ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageOpportunities({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "opportunity.stage_update_denied",
+        sourceEntity: {
+          type: "Opportunity",
+          id: context.req.param("opportunityId")
+        },
+        commandInput: { opportunityId: context.req.param("opportunityId") },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseDealStageChangeBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const opportunity = await dataSource.findOpportunityById(
+      actor.tenantId,
+      context.req.param("opportunityId")
+    );
+    if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
+    if (isFinalOpportunityStatus(opportunity.status)) {
+      return context.json({ error: "opportunity_stage_locked" }, 409);
+    }
+
+    const stage = await dataSource.findDealStageById(actor.tenantId, parsed.value.stageId);
+    if (!stage || stage.status !== "active") {
+      return context.json({ error: "deal_stage_not_found" }, 404);
+    }
+
+    const updatedOpportunity = await runDataSourceTransaction(
+      async (transactionDataSource) => {
+        if (!transactionDataSource.updateOpportunityStage) {
+          throw new Error("transactional_opportunity_stage_not_configured");
+        }
+
+        const updated = await transactionDataSource.updateOpportunityStage({
+          tenantId: actor.tenantId,
+          opportunityId: opportunity.id,
+          stageId: stage.id
+        });
+        await appendManagementAuditEvent(
+          {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "opportunity.stage_updated",
+            sourceWorkflow: "crm_intake",
+            sourceEntity: {
+              type: "Opportunity",
+              id: opportunity.id
+            },
+            commandInput: {
+              opportunityId: opportunity.id,
+              stageId: stage.id
+            },
+            beforeState: opportunity,
+            afterState: updated,
+            permissionResult: decision
+          },
+          transactionDataSource
+        );
+
+        return updated;
+      }
+    );
+
+    return context.json({ opportunity: updatedOpportunity });
   });
 
   app.post("/api/workspace/opportunities/:opportunityId/feasibility", async (context) => {
@@ -301,8 +440,9 @@ export function registerProjectIntakeRoutes(
       return context.json({ error: projectDecision.reason }, 403);
     }
 
-    const body = await context.req.json().catch(() => ({}));
-    const parsed = parseProjectActivationBody(body);
+    const body = await readLimitedJsonBody(context, {});
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseProjectActivationBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const opportunity =
@@ -365,6 +505,8 @@ export function registerProjectIntakeRoutes(
           sourceOpportunityId: currentOpportunity.id,
           title: currentOpportunity.title,
           clientName: currentOpportunity.clientName,
+          clientId: currentOpportunity.clientId,
+          projectTypeId: currentOpportunity.projectTypeId,
           status: "active",
           plannedStart: currentOpportunity.plannedStart,
           plannedFinish: currentOpportunity.plannedFinish,
@@ -467,6 +609,53 @@ export function registerProjectIntakeRoutes(
 
 function isFinalOpportunityStatus(status: string): boolean {
   return status === "converted" || status === "rejected";
+}
+
+async function resolveOpportunityLinks(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  input: OpportunityInput
+): Promise<
+  | {
+      ok: true;
+      client: ClientRecord;
+      contact: ContactRecord;
+      projectType: ProjectTypeRecord;
+      stage: DealStageRecord;
+    }
+  | {
+      ok: false;
+      status: 404 | 501;
+      error: string;
+    }
+> {
+  const client = await dataSource.findClientById?.(tenantId, input.clientId ?? "");
+  if (!client || client.status !== "active") {
+    return { ok: false, status: 404, error: "client_not_found" };
+  }
+
+  const contact = await dataSource.findContactById?.(
+    tenantId,
+    input.primaryContactId ?? ""
+  );
+  if (!contact || contact.status !== "active" || contact.clientId !== client.id) {
+    return { ok: false, status: 404, error: "contact_not_found" };
+  }
+
+  const projectType = await dataSource.findProjectTypeById?.(
+    tenantId,
+    input.projectTypeId ?? ""
+  );
+  if (!projectType || projectType.status !== "active") {
+    return { ok: false, status: 404, error: "project_type_not_found" };
+  }
+
+  const stage = await dataSource.findDealStageById?.(tenantId, input.stageId ?? "");
+  if (!stage || stage.status !== "active") {
+    return { ok: false, status: 404, error: "deal_stage_not_found" };
+  }
+
+  return { ok: true, client, contact, projectType, stage };
 }
 
 function isSingleUseActivationError(error: unknown): boolean {

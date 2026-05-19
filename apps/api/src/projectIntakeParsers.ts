@@ -36,10 +36,14 @@ export function parseOpportunityBody(
 
   const input = body as Record<string, unknown>;
   const id = getOptionalString(input, "id") ?? `opportunity-${crypto.randomUUID()}`;
-  const clientName = getOptionalString(input, "clientName");
+  const clientId = getOptionalString(input, "clientId");
+  const primaryContactId = getOptionalString(input, "primaryContactId");
+  const projectTypeId = getOptionalString(input, "projectTypeId");
+  const stageId = getOptionalString(input, "stageId");
+  const clientName = getOptionalString(input, "clientName") ?? "";
   const contactName = getOptionalString(input, "contactName") ?? "";
   const title = getOptionalString(input, "title");
-  const projectType = getOptionalString(input, "projectType");
+  const projectType = getOptionalString(input, "projectType") ?? "";
   const description = getOptionalString(input, "description") ?? "";
   const plannedStart = parseDate(input.plannedStart);
   const plannedFinish = parseDate(input.plannedFinish);
@@ -50,7 +54,19 @@ export function parseOpportunityBody(
   const demand = parseDemand(input.demand);
 
   if (!idPattern.test(id)) return { ok: false, error: "invalid_opportunity_id" };
-  if (!clientName || clientName.length > maxLengths.clientName) {
+  if (!clientId || !idPattern.test(clientId)) {
+    return { ok: false, error: "invalid_client_id" };
+  }
+  if (!primaryContactId || !idPattern.test(primaryContactId)) {
+    return { ok: false, error: "invalid_primary_contact_id" };
+  }
+  if (!projectTypeId || !idPattern.test(projectTypeId)) {
+    return { ok: false, error: "invalid_project_type_id" };
+  }
+  if (!stageId || !idPattern.test(stageId)) {
+    return { ok: false, error: "invalid_deal_stage_id" };
+  }
+  if (clientName.length > maxLengths.clientName) {
     return { ok: false, error: "invalid_client_name" };
   }
   if (contactName.length > maxLengths.contactName) {
@@ -59,7 +75,7 @@ export function parseOpportunityBody(
   if (!title || title.length > maxLengths.title) {
     return { ok: false, error: "invalid_opportunity_title" };
   }
-  if (!projectType || projectType.length > maxLengths.projectType) {
+  if (projectType.length > maxLengths.projectType) {
     return { ok: false, error: "invalid_project_type" };
   }
   if (description.length > maxLengths.description) {
@@ -88,6 +104,10 @@ export function parseOpportunityBody(
     value: {
       id,
       tenantId,
+      clientId,
+      primaryContactId,
+      projectTypeId,
+      stageId,
       clientName,
       contactName,
       title,

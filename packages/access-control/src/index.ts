@@ -10,6 +10,14 @@ export const permissions = [
   "tenant.audit_events.read",
   "tenant.workspace_config.read",
   "tenant.workspace_config.manage",
+  "tenant.clients.read",
+  "tenant.clients.manage",
+  "tenant.contacts.read",
+  "tenant.contacts.manage",
+  "tenant.project_types.read",
+  "tenant.project_types.manage",
+  "tenant.deal_stages.read",
+  "tenant.deal_stages.manage",
   "tenant.opportunities.read",
   "tenant.opportunities.manage",
   "tenant.projects.read",
@@ -145,6 +153,94 @@ export function canReadOpportunities(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.opportunities.read"
+  });
+}
+
+export function canReadClients(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.clients.read"
+  });
+}
+
+export function canManageClients(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.clients.manage"
+  });
+}
+
+export function canReadContacts(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.contacts.read"
+  });
+}
+
+export function canManageContacts(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.contacts.manage"
+  });
+}
+
+export function canReadProjectTypes(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_types.read"
+  });
+}
+
+export function canManageProjectTypes(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_types.manage"
+  });
+}
+
+export function canReadDealStages(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.deal_stages.read"
+  });
+}
+
+export function canManageDealStages(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.deal_stages.manage"
   });
 }
 

@@ -23,6 +23,18 @@ import {
   type ProjectIntakeRepository
 } from "./projectIntakeRepository";
 import {
+  createCrmRepository,
+  type ClientInput,
+  type ClientRecord,
+  type ContactInput,
+  type ContactRecord,
+  type CrmRepository,
+  type DealStageInput,
+  type DealStageRecord,
+  type ProjectTypeInput,
+  type ProjectTypeRecord
+} from "./crmRepository";
+import {
   mapAccessProfileRecord,
   mapPositionRecord,
   mapTenantUser,
@@ -83,6 +95,16 @@ export type ProjectTemplateInput = Omit<
   ProjectTemplateRecord,
   "createdAt" | "updatedAt"
 >;
+export type {
+  ClientInput,
+  ClientRecord,
+  ContactInput,
+  ContactRecord,
+  DealStageInput,
+  DealStageRecord,
+  ProjectTypeInput,
+  ProjectTypeRecord
+};
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;
@@ -98,7 +120,7 @@ export type UserSessionRecord = {
   expiresAt: Date;
 };
 
-export type PostgresTenantDataSource = ProjectIntakeRepository & {
+export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -151,6 +173,7 @@ export function createPostgresTenantDataSource(
 ): PostgresTenantDataSource {
   return {
     db,
+    ...createCrmRepository(db),
     ...createProjectIntakeRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {

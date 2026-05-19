@@ -111,6 +111,116 @@ export const projectTemplates = pgTable(
   ]
 );
 
+export const clients = pgTable(
+  "clients",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "clients_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("clients_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("clients_tenant_id_name_uidx").on(table.tenantId, table.name)
+  ]
+);
+
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    name: text("name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    telegram: text("telegram"),
+    role: text("role"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "contacts_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "contacts_client_fk",
+      columns: [table.tenantId, table.clientId],
+      foreignColumns: [clients.tenantId, clients.id]
+    }).onDelete("cascade"),
+    index("contacts_tenant_id_idx").on(table.tenantId),
+    index("contacts_tenant_client_id_idx").on(table.tenantId, table.clientId),
+    uniqueIndex("contacts_tenant_id_client_id_id_uidx").on(
+      table.tenantId,
+      table.clientId,
+      table.id
+    )
+  ]
+);
+
+export const projectTypes = pgTable(
+  "project_types",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_types_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("project_types_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("project_types_tenant_id_name_uidx").on(table.tenantId, table.name)
+  ]
+);
+
+export const dealStages = pgTable(
+  "deal_stages",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "deal_stages_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("deal_stages_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("deal_stages_tenant_id_sort_order_uidx").on(
+      table.tenantId,
+      table.sortOrder
+    ),
+    uniqueIndex("deal_stages_tenant_id_name_uidx").on(table.tenantId, table.name)
+  ]
+);
+
 export const opportunities = pgTable(
   "opportunities",
   {
@@ -118,6 +228,10 @@ export const opportunities = pgTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: text("client_id"),
+    primaryContactId: text("primary_contact_id"),
+    projectTypeId: text("project_type_id"),
+    stageId: text("stage_id"),
     clientName: text("client_name").notNull(),
     contactName: text("contact_name").notNull(),
     title: text("title").notNull(),
@@ -142,8 +256,29 @@ export const opportunities = pgTable(
       name: "opportunities_pkey",
       columns: [table.tenantId, table.id]
     }),
+    foreignKey({
+      name: "opportunities_client_fk",
+      columns: [table.tenantId, table.clientId],
+      foreignColumns: [clients.tenantId, clients.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_primary_contact_client_fk",
+      columns: [table.tenantId, table.clientId, table.primaryContactId],
+      foreignColumns: [contacts.tenantId, contacts.clientId, contacts.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_project_type_fk",
+      columns: [table.tenantId, table.projectTypeId],
+      foreignColumns: [projectTypes.tenantId, projectTypes.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_stage_fk",
+      columns: [table.tenantId, table.stageId],
+      foreignColumns: [dealStages.tenantId, dealStages.id]
+    }).onDelete("restrict"),
     index("opportunities_tenant_id_idx").on(table.tenantId),
-    index("opportunities_status_idx").on(table.status)
+    index("opportunities_status_idx").on(table.status),
+    index("opportunities_stage_id_idx").on(table.tenantId, table.stageId)
   ]
 );
 
@@ -182,6 +317,8 @@ export const projects = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     sourceOpportunityId: text("source_opportunity_id").notNull(),
+    clientId: text("client_id"),
+    projectTypeId: text("project_type_id"),
     title: text("title").notNull(),
     clientName: text("client_name").notNull(),
     status: text("status").notNull(),
@@ -202,6 +339,16 @@ export const projects = pgTable(
       name: "projects_source_opportunity_fk",
       columns: [table.tenantId, table.sourceOpportunityId],
       foreignColumns: [opportunities.tenantId, opportunities.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "projects_client_fk",
+      columns: [table.tenantId, table.clientId],
+      foreignColumns: [clients.tenantId, clients.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "projects_project_type_fk",
+      columns: [table.tenantId, table.projectTypeId],
+      foreignColumns: [projectTypes.tenantId, projectTypes.id]
     }).onDelete("restrict"),
     uniqueIndex("projects_tenant_source_opportunity_uidx").on(
       table.tenantId,
@@ -351,6 +498,10 @@ export type PersistenceTableName =
   | "positions"
   | "custom_field_definitions"
   | "project_templates"
+  | "clients"
+  | "contacts"
+  | "project_types"
+  | "deal_stages"
   | "opportunities"
   | "opportunity_demands"
   | "projects"
@@ -373,6 +524,10 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "positions",
   "custom_field_definitions",
   "project_templates",
+  "clients",
+  "contacts",
+  "project_types",
+  "deal_stages",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -388,6 +543,10 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "positions",
   "custom_field_definitions",
   "project_templates",
+  "clients",
+  "contacts",
+  "project_types",
+  "deal_stages",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -424,9 +583,53 @@ const tableColumns = {
     "created_at",
     "updated_at"
   ],
+  clients: [
+    "id",
+    "tenant_id",
+    "name",
+    "description",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  contacts: [
+    "id",
+    "tenant_id",
+    "client_id",
+    "name",
+    "email",
+    "phone",
+    "telegram",
+    "role",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  project_types: [
+    "id",
+    "tenant_id",
+    "name",
+    "description",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  deal_stages: [
+    "id",
+    "tenant_id",
+    "name",
+    "sort_order",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
   opportunities: [
     "id",
     "tenant_id",
+    "client_id",
+    "primary_contact_id",
+    "project_type_id",
+    "stage_id",
     "client_name",
     "contact_name",
     "title",
@@ -456,6 +659,8 @@ const tableColumns = {
     "id",
     "tenant_id",
     "source_opportunity_id",
+    "client_id",
+    "project_type_id",
     "title",
     "client_name",
     "status",

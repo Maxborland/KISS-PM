@@ -12,7 +12,7 @@ describe("KISS PM API Phase 1 shell", () => {
   });
 
   it("lists deterministic dev users for local Phase 1 login", async () => {
-    const app = createApp();
+    const app = createApp({ enableDevTenantRoutes: true });
 
     const response = await app.request("/api/session/dev-users");
 
@@ -34,7 +34,7 @@ describe("KISS PM API Phase 1 shell", () => {
   });
 
   it("returns the current tenant for the dev-session user", async () => {
-    const app = createApp();
+    const app = createApp({ enableDevTenantRoutes: true });
 
     const response = await app.request("/api/tenant/current", {
       headers: { "x-user-id": "user-alpha-admin" }
@@ -55,7 +55,7 @@ describe("KISS PM API Phase 1 shell", () => {
   });
 
   it("denies cross-tenant user reads", async () => {
-    const app = createApp();
+    const app = createApp({ enableDevTenantRoutes: true });
 
     const response = await app.request("/api/tenant/tenant-beta/users", {
       headers: { "x-user-id": "user-alpha-admin" }
@@ -65,6 +65,18 @@ describe("KISS PM API Phase 1 shell", () => {
     await expect(response.json()).resolves.toEqual({
       error: "cross_tenant_denied"
     });
+  });
+
+  it("keeps dev header routes disabled unless explicitly enabled", async () => {
+    const app = createApp();
+
+    const devUsers = await app.request("/api/session/dev-users");
+    const currentTenant = await app.request("/api/tenant/current", {
+      headers: { "x-user-id": "user-alpha-admin" }
+    });
+
+    expect(devUsers.status).toBe(404);
+    expect(currentTenant.status).toBe(404);
   });
 
   it("sets no-store cache headers even for early API rejections", async () => {
@@ -83,6 +95,7 @@ describe("KISS PM API Phase 1 shell", () => {
 
   it("can serve tenant users from an injected data source", async () => {
     const app = createApp({
+      enableDevTenantRoutes: true,
       dataSource: {
         async listDevUsers() {
           return [
@@ -142,6 +155,7 @@ describe("KISS PM API Phase 1 shell", () => {
 
   it("fails closed when an actor access profile is missing", async () => {
     const app = createApp({
+      enableDevTenantRoutes: true,
       dataSource: {
         async listDevUsers() {
           return [];
@@ -183,6 +197,7 @@ describe("KISS PM API Phase 1 shell", () => {
 
   it("fails closed when a persisted actor cannot resolve access profile repository", async () => {
     const app = createApp({
+      enableDevTenantRoutes: true,
       dataSource: {
         async listDevUsers() {
           return [];

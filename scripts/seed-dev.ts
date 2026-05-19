@@ -36,6 +36,54 @@ const dataset: SeedTenantDataset = {
       description: "Участвует в проектных работах и ресурсном планировании"
     }
   ],
+  clients: [
+    {
+      id: "client-romashka",
+      tenantId: "tenant-alpha",
+      name: "ООО Ромашка",
+      description: "Демо-клиент для CRM intake"
+    }
+  ],
+  contacts: [
+    {
+      id: "contact-irina",
+      tenantId: "tenant-alpha",
+      clientId: "client-romashka",
+      name: "Ирина Клиент",
+      email: "irina@romashka.example",
+      phone: "+7 913 000-00-00",
+      telegram: "@irina_client",
+      role: "Заказчик"
+    }
+  ],
+  projectTypes: [
+    {
+      id: "project-type-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение",
+      description: "Проект внедрения продукта или системы"
+    }
+  ],
+  dealStages: [
+    {
+      id: "deal-stage-new",
+      tenantId: "tenant-alpha",
+      name: "Новая",
+      sortOrder: 10
+    },
+    {
+      id: "deal-stage-qualified",
+      tenantId: "tenant-alpha",
+      name: "Квалификация",
+      sortOrder: 20
+    },
+    {
+      id: "deal-stage-ready",
+      tenantId: "tenant-alpha",
+      name: "Готова к оценке",
+      sortOrder: 30
+    }
+  ],
   users: demo.users.map((user) => ({
     ...user,
     email:

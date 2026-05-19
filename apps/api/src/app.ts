@@ -19,6 +19,7 @@ import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerCrmRoutes } from "./crmRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
@@ -34,6 +35,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
   const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
+  const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
 
   app.onError((error, context) => {
     const response = resolveAppErrorResponse(error);
@@ -173,9 +175,12 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
-  registerDevTenantRoutes(app, routeDeps);
+  if (enableDevTenantRoutes) {
+    registerDevTenantRoutes(app, routeDeps);
+  }
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
+  registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
