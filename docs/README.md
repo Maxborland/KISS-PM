@@ -28,6 +28,7 @@
 22. `21_PHASE_2_3_SINGLE_WORKSPACE_CONFIG_AUDIT.md` — audit viewer, negative RBAC и первый custom fields/templates baseline.
 23. `22_PHASE_3_CRM_INTAKE_ACTIVE_PROJECT.md` — manual CRM intake, demand `должность + часы`, ресурсная проверка и активация проекта.
 24. `23_PHASE_3_1_CRM_FOUNDATION_DEAL_UX.md` — клиенты, контакты, типы проектов, этапы сделок, детали сделки, list/kanban views и UI/UX cleanup.
+25. `24_PHASE_4_PROJECT_LIFECYCLE_TASKS_MY_WORK.md` — starter-срез project lifecycle: Task, participant roles, project detail, My Work и audit.
 
 ## Референсы
 
@@ -39,9 +40,11 @@
 
 ## Статус новой реализации
 
-Новая реализация начинается с Phase 1 Node + pnpm skeleton: `apps/api`, `apps/web`, `packages/domain`, `packages/access-control`, `packages/persistence`, `packages/test-fixtures`. PostgreSQL для разработки поднимается через Docker Compose и наполняется demo данными через `pnpm db:seed:dev`; browser smoke проверяется через `pnpm test:e2e:smoke`. Phase 2 стартовала с access profile admin flow, а затем была сужена до single-workspace foundation: вход, пользователи, роли доступа, должности, профиль, тема, RBAC и audit без отдельной SaaS-админки. Phase 2.3 закрыла audit viewer, negative RBAC и базовые workspace settings для custom fields/templates. Phase 3 добавляет ручные возможности, расчет плановых часов из стоимости и ставки, demand `должность + часы`, resource feasibility и governed activation проекта через lifecycle `Project status=draft -> active`. Phase 3.1 укрепляет CRM/intake foundation: клиенты и контакты вынесены в отдельные CRM-страницы, типы проектов и этапы сделок вынесены в настройки, справочники можно создавать, редактировать и архивировать с audit trail, а раздел `Сделки` отвечает за list/kanban/detail, resource feasibility и активацию без fake UI controls.
+Новая реализация начинается с Phase 1 Node + pnpm skeleton: `apps/api`, `apps/web`, `packages/domain`, `packages/access-control`, `packages/persistence`, `packages/test-fixtures`. PostgreSQL для разработки поднимается через Docker Compose и наполняется demo данными через `pnpm db:seed:dev`; browser smoke проверяется через `pnpm test:e2e:smoke`. Phase 2 стартовала с access profile admin flow, а затем была сужена до single-workspace foundation: вход, пользователи, роли доступа, должности, профиль, тема, RBAC и audit без отдельной SaaS-админки. Phase 2.3 закрыла audit viewer, negative RBAC и базовые workspace settings для custom fields/templates. Phase 3 добавляет ручные возможности, расчет плановых часов из стоимости и ставки, demand `должность + часы`, resource feasibility и governed activation проекта через lifecycle `Project status=draft -> active`. Phase 3.1 укрепляет CRM/intake foundation: клиенты и контакты вынесены в отдельные CRM-страницы, типы проектов и этапы сделок вынесены в настройки, справочники можно создавать, редактировать и архивировать с audit trail, а раздел `Сделки` отвечает за list/kanban/detail, resource feasibility и активацию без fake UI controls. Phase 4 starter добавляет tenant-scoped `Task`, участников задач, детали активного проекта, создание задачи с audit trail и раздел `Моя работа`.
 
 Текущий web runtime: `apps/web` является Next.js App Router приложением. API остается отдельным Node/Hono backend в `apps/api`. Authenticated workspace shell остается Client Components UI поверх cookie-сессии `kiss_pm_session`, а server-state слой живет в TanStack Query внутри Next client provider. В dev web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, а `/api/...` и `/health` маршрутизируются через Next rewrites в API runtime.
+
+Browser smoke `pnpm test:e2e:smoke` запускает собственные процессы на изолированных портах `3100/4100`, чтобы не проверять случайно уже запущенный Docker/dev runtime на `3000/4000`. При необходимости используются `E2E_WEB_PORT` и `E2E_API_PORT`.
 
 Для постоянной локальной разработки используется Docker Compose runtime:
 

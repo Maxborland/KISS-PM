@@ -24,6 +24,7 @@ import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
+import { registerProjectWorkRoutes } from "./projectWorkRoutes";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -182,6 +183,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAuditRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
+  registerProjectWorkRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

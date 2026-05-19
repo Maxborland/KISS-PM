@@ -462,6 +462,68 @@ export const userSessions = pgTable(
   ]
 );
 
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    stageId: text("stage_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("todo"),
+    priority: text("priority").notNull().default("normal"),
+    plannedStart: timestamp("planned_start", { withTimezone: true }).notNull(),
+    plannedFinish: timestamp("planned_finish", { withTimezone: true }).notNull(),
+    plannedWork: integer("planned_work").notNull(),
+    actualWork: integer("actual_work").notNull().default(0),
+    progress: integer("progress").notNull().default(0),
+    source: text("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tasks_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "tasks_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    index("tasks_tenant_project_id_idx").on(table.tenantId, table.projectId),
+    index("tasks_tenant_status_idx").on(table.tenantId, table.status)
+  ]
+);
+
+export const taskParticipants = pgTable(
+  "task_participants",
+  {
+    tenantId: text("tenant_id").notNull(),
+    taskId: text("task_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_participants_pkey",
+      columns: [table.tenantId, table.taskId, table.userId, table.role]
+    }),
+    foreignKey({
+      name: "task_participants_task_fk",
+      columns: [table.tenantId, table.taskId],
+      foreignColumns: [tasks.tenantId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_participants_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("task_participants_tenant_user_id_idx").on(table.tenantId, table.userId)
+  ]
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -506,6 +568,8 @@ export type PersistenceTableName =
   | "opportunity_demands"
   | "projects"
   | "project_position_demands"
+  | "tasks"
+  | "task_participants"
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
@@ -532,6 +596,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "tasks",
+  "task_participants",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -551,6 +617,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "tasks",
+  "task_participants",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -678,6 +746,25 @@ const tableColumns = {
     "position_id",
     "required_hours"
   ],
+  tasks: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "stage_id",
+    "title",
+    "description",
+    "status",
+    "priority",
+    "planned_start",
+    "planned_finish",
+    "planned_work",
+    "actual_work",
+    "progress",
+    "source",
+    "created_at",
+    "updated_at"
+  ],
+  task_participants: ["tenant_id", "task_id", "user_id", "role"],
   tenant_users: [
     "id",
     "tenant_id",

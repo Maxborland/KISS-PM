@@ -15,6 +15,7 @@ import {
   useLoginMutation,
   useLogoutMutation,
   useMeQuery,
+  useMyWorkQuery,
   useOpportunitiesQuery,
   usePositionsQuery,
   useProjectsQuery,
@@ -53,6 +54,7 @@ export function useWorkspaceShellData() {
   const dealStagesQuery = useDealStagesQuery(canReadDealStages);
   const opportunitiesQuery = useOpportunitiesQuery(canReadOpportunities);
   const projectsQuery = useProjectsQuery(canReadProjects);
+  const myWorkQuery = useMyWorkQuery(canReadProjects);
   const customFieldsQuery = useCustomFieldsQuery(canReadWorkspaceConfig);
   const projectTemplatesQuery = useProjectTemplatesQuery(canReadWorkspaceConfig);
   const visibleRoutes = useMemo(() => getVisibleRoutes(permissions), [permissions]);
@@ -74,6 +76,7 @@ export function useWorkspaceShellData() {
       dealStages: dealStagesQuery.data,
       opportunities: opportunitiesQuery.data,
       projects: projectsQuery.data,
+      myWork: myWorkQuery.data,
       customFields: customFieldsQuery.data,
       projectTemplates: projectTemplatesQuery.data
     });
@@ -86,6 +89,7 @@ export function useWorkspaceShellData() {
     healthQuery.data?.status,
     healthQuery.isError,
     meQuery.data,
+    myWorkQuery.data?.tasks,
     permissions,
     opportunitiesQuery.data?.opportunities,
     projectTypesQuery.data?.projectTypes,
@@ -133,6 +137,7 @@ export function useWorkspaceShellData() {
         opportunitiesQuery.error
       ),
       projects: getSectionState(canReadProjects, projectsQuery.isFetching, projectsQuery.error),
+      myWork: getSectionState(canReadProjects, myWorkQuery.isFetching, myWorkQuery.error),
       workspaceConfig: getSectionState(
         canReadWorkspaceConfig,
         customFieldsQuery.isFetching || projectTemplatesQuery.isFetching,

@@ -202,6 +202,19 @@
   align-items: start;
 }
 
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.detail-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .detail-card {
   min-width: 0;
   display: grid;
@@ -214,4 +227,20 @@
 
 .detail-card h2 {
   font-size: 15px;
+}
+
+.modal-form {
+  padding-top: 2px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.secondary-button.compact {
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: 12px;
 }

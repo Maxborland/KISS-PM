@@ -485,6 +485,26 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     page.getByRole("row", { name: new RegExp(`Контур внедрения ${suffix}`) })
   ).toBeVisible();
+  await page
+    .getByRole("row", { name: new RegExp(`Контур внедрения ${suffix}`) })
+    .getByRole("button", { name: "Открыть" })
+    .click();
+  await expect(page).toHaveURL(/\/projects\/project-/);
+  await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix}` }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Создать задачу" }).click();
+  const createTaskDialog = page.getByRole("dialog", { name: "Создать задачу" });
+  await expect(createTaskDialog).toBeVisible();
+  await createTaskDialog.getByLabel("Название").fill(`План работ ${suffix}`);
+  await createTaskDialog.getByLabel("Старт").fill("2026-06-02");
+  await createTaskDialog.getByLabel("Финиш").fill("2026-06-05");
+  await createTaskDialog.getByLabel("Плановые часы").fill("24");
+  await createTaskDialog.getByRole("button", { name: "Создать задачу" }).click();
+  await expect(page.getByText("Задача создана и записана в аудит.")).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) })).toBeVisible();
+  await page.getByRole("button", { name: "Моя работа" }).click();
+  await expect(page).toHaveURL(/\/my-work$/);
+  await expect(page.getByRole("heading", { name: "Моя работа" }).first()).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) })).toBeVisible();
 
   await page
     .getByRole("complementary")
@@ -507,6 +527,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Этап сделки изменен").first()).toBeVisible();
   await expect(page.getByText("Ресурсная проверка сделки выполнена").first()).toBeVisible();
   await expect(page.getByText("Проект активирован").first()).toBeVisible();
+  await expect(page.getByText("Задача создана").first()).toBeVisible();
   await expect(page.getByText(new RegExp(`Название: Приоритет ${suffix} -> Приоритет проекта ${suffix}`))).toBeVisible();
   await expect(page.getByText(new RegExp(`Название: Внедрение ${suffix} -> Внедрение проекта ${suffix}`))).toBeVisible();
 

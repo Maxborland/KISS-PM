@@ -17,6 +17,7 @@ import {
 
 export function ProjectsView(props: {
   data: WorkspaceData;
+  onOpenProject: (projectId: string) => void;
   sectionState: SectionState;
 }) {
   const [tableSearch, setTableSearch] = useState("");
@@ -71,12 +72,13 @@ export function ProjectsView(props: {
                 <th>План</th>
                 <th>Потребность</th>
                 <th>Статус</th>
+                <th>Действие</th>
               </tr>
             </thead>
             <tbody>
               {filteredProjects.length === 0 ? (
                 <TableEmpty
-                  colSpan={5}
+                  colSpan={6}
                   label={
                     props.data.projects.length === 0
                       ? "Активных проектов пока нет."
@@ -85,7 +87,7 @@ export function ProjectsView(props: {
                 />
               ) : (
                 filteredProjects.map((project) => (
-                  <tr key={project.id}>
+                  <tr key={project.id} className="clickable-row">
                     <td>
                       <span className="entity-name-cell">
                         <span className="row-avatar">P</span>
@@ -114,6 +116,15 @@ export function ProjectsView(props: {
                         label={project.status === "active" ? "Активен" : project.status}
                         tone={project.status === "active" ? "success" : "muted"}
                       />
+                    </td>
+                    <td>
+                      <button
+                        className="secondary-button compact"
+                        type="button"
+                        onClick={() => props.onOpenProject(project.id)}
+                      >
+                        Открыть
+                      </button>
                     </td>
                   </tr>
                 ))

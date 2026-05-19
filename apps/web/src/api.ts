@@ -234,6 +234,52 @@ export type Project = {
   demand: PositionDemand[];
 };
 
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+export type TaskPriority = "low" | "normal" | "high" | "critical";
+export type TaskParticipantRole =
+  | "executor"
+  | "co_executor"
+  | "requester"
+  | "controller"
+  | "approver"
+  | "observer";
+
+export type TaskParticipant = {
+  userId: string;
+  role: TaskParticipantRole;
+};
+
+export type Task = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  stageId: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  plannedStart: string;
+  plannedFinish: string;
+  plannedWork: number;
+  actualWork: number;
+  progress: number;
+  source: "manual";
+  createdAt: string;
+  updatedAt: string;
+  participants: TaskParticipant[];
+};
+
+export type TaskInput = {
+  id?: string | undefined;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  plannedStart: string;
+  plannedFinish: string;
+  plannedWork: number;
+  participants: TaskParticipant[];
+};
+
 export type OpportunityInput = {
   id?: string;
   clientId: string;
@@ -616,6 +662,32 @@ export async function activateOpportunityProject(
 
 export async function fetchProjects(): Promise<{ projects: Project[] }> {
   return requestJson("/api/workspace/projects");
+}
+
+export async function fetchProjectDetail(
+  projectId: string
+): Promise<{ project: Project; tasks: Task[] }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}`);
+}
+
+export async function fetchProjectTasks(
+  projectId: string
+): Promise<{ tasks: Task[] }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}/tasks`);
+}
+
+export async function fetchMyWork(): Promise<{ tasks: Task[] }> {
+  return requestJson("/api/workspace/my-work");
+}
+
+export async function createProjectTask(
+  projectId: string,
+  input: TaskInput
+): Promise<{ task: Task }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}/tasks`, {
+    method: "POST",
+    body: input
+  });
 }
 
 async function requestJson<T>(

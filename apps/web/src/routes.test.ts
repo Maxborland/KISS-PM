@@ -15,6 +15,7 @@ describe("workspace route model", () => {
   it("keeps stable route ids for the single-workspace shell", () => {
     expect(workspaceRoutes.map((route) => route.id)).toEqual([
       "dashboard",
+      "my-work",
       "opportunities",
       "projects",
       "clients",
@@ -53,12 +54,12 @@ describe("workspace route model", () => {
       {
         id: "admin",
         label: "Администрирование",
-        routes: [workspaceRoutes[5], workspaceRoutes[6]]
+        routes: [workspaceRoutes[6], workspaceRoutes[7]]
       },
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[12]]
+        routes: [workspaceRoutes[13]]
       }
     ]);
   });
@@ -80,12 +81,12 @@ describe("workspace route model", () => {
       {
         id: "crm",
         label: "CRM",
-        routes: [workspaceRoutes[3], workspaceRoutes[4]]
+        routes: [workspaceRoutes[4], workspaceRoutes[5]]
       },
       {
         id: "settings",
         label: "Настройки",
-        routes: [workspaceRoutes[10], workspaceRoutes[11]]
+        routes: [workspaceRoutes[11], workspaceRoutes[12]]
       }
     ]);
   });
@@ -114,6 +115,8 @@ describe("workspace route model", () => {
     expect(getRouteIdFromPathname("/opportunities")).toBe("opportunities");
     expect(getRouteIdFromPathname("/opportunities/opportunity-1")).toBe("opportunities");
     expect(getRouteIdFromPathname("/projects")).toBe("projects");
+    expect(getRouteIdFromPathname("/projects/project-1")).toBe("projects");
+    expect(getRouteIdFromPathname("/my-work")).toBe("my-work");
     expect(getRouteIdFromPathname("/audit")).toBe("audit");
     expect(getRouteIdFromPathname("/settings")).toBe("settings");
     expect(getRouteIdFromPathname("/settings/project-types")).toBe("project-types");
@@ -123,6 +126,7 @@ describe("workspace route model", () => {
 
   it("returns real Next paths for workspace routes", () => {
     expect(getRoutePath("dashboard")).toBe("/dashboard");
+    expect(getRoutePath("my-work")).toBe("/my-work");
     expect(getRoutePath("opportunities")).toBe("/opportunities");
     expect(getRoutePath("projects")).toBe("/projects");
     expect(getRoutePath("clients")).toBe("/clients");

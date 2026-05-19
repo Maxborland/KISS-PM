@@ -5,6 +5,8 @@ import { DashboardView } from "./DashboardView";
 import { OpportunityDetailView } from "./OpportunityDetailView";
 import { OpportunitiesView } from "./OpportunitiesView";
 import { PositionsView } from "./PositionsView";
+import { ProjectDetailView } from "./ProjectDetailView";
+import { MyWorkView } from "./MyWorkView";
 import { ProjectsView } from "./ProjectsView";
 import { RolesView } from "./RolesView";
 import { DealStagesView, ProjectTypesView } from "./SettingsReferenceViews";
@@ -17,11 +19,14 @@ import { type SectionState } from "./workspaceShellState";
 export function WorkspaceRouteRenderer(props: {
   activeRouteId: WorkspaceRouteId;
   activeOpportunityId: string | null;
+  activeProjectId: string | null;
   data: WorkspaceData;
   openCreateRequested: boolean;
   onChanged: (message: string) => void;
   onBackToOpportunities: () => void;
   onOpenOpportunity: (opportunityId: string) => void;
+  onBackToProjects: () => void;
+  onOpenProject: (projectId: string) => void;
   onQuickCreateConsumed: () => void;
   sectionStates: {
     users: SectionState;
@@ -34,6 +39,7 @@ export function WorkspaceRouteRenderer(props: {
     dealStages: SectionState;
     opportunities: SectionState;
     projects: SectionState;
+    myWork: SectionState;
     workspaceConfig: SectionState;
   };
 }) {
@@ -83,6 +89,16 @@ export function WorkspaceRouteRenderer(props: {
     );
   }
 
+  if (props.activeRouteId === "my-work") {
+    return (
+      <MyWorkView
+        data={props.data}
+        sectionState={props.sectionStates.myWork}
+        onOpenProject={props.onOpenProject}
+      />
+    );
+  }
+
   if (props.activeRouteId === "clients") {
     return (
       <ClientsView
@@ -104,9 +120,22 @@ export function WorkspaceRouteRenderer(props: {
   }
 
   if (props.activeRouteId === "projects") {
+    if (props.activeProjectId) {
+      return (
+        <ProjectDetailView
+          data={props.data}
+          projectId={props.activeProjectId}
+          onBack={props.onBackToProjects}
+          onChanged={props.onChanged}
+          sectionState={props.sectionStates.projects}
+        />
+      );
+    }
+
     return (
       <ProjectsView
         data={props.data}
+        onOpenProject={props.onOpenProject}
         sectionState={props.sectionStates.projects}
       />
     );

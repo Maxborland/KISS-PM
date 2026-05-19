@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./connection";
 export * from "./crmRepository";
 export * from "./projectIntakeRepository";
+export * from "./projectWorkRepository";
 export * from "./repositories";
 export * from "./seed";
 export * from "./schema";

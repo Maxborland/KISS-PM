@@ -45,7 +45,7 @@ Phase 1.5 закрывает Phase 1 platform skeleton перед переход
 - `pnpm test:e2e:smoke` проходит против Docker PostgreSQL.
 - `pnpm test`, `pnpm test:db`, `pnpm typecheck` проходят.
 - Browser smoke не требует ручных кликов.
-- Playwright запускает отдельные процессы `apps/api` и `apps/web`; web доступен на `http://127.0.0.1:3000`, API health — на `http://127.0.0.1:4000/health`.
+- Playwright запускает отдельные процессы `apps/api` и `apps/web` на изолированных smoke-портах, чтобы не переиспользовать живой dev/Docker runtime: web по умолчанию `http://127.0.0.1:3100`, API health — `http://127.0.0.1:4100/health`. Порты можно переопределить через `E2E_WEB_PORT` и `E2E_API_PORT`.
 
 ## Следующий шаг после Phase 1.5
 
