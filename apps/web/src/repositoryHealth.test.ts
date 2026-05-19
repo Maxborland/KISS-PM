@@ -19,6 +19,11 @@ const sourceFileBudgets = [
     reason: "API composition must delegate route groups instead of owning endpoint bodies"
   },
   {
+    path: "packages/persistence/src/repositories.ts",
+    maxLines: 560,
+    reason: "persistence root must delegate focused repository areas"
+  },
+  {
     path: "apps/web/src/styles.css",
     maxLines: 1800,
     reason: "style system should stay tokenized and sectioned"

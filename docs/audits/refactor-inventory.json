@@ -429,7 +429,7 @@
       "tests_before": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
       "status": "completed",
-      "notes": "Closed for this refactor plan through REF-005A repository row mappers. Further repository splitting remains future cleanup after more persistence characterization."
+      "notes": "Closed for this refactor plan through REF-005A repository row mappers and REF-005B workspace config repository area. Further repository splitting should wait for a concrete business feature or proven risk."
     },
     {
       "id": "REF-005A",
@@ -453,6 +453,34 @@
       ],
       "status": "completed",
       "notes": "Pure mappers and toPermission moved to repositoryMappers; repository SQL and public datasource API stayed unchanged."
+    },
+    {
+      "id": "REF-005B",
+      "area": "persistence workspace config repository area",
+      "files": [
+        "packages/persistence/src/repositories.ts",
+        "packages/persistence/src/workspaceConfigRepository.ts",
+        "apps/web/src/repositoryHealth.test.ts",
+        "docs/audits/refactor-plan.md",
+        "docs/audits/refactor-inventory.json"
+      ],
+      "problem": "packages/persistence/src/repositories.ts still owned workspace config SQL for custom fields and project templates after pure row mappers were extracted.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts failed because packages/persistence/src/repositories.ts had 627 lines and the new budget is 560"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts",
+        "pnpm --filter @kiss-pm/persistence typecheck",
+        "pnpm test",
+        "pnpm test:db",
+        "pnpm typecheck"
+      ],
+      "status": "completed",
+      "notes": "Custom field and project template persistence now live in workspaceConfigRepository. repositories.ts is 524 lines and remains the root datasource composition. Stop condition: do not split more persistence areas until a business feature or proven risk requires it."
     },
     {
       "id": "REF-006",

@@ -243,7 +243,21 @@ GREEN подтвержден targeted tests и typecheck по API/web.
 - Добавлены unit tests на tenant user, access profile, workspace user, position, custom field и project template mappings.
 - RED подтвержден отсутствующим модулем `repositoryMappers`; GREEN подтвержден persistence typecheck и `pnpm test:db`.
 
-Итог REF-004 / REF-005: API `app.ts` больше не является god-file, route groups вынесены в отдельные модули, из persistence вынесены первые pure/boundary куски с тестами. Глубокое разделение repository areas остается будущей серией, но текущий refactor-plan больше не держит API route split как открытый блокер.
+#### REF-005B — workspace config repository area
+
+Статус: completed.
+
+Срез без изменения SQL, schema и public datasource API:
+
+- Workspace config persistence для custom fields и project templates вынесен в `packages/persistence/src/workspaceConfigRepository.ts`.
+- `packages/persistence/src/repositories.ts` остался root datasource composition и уменьшен с 627 до 524 строк.
+- Repository health guardrail для `repositories.ts` установлен на 560 строк.
+- Поведение tenant-scoped custom fields/templates подтверждено DB characterization test.
+
+RED подтвержден `repositoryHealth.test.ts`: `expected 627 to be less than or equal to 560`.
+GREEN подтвержден `repositoryHealth.test.ts`, DB test и persistence typecheck.
+
+Итог REF-004 / REF-005: API `app.ts` больше не является god-file, route groups вынесены в отдельные модули, из persistence вынесены pure mappers и workspace config repository area. На этом refactor wave останавливается: дальнейшее разделение persistence откладывается до появления конкретной бизнес-функции или доказанного риска, чтобы не превращать работу в рефактор ради рефактора.
 
 ### REF-006 — стабилизация больших тестов
 
@@ -276,15 +290,15 @@ GREEN подтвержден targeted tests и typecheck по API/web.
 - `REF-002` completed: workspace config validation в domain.
 - `REF-003` completed: `App.tsx` стал тонким entrypoint меньше 500 строк; route views, sidebar, topbar, route renderer и auth/data orchestration вынесены.
 - `REF-004` completed: API app error mapping и route groups вынесены из `app.ts`.
-- `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
+- `REF-005` completed for current plan: persistence row mappers и workspace config repository area вынесены из `repositories.ts`.
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
 - `REF-007` documented: user-owned/generated artifacts не удалялись.
 - `REF-008` documented: новые script aliases не добавлялись без toolchain decision.
 
-Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
+Следующий отдельный refactor-plan можно открыть только при конкретном продуктово-техническом поводе:
 
 1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` дальше только при появлении новых shell responsibilities; текущий budget 500 строк должен оставаться жестким guardrail.
-2. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
+2. `packages/persistence/src/repositories.ts`: выделять новые repository areas только вместе с новой бизнес-областью, например CRM intake, project draft, Gantt/resource planning или KPI/control signals.
 
 ## Правила исполнения
 
