@@ -34,9 +34,13 @@ import {
   login,
   logout,
   updateAccessRole,
+  updateClient,
   updateCustomField,
+  updateContact,
+  updateDealStage,
   updateOpportunityStage,
   updatePosition,
+  updateProjectType,
   updateProfile,
   updateProjectTemplate,
   updateTheme,
@@ -344,16 +348,36 @@ export function useCrmMutations() {
       mutationFn: createClient,
       onSuccess: invalidateCrm
     }),
+    updateClient: useMutation({
+      mutationFn: ({ clientId, input }: Parameters<typeof updateClient> extends [infer Id, infer Input] ? { clientId: Id; input: Input } : never) =>
+        updateClient(clientId, input),
+      onSuccess: invalidateCrm
+    }),
     createContact: useMutation({
       mutationFn: createContact,
+      onSuccess: invalidateCrm
+    }),
+    updateContact: useMutation({
+      mutationFn: ({ contactId, input }: Parameters<typeof updateContact> extends [infer Id, infer Input] ? { contactId: Id; input: Input } : never) =>
+        updateContact(contactId, input),
       onSuccess: invalidateCrm
     }),
     createProjectType: useMutation({
       mutationFn: createProjectType,
       onSuccess: invalidateCrm
     }),
+    updateProjectType: useMutation({
+      mutationFn: ({ projectTypeId, input }: Parameters<typeof updateProjectType> extends [infer Id, infer Input] ? { projectTypeId: Id; input: Input } : never) =>
+        updateProjectType(projectTypeId, input),
+      onSuccess: invalidateCrm
+    }),
     createDealStage: useMutation({
       mutationFn: createDealStage,
+      onSuccess: invalidateCrm
+    }),
+    updateDealStage: useMutation({
+      mutationFn: ({ stageId, input }: Parameters<typeof updateDealStage> extends [infer Id, infer Input] ? { stageId: Id; input: Input } : never) =>
+        updateDealStage(stageId, input),
       onSuccess: invalidateCrm
     })
   };

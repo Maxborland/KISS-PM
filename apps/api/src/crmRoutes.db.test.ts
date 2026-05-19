@@ -254,6 +254,257 @@ describe("Phase 3.1 CRM API", () => {
     });
   });
 
+  it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "client-romashka",
+        name: "ООО Ромашка",
+        description: "Ключевой клиент"
+      })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-irina",
+        clientId: "client-romashka",
+        name: "Ирина Клиент",
+        email: "irina@example.test",
+        phone: "+7 913 000-00-00",
+        telegram: "@irina",
+        role: "Заказчик"
+      })
+    });
+    await app.request("/api/workspace/project-types", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "project-type-implementation",
+        name: "Внедрение",
+        description: "Проект внедрения"
+      })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "deal-stage-new",
+        name: "Новая",
+        sortOrder: 10
+      })
+    });
+
+    const clientUpdate = await app.request("/api/workspace/clients/client-romashka", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "ООО Ромашка обновлено",
+        description: "Обновленное описание",
+        status: "active"
+      })
+    });
+    const contactUpdate = await app.request("/api/workspace/contacts/contact-irina", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        clientId: "client-romashka",
+        name: "Ирина Обновленная",
+        email: "irina.updated@example.test",
+        phone: "+7 913 111-11-11",
+        telegram: "@irina_updated",
+        role: "Спонсор",
+        status: "archived"
+      })
+    });
+    const projectTypeUpdate = await app.request(
+      "/api/workspace/project-types/project-type-implementation",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Внедрение обновлено",
+          description: "Обновленный тип",
+          status: "archived"
+        })
+      }
+    );
+    const stageUpdate = await app.request("/api/workspace/deal-stages/deal-stage-new", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Новая обновленная",
+        sortOrder: 30,
+        status: "archived"
+      })
+    });
+    const invalidContactUpdate = await app.request("/api/workspace/contacts/contact-irina", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        clientId: "client-missing",
+        name: "Ирина Обновленная",
+        status: "active"
+      })
+    });
+
+    expect(clientUpdate.status).toBe(200);
+    expect(contactUpdate.status).toBe(200);
+    expect(projectTypeUpdate.status).toBe(200);
+    expect(stageUpdate.status).toBe(200);
+    expect(invalidContactUpdate.status).toBe(404);
+    await expect(clientUpdate.json()).resolves.toMatchObject({
+      client: {
+        id: "client-romashka",
+        name: "ООО Ромашка обновлено",
+        status: "active"
+      }
+    });
+    await expect(contactUpdate.json()).resolves.toMatchObject({
+      contact: {
+        id: "contact-irina",
+        name: "Ирина Обновленная",
+        role: "Спонсор",
+        status: "archived"
+      }
+    });
+    await expect(projectTypeUpdate.json()).resolves.toMatchObject({
+      projectType: {
+        id: "project-type-implementation",
+        name: "Внедрение обновлено",
+        status: "archived"
+      }
+    });
+    await expect(stageUpdate.json()).resolves.toMatchObject({
+      dealStage: {
+        id: "deal-stage-new",
+        name: "Новая обновленная",
+        sortOrder: 30,
+        status: "archived"
+      }
+    });
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { "x-kiss-pm-action": "same-origin", cookie }
+    });
+    expect(audit.status).toBe(200);
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "client.updated",
+          beforeState: expect.objectContaining({ name: "ООО Ромашка" }),
+          afterState: expect.objectContaining({ name: "ООО Ромашка обновлено" })
+        }),
+        expect.objectContaining({ actionType: "contact.updated" }),
+        expect.objectContaining({ actionType: "project_type.updated" }),
+        expect.objectContaining({ actionType: "deal_stage.updated" })
+      ])
+    });
+  });
+
+  it("allows editing a contact on its archived current client but rejects reassignment to archived clients", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "client-current",
+        name: "Текущий клиент"
+      })
+    });
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "client-archived-target",
+        name: "Архивный клиент"
+      })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-current-client",
+        clientId: "client-current",
+        name: "Контакт текущего клиента"
+      })
+    });
+    await app.request("/api/workspace/clients/client-current", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Текущий клиент",
+        description: null,
+        status: "archived"
+      })
+    });
+    await app.request("/api/workspace/clients/client-archived-target", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Архивный клиент",
+        description: null,
+        status: "archived"
+      })
+    });
+
+    const sameClientUpdate = await app.request(
+      "/api/workspace/contacts/contact-current-client",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-current",
+          name: "Контакт архивированного клиента",
+          email: null,
+          phone: null,
+          telegram: null,
+          role: "Исторический контакт",
+          status: "archived"
+        })
+      }
+    );
+    const reassignmentToArchivedClient = await app.request(
+      "/api/workspace/contacts/contact-current-client",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-archived-target",
+          name: "Контакт архивированного клиента",
+          status: "archived"
+        })
+      }
+    );
+
+    expect(sameClientUpdate.status).toBe(200);
+    await expect(sameClientUpdate.json()).resolves.toMatchObject({
+      contact: {
+        id: "contact-current-client",
+        clientId: "client-current",
+        status: "archived"
+      }
+    });
+    expect(reassignmentToArchivedClient.status).toBe(404);
+    await expect(reassignmentToArchivedClient.json()).resolves.toEqual({
+      error: "client_not_found"
+    });
+  });
+
   it("denies CRM foundation mutations for users without Phase 3.1 permissions", async () => {
     const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const clientResponse = await app.request("/api/workspace/clients", {
@@ -306,6 +557,62 @@ describe("Phase 3.1 CRM API", () => {
         sortOrder: 10
       })
     });
+    const clientUpdateResponse = await app.request("/api/workspace/clients/client-denied", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        name: "Нельзя изменить",
+        status: "archived"
+      })
+    });
+    const contactUpdateResponse = await app.request("/api/workspace/contacts/contact-denied", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        clientId: "client-denied",
+        name: "Нельзя изменить",
+        status: "archived"
+      })
+    });
+    const projectTypeUpdateResponse = await app.request(
+      "/api/workspace/project-types/project-type-denied",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          name: "Нельзя изменить",
+          status: "archived"
+        })
+      }
+    );
+    const dealStageUpdateResponse = await app.request(
+      "/api/workspace/deal-stages/deal-stage-denied",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          name: "Нельзя изменить",
+          sortOrder: 20,
+          status: "archived"
+        })
+      }
+    );
     const auditEvents = await createPostgresTenantDataSource(
       createDatabase(client)
     ).listAuditEventsByTenantId("tenant-alpha");
@@ -314,6 +621,10 @@ describe("Phase 3.1 CRM API", () => {
     expect(contactResponse.status).toBe(403);
     expect(projectTypeResponse.status).toBe(403);
     expect(dealStageResponse.status).toBe(403);
+    expect(clientUpdateResponse.status).toBe(403);
+    expect(contactUpdateResponse.status).toBe(403);
+    expect(projectTypeUpdateResponse.status).toBe(403);
+    expect(dealStageUpdateResponse.status).toBe(403);
     await expect(clientResponse.json()).resolves.toEqual({ error: "permission_missing" });
     await expect(contactResponse.json()).resolves.toEqual({ error: "permission_missing" });
     await expect(projectTypeResponse.json()).resolves.toEqual({
@@ -327,7 +638,11 @@ describe("Phase 3.1 CRM API", () => {
         expect.objectContaining({ actionType: "client.create_denied" }),
         expect.objectContaining({ actionType: "contact.create_denied" }),
         expect.objectContaining({ actionType: "project_type.create_denied" }),
-        expect.objectContaining({ actionType: "deal_stage.create_denied" })
+        expect.objectContaining({ actionType: "deal_stage.create_denied" }),
+        expect.objectContaining({ actionType: "client.update_denied" }),
+        expect.objectContaining({ actionType: "contact.update_denied" }),
+        expect.objectContaining({ actionType: "project_type.update_denied" }),
+        expect.objectContaining({ actionType: "deal_stage.update_denied" })
       ])
     );
   });

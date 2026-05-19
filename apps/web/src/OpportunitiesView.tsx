@@ -16,6 +16,13 @@ import type {
   OpportunityInput,
   ProjectType
 } from "./api";
+import {
+  buildKanbanStages,
+  getOpportunityClientLabel,
+  getOpportunityRelationshipLabel,
+  getOpportunityStageLabel,
+  getOpportunityStageOptions
+} from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
 import { useProjectIntakeMutations } from "./workspaceQueries";
 import {
@@ -103,6 +110,10 @@ export function OpportunitiesView(props: {
         .filter((stage) => stage.status === "active")
         .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
     [props.data.dealStages]
+  );
+  const kanbanStages = useMemo(
+    () => buildKanbanStages(props.data.dealStages, filteredOpportunities),
+    [filteredOpportunities, props.data.dealStages]
   );
   const activeClients = useMemo(
     () => props.data.clients.filter((client) => client.status === "active"),
@@ -360,7 +371,7 @@ export function OpportunitiesView(props: {
               data={props.data}
               isPending={isSaving}
               opportunities={filteredOpportunities}
-              stages={activeStages}
+              stages={kanbanStages}
               onOpenOpportunity={props.onOpenOpportunity}
               onUpdateStage={updateStage}
             />
@@ -471,75 +482,76 @@ function DealsTable(props: {
               }
             />
           ) : (
-            props.opportunities.map((opportunity) => (
-              <tr
-                className="clickable-row"
-                key={opportunity.id}
-                tabIndex={0}
-                onClick={(event) => {
-                  if (isInteractiveElement(event.target)) return;
-                  props.onOpenOpportunity(opportunity.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") props.onOpenOpportunity(opportunity.id);
-                }}
-              >
-                <td>
-                  <span className="entity-name-cell">
-                    <span className="row-avatar">С</span>
-                    <span>
-                      <button
-                        className="inline-link-button"
-                        type="button"
-                        onClick={() => props.onOpenOpportunity(opportunity.id)}
-                      >
-                        {opportunity.title}
-                      </button>
-                      <small>
-                        {opportunity.clientName}
-                        {opportunity.contactName ? ` · ${opportunity.contactName}` : ""}
-                      </small>
+            props.opportunities.map((opportunity) => {
+              const relationshipLabel = getOpportunityRelationshipLabel(props.data, opportunity);
+
+              return (
+                <tr
+                  className="clickable-row"
+                  key={opportunity.id}
+                  tabIndex={0}
+                  onClick={(event) => {
+                    if (isInteractiveElement(event.target)) return;
+                    props.onOpenOpportunity(opportunity.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") props.onOpenOpportunity(opportunity.id);
+                  }}
+                >
+                  <td>
+                    <span className="entity-name-cell">
+                      <span className="row-avatar">С</span>
+                      <span>
+                        <button
+                          className="inline-link-button"
+                          type="button"
+                          onClick={() => props.onOpenOpportunity(opportunity.id)}
+                        >
+                          {opportunity.title}
+                        </button>
+                        <small>{relationshipLabel}</small>
+                      </span>
                     </span>
-                  </span>
-                </td>
-                <td>{formatStage(opportunity, props.data.dealStages)}</td>
-                <td>
-                  <strong>{formatDateOnly(opportunity.plannedStart)}</strong>
-                  <small className="muted">
-                    {" -> "}
-                    {formatDateOnly(opportunity.plannedFinish)}
-                  </small>
-                </td>
-                <td>
-                  <strong>{opportunity.plannedHours} ч</strong>
-                  <small className="muted">
-                    {formatMoney(opportunity.contractValue)} / {formatMoney(opportunity.plannedHourlyRate)}
-                  </small>
-                </td>
-                <td>{formatDemand(opportunity, props.data)}</td>
-                <td>{renderFeasibility(opportunity)}</td>
-                <td>
-                  <span className="table-actions">
-                    {props.canCheckFeasibility && !isFinalOpportunity(opportunity) ? (
-                      <button
-                        className="secondary-button"
-                        disabled={props.isPending}
-                        type="button"
-                        onClick={() => props.onCheckFeasibility(opportunity)}
-                      >
-                        Проверить ресурсы
-                      </button>
-                    ) : null}
-                    {renderActivationAction({
-                      canActivateProjects: props.canActivateProjects,
-                      isPending: props.isPending,
-                      opportunity,
-                      onActivate: () => props.onActivate(opportunity)
-                    })}
-                  </span>
-                </td>
-              </tr>
-            ))
+                  </td>
+                  <td>{formatStage(opportunity, props.data.dealStages)}</td>
+                  <td>
+                    <strong>{formatDateOnly(opportunity.plannedStart)}</strong>
+                    <small className="muted">
+                      {" -> "}
+                      {formatDateOnly(opportunity.plannedFinish)}
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{opportunity.plannedHours} ч</strong>
+                    <small className="muted">
+                      {formatMoney(opportunity.contractValue)} / {formatMoney(opportunity.plannedHourlyRate)}
+                    </small>
+                  </td>
+                  <td>{formatDemand(opportunity, props.data)}</td>
+                  <td>{renderFeasibility(opportunity)}</td>
+                  <td>
+                    <span className="table-actions">
+                      {props.canCheckFeasibility && !isFinalOpportunity(opportunity) ? (
+                        <button
+                          className="secondary-button"
+                          disabled={props.isPending}
+                          type="button"
+                          onClick={() => props.onCheckFeasibility(opportunity)}
+                        >
+                          Проверить ресурсы
+                        </button>
+                      ) : null}
+                      {renderActivationAction({
+                        canActivateProjects: props.canActivateProjects,
+                        isPending: props.isPending,
+                        opportunity,
+                        onActivate: () => props.onActivate(opportunity)
+                      })}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -570,7 +582,7 @@ function DealsKanban(props: {
         return (
           <section className="deal-kanban-column" key={stage.id}>
             <header>
-              <strong>{stage.name}</strong>
+              <strong>{stage.status === "archived" ? `${stage.name} · архив` : stage.name}</strong>
               <span>{columnDeals.length}</span>
             </header>
             <div className="deal-card-list">
@@ -586,7 +598,7 @@ function DealsKanban(props: {
                     >
                       {opportunity.title}
                     </button>
-                    <small>{opportunity.clientName}</small>
+                    <small>{getOpportunityClientLabel(props.data, opportunity)}</small>
                     <span className="chip-list">
                       <span className="permission-chip">{opportunity.plannedHours} ч</span>
                       <span className="permission-chip">{formatMoney(opportunity.contractValue)}</span>
@@ -608,9 +620,9 @@ function DealsKanban(props: {
                         value={opportunity.stageId ?? ""}
                         onChange={(event) => props.onUpdateStage(opportunity, event.target.value)}
                       >
-                        {props.stages.map((item) => (
+                        {getOpportunityStageOptions(props.data.dealStages, opportunity).map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.name}
+                            {item.status === "archived" ? `${item.name} · архив` : item.name}
                           </option>
                         ))}
                       </select>
@@ -1007,8 +1019,8 @@ function formatStage(opportunity: Opportunity, stages: DealStage[]) {
   const stage = stages.find((item) => item.id === opportunity.stageId);
   return (
     <StatusPill
-      label={stage?.name ?? opportunity.stageId ?? "Без этапа"}
-      tone={stage ? "success" : "muted"}
+      label={getOpportunityStageLabel(stages, opportunity)}
+      tone={stage?.status === "active" ? "success" : "muted"}
     />
   );
 }

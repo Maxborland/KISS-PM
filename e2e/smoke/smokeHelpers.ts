@@ -8,9 +8,18 @@ export async function loginToWorkspace(
     await page.getByLabel("Email").fill(input.email);
   }
   await page.getByLabel("Пароль").fill(input.password);
+  const loginResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/auth/login") && response.status() === 200
+  );
   await page.getByRole("button", { name: "Войти" }).click();
+  await loginResponse;
   await expect
-    .poll(async () => (await page.request.get("/api/auth/me")).status())
+    .poll(async () =>
+      page.evaluate(async () => {
+        const response = await fetch("/api/auth/me", { credentials: "same-origin" });
+        return response.status;
+      })
+    )
     .toBe(200);
 }
 

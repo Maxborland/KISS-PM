@@ -1,7 +1,17 @@
 import { PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { Client, Contact, DealStage, ProjectType } from "./api";
+import type { Client, Contact } from "./api";
+import {
+  canRenderSectionTable,
+  EntityActions,
+  EntityNameCell,
+  EntityStatusField,
+  EntitySummary,
+  ModalActions,
+  renderCrmStatus,
+  useEntityFormState
+} from "./EntityCrudShared";
 import type { WorkspaceData } from "./workspaceData";
 import { makeClientGeneratedId } from "./workspaceIds";
 import { useCrmMutations } from "./workspaceQueries";
@@ -10,15 +20,11 @@ import {
   getFieldErrorId,
   hasFormErrors,
   validateClientForm,
-  validateContactForm,
-  validateDealStageForm,
-  validateProjectTypeForm
+  validateContactForm
 } from "./workspaceForms";
 import {
   filterClientsForTable,
-  filterContactsForTable,
-  filterDealStagesForTable,
-  filterProjectTypesForTable
+  filterContactsForTable
 } from "./workspaceTables";
 import { formatDate } from "./workspaceViewHelpers";
 import {
@@ -33,12 +39,10 @@ import {
   Modal,
   Panel,
   SectionFeedback,
-  StatusPill,
-  SummaryCard,
   TableEmpty
 } from "./components/workspace-ui";
 
-type CrmModalKind = "client" | "contact" | "projectType" | "dealStage";
+type CrmModalKind = "client" | "contact";
 
 export function ClientsView(props: {
   data: WorkspaceData;
@@ -48,8 +52,13 @@ export function ClientsView(props: {
   const canManageClients = hasPermission(props.data.permissions, "tenant.clients.manage");
   const crmMutations = useCrmMutations();
   const [search, setSearch] = useState("");
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const formState = useEntityFormState();
+  const editingClient = editingClientId
+    ? props.data.clients.find((client) => client.id === editingClientId) ?? null
+    : null;
+  const isSaving = crmMutations.createClient.isPending || crmMutations.updateClient.isPending;
   const filteredClients = useMemo(
     () => filterClientsForTable(props.data.clients, search),
     [props.data.clients, search]
@@ -61,23 +70,48 @@ export function ClientsView(props: {
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") ?? "");
     const description = String(form.get("description") ?? "");
-    const errors = validateClientForm({ name, description });
+    const status = String(form.get("status") ?? "active");
+    const errors = validateClientForm({ name, description, status });
     formState.setFieldErrors(errors);
     formState.setFormError("");
     if (hasFormErrors(errors)) return;
 
     try {
-      await crmMutations.createClient.mutateAsync({
-        id: makeClientGeneratedId("client", name),
-        name: name.trim(),
-        description: description.trim() || null
-      });
+      if (editingClient) {
+        await crmMutations.updateClient.mutateAsync({
+          clientId: editingClient.id,
+          input: {
+            name: name.trim(),
+            description: description.trim() || null,
+            status: status as Client["status"]
+          }
+        });
+      } else {
+        await crmMutations.createClient.mutateAsync({
+          id: makeClientGeneratedId("client", name),
+          name: name.trim(),
+          description: description.trim() || null
+        });
+      }
       setIsModalOpen(false);
+      setEditingClientId(null);
       formState.reset();
-      props.onChanged("Клиент создан");
+      props.onChanged(editingClient ? "Клиент обновлен" : "Клиент создан");
     } catch (error) {
       formState.setFormError(getErrorMessage(error));
     }
+  }
+
+  function openCreateClient() {
+    setEditingClientId(null);
+    formState.reset();
+    setIsModalOpen(true);
+  }
+
+  function openEditClient(clientId: string) {
+    setEditingClientId(clientId);
+    formState.reset();
+    setIsModalOpen(true);
   }
 
   return (
@@ -90,7 +124,7 @@ export function ClientsView(props: {
             <button
               className="primary-button"
               type="button"
-              onClick={() => setIsModalOpen(true)}
+              onClick={openCreateClient}
             >
               <PlusCircle aria-hidden="true" size={15} />
               Создать клиента
@@ -117,17 +151,24 @@ export function ClientsView(props: {
         </CrudToolbar>
         <SectionFeedback state={props.sectionState} emptyLabel="Клиенты недоступны." />
         {canRenderSectionTable(props.sectionState) ? (
-          <ClientsTable clients={filteredClients} totalClients={props.data.clients.length} />
+          <ClientsTable
+            canManage={canManageClients}
+            clients={filteredClients}
+            totalClients={props.data.clients.length}
+            onEdit={openEditClient}
+          />
         ) : null}
       </Panel>
       {isModalOpen ? (
         <ClientModal
+          client={editingClient}
           error={formState.formError}
           fieldErrors={formState.fieldErrors}
-          isSaving={crmMutations.createClient.isPending}
+          isSaving={isSaving}
           onClose={() => {
-            if (crmMutations.createClient.isPending) return;
+            if (isSaving) return;
             setIsModalOpen(false);
+            setEditingClientId(null);
             formState.reset();
           }}
           onSubmit={submitClient}
@@ -145,12 +186,18 @@ export function ContactsView(props: {
   const canManageContacts = hasPermission(props.data.permissions, "tenant.contacts.manage");
   const crmMutations = useCrmMutations();
   const [search, setSearch] = useState("");
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const formState = useEntityFormState();
+  const editingContact = editingContactId
+    ? props.data.contacts.find((contact) => contact.id === editingContactId) ?? null
+    : null;
+  const isSaving = crmMutations.createContact.isPending || crmMutations.updateContact.isPending;
   const filteredContacts = useMemo(
     () => filterContactsForTable(props.data.contacts, props.data.clients, search),
     [props.data.clients, props.data.contacts, search]
   );
+  const activeClients = props.data.clients.filter((client) => client.status === "active");
   const activeContacts = props.data.contacts.filter((contact) => contact.status === "active").length;
 
   async function submitContact(event: React.FormEvent<HTMLFormElement>) {
@@ -159,27 +206,54 @@ export function ContactsView(props: {
     const clientId = String(form.get("clientId") ?? "");
     const name = String(form.get("name") ?? "");
     const email = String(form.get("email") ?? "");
-    const errors = validateContactForm({ clientId, name, email });
+    const status = String(form.get("status") ?? "active");
+    const errors = validateContactForm({ clientId, name, email, status });
     formState.setFieldErrors(errors);
     formState.setFormError("");
     if (hasFormErrors(errors)) return;
 
     try {
-      await crmMutations.createContact.mutateAsync({
-        id: makeClientGeneratedId("contact", name),
+      const input = {
         clientId,
         name: name.trim(),
         email: email.trim() || null,
         phone: String(form.get("phone") ?? "").trim() || null,
         telegram: String(form.get("telegram") ?? "").trim() || null,
         role: String(form.get("role") ?? "").trim() || null
-      });
+      };
+      if (editingContact) {
+        await crmMutations.updateContact.mutateAsync({
+          contactId: editingContact.id,
+          input: {
+            ...input,
+            status: status as Contact["status"]
+          }
+        });
+      } else {
+        await crmMutations.createContact.mutateAsync({
+          id: makeClientGeneratedId("contact", name),
+          ...input
+        });
+      }
       setIsModalOpen(false);
+      setEditingContactId(null);
       formState.reset();
-      props.onChanged("Контакт создан");
+      props.onChanged(editingContact ? "Контакт обновлен" : "Контакт создан");
     } catch (error) {
       formState.setFormError(getErrorMessage(error));
     }
+  }
+
+  function openCreateContact() {
+    setEditingContactId(null);
+    formState.reset();
+    setIsModalOpen(true);
+  }
+
+  function openEditContact(contactId: string) {
+    setEditingContactId(contactId);
+    formState.reset();
+    setIsModalOpen(true);
   }
 
   return (
@@ -191,10 +265,10 @@ export function ContactsView(props: {
           canManageContacts ? (
             <button
               className="primary-button"
-              disabled={props.data.clients.length === 0}
-              title={props.data.clients.length === 0 ? "Сначала создайте клиента" : undefined}
+              disabled={activeClients.length === 0}
+              title={activeClients.length === 0 ? "Сначала создайте активного клиента" : undefined}
               type="button"
-              onClick={() => setIsModalOpen(true)}
+              onClick={openCreateContact}
             >
               <PlusCircle aria-hidden="true" size={15} />
               Создать контакт
@@ -222,21 +296,25 @@ export function ContactsView(props: {
         <SectionFeedback state={props.sectionState} emptyLabel="Контакты недоступны." />
         {canRenderSectionTable(props.sectionState) ? (
           <ContactsTable
+            canManage={canManageContacts}
             clients={props.data.clients}
             contacts={filteredContacts}
             totalContacts={props.data.contacts.length}
+            onEdit={openEditContact}
           />
         ) : null}
       </Panel>
       {isModalOpen ? (
         <ContactModal
+          contact={editingContact}
           clients={props.data.clients}
           error={formState.formError}
           fieldErrors={formState.fieldErrors}
-          isSaving={crmMutations.createContact.isPending}
+          isSaving={isSaving}
           onClose={() => {
-            if (crmMutations.createContact.isPending) return;
+            if (isSaving) return;
             setIsModalOpen(false);
+            setEditingContactId(null);
             formState.reset();
           }}
           onSubmit={submitContact}
@@ -246,241 +324,12 @@ export function ContactsView(props: {
   );
 }
 
-export function ProjectTypesView(props: {
-  data: WorkspaceData;
-  sectionState: SectionState;
-  onChanged: (message: string) => void;
+function ClientsTable(props: {
+  canManage: boolean;
+  clients: Client[];
+  totalClients: number;
+  onEdit: (clientId: string) => void;
 }) {
-  const canManageProjectTypes = hasPermission(
-    props.data.permissions,
-    "tenant.project_types.manage"
-  );
-  const crmMutations = useCrmMutations();
-  const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const formState = useEntityFormState();
-  const filteredProjectTypes = useMemo(
-    () => filterProjectTypesForTable(props.data.projectTypes, search),
-    [props.data.projectTypes, search]
-  );
-  const activeProjectTypes = props.data.projectTypes.filter(
-    (projectType) => projectType.status === "active"
-  ).length;
-
-  async function submitProjectType(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") ?? "");
-    const description = String(form.get("description") ?? "");
-    const errors = validateProjectTypeForm({ name, description });
-    formState.setFieldErrors(errors);
-    formState.setFormError("");
-    if (hasFormErrors(errors)) return;
-
-    try {
-      await crmMutations.createProjectType.mutateAsync({
-        id: makeClientGeneratedId("project-type", name),
-        name: name.trim(),
-        description: description.trim() || null
-      });
-      setIsModalOpen(false);
-      formState.reset();
-      props.onChanged("Тип проекта создан");
-    } catch (error) {
-      formState.setFormError(getErrorMessage(error));
-    }
-  }
-
-  return (
-    <>
-      <Panel
-        title="Типы проектов"
-        subtitle="Tenant-настройка, которую сделки используют для классификации будущего проекта."
-        actions={
-          canManageProjectTypes ? (
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-            >
-              <PlusCircle aria-hidden="true" size={15} />
-              Создать тип
-            </button>
-          ) : (
-            <DisabledAction reason="Нужно право tenant.project_types.manage" />
-          )
-        }
-      >
-        <EntitySummary
-          total={props.data.projectTypes.length}
-          active={activeProjectTypes}
-          archived={props.data.projectTypes.length - activeProjectTypes}
-        />
-        <CrudToolbar
-          searchLabel="Поиск типов проектов"
-          searchPlaceholder="Название, описание, статус..."
-          searchValue={search}
-          resultCount={filteredProjectTypes.length}
-          totalCount={props.data.projectTypes.length}
-          onSearchChange={setSearch}
-        >
-          <span className="toolbar-chip">Настройка workspace</span>
-        </CrudToolbar>
-        <SectionFeedback state={props.sectionState} emptyLabel="Типы проектов недоступны." />
-        {canRenderSectionTable(props.sectionState) ? (
-          <ProjectTypesTable
-            projectTypes={filteredProjectTypes}
-            totalProjectTypes={props.data.projectTypes.length}
-          />
-        ) : null}
-      </Panel>
-      {isModalOpen ? (
-        <ProjectTypeModal
-          error={formState.formError}
-          fieldErrors={formState.fieldErrors}
-          isSaving={crmMutations.createProjectType.isPending}
-          onClose={() => {
-            if (crmMutations.createProjectType.isPending) return;
-            setIsModalOpen(false);
-            formState.reset();
-          }}
-          onSubmit={submitProjectType}
-        />
-      ) : null}
-    </>
-  );
-}
-
-export function DealStagesView(props: {
-  data: WorkspaceData;
-  sectionState: SectionState;
-  onChanged: (message: string) => void;
-}) {
-  const canManageDealStages = hasPermission(
-    props.data.permissions,
-    "tenant.deal_stages.manage"
-  );
-  const crmMutations = useCrmMutations();
-  const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const formState = useEntityFormState();
-  const sortedDealStages = useMemo(
-    () =>
-      [...props.data.dealStages].sort(
-        (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)
-      ),
-    [props.data.dealStages]
-  );
-  const filteredDealStages = useMemo(
-    () => filterDealStagesForTable(sortedDealStages, search),
-    [search, sortedDealStages]
-  );
-  const activeDealStages = props.data.dealStages.filter((stage) => stage.status === "active").length;
-
-  async function submitDealStage(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") ?? "");
-    const sortOrder = String(form.get("sortOrder") ?? "");
-    const errors = validateDealStageForm({ name, sortOrder });
-    formState.setFieldErrors(errors);
-    formState.setFormError("");
-    if (hasFormErrors(errors)) return;
-
-    try {
-      await crmMutations.createDealStage.mutateAsync({
-        id: makeClientGeneratedId("deal-stage", name),
-        name: name.trim(),
-        sortOrder: Number(sortOrder)
-      });
-      setIsModalOpen(false);
-      formState.reset();
-      props.onChanged("Этап сделки создан");
-    } catch (error) {
-      formState.setFormError(getErrorMessage(error));
-    }
-  }
-
-  return (
-    <>
-      <Panel
-        title="Этапы сделок"
-        subtitle="Tenant-настройка воронки. Активные этапы формируют канбан на странице сделок."
-        actions={
-          canManageDealStages ? (
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-            >
-              <PlusCircle aria-hidden="true" size={15} />
-              Создать этап
-            </button>
-          ) : (
-            <DisabledAction reason="Нужно право tenant.deal_stages.manage" />
-          )
-        }
-      >
-        <EntitySummary
-          total={props.data.dealStages.length}
-          active={activeDealStages}
-          archived={props.data.dealStages.length - activeDealStages}
-        />
-        <CrudToolbar
-          searchLabel="Поиск этапов сделок"
-          searchPlaceholder="Название, порядок, статус..."
-          searchValue={search}
-          resultCount={filteredDealStages.length}
-          totalCount={props.data.dealStages.length}
-          onSearchChange={setSearch}
-        >
-          <span className="toolbar-chip">Канбан строится по sortOrder</span>
-        </CrudToolbar>
-        <SectionFeedback state={props.sectionState} emptyLabel="Этапы сделок недоступны." />
-        {canRenderSectionTable(props.sectionState) ? (
-          <DealStagesTable
-            dealStages={filteredDealStages}
-            totalDealStages={props.data.dealStages.length}
-          />
-        ) : null}
-      </Panel>
-      {isModalOpen ? (
-        <DealStageModal
-          defaultSortOrder={(sortedDealStages.at(-1)?.sortOrder ?? 0) + 10}
-          error={formState.formError}
-          fieldErrors={formState.fieldErrors}
-          isSaving={crmMutations.createDealStage.isPending}
-          onClose={() => {
-            if (crmMutations.createDealStage.isPending) return;
-            setIsModalOpen(false);
-            formState.reset();
-          }}
-          onSubmit={submitDealStage}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function EntitySummary(props: {
-  total: number;
-  active: number;
-  archived: number;
-}) {
-  return (
-    <div className="surface-summary-grid">
-      <SummaryCard label="Всего" value={props.total} />
-      <SummaryCard label="Активные" value={props.active} tone="success" />
-      <SummaryCard label="Архив" value={props.archived} tone="muted" />
-    </div>
-  );
-}
-
-function canRenderSectionTable(sectionState: SectionState): boolean {
-  return sectionState.canRead && !sectionState.error && !sectionState.isLoading;
-}
-
-function ClientsTable(props: { clients: Client[]; totalClients: number }) {
   return (
     <div className="table-wrap">
       <table className="data-table" aria-label="Клиенты">
@@ -490,12 +339,13 @@ function ClientsTable(props: { clients: Client[]; totalClients: number }) {
             <th>Описание</th>
             <th>Статус</th>
             <th>Обновлено</th>
+            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
           {props.clients.length === 0 ? (
             <TableEmpty
-              colSpan={4}
+              colSpan={5}
               label={
                 props.totalClients === 0 ? "Клиентов пока нет." : "По фильтру ничего не найдено."
               }
@@ -509,6 +359,13 @@ function ClientsTable(props: { clients: Client[]; totalClients: number }) {
                 <td>{client.description || "Описание не задано"}</td>
                 <td>{renderCrmStatus(client.status)}</td>
                 <td>{formatDate(client.updatedAt)}</td>
+                <td>
+                  <EntityActions
+                    canManage={props.canManage}
+                    entityId={client.id}
+                    onEdit={props.onEdit}
+                  />
+                </td>
               </tr>
             ))
           )}
@@ -519,9 +376,11 @@ function ClientsTable(props: { clients: Client[]; totalClients: number }) {
 }
 
 function ContactsTable(props: {
+  canManage: boolean;
   clients: Client[];
   contacts: Contact[];
   totalContacts: number;
+  onEdit: (contactId: string) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -533,12 +392,13 @@ function ContactsTable(props: {
             <th>Связь</th>
             <th>Статус</th>
             <th>Обновлено</th>
+            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
           {props.contacts.length === 0 ? (
             <TableEmpty
-              colSpan={5}
+              colSpan={6}
               label={
                 props.totalContacts === 0
                   ? "Контактов пока нет."
@@ -559,118 +419,24 @@ function ContactsTable(props: {
                 <td>{contact.role || "Роль не задана"}</td>
                 <td>{renderCrmStatus(contact.status)}</td>
                 <td>{formatDate(contact.updatedAt)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ProjectTypesTable(props: {
-  projectTypes: ProjectType[];
-  totalProjectTypes: number;
-}) {
-  return (
-    <div className="table-wrap">
-      <table className="data-table" aria-label="Типы проектов">
-        <thead>
-          <tr>
-            <th>Тип</th>
-            <th>Описание</th>
-            <th>Статус</th>
-            <th>Обновлено</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.projectTypes.length === 0 ? (
-            <TableEmpty
-              colSpan={4}
-              label={
-                props.totalProjectTypes === 0
-                  ? "Типов проектов пока нет."
-                  : "По фильтру ничего не найдено."
-              }
-            />
-          ) : (
-            props.projectTypes.map((projectType) => (
-              <tr key={projectType.id}>
                 <td>
-                  <EntityNameCell avatar="Т" primary={projectType.name} secondary={projectType.id} />
+                  <EntityActions
+                    canManage={props.canManage}
+                    entityId={contact.id}
+                    onEdit={props.onEdit}
+                  />
                 </td>
-                <td>{projectType.description || "Описание не задано"}</td>
-                <td>{renderCrmStatus(projectType.status)}</td>
-                <td>{formatDate(projectType.updatedAt)}</td>
               </tr>
             ))
           )}
         </tbody>
       </table>
     </div>
-  );
-}
-
-function DealStagesTable(props: {
-  dealStages: DealStage[];
-  totalDealStages: number;
-}) {
-  return (
-    <div className="table-wrap">
-      <table className="data-table" aria-label="Этапы сделок">
-        <thead>
-          <tr>
-            <th>Этап</th>
-            <th>Порядок</th>
-            <th>Статус</th>
-            <th>Обновлено</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.dealStages.length === 0 ? (
-            <TableEmpty
-              colSpan={4}
-              label={
-                props.totalDealStages === 0
-                  ? "Этапов сделок пока нет."
-                  : "По фильтру ничего не найдено."
-              }
-            />
-          ) : (
-            props.dealStages.map((stage) => (
-              <tr key={stage.id}>
-                <td>
-                  <EntityNameCell avatar="Э" primary={stage.name} secondary={stage.id} />
-                </td>
-                <td>{stage.sortOrder}</td>
-                <td>{renderCrmStatus(stage.status)}</td>
-                <td>{formatDate(stage.updatedAt)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function EntityNameCell(props: {
-  avatar: string;
-  primary: string;
-  secondary: string;
-}) {
-  return (
-    <span className="entity-name-cell">
-      <span className="row-avatar">{props.avatar}</span>
-      <span>
-        <strong>{props.primary}</strong>
-        <small>{props.secondary}</small>
-      </span>
-    </span>
   );
 }
 
 function ClientModal(props: {
+  client: Client | null;
   error: string;
   fieldErrors: FormErrors;
   isSaving: boolean;
@@ -679,7 +445,7 @@ function ClientModal(props: {
 }) {
   return (
     <Modal
-      title="Создать клиента"
+      title={props.client ? "Редактировать клиента" : "Создать клиента"}
       description="Клиент станет source of truth для новых сделок."
       isDismissDisabled={props.isSaving}
       onClose={props.onClose}
@@ -693,18 +459,29 @@ function ClientModal(props: {
             aria-describedby={props.fieldErrors.name ? getFieldErrorId("client", "name") : undefined}
             aria-invalid={Boolean(props.fieldErrors.name)}
             data-autofocus
+            defaultValue={props.client?.name ?? ""}
           />
           <FieldError formId="client" field="name" errors={props.fieldErrors} />
         </label>
         <label htmlFor="client-description">
           Описание
-          <textarea id="client-description" name="description" rows={3} />
+          <textarea
+            id="client-description"
+            name="description"
+            rows={3}
+            defaultValue={props.client?.description ?? ""}
+          />
         </label>
+        <EntityStatusField
+          defaultValue={props.client?.status ?? "active"}
+          formId="client"
+          fieldErrors={props.fieldErrors}
+        />
         <ModalActions
           error={props.error}
           isSaving={props.isSaving}
-          primaryLabel="Создать клиента"
-          savingLabel="Создаем..."
+          primaryLabel={props.client ? "Сохранить клиента" : "Создать клиента"}
+          savingLabel="Сохраняем..."
           onClose={props.onClose}
         />
       </form>
@@ -713,6 +490,7 @@ function ClientModal(props: {
 }
 
 function ContactModal(props: {
+  contact: Contact | null;
   clients: Client[];
   error: string;
   fieldErrors: FormErrors;
@@ -720,9 +498,13 @@ function ContactModal(props: {
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const selectableClients = props.clients.filter(
+    (client) => client.status === "active" || client.id === props.contact?.clientId
+  );
+
   return (
     <Modal
-      title="Создать контакт"
+      title={props.contact ? "Редактировать контакт" : "Создать контакт"}
       description="Контакт обязательно привязан к клиенту."
       isDismissDisabled={props.isSaving}
       onClose={props.onClose}
@@ -735,10 +517,10 @@ function ContactModal(props: {
             name="clientId"
             aria-invalid={Boolean(props.fieldErrors.clientId)}
             data-autofocus
-            defaultValue=""
+            defaultValue={props.contact?.clientId ?? ""}
           >
             <option value="">Выберите клиента</option>
-            {props.clients.map((client) => (
+            {selectableClients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
               </option>
@@ -748,7 +530,12 @@ function ContactModal(props: {
         </label>
         <label htmlFor="contact-name">
           Имя контакта
-          <input id="contact-name" name="name" aria-invalid={Boolean(props.fieldErrors.name)} />
+          <input
+            id="contact-name"
+            name="name"
+            aria-invalid={Boolean(props.fieldErrors.name)}
+            defaultValue={props.contact?.name ?? ""}
+          />
           <FieldError formId="contact" field="name" errors={props.fieldErrors} />
         </label>
         <div className="grid-3">
@@ -759,166 +546,44 @@ function ContactModal(props: {
               name="email"
               type="email"
               aria-invalid={Boolean(props.fieldErrors.email)}
+              defaultValue={props.contact?.email ?? ""}
             />
             <FieldError formId="contact" field="email" errors={props.fieldErrors} />
           </label>
           <label htmlFor="contact-phone">
             Телефон
-            <input id="contact-phone" name="phone" />
+            <input id="contact-phone" name="phone" defaultValue={props.contact?.phone ?? ""} />
           </label>
           <label htmlFor="contact-telegram">
             Telegram
-            <input id="contact-telegram" name="telegram" />
+            <input
+              id="contact-telegram"
+              name="telegram"
+              defaultValue={props.contact?.telegram ?? ""}
+            />
           </label>
         </div>
         <label htmlFor="contact-role">
           Роль у клиента
-          <input id="contact-role" name="role" />
+          <input id="contact-role" name="role" defaultValue={props.contact?.role ?? ""} />
         </label>
+        <EntityStatusField
+          defaultValue={props.contact?.status ?? "active"}
+          formId="contact"
+          fieldErrors={props.fieldErrors}
+        />
         <ModalActions
           error={props.error}
           isSaving={props.isSaving}
-          primaryLabel="Создать контакт"
-          savingLabel="Создаем..."
+          primaryLabel={props.contact ? "Сохранить контакт" : "Создать контакт"}
+          savingLabel="Сохраняем..."
           onClose={props.onClose}
         />
       </form>
     </Modal>
-  );
-}
-
-function ProjectTypeModal(props: {
-  error: string;
-  fieldErrors: FormErrors;
-  isSaving: boolean;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <Modal
-      title="Создать тип проекта"
-      description="Тип проекта будет выбран в карточке сделки."
-      isDismissDisabled={props.isSaving}
-      onClose={props.onClose}
-    >
-      <form className="stack-form" noValidate onSubmit={props.onSubmit}>
-        <label htmlFor="project-type-name">
-          Название типа
-          <input id="project-type-name" name="name" data-autofocus />
-          <FieldError formId="project-type" field="name" errors={props.fieldErrors} />
-        </label>
-        <label htmlFor="project-type-description">
-          Описание
-          <textarea id="project-type-description" name="description" rows={3} />
-        </label>
-        <ModalActions
-          error={props.error}
-          isSaving={props.isSaving}
-          primaryLabel="Создать тип проекта"
-          savingLabel="Создаем..."
-          onClose={props.onClose}
-        />
-      </form>
-    </Modal>
-  );
-}
-
-function DealStageModal(props: {
-  defaultSortOrder: number;
-  error: string;
-  fieldErrors: FormErrors;
-  isSaving: boolean;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <Modal
-      title="Создать этап сделки"
-      description="Активные этапы формируют канбан."
-      isDismissDisabled={props.isSaving}
-      onClose={props.onClose}
-    >
-      <form className="stack-form" noValidate onSubmit={props.onSubmit}>
-        <label htmlFor="deal-stage-name">
-          Название этапа
-          <input id="deal-stage-name" name="name" data-autofocus />
-          <FieldError formId="deal-stage" field="name" errors={props.fieldErrors} />
-        </label>
-        <label htmlFor="deal-stage-sort-order">
-          Порядок
-          <input
-            id="deal-stage-sort-order"
-            name="sortOrder"
-            type="number"
-            min="1"
-            defaultValue={props.defaultSortOrder}
-          />
-          <FieldError formId="deal-stage" field="sortOrder" errors={props.fieldErrors} />
-        </label>
-        <ModalActions
-          error={props.error}
-          isSaving={props.isSaving}
-          primaryLabel="Создать этап"
-          savingLabel="Создаем..."
-          onClose={props.onClose}
-        />
-      </form>
-    </Modal>
-  );
-}
-
-function ModalActions(props: {
-  error: string;
-  isSaving: boolean;
-  primaryLabel: string;
-  savingLabel: string;
-  onClose: () => void;
-}) {
-  return (
-    <>
-      {props.error ? <p className="error">{props.error}</p> : null}
-      <div className="form-actions">
-        <button className="primary-button" disabled={props.isSaving} type="submit">
-          {props.isSaving ? props.savingLabel : props.primaryLabel}
-        </button>
-        <button
-          className="secondary-button"
-          disabled={props.isSaving}
-          type="button"
-          onClick={props.onClose}
-        >
-          Отменить
-        </button>
-      </div>
-    </>
-  );
-}
-
-function renderCrmStatus(status: Client["status"]) {
-  return (
-    <StatusPill
-      tone={status === "active" ? "success" : "muted"}
-      label={status === "active" ? "Активно" : "Архив"}
-    />
   );
 }
 
 function getClientName(clients: Client[], clientId: string): string {
   return clients.find((client) => client.id === clientId)?.name ?? clientId;
-}
-
-function useEntityFormState() {
-  const [formError, setFormError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
-
-  return {
-    fieldErrors,
-    formError,
-    reset: () => {
-      setFormError("");
-      setFieldErrors({});
-    },
-    setFieldErrors,
-    setFormError
-  };
 }

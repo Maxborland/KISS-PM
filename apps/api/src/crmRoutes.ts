@@ -115,6 +115,67 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     return context.json({ client }, 201);
   });
 
+  app.patch("/api/workspace/clients/:clientId", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findClientById ||
+      !dataSource.updateClient ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageClients({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const clientId = context.req.param("clientId");
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "client.update_denied",
+        sourceEntity: { type: "Client", id: clientId },
+        commandInput: { endpoint: "updateClient", clientId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findClientById(actor.tenantId, clientId);
+    if (!beforeState) return context.json({ error: "client_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    const parsed = parseClientBody({ ...body.value, id: clientId }, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const client = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateClient) {
+        throw new Error("transactional_client_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateClient(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "client.updated",
+          sourceEntity: { type: "Client", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ client });
+  });
+
   app.get("/api/workspace/contacts", async (context) => {
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -193,6 +254,73 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     return context.json({ contact }, 201);
   });
 
+  app.patch("/api/workspace/contacts/:contactId", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findContactById ||
+      !dataSource.findClientById ||
+      !dataSource.updateContact ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageContacts({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const contactId = context.req.param("contactId");
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "contact.update_denied",
+        sourceEntity: { type: "Contact", id: contactId },
+        commandInput: { endpoint: "updateContact", contactId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findContactById(actor.tenantId, contactId);
+    if (!beforeState) return context.json({ error: "contact_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    const parsed = parseContactBody({ ...body.value, id: contactId }, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const client = await dataSource.findClientById(actor.tenantId, parsed.value.clientId);
+    const isReassigningClient = parsed.value.clientId !== beforeState.clientId;
+    if (!client || (isReassigningClient && client.status !== "active")) {
+      return context.json({ error: "client_not_found" }, 404);
+    }
+
+    const contact = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateContact) {
+        throw new Error("transactional_contact_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateContact(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "contact.updated",
+          sourceEntity: { type: "Contact", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ contact });
+  });
+
   app.get("/api/workspace/project-types", async (context) => {
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -268,6 +396,70 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     return context.json({ projectType }, 201);
   });
 
+  app.patch("/api/workspace/project-types/:projectTypeId", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findProjectTypeById ||
+      !dataSource.updateProjectType ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageProjectTypes({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const projectTypeId = context.req.param("projectTypeId");
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "project_type.update_denied",
+        sourceEntity: { type: "ProjectType", id: projectTypeId },
+        commandInput: { endpoint: "updateProjectType", projectTypeId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findProjectTypeById(actor.tenantId, projectTypeId);
+    if (!beforeState) return context.json({ error: "project_type_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    const parsed = parseProjectTypeBody(
+      { ...body.value, id: projectTypeId },
+      actor.tenantId
+    );
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const projectType = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateProjectType) {
+        throw new Error("transactional_project_type_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateProjectType(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "project_type.updated",
+          sourceEntity: { type: "ProjectType", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ projectType });
+  });
+
   app.get("/api/workspace/deal-stages", async (context) => {
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -341,6 +533,67 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     return context.json({ dealStage }, 201);
   });
 
+  app.patch("/api/workspace/deal-stages/:stageId", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findDealStageById ||
+      !dataSource.updateDealStage ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const stageId = context.req.param("stageId");
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "deal_stage.update_denied",
+        sourceEntity: { type: "DealStage", id: stageId },
+        commandInput: { endpoint: "updateDealStage", stageId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findDealStageById(actor.tenantId, stageId);
+    if (!beforeState) return context.json({ error: "deal_stage_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    const parsed = parseDealStageBody({ ...body.value, id: stageId }, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateDealStage) {
+        throw new Error("transactional_deal_stage_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateDealStage(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "deal_stage.updated",
+          sourceEntity: { type: "DealStage", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ dealStage });
+  });
+
   async function getActor(cookie: string | null): Promise<TenantUser | undefined> {
     return getSessionActorFromHeaders(cookie);
   }
@@ -372,6 +625,10 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       }
     });
   }
+}
+
+function isObjectBody(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function auditInput(input: {

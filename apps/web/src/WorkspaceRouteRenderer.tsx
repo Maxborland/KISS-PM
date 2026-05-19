@@ -1,17 +1,13 @@
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
-import {
-  ClientsView,
-  ContactsView,
-  DealStagesView,
-  ProjectTypesView
-} from "./CrmEntityViews";
+import { ClientsView, ContactsView } from "./CrmEntityViews";
 import { DashboardView } from "./DashboardView";
 import { OpportunityDetailView } from "./OpportunityDetailView";
 import { OpportunitiesView } from "./OpportunitiesView";
 import { PositionsView } from "./PositionsView";
 import { ProjectsView } from "./ProjectsView";
 import { RolesView } from "./RolesView";
+import { DealStagesView, ProjectTypesView } from "./SettingsReferenceViews";
 import { UsersView } from "./UsersView";
 import { WorkspaceSettingsView } from "./WorkspaceSettingsView";
 import { type WorkspaceRouteId } from "./routes";

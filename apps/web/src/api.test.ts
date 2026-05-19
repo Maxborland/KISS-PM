@@ -2,8 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createCustomField,
+  createClient,
   fetchCustomFields,
   fetchProjectTemplates,
+  updateClient,
+  updateContact,
+  updateDealStage,
+  updateProjectType,
   updateProjectTemplate,
   encodePathSegment
 } from "./api";
@@ -90,5 +95,73 @@ describe("web api helpers", () => {
       code: "custom_field_system_key_taken",
       status: 409
     });
+  });
+
+  it("uses encoded CRM foundation update endpoints with same-origin mutation headers", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(JSON.stringify({ client: {} }), { status: 200 }));
+
+    await createClient({
+      id: "client-romashka",
+      name: "ООО Ромашка",
+      description: null
+    });
+    await updateClient("client/unsafe", {
+      name: "ООО Ромашка обновлено",
+      description: "Описание",
+      status: "active"
+    });
+    await updateContact("contact/unsafe", {
+      clientId: "client-romashka",
+      name: "Ирина",
+      email: null,
+      phone: null,
+      telegram: null,
+      role: "Заказчик",
+      status: "archived"
+    });
+    await updateProjectType("project-type/unsafe", {
+      name: "Внедрение",
+      description: null,
+      status: "active"
+    });
+    await updateDealStage("deal-stage/unsafe", {
+      name: "Квалификация",
+      sortOrder: 20,
+      status: "archived"
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/workspace/clients",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/workspace/clients/client%2Funsafe",
+      expect.objectContaining({
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/workspace/contacts/contact%2Funsafe",
+      expect.objectContaining({ method: "PATCH" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/workspace/project-types/project-type%2Funsafe",
+      expect.objectContaining({ method: "PATCH" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/workspace/deal-stages/deal-stage%2Funsafe",
+      expect.objectContaining({ method: "PATCH" })
+    );
   });
 });
