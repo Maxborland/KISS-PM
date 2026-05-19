@@ -3,10 +3,12 @@ import { describe, expect, test } from "vitest";
 import type { DealStage, Opportunity } from "./api";
 import {
   buildKanbanStages,
+  canMoveOpportunityToStage,
   formatOpportunityEconomics,
   getOpportunityClientLabel,
   getOpportunityContactLabel,
   getOpportunityProjectTypeLabel,
+  getOpportunityStageMoveBlocker,
   getOpportunityStageOptions
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
@@ -148,5 +150,69 @@ describe("opportunity display helpers", () => {
       plannedHourlyRateLabel: "5 000 ₽/ч",
       plannedHoursLabel: "200 ч"
     });
+  });
+
+  test("allows moving a non-final opportunity to an active target stage", () => {
+    expect(
+      canMoveOpportunityToStage({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe(true);
+  });
+
+  test("explains why stage movement is disabled", () => {
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: false,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe("Нужно право tenant.opportunities.manage");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: true,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe("Дождитесь завершения текущего действия");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: { ...baseOpportunity, status: "won_closed" },
+        targetStageId: "stage-active"
+      })
+    ).toBe("Этап завершенной сделки нельзя менять");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-unused-archived"
+      })
+    ).toBe("Переносить можно только в активный этап");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-archived"
+      })
+    ).toBe("Сделка уже на этом этапе");
   });
 });
