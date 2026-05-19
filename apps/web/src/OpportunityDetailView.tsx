@@ -1,12 +1,15 @@
 import {
   ArrowLeft,
+  CheckCircle2,
   ClipboardCheck,
   Pencil,
   PlayCircle,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 
-import type { DealStage, Opportunity } from "./api";
+import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
+import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
   formatOpportunityEconomics,
@@ -59,6 +62,7 @@ export function OpportunityDetailView(props: {
   const [riskReason, setRiskReason] = useState("");
   const [actionError, setActionError] = useState("");
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [finalAction, setFinalAction] = useState<OpportunityFinalStatus | null>(null);
   const opportunity =
     opportunityQuery.data?.opportunity ??
     props.data.opportunities.find((item) => item.id === props.opportunityId) ??
@@ -67,7 +71,8 @@ export function OpportunityDetailView(props: {
     mutations.checkFeasibility.isPending ||
     mutations.updateOpportunity.isPending ||
     mutations.updateStage.isPending ||
-    mutations.activateProject.isPending;
+    mutations.activateProject.isPending ||
+    mutations.finalizeOpportunity.isPending;
   const activeClients = props.data.clients.filter((client) => client.status === "active");
   const activeProjectTypes = props.data.projectTypes.filter(
     (projectType) => projectType.status === "active"
@@ -133,6 +138,21 @@ export function OpportunityDetailView(props: {
     props.onChanged("Сделка обновлена");
   }
 
+  async function submitFinalAction(input: {
+    status: OpportunityFinalStatus;
+    reason: string;
+  }) {
+    if (!opportunity) return;
+    await mutations.finalizeOpportunity.mutateAsync({
+      opportunityId: opportunity.id,
+      input
+    });
+    setFinalAction(null);
+    props.onChanged(
+      input.status === "won_closed" ? "Сделка закрыта как выигранная" : "Сделка отклонена"
+    );
+  }
+
   return (
     <Panel
       title="Детали сделки"
@@ -189,7 +209,7 @@ export function OpportunityDetailView(props: {
             </div>
             <StatusPill
               label={getOpportunityStatusLabel(opportunity.status)}
-              tone={opportunity.status === "converted" ? "success" : "muted"}
+              tone={opportunity.status === "won_closed" ? "success" : "muted"}
             />
           </header>
 
@@ -315,7 +335,7 @@ export function OpportunityDetailView(props: {
                   opportunity,
                   onActivate: activateProject
                 })}
-                {opportunity.feasibilityStatus === "conflict" && opportunity.status !== "converted" ? (
+                {opportunity.feasibilityStatus === "conflict" && !isFinalOpportunity(opportunity) ? (
                   <label htmlFor="deal-risk-reason">
                     Причина принятия риска
                     <textarea
@@ -327,6 +347,28 @@ export function OpportunityDetailView(props: {
                   </label>
                 ) : null}
                 {actionError ? <p className="error">{actionError}</p> : null}
+                {canManageOpportunities && !isFinalOpportunity(opportunity) ? (
+                  <div className="table-actions">
+                    <button
+                      className="secondary-button"
+                      disabled={isPending}
+                      type="button"
+                      onClick={() => setFinalAction("won_closed")}
+                    >
+                      <CheckCircle2 aria-hidden="true" size={14} />
+                      Закрыть как выигранную
+                    </button>
+                    <button
+                      className="danger-button"
+                      disabled={isPending}
+                      type="button"
+                      onClick={() => setFinalAction("lost_rejected")}
+                    >
+                      <XCircle aria-hidden="true" size={14} />
+                      Отклонить
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>
@@ -348,6 +390,7 @@ export function OpportunityDetailView(props: {
               {renderFeasibility(opportunity)}
             </section>
           </div>
+          <RuntimeCustomFieldsCard data={props.data} opportunity={opportunity} />
               </>
             );
           })()}
@@ -356,6 +399,7 @@ export function OpportunityDetailView(props: {
               activeStages={activeStages}
               allContacts={props.data.contacts}
               clients={activeClients}
+              customFields={props.data.customFields}
               error={actionError}
               initialOpportunity={opportunity}
               isSaving={isPending}
@@ -366,9 +410,43 @@ export function OpportunityDetailView(props: {
               onSubmit={submitOpportunityUpdate}
             />
           ) : null}
+          {finalAction ? (
+            <DealFinalActionModal
+              action={finalAction}
+              error={actionError}
+              isSaving={isPending}
+              opportunity={opportunity}
+              onClose={() => setFinalAction(null)}
+              onSubmit={submitFinalAction}
+            />
+          ) : null}
         </div>
       ) : null}
     </Panel>
+  );
+}
+
+function RuntimeCustomFieldsCard(props: {
+  data: WorkspaceData;
+  opportunity: Opportunity;
+}) {
+  const fields = props.data.customFields.filter(
+    (field) => field.targetEntity === "opportunity" && field.status === "active"
+  );
+  if (fields.length === 0) return null;
+
+  return (
+    <section className="detail-card">
+      <h2>Поля сделки</h2>
+      <dl className="detail-list">
+        {fields.map((field) => (
+          <div key={field.id}>
+            <dt>{field.tenantLabel}</dt>
+            <dd>{props.opportunity.customFieldValues[field.id] || "Не заполнено"}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -378,10 +456,10 @@ function renderActivationControl(input: {
   opportunity: Opportunity;
   onActivate: () => void;
 }) {
-  if (input.opportunity.status === "converted") {
-    return <StatusPill label="Проект создан" tone="success" />;
+  if (input.opportunity.status === "won_closed") {
+    return <StatusPill label="Закрыта как выигранная" tone="success" />;
   }
-  if (input.opportunity.status === "rejected") {
+  if (input.opportunity.status === "lost_rejected") {
     return <StatusPill label="Отклонена" tone="muted" />;
   }
   if (!input.canActivateProjects) {
@@ -455,7 +533,7 @@ function getPositionName(data: WorkspaceData, positionId: string): string {
 }
 
 function isFinalOpportunity(opportunity: Opportunity): boolean {
-  return opportunity.status === "converted" || opportunity.status === "rejected";
+  return opportunity.status === "won_closed" || opportunity.status === "lost_rejected";
 }
 
 function getOpportunityStatusLabel(status: Opportunity["status"]): string {
@@ -464,8 +542,8 @@ function getOpportunityStatusLabel(status: Opportunity["status"]): string {
     intake: "Приемка",
     feasibility: "Проверка ресурсов",
     ready_to_activate: "Готова к активации",
-    rejected: "Отклонена",
-    converted: "Проект создан"
+    won_closed: "Закрыта как выигранная",
+    lost_rejected: "Отклонена"
   };
 
   return labels[status];

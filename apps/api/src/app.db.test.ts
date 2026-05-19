@@ -637,6 +637,23 @@ describe("API with PostgreSQL data source", () => {
 
   it("creates an opportunity, checks feasibility, activates a project and writes audit", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const opportunityField = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "field-opportunity-priority",
+        systemKey: "opportunity_priority",
+        tenantLabel: "Приоритет сделки",
+        targetEntity: "opportunity",
+        fieldType: "text",
+        required: false,
+        status: "active"
+      })
+    });
     const opportunity = await app.request("/api/workspace/opportunities", {
       method: "POST",
       headers: {
@@ -658,12 +675,67 @@ describe("API with PostgreSQL data source", () => {
         plannedHourlyRate: 6_000,
         probability: 80,
         templateId: null,
+        customFieldValues: {
+          "field-opportunity-priority": "Высокий"
+        },
         demand: [
           { positionId: "position-engineer", requiredHours: 80 },
           { positionId: "position-project-manager", requiredHours: 80 }
         ]
       })
     });
+    const rejectedOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "opportunity-rejected",
+        clientId: "client-romashka",
+        primaryContactId: "contact-irina",
+        projectTypeId: "project-type-implementation",
+        stageId: "deal-stage-new",
+        title: "Сделка без бюджета",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-12",
+        contractValue: 120_000,
+        plannedHourlyRate: 6_000,
+        probability: 20,
+        demand: [{ positionId: "position-engineer", requiredHours: 20 }]
+      })
+    });
+    const rejectedFinalAction = await app.request(
+      "/api/workspace/opportunities/opportunity-rejected/finalize",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          status: "lost_rejected",
+          reason: "Клиент заморозил бюджет"
+        })
+      }
+    );
+    const repeatedRejectedFinalAction = await app.request(
+      "/api/workspace/opportunities/opportunity-rejected/finalize",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          status: "won_closed",
+          reason: "Повторная попытка"
+        })
+      }
+    );
     const invalidOpportunity = await app.request("/api/workspace/opportunities", {
       method: "POST",
       headers: {
@@ -746,12 +818,16 @@ describe("API with PostgreSQL data source", () => {
       headers: { cookie }
     });
 
+    expect(opportunityField.status).toBe(201);
     expect(opportunity.status).toBe(201);
     await expect(opportunity.json()).resolves.toMatchObject({
       opportunity: {
         id: "opportunity-phase-3",
         tenantId: "tenant-alpha",
         plannedHours: 160,
+        customFieldValues: {
+          "field-opportunity-priority": "Высокий"
+        },
         demand: [
           { positionId: "position-engineer", requiredHours: 80 },
           { positionId: "position-project-manager", requiredHours: 80 }
@@ -761,6 +837,18 @@ describe("API with PostgreSQL data source", () => {
     expect(invalidOpportunity.status).toBe(400);
     await expect(invalidOpportunity.json()).resolves.toEqual({
       error: "invalid_planned_hourly_rate"
+    });
+    expect(rejectedOpportunity.status).toBe(201);
+    expect(rejectedFinalAction.status).toBe(200);
+    await expect(rejectedFinalAction.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-rejected",
+        status: "lost_rejected"
+      }
+    });
+    expect(repeatedRejectedFinalAction.status).toBe(409);
+    await expect(repeatedRejectedFinalAction.json()).resolves.toEqual({
+      error: "opportunity_final_action_locked"
     });
     expect(feasibility.status).toBe(200);
     await expect(feasibility.json()).resolves.toMatchObject({
@@ -805,7 +893,11 @@ describe("API with PostgreSQL data source", () => {
       opportunities: expect.arrayContaining([
         expect.objectContaining({
           id: "opportunity-phase-3",
-          status: "converted"
+          status: "won_closed"
+        }),
+        expect.objectContaining({
+          id: "opportunity-rejected",
+          status: "lost_rejected"
         })
       ])
     });
@@ -821,6 +913,7 @@ describe("API with PostgreSQL data source", () => {
     expect(auditBody).toMatchObject({
       auditEvents: expect.arrayContaining([
         expect.objectContaining({ actionType: "opportunity.created" }),
+        expect.objectContaining({ actionType: "opportunity.lost_rejected" }),
         expect.objectContaining({ actionType: "opportunity.feasibility_checked" }),
         expect.objectContaining({ actionType: "project.activated" })
       ])
@@ -1171,6 +1264,21 @@ describe("API with PostgreSQL data source", () => {
         body: JSON.stringify({ id: "project-denied" })
       }
     );
+    const finalAction = await app.request(
+      "/api/workspace/opportunities/opportunity-denied/finalize",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          status: "lost_rejected",
+          reason: "Нет доступа"
+        })
+      }
+    );
     const malformedActivation = await app.request(
       "/api/workspace/opportunities/opportunity-denied/activate",
       {
@@ -1193,6 +1301,7 @@ describe("API with PostgreSQL data source", () => {
     expect(malformedCreateOpportunity.status).toBe(403);
     expect(feasibility.status).toBe(403);
     expect(activation.status).toBe(403);
+    expect(finalAction.status).toBe(403);
     expect(malformedActivation.status).toBe(403);
     expect(auditEvents).toEqual(
       expect.arrayContaining([
@@ -1221,6 +1330,17 @@ describe("API with PostgreSQL data source", () => {
         expect.objectContaining({
           actorUserId: "user-alpha-reader",
           actionType: "project.activation_denied",
+          sourceEntity: {
+            type: "Opportunity",
+            id: "opportunity-denied"
+          },
+          executionResult: expect.objectContaining({
+            status: "denied"
+          })
+        }),
+        expect.objectContaining({
+          actorUserId: "user-alpha-reader",
+          actionType: "opportunity.final_action_denied",
           sourceEntity: {
             type: "Opportunity",
             id: "opportunity-denied"
@@ -2167,6 +2287,3 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 });
-
-
-

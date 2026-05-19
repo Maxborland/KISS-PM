@@ -36,6 +36,8 @@ const auditActionLabels: Record<string, string> = {
   "deal_stage.updated": "Этап сделки обновлен",
   "opportunity.created": "Сделка создана",
   "opportunity.stage_updated": "Этап сделки изменен",
+  "opportunity.won_closed": "Сделка закрыта как выигранная",
+  "opportunity.lost_rejected": "Сделка отклонена",
   "opportunity.feasibility_checked": "Ресурсная проверка сделки выполнена",
   "project.activated": "Проект активирован",
   "task.created": "Задача создана",

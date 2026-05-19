@@ -36,7 +36,8 @@ const baseOpportunity: Opportunity = {
   feasibilityCheckedAt: null,
   createdAt: "2026-05-19T00:00:00.000Z",
   updatedAt: "2026-05-19T00:00:00.000Z",
-  demand: []
+  demand: [],
+  customFieldValues: {}
 };
 
 const stages: DealStage[] = [

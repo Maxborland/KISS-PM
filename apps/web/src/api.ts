@@ -182,8 +182,10 @@ export type OpportunityStatus =
   | "intake"
   | "feasibility"
   | "ready_to_activate"
-  | "rejected"
-  | "converted";
+  | "won_closed"
+  | "lost_rejected";
+
+export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
 
 export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
 
@@ -213,6 +215,7 @@ export type Opportunity = {
   createdAt: string;
   updatedAt: string;
   demand: PositionDemand[];
+  customFieldValues: Record<string, string>;
 };
 
 export type Project = {
@@ -295,11 +298,17 @@ export type OpportunityInput = {
   probability: number;
   templateId: string | null;
   demand: PositionDemand[];
+  customFieldValues?: Record<string, string>;
 };
 export type OpportunityUpdateInput = Omit<OpportunityInput, "id">;
 
 export type OpportunityStageInput = {
   stageId: string;
+};
+
+export type OpportunityFinalActionInput = {
+  status: OpportunityFinalStatus;
+  reason: string;
 };
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
@@ -651,6 +660,19 @@ export async function updateOpportunityStage(
 ): Promise<{ opportunity: Opportunity }> {
   return requestJson(
     `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/stage`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
+export async function finalizeOpportunity(
+  opportunityId: string,
+  input: OpportunityFinalActionInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/finalize`,
     {
       method: "PATCH",
       body: input

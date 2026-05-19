@@ -35,6 +35,7 @@ const opportunityInput: OpportunityInput = {
   probability: 70,
   status: "intake",
   templateId: null,
+  customFieldValues: {},
   demand: [{ positionId: "position-analyst", requiredHours: 160 }]
 };
 
@@ -112,6 +113,7 @@ describe("project intake application service", () => {
         createdInput = input;
         return {
           ...input,
+          customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
           feasibilityCheckedAt: null,
@@ -183,6 +185,7 @@ describe("project intake application service", () => {
     let transactionUsed = false;
     const existingOpportunity = {
       ...opportunityInput,
+      customFieldValues: {},
       status: "ready_to_activate",
       feasibilityStatus: "ok",
       feasibilityResult: { rows: [] },
@@ -262,6 +265,7 @@ describe("project intake application service", () => {
         updatedInput = input;
         return {
           ...input,
+          customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
           feasibilityCheckedAt: null,
@@ -333,6 +337,100 @@ describe("project intake application service", () => {
         feasibilityStatus: null,
         plannedHours: 200
       }),
+      permissionResult: {
+        allowed: true
+      }
+    });
+  });
+
+  it("finalizes an opportunity through a governed close/reject action and records management audit", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    let finalizedInput: { tenantId: string; opportunityId: string; status: string } | null =
+      null;
+    const existingOpportunity = {
+      ...opportunityInput,
+      customFieldValues: {},
+      status: "feasibility",
+      feasibilityStatus: null,
+      feasibilityResult: null,
+      feasibilityCheckedAt: null,
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById() {
+        return undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async finalizeOpportunity(input) {
+        finalizedInput = input;
+        return {
+          ...existingOpportunity,
+          status: input.status,
+          customFieldValues: existingOpportunity.customFieldValues,
+          updatedAt: new Date("2026-05-20T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+      }
+    });
+
+    const result = await service.finalizeOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      finalAction: {
+        status: "lost_rejected",
+        reason: "Клиент заморозил бюджет"
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 200,
+      opportunity: {
+        id: "opportunity-service",
+        status: "lost_rejected"
+      }
+    });
+    expect(finalizedInput).toMatchObject({
+      tenantId: "tenant-alpha",
+      opportunityId: "opportunity-service",
+      status: "lost_rejected"
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      actionType: "opportunity.lost_rejected",
+      commandInput: {
+        opportunityId: "opportunity-service",
+        reason: "Клиент заморозил бюджет"
+      },
+      beforeState: expect.objectContaining({ status: "feasibility" }),
+      afterState: expect.objectContaining({ status: "lost_rejected" }),
       permissionResult: {
         allowed: true
       }

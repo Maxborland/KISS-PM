@@ -248,6 +248,9 @@ export const opportunities = pgTable(
     feasibilityStatus: text("feasibility_status"),
     feasibilityResult: jsonb("feasibility_result").$type<Record<string, unknown> | null>(),
     feasibilityCheckedAt: timestamp("feasibility_checked_at", { withTimezone: true }),
+    customFieldValues: jsonb("custom_field_values")
+      .$type<Record<string, string>>()
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
   },
@@ -714,6 +717,7 @@ const tableColumns = {
     "feasibility_status",
     "feasibility_result",
     "feasibility_checked_at",
+    "custom_field_values",
     "created_at",
     "updated_at"
   ],

@@ -10,6 +10,7 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
   OpportunityInput,
+  OpportunityFinalStatus,
   OpportunityRecord,
   OpportunityUpdateInput,
   ProjectInput,
@@ -82,8 +83,21 @@ export type ActivateProjectFromOpportunityResult =
       project: ProjectRecord;
     };
 
+export type FinalizeOpportunityResult =
+  | ServiceError
+  | {
+      ok: true;
+      status: 200;
+      opportunity: OpportunityRecord;
+    };
+
 export type ProjectActivationInput = Pick<ProjectInput, "id"> & {
   acceptedRiskReason?: string | null;
+};
+
+export type OpportunityFinalActionInput = {
+  status: OpportunityFinalStatus;
+  reason: string;
 };
 
 export type ProjectIntakeService = {
@@ -95,6 +109,10 @@ export type ProjectIntakeService = {
     opportunityId: string;
   }): Promise<AuthorizedResult>;
   preflightUpdateOpportunity(input: {
+    actor: TenantUser;
+    opportunityId: string;
+  }): Promise<AuthorizedResult>;
+  preflightFinalizeOpportunity(input: {
     actor: TenantUser;
     opportunityId: string;
   }): Promise<AuthorizedResult>;
@@ -116,6 +134,11 @@ export type ProjectIntakeService = {
     opportunityId: string;
     input: OpportunityUpdateInput;
   }): Promise<UpdateOpportunityResult>;
+  finalizeOpportunity(input: {
+    actor: TenantUser;
+    opportunityId: string;
+    finalAction: OpportunityFinalActionInput;
+  }): Promise<FinalizeOpportunityResult>;
   checkOpportunityFeasibility(input: {
     actor: TenantUser;
     opportunityId: string;

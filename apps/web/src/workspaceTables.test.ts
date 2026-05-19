@@ -108,7 +108,8 @@ const opportunities: Opportunity[] = [
     feasibilityCheckedAt: null,
     createdAt: "2026-05-18T00:00:00.000Z",
     updatedAt: "2026-05-18T00:00:00.000Z",
-    demand: []
+    demand: [],
+    customFieldValues: {}
   }
 ];
 

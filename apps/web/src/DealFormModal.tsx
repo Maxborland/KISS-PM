@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type {
   Client,
   Contact,
+  CustomFieldDefinition,
   DealStage,
   Opportunity,
   OpportunityInput,
@@ -13,6 +14,7 @@ import type { WorkspaceData } from "./workspaceData";
 import {
   type FormErrors,
   hasFormErrors,
+  validateOpportunityCustomFields,
   validateOpportunityForm
 } from "./workspaceForms";
 import { getErrorMessage } from "./workspaceShellState";
@@ -29,6 +31,7 @@ export type DealFormSubmitInput = OpportunityInput | OpportunityUpdateInput;
 export function DealFormModal(props: {
   activeStages: DealStage[];
   clients: Client[];
+  customFields: CustomFieldDefinition[];
   error: string;
   initialOpportunity?: Opportunity | null;
   isSaving: boolean;
@@ -68,6 +71,13 @@ export function DealFormModal(props: {
       ),
     [props.allContacts, selectedClientId]
   );
+  const activeOpportunityFields = useMemo(
+    () =>
+      props.customFields.filter(
+        (field) => field.targetEntity === "opportunity" && field.status === "active"
+      ),
+    [props.customFields]
+  );
   const plannedHoursPreview = calculatePlannedHoursPreview(
     contractValue,
     plannedHourlyRate
@@ -97,7 +107,11 @@ export function DealFormModal(props: {
         requiredHours: line.requiredHours
       }))
     };
-    const validationErrors = validateOpportunityForm(validationInput);
+    const customFieldValues = collectCustomFieldValues(form, activeOpportunityFields);
+    const validationErrors = {
+      ...validateOpportunityForm(validationInput),
+      ...validateOpportunityCustomFields(activeOpportunityFields, customFieldValues)
+    };
     setFormError("");
     setFieldErrors(validationErrors);
     if (hasFormErrors(validationErrors)) return;
@@ -116,6 +130,7 @@ export function DealFormModal(props: {
       plannedHourlyRate: Number(validationInput.plannedHourlyRate),
       probability: Number(validationInput.probability),
       templateId: String(form.get("templateId") ?? "") || null,
+      customFieldValues,
       demand: demandLines
         .filter((line) => line.positionId.trim())
         .map((line) => ({
@@ -306,6 +321,30 @@ export function DealFormModal(props: {
             ))}
           </select>
         </label>
+        {activeOpportunityFields.length > 0 ? (
+          <fieldset className="permission-grid">
+            <legend>Поля сделки</legend>
+            <div className="grid-3">
+              {activeOpportunityFields.map((field) => (
+                <label key={field.id} htmlFor={`${formId}-${field.id}`}>
+                  {field.tenantLabel}
+                  <input
+                    id={`${formId}-${field.id}`}
+                    name={`customField:${field.id}`}
+                    type={getCustomFieldInputType(field)}
+                    defaultValue={initial?.customFieldValues?.[field.id] ?? ""}
+                    aria-describedby={
+                      fieldErrors[field.id] ? `${formId}-${field.id}-error` : undefined
+                    }
+                    aria-invalid={Boolean(fieldErrors[field.id])}
+                    required={field.required}
+                  />
+                  <FieldError formId={formId} field={field.id} errors={fieldErrors} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <div className="deal-economics-preview" aria-live="polite">
           <span>
             <strong>{formatMoney(Number(contractValue) || 0)}</strong>
@@ -410,6 +449,24 @@ function defaultDemandLine(): DemandFormLine {
     positionId: "",
     requiredHours: ""
   };
+}
+
+function collectCustomFieldValues(
+  form: FormData,
+  fields: CustomFieldDefinition[]
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const field of fields) {
+    const value = String(form.get(`customField:${field.id}`) ?? "").trim();
+    if (value) values[field.id] = value;
+  }
+  return values;
+}
+
+function getCustomFieldInputType(field: CustomFieldDefinition): string {
+  if (field.fieldType === "number") return "number";
+  if (field.fieldType === "date") return "date";
+  return "text";
 }
 
 function calculatePlannedHoursPreview(contractValue: string, plannedHourlyRate: string): number {

@@ -1,5 +1,6 @@
 import type { TenantUser } from "@kiss-pm/domain";
 import type { OpportunityUpdateInput } from "../apiTypes";
+import { validateOpportunityCustomFieldValues } from "./opportunityCustomFields";
 import { resolveOpportunityLinks } from "./opportunityLinks";
 import { isFinalOpportunityStatus } from "./opportunityStatus";
 import type {
@@ -37,6 +38,12 @@ export async function updateOpportunity(
     projectType: opportunity.projectType
   });
   if (!linked.ok) return linked;
+  const customFieldValidation = await validateOpportunityCustomFieldValues(
+    deps.dataSource,
+    input.actor.tenantId,
+    input.input.customFieldValues
+  );
+  if (!customFieldValidation.ok) return customFieldValidation;
 
   const updatedOpportunity = await deps.runDataSourceTransaction(
     async (transactionDataSource) => {
@@ -50,7 +57,8 @@ export async function updateOpportunity(
         status: opportunity.status,
         clientName: linked.client.name,
         contactName: linked.contact.name,
-        projectType: linked.projectType.name
+        projectType: linked.projectType.name,
+        customFieldValues: customFieldValidation.values
       });
       await deps.appendManagementAuditEvent(
         {
@@ -67,7 +75,8 @@ export async function updateOpportunity(
             ...input.input,
             clientName: linked.client.name,
             contactName: linked.contact.name,
-            projectType: linked.projectType.name
+            projectType: linked.projectType.name,
+            customFieldValues: customFieldValidation.values
           },
           beforeState: opportunity,
           afterState: updated,
