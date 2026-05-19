@@ -154,7 +154,16 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Поведение profile/theme mutation calls, permission gating и form markup не менялось.
 - GREEN подтвержден `repositoryHealth.test.ts`, `pnpm typecheck` и `pnpm test`.
 
-Итог REF-003 на текущий момент: `App.tsx` больше не владеет shell-state helpers, route icon registry, dashboard presentation, users CRUD view, roles CRUD view, positions CRUD view, audit view и account views, но REF-003 остается открытым. Цель следующей серии — использовать Next.js App Router и page/view-level boundaries, чтобы довести `App.tsx` до shell-файла меньше 500 строк.
+#### REF-003I — workspace settings view extraction
+
+Статус: completed.
+
+- `WorkspaceSettingsView` вынесен из `App.tsx` в `apps/web/src/WorkspaceSettingsView.tsx`.
+- `App.tsx` health-budget ужесточен с 1300 до 700 строк.
+- Поведение custom fields/templates mutation calls, permission gating и form markup не менялось.
+- GREEN подтвержден `repositoryHealth.test.ts`, `pnpm typecheck` и `pnpm test`.
+
+Итог REF-003 на текущий момент: `App.tsx` больше не владеет shell-state helpers, route icon registry, dashboard presentation, users CRUD view, roles CRUD view, positions CRUD view, audit view, account views и workspace settings view. REF-003 остается открытым только из-за последнего shell/orchestration budget: нужно довести `App.tsx` ниже 500 строк.
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
@@ -216,7 +225,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 Текущий план закрыт как безопасный refactor batch:
 
 - `REF-002` completed: workspace config validation в domain.
-- `REF-003` in_progress: shell-state, route icon registry, dashboard presentation, users CRUD view, roles CRUD view, positions CRUD view, audit view и account views вынесены из `App.tsx`; нужны page/view-level slices до бюджета меньше 500 строк.
+- `REF-003` in_progress: все route views вынесены из `App.tsx`; нужен последний shell/orchestration slice до бюджета меньше 500 строк.
 - `REF-004` completed for current plan: API app error mapping вынесен из `app.ts`.
 - `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
@@ -225,7 +234,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
 
-1. `App.tsx`: вынести `WorkspaceSettingsView`, затем shell/router orchestration; где возможно, привязать к Next.js route page boundaries.
+1. `App.tsx`: вынести shell/router orchestration так, чтобы `App.tsx` стал тонким entrypoint меньше 500 строк.
 2. `apps/api/src/app.ts`: выделить route groups для users/positions/access roles/profile/theme.
 3. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
 
