@@ -33,7 +33,7 @@
 
 - `packages/persistence/src/schema.ts`
 - `packages/persistence/src/index.ts`
-- `packages/persistence/src/postgresTenantDataSource.ts`
+- `packages/persistence/src/repositories.ts`
 - `packages/persistence/src/repositories.db.test.ts`
 - `apps/api/src/apiTypes.ts`
 - `apps/api/src/app.ts`
@@ -49,31 +49,31 @@
 
 ## Block 1. Spec, docs and characterization
 
-- [ ] Update Phase 3.1/phase status docs so audit-in-card is no longer marked as out of scope.
-- [ ] Add compact product spec for CRM activity workspace.
-- [ ] Add characterization tests around existing stage change and audit event source entity, before changing behavior.
-- [ ] Run:
+- [x] Update Phase 3.1/phase status docs so audit-in-card is no longer marked as out of scope.
+- [x] Add compact product spec for CRM activity workspace.
+- [x] Add characterization tests around existing stage change and audit event source entity, before changing behavior.
+- [x] Run:
   - `pnpm typecheck`
   - `pnpm test`
-- [ ] Commit: `docs: define crm activity workspace baseline`.
+- [x] Commit: `docs: define crm activity workspace baseline` (`b770f66`).
 
 ## Block 2. Persistence model
 
-- [ ] Add `opportunity_activities` table:
+- [x] Add `opportunity_activities` table:
   - composite tenant safety with `tenant_id`;
   - FK to `opportunities(tenant_id, id)`;
   - optional FK to assignee user if current schema supports it safely, otherwise validate assignee in application layer for first slice;
   - indexes on `(tenant_id, opportunity_id, created_at)` and `(tenant_id, assignee_user_id)`.
-- [ ] Add repository methods:
+- [x] Add repository methods:
   - `listOpportunityActivities(tenantId, opportunityId)`;
   - `createOpportunityActivity(input)`;
   - `updateOpportunityActivity(input)` for task completion.
-- [ ] Add DB tests:
+- [x] Add DB tests:
   - tenant isolation;
   - ordering by createdAt;
   - task update does not affect another tenant;
   - cross-tenant opportunity link is rejected.
-- [ ] Run:
+- [x] Run:
   - `pnpm --filter @kiss-pm/persistence test`
   - `pnpm test:db`
 - [ ] Commit: `feat: add opportunity activity persistence`.
