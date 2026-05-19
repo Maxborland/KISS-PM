@@ -57,7 +57,7 @@
 
 ## Smoke proof points
 
-- Admin видит `Возможности` и `Проекты`.
+- Admin видит `Сделки` и `Проекты`.
 - Admin создает opportunity вручную.
 - Карточка opportunity считает `960000 / 6000 = 160` плановых часов.
 - Demand задан двумя строками: `Руководитель проекта: 80 ч`, `Инженер: 80 ч`.
@@ -65,7 +65,7 @@
 - Admin активирует проект.
 - Проект появляется в разделе `Проекты`.
 - Audit показывает `Возможность создана`, `Ресурсная проверка сделки выполнена`, `Проект активирован`.
-- Restricted user не видит `Возможности`/`Проекты`, deep-link возвращает на dashboard, API endpoints Phase 3 отвечают `403`.
+- Restricted user не видит `Сделки`/`Проекты`, deep-link возвращает на dashboard, API endpoints Phase 3 отвечают `403`.
 - Restricted mutation attempts пишутся в audit как denied action events.
 
 ## Remaining follow-up after Phase 3

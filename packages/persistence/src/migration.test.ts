@@ -54,6 +54,13 @@ const phase4ProjectTasksMigration = readFileSync(
   new URL("../migrations/0010_phase_4_project_tasks.sql", import.meta.url),
   "utf8"
 );
+const phase4CrmFinalActionsMigration = readFileSync(
+  new URL(
+    "../migrations/0011_phase_4_crm_final_actions_custom_fields.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -207,6 +214,17 @@ describe("Phase 4 project tasks SQL migration", () => {
     );
     expect(phase4ProjectTasksMigration).toContain(
       'CREATE INDEX "task_participants_tenant_user_id_idx"'
+    );
+  });
+});
+
+describe("Phase 4 CRM final actions SQL migration", () => {
+  it("stores runtime custom field values on opportunities", () => {
+    expect(phase4CrmFinalActionsMigration).toContain(
+      'ALTER TABLE "opportunities"'
+    );
+    expect(phase4CrmFinalActionsMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "custom_field_values" jsonb NOT NULL DEFAULT'
     );
   });
 });

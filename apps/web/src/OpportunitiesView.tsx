@@ -1,14 +1,17 @@
 import {
   Calculator,
+  CheckCircle2,
   ClipboardCheck,
   KanbanSquare,
   List,
   PlayCircle,
-  PlusCircle
+  PlusCircle,
+  XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { DealStage, Opportunity } from "./api";
+import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
+import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
   buildKanbanStages,
@@ -71,6 +74,10 @@ export function OpportunitiesView(props: {
   const projectMutations = useProjectIntakeMutations();
   const [modal, setModal] = useState<ModalKind>(null);
   const [activationTargetId, setActivationTargetId] = useState<string | null>(null);
+  const [finalActionTarget, setFinalActionTarget] = useState<{
+    opportunityId: string;
+    action: OpportunityFinalStatus;
+  } | null>(null);
   const [viewMode, setViewMode] = useState<DealViewMode>("list");
   const [tableSearch, setTableSearch] = useState("");
   const [formError, setFormError] = useState("");
@@ -117,7 +124,8 @@ export function OpportunitiesView(props: {
     projectMutations.updateOpportunity.isPending ||
     projectMutations.checkFeasibility.isPending ||
     projectMutations.updateStage.isPending ||
-    projectMutations.activateProject.isPending;
+    projectMutations.activateProject.isPending ||
+    projectMutations.finalizeOpportunity.isPending;
 
   useEffect(() => {
     if (!props.openCreateRequested) return;
@@ -129,6 +137,7 @@ export function OpportunitiesView(props: {
     if (isSaving) return;
     setModal(null);
     setActivationTargetId(null);
+    setFinalActionTarget(null);
     resetFormState();
   }
 
@@ -189,6 +198,21 @@ export function OpportunitiesView(props: {
     } catch (error) {
       setFormError(getErrorMessage(error));
     }
+  }
+
+  async function finalizeOpportunity(input: {
+    status: OpportunityFinalStatus;
+    reason: string;
+  }) {
+    if (!finalActionTarget) return;
+    await projectMutations.finalizeOpportunity.mutateAsync({
+      opportunityId: finalActionTarget.opportunityId,
+      input
+    });
+    closeModal();
+    props.onChanged(
+      input.status === "won_closed" ? "Сделка закрыта как выигранная" : "Сделка отклонена"
+    );
   }
 
   return (
@@ -260,6 +284,7 @@ export function OpportunitiesView(props: {
             <DealsTable
               canActivateProjects={canActivateProjects}
               canCheckFeasibility={canCheckFeasibility}
+              canManageOpportunities={canManageOpportunities}
               data={props.data}
               isPending={isSaving}
               opportunities={filteredOpportunities}
@@ -269,6 +294,9 @@ export function OpportunitiesView(props: {
                 setActivationTargetId(opportunity.id);
               }}
               onCheckFeasibility={checkFeasibility}
+              onFinalize={(opportunity, action) =>
+                setFinalActionTarget({ opportunityId: opportunity.id, action })
+              }
               onOpenOpportunity={props.onOpenOpportunity}
             />
           ) : (
@@ -291,6 +319,7 @@ export function OpportunitiesView(props: {
           clients={activeClients}
           allContacts={props.data.contacts}
           error={formError}
+          customFields={props.data.customFields}
           isSaving={isSaving}
           positions={props.data.positions}
           projectTemplates={props.data.projectTemplates}
@@ -308,6 +337,23 @@ export function OpportunitiesView(props: {
           onClose={closeModal}
           onSubmit={activateProject}
         />
+      ) : null}
+      {finalActionTarget ? (
+        (() => {
+          const target = props.data.opportunities.find(
+            (opportunity) => opportunity.id === finalActionTarget.opportunityId
+          );
+          return target ? (
+            <DealFinalActionModal
+              action={finalActionTarget.action}
+              error={formError}
+              isSaving={isSaving}
+              opportunity={target}
+              onClose={closeModal}
+              onSubmit={finalizeOpportunity}
+            />
+          ) : null;
+        })()
       ) : null}
     </>
   );
@@ -341,11 +387,13 @@ function ReferenceTile(props: {
 function DealsTable(props: {
   canActivateProjects: boolean;
   canCheckFeasibility: boolean;
+  canManageOpportunities: boolean;
   data: WorkspaceData;
   isPending: boolean;
   opportunities: Opportunity[];
   onActivate: (opportunity: Opportunity) => void;
   onCheckFeasibility: (opportunity: Opportunity) => void;
+  onFinalize: (opportunity: Opportunity, action: OpportunityFinalStatus) => void;
   onOpenOpportunity: (opportunityId: string) => void;
 }) {
   return (
@@ -440,6 +488,28 @@ function DealsTable(props: {
                         opportunity,
                         onActivate: () => props.onActivate(opportunity)
                       })}
+                      {props.canManageOpportunities && !isFinalOpportunity(opportunity) ? (
+                        <>
+                          <button
+                            className="secondary-button"
+                            disabled={props.isPending}
+                            type="button"
+                            onClick={() => props.onFinalize(opportunity, "won_closed")}
+                          >
+                            <CheckCircle2 aria-hidden="true" size={14} />
+                            Закрыть
+                          </button>
+                          <button
+                            className="danger-button"
+                            disabled={props.isPending}
+                            type="button"
+                            onClick={() => props.onFinalize(opportunity, "lost_rejected")}
+                          >
+                            <XCircle aria-hidden="true" size={14} />
+                            Отклонить
+                          </button>
+                        </>
+                      ) : null}
                     </span>
                   </td>
                 </tr>
@@ -660,10 +730,10 @@ function renderActivationAction(input: {
   opportunity: Opportunity;
   onActivate: () => void;
 }) {
-  if (input.opportunity.status === "converted") {
-    return <span className="muted">Проект создан</span>;
+  if (input.opportunity.status === "won_closed") {
+    return <span className="muted">Закрыта</span>;
   }
-  if (input.opportunity.status === "rejected") {
+  if (input.opportunity.status === "lost_rejected") {
     return <span className="muted">Отклонена</span>;
   }
   if (!input.canActivateProjects) {
@@ -698,7 +768,7 @@ function renderActivationAction(input: {
 }
 
 function isFinalOpportunity(opportunity: Opportunity): boolean {
-  return opportunity.status === "converted" || opportunity.status === "rejected";
+  return opportunity.status === "won_closed" || opportunity.status === "lost_rejected";
 }
 
 function renderFeasibility(opportunity: Opportunity) {

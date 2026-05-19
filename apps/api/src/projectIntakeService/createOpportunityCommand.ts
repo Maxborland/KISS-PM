@@ -1,6 +1,7 @@
 import type { TenantUser } from "@kiss-pm/domain";
 import type { OpportunityInput } from "../apiTypes";
 import { authorizeOpportunityCreate } from "./authorization";
+import { validateOpportunityCustomFieldValues } from "./opportunityCustomFields";
 import { resolveOpportunityLinks } from "./opportunityLinks";
 import type {
   CreateOpportunityResult,
@@ -23,6 +24,12 @@ export async function createOpportunity(
     input.input
   );
   if (!linked.ok) return linked;
+  const customFieldValidation = await validateOpportunityCustomFieldValues(
+    deps.dataSource,
+    input.actor.tenantId,
+    input.input.customFieldValues
+  );
+  if (!customFieldValidation.ok) return customFieldValidation;
 
   const existing = await deps.dataSource.listOpportunities!(input.actor.tenantId);
   if (existing.some((opportunity) => opportunity.id === input.input.id)) {
@@ -39,7 +46,8 @@ export async function createOpportunity(
         ...input.input,
         clientName: linked.client.name,
         contactName: linked.contact.name,
-        projectType: linked.projectType.name
+        projectType: linked.projectType.name,
+        customFieldValues: customFieldValidation.values
       });
     await deps.appendManagementAuditEvent(
       {
@@ -55,7 +63,8 @@ export async function createOpportunity(
           ...input.input,
           clientName: linked.client.name,
           contactName: linked.contact.name,
-          projectType: linked.projectType.name
+          projectType: linked.projectType.name,
+          customFieldValues: customFieldValidation.values
         },
         beforeState: null,
         afterState: createdOpportunity,

@@ -10,6 +10,8 @@
 - Context-aware `Quick Create` только там, где есть реальные действия.
 - UI/UX cleanup перед проектным контуром.
 - CRM hardening после пользовательского ревью: реальный drag-and-drop kanban, кликабельные клиент/контакт, редактирование сделки, корректная экономика сделки и custom fields для сущности `Сделка`.
+- Governed final actions: закрытие выигранной сделки и отклонение сделки с обязательной причиной, permission check и audit.
+- Runtime custom field values for `Сделка`: форма рендерит активные поля, валидирует значения и показывает сохраненные значения в деталях.
 
 ## Decisions
 
@@ -19,6 +21,7 @@
 - Этапы сделок и типы проектов являются tenant-scoped сущностями, а не React constants.
 - Карточка сделки не показывает audit block. Audit остается отдельным разделом и backend evidence layer.
 - `Стоимость`, `Норма часа`, `Необходимые часы` и `Потребность` показываются отдельно: `plannedHours = contractValue / plannedHourlyRate`, demand хранится строками `должность + часы`.
+- Чистая модель финального lifecycle сделки: `won_closed` и `lost_rejected`; старые legacy-статусы не являются текущей моделью.
 
 ## Red / Green evidence
 
@@ -42,6 +45,12 @@
 - CRM hardening Bug Hunt: smoke выявил нестабильные Playwright selectors для economics preview, detail fields и kanban drop target; исправлено на scoped locators и accessible kanban region.
 - CRM hardening Code Review: найдено, что редактирование стоимости до 1 200 000 при норме 6 000 и demand 160 должно давать warning, а не `ok`; smoke зафиксировал `Есть предупреждения`.
 - CRM hardening Security Review: backend update сделки проходит через permission check, tenant-scoped linked entity resolution, transaction и audit; Critical/Important замечаний нет.
+- Governed final actions/custom fields Bug Hunt: старые legacy-статусы оставались в docs/status/ADR; исправлено на `won_closed/lost_rejected`.
+- Governed final actions/custom fields Code Review: runtime custom fields должны валидироваться backend-side, а не только в форме; добавлена validation against active `targetEntity=opportunity` definitions.
+- Governed final actions/custom fields Security Review: final action проходит permission check, tenant-scoped repository update, final-state lock и denied audit for restricted mutation.
+- Repeat Bug Hunt: frontend date validation принимала rollover-даты вроде `2026-02-31`, а backend уже был строгим; исправлено общим strict date parser и тестом.
+- Repeat Security Review: повторное или гоняющееся final action больше не приводит к repository exception/500; persistence возвращает empty update, service отвечает `409 opportunity_final_action_locked`.
+- Runtime UI Review: после restart compose web/API экран `Сделки` показывает финальные строки как `Отклонена` и `Закрыта`, без старых action controls для final deals.
 
 ## Fresh verification
 
@@ -63,10 +72,22 @@
 - CRM hardening `pnpm test:db`: passed, exit 0; 7 files / 38 tests.
 - CRM hardening `pnpm --filter @kiss-pm/web build`: passed, exit 0; Next.js build successful.
 - CRM hardening `pnpm test:e2e:smoke`: passed, exit 0; 1 Chromium smoke covering deal create/edit, client/contact deep links, DnD stage move, feasibility warning and activation.
+- Governed final actions/custom fields targeted tests: `pnpm vitest run apps/api/src/projectIntakeParsers.test.ts apps/api/src/projectIntakeService.test.ts apps/web/src/workspaceForms.test.ts packages/persistence/src/migration.test.ts` passed, exit 0; 33 tests.
+- Governed final actions/custom fields targeted DB tests: `DATABASE_URL=...55433 pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts packages/persistence/src/repositories.db.test.ts` passed, exit 0; 27 tests.
+- Governed final actions/custom fields `pnpm typecheck`: passed, exit 0.
+- Governed final actions/custom fields `pnpm --filter @kiss-pm/web typecheck`: passed, exit 0.
+- Governed final actions/custom fields `pnpm test`: passed, exit 0; 144 tests.
+- Governed final actions/custom fields `pnpm test:db`: passed, exit 0; 38 tests.
+- Governed final actions/custom fields `pnpm --filter @kiss-pm/web build`: passed, exit 0; Next.js build successful.
+- Governed final actions/custom fields `pnpm test:e2e:smoke`: passed, exit 0; 1 Chromium smoke, 42.0s.
+- Governed final actions/custom fields docs grep: `rg -n 'converted|status: "rejected"|status=rejected|status=converted|Проект создан|Возможности|runtime rendering/validation значений' docs apps packages e2e` returned no matches, exit 1.
+- Governed final actions/custom fields `git diff --check`: passed, exit 0.
+- Governed final actions/custom fields `docker compose ps` after restart with `KISS_PM_WEB_PORT=3001`, `KISS_PM_API_PORT=4001`, `KISS_PM_POSTGRES_PORT=55433`: `postgres`, `api`, `web` up; `postgres` healthy.
+- Browser proof on `http://127.0.0.1:3001/opportunities`: table rows show `Отклонена` for `lost_rejected` and `Закрыта` for `won_closed`; narrow viewport has no document-level horizontal overflow, table uses contained horizontal scroll.
 
 ## Remaining follow-up after Phase 3.1
 
 - External CRM/intake connectors.
 - Full resource matrix.
 - Gantt/WBS/tasks.
-- Runtime rendering/validation of custom deal field values in deal forms.
+- Настраиваемые options для select/custom dictionary fields; текущий baseline валидирует scalar number/text/date values.

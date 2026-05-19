@@ -1,6 +1,10 @@
 import { calculatePlannedHours } from "@kiss-pm/domain";
 import type { TenantId } from "@kiss-pm/domain";
-import type { OpportunityInput, OpportunityUpdateInput } from "./apiTypes";
+import type {
+  OpportunityFinalStatus,
+  OpportunityInput,
+  OpportunityUpdateInput
+} from "./apiTypes";
 import { getOptionalString } from "./parseHelpers";
 
 type ParseResult<T> =
@@ -25,6 +29,13 @@ const maxLengths = {
   projectType: 80,
   description: 1_000
 } as const;
+const maxCustomFields = 50;
+const maxCustomFieldKeyLength = 120;
+const maxCustomFieldValueLength = 500;
+const finalStatuses = new Set<OpportunityFinalStatus>([
+  "won_closed",
+  "lost_rejected"
+]);
 
 export function parseOpportunityBody(
   body: unknown,
@@ -85,6 +96,7 @@ function parseOpportunityFields(
   const probability = parseProbability(input.probability);
   const templateId = getOptionalString(input, "templateId") ?? null;
   const demand = parseDemand(input.demand);
+  const customFieldValues = parseCustomFieldValues(input.customFieldValues);
 
   if (!idPattern.test(id)) return { ok: false, error: "invalid_opportunity_id" };
   if (!clientId || !idPattern.test(clientId)) {
@@ -131,6 +143,7 @@ function parseOpportunityFields(
   }
   if (probability === null) return { ok: false, error: "invalid_probability" };
   if (!demand.ok) return demand;
+  if (!customFieldValues.ok) return customFieldValues;
 
   return {
     ok: true,
@@ -154,8 +167,36 @@ function parseOpportunityFields(
         plannedHours: calculatePlannedHours(contractValue, plannedHourlyRate),
         probability,
         templateId,
-        demand: demand.value
+        demand: demand.value,
+        customFieldValues: customFieldValues.value
       }
+    }
+  };
+}
+
+export function parseOpportunityFinalActionBody(
+  body: unknown
+): ParseResult<{ status: OpportunityFinalStatus; reason: string }> {
+  if (!body || typeof body !== "object") {
+    return { ok: false, error: "invalid_body" };
+  }
+
+  const input = body as Record<string, unknown>;
+  const status = getOptionalString(input, "status");
+  const reason = getOptionalString(input, "reason") ?? "";
+
+  if (!status || !finalStatuses.has(status as OpportunityFinalStatus)) {
+    return { ok: false, error: "invalid_opportunity_final_status" };
+  }
+  if (!reason || reason.length > 500) {
+    return { ok: false, error: "invalid_opportunity_final_reason" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      status: status as OpportunityFinalStatus,
+      reason
     }
   };
 }
@@ -179,6 +220,46 @@ export function parseProjectActivationBody(
       acceptedRiskReason: acceptedRiskReason || null
     }
   };
+}
+
+function parseCustomFieldValues(
+  value: unknown
+): ParseResult<Record<string, string>> {
+  if (value === undefined || value === null) return { ok: true, value: {} };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, error: "invalid_custom_field_values" };
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > maxCustomFields) {
+    return { ok: false, error: "invalid_custom_field_values" };
+  }
+
+  const customFieldValues: Record<string, string> = {};
+  for (const [key, rawValue] of entries) {
+    if (
+      !key ||
+      key.length > maxCustomFieldKeyLength ||
+      !/^[a-zA-Z0-9_-]+$/.test(key)
+    ) {
+      return { ok: false, error: "invalid_custom_field_key" };
+    }
+    if (
+      typeof rawValue !== "string" &&
+      typeof rawValue !== "number" &&
+      typeof rawValue !== "boolean"
+    ) {
+      return { ok: false, error: "invalid_custom_field_value" };
+    }
+
+    const fieldValue = String(rawValue).trim();
+    if (fieldValue.length > maxCustomFieldValueLength) {
+      return { ok: false, error: "invalid_custom_field_value" };
+    }
+    if (fieldValue) customFieldValues[key] = fieldValue;
+  }
+
+  return { ok: true, value: customFieldValues };
 }
 
 function parseDemand(value: unknown): ParseResult<OpportunityInput["demand"]> {

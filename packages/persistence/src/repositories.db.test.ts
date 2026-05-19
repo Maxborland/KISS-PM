@@ -279,6 +279,9 @@ describe("PostgreSQL tenant data source", () => {
       probability: 80,
       status: "new",
       templateId: null,
+      customFieldValues: {
+        "field-opportunity-priority": "Высокий"
+      },
       demand: [
         { positionId: "position-engineer", requiredHours: 120 },
         { positionId: "position-analyst", requiredHours: 40 }
@@ -315,6 +318,9 @@ describe("PostgreSQL tenant data source", () => {
       id: "opportunity-alpha",
       tenantId: "tenant-alpha",
       plannedHours: 160,
+      customFieldValues: {
+        "field-opportunity-priority": "Высокий"
+      },
       demand: [
         { positionId: "position-engineer", requiredHours: 120 },
         { positionId: "position-analyst", requiredHours: 40 }
@@ -353,7 +359,7 @@ describe("PostgreSQL tenant data source", () => {
     expect(activatedProject.activatedAt).toBeInstanceOf(Date);
     await expect(
       dataSource.findOpportunityById("tenant-alpha", "opportunity-alpha")
-    ).resolves.toMatchObject({ status: "converted" });
+    ).resolves.toMatchObject({ status: "won_closed" });
 
     await expect(
       dataSource.createProjectDraftFromOpportunity({

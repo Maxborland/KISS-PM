@@ -35,6 +35,7 @@ import {
   fetchProjectDetail,
   fetchProjectTasks,
   fetchUsers,
+  finalizeOpportunity,
   login,
   logout,
   updateAccessRole,
@@ -469,6 +470,18 @@ export function useProjectIntakeMutations() {
     activateProject: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof activateOpportunityProject> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         activateOpportunityProject(opportunityId, input),
+      onSuccess: async (_result, variables) => {
+        await Promise.all([
+          invalidateProjectIntake(),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
+          })
+        ]);
+      }
+    }),
+    finalizeOpportunity: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof finalizeOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        finalizeOpportunity(opportunityId, input),
       onSuccess: async (_result, variables) => {
         await Promise.all([
           invalidateProjectIntake(),

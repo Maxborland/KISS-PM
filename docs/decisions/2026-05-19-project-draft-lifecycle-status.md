@@ -33,7 +33,7 @@ CRM opportunity -> intake / feasibility -> project draft -> active project
 3. `/api/workspace/projects` возвращает только `active` проекты, то есть draft не попадает в боевую рабочую зону.
 4. Draft не участвует в расчете занятых часов ресурсной проверки. Резерв capacity в Phase 3 дает только `active` project.
 5. Activation является governed action: backend permissions, final capacity recheck, tenant resource lock, audit.
-6. Activation переводит draft в active, конвертирует source opportunity в `converted` и сохраняет single-use правило: одна opportunity не может породить несколько проектов.
+6. Activation переводит draft в active, закрывает source opportunity как `won_closed` и сохраняет single-use правило: одна opportunity не может породить несколько проектов.
 7. Старый endpoint `POST /api/workspace/opportunities/:id/activate` остается совместимым для Phase 3 UI, но внутри проходит через draft lifecycle: create draft -> activate draft.
 
 ## Почему не отдельный ProjectDraft aggregate

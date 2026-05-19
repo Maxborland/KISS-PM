@@ -372,6 +372,9 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
     .getByLabel("Шаблон проекта")
     .selectOption({ label: `Внедрение проекта ${suffix}` });
   await createOpportunityDialog
+    .getByLabel(`Приоритет проекта ${suffix}`)
+    .fill("Высокий");
+  await createOpportunityDialog
     .getByLabel("Должность")
     .selectOption({ label: "Руководитель проекта" });
   await createOpportunityDialog.getByLabel("Часы").fill("80");
@@ -400,6 +403,8 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(dealDetailFields.locator("dt", { hasText: "Стоимость" })).toBeVisible();
   await expect(dealDetailFields.locator("dt", { hasText: "Норма часа" })).toBeVisible();
   await expect(dealDetailFields.locator("dt", { hasText: "Необходимые часы" })).toBeVisible();
+  await expect(page.getByText("Поля сделки")).toBeVisible();
+  await expect(page.getByText("Высокий")).toBeVisible();
   await page.getByRole("button", { name: `Клиент ${suffix} обновлен` }).click();
   await expect(page).toHaveURL(/\/clients\/.+/);
   await expect(page.getByRole("heading", { name: "Карточка клиента" })).toBeVisible();
@@ -416,10 +421,14 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await editOpportunityDialog.getByLabel("Название сделки").fill(`Контур внедрения ${suffix} edited`);
   await editOpportunityDialog.getByLabel("Стоимость").fill("1200000");
   await editOpportunityDialog.getByLabel("Норма часа").fill("6000");
+  await editOpportunityDialog
+    .getByLabel(`Приоритет проекта ${suffix}`)
+    .fill("Средний");
   await expect(editOpportunityDialog.getByText("200 ч")).toBeVisible();
   await editOpportunityDialog.getByRole("button", { name: "Сохранить сделку" }).click();
   await expect(page.getByText("Сделка обновлена")).toBeVisible();
   await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix} edited` })).toBeVisible();
+  await expect(page.getByText("Средний")).toBeVisible();
   await page.getByRole("button", { name: "К списку сделок" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
 
@@ -514,7 +523,43 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   const activateProjectDialog = page.getByRole("dialog", { name: "Активировать проект" });
   await expect(activateProjectDialog).toBeVisible();
   await activateProjectDialog.getByRole("button", { name: "Активировать проект" }).click();
-  await expect(opportunityRow.getByText("Проект создан")).toBeVisible();
+  await expect(opportunityRow.getByText("Закрыта")).toBeVisible();
+  await dealsPanel.getByRole("button", { name: "Создать сделку" }).click();
+  const rejectOpportunityDialog = page.getByRole("dialog", { name: "Создать сделку" });
+  await expect(rejectOpportunityDialog).toBeVisible();
+  await rejectOpportunityDialog
+    .locator("#opportunity-clientId")
+    .selectOption({ label: `Клиент ${suffix} финал` });
+  await rejectOpportunityDialog
+    .locator("#opportunity-primaryContactId")
+    .selectOption({ label: `Контакт ${suffix} финал` });
+  await rejectOpportunityDialog
+    .locator("#opportunity-stageId")
+    .selectOption({ label: "Квалификация" });
+  await rejectOpportunityDialog.getByLabel("Название сделки").fill(`Отказ ${suffix}`);
+  await rejectOpportunityDialog
+    .locator("#opportunity-projectTypeId")
+    .selectOption({ label: `Тип проекта ${suffix} финал` });
+  await rejectOpportunityDialog.getByLabel("Старт").fill(plannedStart);
+  await rejectOpportunityDialog.getByLabel("Плановый финиш").fill(plannedFinish);
+  await rejectOpportunityDialog.getByLabel("Стоимость").fill("120000");
+  await rejectOpportunityDialog.getByLabel("Норма часа").fill("6000");
+  await rejectOpportunityDialog
+    .getByLabel(`Приоритет проекта ${suffix}`)
+    .fill("Низкий");
+  await rejectOpportunityDialog
+    .getByLabel("Должность")
+    .selectOption({ label: "Инженер" });
+  await rejectOpportunityDialog.getByLabel("Часы").fill("20");
+  await rejectOpportunityDialog.getByRole("button", { name: "Создать сделку" }).click();
+  const rejectedRow = page.getByRole("row", { name: new RegExp(`Отказ ${suffix}`) });
+  await expect(rejectedRow).toBeVisible();
+  await rejectedRow.getByRole("button", { name: "Отклонить" }).click();
+  const rejectDialog = page.getByRole("dialog", { name: "Отклонить сделку" });
+  await expect(rejectDialog).toBeVisible();
+  await rejectDialog.getByLabel("Причина решения").fill("Клиент отказался от бюджета");
+  await rejectDialog.getByRole("button", { name: "Отклонить сделку" }).click();
+  await expect(rejectedRow.getByText("Отклонена")).toBeVisible();
   await page.getByRole("button", { name: "Проекты" }).click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByRole("heading", { name: "Проекты" }).first()).toBeVisible();
@@ -560,6 +605,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Этап сделки создан").first()).toBeVisible();
   await expect(page.getByText("Этап сделки обновлен").first()).toBeVisible();
   await expect(page.getByText("Сделка создана").first()).toBeVisible();
+  await expect(page.getByText("Сделка отклонена").first()).toBeVisible();
   await expect(page.getByText("Этап сделки изменен").first()).toBeVisible();
   await expect(page.getByText("Ресурсная проверка сделки выполнена").first()).toBeVisible();
   await expect(page.getByText("Проект активирован").first()).toBeVisible();
@@ -736,6 +782,19 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
       await page.request.post("/api/workspace/opportunities/not-found/activate", {
         data: {
           acceptedRiskReason: null
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/opportunities/not-found/finalize", {
+        data: {
+          status: "lost_rejected",
+          reason: "Недоступно"
         },
         headers: {
           "x-kiss-pm-action": "same-origin"

@@ -135,6 +135,9 @@ export type PositionDemandRecord = {
   requiredHours: number;
 };
 
+export type OpportunityCustomFieldValues = Record<string, string>;
+export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
+
 export type OpportunityRecord = {
   id: string;
   tenantId: TenantId;
@@ -161,12 +164,20 @@ export type OpportunityRecord = {
   createdAt: Date;
   updatedAt: Date;
   demand: PositionDemandRecord[];
+  customFieldValues: OpportunityCustomFieldValues;
 };
 
 export type OpportunityInput = Omit<
   OpportunityRecord,
-  "createdAt" | "updatedAt" | "feasibilityStatus" | "feasibilityResult" | "feasibilityCheckedAt"
->;
+  | "createdAt"
+  | "updatedAt"
+  | "feasibilityStatus"
+  | "feasibilityResult"
+  | "feasibilityCheckedAt"
+  | "customFieldValues"
+> & {
+  customFieldValues?: OpportunityCustomFieldValues;
+};
 export type OpportunityUpdateInput = Omit<
   OpportunityInput,
   "id" | "clientName" | "contactName" | "projectType" | "status"
@@ -320,6 +331,11 @@ export type ApiTenantDataSource = {
     opportunityId: string;
     stageId: string;
   }): Promise<OpportunityRecord>;
+  finalizeOpportunity?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    status: OpportunityFinalStatus;
+  }): Promise<OpportunityRecord | undefined>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
