@@ -97,7 +97,7 @@ export function LoginScreen(props: {
 
 export function SummaryCard(props: {
   label: string;
-  value: number;
+  value: ReactNode;
   tone?: "default" | "success" | "muted";
 }) {
   return (

@@ -177,7 +177,7 @@ describe("workspace form quality baseline", () => {
       validateCustomFieldForm({
         systemKey: `a${"x".repeat(79)}`,
         tenantLabel: "x".repeat(120),
-        targetEntity: "project",
+        targetEntity: "opportunity",
         fieldType: "select",
         status: "active"
       })

@@ -42,6 +42,7 @@ import {
   updateCustomField,
   updateContact,
   updateDealStage,
+  updateOpportunity,
   updateOpportunityStage,
   updatePosition,
   updateProjectType,
@@ -429,6 +430,18 @@ export function useProjectIntakeMutations() {
     createOpportunity: useMutation({
       mutationFn: createOpportunity,
       onSuccess: invalidateProjectIntake
+    }),
+    updateOpportunity: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        updateOpportunity(opportunityId, input),
+      onSuccess: async (_result, variables) => {
+        await Promise.all([
+          invalidateProjectIntake(),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
+          })
+        ]);
+      }
     }),
     checkFeasibility: useMutation({
       mutationFn: checkOpportunityFeasibility,

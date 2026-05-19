@@ -867,7 +867,7 @@ h2 {
 
 .surface-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -1684,6 +1684,7 @@ input[type="color"] {
   .grid-3,
   .two-column,
   .crm-reference-strip,
+  .deal-economics-preview,
   .deal-detail-layout,
   .management-layout {
     grid-template-columns: 1fr;

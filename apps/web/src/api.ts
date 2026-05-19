@@ -82,7 +82,7 @@ export type CustomFieldDefinition = {
   tenantId: string;
   systemKey: string;
   tenantLabel: string;
-  targetEntity: "project";
+  targetEntity: "project" | "opportunity";
   fieldType: WorkspaceConfigFieldType;
   required: boolean;
   status: WorkspaceConfigStatus;
@@ -296,6 +296,7 @@ export type OpportunityInput = {
   templateId: string | null;
   demand: PositionDemand[];
 };
+export type OpportunityUpdateInput = Omit<OpportunityInput, "id">;
 
 export type OpportunityStageInput = {
   stageId: string;
@@ -619,6 +620,16 @@ export async function createOpportunity(
 ): Promise<{ opportunity: Opportunity }> {
   return requestJson("/api/workspace/opportunities", {
     method: "POST",
+    body: input
+  });
+}
+
+export async function updateOpportunity(
+  opportunityId: string,
+  input: OpportunityUpdateInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(`/api/workspace/opportunities/${encodePathSegment(opportunityId)}`, {
+    method: "PATCH",
     body: input
   });
 }

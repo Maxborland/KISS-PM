@@ -111,7 +111,9 @@ describe("workspace route model", () => {
     expect(getRouteIdFromPathname("/users")).toBe("users");
     expect(getRouteIdFromPathname("/access-roles")).toBe("access-roles");
     expect(getRouteIdFromPathname("/clients")).toBe("clients");
+    expect(getRouteIdFromPathname("/clients/client-1")).toBe("clients");
     expect(getRouteIdFromPathname("/contacts")).toBe("contacts");
+    expect(getRouteIdFromPathname("/contacts/contact-1")).toBe("contacts");
     expect(getRouteIdFromPathname("/opportunities")).toBe("opportunities");
     expect(getRouteIdFromPathname("/opportunities/opportunity-1")).toBe("opportunities");
     expect(getRouteIdFromPathname("/projects")).toBe("projects");

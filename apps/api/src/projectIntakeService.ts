@@ -7,6 +7,8 @@ import {
 import { changeOpportunityStage } from "./projectIntakeService/changeOpportunityStageCommand";
 import { checkOpportunityFeasibility } from "./projectIntakeService/checkOpportunityFeasibilityCommand";
 import { createOpportunity } from "./projectIntakeService/createOpportunityCommand";
+import { updateOpportunity } from "./projectIntakeService/updateOpportunityCommand";
+import { authorizeOpportunityUpdate } from "./projectIntakeService/updateOpportunityAuthorization";
 import type {
   ProjectIntakeService,
   ProjectIntakeServiceDeps
@@ -24,6 +26,10 @@ export function createProjectIntakeService(
       return authorizeOpportunityStageChange(deps, input);
     },
 
+    preflightUpdateOpportunity(input) {
+      return authorizeOpportunityUpdate(deps, input);
+    },
+
     preflightProjectActivation(input) {
       return authorizeProjectActivation(deps, input);
     },
@@ -34,6 +40,10 @@ export function createProjectIntakeService(
 
     changeOpportunityStage(input) {
       return changeOpportunityStage(deps, input);
+    },
+
+    updateOpportunity(input) {
+      return updateOpportunity(deps, input);
     },
 
     checkOpportunityFeasibility(input) {

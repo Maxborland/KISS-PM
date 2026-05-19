@@ -152,8 +152,8 @@ export function validateCustomFieldForm(input: {
   if (!isWorkspaceConfigTenantLabelInput(input.tenantLabel)) {
     errors.tenantLabel = "Укажите русское название поля.";
   }
-  if (input.targetEntity !== "project") {
-    errors.targetEntity = "Пока доступны только поля проекта.";
+  if (!["project", "opportunity"].includes(input.targetEntity)) {
+    errors.targetEntity = "Выберите сущность: проект или сделка.";
   }
   if (!isWorkspaceConfigFieldType(input.fieldType)) {
     errors.fieldType = "Выберите тип поля.";

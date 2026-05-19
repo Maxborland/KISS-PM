@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseOpportunityBody } from "./projectIntakeParsers";
+import {
+  parseOpportunityBody,
+  parseOpportunityUpdateBody
+} from "./projectIntakeParsers";
 
 describe("project intake parsers", () => {
   const validOpportunityBody = {
@@ -28,6 +31,31 @@ describe("project intake parsers", () => {
       value: {
         tenantId: "tenant-alpha",
         plannedHours: 160
+      }
+    });
+  });
+
+  it("parses opportunity updates and recalculates required hours from value and hourly norm", () => {
+    const parsed = parseOpportunityUpdateBody(
+      {
+        ...validOpportunityBody,
+        title: "Внедрение KISS PM обновлено",
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }]
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        tenantId: "tenant-alpha",
+        title: "Внедрение KISS PM обновлено",
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        plannedHours: 200,
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }]
       }
     });
   });

@@ -92,8 +92,28 @@ export function isArchivedOpportunityStage(
   return dealStages.find((item) => item.id === opportunity.stageId)?.status === "archived";
 }
 
+export function formatOpportunityEconomics(opportunity: Opportunity): {
+  contractValueLabel: string;
+  plannedHourlyRateLabel: string;
+  plannedHoursLabel: string;
+} {
+  return {
+    contractValueLabel: formatMoney(opportunity.contractValue),
+    plannedHourlyRateLabel: `${formatMoney(opportunity.plannedHourlyRate)}/ч`,
+    plannedHoursLabel: `${opportunity.plannedHours} ч`
+  };
+}
+
 function sortDealStages(dealStages: DealStage[]): DealStage[] {
   return [...dealStages].sort(
     (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)
   );
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 0,
+    style: "currency",
+    currency: "RUB"
+  }).format(value);
 }

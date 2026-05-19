@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { DealStage, Opportunity } from "./api";
 import {
   buildKanbanStages,
+  formatOpportunityEconomics,
   getOpportunityClientLabel,
   getOpportunityContactLabel,
   getOpportunityProjectTypeLabel,
@@ -138,5 +139,13 @@ describe("opportunity display helpers", () => {
         stageId: "stage-active"
       }).map((stage) => stage.id)
     ).toEqual(["stage-active"]);
+  });
+
+  test("formats deal economics as separate value, hourly norm and required hours", () => {
+    expect(formatOpportunityEconomics(baseOpportunity)).toEqual({
+      contractValueLabel: "1 000 000 ₽",
+      plannedHourlyRateLabel: "5 000 ₽/ч",
+      plannedHoursLabel: "200 ч"
+    });
   });
 });

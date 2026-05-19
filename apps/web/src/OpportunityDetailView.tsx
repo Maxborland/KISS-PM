@@ -1,14 +1,15 @@
 import {
   ArrowLeft,
-  CalendarDays,
   ClipboardCheck,
+  Pencil,
   PlayCircle,
-  Tag
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import type { AuditEvent, DealStage, Opportunity } from "./api";
+import type { DealStage, Opportunity } from "./api";
+import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
+  formatOpportunityEconomics,
   getOpportunityClientLabel,
   getOpportunityContactLabel,
   getOpportunityProjectTypeLabel,
@@ -17,7 +18,6 @@ import {
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
 import { useOpportunityQuery, useProjectIntakeMutations } from "./workspaceQueries";
-import { getAuditActionLabel } from "./workspaceDashboard";
 import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
@@ -29,8 +29,7 @@ import {
   Panel,
   SectionFeedback,
   StatusPill,
-  SummaryCard,
-  TableEmpty
+  SummaryCard
 } from "./components/workspace-ui";
 
 export function OpportunityDetailView(props: {
@@ -38,6 +37,8 @@ export function OpportunityDetailView(props: {
   opportunityId: string;
   onBack: () => void;
   onChanged: (message: string) => void;
+  onOpenClient: (clientId: string) => void;
+  onOpenContact: (contactId: string) => void;
   sectionState: SectionState;
 }) {
   const canManageOpportunities = hasPermission(
@@ -57,21 +58,21 @@ export function OpportunityDetailView(props: {
   const mutations = useProjectIntakeMutations();
   const [riskReason, setRiskReason] = useState("");
   const [actionError, setActionError] = useState("");
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const opportunity =
     opportunityQuery.data?.opportunity ??
     props.data.opportunities.find((item) => item.id === props.opportunityId) ??
     null;
-  const relatedAuditEvents = useMemo(
-    () =>
-      opportunity
-        ? props.data.auditEvents.filter((event) => isAuditEventRelatedToOpportunity(event, opportunity.id))
-        : [],
-    [opportunity, props.data.auditEvents]
-  );
   const isPending =
     mutations.checkFeasibility.isPending ||
+    mutations.updateOpportunity.isPending ||
     mutations.updateStage.isPending ||
     mutations.activateProject.isPending;
+  const activeClients = props.data.clients.filter((client) => client.status === "active");
+  const activeProjectTypes = props.data.projectTypes.filter(
+    (projectType) => projectType.status === "active"
+  );
+  const activeStages = props.data.dealStages.filter((stage) => stage.status === "active");
 
   async function updateStage(stageId: string) {
     if (!opportunity || stageId === opportunity.stageId) return;
@@ -122,15 +123,38 @@ export function OpportunityDetailView(props: {
     }
   }
 
+  async function submitOpportunityUpdate(input: DealFormSubmitInput) {
+    if (!opportunity) return;
+    await mutations.updateOpportunity.mutateAsync({
+      opportunityId: opportunity.id,
+      input
+    });
+    setIsEditOpen(false);
+    props.onChanged("Сделка обновлена");
+  }
+
   return (
     <Panel
       title="Детали сделки"
-      subtitle="Карточка сделки показывает CRM-связи, ресурсную проверку, управляемые действия и audit context."
+      subtitle="Карточка сделки показывает CRM-связи, экономику, ресурсную проверку и управляемые действия."
       actions={
-        <button className="secondary-button" type="button" onClick={props.onBack}>
-          <ArrowLeft aria-hidden="true" size={14} />
-          К списку сделок
-        </button>
+        <span className="table-actions">
+          {canManageOpportunities && opportunity && !isFinalOpportunity(opportunity) ? (
+            <button
+              className="primary-button"
+              disabled={isPending}
+              type="button"
+              onClick={() => setIsEditOpen(true)}
+            >
+              <Pencil aria-hidden="true" size={14} />
+              Редактировать
+            </button>
+          ) : null}
+          <button className="secondary-button" type="button" onClick={props.onBack}>
+            <ArrowLeft aria-hidden="true" size={14} />
+            К списку сделок
+          </button>
+        </span>
       }
     >
       <SectionFeedback state={props.sectionState} emptyLabel="Сделки недоступны." />
@@ -145,6 +169,15 @@ export function OpportunityDetailView(props: {
       ) : null}
       {opportunity ? (
         <div className="deal-detail-stack">
+          {(() => {
+            const economics = formatOpportunityEconomics(opportunity);
+            const demandedHours = opportunity.demand.reduce(
+              (sum, line) => sum + line.requiredHours,
+              0
+            );
+
+            return (
+              <>
           <header className="deal-detail-header">
             <span className="row-avatar">С</span>
             <div className="deal-detail-title">
@@ -161,7 +194,9 @@ export function OpportunityDetailView(props: {
           </header>
 
           <div className="surface-summary-grid">
-            <SummaryCard label="Плановые часы" value={opportunity.plannedHours} />
+            <SummaryCard label="Стоимость" value={economics.contractValueLabel} />
+            <SummaryCard label="Норма часа" value={economics.plannedHourlyRateLabel} />
+            <SummaryCard label="Необходимые часы" value={economics.plannedHoursLabel} />
             <SummaryCard
               label="Вероятность, %"
               value={opportunity.probability}
@@ -169,7 +204,7 @@ export function OpportunityDetailView(props: {
             />
             <SummaryCard
               label="Потребность, ч"
-              value={opportunity.demand.reduce((sum, line) => sum + line.requiredHours, 0)}
+              value={demandedHours}
               tone="muted"
             />
           </div>
@@ -180,11 +215,35 @@ export function OpportunityDetailView(props: {
               <dl className="detail-list">
                 <div>
                   <dt>Клиент</dt>
-                  <dd>{getOpportunityClientLabel(props.data, opportunity)}</dd>
+                  <dd>
+                    {opportunity.clientId ? (
+                      <button
+                        className="inline-link-button"
+                        type="button"
+                        onClick={() => props.onOpenClient(opportunity.clientId!)}
+                      >
+                        {getOpportunityClientLabel(props.data, opportunity)}
+                      </button>
+                    ) : (
+                      getOpportunityClientLabel(props.data, opportunity)
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>Контакт</dt>
-                  <dd>{getOpportunityContactLabel(props.data, opportunity)}</dd>
+                  <dd>
+                    {opportunity.primaryContactId ? (
+                      <button
+                        className="inline-link-button"
+                        type="button"
+                        onClick={() => props.onOpenContact(opportunity.primaryContactId!)}
+                      >
+                        {getOpportunityContactLabel(props.data, opportunity)}
+                      </button>
+                    ) : (
+                      getOpportunityContactLabel(props.data, opportunity)
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>Тип проекта</dt>
@@ -220,11 +279,16 @@ export function OpportunityDetailView(props: {
                   </dd>
                 </div>
                 <div>
-                  <dt>Экономика</dt>
-                  <dd>
-                    {formatMoney(opportunity.contractValue)} /{" "}
-                    {formatMoney(opportunity.plannedHourlyRate)} за час
-                  </dd>
+                  <dt>Стоимость</dt>
+                  <dd>{economics.contractValueLabel}</dd>
+                </div>
+                <div>
+                  <dt>Норма часа</dt>
+                  <dd>{economics.plannedHourlyRateLabel}</dd>
+                </div>
+                <div>
+                  <dt>Необходимые часы</dt>
+                  <dd>{economics.plannedHoursLabel}</dd>
                 </div>
               </dl>
             </section>
@@ -284,46 +348,24 @@ export function OpportunityDetailView(props: {
               {renderFeasibility(opportunity)}
             </section>
           </div>
-
-          <section className="detail-card">
-            <h2>Audit context</h2>
-            <div className="table-wrap">
-              <table className="data-table audit-table" aria-label="Аудит сделки">
-                <thead>
-                  <tr>
-                    <th>Событие</th>
-                    <th>Workflow</th>
-                    <th>Корреляция</th>
-                    <th>Время</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {relatedAuditEvents.length === 0 ? (
-                    <TableEmpty colSpan={4} label="Связанных событий аудита пока нет." />
-                  ) : (
-                    relatedAuditEvents.map((event) => (
-                      <tr key={event.id}>
-                        <td>
-                          <span className="entity-name-cell">
-                            <Tag aria-hidden="true" size={14} />
-                            <span>
-                              <strong>{getAuditActionLabel(event.actionType)}</strong>
-                              <small>{event.actionType}</small>
-                            </span>
-                          </span>
-                        </td>
-                        <td>{event.sourceWorkflow ?? "Не задан"}</td>
-                        <td>
-                          <code className="inline-code">{event.correlationId}</code>
-                        </td>
-                        <td>{formatDate(event.createdAt)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+              </>
+            );
+          })()}
+          {isEditOpen ? (
+            <DealFormModal
+              activeStages={activeStages}
+              allContacts={props.data.contacts}
+              clients={activeClients}
+              error={actionError}
+              initialOpportunity={opportunity}
+              isSaving={isPending}
+              positions={props.data.positions}
+              projectTemplates={props.data.projectTemplates}
+              projectTypes={activeProjectTypes}
+              onClose={() => setIsEditOpen(false)}
+              onSubmit={submitOpportunityUpdate}
+            />
+          ) : null}
         </div>
       ) : null}
     </Panel>
@@ -435,20 +477,4 @@ function getFeasibilityLabel(status: Opportunity["feasibilityStatus"]): string {
   if (status === "conflict") return "Конфликт ресурса";
   if (status === "blocked") return "Заблокировано";
   return "Не проверено";
-}
-
-function isAuditEventRelatedToOpportunity(event: AuditEvent, opportunityId: string): boolean {
-  return (
-    event.sourceEntity?.id === opportunityId ||
-    event.beforeState?.id === opportunityId ||
-    event.afterState?.id === opportunityId
-  );
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }

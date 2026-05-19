@@ -238,6 +238,41 @@ describe("Phase 3.1 CRM API", () => {
       }
     });
 
+    const opportunityUpdate = await app.request(
+      "/api/workspace/opportunities/opportunity-alpha",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-romashka",
+          primaryContactId: "contact-irina",
+          projectTypeId: "project-type-implementation",
+          stageId: "deal-stage-qualified",
+          title: "Внедрение KISS PM обновлено",
+          description: "Обновленная приемка",
+          plannedStart: "2026-06-01",
+          plannedFinish: "2026-06-12",
+          contractValue: 1_200_000,
+          plannedHourlyRate: 6_000,
+          probability: 90,
+          templateId: null,
+          demand: [{ positionId: "position-engineer", requiredHours: 200 }]
+        })
+      }
+    );
+    expect(opportunityUpdate.status).toBe(200);
+    await expect(opportunityUpdate.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-alpha",
+        title: "Внедрение KISS PM обновлено",
+        plannedHours: 200,
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }],
+        feasibilityStatus: null
+      }
+    });
+
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { "x-kiss-pm-action": "same-origin", cookie }
     });
@@ -249,7 +284,8 @@ describe("Phase 3.1 CRM API", () => {
         expect.objectContaining({ actionType: "project_type.created" }),
         expect.objectContaining({ actionType: "deal_stage.created" }),
         expect.objectContaining({ actionType: "opportunity.created" }),
-        expect.objectContaining({ actionType: "opportunity.stage_updated" })
+        expect.objectContaining({ actionType: "opportunity.stage_updated" }),
+        expect.objectContaining({ actionType: "opportunity.updated" })
       ])
     });
   });

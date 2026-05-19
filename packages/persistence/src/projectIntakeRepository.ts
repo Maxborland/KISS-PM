@@ -98,6 +98,7 @@ export type ProjectIntakeRepository = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity(input: OpportunityInput): Promise<OpportunityRecord>;
   updateOpportunityFeasibility(
     input: OpportunityFeasibilityUpdate
   ): Promise<OpportunityRecord>;
@@ -265,6 +266,69 @@ export function createProjectIntakeRepository(
       ]);
 
       return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async updateOpportunity(input) {
+      return db.transaction(async (transaction) => {
+        const now = new Date();
+        const [row] = await transaction
+          .update(opportunities)
+          .set({
+            clientId: input.clientId,
+            primaryContactId: input.primaryContactId,
+            projectTypeId: input.projectTypeId,
+            stageId: input.stageId,
+            clientName: input.clientName,
+            contactName: input.contactName,
+            title: input.title,
+            projectType: input.projectType,
+            description: input.description,
+            plannedStart: input.plannedStart,
+            plannedFinish: input.plannedFinish,
+            contractValue: input.contractValue,
+            plannedHourlyRate: input.plannedHourlyRate,
+            plannedHours: input.plannedHours,
+            probability: input.probability,
+            status: input.status,
+            templateId: input.templateId,
+            feasibilityStatus: null,
+            feasibilityResult: null,
+            feasibilityCheckedAt: null,
+            updatedAt: now
+          })
+          .where(
+            and(
+              eq(opportunities.tenantId, input.tenantId),
+              eq(opportunities.id, input.id),
+              ne(opportunities.status, "converted"),
+              ne(opportunities.status, "rejected")
+            )
+          )
+          .returning();
+
+        if (!row) throw new Error("Opportunity update returned no row");
+
+        await transaction
+          .delete(opportunityDemands)
+          .where(
+            and(
+              eq(opportunityDemands.tenantId, input.tenantId),
+              eq(opportunityDemands.opportunityId, input.id)
+            )
+          );
+
+        if (input.demand.length > 0) {
+          await transaction.insert(opportunityDemands).values(
+            input.demand.map((line) => ({
+              tenantId: input.tenantId,
+              opportunityId: input.id,
+              positionId: line.positionId,
+              requiredHours: line.requiredHours
+            }))
+          );
+        }
+
+        return mapOpportunityRecord(row, input.demand);
+      });
     },
     async updateOpportunityStage(input) {
       const [row] = await db

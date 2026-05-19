@@ -1,6 +1,6 @@
 import { calculatePlannedHours } from "@kiss-pm/domain";
 import type { TenantId } from "@kiss-pm/domain";
-import type { OpportunityInput } from "./apiTypes";
+import type { OpportunityInput, OpportunityUpdateInput } from "./apiTypes";
 import { getOptionalString } from "./parseHelpers";
 
 type ParseResult<T> =
@@ -30,6 +30,39 @@ export function parseOpportunityBody(
   body: unknown,
   tenantId: TenantId
 ): ParseResult<OpportunityInput> {
+  const parsed = parseOpportunityFields(body, tenantId);
+  if (!parsed.ok) return parsed;
+
+  return {
+    ok: true,
+    value: {
+      id: parsed.value.id,
+      ...parsed.value.fields,
+      status: "new"
+    }
+  };
+}
+
+export function parseOpportunityUpdateBody(
+  body: unknown,
+  tenantId: TenantId
+): ParseResult<OpportunityUpdateInput> {
+  const parsed = parseOpportunityFields(body, tenantId);
+  if (!parsed.ok) return parsed;
+
+  return {
+    ok: true,
+    value: parsed.value.fields
+  };
+}
+
+function parseOpportunityFields(
+  body: unknown,
+  tenantId: TenantId
+): ParseResult<{
+  id: string;
+  fields: OpportunityUpdateInput & Pick<OpportunityInput, "clientName" | "contactName" | "projectType">;
+}> {
   if (!body || typeof body !== "object") {
     return { ok: false, error: "invalid_body" };
   }
@@ -103,25 +136,26 @@ export function parseOpportunityBody(
     ok: true,
     value: {
       id,
-      tenantId,
-      clientId,
-      primaryContactId,
-      projectTypeId,
-      stageId,
-      clientName,
-      contactName,
-      title,
-      projectType,
-      description: description || null,
-      plannedStart,
-      plannedFinish,
-      contractValue,
-      plannedHourlyRate,
-      plannedHours: calculatePlannedHours(contractValue, plannedHourlyRate),
-      probability,
-      status: "new",
-      templateId,
-      demand: demand.value
+      fields: {
+        tenantId,
+        clientId,
+        primaryContactId,
+        projectTypeId,
+        stageId,
+        clientName,
+        contactName,
+        title,
+        projectType,
+        description: description || null,
+        plannedStart,
+        plannedFinish,
+        contractValue,
+        plannedHourlyRate,
+        plannedHours: calculatePlannedHours(contractValue, plannedHourlyRate),
+        probability,
+        templateId,
+        demand: demand.value
+      }
     }
   };
 }

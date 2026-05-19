@@ -176,6 +176,8 @@ export function getRouteIdFromPathname(pathname: string): WorkspaceRouteId {
   const normalizedPath = normalizePathname(pathname);
   if (normalizedPath.startsWith("/opportunities/")) return "opportunities";
   if (normalizedPath.startsWith("/projects/")) return "projects";
+  if (normalizedPath.startsWith("/clients/")) return "clients";
+  if (normalizedPath.startsWith("/contacts/")) return "contacts";
 
   return (
     workspaceRoutes.find((route) => route.path === normalizedPath)?.id ??
