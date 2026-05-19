@@ -175,8 +175,31 @@
       "expected_behavior_change": "none",
       "tests_before": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
-      "status": "pending",
-      "notes": "Split only after repository tests pin tenant isolation and audit write paths."
+      "status": "in_progress",
+      "notes": "Split only after repository tests pin tenant isolation and audit write paths. First completed sub-slice: REF-005A repository row mappers."
+    },
+    {
+      "id": "REF-005A",
+      "area": "persistence repository row mappers",
+      "files": [
+        "packages/persistence/src/repositories.ts",
+        "packages/persistence/src/repositoryMappers.ts",
+        "packages/persistence/src/repositoryMappers.test.ts"
+      ],
+      "problem": "repositories.ts owned pure row-to-domain mappers and permission coercion alongside SQL query methods.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run packages/persistence/src/repositoryMappers.test.ts packages/persistence/src/repositories.db.test.ts failed because repositoryMappers did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run packages/persistence/src/repositoryMappers.test.ts packages/persistence/src/repositories.db.test.ts",
+        "pnpm --filter @kiss-pm/persistence typecheck",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "Pure mappers and toPermission moved to repositoryMappers; repository SQL and public datasource API stayed unchanged."
     },
     {
       "id": "REF-006",

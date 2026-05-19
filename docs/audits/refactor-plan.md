@@ -102,7 +102,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
-Статус: REF-004 in_progress, REF-005 pending.
+Статус: REF-004 in_progress, REF-005 in_progress.
 
 Начинать после дополнительного покрытия auth/session/workspace config/audit acceptance. Для каждого route/service split нужен `pnpm test:db`.
 
@@ -117,6 +117,17 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 - Fail-closed response для missing access profile остается `{ error: "access_profile_not_found" }` со статусом 403.
 - Unknown error остается `{ error: "internal_error" }` со статусом 500.
 - RED подтвержден отсутствующим модулем `appErrors`; GREEN подтвержден unit/API/DB проверками.
+
+#### REF-005A — persistence row mappers
+
+Статус: completed.
+
+Срез без изменения SQL и repository public API:
+
+- Pure row-to-domain mappers вынесены из `packages/persistence/src/repositories.ts` в `packages/persistence/src/repositoryMappers.ts`.
+- `toPermission` вынесен вместе с мапперами и сохраняет fail-fast поведение для неизвестных persisted permission keys.
+- Добавлены unit tests на tenant user, access profile, workspace user, position, custom field и project template mappings.
+- RED подтвержден отсутствующим модулем `repositoryMappers`; GREEN подтвержден persistence typecheck и `pnpm test:db`.
 
 ### REF-006 — стабилизация больших тестов
 
