@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCustomField,
   createClient,
+  createOpportunityComment,
+  createOpportunityTask,
   createProjectTask,
+  fetchOpportunityActivity,
   fetchCustomFields,
   fetchMyWork,
   fetchProjectDetail,
@@ -12,6 +15,7 @@ import {
   updateClient,
   updateContact,
   updateDealStage,
+  updateOpportunityTask,
   updateProjectType,
   updateProjectTemplate,
   encodePathSegment
@@ -215,6 +219,55 @@ describe("web api helpers", () => {
           "x-kiss-pm-action": "same-origin"
         }
       })
+    );
+  });
+
+  it("uses encoded opportunity activity endpoints and same-origin mutation headers", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ activities: [], systemEvents: [] }), { status: 200 })
+      );
+
+    await fetchOpportunityActivity("opportunity/unsafe");
+    await createOpportunityComment("opportunity/unsafe", {
+      body: "Комментарий по сделке"
+    });
+    await createOpportunityTask("opportunity/unsafe", {
+      title: "Позвонить клиенту",
+      body: "Уточнить дату старта",
+      dueDate: "2026-06-10",
+      assigneeUserId: "user-alpha-admin"
+    });
+    await updateOpportunityTask("opportunity/unsafe", "activity/unsafe", {
+      status: "done"
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/workspace/opportunities/opportunity%2Funsafe/activity",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/workspace/opportunities/opportunity%2Funsafe/comments",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/workspace/opportunities/opportunity%2Funsafe/tasks",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/workspace/opportunities/opportunity%2Funsafe/tasks/activity%2Funsafe",
+      expect.objectContaining({ method: "PATCH" })
     );
   });
 });

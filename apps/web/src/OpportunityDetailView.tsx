@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 
 import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
+import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
@@ -189,6 +190,8 @@ export function OpportunityDetailView(props: {
       ) : null}
       {opportunity ? (
         <div className="deal-detail-stack">
+          <div className="deal-workspace-layout">
+            <div className="deal-workspace-main">
           {(() => {
             const economics = formatOpportunityEconomics(opportunity);
             const demandedHours = opportunity.demand.reduce(
@@ -394,6 +397,14 @@ export function OpportunityDetailView(props: {
               </>
             );
           })()}
+            </div>
+            <OpportunityActivityPanel
+              canManageOpportunities={canManageOpportunities}
+              data={props.data}
+              opportunityId={opportunity.id}
+              onChanged={props.onChanged}
+            />
+          </div>
           {isEditOpen ? (
             <DealFormModal
               activeStages={activeStages}

@@ -6,6 +6,8 @@ import {
   createCustomField,
   createContact,
   createDealStage,
+  createOpportunityComment,
+  createOpportunityTask,
   createOpportunity,
   createProjectTask,
   createPosition,
@@ -27,6 +29,7 @@ import {
   fetchMe,
   fetchMyWork,
   fetchOpportunity,
+  fetchOpportunityActivity,
   fetchOpportunities,
   fetchPositions,
   fetchProjects,
@@ -44,6 +47,7 @@ import {
   updateContact,
   updateDealStage,
   updateOpportunity,
+  updateOpportunityTask,
   updateOpportunityStage,
   updatePosition,
   updateProjectType,
@@ -67,6 +71,8 @@ export const workspaceQueryKeys = {
   opportunities: () => ["workspace", "opportunities"] as const,
   opportunity: (opportunityId: string) =>
     ["workspace", "opportunities", opportunityId] as const,
+  opportunityActivity: (opportunityId: string) =>
+    ["workspace", "opportunities", opportunityId, "activity"] as const,
   projects: () => ["workspace", "projects"] as const,
   projectDetail: (projectId: string) => ["workspace", "projects", projectId] as const,
   projectTasks: (projectId: string) =>
@@ -180,6 +186,17 @@ export function useOpportunityQuery(opportunityId: string | null, enabled: boole
   return useQuery({
     queryKey: workspaceQueryKeys.opportunity(opportunityId ?? "unknown"),
     queryFn: () => fetchOpportunity(opportunityId ?? ""),
+    enabled: enabled && Boolean(opportunityId)
+  });
+}
+
+export function useOpportunityActivityQuery(
+  opportunityId: string | null,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.opportunityActivity(opportunityId ?? "unknown"),
+    queryFn: () => fetchOpportunityActivity(opportunityId ?? ""),
     enabled: enabled && Boolean(opportunityId)
   });
 }
@@ -419,77 +436,115 @@ export function useCrmMutations() {
 
 export function useProjectIntakeMutations() {
   const queryClient = useQueryClient();
-  const invalidateProjectIntake = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
-    ]);
-  };
+  const invalidateProjectIntake = (opportunityId?: string | null) =>
+    invalidateProjectIntakeQueries(queryClient, opportunityId);
 
   return {
     createOpportunity: useMutation({
       mutationFn: createOpportunity,
-      onSuccess: invalidateProjectIntake
+      onSuccess: async () => {
+        await invalidateProjectIntake();
+      }
     }),
     updateOpportunity: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         updateOpportunity(opportunityId, input),
       onSuccess: async (_result, variables) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
-        ]);
+        await invalidateProjectIntake(String(variables.opportunityId));
       }
     }),
     checkFeasibility: useMutation({
       mutationFn: checkOpportunityFeasibility,
       onSuccess: async (_result, opportunityId) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(opportunityId)
-          })
-        ]);
+        await invalidateProjectIntake(opportunityId);
       }
     }),
     updateStage: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunityStage> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         updateOpportunityStage(opportunityId, input),
       onSuccess: async (_result, variables) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
-        ]);
+        await invalidateProjectIntake(String(variables.opportunityId));
       }
     }),
     activateProject: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof activateOpportunityProject> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         activateOpportunityProject(opportunityId, input),
       onSuccess: async (_result, variables) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
-        ]);
+        await invalidateProjectIntake(String(variables.opportunityId));
       }
     }),
     finalizeOpportunity: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof finalizeOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         finalizeOpportunity(opportunityId, input),
       onSuccess: async (_result, variables) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
-        ]);
+        await invalidateProjectIntake(String(variables.opportunityId));
       }
+    })
+  };
+}
+
+export async function invalidateProjectIntakeQueries(
+  queryClient: QueryClient,
+  opportunityId?: string | null
+): Promise<void> {
+  const invalidations = [
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+  ];
+
+  if (opportunityId) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.opportunity(opportunityId)
+      }),
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.opportunityActivity(opportunityId)
+      })
+    );
+  }
+
+  await Promise.all(invalidations);
+}
+
+export function useOpportunityActivityMutations(opportunityId: string | null) {
+  const queryClient = useQueryClient();
+  const invalidateActivity = async () => {
+    if (!opportunityId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.opportunityActivity(opportunityId)
+      }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
+
+  return {
+    createComment: useMutation({
+      mutationFn: (input: Parameters<typeof createOpportunityComment>[1]) => {
+        if (!opportunityId) throw new Error("opportunity_id_required");
+        return createOpportunityComment(opportunityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    createTask: useMutation({
+      mutationFn: (input: Parameters<typeof createOpportunityTask>[1]) => {
+        if (!opportunityId) throw new Error("opportunity_id_required");
+        return createOpportunityTask(opportunityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    updateTask: useMutation({
+      mutationFn: (input: {
+        activityId: string;
+        status: Parameters<typeof updateOpportunityTask>[2]["status"];
+      }) => {
+        if (!opportunityId) throw new Error("opportunity_id_required");
+        return updateOpportunityTask(opportunityId, input.activityId, {
+          status: input.status
+        });
+      },
+      onSuccess: invalidateActivity
     })
   };
 }
