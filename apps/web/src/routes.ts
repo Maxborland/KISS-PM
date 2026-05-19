@@ -9,7 +9,7 @@ export const workspaceRoutes = [
   },
   {
     id: "opportunities",
-    label: "Возможности",
+    label: "Сделки",
     group: "workspace",
     path: "/opportunities",
     permission: "tenant.opportunities.read",
@@ -22,6 +22,22 @@ export const workspaceRoutes = [
     path: "/projects",
     permission: "tenant.projects.read",
     description: "Активные проекты, плановые даты и потребность по должностям"
+  },
+  {
+    id: "clients",
+    label: "Клиенты",
+    group: "crm",
+    path: "/clients",
+    permission: "tenant.clients.read",
+    description: "CRM-клиенты как отдельный справочник входящего контура"
+  },
+  {
+    id: "contacts",
+    label: "Контакты",
+    group: "crm",
+    path: "/contacts",
+    permission: "tenant.contacts.read",
+    description: "Контакты клиентов для сделок и будущих коммуникаций"
   },
   {
     id: "users",
@@ -57,11 +73,27 @@ export const workspaceRoutes = [
   },
   {
     id: "settings",
-    label: "Настройки",
-    group: "admin",
+    label: "Поля и шаблоны",
+    group: "settings",
     path: "/settings",
     permission: "tenant.workspace_config.read",
     description: "Пользовательские поля и шаблоны проекта"
+  },
+  {
+    id: "project-types",
+    label: "Типы проектов",
+    group: "settings",
+    path: "/settings/project-types",
+    permission: "tenant.project_types.read",
+    description: "Tenant-настраиваемые типы проектов для сделок и проектов"
+  },
+  {
+    id: "deal-stages",
+    label: "Этапы сделок",
+    group: "settings",
+    path: "/settings/deal-stages",
+    permission: "tenant.deal_stages.read",
+    description: "Tenant-настраиваемые этапы, из которых строится канбан сделок"
   },
   {
     id: "profile",
@@ -87,7 +119,9 @@ export type WorkspaceRouteGroupId = WorkspaceRoute["group"];
 
 const workspaceRouteGroups = [
   { id: "workspace", label: "Работа" },
+  { id: "crm", label: "CRM" },
   { id: "admin", label: "Администрирование" },
+  { id: "settings", label: "Настройки" },
   { id: "personal", label: "Личное" }
 ] as const satisfies readonly {
   id: WorkspaceRouteGroupId;
@@ -131,8 +165,11 @@ export function getRouteById(routeId: WorkspaceRouteId): WorkspaceRoute {
 }
 
 export function getRouteIdFromPathname(pathname: string): WorkspaceRouteId {
+  const normalizedPath = normalizePathname(pathname);
+  if (normalizedPath.startsWith("/opportunities/")) return "opportunities";
+
   return (
-    workspaceRoutes.find((route) => route.path === normalizePathname(pathname))?.id ??
+    workspaceRoutes.find((route) => route.path === normalizedPath)?.id ??
     "dashboard"
   );
 }

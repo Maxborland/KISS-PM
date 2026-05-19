@@ -1,4 +1,14 @@
-import type { AccessRole, Opportunity, Position, Project, WorkspaceUser } from "./api";
+import type {
+  AccessRole,
+  Client,
+  Contact,
+  DealStage,
+  Opportunity,
+  Position,
+  Project,
+  ProjectType,
+  WorkspaceUser
+} from "./api";
 
 export function filterUsersForTable(
   users: WorkspaceUser[],
@@ -63,15 +73,84 @@ export function filterOpportunitiesForTable(
     normalizeTableQuery(
       [
         opportunity.clientName,
+        opportunity.clientId,
         opportunity.contactName,
+        opportunity.primaryContactId,
         opportunity.title,
         opportunity.projectType,
+        opportunity.projectTypeId,
+        opportunity.stageId,
         opportunity.status,
         opportunity.feasibilityStatus
       ]
         .filter(Boolean)
         .join(" ")
     ).includes(normalizedQuery)
+  );
+}
+
+export function filterClientsForTable(clients: Client[], query: string): Client[] {
+  const normalizedQuery = normalizeTableQuery(query);
+  if (!normalizedQuery) return clients;
+
+  return clients.filter((client) =>
+    normalizeTableQuery([client.name, client.description, client.status].filter(Boolean).join(" "))
+      .includes(normalizedQuery)
+  );
+}
+
+export function filterContactsForTable(
+  contacts: Contact[],
+  clients: Client[],
+  query: string
+): Contact[] {
+  const normalizedQuery = normalizeTableQuery(query);
+  if (!normalizedQuery) return contacts;
+
+  return contacts.filter((contact) => {
+    const client = clients.find((item) => item.id === contact.clientId);
+
+    return normalizeTableQuery(
+      [
+        contact.name,
+        contact.email,
+        contact.phone,
+        contact.telegram,
+        contact.role,
+        contact.status,
+        client?.name
+      ]
+        .filter(Boolean)
+        .join(" ")
+    ).includes(normalizedQuery);
+  });
+}
+
+export function filterProjectTypesForTable(
+  projectTypes: ProjectType[],
+  query: string
+): ProjectType[] {
+  const normalizedQuery = normalizeTableQuery(query);
+  if (!normalizedQuery) return projectTypes;
+
+  return projectTypes.filter((projectType) =>
+    normalizeTableQuery(
+      [projectType.name, projectType.description, projectType.status].filter(Boolean).join(" ")
+    ).includes(normalizedQuery)
+  );
+}
+
+export function filterDealStagesForTable(
+  dealStages: DealStage[],
+  query: string
+): DealStage[] {
+  const normalizedQuery = normalizeTableQuery(query);
+  if (!normalizedQuery) return dealStages;
+
+  return dealStages.filter((stage) =>
+    normalizeTableQuery([stage.name, stage.sortOrder, stage.status].join(" ")).includes(
+      normalizedQuery
+    )
   );
 }
 

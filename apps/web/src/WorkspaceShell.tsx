@@ -18,6 +18,7 @@ import {
 import { LoginScreen, getFocusableElements } from "./components/workspace-ui";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceTopbar } from "./WorkspaceTopbar";
+import { canStartDealCreation } from "./workspaceShellState";
 import { useWorkspaceShellData } from "./useWorkspaceShellData";
 
 const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
@@ -51,6 +52,7 @@ export function WorkspaceShell() {
     visibleRoutes
   } = useWorkspaceShellData();
   const activeRouteId = getRouteIdFromPathname(pathname);
+  const activeOpportunityId = getOpportunityIdFromPathname(pathname);
 
   useEffect(() => {
     if (!meQuery.data) return;
@@ -65,8 +67,8 @@ export function WorkspaceShell() {
   }, [activeRouteId, meQuery.data, pathname, permissions, router]);
 
   useEffect(() => {
-    if (activeRouteId !== "users") return;
-    if (sessionStorage.getItem("kiss-pm.quick-create") === "user") {
+    if (activeRouteId !== "opportunities") return;
+    if (sessionStorage.getItem("kiss-pm.quick-create") === "deal") {
       sessionStorage.removeItem("kiss-pm.quick-create");
       setQuickCreateRequested(true);
     }
@@ -334,6 +336,8 @@ export function WorkspaceShell() {
     : isSidebarCompact
       ? "Развернуть навигацию"
       : "Свернуть навигацию";
+  const canQuickCreateDeal =
+    activeRouteId === "opportunities" && canStartDealCreation(data);
 
   return (
     <main
@@ -364,11 +368,11 @@ export function WorkspaceShell() {
         onLogout={logoutFromUserMenu}
         onNavigate={navigateRoute}
         onProfile={() => navigateFromUserMenu("profile")}
-        onQuickCreateUser={() => {
-          sessionStorage.setItem("kiss-pm.quick-create", "user");
+        onQuickCreateDeal={canQuickCreateDeal ? () => {
+          sessionStorage.setItem("kiss-pm.quick-create", "deal");
           setQuickCreateRequested(true);
-          navigateRoute("users");
-        }}
+          navigateRoute("opportunities");
+        } : null}
         onTheme={() => navigateFromUserMenu("theme")}
         onToggleUserMenu={() =>
           setOpenUserMenu((value) => (value === "sidebar" ? null : "sidebar"))
@@ -405,15 +409,28 @@ export function WorkspaceShell() {
         {message ? <p className="toast">{message}</p> : null}
         <WorkspaceRouteRenderer
           activeRouteId={activeRouteId}
+          activeOpportunityId={activeOpportunityId}
           data={data}
           openCreateRequested={quickCreateRequested}
           onChanged={setMessage}
           onQuickCreateConsumed={() => {
             setQuickCreateRequested(false);
           }}
+          onOpenOpportunity={(opportunityId) => {
+            router.push(`/opportunities/${encodeURIComponent(opportunityId)}`);
+          }}
+          onBackToOpportunities={() => {
+            router.push(getRoutePath("opportunities"));
+          }}
           sectionStates={sectionStates}
         />
       </section>
     </main>
   );
+}
+
+function getOpportunityIdFromPathname(pathname: string): string | null {
+  const match = /^\/opportunities\/([^/]+)\/?$/.exec(pathname);
+  const rawOpportunityId = match?.[1];
+  return rawOpportunityId ? decodeURIComponent(rawOpportunityId) : null;
 }

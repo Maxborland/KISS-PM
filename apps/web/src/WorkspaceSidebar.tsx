@@ -22,7 +22,7 @@ export function WorkspaceSidebar(props: {
   onLogout: () => void;
   onNavigate: (routeId: WorkspaceRouteId) => void;
   onProfile: () => void;
-  onQuickCreateUser: () => void;
+  onQuickCreateDeal: (() => void) | null;
   onTheme: () => void;
   onToggleUserMenu: () => void;
 }) {
@@ -42,17 +42,19 @@ export function WorkspaceSidebar(props: {
           </div>
         </div>
       </div>
-      <div className="quick-create-row">
-        <button
-          className="quick-create-button"
-          title="Быстро создать пользователя"
-          type="button"
-          onClick={props.onQuickCreateUser}
-        >
-          <PlusCircle aria-hidden="true" size={16} />
-          <span>Быстро создать</span>
-        </button>
-      </div>
+      {props.onQuickCreateDeal ? (
+        <div className="quick-create-row">
+          <button
+            className="quick-create-button"
+            title="Создать сделку в текущем разделе"
+            type="button"
+            onClick={props.onQuickCreateDeal}
+          >
+            <PlusCircle aria-hidden="true" size={16} />
+            <span>Создать сделку</span>
+          </button>
+        </div>
+      ) : null}
       <nav className="nav-list" aria-label="Основная навигация">
         {props.visibleRouteGroups.map((group) => (
           <section className="nav-group" key={group.id}>
@@ -81,7 +83,7 @@ export function WorkspaceSidebar(props: {
       <div className="sidebar-spacer" />
       <section className="sidebar-note" aria-label="Текущий слой продукта">
         <strong>Текущий слой</strong>
-        <p>Вход, пользователи, роли доступа, должности, профиль, тема и события аудита.</p>
+        <p>CRM foundation, сделки, ресурсная проверка и активация проекта.</p>
       </section>
       <div className="account-menu-anchor sidebar-account-menu" ref={props.sidebarUserMenuRef}>
         <button

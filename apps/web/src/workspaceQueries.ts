@@ -2,9 +2,13 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 
 import {
   createAccessRole,
+  createClient,
   createCustomField,
+  createContact,
+  createDealStage,
   createOpportunity,
   createPosition,
+  createProjectType,
   createProjectTemplate,
   createUser,
   activateOpportunityProject,
@@ -15,17 +19,23 @@ import {
   fetchAccessRoles,
   fetchApiHealth,
   fetchAuditEvents,
+  fetchClients,
+  fetchContacts,
   fetchCustomFields,
+  fetchDealStages,
   fetchMe,
+  fetchOpportunity,
   fetchOpportunities,
   fetchPositions,
   fetchProjects,
+  fetchProjectTypes,
   fetchProjectTemplates,
   fetchUsers,
   login,
   logout,
   updateAccessRole,
   updateCustomField,
+  updateOpportunityStage,
   updatePosition,
   updateProfile,
   updateProjectTemplate,
@@ -40,7 +50,13 @@ export const workspaceQueryKeys = {
   positions: () => ["workspace", "positions"] as const,
   accessRoles: () => ["workspace", "accessRoles"] as const,
   auditEvents: () => ["workspace", "auditEvents"] as const,
+  clients: () => ["workspace", "crm", "clients"] as const,
+  contacts: () => ["workspace", "crm", "contacts"] as const,
+  projectTypes: () => ["workspace", "crm", "projectTypes"] as const,
+  dealStages: () => ["workspace", "crm", "dealStages"] as const,
   opportunities: () => ["workspace", "opportunities"] as const,
+  opportunity: (opportunityId: string) =>
+    ["workspace", "opportunities", opportunityId] as const,
   projects: () => ["workspace", "projects"] as const,
   customFields: () => ["workspace", "config", "customFields"] as const,
   projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
@@ -106,11 +122,51 @@ export function useAuditEventsQuery(enabled: boolean) {
   });
 }
 
+export function useClientsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.clients(),
+    queryFn: fetchClients,
+    enabled
+  });
+}
+
+export function useContactsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.contacts(),
+    queryFn: fetchContacts,
+    enabled
+  });
+}
+
+export function useProjectTypesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectTypes(),
+    queryFn: fetchProjectTypes,
+    enabled
+  });
+}
+
+export function useDealStagesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.dealStages(),
+    queryFn: fetchDealStages,
+    enabled
+  });
+}
+
 export function useOpportunitiesQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.opportunities(),
     queryFn: fetchOpportunities,
     enabled
+  });
+}
+
+export function useOpportunityQuery(opportunityId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.opportunity(opportunityId ?? "unknown"),
+    queryFn: () => fetchOpportunity(opportunityId ?? ""),
+    enabled: enabled && Boolean(opportunityId)
   });
 }
 
@@ -270,6 +326,39 @@ export function useWorkspaceConfigMutations() {
   };
 }
 
+export function useCrmMutations() {
+  const queryClient = useQueryClient();
+  const invalidateCrm = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.clients() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.contacts() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projectTypes() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.dealStages() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
+
+  return {
+    createClient: useMutation({
+      mutationFn: createClient,
+      onSuccess: invalidateCrm
+    }),
+    createContact: useMutation({
+      mutationFn: createContact,
+      onSuccess: invalidateCrm
+    }),
+    createProjectType: useMutation({
+      mutationFn: createProjectType,
+      onSuccess: invalidateCrm
+    }),
+    createDealStage: useMutation({
+      mutationFn: createDealStage,
+      onSuccess: invalidateCrm
+    })
+  };
+}
+
 export function useProjectIntakeMutations() {
   const queryClient = useQueryClient();
   const invalidateProjectIntake = async () => {
@@ -287,12 +376,38 @@ export function useProjectIntakeMutations() {
     }),
     checkFeasibility: useMutation({
       mutationFn: checkOpportunityFeasibility,
-      onSuccess: invalidateProjectIntake
+      onSuccess: async (_result, opportunityId) => {
+        await Promise.all([
+          invalidateProjectIntake(),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.opportunity(opportunityId)
+          })
+        ]);
+      }
+    }),
+    updateStage: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunityStage> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        updateOpportunityStage(opportunityId, input),
+      onSuccess: async (_result, variables) => {
+        await Promise.all([
+          invalidateProjectIntake(),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
+          })
+        ]);
+      }
     }),
     activateProject: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof activateOpportunityProject> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         activateOpportunityProject(opportunityId, input),
-      onSuccess: invalidateProjectIntake
+      onSuccess: async (_result, variables) => {
+        await Promise.all([
+          invalidateProjectIntake(),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
+          })
+        ]);
+      }
     })
   };
 }

@@ -1,4 +1,5 @@
 @import "./shadcn.css";
+@import "./crmStyles.css";
 
 :root {
   color: #020617;
@@ -1682,6 +1683,8 @@ input[type="color"] {
 
   .grid-3,
   .two-column,
+  .crm-reference-strip,
+  .deal-detail-layout,
   .management-layout {
     grid-template-columns: 1fr;
   }

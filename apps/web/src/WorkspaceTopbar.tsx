@@ -1,4 +1,4 @@
-import { Bell, Menu, Moon, Search, Settings } from "lucide-react";
+import { Menu, Moon, Search, Settings } from "lucide-react";
 import { type RefObject } from "react";
 
 import { AccountMenu } from "./components/workspace-ui";
@@ -69,15 +69,6 @@ export function WorkspaceTopbar(props: {
             <Settings aria-hidden="true" size={17} />
           </button>
         ) : null}
-        <button
-          aria-label="Уведомления"
-          className="topbar-icon-button"
-          disabled
-          title="Уведомления появятся вместе с control signals"
-          type="button"
-        >
-          <Bell aria-hidden="true" size={17} />
-        </button>
         <div className="account-menu-anchor topbar-account-menu" ref={props.topbarUserMenuRef}>
           <button
             aria-expanded={props.openUserMenu === "topbar"}

@@ -36,7 +36,7 @@ export function DashboardView(props: {
         icon={ClipboardList}
         hint={getMetricHint(props.sectionStates.opportunities)}
         meta="CRM-вход"
-        title="Возможности"
+        title="Сделки"
         value={props.data.opportunities.length}
       />
       <Metric

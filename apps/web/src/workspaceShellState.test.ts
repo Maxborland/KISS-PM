@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError } from "./api";
 import {
+  canStartDealCreation,
   getErrorMessage,
   getMetricHint,
   getSectionState,
@@ -14,6 +15,31 @@ describe("workspace shell state helpers", () => {
       hasPermission(["tenant.users.read", "tenant.users.manage"], "tenant.users.read")
     ).toBe(true);
     expect(hasPermission(["tenant.users.read"], "tenant.users")).toBe(false);
+  });
+
+  it("allows deal quick create only when manage permission and active prerequisites exist", () => {
+    const baseData = {
+      permissions: ["tenant.opportunities.manage"],
+      clients: [{ status: "active" }],
+      contacts: [{ status: "active" }],
+      projectTypes: [{ status: "active" }],
+      dealStages: [{ status: "active" }],
+      positions: [{}]
+    };
+
+    expect(canStartDealCreation(baseData)).toBe(true);
+    expect(
+      canStartDealCreation({
+        ...baseData,
+        permissions: ["tenant.opportunities.read"]
+      })
+    ).toBe(false);
+    expect(
+      canStartDealCreation({
+        ...baseData,
+        projectTypes: [{ status: "archived" }]
+      })
+    ).toBe(false);
   });
 
   it("builds unreadable section state without leaking loading or error state", () => {

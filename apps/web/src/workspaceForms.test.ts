@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   getNextFocusTrapIndex,
+  validateClientForm,
+  validateContactForm,
+  validateDealStageForm,
   validateOpportunityForm,
   validateCustomFieldForm,
   validatePositionForm,
+  validateProjectTypeForm,
   validateProjectTemplateForm,
   validateRoleForm,
   validateUserForm
@@ -95,9 +99,11 @@ describe("workspace form quality baseline", () => {
   it("validates manual opportunity intake before API mutation", () => {
     expect(
       validateOpportunityForm({
-        clientName: "",
+        clientId: "",
+        primaryContactId: "",
         title: "",
-        projectType: "",
+        projectTypeId: "",
+        stageId: "",
         plannedStart: "2026-06-30",
         plannedFinish: "2026-06-01",
         contractValue: "0",
@@ -110,15 +116,41 @@ describe("workspace form quality baseline", () => {
         ]
       })
     ).toEqual({
-      clientName: "Укажите клиента.",
+      clientId: "Выберите клиента.",
+      primaryContactId: "Выберите контакт клиента.",
       title: "Укажите название входящего проекта.",
-      projectType: "Укажите тип проекта.",
+      projectTypeId: "Выберите тип проекта.",
+      stageId: "Выберите этап сделки.",
       plannedFinish: "Дата финиша не может быть раньше старта.",
       contractValue: "Стоимость контракта должна быть больше 0.",
       plannedHourlyRate: "Плановая норма часа должна быть больше 0.",
       probability: "Вероятность должна быть от 0 до 100.",
       demand: "Каждая строка потребности должна содержать должность и часы.",
       demandDuplicates: "Должность в потребности нельзя дублировать."
+    });
+  });
+
+  it("validates CRM foundation forms before API mutation", () => {
+    expect(validateClientForm({ name: "", description: "" })).toEqual({
+      name: "Укажите клиента."
+    });
+    expect(
+      validateContactForm({
+        clientId: "",
+        name: "",
+        email: "bad-email"
+      })
+    ).toEqual({
+      clientId: "Выберите клиента.",
+      name: "Укажите контакт.",
+      email: "Введите корректный email контакта."
+    });
+    expect(validateProjectTypeForm({ name: "", description: "" })).toEqual({
+      name: "Укажите тип проекта."
+    });
+    expect(validateDealStageForm({ name: "", sortOrder: "0" })).toEqual({
+      name: "Укажите этап сделки.",
+      sortOrder: "Порядок должен быть положительным целым числом."
     });
   });
 
