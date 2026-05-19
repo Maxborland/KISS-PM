@@ -1,10 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 
-import {
-  isPermission,
-  type AccessProfile,
-  type Permission
-} from "@kiss-pm/access-control";
+import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 
 import {
@@ -24,6 +20,15 @@ import {
   userCredentials,
   userSessions
 } from "./schema";
+import {
+  mapAccessProfileRecord,
+  mapCustomFieldDefinitionRecord,
+  mapPositionRecord,
+  mapProjectTemplateRecord,
+  mapTenantUser,
+  mapWorkspaceUserRecord,
+  toPermission
+} from "./repositoryMappers";
 
 export type PersistedAccessProfile = AccessProfile;
 export type AccessProfileRecord = AccessProfile & {
@@ -617,94 +622,5 @@ export function createPostgresTenantDataSource(
         createdAt: row.createdAt
       }));
     }
-  };
-}
-
-function toPermission(value: string): Permission {
-  if (isPermission(value)) {
-    return value;
-  }
-
-  throw new Error(`Unknown persisted permission: ${value}`);
-}
-
-function mapAccessProfileRecord(
-  row: typeof accessProfiles.$inferSelect
-): AccessProfileRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    name: row.name,
-    permissions: row.permissions.map(toPermission)
-  };
-}
-
-function mapWorkspaceUserRecord(
-  row: typeof tenantUsers.$inferSelect,
-  positionName: string | null
-): WorkspaceUserRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    accessProfileId: row.accessProfileId,
-    positionId: row.positionId,
-    positionName,
-    email: row.email,
-    name: row.name,
-    phone: row.phone,
-    telegram: row.telegram,
-    status: row.status,
-    theme: row.theme,
-    accentColor: row.accentColor
-  };
-}
-
-function mapPositionRecord(row: typeof positions.$inferSelect): PositionRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    name: row.name,
-    description: row.description
-  };
-}
-
-function mapCustomFieldDefinitionRecord(
-  row: typeof customFieldDefinitions.$inferSelect
-): CustomFieldDefinitionRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    systemKey: row.systemKey,
-    tenantLabel: row.tenantLabel,
-    targetEntity: row.targetEntity,
-    fieldType: row.fieldType,
-    required: row.required,
-    status: row.status,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt
-  };
-}
-
-function mapProjectTemplateRecord(
-  row: typeof projectTemplates.$inferSelect
-): ProjectTemplateRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    systemKey: row.systemKey,
-    tenantLabel: row.tenantLabel,
-    description: row.description,
-    status: row.status,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt
-  };
-}
-
-function mapTenantUser(row: typeof tenantUsers.$inferSelect): TenantUser {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    name: row.name,
-    accessProfileId: row.accessProfileId
   };
 }
