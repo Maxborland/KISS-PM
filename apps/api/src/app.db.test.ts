@@ -623,6 +623,53 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 
+  it("keeps access role ids scoped to each tenant", async () => {
+    const alphaCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
+    const sharedRoleInput = {
+      id: "access-profile-shared-local-id",
+      name: "Локальная роль",
+      permissions: ["tenant.users.read"]
+    };
+
+    const alphaRole = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: alphaCookie
+      },
+      body: JSON.stringify(sharedRoleInput)
+    });
+    const betaRole = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: betaCookie
+      },
+      body: JSON.stringify(sharedRoleInput)
+    });
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const alphaRoles = await dataSource.listAccessProfilesByTenantId("tenant-alpha");
+    const betaRoles = await dataSource.listAccessProfilesByTenantId("tenant-beta");
+
+    expect(alphaRole.status).toBe(201);
+    expect(betaRole.status).toBe(201);
+    expect(
+      alphaRoles.find((role) => role.id === sharedRoleInput.id)
+    ).toMatchObject({
+      tenantId: "tenant-alpha",
+      id: sharedRoleInput.id
+    });
+    expect(
+      betaRoles.find((role) => role.id === sharedRoleInput.id)
+    ).toMatchObject({
+      tenantId: "tenant-beta",
+      id: sharedRoleInput.id
+    });
+  });
+
   it("allows clearing optional profile contact fields", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
 
@@ -803,6 +850,102 @@ describe("API with PostgreSQL data source", () => {
 
     expect(createdField.status).toBe(500);
     expect(fields.some((field) => field.id === "field-rollback")).toBe(false);
+  });
+
+  it("rolls back access role create, update and delete when audit write fails", async () => {
+    const db = createDatabase(client);
+    const baseDataSource = createPostgresTenantDataSource(db);
+    await baseDataSource.createAccessProfile({
+      id: "access-profile-alpha-rollback-existing",
+      tenantId: "tenant-alpha",
+      name: "Роль для отката",
+      permissions: ["tenant.users.read"]
+    });
+    const appWithFailingAudit = createApp({
+      dataSource: {
+        ...baseDataSource,
+        async appendAuditEvent() {
+          throw new Error("audit_failed");
+        },
+        async withTransaction(operation) {
+          return db.transaction((transaction) =>
+            operation({
+              ...createPostgresTenantDataSource(transaction as unknown as typeof db),
+              async appendAuditEvent() {
+                throw new Error("audit_failed");
+              }
+            })
+          );
+        }
+      }
+    });
+    const login = await appWithFailingAudit.request("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        email: "admin@kiss-pm.local",
+        password: "local-admin-password"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") ?? "";
+
+    const createdRole = await appWithFailingAudit.request(
+      "/api/tenant/current/access-profiles",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: "access-profile-alpha-rollback-new",
+          name: "Новая роль без аудита",
+          permissions: ["tenant.users.read"]
+        })
+      }
+    );
+    const updatedRole = await appWithFailingAudit.request(
+      "/api/workspace/access-roles/access-profile-alpha-rollback-existing",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          name: "Роль не должна сохраниться",
+          permissions: ["tenant.users.read", "profile.read"]
+        })
+      }
+    );
+    const deletedRole = await appWithFailingAudit.request(
+      "/api/workspace/access-roles/access-profile-alpha-rollback-existing",
+      {
+        method: "DELETE",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const roles = await baseDataSource.listAccessProfilesByTenantId("tenant-alpha");
+
+    expect(createdRole.status).toBe(500);
+    expect(updatedRole.status).toBe(500);
+    expect(deletedRole.status).toBe(500);
+    expect(
+      roles.some((role) => role.id === "access-profile-alpha-rollback-new")
+    ).toBe(false);
+    expect(
+      roles.find((role) => role.id === "access-profile-alpha-rollback-existing")
+    ).toMatchObject({
+      name: "Роль для отката",
+      permissions: ["tenant.users.read"]
+    });
   });
 
   it("rejects user management when transaction boundary is not configured", async () => {

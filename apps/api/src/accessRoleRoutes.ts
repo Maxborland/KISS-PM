@@ -2,7 +2,6 @@ import {
   canManageAccessProfiles,
   canReadAccessProfiles
 } from "@kiss-pm/access-control";
-import { randomUUID } from "node:crypto";
 import { parseAccessProfileCreateBody } from "./workspaceParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
@@ -11,7 +10,8 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     appendManagementAuditEvent,
     dataSource,
     getActorProfile,
-    getSessionActorFromHeaders
+    getSessionActorFromHeaders,
+    runDataSourceTransaction
   } = deps;
 
   app.get("/api/tenant/current/access-profiles", async (context) => {
@@ -57,7 +57,8 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       !dataSource.createAccessProfile ||
       !dataSource.appendAuditEvent ||
-      !dataSource.listAccessProfilesByTenantId
+      !dataSource.listAccessProfilesByTenantId ||
+      !dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -90,32 +91,34 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "access_role_name_taken" }, 409);
     }
 
-    const accessProfile = await dataSource.createAccessProfile({
-      ...parsed.value,
-      tenantId: actor.tenantId
-    });
-    const correlationId = randomUUID();
+    const accessProfile = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createAccessProfile) {
+        throw new Error("transactional_access_profile_create_not_configured");
+      }
 
-    await dataSource.appendAuditEvent({
-      id: `audit-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.access_profile.created",
-      sourceSurfaceId: null,
-      sourceWorkflow: "tenant_admin_access_profile",
-      sourceEntity: {
-        type: "AccessProfile",
-        id: accessProfile.id
-      },
-      input: parsed.value,
-      beforeState: null,
-      afterState: accessProfile,
-      permissionResult: decision,
-      executionResult: {
-        status: "succeeded"
-      },
-      correlationId,
-      createdAt: new Date()
+      const createdProfile = await transactionDataSource.createAccessProfile({
+        ...parsed.value,
+        tenantId: actor.tenantId
+      });
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.access_profile.created",
+          sourceWorkflow: "tenant_admin_access_profile",
+          sourceEntity: {
+            type: "AccessProfile",
+            id: createdProfile.id
+          },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: createdProfile,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return createdProfile;
     });
 
     return context.json({ accessProfile }, 201);
@@ -150,7 +153,12 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "session_required" }, 401);
     }
 
-    if (!dataSource.updateAccessProfile || !dataSource.listAccessProfilesByTenantId) {
+    if (
+      !dataSource.updateAccessProfile ||
+      !dataSource.listAccessProfilesByTenantId ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
@@ -197,24 +205,34 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "access_role_name_taken" }, 409);
     }
 
-    const accessRole = await dataSource.updateAccessProfile({
-      ...parsed.value,
-      tenantId: actor.tenantId
-    });
+    const accessRole = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateAccessProfile) {
+        throw new Error("transactional_access_profile_update_not_configured");
+      }
 
-    await appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.access_profile.updated",
-      sourceWorkflow: "single_workspace_access_roles",
-      sourceEntity: {
-        type: "AccessProfile",
-        id: accessRole.id
-      },
-      commandInput: parsed.value,
-      beforeState,
-      afterState: accessRole,
-      permissionResult: decision
+      const updatedRole = await transactionDataSource.updateAccessProfile({
+        ...parsed.value,
+        tenantId: actor.tenantId
+      });
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.access_profile.updated",
+          sourceWorkflow: "single_workspace_access_roles",
+          sourceEntity: {
+            type: "AccessProfile",
+            id: updatedRole.id
+          },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updatedRole,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return updatedRole;
     });
 
     return context.json({ accessRole });
@@ -232,7 +250,9 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       !dataSource.deleteAccessProfile ||
       !dataSource.listAccessProfilesByTenantId ||
-      !dataSource.listWorkspaceUsers
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -269,20 +289,29 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "access_role_assigned" }, 409);
     }
 
-    await dataSource.deleteAccessProfile(actor.tenantId, roleId);
-    await appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.access_profile.deleted",
-      sourceWorkflow: "single_workspace_access_roles",
-      sourceEntity: {
-        type: "AccessProfile",
-        id: roleId
-      },
-      commandInput: { id: roleId },
-      beforeState,
-      afterState: null,
-      permissionResult: decision
+    await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.deleteAccessProfile) {
+        throw new Error("transactional_access_profile_delete_not_configured");
+      }
+
+      await transactionDataSource.deleteAccessProfile(actor.tenantId, roleId);
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.access_profile.deleted",
+          sourceWorkflow: "single_workspace_access_roles",
+          sourceEntity: {
+            type: "AccessProfile",
+            id: roleId
+          },
+          commandInput: { id: roleId },
+          beforeState,
+          afterState: null,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
     });
 
     return context.json({ status: "deleted" });

@@ -8,8 +8,8 @@ export const rolePermissionOptions = [
   { value: "tenant.positions.read", label: "Читать должности" },
   { value: "tenant.positions.manage", label: "Управлять должностями" },
   { value: "tenant.audit_events.read", label: "Читать аудит" },
-  { value: "tenant.workspace_config.read", label: "Читать настройки workspace" },
-  { value: "tenant.workspace_config.manage", label: "Управлять настройками workspace" },
+  { value: "tenant.workspace_config.read", label: "Читать настройки рабочего пространства" },
+  { value: "tenant.workspace_config.manage", label: "Управлять настройками рабочего пространства" },
   { value: "profile.read", label: "Читать профиль" },
   { value: "profile.update", label: "Обновлять профиль" },
   { value: "workspace.theme.manage", label: "Управлять темой" }
