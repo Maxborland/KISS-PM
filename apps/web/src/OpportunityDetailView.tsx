@@ -8,6 +8,13 @@ import {
 import { useMemo, useState } from "react";
 
 import type { AuditEvent, DealStage, Opportunity } from "./api";
+import {
+  getOpportunityClientLabel,
+  getOpportunityContactLabel,
+  getOpportunityProjectTypeLabel,
+  getOpportunityStageLabel,
+  getOpportunityStageOptions
+} from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
 import { useOpportunityQuery, useProjectIntakeMutations } from "./workspaceQueries";
 import { getAuditActionLabel } from "./workspaceDashboard";
@@ -54,13 +61,6 @@ export function OpportunityDetailView(props: {
     opportunityQuery.data?.opportunity ??
     props.data.opportunities.find((item) => item.id === props.opportunityId) ??
     null;
-  const activeStages = useMemo(
-    () =>
-      props.data.dealStages
-        .filter((stage) => stage.status === "active")
-        .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
-    [props.data.dealStages]
-  );
   const relatedAuditEvents = useMemo(
     () =>
       opportunity
@@ -150,7 +150,8 @@ export function OpportunityDetailView(props: {
             <div className="deal-detail-title">
               <h1>{opportunity.title}</h1>
               <span className="muted">
-                {opportunity.clientName} · {opportunity.contactName || "контакт не задан"}
+                {getOpportunityClientLabel(props.data, opportunity)} ·{" "}
+                {getOpportunityContactLabel(props.data, opportunity)}
               </span>
             </div>
             <StatusPill
@@ -179,15 +180,15 @@ export function OpportunityDetailView(props: {
               <dl className="detail-list">
                 <div>
                   <dt>Клиент</dt>
-                  <dd>{opportunity.clientName}</dd>
+                  <dd>{getOpportunityClientLabel(props.data, opportunity)}</dd>
                 </div>
                 <div>
                   <dt>Контакт</dt>
-                  <dd>{getContactLabel(props.data, opportunity)}</dd>
+                  <dd>{getOpportunityContactLabel(props.data, opportunity)}</dd>
                 </div>
                 <div>
                   <dt>Тип проекта</dt>
-                  <dd>{getProjectTypeLabel(props.data, opportunity)}</dd>
+                  <dd>{getOpportunityProjectTypeLabel(props.data, opportunity)}</dd>
                 </div>
                 <div>
                   <dt>Этап</dt>
@@ -200,14 +201,14 @@ export function OpportunityDetailView(props: {
                         onChange={(event) => updateStage(event.target.value)}
                       >
                         <option value="">Этап не задан</option>
-                        {activeStages.map((stage) => (
+                        {getOpportunityStageOptions(props.data.dealStages, opportunity).map((stage) => (
                           <option key={stage.id} value={stage.id}>
-                            {stage.name}
+                            {stage.status === "archived" ? `${stage.name} · архив` : stage.name}
                           </option>
                         ))}
                       </select>
                     ) : (
-                      formatStage(opportunity, activeStages)
+                      formatStage(opportunity, props.data.dealStages)
                     )}
                   </dd>
                 </div>
@@ -401,22 +402,9 @@ function formatStage(opportunity: Opportunity, stages: DealStage[]) {
   const stage = stages.find((item) => item.id === opportunity.stageId);
   return (
     <StatusPill
-      label={stage?.name ?? opportunity.stageId ?? "Без этапа"}
-      tone={stage ? "success" : "muted"}
+      label={getOpportunityStageLabel(stages, opportunity)}
+      tone={stage?.status === "active" ? "success" : "muted"}
     />
-  );
-}
-
-function getContactLabel(data: WorkspaceData, opportunity: Opportunity): string {
-  const contact = data.contacts.find((item) => item.id === opportunity.primaryContactId);
-  if (!contact) return opportunity.contactName || "Контакт не задан";
-  return [contact.name, contact.email, contact.phone].filter(Boolean).join(" · ");
-}
-
-function getProjectTypeLabel(data: WorkspaceData, opportunity: Opportunity): string {
-  return (
-    data.projectTypes.find((item) => item.id === opportunity.projectTypeId)?.name ??
-    opportunity.projectType
   );
 }
 

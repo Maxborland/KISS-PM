@@ -152,6 +152,24 @@ describe("workspace form quality baseline", () => {
       name: "Укажите этап сделки.",
       sortOrder: "Порядок должен быть положительным целым числом."
     });
+    expect(
+      validateClientForm({
+        name: "Клиент",
+        description: "",
+        status: "paused"
+      })
+    ).toEqual({
+      status: "Выберите корректный статус справочника."
+    });
+    expect(
+      validateDealStageForm({
+        name: "Квалификация",
+        sortOrder: "10",
+        status: "paused"
+      })
+    ).toEqual({
+      status: "Выберите корректный статус справочника."
+    });
   });
 
   it("keeps workspace config form limits aligned with the domain contract", () => {

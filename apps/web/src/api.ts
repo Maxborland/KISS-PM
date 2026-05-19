@@ -158,12 +158,19 @@ export type DealStage = {
 };
 
 export type ClientInput = Pick<Client, "id" | "name" | "description">;
+export type ClientUpdateInput = Pick<Client, "name" | "description" | "status">;
 export type ContactInput = Pick<
   Contact,
   "id" | "clientId" | "name" | "email" | "phone" | "telegram" | "role"
 >;
+export type ContactUpdateInput = Pick<
+  Contact,
+  "clientId" | "name" | "email" | "phone" | "telegram" | "role" | "status"
+>;
 export type ProjectTypeInput = Pick<ProjectType, "id" | "name" | "description">;
+export type ProjectTypeUpdateInput = Pick<ProjectType, "name" | "description" | "status">;
 export type DealStageInput = Pick<DealStage, "id" | "name" | "sortOrder">;
+export type DealStageUpdateInput = Pick<DealStage, "name" | "sortOrder" | "status">;
 
 export type PositionDemand = {
   positionId: string;
@@ -471,6 +478,16 @@ export async function createClient(input: ClientInput): Promise<{ client: Client
   });
 }
 
+export async function updateClient(
+  clientId: string,
+  input: ClientUpdateInput
+): Promise<{ client: Client }> {
+  return requestJson(`/api/workspace/clients/${encodePathSegment(clientId)}`, {
+    method: "PATCH",
+    body: input
+  });
+}
+
 export async function fetchContacts(): Promise<{ contacts: Contact[] }> {
   return requestJson("/api/workspace/contacts");
 }
@@ -478,6 +495,16 @@ export async function fetchContacts(): Promise<{ contacts: Contact[] }> {
 export async function createContact(input: ContactInput): Promise<{ contact: Contact }> {
   return requestJson("/api/workspace/contacts", {
     method: "POST",
+    body: input
+  });
+}
+
+export async function updateContact(
+  contactId: string,
+  input: ContactUpdateInput
+): Promise<{ contact: Contact }> {
+  return requestJson(`/api/workspace/contacts/${encodePathSegment(contactId)}`, {
+    method: "PATCH",
     body: input
   });
 }
@@ -495,6 +522,19 @@ export async function createProjectType(
   });
 }
 
+export async function updateProjectType(
+  projectTypeId: string,
+  input: ProjectTypeUpdateInput
+): Promise<{ projectType: ProjectType }> {
+  return requestJson(
+    `/api/workspace/project-types/${encodePathSegment(projectTypeId)}`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
 export async function fetchDealStages(): Promise<{ dealStages: DealStage[] }> {
   return requestJson("/api/workspace/deal-stages");
 }
@@ -504,6 +544,16 @@ export async function createDealStage(
 ): Promise<{ dealStage: DealStage }> {
   return requestJson("/api/workspace/deal-stages", {
     method: "POST",
+    body: input
+  });
+}
+
+export async function updateDealStage(
+  stageId: string,
+  input: DealStageUpdateInput
+): Promise<{ dealStage: DealStage }> {
+  return requestJson(`/api/workspace/deal-stages/${encodePathSegment(stageId)}`, {
+    method: "PATCH",
     body: input
   });
 }

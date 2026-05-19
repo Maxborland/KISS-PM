@@ -61,12 +61,16 @@ export function validatePositionForm(input: { name: string }): FormErrors {
 export function validateClientForm(input: {
   name: string;
   description: string;
+  status?: string;
 }): FormErrors {
   const errors: FormErrors = {};
 
   if (!input.name.trim()) errors.name = "Укажите клиента.";
   if (input.description.length > 1000) {
     errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
   }
 
   return errors;
@@ -76,6 +80,7 @@ export function validateContactForm(input: {
   clientId: string;
   name: string;
   email: string;
+  status?: string;
 }): FormErrors {
   const errors: FormErrors = {};
 
@@ -84,6 +89,9 @@ export function validateContactForm(input: {
   if (input.email.trim() && !isEmail(input.email)) {
     errors.email = "Введите корректный email контакта.";
   }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
+  }
 
   return errors;
 }
@@ -91,12 +99,16 @@ export function validateContactForm(input: {
 export function validateProjectTypeForm(input: {
   name: string;
   description: string;
+  status?: string;
 }): FormErrors {
   const errors: FormErrors = {};
 
   if (!input.name.trim()) errors.name = "Укажите тип проекта.";
   if (input.description.length > 1000) {
     errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
   }
 
   return errors;
@@ -105,6 +117,7 @@ export function validateProjectTypeForm(input: {
 export function validateDealStageForm(input: {
   name: string;
   sortOrder: string;
+  status?: string;
 }): FormErrors {
   const errors: FormErrors = {};
   const sortOrder = Number(input.sortOrder);
@@ -113,8 +126,15 @@ export function validateDealStageForm(input: {
   if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
     errors.sortOrder = "Порядок должен быть положительным целым числом.";
   }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
+  }
 
   return errors;
+}
+
+function isCrmStatus(value: string): boolean {
+  return value === "active" || value === "archived";
 }
 
 export function validateCustomFieldForm(input: {

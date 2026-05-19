@@ -223,6 +223,18 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await createClientDialog.getByRole("button", { name: "Создать клиента" }).click();
   await expect(page.getByText("Клиент создан")).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(`Клиент ${suffix}`) })).toBeVisible();
+  const clientRow = page.getByRole("row", { name: new RegExp(`Клиент ${suffix}`) });
+  await clientRow.getByRole("button", { name: "Редактировать" }).click();
+  const editClientDialog = page.getByRole("dialog", { name: "Редактировать клиента" });
+  await expect(editClientDialog).toBeVisible();
+  await editClientDialog.getByLabel("Название клиента").fill(`Клиент ${suffix} обновлен`);
+  await editClientDialog.getByLabel("Описание").fill("Обновленный smoke клиент для сделки");
+  await editClientDialog.getByLabel("Статус").selectOption("active");
+  await editClientDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+  await expect(page.getByText("Клиент обновлен")).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Клиент ${suffix} обновлен`) })
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Контакты" }).click();
   await expect(page).toHaveURL(/\/contacts$/);
@@ -232,13 +244,27 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(createContactDialog).toBeVisible();
   await createContactDialog.getByRole("button", { name: "Создать контакт" }).click();
   await expect(createContactDialog.getByText("Выберите клиента.")).toBeVisible();
-  await createContactDialog.locator("#contact-client").selectOption({ label: `Клиент ${suffix}` });
+  await createContactDialog
+    .locator("#contact-client")
+    .selectOption({ label: `Клиент ${suffix} обновлен` });
   await createContactDialog.getByLabel("Имя контакта").fill(`Контакт ${suffix}`);
   await createContactDialog.getByLabel("Email").fill(`contact-${suffix}@example.com`);
   await createContactDialog.getByLabel("Роль у клиента").fill("Заказчик");
   await createContactDialog.getByRole("button", { name: "Создать контакт" }).click();
   await expect(page.getByText("Контакт создан")).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(`Контакт ${suffix}`) })).toBeVisible();
+  const contactRow = page.getByRole("row", { name: new RegExp(`Контакт ${suffix}`) });
+  await contactRow.getByRole("button", { name: "Редактировать" }).click();
+  const editContactDialog = page.getByRole("dialog", { name: "Редактировать контакт" });
+  await expect(editContactDialog).toBeVisible();
+  await editContactDialog.getByLabel("Имя контакта").fill(`Контакт ${suffix} обновлен`);
+  await editContactDialog.getByLabel("Роль у клиента").fill("Спонсор");
+  await editContactDialog.getByLabel("Статус").selectOption("active");
+  await editContactDialog.getByRole("button", { name: "Сохранить контакт" }).click();
+  await expect(page.getByText("Контакт обновлен")).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Контакт ${suffix} обновлен.*Спонсор`) })
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Типы проектов" }).click();
   await expect(page).toHaveURL(/\/settings\/project-types$/);
@@ -253,6 +279,17 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await createProjectTypeDialog.getByRole("button", { name: "Создать тип проекта" }).click();
   await expect(page.getByText("Тип проекта создан")).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(`Тип проекта ${suffix}`) })).toBeVisible();
+  const projectTypeRow = page.getByRole("row", { name: new RegExp(`Тип проекта ${suffix}`) });
+  await projectTypeRow.getByRole("button", { name: "Редактировать" }).click();
+  const editProjectTypeDialog = page.getByRole("dialog", { name: "Редактировать тип проекта" });
+  await expect(editProjectTypeDialog).toBeVisible();
+  await editProjectTypeDialog.getByLabel("Название типа").fill(`Тип проекта ${suffix} обновлен`);
+  await editProjectTypeDialog.getByLabel("Статус").selectOption("active");
+  await editProjectTypeDialog.getByRole("button", { name: "Сохранить тип проекта" }).click();
+  await expect(page.getByText("Тип проекта обновлен")).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Тип проекта ${suffix} обновлен`) })
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Этапы сделок" }).click();
   await expect(page).toHaveURL(/\/settings\/deal-stages$/);
@@ -267,6 +304,17 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await createStageDialog.getByRole("button", { name: "Создать этап" }).click();
   await expect(page.getByText("Этап сделки создан")).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(`Этап ${suffix}`) })).toBeVisible();
+  const stageRow = page.getByRole("row", { name: new RegExp(`Этап ${suffix}`) });
+  await stageRow.getByRole("button", { name: "Редактировать" }).click();
+  const editStageDialog = page.getByRole("dialog", { name: "Редактировать этап сделки" });
+  await expect(editStageDialog).toBeVisible();
+  await editStageDialog.getByLabel("Название этапа").fill(`Этап ${suffix} обновлен`);
+  await editStageDialog.getByLabel("Статус").selectOption("active");
+  await editStageDialog.getByRole("button", { name: "Сохранить этап" }).click();
+  await expect(page.getByText("Этап сделки обновлен")).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: new RegExp(`Этап ${suffix} обновлен`) })
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Сделки" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
@@ -287,13 +335,21 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     createOpportunityDialog.getByText("Добавьте хотя бы одну строку потребности.")
   ).toBeVisible();
-  await createOpportunityDialog.locator("#opportunity-clientId").selectOption({ label: `Клиент ${suffix}` });
-  await createOpportunityDialog.locator("#opportunity-primaryContactId").selectOption({ label: `Контакт ${suffix}` });
-  await createOpportunityDialog.locator("#opportunity-stageId").selectOption({ label: `Этап ${suffix}` });
+  await createOpportunityDialog
+    .locator("#opportunity-clientId")
+    .selectOption({ label: `Клиент ${suffix} обновлен` });
+  await createOpportunityDialog
+    .locator("#opportunity-primaryContactId")
+    .selectOption({ label: `Контакт ${suffix} обновлен` });
+  await createOpportunityDialog
+    .locator("#opportunity-stageId")
+    .selectOption({ label: `Этап ${suffix} обновлен` });
   await createOpportunityDialog
     .getByLabel("Название входящего проекта")
     .fill(`Контур внедрения ${suffix}`);
-  await createOpportunityDialog.locator("#opportunity-projectTypeId").selectOption({ label: `Тип проекта ${suffix}` });
+  await createOpportunityDialog
+    .locator("#opportunity-projectTypeId")
+    .selectOption({ label: `Тип проекта ${suffix} обновлен` });
   await createOpportunityDialog.getByLabel("Старт").fill(plannedStart);
   await createOpportunityDialog.getByLabel("Плановый финиш").fill(plannedFinish);
   const contractValueInput = createOpportunityDialog.getByLabel("Стоимость контракта");
@@ -325,13 +381,90 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page).toHaveURL(/\/opportunities\/.+/);
   await expect(page.getByRole("heading", { name: "Детали сделки" }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix}` })).toBeVisible();
-  await expect(page.getByText(`Клиент ${suffix} · Контакт ${suffix}`)).toBeVisible();
+  await expect(
+    page.getByText(`Клиент ${suffix} обновлен · Контакт ${suffix} обновлен`)
+  ).toBeVisible();
   await page.getByRole("button", { name: "К списку сделок" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
+
+  await page.getByRole("button", { name: "Клиенты" }).click();
+  const postDealClientRow = page.getByRole("row", {
+    name: new RegExp(`Клиент ${suffix} обновлен`)
+  });
+  await postDealClientRow.getByRole("button", { name: "Редактировать" }).click();
+  const postDealClientDialog = page.getByRole("dialog", { name: "Редактировать клиента" });
+  await expect(postDealClientDialog).toBeVisible();
+  await postDealClientDialog.getByLabel("Название клиента").fill(`Клиент ${suffix} финал`);
+  await postDealClientDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+  await expect(page.getByText("Клиент обновлен")).toBeVisible();
+
+  await page.getByRole("button", { name: "Контакты" }).click();
+  const postDealContactRow = page.getByRole("row", {
+    name: new RegExp(`Контакт ${suffix} обновлен`)
+  });
+  await postDealContactRow.getByRole("button", { name: "Редактировать" }).click();
+  const postDealContactDialog = page.getByRole("dialog", { name: "Редактировать контакт" });
+  await expect(postDealContactDialog).toBeVisible();
+  await postDealContactDialog.getByLabel("Имя контакта").fill(`Контакт ${suffix} финал`);
+  await postDealContactDialog.getByRole("button", { name: "Сохранить контакт" }).click();
+  await expect(page.getByText("Контакт обновлен")).toBeVisible();
+
+  await page.getByRole("button", { name: "Типы проектов" }).click();
+  const postDealProjectTypeRow = page.getByRole("row", {
+    name: new RegExp(`Тип проекта ${suffix} обновлен`)
+  });
+  await postDealProjectTypeRow.getByRole("button", { name: "Редактировать" }).click();
+  const postDealProjectTypeDialog = page.getByRole("dialog", {
+    name: "Редактировать тип проекта"
+  });
+  await expect(postDealProjectTypeDialog).toBeVisible();
+  await postDealProjectTypeDialog
+    .getByLabel("Название типа")
+    .fill(`Тип проекта ${suffix} финал`);
+  await postDealProjectTypeDialog.getByRole("button", { name: "Сохранить тип проекта" }).click();
+  await expect(page.getByText("Тип проекта обновлен")).toBeVisible();
+
+  await page.getByRole("button", { name: "Этапы сделок" }).click();
+  const postDealStageRow = page.getByRole("row", {
+    name: new RegExp(`Этап ${suffix} обновлен`)
+  });
+  await postDealStageRow.getByRole("button", { name: "Редактировать" }).click();
+  const postDealStageDialog = page.getByRole("dialog", { name: "Редактировать этап сделки" });
+  await expect(postDealStageDialog).toBeVisible();
+  await postDealStageDialog.getByLabel("Название этапа").fill(`Этап ${suffix} архив`);
+  await postDealStageDialog.getByLabel("Статус").selectOption("archived");
+  await postDealStageDialog.getByRole("button", { name: "Сохранить этап" }).click();
+  await expect(page.getByText("Этап сделки обновлен")).toBeVisible();
+
+  await page.getByRole("button", { name: "Сделки" }).click();
+  await expect(page).toHaveURL(/\/opportunities$/);
+  await expect(
+    page.getByRole("row", {
+      name: new RegExp(`Контур внедрения ${suffix}.*Клиент ${suffix} финал.*Контакт ${suffix} финал`)
+    })
+  ).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(`Контур внедрения ${suffix}`) }).click();
+  await expect(page).toHaveURL(/\/opportunities\/.+/);
+  await expect(
+    page.getByText(`Клиент ${suffix} финал · Контакт ${suffix} финал`)
+  ).toBeVisible();
+  await expect(page.getByText(`Тип проекта ${suffix} финал`)).toBeVisible();
+  await expect(page.getByLabel("Этап сделки").locator("option:checked")).toHaveText(
+    `Этап ${suffix} архив · архив`
+  );
+  await page.getByRole("button", { name: "К списку сделок" }).click();
+  await expect(page).toHaveURL(/\/opportunities$/);
+
   await page.getByRole("button", { name: "Канбан" }).click();
   await expect(page.getByLabel("Канбан сделок")).toBeVisible();
+  await expect(
+    page.locator(".deal-kanban-column header strong").filter({
+      hasText: `Этап ${suffix} архив · архив`
+    })
+  ).toBeVisible();
   const dealCard = page.locator(".deal-card").filter({ hasText: `Контур внедрения ${suffix}` });
   await expect(dealCard).toBeVisible();
+  await expect(dealCard.getByText(`Клиент ${suffix} финал`)).toBeVisible();
   await dealCard.getByLabel("Этап сделки").selectOption({ label: "Квалификация" });
   await expect(page.getByText("Этап сделки обновлен")).toBeVisible();
   await page.getByRole("button", { name: "Список" }).click();
@@ -363,9 +496,13 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Шаблон проекта создан").first()).toBeVisible();
   await expect(page.getByText("Шаблон проекта обновлен").first()).toBeVisible();
   await expect(page.getByText("Клиент создан").first()).toBeVisible();
+  await expect(page.getByText("Клиент обновлен").first()).toBeVisible();
   await expect(page.getByText("Контакт создан").first()).toBeVisible();
+  await expect(page.getByText("Контакт обновлен").first()).toBeVisible();
   await expect(page.getByText("Тип проекта создан").first()).toBeVisible();
+  await expect(page.getByText("Тип проекта обновлен").first()).toBeVisible();
   await expect(page.getByText("Этап сделки создан").first()).toBeVisible();
+  await expect(page.getByText("Этап сделки обновлен").first()).toBeVisible();
   await expect(page.getByText("Сделка создана").first()).toBeVisible();
   await expect(page.getByText("Этап сделки изменен").first()).toBeVisible();
   await expect(page.getByText("Ресурсная проверка сделки выполнена").first()).toBeVisible();
@@ -557,6 +694,60 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
           tenantLabel: "Недоступный шаблон",
           description: "",
           status: "draft"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/clients/client-romashka", {
+        data: {
+          name: "Недоступный клиент",
+          status: "archived"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/contacts/contact-irina", {
+        data: {
+          clientId: "client-romashka",
+          name: "Недоступный контакт",
+          status: "archived"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/project-types/project-type-implementation", {
+        data: {
+          name: "Недоступный тип",
+          status: "archived"
+        },
+        headers: {
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    ).status()
+  ).toBe(403);
+  expect(
+    (
+      await page.request.patch("/api/workspace/deal-stages/deal-stage-new", {
+        data: {
+          name: "Недоступный этап",
+          sortOrder: 10,
+          status: "archived"
         },
         headers: {
           "x-kiss-pm-action": "same-origin"
