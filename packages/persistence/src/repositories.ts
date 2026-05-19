@@ -79,10 +79,7 @@ export type CustomFieldDefinitionRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type CustomFieldDefinitionInput = Omit<
-  CustomFieldDefinitionRecord,
-  "createdAt" | "updatedAt"
->;
+export type CustomFieldDefinitionInput = Omit<CustomFieldDefinitionRecord, "createdAt" | "updatedAt">;
 export type ProjectTemplateRecord = {
   id: string;
   tenantId: TenantId;
@@ -93,20 +90,8 @@ export type ProjectTemplateRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type ProjectTemplateInput = Omit<
-  ProjectTemplateRecord,
-  "createdAt" | "updatedAt"
->;
-export type {
-  ClientInput,
-  ClientRecord,
-  ContactInput,
-  ContactRecord,
-  DealStageInput,
-  DealStageRecord,
-  ProjectTypeInput,
-  ProjectTypeRecord
-};
+export type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
+export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProjectTypeInput, ProjectTypeRecord };
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;

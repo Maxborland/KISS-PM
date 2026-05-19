@@ -80,29 +80,29 @@
 
 ## Block 3. API/application service
 
-- [ ] Add parsers for:
+- [x] Add parsers for:
   - create comment body `{ body }`;
   - create task body `{ title, body?, dueDate?, assigneeUserId? }`;
   - patch task body `{ status }`.
-- [ ] Register `opportunityActivityRoutes`.
-- [ ] Implement:
+- [x] Register `opportunityActivityRoutes`.
+- [x] Implement:
   - `GET /api/workspace/opportunities/:opportunityId/activity`;
   - `POST /api/workspace/opportunities/:opportunityId/comments`;
   - `POST /api/workspace/opportunities/:opportunityId/tasks`;
   - `PATCH /api/workspace/opportunities/:opportunityId/tasks/:activityId`.
-- [ ] Permission rules:
+- [x] Permission rules:
   - read requires `tenant.opportunities.read`;
   - redacted system events in feed require `tenant.opportunities.read`;
   - raw audit tab payload requires `tenant.audit_events.read`;
   - mutations require `tenant.opportunities.manage`;
   - missing opportunity returns `404`;
   - restricted direct mutation returns `403`.
-- [ ] Audit:
+- [x] Audit:
   - `opportunity.comment.created`;
   - `opportunity.task.created`;
   - `opportunity.task.completed`;
   - source entity is `{ type: "Opportunity", id: opportunityId }`.
-- [ ] API/DB tests:
+- [x] API/DB tests:
   - create/list comment;
   - create/list/complete task;
   - activity feed includes same-opportunity redacted audit event;
@@ -110,10 +110,16 @@
   - raw audit tab payload is hidden without `tenant.audit_events.read`;
   - restricted user gets `403`;
   - cross-tenant ID cannot leak activity.
-- [ ] Run:
+- [x] Run:
   - `pnpm --filter @kiss-pm/api test`
   - `pnpm test:db`
 - [ ] Commit: `feat: expose opportunity activity api`.
+
+Review notes:
+
+- Code review found strict date parsing gap for task `dueDate`; fixed with `YYYY-MM-DD` round-trip parser and parser tests.
+- Security review found denied events polluted ordinary activity feed; fixed by showing denied events only in raw audit for audit readers.
+- Security review found no-op/concurrent task completion audit risk; fixed by repository-level compare-and-swap transition and API audit only for actual status changes.
 
 ## Block 4. Kanban DnD hardening
 

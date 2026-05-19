@@ -1,6 +1,13 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
-import type { TaskInput, TaskRecord } from "@kiss-pm/persistence";
+import type {
+  OpportunityActivityInput,
+  OpportunityActivityRecord,
+  OpportunityActivityTransitionResult,
+  OpportunityActivityUpdateInput,
+  TaskInput,
+  TaskRecord
+} from "@kiss-pm/persistence";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -336,6 +343,19 @@ export type ApiTenantDataSource = {
     opportunityId: string;
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
+  listOpportunityActivities?(
+    tenantId: TenantId,
+    opportunityId: string
+  ): Promise<OpportunityActivityRecord[]>;
+  createOpportunityActivity?(
+    input: OpportunityActivityInput
+  ): Promise<OpportunityActivityRecord>;
+  updateOpportunityActivity?(
+    input: OpportunityActivityUpdateInput
+  ): Promise<OpportunityActivityRecord | undefined>;
+  transitionOpportunityActivityStatus?(
+    input: OpportunityActivityUpdateInput
+  ): Promise<OpportunityActivityTransitionResult>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
