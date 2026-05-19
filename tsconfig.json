@@ -1,17 +1,11 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node", "bun", "vitest/globals", "@testing-library/jest-dom"]
-  },
-  "include": [
-    "apps/**/*.ts",
-    "apps/**/*.tsx",
-    "packages/**/*.ts",
-    "scripts/**/*.ts",
-    "e2e/**/*.ts",
-    "*.config.ts",
-    "vitest.setup.ts"
+  "files": [],
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/access-control" },
+    { "path": "./packages/persistence" },
+    { "path": "./packages/test-fixtures" },
+    { "path": "./apps/api" },
+    { "path": "./apps/web" }
   ]
 }
