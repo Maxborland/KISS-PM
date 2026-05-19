@@ -149,39 +149,47 @@ Review notes:
 - Security Review found no Critical/Important findings; minor archived-column copy issue fixed from `Только просмотр` to `Нельзя переносить сюда`.
 - Browser smoke on `http://127.0.0.1:3001/opportunities` verified login, Kanban rendering, select fallback move to `Квалификация`, and persisted state after reload.
 - Targeted E2E `e2e/smoke/deals-kanban.spec.ts` verifies real API-created deal movement through Kanban select fallback and persistence after reload.
-- [ ] Commit: `fix: harden deals kanban stage movement`.
+- [x] Commit: `fix: harden deals kanban stage movement` (`eba2035`).
 
 ## Block 5. Deal activity UI
 
-- [ ] Add API client methods:
+- [x] Add API client methods:
   - `fetchOpportunityActivity`;
   - `createOpportunityComment`;
   - `createOpportunityTask`;
-  - `completeOpportunityTask`.
-- [ ] Add TanStack Query hooks and invalidation scoped to:
-  - `["opportunityActivity", opportunityId]`;
+  - `updateOpportunityTask`.
+- [x] Add TanStack Query hooks and invalidation scoped to:
+  - `["workspace", "opportunities", opportunityId, "activity"]`;
   - `["auditEvents"]` only where needed after mutation.
-- [ ] Add `OpportunityActivityPanel`:
+- [x] Add `OpportunityActivityPanel`:
   - tabs/segmented control: `Лента`, `Чат`, `Задачи`, `Аудит`;
   - loading/error/empty states per tab;
   - compact comment form;
   - compact task form;
   - task completion action;
   - filtered audit rows.
-- [ ] Refactor `OpportunityDetailView.tsx` into a two-column workspace:
+- [x] Refactor `OpportunityDetailView.tsx` into a two-column workspace:
   - left facts/actions;
   - right activity panel;
   - responsive narrow viewport stacks panel after facts.
-- [ ] UI tests/smoke:
+- [x] UI tests/smoke:
   - create comment and see it in feed/chat;
   - create task and see it in feed/tasks;
   - complete task and see status update;
   - audit tab shows stage/action event.
-- [ ] Run:
+- [x] Run:
   - `pnpm --filter @kiss-pm/web typecheck`
   - `pnpm --filter @kiss-pm/web build`
   - `pnpm test`
-- [ ] Commit: `feat: add deal activity workspace`.
+
+Review notes:
+
+- TDD RED confirmed missing web API/query surface for opportunity activity; GREEN added API client methods, stable query key, mutation hooks and activity feed helper tests.
+- Code Review found three Important issues: stale activity feed after existing deal actions, oversized activity panel and hardcoded light backgrounds. Fixed by invalidating opportunity activity after deal actions, splitting panel into focused feed/forms/audit modules and using `var(--panel)` / `var(--panel-subtle)` in the new activity UI.
+- Bug Hunt found no Critical/Important findings after implementation and after fixes.
+- Security Review found no Critical/Important findings; backend permission/audit boundaries remain enforced by existing activity routes.
+- Targeted E2E `e2e/smoke/deal-activity.spec.ts` verifies resource check event appears immediately in the deal panel, comment/task create and task completion, audit rows and persistence after reload.
+- [x] Commit: `feat: add deal activity workspace`.
 
 ## Block 6. End-to-end acceptance and UX polish
 

@@ -311,6 +311,55 @@ export type OpportunityFinalActionInput = {
   reason: string;
 };
 
+export type OpportunityActivityType = "comment" | "task";
+export type OpportunityActivityStatus = "todo" | "done";
+
+export type OpportunityActivity = {
+  id: string;
+  tenantId: string;
+  opportunityId: string;
+  type: OpportunityActivityType;
+  title: string | null;
+  body: string | null;
+  status: OpportunityActivityStatus | null;
+  dueDate: string | null;
+  assigneeUserId: string | null;
+  authorUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OpportunitySystemEvent = {
+  id: string;
+  actorUserId: string;
+  actionType: string;
+  sourceWorkflow: string | null;
+  createdAt: string;
+  executionStatus: unknown;
+};
+
+export type OpportunityActivityFeed = {
+  activities: OpportunityActivity[];
+  systemEvents: OpportunitySystemEvent[];
+  canReadRawAudit: boolean;
+  auditEvents: AuditEvent[] | null;
+};
+
+export type OpportunityCommentInput = {
+  body: string;
+};
+
+export type OpportunityTaskInput = {
+  title: string;
+  body?: string | null;
+  dueDate?: string | null;
+  assigneeUserId?: string | null;
+};
+
+export type OpportunityTaskUpdateInput = {
+  status: OpportunityActivityStatus;
+};
+
 export async function fetchApiHealth(): Promise<ApiHealth> {
   return requestJson("/health");
 }
@@ -688,6 +737,54 @@ export async function activateOpportunityProject(
     `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/activate`,
     {
       method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function fetchOpportunityActivity(
+  opportunityId: string
+): Promise<OpportunityActivityFeed> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/activity`
+  );
+}
+
+export async function createOpportunityComment(
+  opportunityId: string,
+  input: OpportunityCommentInput
+): Promise<{ activity: OpportunityActivity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/comments`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function createOpportunityTask(
+  opportunityId: string,
+  input: OpportunityTaskInput
+): Promise<{ activity: OpportunityActivity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/tasks`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function updateOpportunityTask(
+  opportunityId: string,
+  activityId: string,
+  input: OpportunityTaskUpdateInput
+): Promise<{ activity: OpportunityActivity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/tasks/${encodePathSegment(activityId)}`,
+    {
+      method: "PATCH",
       body: input
     }
   );
