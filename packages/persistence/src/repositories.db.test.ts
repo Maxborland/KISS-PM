@@ -22,11 +22,11 @@ describe("PostgreSQL tenant data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -226,14 +226,50 @@ describe("PostgreSQL tenant data source", () => {
         ('position-engineer', 'tenant-alpha', 'Инженер', now()),
         ('position-analyst', 'tenant-alpha', 'Аналитик', now())
     `;
+    const clientRecord = await dataSource.createClient({
+      id: "client-romashka",
+      tenantId: "tenant-alpha",
+      name: "ООО Ромашка",
+      description: null,
+      status: "active"
+    });
+    const contact = await dataSource.createContact({
+      id: "contact-irina",
+      tenantId: "tenant-alpha",
+      clientId: clientRecord.id,
+      name: "Ирина Клиент",
+      email: null,
+      phone: null,
+      telegram: null,
+      role: null,
+      status: "active"
+    });
+    const projectType = await dataSource.createProjectType({
+      id: "project-type-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение",
+      description: null,
+      status: "active"
+    });
+    const stage = await dataSource.createDealStage({
+      id: "deal-stage-new",
+      tenantId: "tenant-alpha",
+      name: "Новая",
+      sortOrder: 10,
+      status: "active"
+    });
 
     const opportunity = await dataSource.createOpportunity({
       id: "opportunity-alpha",
       tenantId: "tenant-alpha",
-      clientName: "ООО Ромашка",
-      contactName: "Ирина Клиент",
+      clientId: clientRecord.id,
+      primaryContactId: contact.id,
+      projectTypeId: projectType.id,
+      stageId: stage.id,
+      clientName: clientRecord.name,
+      contactName: contact.name,
       title: "Внедрение KISS PM",
-      projectType: "implementation",
+      projectType: projectType.name,
       description: "Первичный проект внедрения",
       plannedStart: new Date("2026-06-01T00:00:00.000Z"),
       plannedFinish: new Date("2026-06-12T00:00:00.000Z"),
@@ -262,6 +298,8 @@ describe("PostgreSQL tenant data source", () => {
       id: "project-alpha",
       tenantId: "tenant-alpha",
       sourceOpportunityId: "opportunity-alpha",
+      clientId: assessed.clientId,
+      projectTypeId: assessed.projectTypeId,
       title: assessed.title,
       clientName: assessed.clientName,
       status: "active",
@@ -298,6 +336,8 @@ describe("PostgreSQL tenant data source", () => {
         id: "project-alpha-copy",
         tenantId: "tenant-alpha",
         sourceOpportunityId: "opportunity-alpha",
+        clientId: assessed.clientId,
+        projectTypeId: assessed.projectTypeId,
         title: assessed.title,
         clientName: assessed.clientName,
         status: "active",

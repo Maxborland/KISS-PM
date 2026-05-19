@@ -35,6 +35,14 @@ const phase3ProjectSourceUniqueMigration = readFileSync(
   ),
   "utf8"
 );
+const phase31CrmFoundationMigration = readFileSync(
+  new URL("../migrations/0007_phase_3_1_crm_foundation.sql", import.meta.url),
+  "utf8"
+);
+const phase31ContactClientFkMigration = readFileSync(
+  new URL("../migrations/0008_phase_3_1_contact_client_fk.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -122,6 +130,39 @@ describe("Phase 3 SQL migration", () => {
     );
     expect(phase3ProjectSourceUniqueMigration).toContain(
       'ON "projects" USING btree ("tenant_id","source_opportunity_id")'
+    );
+  });
+});
+
+describe("Phase 3.1 SQL migration", () => {
+  it("adds tenant-scoped CRM foundation tables and links opportunities", () => {
+    expect(phase31CrmFoundationMigration).toContain('CREATE TABLE "clients"');
+    expect(phase31CrmFoundationMigration).toContain('CREATE TABLE "contacts"');
+    expect(phase31CrmFoundationMigration).toContain('CREATE TABLE "project_types"');
+    expect(phase31CrmFoundationMigration).toContain('CREATE TABLE "deal_stages"');
+    expect(phase31CrmFoundationMigration).toContain(
+      'ALTER TABLE "opportunities" ADD COLUMN "client_id" text'
+    );
+    expect(phase31CrmFoundationMigration).toContain(
+      'ALTER TABLE "opportunities" ADD COLUMN "primary_contact_id" text'
+    );
+    expect(phase31CrmFoundationMigration).toContain(
+      'ALTER TABLE "opportunities" ADD COLUMN "project_type_id" text'
+    );
+    expect(phase31CrmFoundationMigration).toContain(
+      'ALTER TABLE "opportunities" ADD COLUMN "stage_id" text'
+    );
+  });
+
+  it("keeps primary contact constrained to the selected deal client", () => {
+    expect(phase31ContactClientFkMigration).toContain(
+      'CONSTRAINT "opportunities_primary_contact_client_fk"'
+    );
+    expect(phase31ContactClientFkMigration).toContain(
+      'FOREIGN KEY ("tenant_id","client_id","primary_contact_id")'
+    );
+    expect(phase31ContactClientFkMigration).toContain(
+      'REFERENCES "public"."contacts"("tenant_id","client_id","id")'
     );
   });
 });

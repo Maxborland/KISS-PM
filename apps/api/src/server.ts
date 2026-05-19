@@ -15,9 +15,12 @@ const postgresClient = databaseUrl
 const dataSource = postgresClient
   ? createPostgresTenantDataSource(createDatabase(postgresClient))
   : undefined;
+const enableDevTenantRoutes = process.env.KISS_PM_ENABLE_DEV_ROUTES === "true";
 
 serve({
-  fetch: (dataSource ? createApp({ dataSource }) : createApp()).fetch,
+  fetch: (dataSource
+    ? createApp({ dataSource, enableDevTenantRoutes })
+    : createApp({ enableDevTenantRoutes })).fetch,
   hostname,
   port
 });

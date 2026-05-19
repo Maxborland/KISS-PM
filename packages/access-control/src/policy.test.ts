@@ -2,16 +2,24 @@ import { describe, expect, it } from "vitest";
 import { createTenantUser } from "@kiss-pm/domain";
 import {
   canManageAccessProfiles,
+  canManageClients,
+  canManageContacts,
+  canManageDealStages,
   canManageOpportunities,
   canManagePositions,
   canManageProjectActivation,
+  canManageProjectTypes,
   canManageProjects,
   canManageTenantUsers,
   canManageWorkspaceConfig,
   canManageWorkspaceTheme,
   canReadAuditEvents,
+  canReadClients,
+  canReadContacts,
+  canReadDealStages,
   canReadOpportunities,
   canReadProjects,
+  canReadProjectTypes,
   canReadResourceFeasibility,
   canReadTenantUsers,
   canReadWorkspaceConfig,
@@ -32,6 +40,14 @@ describe("access-control tenant policy", () => {
       "tenant.audit_events.read",
       "tenant.workspace_config.read",
       "tenant.workspace_config.manage",
+      "tenant.clients.read",
+      "tenant.clients.manage",
+      "tenant.contacts.read",
+      "tenant.contacts.manage",
+      "tenant.project_types.read",
+      "tenant.project_types.manage",
+      "tenant.deal_stages.read",
+      "tenant.deal_stages.manage",
       "tenant.opportunities.read",
       "tenant.opportunities.manage",
       "tenant.projects.read",
@@ -324,6 +340,81 @@ describe("access-control tenant policy", () => {
         profile: adminProfile,
         targetTenantId: "tenant-beta"
       })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 3.1 CRM foundation actions only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const crmReader = createAccessProfile({
+      id: "crm-reader",
+      permissions: [
+        "tenant.clients.read",
+        "tenant.contacts.read",
+        "tenant.project_types.read",
+        "tenant.deal_stages.read"
+      ]
+    });
+
+    expect(
+      canReadClients({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
+      canReadContacts({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
+      canReadProjectTypes({
+        actor,
+        profile: crmReader,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadDealStages({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
+      canManageClients({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageClients({ actor, profile: adminProfile, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
+      canManageContacts({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageProjectTypes({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageDealStages({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadClients({ actor, profile: adminProfile, targetTenantId: "tenant-beta" })
     ).toEqual({
       allowed: false,
       reason: "cross_tenant_denied"

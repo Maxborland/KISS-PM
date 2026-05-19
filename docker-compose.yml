@@ -54,6 +54,7 @@ services:
     environment:
       DATABASE_URL: postgres://${KISS_PM_POSTGRES_USER:-kiss_pm}:${KISS_PM_POSTGRES_PASSWORD:-change_me_local_dev_only}@postgres:5432/${KISS_PM_POSTGRES_DB:-kiss_pm}
       HOST: 0.0.0.0
+      KISS_PM_ENABLE_DEV_ROUTES: "true"
       PORT: 4000
     ports:
       - "${KISS_PM_API_PORT:-4000}:4000"

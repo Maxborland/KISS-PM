@@ -41,6 +41,60 @@ export type PositionRecord = {
   description: string | null;
 };
 
+export type CrmEntityStatus = "active" | "archived";
+
+export type ClientRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ClientInput = Omit<ClientRecord, "createdAt" | "updatedAt">;
+
+export type ContactRecord = {
+  id: string;
+  tenantId: TenantId;
+  clientId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  telegram: string | null;
+  role: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ContactInput = Omit<ContactRecord, "createdAt" | "updatedAt">;
+
+export type ProjectTypeRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProjectTypeInput = Omit<ProjectTypeRecord, "createdAt" | "updatedAt">;
+
+export type DealStageRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  sortOrder: number;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DealStageInput = Omit<DealStageRecord, "createdAt" | "updatedAt">;
+
 export type CustomFieldDefinitionRecord = {
   id: string;
   tenantId: TenantId;
@@ -83,6 +137,10 @@ export type PositionDemandRecord = {
 export type OpportunityRecord = {
   id: string;
   tenantId: TenantId;
+  clientId: string | null;
+  primaryContactId: string | null;
+  projectTypeId: string | null;
+  stageId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -113,6 +171,8 @@ export type ProjectRecord = {
   id: string;
   tenantId: TenantId;
   sourceOpportunityId: string;
+  clientId: string | null;
+  projectTypeId: string | null;
   title: string;
   clientName: string;
   status: string;
@@ -191,6 +251,31 @@ export type ApiTenantDataSource = {
   createPosition?(input: PositionRecord): Promise<PositionRecord>;
   updatePosition?(input: PositionRecord): Promise<PositionRecord>;
   deletePosition?(tenantId: TenantId, positionId: string): Promise<void>;
+  listClients?(tenantId: TenantId): Promise<ClientRecord[]>;
+  findClientById?(tenantId: TenantId, clientId: string): Promise<ClientRecord | undefined>;
+  createClient?(input: ClientInput): Promise<ClientRecord>;
+  updateClient?(input: ClientInput): Promise<ClientRecord>;
+  listContacts?(tenantId: TenantId): Promise<ContactRecord[]>;
+  findContactById?(
+    tenantId: TenantId,
+    contactId: string
+  ): Promise<ContactRecord | undefined>;
+  createContact?(input: ContactInput): Promise<ContactRecord>;
+  updateContact?(input: ContactInput): Promise<ContactRecord>;
+  listProjectTypes?(tenantId: TenantId): Promise<ProjectTypeRecord[]>;
+  findProjectTypeById?(
+    tenantId: TenantId,
+    projectTypeId: string
+  ): Promise<ProjectTypeRecord | undefined>;
+  createProjectType?(input: ProjectTypeInput): Promise<ProjectTypeRecord>;
+  updateProjectType?(input: ProjectTypeInput): Promise<ProjectTypeRecord>;
+  listDealStages?(tenantId: TenantId): Promise<DealStageRecord[]>;
+  findDealStageById?(
+    tenantId: TenantId,
+    stageId: string
+  ): Promise<DealStageRecord | undefined>;
+  createDealStage?(input: DealStageInput): Promise<DealStageRecord>;
+  updateDealStage?(input: DealStageInput): Promise<DealStageRecord>;
   listCustomFieldDefinitions?(
     tenantId: TenantId
   ): Promise<CustomFieldDefinitionRecord[]>;
@@ -219,6 +304,11 @@ export type ApiTenantDataSource = {
     status: string;
     feasibilityStatus: string;
     feasibilityResult: Record<string, unknown>;
+  }): Promise<OpportunityRecord>;
+  updateOpportunityStage?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
   }): Promise<OpportunityRecord>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   activateProjectFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
@@ -265,4 +355,5 @@ export type ApiTenantDataSource = {
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   secureCookies?: boolean;
+  enableDevTenantRoutes?: boolean;
 };

@@ -28,6 +28,10 @@ export type PositionDemandRecord = {
 export type OpportunityRecord = {
   id: string;
   tenantId: TenantId;
+  clientId: string | null;
+  primaryContactId: string | null;
+  projectTypeId: string | null;
+  stageId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -66,6 +70,8 @@ export type ProjectRecord = {
   id: string;
   tenantId: TenantId;
   sourceOpportunityId: string;
+  clientId: string | null;
+  projectTypeId: string | null;
   title: string;
   clientName: string;
   status: ProjectStatus;
@@ -91,6 +97,11 @@ export type ProjectIntakeRepository = {
   updateOpportunityFeasibility(
     input: OpportunityFeasibilityUpdate
   ): Promise<OpportunityRecord>;
+  updateOpportunityStage(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
+  }): Promise<OpportunityRecord>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
   activateProjectFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
 };
@@ -187,6 +198,10 @@ export function createProjectIntakeRepository(
           .values({
             id: input.id,
             tenantId: input.tenantId,
+            clientId: input.clientId,
+            primaryContactId: input.primaryContactId,
+            projectTypeId: input.projectTypeId,
+            stageId: input.stageId,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -246,6 +261,28 @@ export function createProjectIntakeRepository(
 
       return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
     },
+    async updateOpportunityStage(input) {
+      const [row] = await db
+        .update(opportunities)
+        .set({
+          stageId: input.stageId,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunities.tenantId, input.tenantId),
+            eq(opportunities.id, input.opportunityId)
+          )
+        )
+        .returning();
+
+      if (!row) throw new Error("Opportunity stage update returned no row");
+      const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
+        input.opportunityId
+      ]);
+
+      return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
     async listProjects(tenantId) {
       const rows = await db
         .select()
@@ -290,6 +327,8 @@ export function createProjectIntakeRepository(
             id: input.id,
             tenantId: input.tenantId,
             sourceOpportunityId: input.sourceOpportunityId,
+            clientId: input.clientId,
+            projectTypeId: input.projectTypeId,
             title: input.title,
             clientName: input.clientName,
             status: input.status,
@@ -329,6 +368,10 @@ function mapOpportunityRecord(
   return {
     id: row.id,
     tenantId: row.tenantId,
+    clientId: row.clientId,
+    primaryContactId: row.primaryContactId,
+    projectTypeId: row.projectTypeId,
+    stageId: row.stageId,
     clientName: row.clientName,
     contactName: row.contactName,
     title: row.title,
@@ -359,6 +402,8 @@ function mapProjectRecord(
     id: row.id,
     tenantId: row.tenantId,
     sourceOpportunityId: row.sourceOpportunityId,
+    clientId: row.clientId,
+    projectTypeId: row.projectTypeId,
     title: row.title,
     clientName: row.clientName,
     status: row.status as ProjectStatus,
