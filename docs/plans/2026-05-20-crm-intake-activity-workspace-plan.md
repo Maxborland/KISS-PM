@@ -76,7 +76,7 @@
 - [x] Run:
   - `pnpm --filter @kiss-pm/persistence test`
   - `pnpm test:db`
-- [ ] Commit: `feat: add opportunity activity persistence`.
+- [x] Commit: `feat: add opportunity activity persistence` (`2a6269a`).
 
 ## Block 3. API/application service
 
@@ -113,7 +113,7 @@
 - [x] Run:
   - `pnpm --filter @kiss-pm/api test`
   - `pnpm test:db`
-- [ ] Commit: `feat: expose opportunity activity api`.
+- [x] Commit: `feat: expose opportunity activity api` (`48c0b6a`).
 
 Review notes:
 
@@ -123,22 +123,32 @@ Review notes:
 
 ## Block 4. Kanban DnD hardening
 
-- [ ] Extract kanban from `OpportunitiesView.tsx` into `DealsKanban.tsx`.
-- [ ] Replace brittle native HTML5 DnD with a robust implementation.
+- [x] Extract kanban from `OpportunitiesView.tsx` into `DealsKanban.tsx`.
+- [x] Replace brittle native HTML5 DnD with a robust implementation.
   - Preferred: `@dnd-kit/core` with pointer + keyboard sensors.
   - If dependency install is blocked, implement explicit stage action fallback first and keep native DnD behind a visible tested affordance.
-- [ ] Keep stage select fallback for accessibility.
-- [ ] Add UI states:
+- [x] Keep stage select fallback for accessibility.
+- [x] Add UI states:
   - dragging card;
   - active drop column;
   - pending stage update;
   - disabled reason for final/restricted deals.
-- [ ] Tests:
+- [x] Tests:
   - component/helper test for allowed target stages;
   - E2E drag or explicit move stage flow persists after reload.
-- [ ] Run:
+- [x] Run:
   - `pnpm --filter @kiss-pm/web typecheck`
   - `pnpm test`
+- [x] Commit: `fix: harden deals kanban stage movement`.
+
+Review notes:
+
+- TDD RED confirmed missing stage-move helpers in `apps/web/src/opportunityDisplay.test.ts`; GREEN added `canMoveOpportunityToStage` and disabled reason coverage.
+- Bug Hunt found no Critical/Important findings after implementation.
+- Code Review found two Important issues: whole-card fake drag cursor and disabled reason priority. Both fixed by moving drag affordance to the handle only and checking permission/pending reasons before target-stage availability.
+- Security Review found no Critical/Important findings; minor archived-column copy issue fixed from `Только просмотр` to `Нельзя переносить сюда`.
+- Browser smoke on `http://127.0.0.1:3001/opportunities` verified login, Kanban rendering, select fallback move to `Квалификация`, and persisted state after reload.
+- Targeted E2E `e2e/smoke/deals-kanban.spec.ts` verifies real API-created deal movement through Kanban select fallback and persistence after reload.
 - [ ] Commit: `fix: harden deals kanban stage movement`.
 
 ## Block 5. Deal activity UI

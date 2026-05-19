@@ -13,13 +13,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
 import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
+import { DealsKanban } from "./DealsKanban";
 import {
   buildKanbanStages,
   formatOpportunityEconomics,
-  getOpportunityClientLabel,
   getOpportunityRelationshipLabel,
-  getOpportunityStageLabel,
-  getOpportunityStageOptions
+  getOpportunityStageLabel
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
 import { useProjectIntakeMutations } from "./workspaceQueries";
@@ -518,133 +517,6 @@ function DealsTable(props: {
           )}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function DealsKanban(props: {
-  canManageOpportunities: boolean;
-  data: WorkspaceData;
-  isPending: boolean;
-  opportunities: Opportunity[];
-  stages: DealStage[];
-  onOpenOpportunity: (opportunityId: string) => void;
-  onUpdateStage: (opportunity: Opportunity, stageId: string) => void;
-}) {
-  const [draggingOpportunityId, setDraggingOpportunityId] = useState<string | null>(null);
-  if (props.stages.length === 0) {
-    return <p className="empty-state">Создайте хотя бы один этап сделки для канбана.</p>;
-  }
-
-  return (
-    <div className="deal-kanban" aria-label="Канбан сделок">
-      {props.stages.map((stage) => {
-        const columnDeals = props.opportunities.filter(
-          (opportunity) => opportunity.stageId === stage.id
-        );
-
-        return (
-          <section
-            aria-label={`Этап ${stage.name}`}
-            className={`deal-kanban-column${draggingOpportunityId ? " is-drop-ready" : ""}`}
-            key={stage.id}
-            onDragOver={(event) => {
-              if (!props.canManageOpportunities || props.isPending) return;
-              event.preventDefault();
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const opportunityId =
-                event.dataTransfer.getData("application/x-kiss-pm-opportunity") ||
-                draggingOpportunityId;
-              const opportunity = props.opportunities.find((item) => item.id === opportunityId);
-              setDraggingOpportunityId(null);
-              if (!opportunity || opportunity.stageId === stage.id) return;
-              if (isFinalOpportunity(opportunity) || !props.canManageOpportunities) return;
-              props.onUpdateStage(opportunity, stage.id);
-            }}
-          >
-            <header>
-              <strong>{stage.status === "archived" ? `${stage.name} · архив` : stage.name}</strong>
-              <span>{columnDeals.length}</span>
-            </header>
-            <div className="deal-card-list" data-stage-id={stage.id}>
-              {columnDeals.length === 0 ? (
-                <p className="empty-state compact">Нет сделок на этапе</p>
-              ) : (
-                columnDeals.map((opportunity) => {
-                  const economics = formatOpportunityEconomics(opportunity);
-
-                  return (
-                    <article
-                      className={`deal-card${draggingOpportunityId === opportunity.id ? " is-dragging" : ""}`}
-                      draggable={
-                        props.canManageOpportunities &&
-                        !props.isPending &&
-                        !isFinalOpportunity(opportunity)
-                      }
-                      key={opportunity.id}
-                      onDragEnd={() => setDraggingOpportunityId(null)}
-                      onDragStart={(event) => {
-                        setDraggingOpportunityId(opportunity.id);
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData(
-                          "application/x-kiss-pm-opportunity",
-                          opportunity.id
-                        );
-                      }}
-                    >
-                      <button
-                        className="inline-link-button"
-                        type="button"
-                        onClick={() => props.onOpenOpportunity(opportunity.id)}
-                      >
-                        {opportunity.title}
-                      </button>
-                      <small>{getOpportunityClientLabel(props.data, opportunity)}</small>
-                      <span className="chip-list">
-                        <span className="permission-chip">
-                          {economics.plannedHoursLabel}
-                        </span>
-                        <span className="permission-chip">
-                          {economics.contractValueLabel}
-                        </span>
-                        <span className="permission-chip">
-                          {economics.plannedHourlyRateLabel}
-                        </span>
-                      </span>
-                      <label htmlFor={`${opportunity.id}-stage`}>
-                        <span className="sr-only">Сменить этап без перетаскивания</span>
-                        <select
-                          id={`${opportunity.id}-stage`}
-                          disabled={
-                            props.isPending ||
-                            isFinalOpportunity(opportunity) ||
-                            !props.canManageOpportunities
-                          }
-                          title={
-                            props.canManageOpportunities
-                              ? "Клавиатурная смена этапа"
-                              : "Нужно право tenant.opportunities.manage"
-                          }
-                          value={opportunity.stageId ?? ""}
-                          onChange={(event) => props.onUpdateStage(opportunity, event.target.value)}
-                        >
-                          {getOpportunityStageOptions(props.data.dealStages, opportunity).map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.status === "archived" ? `${item.name} · архив` : item.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        );
-      })}
     </div>
   );
 }

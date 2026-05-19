@@ -76,6 +76,45 @@ export function getOpportunityStageOptions(
   );
 }
 
+export type OpportunityStageMoveCheck = {
+  canManageOpportunities: boolean;
+  dealStages: DealStage[];
+  isPending: boolean;
+  opportunity: Opportunity;
+  targetStageId: string;
+};
+
+export function canMoveOpportunityToStage(input: OpportunityStageMoveCheck): boolean {
+  return getOpportunityStageMoveBlocker(input) === null;
+}
+
+export function getOpportunityStageMoveBlocker(
+  input: OpportunityStageMoveCheck
+): string | null {
+  if (!input.canManageOpportunities) {
+    return "Нужно право tenant.opportunities.manage";
+  }
+  if (input.isPending) {
+    return "Дождитесь завершения текущего действия";
+  }
+  if (isFinalOpportunity(input.opportunity)) {
+    return "Этап завершенной сделки нельзя менять";
+  }
+  if (input.targetStageId === input.opportunity.stageId) {
+    return "Сделка уже на этом этапе";
+  }
+
+  const targetStage = input.dealStages.find((stage) => stage.id === input.targetStageId);
+  if (!targetStage) {
+    return "Этап сделки не найден";
+  }
+  if (targetStage.status !== "active") {
+    return "Переносить можно только в активный этап";
+  }
+
+  return null;
+}
+
 export function getOpportunityStageLabel(
   dealStages: DealStage[],
   opportunity: Opportunity
@@ -108,6 +147,10 @@ function sortDealStages(dealStages: DealStage[]): DealStage[] {
   return [...dealStages].sort(
     (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)
   );
+}
+
+function isFinalOpportunity(opportunity: Opportunity): boolean {
+  return opportunity.status === "won_closed" || opportunity.status === "lost_rejected";
 }
 
 function formatMoney(value: number): string {
