@@ -294,7 +294,7 @@ describe("PostgreSQL tenant data source", () => {
         rows: []
       }
     });
-    const project = await dataSource.activateProjectFromOpportunity({
+    const project = await dataSource.createProjectDraftFromOpportunity({
       id: "project-alpha",
       tenantId: "tenant-alpha",
       sourceOpportunityId: "opportunity-alpha",
@@ -302,7 +302,7 @@ describe("PostgreSQL tenant data source", () => {
       projectTypeId: assessed.projectTypeId,
       title: assessed.title,
       clientName: assessed.clientName,
-      status: "active",
+      status: "draft",
       plannedStart: assessed.plannedStart,
       plannedFinish: assessed.plannedFinish,
       contractValue: assessed.contractValue,
@@ -325,14 +325,38 @@ describe("PostgreSQL tenant data source", () => {
     expect(project).toMatchObject({
       id: "project-alpha",
       tenantId: "tenant-alpha",
-      status: "active",
+      status: "draft",
+      activatedAt: null,
       demand: [
         { positionId: "position-engineer", requiredHours: 120 },
         { positionId: "position-analyst", requiredHours: 40 }
       ]
     });
     await expect(
-      dataSource.activateProjectFromOpportunity({
+      dataSource.findOpportunityById("tenant-alpha", "opportunity-alpha")
+    ).resolves.toMatchObject({ status: "ready_to_activate" });
+
+    const activatedProject = await dataSource.activateProjectDraft({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha"
+    });
+
+    expect(activatedProject).toMatchObject({
+      id: "project-alpha",
+      tenantId: "tenant-alpha",
+      status: "active",
+      demand: [
+        { positionId: "position-engineer", requiredHours: 120 },
+        { positionId: "position-analyst", requiredHours: 40 }
+      ]
+    });
+    expect(activatedProject.activatedAt).toBeInstanceOf(Date);
+    await expect(
+      dataSource.findOpportunityById("tenant-alpha", "opportunity-alpha")
+    ).resolves.toMatchObject({ status: "converted" });
+
+    await expect(
+      dataSource.createProjectDraftFromOpportunity({
         id: "project-alpha-copy",
         tenantId: "tenant-alpha",
         sourceOpportunityId: "opportunity-alpha",
@@ -340,7 +364,7 @@ describe("PostgreSQL tenant data source", () => {
         projectTypeId: assessed.projectTypeId,
         title: assessed.title,
         clientName: assessed.clientName,
-        status: "active",
+        status: "draft",
         plannedStart: assessed.plannedStart,
         plannedFinish: assessed.plannedFinish,
         contractValue: assessed.contractValue,
@@ -348,7 +372,13 @@ describe("PostgreSQL tenant data source", () => {
         templateId: assessed.templateId,
         demand: assessed.demand
       })
-    ).rejects.toThrow("source_opportunity_already_activated");
+    ).rejects.toThrow("source_opportunity_not_draftable");
+    await expect(
+      dataSource.activateProjectDraft({
+        tenantId: "tenant-alpha",
+        projectId: "project-alpha"
+      })
+    ).rejects.toThrow("project_draft_not_activatable");
     await expect(dataSource.listProjects("tenant-alpha")).resolves.toHaveLength(1);
     await expect(dataSource.listProjects("tenant-beta")).resolves.toEqual([]);
   });

@@ -182,11 +182,15 @@ export type ProjectRecord = {
   plannedHours: number;
   templateId: string | null;
   createdAt: Date;
-  activatedAt: Date;
+  activatedAt: Date | null;
   demand: PositionDemandRecord[];
 };
 
 export type ProjectInput = Omit<ProjectRecord, "createdAt" | "activatedAt">;
+export type ProjectDraftActivationInput = {
+  tenantId: TenantId;
+  projectId: string;
+};
 
 export type UserCredentialRecord = {
   userId: UserId;
@@ -311,7 +315,8 @@ export type ApiTenantDataSource = {
     stageId: string;
   }): Promise<OpportunityRecord>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
-  activateProjectFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
+  createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
+  activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;
