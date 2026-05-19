@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
@@ -35,6 +35,22 @@ export type OpportunityActivityUpdateInput = {
   status: OpportunityActivityStatus;
 };
 
+export type OpportunityActivityTransitionResult =
+  | {
+      found: false;
+    }
+  | {
+      found: true;
+      changed: false;
+      activity: OpportunityActivityRecord;
+    }
+  | {
+      found: true;
+      changed: true;
+      beforeState: OpportunityActivityRecord;
+      activity: OpportunityActivityRecord;
+    };
+
 export type OpportunityActivityRepository = {
   listOpportunityActivities(
     tenantId: TenantId,
@@ -46,6 +62,9 @@ export type OpportunityActivityRepository = {
   updateOpportunityActivity(
     input: OpportunityActivityUpdateInput
   ): Promise<OpportunityActivityRecord | undefined>;
+  transitionOpportunityActivityStatus(
+    input: OpportunityActivityUpdateInput
+  ): Promise<OpportunityActivityTransitionResult>;
 };
 
 export function createOpportunityActivityRepository(
@@ -110,6 +129,77 @@ export function createOpportunityActivityRepository(
         .returning();
 
       return row ? mapOpportunityActivityRecord(row) : undefined;
+    },
+    async transitionOpportunityActivityStatus(input) {
+      const [beforeRow] = await db
+        .select()
+        .from(opportunityActivities)
+        .where(
+          and(
+            eq(opportunityActivities.tenantId, input.tenantId),
+            eq(opportunityActivities.opportunityId, input.opportunityId),
+            eq(opportunityActivities.id, input.activityId),
+            eq(opportunityActivities.type, "task")
+          )
+        )
+        .limit(1);
+
+      if (!beforeRow) return { found: false };
+
+      const beforeState = mapOpportunityActivityRecord(beforeRow);
+      if (beforeState.status === input.status) {
+        return {
+          found: true,
+          changed: false,
+          activity: beforeState
+        };
+      }
+
+      const [updatedRow] = await db
+        .update(opportunityActivities)
+        .set({
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunityActivities.tenantId, input.tenantId),
+            eq(opportunityActivities.opportunityId, input.opportunityId),
+            eq(opportunityActivities.id, input.activityId),
+            eq(opportunityActivities.type, "task"),
+            ne(opportunityActivities.status, input.status)
+          )
+        )
+        .returning();
+
+      if (!updatedRow) {
+        const [currentRow] = await db
+          .select()
+          .from(opportunityActivities)
+          .where(
+            and(
+              eq(opportunityActivities.tenantId, input.tenantId),
+              eq(opportunityActivities.opportunityId, input.opportunityId),
+              eq(opportunityActivities.id, input.activityId),
+              eq(opportunityActivities.type, "task")
+            )
+          )
+          .limit(1);
+        if (!currentRow) return { found: false };
+
+        return {
+          found: true,
+          changed: false,
+          activity: mapOpportunityActivityRecord(currentRow)
+        };
+      }
+
+      return {
+        found: true,
+        changed: true,
+        beforeState,
+        activity: mapOpportunityActivityRecord(updatedRow)
+      };
     }
   };
 }
