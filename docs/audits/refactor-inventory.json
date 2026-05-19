@@ -68,20 +68,20 @@
       "id": "REF-003",
       "area": "web application shell",
       "files": ["apps/web/src/App.tsx"],
-      "problem": "App.tsx is still larger than the target shell budget because it owns authenticated shell orchestration and layout wiring in one 600+ line component.",
+      "problem": "App.tsx was a god file; after the completed slices it is a thin client entrypoint and shell orchestration has its own guarded module.",
       "risk": "high",
       "refactor_type": "split large component",
       "expected_behavior_change": "none",
       "tests_before": [
-        "apps/web/src/repositoryHealth.test.ts currently allows App.tsx up to 700 lines"
+        "apps/web/src/repositoryHealth.test.ts now limits App.tsx to 100 lines and WorkspaceShell.tsx to 750 lines"
       ],
       "tests_after": [
         "component or route-level characterization tests before extraction",
         "pnpm --filter @kiss-pm/web typecheck",
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
-      "status": "in_progress",
-      "notes": "REF-003 is reopened after review: helper extraction was not enough. Completed sub-slices: REF-003A shell state helpers, REF-003B route icon registry, REF-003C dashboard view extraction, REF-003D users view extraction, REF-003E roles view extraction, REF-003F positions view extraction, REF-003G audit view extraction, REF-003H account views extraction, REF-003I workspace settings view extraction. Continue with shell/page orchestration extraction until App.tsx is below 500 lines."
+      "status": "completed",
+      "notes": "Closed after review through REF-003A..REF-003J. App.tsx is below the 500-line target and stays a thin client entrypoint; WorkspaceShell.tsx has its own next split budget."
     },
     {
       "id": "REF-003C",
@@ -249,6 +249,30 @@
       ],
       "status": "completed",
       "notes": "WorkspaceSettingsView extracted without changing custom field/template mutation calls, permission gating or form markup. App.tsx line budget tightened from 1300 to 700."
+    },
+    {
+      "id": "REF-003J",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/WorkspaceShell.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "App.tsx still owned authenticated workspace shell orchestration after route views were extracted.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "WorkspaceShell extracted. App.tsx is now a 7-line client entrypoint; repository health guards App.tsx at 100 lines and WorkspaceShell.tsx at 750 lines."
     },
     {
       "id": "REF-003A",
