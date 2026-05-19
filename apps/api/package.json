@@ -1,25 +1,22 @@
 {
   "name": "@kiss-pm/api",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ../../scripts/dev-api-server.mjs",
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run src/**/*.test.ts"
+    "dev": "tsx src/server.ts",
+    "test": "vitest run --root ../.. apps/api/src",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@kiss-pm/access-control": "0.1.0",
-    "@kiss-pm/action-engine": "0.1.0",
-    "@kiss-pm/control-surfaces": "0.1.0",
-    "@kiss-pm/crm-core": "0.1.0",
-    "@kiss-pm/domain-core": "0.1.0",
-    "@kiss-pm/project-core": "0.1.0",
-    "@kiss-pm/resource-planning": "0.1.0",
-    "@kiss-pm/scheduling-engine": "0.1.0",
-    "@kiss-pm/shared-test-fixtures": "0.1.0",
-    "@kiss-pm/tenant-config": "0.1.0",
-    "hono": "^4.10.6",
-    "zod": "^4.2.1"
+    "@hono/node-server": "^1.14.2",
+    "@kiss-pm/access-control": "workspace:*",
+    "@kiss-pm/domain": "workspace:*",
+    "@kiss-pm/persistence": "workspace:*",
+    "@kiss-pm/test-fixtures": "workspace:*",
+    "hono": "^4.7.10"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4"
   }
 }

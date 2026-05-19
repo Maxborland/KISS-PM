@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${KISS_PM_POSTGRES_DB:-kiss_pm}
+      POSTGRES_USER: ${KISS_PM_POSTGRES_USER:-kiss_pm}
+      POSTGRES_PASSWORD: ${KISS_PM_POSTGRES_PASSWORD:-change_me_local_dev_only}
+    ports:
+      - "${KISS_PM_POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${KISS_PM_POSTGRES_USER:-kiss_pm} -d ${KISS_PM_POSTGRES_DB:-kiss_pm}"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      - kiss_pm_postgres_data:/var/lib/postgresql/data
+
+  dev-deps:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: >
+      sh -lc "corepack enable &&
+      corepack prepare pnpm@10.33.2 --activate &&
+      pnpm config set store-dir /pnpm/store &&
+      pnpm install --frozen-lockfile"
+    environment:
+      CI: "true"
+    volumes:
+      - .:/workspace
+      - kiss_pm_pnpm_store:/pnpm/store
+      - kiss_pm_root_node_modules:/workspace/node_modules
+      - kiss_pm_api_node_modules:/workspace/apps/api/node_modules
+      - kiss_pm_web_node_modules:/workspace/apps/web/node_modules
+      - kiss_pm_access_control_node_modules:/workspace/packages/access-control/node_modules
+      - kiss_pm_domain_node_modules:/workspace/packages/domain/node_modules
+      - kiss_pm_persistence_node_modules:/workspace/packages/persistence/node_modules
+      - kiss_pm_test_fixtures_node_modules:/workspace/packages/test-fixtures/node_modules
+    restart: "no"
+
+  api:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: >
+      sh -lc "corepack enable &&
+      corepack prepare pnpm@10.33.2 --activate &&
+      pnpm config set store-dir /pnpm/store &&
+      pnpm db:migrate &&
+      pnpm db:seed:dev &&
+      pnpm --filter @kiss-pm/api dev"
+    environment:
+      DATABASE_URL: postgres://${KISS_PM_POSTGRES_USER:-kiss_pm}:${KISS_PM_POSTGRES_PASSWORD:-change_me_local_dev_only}@postgres:5432/${KISS_PM_POSTGRES_DB:-kiss_pm}
+      HOST: 0.0.0.0
+      KISS_PM_ENABLE_DEV_ROUTES: "true"
+      PORT: 4000
+    ports:
+      - "${KISS_PM_API_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dev-deps:
+        condition: service_completed_successfully
+    volumes:
+      - .:/workspace
+      - kiss_pm_pnpm_store:/pnpm/store
+      - kiss_pm_root_node_modules:/workspace/node_modules
+      - kiss_pm_api_node_modules:/workspace/apps/api/node_modules
+      - kiss_pm_web_node_modules:/workspace/apps/web/node_modules
+      - kiss_pm_access_control_node_modules:/workspace/packages/access-control/node_modules
+      - kiss_pm_domain_node_modules:/workspace/packages/domain/node_modules
+      - kiss_pm_persistence_node_modules:/workspace/packages/persistence/node_modules
+      - kiss_pm_test_fixtures_node_modules:/workspace/packages/test-fixtures/node_modules
+
+  web:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: >
+      sh -lc "corepack enable &&
+      corepack prepare pnpm@10.33.2 --activate &&
+      pnpm config set store-dir /pnpm/store &&
+      pnpm --filter @kiss-pm/web exec next dev -H 0.0.0.0 -p 3000"
+    environment:
+      KISS_PM_API_ORIGIN: http://api:4000
+      NEXT_TELEMETRY_DISABLED: 1
+      WATCHPACK_POLLING: true
+    ports:
+      - "${KISS_PM_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_started
+      dev-deps:
+        condition: service_completed_successfully
+    volumes:
+      - .:/workspace
+      - kiss_pm_pnpm_store:/pnpm/store
+      - kiss_pm_root_node_modules:/workspace/node_modules
+      - kiss_pm_api_node_modules:/workspace/apps/api/node_modules
+      - kiss_pm_web_node_modules:/workspace/apps/web/node_modules
+      - kiss_pm_web_next:/workspace/apps/web/.next
+      - kiss_pm_access_control_node_modules:/workspace/packages/access-control/node_modules
+      - kiss_pm_domain_node_modules:/workspace/packages/domain/node_modules
+      - kiss_pm_persistence_node_modules:/workspace/packages/persistence/node_modules
+      - kiss_pm_test_fixtures_node_modules:/workspace/packages/test-fixtures/node_modules
+
+volumes:
+  kiss_pm_postgres_data:
+  kiss_pm_pnpm_store:
+  kiss_pm_root_node_modules:
+  kiss_pm_api_node_modules:
+  kiss_pm_web_node_modules:
+  kiss_pm_web_next:
+  kiss_pm_access_control_node_modules:
+  kiss_pm_domain_node_modules:
+  kiss_pm_persistence_node_modules:
+  kiss_pm_test_fixtures_node_modules:

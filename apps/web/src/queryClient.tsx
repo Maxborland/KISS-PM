@@ -1,28 +1,23 @@
-import { type ReactNode, useState } from "react";
+"use client";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
-type CreateAppQueryClientOptions = {
-  testMode?: boolean;
-};
-
-export function createAppQueryClient(options: CreateAppQueryClientOptions = {}): QueryClient {
-  const testMode = options.testMode ?? import.meta.env.MODE === "test";
-
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: testMode ? false : 2,
-        refetchOnWindowFocus: false
-      },
-      mutations: {
-        retry: false
-      }
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 15_000
+    },
+    mutations: {
+      retry: 0
     }
-  });
-}
+  }
+});
 
-export function AppQueryClientProvider({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => createAppQueryClient());
-
+export function AppQueryProvider({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
+
+export { queryClient };

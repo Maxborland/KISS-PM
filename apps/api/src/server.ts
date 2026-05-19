@@ -1,63 +1,40 @@
-import { createServer } from "node:http";
-import { Readable } from "node:stream";
+import { serve } from "@hono/node-server";
+import {
+  createDatabase,
+  createPostgresClient,
+  createPostgresTenantDataSource
+} from "@kiss-pm/persistence";
+import { createApp } from "./app";
 
-import { createApiApp } from "./app";
-import { shouldAllowPhase12TestFixtureAuth } from "./phase12Deployment";
+const port = Number.parseInt(process.env.PORT ?? "4000", 10);
+const hostname = process.env.HOST ?? "127.0.0.1";
+const databaseUrl = process.env.DATABASE_URL;
+const postgresClient = databaseUrl
+  ? createPostgresClient(databaseUrl)
+  : undefined;
+const dataSource = postgresClient
+  ? createPostgresTenantDataSource(createDatabase(postgresClient))
+  : undefined;
+const enableDevTenantRoutes = process.env.KISS_PM_ENABLE_DEV_ROUTES === "true";
 
-function readArg(name: string, fallback: string) {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? (process.argv[index + 1] ?? fallback) : fallback;
-}
-
-const hostname = readArg("--host", "127.0.0.1");
-const port = Number(readArg("--port", process.env.PORT ?? "4173"));
-const app = createApiApp({
-  allowTestFixtureReset: process.env.KISS_PM_ALLOW_TEST_FIXTURE_RESET === "true",
-  allowTestFixtureAuth: shouldAllowPhase12TestFixtureAuth(process.env)
+serve({
+  fetch: (dataSource
+    ? createApp({ dataSource, enableDevTenantRoutes })
+    : createApp({ enableDevTenantRoutes })).fetch,
+  hostname,
+  port
 });
 
-const bunRuntime = (globalThis as typeof globalThis & {
-  Bun?: {
-    serve(input: { fetch: typeof app.fetch; hostname: string; port: number }): unknown;
-  };
-}).Bun;
+console.log(`KISS PM API listening on http://${hostname}:${port}`);
 
-if (bunRuntime !== undefined) {
-  bunRuntime.serve({
-    fetch: app.fetch,
-    hostname,
-    port
-  });
-} else {
-  createServer((nodeRequest, nodeResponse) => {
-    const requestUrl = `http://${nodeRequest.headers.host ?? `${hostname}:${port}`}${nodeRequest.url ?? "/"}`;
-    const requestInit: RequestInit & { duplex?: "half" } = {
-      method: nodeRequest.method,
-      headers: nodeRequest.headers as HeadersInit,
-      ...(nodeRequest.method !== "GET" && nodeRequest.method !== "HEAD"
-        ? {
-            body: Readable.toWeb(nodeRequest) as unknown as ReadableStream<Uint8Array>,
-            duplex: "half"
-          }
-        : {})
-    };
-
-    void Promise.resolve(app.fetch(new Request(requestUrl, requestInit))).then(
-      async (response: Response) => {
-        nodeResponse.statusCode = response.status;
-        response.headers.forEach((value: string, key: string) => nodeResponse.setHeader(key, value));
-        if (response.body === null) {
-          nodeResponse.end();
-          return;
-        }
-        nodeResponse.end(Buffer.from(await response.arrayBuffer()));
-      },
-      () => {
-        nodeResponse.statusCode = 500;
-        nodeResponse.end("Internal Server Error");
-      }
-    );
-  }).listen(port, hostname);
+if (postgresClient) {
+  console.log("KISS PM API uses PostgreSQL persistence runtime");
 }
 
-console.log(`KISS PM API listening on http://${hostname}:${port}`);
+process.on("SIGTERM", () => {
+  void postgresClient?.end();
+});
+
+process.on("SIGINT", () => {
+  void postgresClient?.end();
+});
