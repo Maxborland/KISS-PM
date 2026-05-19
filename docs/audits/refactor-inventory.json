@@ -138,8 +138,32 @@
       "expected_behavior_change": "none",
       "tests_before": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
       "tests_after": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
-      "status": "pending",
-      "notes": "Proceed route group by route group; keep backend permission checks and audit evidence intact."
+      "status": "in_progress",
+      "notes": "Proceed route group by route group; keep backend permission checks and audit evidence intact. First completed sub-slice: REF-004A app error mapping."
+    },
+    {
+      "id": "REF-004A",
+      "area": "api application error boundary",
+      "files": [
+        "apps/api/src/app.ts",
+        "apps/api/src/appErrors.ts",
+        "apps/api/src/appErrors.test.ts"
+      ],
+      "problem": "app.ts owned fail-closed application error mapping alongside route wiring.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/api/src/appErrors.test.ts apps/api/src/app.test.ts failed because appErrors did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/api/src/appErrors.test.ts apps/api/src/app.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/api test",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "MissingAccessProfileError and resolveAppErrorResponse now live outside app.ts; Hono onError remains a thin adapter."
     },
     {
       "id": "REF-005",

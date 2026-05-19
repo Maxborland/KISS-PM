@@ -102,9 +102,21 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
-Статус: pending.
+Статус: REF-004 in_progress, REF-005 pending.
 
 Начинать после дополнительного покрытия auth/session/workspace config/audit acceptance. Для каждого route/service split нужен `pnpm test:db`.
+
+#### REF-004A — API app error boundary
+
+Статус: completed.
+
+Срез без изменения API contracts:
+
+- `MissingAccessProfileError` и `resolveAppErrorResponse` вынесены из `apps/api/src/app.ts` в `apps/api/src/appErrors.ts`.
+- `app.onError` остался тонким Hono adapter.
+- Fail-closed response для missing access profile остается `{ error: "access_profile_not_found" }` со статусом 403.
+- Unknown error остается `{ error: "internal_error" }` со статусом 500.
+- RED подтвержден отсутствующим модулем `appErrors`; GREEN подтвержден unit/API/DB проверками.
 
 ### REF-006 — стабилизация больших тестов
 
