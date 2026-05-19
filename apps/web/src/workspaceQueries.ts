@@ -3,9 +3,12 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import {
   createAccessRole,
   createCustomField,
+  createOpportunity,
   createPosition,
   createProjectTemplate,
   createUser,
+  activateOpportunityProject,
+  checkOpportunityFeasibility,
   deleteAccessRole,
   deletePosition,
   deleteUser,
@@ -14,7 +17,9 @@ import {
   fetchAuditEvents,
   fetchCustomFields,
   fetchMe,
+  fetchOpportunities,
   fetchPositions,
+  fetchProjects,
   fetchProjectTemplates,
   fetchUsers,
   login,
@@ -35,6 +40,8 @@ export const workspaceQueryKeys = {
   positions: () => ["workspace", "positions"] as const,
   accessRoles: () => ["workspace", "accessRoles"] as const,
   auditEvents: () => ["workspace", "auditEvents"] as const,
+  opportunities: () => ["workspace", "opportunities"] as const,
+  projects: () => ["workspace", "projects"] as const,
   customFields: () => ["workspace", "config", "customFields"] as const,
   projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
 };
@@ -95,6 +102,22 @@ export function useAuditEventsQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.auditEvents(),
     queryFn: fetchAuditEvents,
+    enabled
+  });
+}
+
+export function useOpportunitiesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.opportunities(),
+    queryFn: fetchOpportunities,
+    enabled
+  });
+}
+
+export function useProjectsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projects(),
+    queryFn: fetchProjects,
     enabled
   });
 }
@@ -243,6 +266,33 @@ export function useWorkspaceConfigMutations() {
       mutationFn: ({ templateId, input }: Parameters<typeof updateProjectTemplate> extends [infer Id, infer Input] ? { templateId: Id; input: Input } : never) =>
         updateProjectTemplate(templateId, input),
       onSuccess: invalidateWorkspaceConfig
+    })
+  };
+}
+
+export function useProjectIntakeMutations() {
+  const queryClient = useQueryClient();
+  const invalidateProjectIntake = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
+
+  return {
+    createOpportunity: useMutation({
+      mutationFn: createOpportunity,
+      onSuccess: invalidateProjectIntake
+    }),
+    checkFeasibility: useMutation({
+      mutationFn: checkOpportunityFeasibility,
+      onSuccess: invalidateProjectIntake
+    }),
+    activateProject: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof activateOpportunityProject> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        activateOpportunityProject(opportunityId, input),
+      onSuccess: invalidateProjectIntake
     })
   };
 }

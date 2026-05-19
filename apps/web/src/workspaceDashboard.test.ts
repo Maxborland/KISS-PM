@@ -82,6 +82,10 @@ describe("workspace dashboard", () => {
     expect(getAuditActionLabel("workspace.custom_field.updated")).toBe(
       "Пользовательское поле обновлено"
     );
+    expect(getAuditActionLabel("opportunity.feasibility_checked")).toBe(
+      "Ресурсная проверка сделки выполнена"
+    );
+    expect(getAuditActionLabel("project.activated")).toBe("Проект активирован");
     expect(getAuditActionLabel("unknown.action")).toBe("unknown.action");
   });
 

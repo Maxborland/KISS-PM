@@ -7,13 +7,17 @@ import {
 } from "./index";
 
 describe("PostgreSQL persistence schema", () => {
-  it("defines the Phase 1.2 foundation tables", () => {
+  it("defines the persistence tables through Phase 3", () => {
     expect(persistenceTableNames).toEqual([
       "tenants",
       "access_profiles",
       "positions",
       "custom_field_definitions",
       "project_templates",
+      "opportunities",
+      "opportunity_demands",
+      "projects",
+      "project_position_demands",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -27,6 +31,10 @@ describe("PostgreSQL persistence schema", () => {
       "positions",
       "custom_field_definitions",
       "project_templates",
+      "opportunities",
+      "opportunity_demands",
+      "projects",
+      "project_position_demands",
       "tenant_users",
       "user_credentials",
       "user_sessions",

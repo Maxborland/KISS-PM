@@ -26,6 +26,9 @@ const auditActionLabels: Record<string, string> = {
   "workspace.custom_field.updated": "Пользовательское поле обновлено",
   "workspace.project_template.created": "Шаблон проекта создан",
   "workspace.project_template.updated": "Шаблон проекта обновлен",
+  "opportunity.created": "Возможность создана",
+  "opportunity.feasibility_checked": "Ресурсная проверка сделки выполнена",
+  "project.activated": "Проект активирован",
   "profile.updated": "Профиль обновлен",
   "profile.theme.updated": "Оформление обновлено"
 };

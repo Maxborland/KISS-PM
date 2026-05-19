@@ -12,7 +12,9 @@ import {
   useLoginMutation,
   useLogoutMutation,
   useMeQuery,
+  useOpportunitiesQuery,
   usePositionsQuery,
+  useProjectsQuery,
   useProjectTemplatesQuery,
   useUsersQuery
 } from "./workspaceQueries";
@@ -30,11 +32,15 @@ export function useWorkspaceShellData() {
   const canReadPositions = hasPermission(permissions, "tenant.positions.read");
   const canReadAccessRoles = hasPermission(permissions, "tenant.access_profiles.read");
   const canReadAudit = hasPermission(permissions, "tenant.audit_events.read");
+  const canReadOpportunities = hasPermission(permissions, "tenant.opportunities.read");
+  const canReadProjects = hasPermission(permissions, "tenant.projects.read");
   const canReadWorkspaceConfig = hasPermission(permissions, "tenant.workspace_config.read");
   const usersQuery = useUsersQuery(canReadUsers);
   const positionsQuery = usePositionsQuery(canReadPositions);
   const accessRolesQuery = useAccessRolesQuery(canReadAccessRoles);
   const auditEventsQuery = useAuditEventsQuery(canReadAudit);
+  const opportunitiesQuery = useOpportunitiesQuery(canReadOpportunities);
+  const projectsQuery = useProjectsQuery(canReadProjects);
   const customFieldsQuery = useCustomFieldsQuery(canReadWorkspaceConfig);
   const projectTemplatesQuery = useProjectTemplatesQuery(canReadWorkspaceConfig);
   const visibleRoutes = useMemo(() => getVisibleRoutes(permissions), [permissions]);
@@ -50,6 +56,8 @@ export function useWorkspaceShellData() {
       positions: positionsQuery.data,
       accessRoles: accessRolesQuery.data,
       auditEvents: auditEventsQuery.data,
+      opportunities: opportunitiesQuery.data,
+      projects: projectsQuery.data,
       customFields: customFieldsQuery.data,
       projectTemplates: projectTemplatesQuery.data
     });
@@ -60,6 +68,8 @@ export function useWorkspaceShellData() {
     healthQuery.isError,
     meQuery.data,
     permissions,
+    opportunitiesQuery.data?.opportunities,
+    projectsQuery.data?.projects,
     customFieldsQuery.data?.customFields,
     projectTemplatesQuery.data?.projectTemplates,
     positionsQuery.data?.positions,
@@ -85,6 +95,12 @@ export function useWorkspaceShellData() {
         accessRolesQuery.error
       ),
       auditEvents: getSectionState(canReadAudit, auditEventsQuery.isFetching, auditEventsQuery.error),
+      opportunities: getSectionState(
+        canReadOpportunities,
+        opportunitiesQuery.isFetching,
+        opportunitiesQuery.error
+      ),
+      projects: getSectionState(canReadProjects, projectsQuery.isFetching, projectsQuery.error),
       workspaceConfig: getSectionState(
         canReadWorkspaceConfig,
         customFieldsQuery.isFetching || projectTemplatesQuery.isFetching,

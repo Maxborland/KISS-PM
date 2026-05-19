@@ -10,6 +10,12 @@ export const permissions = [
   "tenant.audit_events.read",
   "tenant.workspace_config.read",
   "tenant.workspace_config.manage",
+  "tenant.opportunities.read",
+  "tenant.opportunities.manage",
+  "tenant.projects.read",
+  "tenant.projects.manage",
+  "tenant.project_activation.manage",
+  "tenant.resource_feasibility.read",
   "profile.read",
   "profile.update",
   "workspace.theme.manage"
@@ -128,6 +134,72 @@ export function canManageWorkspaceConfig(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.workspace_config.manage"
+  });
+}
+
+export function canReadOpportunities(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.opportunities.read"
+  });
+}
+
+export function canManageOpportunities(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.opportunities.manage"
+  });
+}
+
+export function canReadProjects(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.projects.read"
+  });
+}
+
+export function canManageProjects(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.projects.manage"
+  });
+}
+
+export function canManageProjectActivation(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_activation.manage"
+  });
+}
+
+export function canReadResourceFeasibility(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.resource_feasibility.read"
   });
 }
 

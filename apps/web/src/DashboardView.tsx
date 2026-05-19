@@ -1,7 +1,7 @@
 import {
   Activity,
-  BriefcaseBusiness,
-  ShieldCheck,
+  ClipboardList,
+  PanelsTopLeft,
   Users
 } from "lucide-react";
 
@@ -22,6 +22,8 @@ export function DashboardView(props: {
     positions: SectionState;
     accessRoles: SectionState;
     auditEvents: SectionState;
+    opportunities: SectionState;
+    projects: SectionState;
   };
 }) {
   const activeUsers = props.data.users.filter((user) => user.status === "active").length;
@@ -31,25 +33,25 @@ export function DashboardView(props: {
   return (
     <section className="dashboard-grid">
       <Metric
+        icon={ClipboardList}
+        hint={getMetricHint(props.sectionStates.opportunities)}
+        meta="CRM-вход"
+        title="Возможности"
+        value={props.data.opportunities.length}
+      />
+      <Metric
+        icon={PanelsTopLeft}
+        hint={getMetricHint(props.sectionStates.projects)}
+        meta="Боевой контур"
+        title="Активные проекты"
+        value={props.data.projects.length}
+      />
+      <Metric
         icon={Users}
         hint={getMetricHint(props.sectionStates.users)}
         meta="Активные учетные записи"
         title="Пользователи"
         value={props.data.users.length}
-      />
-      <Metric
-        icon={ShieldCheck}
-        hint={getMetricHint(props.sectionStates.accessRoles)}
-        meta="Профили доступа"
-        title="Роли доступа"
-        value={props.data.accessRoles.length}
-      />
-      <Metric
-        icon={BriefcaseBusiness}
-        hint={getMetricHint(props.sectionStates.positions)}
-        meta="Оргструктура"
-        title="Должности"
-        value={props.data.positions.length}
       />
       <Metric
         icon={Activity}
@@ -64,8 +66,8 @@ export function DashboardView(props: {
           <div>
             <h2>Рабочее пространство</h2>
             <p className="panel-subtitle">
-              Базовый контур рабочего пространства: вход, пользователи, роли,
-              должности, профиль, тема и журнал аудита.
+              Рабочий контур Phase 3: входящие возможности, ресурсная проверка,
+              активные проекты, пользователи, роли, должности и журнал аудита.
             </p>
           </div>
         </div>

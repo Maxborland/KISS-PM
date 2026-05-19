@@ -22,6 +22,7 @@ import { registerAuthRoutes } from "./authRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
+import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -37,6 +38,11 @@ export function createApp(options: CreateAppOptions = {}) {
   app.onError((error, context) => {
     const response = resolveAppErrorResponse(error);
     return context.json(response.body, response.status);
+  });
+
+  app.use("/api/*", async (context, next) => {
+    context.header("Cache-Control", "no-store, private");
+    await next();
   });
 
   app.use("/api/*", async (context, next) => {
@@ -144,9 +150,7 @@ export function createApp(options: CreateAppOptions = {}) {
       beforeState: input.beforeState,
       afterState: input.afterState,
       permissionResult: input.permissionResult,
-      executionResult: {
-        status: "succeeded"
-      },
+      executionResult: input.executionResult ?? { status: "succeeded" },
       correlationId: randomUUID(),
       createdAt: new Date()
     });
@@ -172,6 +176,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerDevTenantRoutes(app, routeDeps);
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
+  registerProjectIntakeRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

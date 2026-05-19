@@ -45,7 +45,17 @@ const dataset: SeedTenantDataset = {
     positionId:
       user.id === "user-alpha-admin" ? "position-project-manager" : null,
     password: user.id === "user-alpha-admin" ? "local-admin-password" : "local-beta-password"
-  }))
+  })).concat([
+    {
+      id: "user-alpha-engineer",
+      tenantId: "tenant-alpha",
+      name: "Игорь Инженер",
+      accessProfileId: "access-profile-alpha-admin",
+      email: "engineer@kiss-pm.local",
+      positionId: "position-engineer",
+      password: "engineer12345"
+    }
+  ])
 };
 const client = createPostgresClient(databaseUrl);
 

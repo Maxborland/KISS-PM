@@ -179,6 +179,12 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.audit_events.read",
     "tenant.workspace_config.read",
     "tenant.workspace_config.manage",
+    "tenant.opportunities.read",
+    "tenant.opportunities.manage",
+    "tenant.projects.read",
+    "tenant.projects.manage",
+    "tenant.project_activation.manage",
+    "tenant.resource_feasibility.read",
     "profile.read",
     "profile.update",
     "workspace.theme.manage"

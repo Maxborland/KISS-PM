@@ -11,6 +11,8 @@ describe("workspace query keys", () => {
     expect(workspaceQueryKeys.positions()).toEqual(["workspace", "positions"]);
     expect(workspaceQueryKeys.accessRoles()).toEqual(["workspace", "accessRoles"]);
     expect(workspaceQueryKeys.auditEvents()).toEqual(["workspace", "auditEvents"]);
+    expect(workspaceQueryKeys.opportunities()).toEqual(["workspace", "opportunities"]);
+    expect(workspaceQueryKeys.projects()).toEqual(["workspace", "projects"]);
     expect(workspaceQueryKeys.customFields()).toEqual([
       "workspace",
       "config",

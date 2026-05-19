@@ -35,6 +35,12 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.audit_events.read",
         "tenant.workspace_config.read",
         "tenant.workspace_config.manage",
+        "tenant.opportunities.read",
+        "tenant.opportunities.manage",
+        "tenant.projects.read",
+        "tenant.projects.manage",
+        "tenant.project_activation.manage",
+        "tenant.resource_feasibility.read",
         "profile.read",
         "profile.update",
         "workspace.theme.manage"
@@ -54,6 +60,12 @@ const apiSeedDataset: SeedTenantDataset = {
         "tenant.audit_events.read",
         "tenant.workspace_config.read",
         "tenant.workspace_config.manage",
+        "tenant.opportunities.read",
+        "tenant.opportunities.manage",
+        "tenant.projects.read",
+        "tenant.projects.manage",
+        "tenant.project_activation.manage",
+        "tenant.resource_feasibility.read",
         "profile.read",
         "profile.update",
         "workspace.theme.manage"
@@ -102,6 +114,7 @@ const apiSeedDataset: SeedTenantDataset = {
       email: "reader@kiss-pm.local",
       name: "Роман Наблюдатель",
       accessProfileId: "access-profile-alpha-reader",
+      positionId: "position-engineer",
       password: "local-reader-password"
     }
   ]
@@ -133,7 +146,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       apiSeedDataset,
@@ -142,7 +155,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -563,6 +576,512 @@ describe("API with PostgreSQL data source", () => {
         expect.objectContaining({ actionType: "workspace.project_template.updated" })
       ])
     });
+  });
+
+  it("creates an opportunity, checks feasibility, activates a project and writes audit", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const opportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "opportunity-phase-3",
+        clientName: "ООО Ромашка",
+        contactName: "Ирина Клиент",
+        title: "Внедрение KISS PM",
+        projectType: "implementation",
+        description: "Первичный проект внедрения",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-12",
+        contractValue: 960_000,
+        plannedHourlyRate: 6_000,
+        probability: 80,
+        templateId: null,
+        demand: [
+          { positionId: "position-engineer", requiredHours: 80 },
+          { positionId: "position-project-manager", requiredHours: 80 }
+        ]
+      })
+    });
+    const invalidOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "opportunity-invalid",
+        clientName: "ООО Ошибка",
+        contactName: "Нет Нормы",
+        title: "Некорректная сделка",
+        projectType: "implementation",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-12",
+        contractValue: 100_000,
+        plannedHourlyRate: 0,
+        probability: 80,
+        demand: [{ positionId: "position-engineer", requiredHours: 10 }]
+      })
+    });
+    const feasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-phase-3/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const activation = await app.request(
+      "/api/workspace/opportunities/opportunity-phase-3/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: "project-phase-3",
+          acceptedRiskReason: "Запускаем с контролем загрузки руководителя проекта"
+        })
+      }
+    );
+    const repeatedFeasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-phase-3/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const repeatedActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-phase-3/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-phase-3-copy" })
+      }
+    );
+    const opportunities = await app.request("/api/workspace/opportunities", {
+      headers: { cookie }
+    });
+    const projects = await app.request("/api/workspace/projects", {
+      headers: { cookie }
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie }
+    });
+    const me = await app.request("/api/auth/me", {
+      headers: { cookie }
+    });
+
+    expect(opportunity.status).toBe(201);
+    await expect(opportunity.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-phase-3",
+        tenantId: "tenant-alpha",
+        plannedHours: 160,
+        demand: [
+          { positionId: "position-engineer", requiredHours: 80 },
+          { positionId: "position-project-manager", requiredHours: 80 }
+        ]
+      }
+    });
+    expect(invalidOpportunity.status).toBe(400);
+    await expect(invalidOpportunity.json()).resolves.toEqual({
+      error: "invalid_planned_hourly_rate"
+    });
+    expect(feasibility.status).toBe(200);
+    await expect(feasibility.json()).resolves.toMatchObject({
+      opportunity: {
+        status: "ready_to_activate",
+        feasibilityStatus: "ok"
+      },
+      assessment: {
+        plannedHours: 160,
+        totalRequiredHours: 160,
+        status: "ok",
+        rows: expect.arrayContaining([
+          expect.objectContaining({
+            positionId: "position-engineer",
+            requiredHours: 80,
+            status: "ok"
+          })
+        ])
+      }
+    });
+    expect(activation.status).toBe(201);
+    await expect(activation.json()).resolves.toMatchObject({
+      project: {
+        id: "project-phase-3",
+        tenantId: "tenant-alpha",
+        sourceOpportunityId: "opportunity-phase-3",
+        status: "active",
+        demand: expect.arrayContaining([
+          { positionId: "position-engineer", requiredHours: 80 }
+        ])
+      }
+    });
+    expect(repeatedFeasibility.status).toBe(409);
+    await expect(repeatedFeasibility.json()).resolves.toEqual({
+      error: "opportunity_not_feasible"
+    });
+    expect(repeatedActivation.status).toBe(409);
+    await expect(repeatedActivation.json()).resolves.toEqual({
+      error: "opportunity_not_activatable"
+    });
+    await expect(opportunities.json()).resolves.toMatchObject({
+      opportunities: expect.arrayContaining([
+        expect.objectContaining({
+          id: "opportunity-phase-3",
+          status: "converted"
+        })
+      ])
+    });
+    await expect(projects.json()).resolves.toMatchObject({
+      projects: expect.arrayContaining([
+        expect.objectContaining({
+          id: "project-phase-3",
+          status: "active"
+        })
+      ])
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({ actionType: "opportunity.created" }),
+        expect.objectContaining({ actionType: "opportunity.feasibility_checked" }),
+        expect.objectContaining({ actionType: "project.activated" })
+      ])
+    });
+    expect(me.headers.get("cache-control")).toBe("no-store, private");
+    expect(opportunities.headers.get("cache-control")).toBe("no-store, private");
+    expect(projects.headers.get("cache-control")).toBe("no-store, private");
+  });
+
+  it("rechecks current resource capacity during project activation", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const baseOpportunity = {
+      clientName: "ООО Перегрузка",
+      contactName: "Ирина Клиент",
+      projectType: "implementation",
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 480_000,
+      plannedHourlyRate: 6_000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
+    };
+
+    const firstOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        ...baseOpportunity,
+        id: "opportunity-stale-feasibility",
+        title: "Проект со старой проверкой"
+      })
+    });
+    const firstFeasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-stale-feasibility/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const competingOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        ...baseOpportunity,
+        id: "opportunity-capacity-consumer",
+        title: "Проект, занявший ресурс"
+      })
+    });
+    const competingFeasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-capacity-consumer/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const competingActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-capacity-consumer/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-capacity-consumer" })
+      }
+    );
+    const staleActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-stale-feasibility/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-stale-feasibility" })
+      }
+    );
+    const acceptedRiskActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-stale-feasibility/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: "project-stale-feasibility",
+          acceptedRiskReason: "Подтвержден осознанный запуск при дефиците инженера"
+        })
+      }
+    );
+
+    expect(firstOpportunity.status).toBe(201);
+    expect(firstFeasibility.status).toBe(200);
+    await expect(firstFeasibility.json()).resolves.toMatchObject({
+      assessment: { status: "ok" }
+    });
+    expect(competingOpportunity.status).toBe(201);
+    expect(competingFeasibility.status).toBe(200);
+    expect(competingActivation.status).toBe(201);
+    expect(staleActivation.status).toBe(409);
+    await expect(staleActivation.json()).resolves.toEqual({
+      error: "risk_acceptance_required"
+    });
+    expect(acceptedRiskActivation.status).toBe(201);
+  });
+
+  it("serializes concurrent activations that compete for the same position capacity", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const baseOpportunity = {
+      clientName: "ООО Конкурентная Емкость",
+      contactName: "Ирина Клиент",
+      projectType: "implementation",
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 480_000,
+      plannedHourlyRate: 6_000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
+    };
+    await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        ...baseOpportunity,
+        id: "opportunity-concurrent-a",
+        title: "Конкурентный проект A"
+      })
+    });
+    await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        ...baseOpportunity,
+        id: "opportunity-concurrent-b",
+        title: "Конкурентный проект B"
+      })
+    });
+    const feasibilityA = await app.request(
+      "/api/workspace/opportunities/opportunity-concurrent-a/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const feasibilityB = await app.request(
+      "/api/workspace/opportunities/opportunity-concurrent-b/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const [activationA, activationB] = await Promise.all([
+      app.request("/api/workspace/opportunities/opportunity-concurrent-a/activate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-concurrent-a" })
+      }),
+      app.request("/api/workspace/opportunities/opportunity-concurrent-b/activate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-concurrent-b" })
+      })
+    ]);
+    const projects = await app.request("/api/workspace/projects", {
+      headers: { cookie }
+    });
+
+    expect(feasibilityA.status).toBe(200);
+    expect(feasibilityB.status).toBe(200);
+    expect([activationA.status, activationB.status].sort()).toEqual([201, 409]);
+    const rejectedActivation = activationA.status === 409 ? activationA : activationB;
+    await expect(rejectedActivation.json()).resolves.toEqual({
+      error: "risk_acceptance_required"
+    });
+    await expect(projects.json()).resolves.toMatchObject({
+      projects: expect.arrayContaining([
+        expect.objectContaining({ id: expect.stringMatching(/^project-concurrent-/) })
+      ])
+    });
+  });
+
+  it("denies opportunity and project reads and mutations for users without Phase 3 permissions", async () => {
+    const cookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+
+    const opportunities = await app.request("/api/workspace/opportunities", {
+      headers: { cookie }
+    });
+    const projects = await app.request("/api/workspace/projects", {
+      headers: { cookie }
+    });
+    const createOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "opportunity-denied",
+        clientName: "ООО Нет Прав",
+        contactName: "Роман",
+        title: "Недоступная сделка",
+        projectType: "implementation",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-12",
+        contractValue: 100_000,
+        plannedHourlyRate: 5_000,
+        probability: 50,
+        demand: [{ positionId: "position-engineer", requiredHours: 10 }]
+      })
+    });
+    const feasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-denied/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const activation = await app.request(
+      "/api/workspace/opportunities/opportunity-denied/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({ id: "project-denied" })
+      }
+    );
+    const auditEvents = await createPostgresTenantDataSource(
+      createDatabase(client)
+    ).listAuditEventsByTenantId("tenant-alpha");
+
+    expect(opportunities.status).toBe(403);
+    expect(projects.status).toBe(403);
+    expect(createOpportunity.status).toBe(403);
+    expect(feasibility.status).toBe(403);
+    expect(activation.status).toBe(403);
+    expect(auditEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actorUserId: "user-alpha-reader",
+          actionType: "opportunity.create_denied",
+          permissionResult: expect.objectContaining({
+            allowed: false,
+            reason: "permission_missing"
+          }),
+          executionResult: expect.objectContaining({
+            status: "denied"
+          })
+        }),
+        expect.objectContaining({
+          actorUserId: "user-alpha-reader",
+          actionType: "opportunity.feasibility_denied",
+          sourceEntity: {
+            type: "Opportunity",
+            id: "opportunity-denied"
+          },
+          executionResult: expect.objectContaining({
+            status: "denied"
+          })
+        }),
+        expect.objectContaining({
+          actorUserId: "user-alpha-reader",
+          actionType: "project.activation_denied",
+          sourceEntity: {
+            type: "Opportunity",
+            id: "opportunity-denied"
+          },
+          executionResult: expect.objectContaining({
+            status: "denied"
+          })
+        })
+      ])
+    );
   });
 
   it("denies workspace config read and mutation for users without config permissions", async () => {

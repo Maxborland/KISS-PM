@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -18,6 +18,10 @@ import {
   userCredentials,
   userSessions
 } from "./schema";
+import {
+  createProjectIntakeRepository,
+  type ProjectIntakeRepository
+} from "./projectIntakeRepository";
 import {
   mapAccessProfileRecord,
   mapPositionRecord,
@@ -94,7 +98,7 @@ export type UserSessionRecord = {
   expiresAt: Date;
 };
 
-export type PostgresTenantDataSource = {
+export type PostgresTenantDataSource = ProjectIntakeRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -137,6 +141,7 @@ export type PostgresTenantDataSource = {
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
+  lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(tenantId: TenantId): Promise<AuditEventListItem[]>;
 };
@@ -146,6 +151,7 @@ export function createPostgresTenantDataSource(
 ): PostgresTenantDataSource {
   return {
     db,
+    ...createProjectIntakeRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
       const rows = await db.select().from(tenantUsers).orderBy(tenantUsers.id);
@@ -475,6 +481,14 @@ export function createPostgresTenantDataSource(
           )
         )
       );
+    },
+    async lockTenantResourcePlanning(tenantId) {
+      await db.execute(sql`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${tenantId}),
+          hashtext('kiss_pm_resource_planning')
+        )
+      `);
     },
     async appendAuditEvent(input) {
       const event = createAuditEventRecord(input);
