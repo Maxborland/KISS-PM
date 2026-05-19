@@ -169,10 +169,21 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 - `WorkspaceShell` вынесен из `App.tsx` в `apps/web/src/WorkspaceShell.tsx`.
 - `App.tsx` стал тонким Next client entrypoint на 7 строк.
-- Repository health теперь ограничивает `App.tsx` 100 строками и `WorkspaceShell.tsx` 750 строками.
+- Repository health теперь ограничивает `App.tsx` 100 строками.
 - GREEN подтвержден `repositoryHealth.test.ts`, `pnpm typecheck` и `pnpm test`.
 
-Итог REF-003: `App.tsx` больше не god-file и находится ниже целевого бюджета 500 строк. Все route views вынесены в отдельные модули, а оставшаяся shell orchestration имеет отдельный health-budget для следующего refactor wave.
+#### REF-003K — workspace shell layout/data split
+
+Статус: completed.
+
+- `WorkspaceSidebar` вынесен в `apps/web/src/WorkspaceSidebar.tsx`.
+- `WorkspaceTopbar` вынесен в `apps/web/src/WorkspaceTopbar.tsx`.
+- `WorkspaceRouteRenderer` вынесен в `apps/web/src/WorkspaceRouteRenderer.tsx`.
+- Auth/data orchestration вынесена в `apps/web/src/useWorkspaceShellData.ts`.
+- `WorkspaceShell.tsx` уменьшен до 415 строк и ограничен health-budget 500 строк.
+- GREEN подтвержден `repositoryHealth.test.ts`, `pnpm typecheck`, `pnpm test`, `pnpm --filter @kiss-pm/web build` и `pnpm test:e2e:smoke`.
+
+Итог REF-003: `App.tsx` больше не god-file и находится ниже целевого бюджета 500 строк. Все route views, navigation drawer, topbar, route renderer и auth/data orchestration вынесены в отдельные reusable модули.
 
 ### REF-004 / REF-005 — API и persistence boundaries
 
@@ -234,7 +245,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 Текущий план закрыт как безопасный refactor batch:
 
 - `REF-002` completed: workspace config validation в domain.
-- `REF-003` completed: `App.tsx` стал тонким entrypoint меньше 500 строк; route views и workspace shell вынесены.
+- `REF-003` completed: `App.tsx` стал тонким entrypoint меньше 500 строк; route views, sidebar, topbar, route renderer и auth/data orchestration вынесены.
 - `REF-004` completed for current plan: API app error mapping вынесен из `app.ts`.
 - `REF-005` completed for current plan: persistence row mappers вынесены из `repositories.ts`.
 - `REF-006` completed: smoke helpers вынесены без ослабления E2E.
@@ -243,7 +254,7 @@ baseline -> audit -> refactor matrix -> characterization tests -> small refactor
 
 Следующий отдельный refactor-plan можно открыть для более глубокого разделения:
 
-1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` по shell layout, navigation drawer, topbar и route renderer, сохраняя текущий budget 750 строк.
+1. Следующий web refactor-plan: дробить `WorkspaceShell.tsx` дальше только при появлении новых shell responsibilities; текущий budget 500 строк должен оставаться жестким guardrail.
 2. `apps/api/src/app.ts`: выделить route groups для users/positions/access roles/profile/theme.
 3. `packages/persistence/src/repositories.ts`: выделить repository areas после дополнительных DB characterization tests.
 

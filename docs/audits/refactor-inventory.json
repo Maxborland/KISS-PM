@@ -68,12 +68,12 @@
       "id": "REF-003",
       "area": "web application shell",
       "files": ["apps/web/src/App.tsx"],
-      "problem": "App.tsx was a god file; after the completed slices it is a thin client entrypoint and shell orchestration has its own guarded module.",
+      "problem": "App.tsx was a god file; after the completed slices it is a thin client entrypoint and shell orchestration is split into reusable layout, routing and data modules.",
       "risk": "high",
       "refactor_type": "split large component",
       "expected_behavior_change": "none",
       "tests_before": [
-        "apps/web/src/repositoryHealth.test.ts now limits App.tsx to 100 lines and WorkspaceShell.tsx to 750 lines"
+        "apps/web/src/repositoryHealth.test.ts now limits App.tsx to 100 lines and WorkspaceShell.tsx to 500 lines"
       ],
       "tests_after": [
         "component or route-level characterization tests before extraction",
@@ -81,7 +81,7 @@
         "pnpm test:e2e:smoke for navigation-critical changes"
       ],
       "status": "completed",
-      "notes": "Closed after review through REF-003A..REF-003J. App.tsx is below the 500-line target and stays a thin client entrypoint; WorkspaceShell.tsx has its own next split budget."
+      "notes": "Closed after review through REF-003A..REF-003K. App.tsx is below the 500-line target; WorkspaceShell.tsx is below the 500-line follow-up budget and delegates reusable sidebar, topbar, route rendering and data orchestration."
     },
     {
       "id": "REF-003C",
@@ -272,7 +272,35 @@
         "pnpm test"
       ],
       "status": "completed",
-      "notes": "WorkspaceShell extracted. App.tsx is now a 7-line client entrypoint; repository health guards App.tsx at 100 lines and WorkspaceShell.tsx at 750 lines."
+      "notes": "WorkspaceShell extracted. App.tsx is now a 7-line client entrypoint; repository health guards App.tsx at 100 lines."
+    },
+    {
+      "id": "REF-003K",
+      "area": "web",
+      "files": [
+        "apps/web/src/WorkspaceShell.tsx",
+        "apps/web/src/WorkspaceSidebar.tsx",
+        "apps/web/src/WorkspaceTopbar.tsx",
+        "apps/web/src/WorkspaceRouteRenderer.tsx",
+        "apps/web/src/useWorkspaceShellData.ts",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "WorkspaceShell still owned navigation drawer, topbar, route rendering and authenticated data orchestration after App.tsx was thinned.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test",
+        "pnpm --filter @kiss-pm/web build",
+        "pnpm test:e2e:smoke"
+      ],
+      "status": "completed",
+      "notes": "WorkspaceSidebar, WorkspaceTopbar, WorkspaceRouteRenderer and useWorkspaceShellData extracted. WorkspaceShell is now 415 lines and guarded by a 500-line budget."
     },
     {
       "id": "REF-003A",
