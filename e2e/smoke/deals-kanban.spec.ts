@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { loginToWorkspace } from "./smokeHelpers";
+import {
+  deactivateStaleSmokeOpportunityFields,
+  getRequiredOpportunityCustomFieldValues,
+  loginToWorkspace
+} from "./smokeHelpers";
 
 test("deals kanban stage move persists after reload", async ({ page }) => {
   const suffix = Date.now().toString(36);
@@ -9,6 +13,8 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
 
   await page.goto("/");
   await loginToWorkspace(page, { password: "local-admin-password" });
+  await deactivateStaleSmokeOpportunityFields(page);
+  const customFieldValues = await getRequiredOpportunityCustomFieldValues(page);
 
   const createResponse = await page.request.post("/api/workspace/opportunities", {
     data: {
@@ -26,7 +32,7 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
       probability: 40,
       templateId: null,
       demand: [{ positionId: "position-engineer", requiredHours: 100 }],
-      customFieldValues: {}
+      customFieldValues
     },
     headers: {
       "x-kiss-pm-action": "same-origin"
@@ -35,7 +41,8 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
   expect(createResponse.status()).toBe(201);
 
   await page.goto("/opportunities");
-  await page.getByRole("button", { name: "Канбан" }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("button", { name: "Канбан", exact: true }).click();
 
   const kanban = page.getByLabel("Канбан сделок");
   const newColumn = page.getByRole("region", { name: "Этап Новая" });
@@ -45,16 +52,46 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
   await expect(newCard).toBeVisible();
   await expect(newCard.getByRole("button", { name: new RegExp(`Перетащить сделку ${title}`) })).toBeVisible();
 
-  await newCard.getByLabel("Сменить этап без перетаскивания").selectOption({
-    label: "Квалификация"
-  });
+  await dragDealCardToColumn(
+    page,
+    newCard.getByRole("button", { name: new RegExp(`Перетащить сделку ${title}`) }),
+    qualifiedColumn
+  );
 
   await expect(qualifiedColumn.locator("article").filter({ hasText: title })).toBeVisible();
   await expect(newColumn.locator("article").filter({ hasText: title })).toHaveCount(0);
 
   await page.reload();
-  await page.getByRole("button", { name: "Канбан" }).click();
+  await page.getByRole("button", { name: "Канбан", exact: true }).click();
 
   await expect(kanban).toBeVisible();
   await expect(qualifiedColumn.locator("article").filter({ hasText: title })).toBeVisible();
 });
+
+async function dragDealCardToColumn(
+  page: import("@playwright/test").Page,
+  dragHandle: import("@playwright/test").Locator,
+  targetColumn: import("@playwright/test").Locator
+) {
+  const handleBox = await dragHandle.boundingBox();
+  const targetBox = await targetColumn.boundingBox();
+  expect(handleBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+  if (!handleBox || !targetBox) return;
+
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2,
+    handleBox.y + handleBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2,
+    handleBox.y + handleBox.height / 2 + 16
+  );
+  await page.mouse.move(
+    targetBox.x + targetBox.width / 2,
+    targetBox.y + Math.min(180, targetBox.height / 2),
+    { steps: 18 }
+  );
+  await page.mouse.up();
+}
