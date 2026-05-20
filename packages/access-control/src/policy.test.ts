@@ -11,6 +11,10 @@ import {
   canManageProjectActivation,
   canManageProjectTypes,
   canManageProjects,
+  canManageTaskStatuses,
+  canCreateTasks,
+  canDeleteTasks,
+  canEditTasks,
   canManageTenantUsers,
   canManageWorkspaceConfig,
   canManageWorkspaceTheme,
@@ -56,6 +60,10 @@ describe("access-control tenant policy", () => {
       "tenant.opportunities.manage",
       "tenant.projects.read",
       "tenant.projects.manage",
+      "tenant.tasks.create",
+      "tenant.tasks.edit",
+      "tenant.tasks.delete",
+      "tenant.task_statuses.manage",
       "tenant.project_activation.manage",
       "tenant.resource_feasibility.read",
       "profile.read",
@@ -437,6 +445,61 @@ describe("access-control tenant policy", () => {
     ).toBe(true);
     expect(
       canReadClients({ actor, profile: adminProfile, targetTenantId: "tenant-beta" })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 4.2 task actions only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const taskCreator = createAccessProfile({
+      id: "task-creator",
+      permissions: ["tenant.projects.read", "tenant.tasks.create"]
+    });
+
+    expect(
+      canCreateTasks({ actor, profile: taskCreator, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canEditTasks({ actor, profile: taskCreator, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canDeleteTasks({ actor, profile: taskCreator, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageTaskStatuses({
+        actor,
+        profile: taskCreator,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageTaskStatuses({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canEditTasks({ actor, profile: adminProfile, targetTenantId: "tenant-beta" })
     ).toEqual({
       allowed: false,
       reason: "cross_tenant_denied"

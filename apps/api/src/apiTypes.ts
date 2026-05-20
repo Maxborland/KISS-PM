@@ -6,8 +6,12 @@ import type {
   CrmActivityRecord,
   CrmActivityTransitionResult,
   CrmActivityUpdateInput,
+  TaskActivityInput,
+  TaskActivityRecord,
   TaskInput,
   TaskRecord,
+  TaskStatusInput,
+  TaskStatusRecord,
   TaskStatusUpdateInput
 } from "@kiss-pm/persistence";
 
@@ -392,8 +396,20 @@ export type ApiTenantDataSource = {
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  findTaskById?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
+  listTaskStatuses?(tenantId: TenantId): Promise<TaskStatusRecord[]>;
+  createTaskStatus?(input: TaskStatusInput): Promise<TaskStatusRecord>;
+  updateTaskStatusDefinition?(input: TaskStatusInput): Promise<TaskStatusRecord>;
+  archiveTaskStatus?(
+    tenantId: TenantId,
+    statusId: string
+  ): Promise<TaskStatusRecord | undefined>;
   createTask?(input: TaskInput): Promise<TaskRecord>;
+  updateTask?(input: TaskInput): Promise<TaskRecord | undefined>;
+  archiveTask?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   updateTaskStatus?(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
+  listTaskActivities?(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
+  createTaskActivity?(input: TaskActivityInput): Promise<TaskActivityRecord>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;

@@ -1,6 +1,13 @@
 import { getOptionalString, getStringField } from "./parseHelpers";
 
 const taskPriorities = ["low", "normal", "high", "critical"] as const;
+const taskStatusCategories = [
+  "new",
+  "waiting",
+  "in_progress",
+  "review",
+  "done"
+] as const;
 const taskParticipantRoles = [
   "executor",
   "co_executor",
@@ -15,9 +22,12 @@ export type CreateTaskBody = {
   title: string;
   description: string | null;
   priority: (typeof taskPriorities)[number];
+  statusId: string | undefined;
   plannedStart: Date;
   plannedFinish: Date;
+  durationWorkingDays: number;
   plannedWork: number;
+  requiresAcceptance: boolean;
   participants: {
     userId: string;
     role: (typeof taskParticipantRoles)[number];
@@ -29,14 +39,40 @@ export type CreateTaskParseResult =
   | { ok: false; error: string };
 
 export type UpdateTaskStatusBody = {
-  status: (typeof taskStatuses)[number];
+  statusId: string;
 };
 
 export type UpdateTaskStatusParseResult =
   | { ok: true; value: UpdateTaskStatusBody }
   | { ok: false; error: string };
 
-const taskStatuses = ["todo", "in_progress", "blocked", "done"] as const;
+export type UpdateTaskBody = Omit<CreateTaskBody, "id"> & {
+  statusId: string;
+};
+
+export type UpdateTaskParseResult =
+  | { ok: true; value: UpdateTaskBody }
+  | { ok: false; error: string };
+
+export type CreateTaskStatusBody = {
+  id: string;
+  name: string;
+  category: (typeof taskStatusCategories)[number];
+  sortOrder: number;
+  status: "active" | "archived";
+};
+
+export type CreateTaskStatusParseResult =
+  | { ok: true; value: CreateTaskStatusBody }
+  | { ok: false; error: string };
+
+export type TaskCommentBody = {
+  body: string;
+};
+
+export type TaskCommentParseResult =
+  | { ok: true; value: TaskCommentBody }
+  | { ok: false; error: string };
 
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const id = getOptionalString(input, "id") ?? undefined;
@@ -49,6 +85,11 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const plannedFinish = parseDateField(input, "plannedFinish");
   if (!plannedStart || !plannedFinish || plannedFinish < plannedStart) {
     return { ok: false, error: "invalid_task_dates" };
+  }
+
+  const durationWorkingDays = getIntegerField(input, "durationWorkingDays") ?? 1;
+  if (durationWorkingDays < 1 || durationWorkingDays > 1000) {
+    return { ok: false, error: "invalid_task_duration" };
   }
 
   const plannedWork = getIntegerField(input, "plannedWork");
@@ -74,10 +115,29 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
       title,
       description: getOptionalString(input, "description"),
       priority,
+      statusId: getOptionalString(input, "statusId") ?? undefined,
       plannedStart,
       plannedFinish,
+      durationWorkingDays,
       plannedWork,
+      requiresAcceptance: getBooleanField(input, "requiresAcceptance") ?? false,
       participants: participants.value
+    }
+  };
+}
+
+export function parseUpdateTaskBody(input: unknown): UpdateTaskParseResult {
+  const parsed = parseCreateTaskBody(input);
+  if (!parsed.ok) return parsed;
+
+  const statusId = getOptionalString(input, "statusId");
+  if (!statusId) return { ok: false, error: "invalid_task_status" };
+
+  return {
+    ok: true,
+    value: {
+      ...parsed.value,
+      statusId
     }
   };
 }
@@ -86,11 +146,56 @@ export function parseUpdateTaskStatusBody(
   input: unknown
 ): UpdateTaskStatusParseResult {
   const status = getStringField(input, "status") ?? "";
-  if (!isTaskStatus(status)) {
+  const statusId = getOptionalString(input, "statusId") ?? status;
+  if (!isSafeIdentifier(statusId) || statusId === "cancelled") {
     return { ok: false, error: "invalid_task_status" };
   }
 
-  return { ok: true, value: { status } };
+  return { ok: true, value: { statusId } };
+}
+
+export function parseCreateTaskStatusBody(
+  input: unknown
+): CreateTaskStatusParseResult {
+  const id = getOptionalString(input, "id");
+  if (!id || !isSafeIdentifier(id)) {
+    return { ok: false, error: "invalid_task_status_id" };
+  }
+  const name = getStringField(input, "name") ?? "";
+  if (name.length < 2 || name.length > 80) {
+    return { ok: false, error: "invalid_task_status_name" };
+  }
+  const category = getStringField(input, "category") ?? "";
+  if (!isTaskStatusCategory(category)) {
+    return { ok: false, error: "invalid_task_status_category" };
+  }
+  const sortOrder = getIntegerField(input, "sortOrder");
+  if (sortOrder === null || sortOrder < 1 || sortOrder > 10000) {
+    return { ok: false, error: "invalid_task_status_sort_order" };
+  }
+  const status = getOptionalString(input, "status") ?? "active";
+  if (status !== "active" && status !== "archived") {
+    return { ok: false, error: "invalid_task_status_state" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      id,
+      name,
+      category,
+      sortOrder,
+      status
+    }
+  };
+}
+
+export function parseTaskCommentBody(input: unknown): TaskCommentParseResult {
+  const body = getStringField(input, "body") ?? "";
+  if (body.length < 1 || body.length > 4000) {
+    return { ok: false, error: "invalid_task_comment" };
+  }
+  return { ok: true, value: { body } };
 }
 
 function parseParticipants(
@@ -164,12 +269,15 @@ function getIntegerField(input: unknown, key: string): number | null {
   return value;
 }
 
-function isTaskPriority(value: string): value is CreateTaskBody["priority"] {
-  return taskPriorities.includes(value as CreateTaskBody["priority"]);
+function getBooleanField(input: unknown, key: string): boolean | null {
+  if (!input || typeof input !== "object") return null;
+  const value = (input as Record<string, unknown>)[key];
+  if (typeof value !== "boolean") return null;
+  return value;
 }
 
-function isTaskStatus(value: string): value is UpdateTaskStatusBody["status"] {
-  return taskStatuses.includes(value as UpdateTaskStatusBody["status"]);
+function isTaskPriority(value: string): value is CreateTaskBody["priority"] {
+  return taskPriorities.includes(value as CreateTaskBody["priority"]);
 }
 
 function isTaskParticipantRole(
@@ -178,4 +286,14 @@ function isTaskParticipantRole(
   return taskParticipantRoles.includes(
     value as CreateTaskBody["participants"][number]["role"]
   );
+}
+
+function isTaskStatusCategory(
+  value: string
+): value is CreateTaskStatusBody["category"] {
+  return taskStatusCategories.includes(value as CreateTaskStatusBody["category"]);
+}
+
+function isSafeIdentifier(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{2,119}$/.test(value);
 }

@@ -28,6 +28,10 @@ const projectWorkApiSeed: SeedTenantDataset = {
         "tenant.opportunities.read",
         "tenant.opportunities.manage",
         "tenant.project_activation.manage",
+        "tenant.tasks.create",
+        "tenant.tasks.edit",
+        "tenant.tasks.delete",
+        "tenant.task_statuses.manage",
         "tenant.resource_feasibility.read",
         "tenant.audit_events.read"
       ]
@@ -203,7 +207,10 @@ describe("project work API routes", () => {
         id: "task-alpha",
         projectId: "project-alpha",
         title: "Подготовить план внедрения",
-        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+        participants: expect.arrayContaining([
+          { userId: "user-alpha-executor", role: "executor" },
+          { userId: "user-alpha-admin", role: "requester" }
+        ])
       }
     });
     expect(projectDetail.status).toBe(200);
@@ -254,7 +261,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: executorCookie
         },
-        body: JSON.stringify({ status: "in_progress" })
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
     const myWork = await app.request("/api/workspace/my-work", {
@@ -290,6 +297,256 @@ describe("project work API routes", () => {
     });
   });
 
+  it("keeps acceptance-required tasks on review until requester accepts the result", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-acceptance",
+        title: "Проверить результат внедрения",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        requiresAcceptance: true,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    await app.request("/api/workspace/projects/project-alpha/tasks/task-acceptance/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: executorCookie
+      },
+      body: JSON.stringify({ statusId: "task-status-in-progress" })
+    });
+
+    const directDone = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: executorCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-done" })
+      }
+    );
+    const review = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: executorCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-review" })
+      }
+    );
+    const accepted = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-done" })
+      }
+    );
+
+    expect(directDone.status).toBe(409);
+    await expect(directDone.json()).resolves.toEqual({
+      error: "task_acceptance_required"
+    });
+    expect(review.status).toBe(200);
+    await expect(review.json()).resolves.toMatchObject({
+      task: { id: "task-acceptance", status: "review" }
+    });
+    expect(accepted.status).toBe(200);
+    await expect(accepted.json()).resolves.toMatchObject({
+      task: { id: "task-acceptance", status: "done", progress: 100 }
+    });
+  });
+
+  it("manages tenant task statuses and keeps system statuses required", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+
+    const initial = await app.request("/api/workspace/task-statuses", {
+      headers: { cookie: adminCookie }
+    });
+    const deniedCreate = await app.request("/api/workspace/task-statuses", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: readerCookie
+      },
+      body: JSON.stringify({
+        id: "task-status-client-wait",
+        name: "Ждем клиента",
+        category: "waiting",
+        sortOrder: 35
+      })
+    });
+    const created = await app.request("/api/workspace/task-statuses", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-status-client-wait",
+        name: "Ждем клиента",
+        category: "waiting",
+        sortOrder: 35
+      })
+    });
+    const updated = await app.request(
+      "/api/workspace/task-statuses/task-status-client-wait",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          name: "Ожидает клиента",
+          category: "waiting",
+          sortOrder: 36,
+          status: "active"
+        })
+      }
+    );
+    const archived = await app.request(
+      "/api/workspace/task-statuses/task-status-client-wait",
+      {
+        method: "DELETE",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        }
+      }
+    );
+    const systemArchive = await app.request("/api/workspace/task-statuses/task-status-new", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
+
+    expect(initial.status).toBe(200);
+    await expect(initial.json()).resolves.toMatchObject({
+      taskStatuses: expect.arrayContaining([
+        expect.objectContaining({ id: "task-status-new", category: "new" }),
+        expect.objectContaining({ id: "task-status-done", category: "done" })
+      ])
+    });
+    expect(deniedCreate.status).toBe(403);
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({
+      taskStatus: { id: "task-status-client-wait", category: "waiting", status: "active" }
+    });
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      taskStatus: { id: "task-status-client-wait", name: "Ожидает клиента" }
+    });
+    expect(archived.status).toBe(200);
+    await expect(archived.json()).resolves.toMatchObject({
+      taskStatus: { id: "task-status-client-wait", status: "archived" }
+    });
+    expect(systemArchive.status).toBe(409);
+  });
+
+  it("persists task comments for task participants and blocks unrelated readers", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-commented",
+        title: "Обсудить задачу",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-admin", role: "executor" }]
+      })
+    });
+
+    const deniedComment = await app.request("/api/workspace/tasks/task-commented/comments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: executorCookie
+      },
+      body: JSON.stringify({ body: "Я не участник этой задачи" })
+    });
+    const comment = await app.request("/api/workspace/tasks/task-commented/comments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ body: "Проверил контекст, можно брать в работу." })
+    });
+    const detail = await app.request("/api/workspace/tasks/task-commented", {
+      headers: { cookie: adminCookie }
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(deniedComment.status).toBe(403);
+    await expect(deniedComment.json()).resolves.toEqual({
+      error: "task_participant_required"
+    });
+    expect(comment.status).toBe(201);
+    await expect(comment.json()).resolves.toMatchObject({
+      activity: {
+        taskId: "task-commented",
+        type: "comment",
+        body: "Проверил контекст, можно брать в работу."
+      }
+    });
+    await expect(detail.json()).resolves.toMatchObject({
+      task: { id: "task-commented" },
+      activities: [
+        expect.objectContaining({
+          type: "comment",
+          body: "Проверил контекст, можно брать в работу."
+        })
+      ]
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.comment_created",
+          sourceEntity: { type: "Task", id: "task-commented" }
+        })
+      ])
+    });
+  });
+
   it("denies task status transition for non-participant readers", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
@@ -319,7 +576,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: readerCookie
         },
-        body: JSON.stringify({ status: "done" })
+        body: JSON.stringify({ statusId: "task-status-done" })
       }
     );
 
@@ -361,7 +618,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: observerCookie
         },
-        body: JSON.stringify({ status: "in_progress" })
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
 
@@ -436,7 +693,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: adminCookie
         },
-        body: JSON.stringify({ status: "in_progress" })
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
     await app.request(
@@ -448,7 +705,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: adminCookie
         },
-        body: JSON.stringify({ status: "done" })
+        body: JSON.stringify({ statusId: "task-status-done" })
       }
     );
 
@@ -461,7 +718,7 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: adminCookie
         },
-        body: JSON.stringify({ status: "in_progress" })
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
 
@@ -482,7 +739,7 @@ describe("project work API routes", () => {
           "content-type": "application/json",
           cookie: adminCookie
         },
-        body: JSON.stringify({ status: "in_progress" })
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
 
