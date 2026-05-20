@@ -1228,8 +1228,6 @@ h2 {
   color: var(--muted);
 }
 
-.crm-card-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.75fr); gap: 16px; }
-
 .detail-card {
   display: grid;
   gap: 16px;
@@ -1720,8 +1718,7 @@ input[type="color"] {
   .crm-reference-strip,
   .deal-economics-preview,
   .deal-detail-layout,
-  .management-layout,
-  .crm-card-layout {
+  .management-layout {
     grid-template-columns: 1fr;
   }
 

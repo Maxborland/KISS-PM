@@ -437,12 +437,20 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   ).toContainText("+7 913 111-22-33");
   await page.getByRole("button", { name: `Клиент ${suffix} обновлен` }).click();
   await expect(page).toHaveURL(/\/clients\/.+/);
-  await expect(page.getByRole("heading", { name: "Карточка клиента" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "О клиенте" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Редактировать поле Название клиента" }).first()
+  ).toBeVisible();
+  await expect(page.getByLabel("Активность: клиент")).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/opportunities\/.+/);
   await page.getByRole("button", { name: new RegExp(`Контакт ${suffix} обновлен`) }).click();
   await expect(page).toHaveURL(/\/contacts\/.+/);
-  await expect(page.getByRole("heading", { name: "Карточка контакта" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "О контакте" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Редактировать поле Имя контакта" }).first()
+  ).toBeVisible();
+  await expect(page.getByLabel("Активность: контакт")).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/opportunities\/.+/);
   await page.getByRole("button", { name: "Редактировать", exact: true }).click();

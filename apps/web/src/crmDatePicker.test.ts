@@ -11,7 +11,7 @@ describe("CRM date picker foundation", () => {
     const sources = [
       "apps/web/src/DealFormModal.tsx",
       "apps/web/src/OpportunityActivityForms.tsx",
-      "apps/web/src/OpportunityDetailFacts.tsx",
+      "apps/web/src/CrmInlineEdit.tsx",
       "apps/web/src/ProjectDetailView.tsx"
     ];
 

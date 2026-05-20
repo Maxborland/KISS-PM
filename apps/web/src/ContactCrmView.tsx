@@ -1,7 +1,15 @@
 import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { Client, Contact, Product } from "./api";
+import type { Client, Contact, ContactUpdateInput } from "./api";
+import {
+  CrmEntityActivityPlaceholder,
+  CrmEntityFact,
+  CrmEntityFactList,
+  CrmEntitySection,
+  CrmEntityWorkspace
+} from "./CrmEntityWorkspace";
+import { InlineEditableValue } from "./CrmInlineEdit";
 import {
   canRenderSectionTable,
   EntityActions,
@@ -17,17 +25,10 @@ import { makeClientGeneratedId } from "./workspaceIds";
 import { useCrmMutations } from "./workspaceQueries";
 import {
   type FormErrors,
-  getFieldErrorId,
   hasFormErrors,
-  validateClientForm,
-  validateContactForm,
-  validateProductForm
+  validateContactForm
 } from "./workspaceForms";
-import {
-  filterClientsForTable,
-  filterContactsForTable,
-  filterProductsForTable
-} from "./workspaceTables";
+import { filterContactsForTable } from "./workspaceTables";
 import { formatDate } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
@@ -129,15 +130,59 @@ export function ContactsView(props: {
     setIsModalOpen(true);
   }
 
+  async function saveContactInline(contact: Contact, patch: Partial<Contact>) {
+    const patchInput: Partial<ContactUpdateInput> = {};
+    if (typeof patch.clientId === "string") patchInput.clientId = patch.clientId;
+    if (typeof patch.name === "string") patchInput.name = patch.name.trim();
+    if (typeof patch.email === "string") patchInput.email = patch.email.trim() || null;
+    if (typeof patch.phone === "string") patchInput.phone = patch.phone.trim() || null;
+    if (typeof patch.telegram === "string") patchInput.telegram = patch.telegram.trim() || null;
+    if (typeof patch.role === "string") patchInput.role = patch.role.trim() || null;
+    if (patch.status) patchInput.status = patch.status;
+    const input = {
+      clientId: patchInput.clientId ?? contact.clientId,
+      name: patchInput.name ?? contact.name,
+      email: "email" in patchInput ? patchInput.email ?? null : contact.email,
+      phone: "phone" in patchInput ? patchInput.phone ?? null : contact.phone,
+      telegram: "telegram" in patchInput ? patchInput.telegram ?? null : contact.telegram,
+      role: "role" in patchInput ? patchInput.role ?? null : contact.role,
+      status: patchInput.status ?? contact.status
+    };
+    const errors = validateContactForm({
+      clientId: input.clientId,
+      name: input.name,
+      email: input.email ?? "",
+      status: input.status
+    });
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте поле контакта.");
+    }
+
+    await crmMutations.updateContact.mutateAsync({
+      contactId: contact.id,
+      input
+    });
+    props.onChanged("Поле контакта обновлено");
+  }
+
   if (props.activeContactId) {
+    const activeContactClient = activeContact
+      ? props.data.clients.find((client) => client.id === activeContact.clientId) ?? null
+      : null;
+
     return (
       <>
-        <Panel
-          title="Карточка контакта"
-          subtitle="Контакт клиента для сделок и будущих коммуникаций."
-          actions={
-            <span className="table-actions">
-              {canManageContacts && activeContact ? (
+        <SectionFeedback state={props.sectionState} emptyLabel="Контакты недоступны." />
+        {activeContact ? (
+          <CrmEntityWorkspace
+            activity={
+              <CrmEntityActivityPlaceholder
+                entityLabel="контакт"
+                summary="0 задач · 0 сообщений"
+              />
+            }
+            actions={
+              canManageContacts ? (
                 <button
                   className="primary-button"
                   disabled={isSaving}
@@ -146,69 +191,132 @@ export function ContactsView(props: {
                 >
                   Редактировать
                 </button>
-              ) : null}
-              <button className="secondary-button" type="button" onClick={props.onBack}>
-                <ArrowLeft aria-hidden="true" size={14} />
-                К списку контактов
-              </button>
-            </span>
-          }
-        >
-          <SectionFeedback state={props.sectionState} emptyLabel="Контакты недоступны." />
-          {activeContact ? (
-            <div className="crm-card-layout">
-              <section className="detail-card">
-                <h2>{activeContact.name}</h2>
-                <dl className="detail-list">
-                  <div>
-                    <dt>Клиент</dt>
-                    <dd>{getClientName(props.data.clients, activeContact.clientId)}</dd>
-                  </div>
-                  <div>
-                    <dt>Email</dt>
-                    <dd>{activeContact.email || "Не задан"}</dd>
-                  </div>
-                  <div>
-                    <dt>Телефон</dt>
-                    <dd>{activeContact.phone || "Не задан"}</dd>
-                  </div>
-                  <div>
-                    <dt>Telegram</dt>
-                    <dd>{activeContact.telegram || "Не задан"}</dd>
-                  </div>
-                  <div>
-                    <dt>Роль</dt>
-                    <dd>{activeContact.role || "Роль не задана"}</dd>
-                  </div>
-                  <div>
-                    <dt>Статус</dt>
-                    <dd>{renderCrmStatus(activeContact.status)}</dd>
-                  </div>
-                  <div>
-                    <dt>Обновлено</dt>
-                    <dd>{formatDate(activeContact.updatedAt)}</dd>
-                  </div>
-                </dl>
-              </section>
-              <aside className="detail-card">
-                <h3>Связанный клиент</h3>
+              ) : null
+            }
+            backLabel="Контакты"
+            eyebrow="Контакт"
+            meta={
+              <>
+                Клиент:{" "}
                 <button
-                  className="entity-row-link"
+                  className="inline-link-button"
                   type="button"
                   onClick={() => props.onOpenClient?.(activeContact.clientId)}
                 >
-                  {getClientName(props.data.clients, activeContact.clientId)}
+                  {activeContactClient?.name ?? activeContact.clientId}
                 </button>
-                <p className="muted">
-                  Контакт используется в сделках и будущих коммуникациях. Отдельная
-                  лента контакта появится вместе с моделью коммуникаций.
-                </p>
-              </aside>
-            </div>
-          ) : (
+              </>
+            }
+            status={renderCrmStatus(activeContact.status)}
+            title={
+              <InlineEditableValue
+                disabled={!canManageContacts || isSaving}
+                label="Имя контакта"
+                value={activeContact.name}
+                onSave={(value) => saveContactInline(activeContact, { name: value })}
+              />
+            }
+            onBack={props.onBack ?? (() => undefined)}
+          >
+            <CrmEntitySection title="О контакте">
+              <CrmEntityFactList>
+                <CrmEntityFact label="Клиент">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={getClientName(props.data.clients, activeContact.clientId)}
+                    label="Клиент контакта"
+                    mode="select"
+                    options={activeClients.map((client) => ({
+                      label: client.name,
+                      value: client.id
+                    }))}
+                    value={activeContact.clientId}
+                    onSave={(value) => saveContactInline(activeContact, { clientId: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Имя">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    label="Имя контакта"
+                    value={activeContact.name}
+                    onSave={(value) => saveContactInline(activeContact, { name: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Email">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={activeContact.email || "Не задан"}
+                    label="Email контакта"
+                    value={activeContact.email ?? ""}
+                    onSave={(value) => saveContactInline(activeContact, { email: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Телефон">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={activeContact.phone || "Не задан"}
+                    label="Телефон контакта"
+                    value={activeContact.phone ?? ""}
+                    onSave={(value) => saveContactInline(activeContact, { phone: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Telegram">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={activeContact.telegram || "Не задан"}
+                    label="Telegram контакта"
+                    value={activeContact.telegram ?? ""}
+                    onSave={(value) => saveContactInline(activeContact, { telegram: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Роль у клиента">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={activeContact.role || "Роль не задана"}
+                    label="Роль контакта"
+                    value={activeContact.role ?? ""}
+                    onSave={(value) => saveContactInline(activeContact, { role: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Статус">
+                  <InlineEditableValue
+                    disabled={!canManageContacts || isSaving}
+                    display={activeContact.status === "active" ? "Активно" : "Архив"}
+                    label="Статус контакта"
+                    mode="select"
+                    options={crmStatusOptions}
+                    value={activeContact.status}
+                    onSave={(value) =>
+                      saveContactInline(activeContact, { status: value as Contact["status"] })
+                    }
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Обновлено">{formatDate(activeContact.updatedAt)}</CrmEntityFact>
+              </CrmEntityFactList>
+            </CrmEntitySection>
+            <CrmEntitySection title="Связанный клиент">
+              <button
+                className="entity-row-link"
+                type="button"
+                onClick={() => props.onOpenClient?.(activeContact.clientId)}
+              >
+                <EntityNameCell
+                  avatar="К"
+                  primary={activeContactClient?.name ?? activeContact.clientId}
+                  secondary={activeContactClient?.description ?? "Клиент без описания"}
+                />
+              </button>
+            </CrmEntitySection>
+          </CrmEntityWorkspace>
+        ) : (
+          <Panel title="Контакт не найден" subtitle="Запись не найдена в текущем workspace.">
             <p className="empty-state">Контакт не найден.</p>
-          )}
-        </Panel>
+            <button className="secondary-button" type="button" onClick={props.onBack}>
+              <ArrowLeft aria-hidden="true" size={14} />
+              К списку контактов
+            </button>
+          </Panel>
+        )}
         {isModalOpen ? (
           <ContactModal
             contact={editingContact}
@@ -462,6 +570,10 @@ function ContactModal(props: {
   );
 }
 
+const crmStatusOptions = [
+  { label: "Активно", value: "active" },
+  { label: "Архив", value: "archived" }
+];
 
 function getClientName(clients: Client[], clientId: string): string {
   return clients.find((client) => client.id === clientId)?.name ?? clientId;

@@ -17,6 +17,166 @@
   gap: 14px;
 }
 
+.crm-entity-page {
+  min-width: 0;
+}
+
+.crm-entity-workspace {
+  display: grid;
+  grid-template-columns: minmax(500px, 620px) minmax(420px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.crm-entity-main {
+  min-width: 0;
+  max-width: 620px;
+  display: grid;
+  gap: 14px;
+}
+
+.crm-entity-header,
+.crm-entity-section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.crm-entity-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.crm-entity-title-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.crm-entity-title-row h1 {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.crm-entity-header p {
+  margin: 6px 0 0;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.crm-entity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.crm-entity-section {
+  display: grid;
+  gap: 12px;
+}
+
+.crm-entity-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.crm-entity-section-header h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.crm-entity-fact-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.crm-entity-fact-list > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(130px, 0.42fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.crm-entity-fact-list > div:last-child {
+  border-bottom: 0;
+}
+
+.crm-entity-fact-list dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.crm-entity-fact-list dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.crm-related-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-related-list li {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.crm-entity-activity {
+  min-height: 260px;
+}
+
+.crm-activity-placeholder {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed #c8d3e2;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.crm-activity-placeholder strong {
+  color: var(--text);
+}
+
+.crm-activity-placeholder p {
+  margin: 0;
+  line-height: 1.45;
+}
+
 .deal-detail-header {
   display: flex;
   align-items: center;
@@ -1935,23 +2095,27 @@
 }
 
 @media (max-width: 1180px) {
-  .deal-workspace-layout {
+  .deal-workspace-layout,
+  .crm-entity-workspace {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .deal-workspace-main {
+  .deal-workspace-main,
+  .crm-entity-main {
     max-width: none;
   }
 }
 
 @media (max-width: 900px) {
   .deal-page-header,
+  .crm-entity-header,
   .deal-overview-grid,
   .deal-resource-body {
     grid-template-columns: 1fr;
   }
 
   .deal-page-actions,
+  .crm-entity-actions,
   .deal-resource-actions {
     justify-content: flex-start;
     justify-items: stretch;
@@ -2010,7 +2174,8 @@
   }
 
   .deal-fact-list div,
-  .deal-mini-list div {
+  .deal-mini-list div,
+  .crm-entity-fact-list > div {
     grid-template-columns: 1fr;
     gap: 4px;
   }
