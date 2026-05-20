@@ -2,6 +2,7 @@ import { CheckCircle2, PlusCircle, SquareCheckBig } from "lucide-react";
 import type { FormEvent } from "react";
 
 import type { OpportunityActivity } from "./api";
+import { DatePickerField } from "./components/DatePickerField";
 import { StatusPill } from "./components/workspace-ui";
 import { sortOpportunityTasks } from "./opportunityActivity";
 import { getWorkspaceUserName } from "./OpportunityActivityFeed";
@@ -75,18 +76,13 @@ export function OpportunityTaskView(props: {
           />
         </label>
         <div className="activity-form-grid">
-          <label htmlFor="deal-task-due-date">
-            Срок
-            <input
-              id="deal-task-due-date"
-              disabled={!props.canManageOpportunities || props.isSaving}
-              type="date"
-              value={props.form.dueDate}
-              onChange={(event) =>
-                props.onFormChange({ ...props.form, dueDate: event.target.value })
-              }
-            />
-          </label>
+          <DatePickerField
+            disabled={!props.canManageOpportunities || props.isSaving}
+            id="deal-task-due-date"
+            label="Срок"
+            value={props.form.dueDate}
+            onChange={(value) => props.onFormChange({ ...props.form, dueDate: value })}
+          />
           <label htmlFor="deal-task-assignee">
             Ответственный
             <select

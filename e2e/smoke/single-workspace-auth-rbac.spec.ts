@@ -407,6 +407,12 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   const opportunityId = page.url().split("/opportunities/")[1] ?? "";
   await expect(page.getByRole("region", { name: "Карточка сделки" })).toBeVisible();
   await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix}` })).toBeVisible();
+  await page.getByRole("button", { name: "Редактировать поле Название сделки" }).click();
+  await page.getByLabel("Название сделки").fill(`Контур внедрения ${suffix} header`);
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(
+    page.getByRole("button", { name: "Редактировать поле Название сделки" })
+  ).toContainText(`Контур внедрения ${suffix} header`);
   await expect(
     page.getByText(`Клиент: Клиент ${suffix} обновлен`)
   ).toBeVisible();

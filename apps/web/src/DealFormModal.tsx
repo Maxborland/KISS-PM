@@ -18,6 +18,7 @@ import {
   validateOpportunityForm
 } from "./workspaceForms";
 import { getErrorMessage } from "./workspaceShellState";
+import { DatePickerField } from "./components/DatePickerField";
 import { FieldError, Modal } from "./components/workspace-ui";
 
 type DemandFormLine = {
@@ -55,6 +56,8 @@ export function DealFormModal(props: {
   const [plannedHourlyRate, setPlannedHourlyRate] = useState(
     initial ? String(initial.plannedHourlyRate) : ""
   );
+  const [plannedStart, setPlannedStart] = useState(toDateInputValue(initial?.plannedStart));
+  const [plannedFinish, setPlannedFinish] = useState(toDateInputValue(initial?.plannedFinish));
   const [demandLines, setDemandLines] = useState<DemandFormLine[]>(
     initial?.demand.length
       ? initial.demand.map((line) => ({
@@ -97,8 +100,8 @@ export function DealFormModal(props: {
       title: String(form.get("title") ?? ""),
       projectTypeId: String(form.get("projectTypeId") ?? ""),
       stageId: String(form.get("stageId") ?? ""),
-      plannedStart: String(form.get("plannedStart") ?? ""),
-      plannedFinish: String(form.get("plannedFinish") ?? ""),
+      plannedStart,
+      plannedFinish,
       contractValue,
       plannedHourlyRate,
       probability: String(form.get("probability") ?? ""),
@@ -238,26 +241,34 @@ export function DealFormModal(props: {
             </select>
             <FieldError formId={formId} field="projectTypeId" errors={fieldErrors} />
           </label>
-          <label htmlFor={`${formId}-plannedStart`}>
-            Старт
-            <input
+          <span className="form-field-shell">
+            <DatePickerField
+              describedBy={
+                fieldErrors.plannedStart ? `${formId}-plannedStart-error` : undefined
+              }
               id={`${formId}-plannedStart`}
+              invalid={Boolean(fieldErrors.plannedStart)}
+              label="Старт"
               name="plannedStart"
-              type="date"
-              defaultValue={toDateInputValue(initial?.plannedStart)}
+              value={plannedStart}
+              onChange={setPlannedStart}
             />
             <FieldError formId={formId} field="plannedStart" errors={fieldErrors} />
-          </label>
-          <label htmlFor={`${formId}-plannedFinish`}>
-            Плановый финиш
-            <input
+          </span>
+          <span className="form-field-shell">
+            <DatePickerField
+              describedBy={
+                fieldErrors.plannedFinish ? `${formId}-plannedFinish-error` : undefined
+              }
               id={`${formId}-plannedFinish`}
+              invalid={Boolean(fieldErrors.plannedFinish)}
+              label="Плановый финиш"
               name="plannedFinish"
-              type="date"
-              defaultValue={toDateInputValue(initial?.plannedFinish)}
+              value={plannedFinish}
+              onChange={setPlannedFinish}
             />
             <FieldError formId={formId} field="plannedFinish" errors={fieldErrors} />
-          </label>
+          </span>
         </div>
         <label htmlFor={`${formId}-description`}>
           Описание

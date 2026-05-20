@@ -24,6 +24,7 @@ import { toDateInputValue } from "./opportunityInlineEdit";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
 import { getErrorMessage } from "./workspaceShellState";
+import { DatePickerField } from "./components/DatePickerField";
 import { StatusPill } from "./components/workspace-ui";
 
 export function DealOverviewCard(props: {
@@ -518,7 +519,7 @@ function RuntimeCustomFieldFacts(props: {
   );
 }
 
-function InlineEditableValue(props: {
+export function InlineEditableValue(props: {
   disabled?: boolean;
   display?: React.ReactNode;
   label: string;
@@ -600,6 +601,14 @@ function InlineEditableValue(props: {
             </option>
           ))}
         </select>
+      ) : mode === "date" ? (
+        <DatePickerField
+          disabled={isSaving}
+          id={`inline-date-${toStableDomId(props.label)}`}
+          label={props.label}
+          value={draft}
+          onChange={setDraft}
+        />
       ) : mode === "textarea" ? (
         <textarea
           aria-label={props.label}
@@ -647,6 +656,20 @@ function InlineEditableValue(props: {
       </span>
     </span>
   );
+}
+
+function toStableDomId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .split("")
+    .map((character) => {
+      if (/^[a-z0-9]$/.test(character)) return character;
+      return `-${character.charCodeAt(0).toString(36)}`;
+    })
+    .join("")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "") || "field";
 }
 
 function formatInlineDisplay(value: string, suffix?: string): string {
