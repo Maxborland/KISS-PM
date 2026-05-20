@@ -29,13 +29,58 @@
 .deal-detail-title {
   flex: 1 1 auto;
   min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.deal-detail-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .deal-detail-title h1 {
-  margin: 0 0 4px;
+  margin: 0;
   color: var(--text);
   font-size: 24px;
   line-height: 1.15;
+}
+
+.deal-detail-subtitle {
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.deal-commercial-summary {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.deal-section-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.deal-section-heading h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.deal-section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .deal-detail-layout {
@@ -243,7 +288,71 @@
 .deal-card-main {
   min-width: 0;
   display: grid;
+  gap: 4px;
+}
+
+.deal-card-main small,
+.deal-card-contact,
+.deal-card-facts span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.deal-card-contact,
+.deal-card-facts span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.deal-card-contact {
+  overflow-wrap: anywhere;
+}
+
+.deal-card-facts {
+  display: grid;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.deal-card-economics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.deal-card-economics span {
+  min-width: 0;
+  display: grid;
   gap: 2px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.deal-card-economics small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.deal-card-economics strong {
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.deal-card-feasibility {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .deal-card-stage-controls {

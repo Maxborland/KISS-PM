@@ -226,10 +226,10 @@ Review notes:
 Review notes:
 
 - Bug Hunt found three Important issues: stale generic audit assertions, missing read-only task completion denial and cross-run required custom field buildup. Fixed by suffix/sourceEntity audit checks, read-only `PATCH /tasks/:activityId` 403 coverage and deactivating stale smoke opportunity fields before tests.
-- Code Review found two Important issues: DnD coverage weakened by select fallback and serial `workers: 1` workaround. Fixed by restoring pointer-driven DnD smoke and removing serial workers after isolating smoke state.
+- Code Review found two Important issues: DnD coverage weakened by select fallback and serial `workers: 1` workaround. Fixed in that slice by restoring pointer-driven DnD smoke and removing serial workers after isolating smoke state.
 - Security Review found no Critical/Important findings after fixes.
 - Browser smoke on `http://127.0.0.1:3001/opportunities` and `http://127.0.0.1:3001/opportunities/:id` covered desktop and narrow viewport; E2E now asserts no mobile horizontal overflow in the deal detail workspace.
-- Full `pnpm test:e2e:smoke` passes in parallel mode: 4 tests, 3 workers.
+- Historical verification for that slice: full `pnpm test:e2e:smoke` passed in parallel mode, 4 tests / 3 workers. Later CRM product-polish work increased Kanban card density and the current canonical Playwright config runs smoke with `workers: 1` because the smoke suite mutates one shared tenant and includes real pointer-driven DnD.
 - [x] Commit: `test: cover crm intake activity workspace`.
 
 ## Block 7. Product UI polish after activity workspace

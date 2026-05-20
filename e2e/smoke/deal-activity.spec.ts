@@ -47,6 +47,15 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
 
   await page.goto(`/opportunities/${opportunityId}`);
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  const commercialSummary = page.getByRole("region", {
+    name: "Коммерческая модель сделки"
+  });
+  await expect(commercialSummary).toBeVisible();
+  await expect(commercialSummary.getByText("Стоимость контракта", { exact: true })).toBeVisible();
+  await expect(commercialSummary.getByText("Плановая ставка", { exact: true })).toBeVisible();
+  await expect(commercialSummary.getByText("Расчетные часы", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CRM-связи и параметры" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Потребность по ролям" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Рабочее окно сделки" })).toBeVisible();
   const activityPanel = page.getByLabel("Рабочая лента сделки");
   await expect(

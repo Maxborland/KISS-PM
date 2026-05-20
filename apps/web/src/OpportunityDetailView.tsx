@@ -204,8 +204,9 @@ export function OpportunityDetailView(props: {
           <header className="deal-detail-header">
             <span className="row-avatar">С</span>
             <div className="deal-detail-title">
+              <span className="deal-detail-kicker">CRM intake / Сделка</span>
               <h1>{opportunity.title}</h1>
-              <span className="muted">
+              <span className="deal-detail-subtitle">
                 {getOpportunityClientLabel(props.data, opportunity)} ·{" "}
                 {getOpportunityContactLabel(props.data, opportunity)}
               </span>
@@ -216,25 +217,34 @@ export function OpportunityDetailView(props: {
             />
           </header>
 
-          <div className="surface-summary-grid">
-            <SummaryCard label="Стоимость" value={economics.contractValueLabel} />
-            <SummaryCard label="Норма часа" value={economics.plannedHourlyRateLabel} />
-            <SummaryCard label="Необходимые часы" value={economics.plannedHoursLabel} />
-            <SummaryCard
-              label="Вероятность, %"
-              value={opportunity.probability}
-              tone="success"
-            />
-            <SummaryCard
-              label="Потребность, ч"
-              value={demandedHours}
-              tone="muted"
-            />
-          </div>
+          <section
+            aria-label="Коммерческая модель сделки"
+            className="deal-commercial-summary"
+          >
+            <div className="deal-section-heading">
+              <h2>Коммерческая модель</h2>
+              <p>Стоимость, плановая ставка и расчетные часы не смешиваются в одно поле.</p>
+            </div>
+            <div className="surface-summary-grid">
+              <SummaryCard label="Стоимость контракта" value={economics.contractValueLabel} />
+              <SummaryCard label="Плановая ставка" value={economics.plannedHourlyRateLabel} />
+              <SummaryCard label="Расчетные часы" value={economics.plannedHoursLabel} />
+              <SummaryCard
+                label="Вероятность"
+                value={`${opportunity.probability}%`}
+                tone="success"
+              />
+              <SummaryCard
+                label="Потребность ролей"
+                value={`${demandedHours} ч`}
+                tone="muted"
+              />
+            </div>
+          </section>
 
           <div className="deal-detail-layout">
             <section className="detail-card">
-              <h2>Связи и параметры</h2>
+              <h2>CRM-связи и параметры</h2>
               <dl className="detail-list">
                 <div>
                   <dt>Клиент</dt>
@@ -378,7 +388,7 @@ export function OpportunityDetailView(props: {
 
           <div className="deal-detail-layout">
             <section className="detail-card">
-              <h2>Потребность: должность + часы</h2>
+              <h2>Потребность по ролям</h2>
               <div className="chip-list">
                 {opportunity.demand.map((line) => (
                   <span className="permission-chip" key={line.positionId}>

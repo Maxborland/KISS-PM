@@ -4,6 +4,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
@@ -12,17 +13,24 @@ import {
   type DragOverEvent,
   type DragStartEvent
 } from "@dnd-kit/core";
-import { ArrowRightLeft, GripVertical, Loader2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  BriefcaseBusiness,
+  CalendarDays,
+  GripVertical,
+  Loader2,
+  UserRound
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { DealStage, Opportunity } from "./api";
 import {
+  buildOpportunityKanbanCardViewModel,
   canMoveOpportunityToStage,
-  formatOpportunityEconomics,
-  getOpportunityClientLabel,
   getOpportunityStageMoveBlocker,
   getOpportunityStageOptions
 } from "./opportunityDisplay";
+import { StatusPill } from "./components/workspace-ui";
 import type { WorkspaceData } from "./workspaceData";
 
 export function DealsKanban(props: {
@@ -101,6 +109,7 @@ export function DealsKanban(props: {
 
   return (
     <DndContext
+      collisionDetection={pointerWithin}
       sensors={sensors}
       onDragCancel={() => {
         setDraggingOpportunityId(null);
@@ -217,7 +226,7 @@ function DealKanbanCard(props: {
       currentStageId: props.opportunity.stageId
     }
   });
-  const economics = formatOpportunityEconomics(props.opportunity);
+  const card = buildOpportunityKanbanCardViewModel(props.data, props.opportunity);
   const isMoving = props.pendingMove?.opportunityId === props.opportunity.id;
 
   return (
@@ -242,13 +251,42 @@ function DealKanbanCard(props: {
         >
           {props.opportunity.title}
         </button>
-        <small>{getOpportunityClientLabel(props.data, props.opportunity)}</small>
+        <small>{card.clientLabel}</small>
+        <span className="deal-card-contact">
+          <UserRound aria-hidden="true" size={12} />
+          {card.contactLabel}
+        </span>
       </div>
-      <span className="chip-list">
-        <span className="permission-chip">{economics.plannedHoursLabel}</span>
-        <span className="permission-chip">{economics.contractValueLabel}</span>
-        <span className="permission-chip">{economics.plannedHourlyRateLabel}</span>
-      </span>
+      <div className="deal-card-facts">
+        <span>
+          <CalendarDays aria-hidden="true" size={12} />
+          {card.periodLabel}
+        </span>
+        <span>
+          <BriefcaseBusiness aria-hidden="true" size={12} />
+          {card.demandLabel}
+        </span>
+      </div>
+      <div
+        aria-label={`Экономика сделки: необходимые часы ${card.plannedHoursLabel}; стоимость ${card.contractValueLabel}; плановая норма часа ${card.plannedHourlyRateLabel}`}
+        className="deal-card-economics"
+      >
+        <span>
+          <small>Часы</small>
+          <strong>{card.plannedHoursLabel}</strong>
+        </span>
+        <span>
+          <small>Стоимость</small>
+          <strong>{card.contractValueLabel}</strong>
+        </span>
+        <span>
+          <small>Норма</small>
+          <strong>{card.plannedHourlyRateLabel}</strong>
+        </span>
+      </div>
+      <div className="deal-card-feasibility">
+        <StatusPill label={card.feasibilityLabel} tone={card.feasibilityTone} />
+      </div>
       <div className="deal-card-stage-controls">
         <button
           aria-label={
