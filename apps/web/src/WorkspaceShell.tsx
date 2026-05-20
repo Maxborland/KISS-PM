@@ -55,6 +55,7 @@ export function WorkspaceShell() {
   const activeOpportunityId = getOpportunityIdFromPathname(pathname);
   const activeClientId = getClientIdFromPathname(pathname);
   const activeContactId = getContactIdFromPathname(pathname);
+  const activeProductId = getProductIdFromPathname(pathname);
   const activeProjectId = getProjectIdFromPathname(pathname);
 
   useEffect(() => {
@@ -415,6 +416,7 @@ export function WorkspaceShell() {
           activeOpportunityId={activeOpportunityId}
           activeClientId={activeClientId}
           activeContactId={activeContactId}
+          activeProductId={activeProductId}
           activeProjectId={activeProjectId}
           data={data}
           openCreateRequested={quickCreateRequested}
@@ -431,6 +433,9 @@ export function WorkspaceShell() {
           onOpenContact={(contactId) => {
             router.push(`/contacts/${encodeURIComponent(contactId)}`);
           }}
+          onOpenProduct={(productId) => {
+            router.push(`/products/${encodeURIComponent(productId)}`);
+          }}
           onOpenProject={(projectId) => {
             router.push(`/projects/${encodeURIComponent(projectId)}`);
           }}
@@ -442,6 +447,9 @@ export function WorkspaceShell() {
           }}
           onBackToContacts={() => {
             router.push(getRoutePath("contacts"));
+          }}
+          onBackToProducts={() => {
+            router.push(getRoutePath("products"));
           }}
           onBackToProjects={() => {
             router.push(getRoutePath("projects"));
@@ -475,4 +483,10 @@ function getContactIdFromPathname(pathname: string): string | null {
   const match = /^\/contacts\/([^/]+)\/?$/.exec(pathname);
   const rawContactId = match?.[1];
   return rawContactId ? decodeURIComponent(rawContactId) : null;
+}
+
+function getProductIdFromPathname(pathname: string): string | null {
+  const match = /^\/products\/([^/]+)\/?$/.exec(pathname);
+  const rawProductId = match?.[1];
+  return rawProductId ? decodeURIComponent(rawProductId) : null;
 }

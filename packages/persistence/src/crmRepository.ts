@@ -3,7 +3,7 @@ import { asc, and, eq } from "drizzle-orm";
 import type { TenantId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
-import { clients, contacts, dealStages, projectTypes } from "./schema";
+import { clients, contacts, dealStages, products, projectTypes } from "./schema";
 
 export type CrmEntityStatus = "active" | "archived";
 
@@ -34,6 +34,24 @@ export type ContactRecord = {
 };
 
 export type ContactInput = Omit<ContactRecord, "createdAt" | "updatedAt">;
+
+export type ProductType = "service" | "goods";
+
+export type ProductRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  sku: string | null;
+  type: ProductType;
+  unit: string;
+  price: number;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProductInput = Omit<ProductRecord, "createdAt" | "updatedAt">;
 
 export type ProjectTypeRecord = {
   id: string;
@@ -71,6 +89,13 @@ export type CrmRepository = {
   ): Promise<ContactRecord | undefined>;
   createContact(input: ContactInput): Promise<ContactRecord>;
   updateContact(input: ContactInput): Promise<ContactRecord>;
+  listProducts(tenantId: TenantId): Promise<ProductRecord[]>;
+  findProductById(
+    tenantId: TenantId,
+    productId: string
+  ): Promise<ProductRecord | undefined>;
+  createProduct(input: ProductInput): Promise<ProductRecord>;
+  updateProduct(input: ProductInput): Promise<ProductRecord>;
   listProjectTypes(tenantId: TenantId): Promise<ProjectTypeRecord[]>;
   findProjectTypeById(
     tenantId: TenantId,
@@ -170,6 +195,49 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
         .returning();
       if (!row) throw new Error("Contact update returned no row");
       return mapContactRecord(row);
+    },
+    async listProducts(tenantId) {
+      const rows = await db
+        .select()
+        .from(products)
+        .where(eq(products.tenantId, tenantId))
+        .orderBy(asc(products.name));
+      return rows.map(mapProductRecord);
+    },
+    async findProductById(tenantId, productId) {
+      const [row] = await db
+        .select()
+        .from(products)
+        .where(and(eq(products.tenantId, tenantId), eq(products.id, productId)))
+        .limit(1);
+      return row ? mapProductRecord(row) : undefined;
+    },
+    async createProduct(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(products)
+        .values({ ...input, createdAt: now, updatedAt: now })
+        .returning();
+      if (!row) throw new Error("Product insert returned no row");
+      return mapProductRecord(row);
+    },
+    async updateProduct(input) {
+      const [row] = await db
+        .update(products)
+        .set({
+          name: input.name,
+          sku: input.sku,
+          type: input.type,
+          unit: input.unit,
+          price: input.price,
+          description: input.description,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(and(eq(products.tenantId, input.tenantId), eq(products.id, input.id)))
+        .returning();
+      if (!row) throw new Error("Product update returned no row");
+      return mapProductRecord(row);
     },
     async listProjectTypes(tenantId) {
       const rows = await db
@@ -278,6 +346,22 @@ function mapContactRecord(row: typeof contacts.$inferSelect): ContactRecord {
     phone: row.phone,
     telegram: row.telegram,
     role: row.role,
+    status: row.status as CrmEntityStatus,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function mapProductRecord(row: typeof products.$inferSelect): ProductRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    name: row.name,
+    sku: row.sku,
+    type: row.type as ProductType,
+    unit: row.unit,
+    price: row.price,
+    description: row.description,
     status: row.status as CrmEntityStatus,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt

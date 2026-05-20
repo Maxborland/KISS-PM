@@ -2,6 +2,7 @@ import type {
   ClientInput,
   ContactInput,
   DealStageInput,
+  ProductInput,
   ProjectTypeInput
 } from "./apiTypes";
 import { getOptionalString } from "./parseHelpers";
@@ -24,6 +25,8 @@ const maxLengths = {
   description: 1_000,
   email: 160,
   phone: 80,
+  sku: 80,
+  unit: 40,
   telegram: 80,
   role: 120
 } as const;
@@ -110,6 +113,54 @@ export function parseContactBody(
   };
 }
 
+export function parseProductBody(
+  body: unknown,
+  tenantId: string
+): ParseResult<ProductInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = getOptionalString(input, "id") ?? `product-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const sku = getOptionalString(input, "sku") ?? null;
+  const type = parseProductType(getOptionalString(input, "type") ?? "service");
+  const unit = getOptionalString(input, "unit");
+  const price = parsePositiveInteger(input.price);
+  const description = getOptionalString(input, "description") ?? null;
+  const status = parseStatus(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_product_id" };
+  if (!name || name.length > maxLengths.name) {
+    return { ok: false, error: "invalid_product_name" };
+  }
+  if (sku !== null && sku.length > maxLengths.sku) {
+    return { ok: false, error: "invalid_product_sku" };
+  }
+  if (!type) return { ok: false, error: "invalid_product_type" };
+  if (!unit || unit.length > maxLengths.unit) {
+    return { ok: false, error: "invalid_product_unit" };
+  }
+  if (price === null) return { ok: false, error: "invalid_product_price" };
+  if (description !== null && description.length > maxLengths.description) {
+    return { ok: false, error: "invalid_description" };
+  }
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      name,
+      sku,
+      type,
+      unit,
+      price,
+      description,
+      status
+    }
+  };
+}
+
 export function parseProjectTypeBody(
   body: unknown,
   tenantId: string
@@ -168,6 +219,10 @@ export function isId(value: string): boolean {
 
 function parseStatus(value: string): "active" | "archived" | null {
   return value === "active" || value === "archived" ? value : null;
+}
+
+function parseProductType(value: string): "service" | "goods" | null {
+  return value === "service" || value === "goods" ? value : null;
 }
 
 function parsePositiveInteger(value: unknown): number | null {

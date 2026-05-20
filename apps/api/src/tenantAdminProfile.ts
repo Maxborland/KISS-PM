@@ -15,6 +15,8 @@ export const tenantAdminProfile = createAccessProfile({
     "tenant.clients.manage",
     "tenant.contacts.read",
     "tenant.contacts.manage",
+    "tenant.products.read",
+    "tenant.products.manage",
     "tenant.project_types.read",
     "tenant.project_types.manage",
     "tenant.deal_stages.read",

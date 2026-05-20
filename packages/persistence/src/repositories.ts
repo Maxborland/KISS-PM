@@ -33,6 +33,8 @@ import {
   type CrmRepository,
   type DealStageInput,
   type DealStageRecord,
+  type ProductInput,
+  type ProductRecord,
   type ProjectTypeInput,
   type ProjectTypeRecord
 } from "./crmRepository";
@@ -91,7 +93,7 @@ export type ProjectTemplateRecord = {
   updatedAt: Date;
 };
 export type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
-export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProjectTypeInput, ProjectTypeRecord };
+export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;

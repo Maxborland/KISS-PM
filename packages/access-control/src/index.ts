@@ -14,6 +14,8 @@ export const permissions = [
   "tenant.clients.manage",
   "tenant.contacts.read",
   "tenant.contacts.manage",
+  "tenant.products.read",
+  "tenant.products.manage",
   "tenant.project_types.read",
   "tenant.project_types.manage",
   "tenant.deal_stages.read",
@@ -197,6 +199,28 @@ export function canManageContacts(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.contacts.manage"
+  });
+}
+
+export function canReadProducts(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.products.read"
+  });
+}
+
+export function canManageProducts(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.products.manage"
   });
 }
 

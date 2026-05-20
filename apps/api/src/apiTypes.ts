@@ -79,6 +79,24 @@ export type ContactRecord = {
 
 export type ContactInput = Omit<ContactRecord, "createdAt" | "updatedAt">;
 
+export type ProductType = "service" | "goods";
+
+export type ProductRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  sku: string | null;
+  type: ProductType;
+  unit: string;
+  price: number;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProductInput = Omit<ProductRecord, "createdAt" | "updatedAt">;
+
 export type ProjectTypeRecord = {
   id: string;
   tenantId: TenantId;
@@ -289,6 +307,13 @@ export type ApiTenantDataSource = {
   ): Promise<ContactRecord | undefined>;
   createContact?(input: ContactInput): Promise<ContactRecord>;
   updateContact?(input: ContactInput): Promise<ContactRecord>;
+  listProducts?(tenantId: TenantId): Promise<ProductRecord[]>;
+  findProductById?(
+    tenantId: TenantId,
+    productId: string
+  ): Promise<ProductRecord | undefined>;
+  createProduct?(input: ProductInput): Promise<ProductRecord>;
+  updateProduct?(input: ProductInput): Promise<ProductRecord>;
   listProjectTypes?(tenantId: TenantId): Promise<ProjectTypeRecord[]>;
   findProjectTypeById?(
     tenantId: TenantId,

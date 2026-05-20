@@ -9,6 +9,7 @@ import {
   validateOpportunityForm,
   validateCustomFieldForm,
   validatePositionForm,
+  validateProductForm,
   validateProjectTypeForm,
   validateProjectTemplateForm,
   validateRoleForm,
@@ -148,6 +149,20 @@ describe("workspace form quality baseline", () => {
     });
     expect(validateProjectTypeForm({ name: "", description: "" })).toEqual({
       name: "Укажите тип проекта."
+    });
+    expect(
+      validateProductForm({
+        name: "",
+        sku: "",
+        type: "invalid",
+        unit: "",
+        price: "0"
+      })
+    ).toEqual({
+      name: "Укажите товар или услугу.",
+      type: "Выберите тип позиции.",
+      unit: "Укажите единицу измерения.",
+      price: "Цена должна быть положительным целым числом."
     });
     expect(validateDealStageForm({ name: "", sortOrder: "0" })).toEqual({
       name: "Укажите этап сделки.",

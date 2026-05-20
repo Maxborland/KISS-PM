@@ -14,6 +14,8 @@ export const rolePermissionOptions = [
   { value: "tenant.clients.manage", label: "Управлять клиентами" },
   { value: "tenant.contacts.read", label: "Читать контакты" },
   { value: "tenant.contacts.manage", label: "Управлять контактами" },
+  { value: "tenant.products.read", label: "Читать товары и услуги" },
+  { value: "tenant.products.manage", label: "Управлять товарами и услугами" },
   { value: "tenant.project_types.read", label: "Читать типы проектов" },
   { value: "tenant.project_types.manage", label: "Управлять типами проектов" },
   { value: "tenant.deal_stages.read", label: "Читать этапы сделок" },

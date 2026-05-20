@@ -30,6 +30,8 @@ const dataset: SeedTenantDataset = {
         "tenant.clients.manage",
         "tenant.contacts.read",
         "tenant.contacts.manage",
+        "tenant.products.read",
+        "tenant.products.manage",
         "tenant.project_types.read",
         "tenant.project_types.manage",
         "tenant.deal_stages.read",
@@ -98,7 +100,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -107,7 +109,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -141,6 +143,19 @@ describe("Phase 3.1 CRM API", () => {
         role: "Заказчик"
       })
     });
+    const productResponse = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-implementation",
+        name: "Внедрение KISS PM",
+        sku: "KISS-IMPL",
+        type: "service",
+        unit: "час",
+        price: 6000,
+        description: "Проектная услуга"
+      })
+    });
     const projectTypeResponse = await app.request("/api/workspace/project-types", {
       method: "POST",
       headers,
@@ -171,6 +186,7 @@ describe("Phase 3.1 CRM API", () => {
 
     expect(clientResponse.status).toBe(201);
     expect(contactResponse.status).toBe(201);
+    expect(productResponse.status).toBe(201);
     expect(projectTypeResponse.status).toBe(201);
     expect(firstStageResponse.status).toBe(201);
     expect(secondStageResponse.status).toBe(201);
@@ -313,6 +329,7 @@ describe("Phase 3.1 CRM API", () => {
       auditEvents: expect.arrayContaining([
         expect.objectContaining({ actionType: "client.created" }),
         expect.objectContaining({ actionType: "contact.created" }),
+        expect.objectContaining({ actionType: "product.created" }),
         expect.objectContaining({ actionType: "project_type.created" }),
         expect.objectContaining({ actionType: "deal_stage.created" }),
         expect.objectContaining({ actionType: "opportunity.created" }),
@@ -431,6 +448,34 @@ describe("Phase 3.1 CRM API", () => {
         status: "archived"
       })
     });
+    const productCreate = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-implementation",
+        name: "Внедрение KISS PM",
+        sku: "KISS-IMPL",
+        type: "service",
+        unit: "час",
+        price: 6000
+      })
+    });
+    const productUpdate = await app.request(
+      "/api/workspace/products/product-implementation",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Внедрение KISS PM расширенное",
+          sku: "KISS-IMPL-PLUS",
+          type: "service",
+          unit: "час",
+          price: 7000,
+          description: "Расширенная услуга",
+          status: "archived"
+        })
+      }
+    );
     const projectTypeUpdate = await app.request(
       "/api/workspace/project-types/project-type-implementation",
       {
@@ -464,6 +509,8 @@ describe("Phase 3.1 CRM API", () => {
 
     expect(clientUpdate.status).toBe(200);
     expect(contactUpdate.status).toBe(200);
+    expect(productCreate.status).toBe(201);
+    expect(productUpdate.status).toBe(200);
     expect(projectTypeUpdate.status).toBe(200);
     expect(stageUpdate.status).toBe(200);
     expect(invalidContactUpdate.status).toBe(404);
@@ -479,6 +526,15 @@ describe("Phase 3.1 CRM API", () => {
         id: "contact-irina",
         name: "Ирина Обновленная",
         role: "Спонсор",
+        status: "archived"
+      }
+    });
+    await expect(productUpdate.json()).resolves.toMatchObject({
+      product: {
+        id: "product-implementation",
+        name: "Внедрение KISS PM расширенное",
+        sku: "KISS-IMPL-PLUS",
+        price: 7000,
         status: "archived"
       }
     });
@@ -510,6 +566,7 @@ describe("Phase 3.1 CRM API", () => {
           afterState: expect.objectContaining({ name: "ООО Ромашка обновлено" })
         }),
         expect.objectContaining({ actionType: "contact.updated" }),
+        expect.objectContaining({ actionType: "product.updated" }),
         expect.objectContaining({ actionType: "project_type.updated" }),
         expect.objectContaining({ actionType: "deal_stage.updated" })
       ])
@@ -638,6 +695,21 @@ describe("Phase 3.1 CRM API", () => {
         name: "Нельзя создать"
       })
     });
+    const productResponse = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        id: "product-denied",
+        name: "Нельзя создать",
+        type: "service",
+        unit: "час",
+        price: 6000
+      })
+    });
     const projectTypeResponse = await app.request("/api/workspace/project-types", {
       method: "POST",
       headers: {
@@ -688,6 +760,24 @@ describe("Phase 3.1 CRM API", () => {
         status: "archived"
       })
     });
+    const productUpdateResponse = await app.request(
+      "/api/workspace/products/product-denied",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          name: "Нельзя изменить",
+          type: "service",
+          unit: "час",
+          price: 6000,
+          status: "archived"
+        })
+      }
+    );
     const projectTypeUpdateResponse = await app.request(
       "/api/workspace/project-types/project-type-denied",
       {
@@ -725,14 +815,17 @@ describe("Phase 3.1 CRM API", () => {
 
     expect(clientResponse.status).toBe(403);
     expect(contactResponse.status).toBe(403);
+    expect(productResponse.status).toBe(403);
     expect(projectTypeResponse.status).toBe(403);
     expect(dealStageResponse.status).toBe(403);
     expect(clientUpdateResponse.status).toBe(403);
     expect(contactUpdateResponse.status).toBe(403);
+    expect(productUpdateResponse.status).toBe(403);
     expect(projectTypeUpdateResponse.status).toBe(403);
     expect(dealStageUpdateResponse.status).toBe(403);
     await expect(clientResponse.json()).resolves.toEqual({ error: "permission_missing" });
     await expect(contactResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(productResponse.json()).resolves.toEqual({ error: "permission_missing" });
     await expect(projectTypeResponse.json()).resolves.toEqual({
       error: "permission_missing"
     });
@@ -743,10 +836,12 @@ describe("Phase 3.1 CRM API", () => {
       expect.arrayContaining([
         expect.objectContaining({ actionType: "client.create_denied" }),
         expect.objectContaining({ actionType: "contact.create_denied" }),
+        expect.objectContaining({ actionType: "product.create_denied" }),
         expect.objectContaining({ actionType: "project_type.create_denied" }),
         expect.objectContaining({ actionType: "deal_stage.create_denied" }),
         expect.objectContaining({ actionType: "client.update_denied" }),
         expect.objectContaining({ actionType: "contact.update_denied" }),
+        expect.objectContaining({ actionType: "product.update_denied" }),
         expect.objectContaining({ actionType: "project_type.update_denied" }),
         expect.objectContaining({ actionType: "deal_stage.update_denied" })
       ])

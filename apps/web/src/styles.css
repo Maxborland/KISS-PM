@@ -1054,6 +1054,26 @@ h2 {
   font-size: 12px;
 }
 
+.entity-row-link {
+  display: inline-flex;
+  max-width: 100%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  border: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.entity-row-link:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.entity-row-link:hover strong { color: var(--accent); }
+
 .person-cell small {
   display: block;
   margin-top: 2px;
@@ -1209,11 +1229,23 @@ h2 {
   color: var(--muted);
 }
 
-.detail-list {
+.crm-card-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.75fr); gap: 16px; }
+
+.detail-card {
   display: grid;
-  gap: 10px;
-  margin: 0;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
 }
+
+.detail-card h2, .detail-card h3 { margin: 0; color: var(--text); }
+
+.entity-link-list { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.entity-link-list li { display: grid; gap: 4px; border-bottom: 1px solid var(--border-muted); padding-bottom: 12px; }
+.entity-link-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.detail-list { display: grid; gap: 10px; margin: 0; }
 
 .detail-list div {
   display: grid;
@@ -1686,7 +1718,8 @@ input[type="color"] {
   .crm-reference-strip,
   .deal-economics-preview,
   .deal-detail-layout,
-  .management-layout {
+  .management-layout,
+  .crm-card-layout {
     grid-template-columns: 1fr;
   }
 
