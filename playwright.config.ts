@@ -15,6 +15,7 @@ const webOrigin = `http://127.0.0.1:${webPort}`;
 export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
+  workers: 1,
   expect: {
     timeout: 10_000
   },

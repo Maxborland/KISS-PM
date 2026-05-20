@@ -3,7 +3,7 @@ import type { WorkspaceData } from "./workspaceData";
 
 type OpportunityReferenceData = Pick<
   WorkspaceData,
-  "clients" | "contacts" | "projectTypes"
+  "clients" | "contacts" | "positions" | "projectTypes"
 >;
 
 export function getOpportunityClientLabel(
@@ -143,6 +143,47 @@ export function formatOpportunityEconomics(opportunity: Opportunity): {
   };
 }
 
+export type OpportunityKanbanCardViewModel = {
+  clientLabel: string;
+  contactLabel: string;
+  contractValueLabel: string;
+  demandLabel: string;
+  feasibilityLabel: string;
+  feasibilityTone: "success" | "muted";
+  periodLabel: string;
+  plannedHourlyRateLabel: string;
+  plannedHoursLabel: string;
+};
+
+export function buildOpportunityKanbanCardViewModel(
+  data: OpportunityReferenceData,
+  opportunity: Opportunity
+): OpportunityKanbanCardViewModel {
+  const economics = formatOpportunityEconomics(opportunity);
+
+  return {
+    clientLabel: getOpportunityClientLabel(data, opportunity),
+    contactLabel: getOpportunityContactLabel(data, opportunity),
+    contractValueLabel: economics.contractValueLabel,
+    demandLabel: formatOpportunityDemand(data, opportunity),
+    feasibilityLabel: getOpportunityFeasibilityLabel(opportunity.feasibilityStatus),
+    feasibilityTone: opportunity.feasibilityStatus === "ok" ? "success" : "muted",
+    periodLabel: `${formatDateOnly(opportunity.plannedStart)} -> ${formatDateOnly(opportunity.plannedFinish)}`,
+    plannedHourlyRateLabel: economics.plannedHourlyRateLabel,
+    plannedHoursLabel: economics.plannedHoursLabel
+  };
+}
+
+export function getOpportunityFeasibilityLabel(
+  status: Opportunity["feasibilityStatus"]
+): string {
+  if (status === "ok") return "Достаточно ресурса";
+  if (status === "warning") return "Есть предупреждения";
+  if (status === "conflict") return "Конфликт ресурса";
+  if (status === "blocked") return "Заблокировано";
+  return "Не проверено";
+}
+
 function sortDealStages(dealStages: DealStage[]): DealStage[] {
   return [...dealStages].sort(
     (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)
@@ -159,4 +200,29 @@ function formatMoney(value: number): string {
     style: "currency",
     currency: "RUB"
   }).format(value);
+}
+
+function formatOpportunityDemand(
+  data: Pick<WorkspaceData, "positions">,
+  opportunity: Opportunity
+): string {
+  if (opportunity.demand.length === 0) return "Потребность не задана";
+
+  return opportunity.demand
+    .map((line) => {
+      const positionName =
+        data.positions.find((position) => position.id === line.positionId)?.name ??
+        line.positionId;
+      return `${positionName}: ${line.requiredHours} ч`;
+    })
+    .join(", ");
+}
+
+function formatDateOnly(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+    year: "numeric"
+  }).format(new Date(value));
 }
