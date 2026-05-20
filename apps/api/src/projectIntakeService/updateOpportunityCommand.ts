@@ -29,8 +29,12 @@ export async function updateOpportunity(
     return { ok: false, status: 409, error: "opportunity_update_locked" };
   }
 
-  const linked = await resolveOpportunityLinks(deps.dataSource, input.actor.tenantId, {
+  const inputWithOwner = {
     ...input.input,
+    ownerUserId: input.input.ownerUserId ?? opportunity.ownerUserId ?? input.actor.id
+  };
+  const linked = await resolveOpportunityLinks(deps.dataSource, input.actor.tenantId, {
+    ...inputWithOwner,
     id: opportunity.id,
     status: opportunity.status,
     clientName: opportunity.clientName,
@@ -41,7 +45,7 @@ export async function updateOpportunity(
   const customFieldValidation = await validateOpportunityCustomFieldValues(
     deps.dataSource,
     input.actor.tenantId,
-    input.input.customFieldValues
+    inputWithOwner.customFieldValues
   );
   if (!customFieldValidation.ok) return customFieldValidation;
 
@@ -52,7 +56,7 @@ export async function updateOpportunity(
       }
 
       const updated = await transactionDataSource.updateOpportunity({
-        ...input.input,
+        ...inputWithOwner,
         id: opportunity.id,
         status: opportunity.status,
         clientName: linked.client.name,
@@ -72,7 +76,7 @@ export async function updateOpportunity(
           },
           commandInput: {
             opportunityId: opportunity.id,
-            ...input.input,
+            ...inputWithOwner,
             clientName: linked.client.name,
             contactName: linked.contact.name,
             projectType: linked.projectType.name,

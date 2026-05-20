@@ -20,6 +20,7 @@ const baseOpportunity: Opportunity = {
   tenantId: "tenant-1",
   clientId: "client-1",
   primaryContactId: "contact-1",
+  ownerUserId: "user-owner",
   projectTypeId: "project-type-1",
   stageId: "stage-archived",
   clientName: "Старый клиент",
@@ -179,7 +180,7 @@ describe("opportunity display helpers", () => {
   test("formats deal economics as separate value, hourly norm and required hours", () => {
     expect(formatOpportunityEconomics(baseOpportunity)).toEqual({
       contractValueLabel: "1 000 000 ₽",
-      plannedHourlyRateLabel: "5 000 ₽/ч",
+      plannedHourlyRateLabel: "5 000 ₽ / ч",
       plannedHoursLabel: "200 ч"
     });
   });
@@ -201,7 +202,7 @@ describe("opportunity display helpers", () => {
       feasibilityLabel: "Есть предупреждения",
       feasibilityTone: "muted",
       periodLabel: "01.07.2026 -> 31.07.2026",
-      plannedHourlyRateLabel: "5 000 ₽/ч",
+      plannedHourlyRateLabel: "5 000 ₽ / ч",
       plannedHoursLabel: "200 ч"
     });
   });

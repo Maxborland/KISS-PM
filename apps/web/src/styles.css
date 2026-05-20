@@ -689,17 +689,16 @@ h2 {
   align-items: start;
 }
 
-.grid-3 {
+.grid-3,
+.grid-4 {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
-.two-column {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-  gap: 14px;
-}
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.two-column { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr); gap: 14px; }
 
 .management-layout {
   display: grid;
@@ -1528,6 +1527,8 @@ input[type="color"] {
   animation: modal-in 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.modal-panel.wide { width: min(1120px, 100%); }
+
 .icon-button {
   width: 34px;
   height: 34px;
@@ -1714,6 +1715,7 @@ input[type="color"] {
   }
 
   .grid-3,
+  .grid-4,
   .two-column,
   .crm-reference-strip,
   .deal-economics-preview,

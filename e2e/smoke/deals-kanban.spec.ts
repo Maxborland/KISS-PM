@@ -57,10 +57,11 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
   await expect(newCard).toContainText("ООО Ромашка");
   await expect(newCard).toContainText("Ирина Клиент");
   await expect(newCard).toContainText("01.02.2031 -> 28.02.2031");
-  await expect(newCard).toContainText("Инженер: 100 ч");
+  await expect(newCard).toContainText("600 000");
+  await expect(newCard).toContainText("100 ч");
   await expect(newCard).toContainText("Не проверено");
   await expect(newCard.getByRole("button", { name: new RegExp(`Перетащить сделку ${title}`) })).toBeVisible();
-  await expect(newCard.getByText("Перетащите карточку или выберите этап")).toBeVisible();
+  await expect(newCard.getByText("Перетащите за ручку или выберите этап")).toBeVisible();
   await expect(page.getByText("Drag-and-drop")).toHaveCount(0);
 
   await dragDealCardToColumn(

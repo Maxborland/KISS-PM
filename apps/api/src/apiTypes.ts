@@ -168,6 +168,7 @@ export type OpportunityRecord = {
   tenantId: TenantId;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -199,8 +200,10 @@ export type OpportunityInput = Omit<
   | "feasibilityStatus"
   | "feasibilityResult"
   | "feasibilityCheckedAt"
+  | "ownerUserId"
   | "customFieldValues"
 > & {
+  ownerUserId?: string | null;
   customFieldValues?: OpportunityCustomFieldValues;
 };
 export type OpportunityUpdateInput = Omit<

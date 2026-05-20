@@ -90,6 +90,7 @@ const opportunities: Opportunity[] = [
     tenantId: "tenant-alpha",
     clientId: "client-romashka",
     primaryContactId: "contact-irina",
+    ownerUserId: "user-admin",
     projectTypeId: "project-type-implementation",
     stageId: "deal-stage-qualified",
     clientName: "ООО Ромашка",

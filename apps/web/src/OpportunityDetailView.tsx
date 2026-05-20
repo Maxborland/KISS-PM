@@ -24,7 +24,8 @@ import type {
 } from "./api";
 import {
   DealOverviewCard,
-  DealRelationshipCards
+  DealRelationshipCards,
+  DealStageStrip
 } from "./OpportunityDetailFacts";
 import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
@@ -53,7 +54,7 @@ import {
   validateOpportunityCustomFields,
   validateOpportunityForm
 } from "./workspaceForms";
-import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
+import { formatDate, formatDateOnly, formatHours } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
   hasPermission,
@@ -312,6 +313,13 @@ export function OpportunityDetailView(props: {
                 onFinalize={setFinalAction}
                 onSaveOpportunity={saveOpportunityInline}
               />
+              <DealStageStrip
+                canManageOpportunities={canManageOpportunities}
+                data={props.data}
+                isPending={isPending}
+                opportunity={opportunity}
+                onUpdateStage={updateStage}
+              />
               <DealMetricGrid opportunity={opportunity} />
               <DealOverviewCard
                 canManageOpportunities={canManageOpportunities}
@@ -362,6 +370,7 @@ export function OpportunityDetailView(props: {
               positions={props.data.positions}
               projectTemplates={props.data.projectTemplates}
               projectTypes={activeProjectTypes}
+              users={props.data.users}
               onClose={() => setIsEditOpen(false)}
               onSubmit={submitOpportunityUpdate}
             />
@@ -432,6 +441,16 @@ function DealPageHeader(props: {
           Клиент: {getOpportunityClientLabel(props.data, props.opportunity)} · Контакт:{" "}
           {getOpportunityContactLabel(props.data, props.opportunity)}
         </p>
+        <DealOwnerInlineEditor
+          disabled={
+            props.isPending ||
+            !props.canManageOpportunities ||
+            isFinalOpportunity(props.opportunity)
+          }
+          opportunity={props.opportunity}
+          users={props.data.users}
+          onSave={(ownerUserId) => props.onSaveOpportunity({ ownerUserId })}
+        />
       </div>
       <div className="deal-page-actions">
         {isFinal ? (
@@ -509,7 +528,7 @@ function DealMetricGrid(props: { opportunity: Opportunity }) {
       <DealMetric
         icon={UserRound}
         label="Потребность"
-        value={`${demandedHours} ч`}
+        value={formatHours(demandedHours)}
       />
       <DealMetric
         icon={WalletCards}
@@ -621,7 +640,7 @@ function ResourceProgressRow(props: {
     <div className="deal-resource-row">
       <span>{props.row.positionName}</span>
       <strong>
-        {props.row.requiredHours}/{props.row.availableHours} ч
+        {formatHours(props.row.requiredHours)} / {formatHours(props.row.availableHours)}
       </strong>
       <div className="deal-progress-track" aria-label={`${props.row.positionName}: ${percent}%`}>
         <span style={{ width: `${percent}%` }} />
@@ -727,6 +746,92 @@ function DealTitleInlineEditor(props: {
             Отмена
           </button>
         </span>
+      </span>
+      {error ? <small className="deal-title-edit-error" role="alert">{error}</small> : null}
+    </span>
+  );
+}
+
+function DealOwnerInlineEditor(props: {
+  disabled: boolean;
+  opportunity: Opportunity;
+  users: WorkspaceData["users"];
+  onSave: (ownerUserId: string | null) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(props.opportunity.ownerUserId ?? "");
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const owner = props.users.find((user) => user.id === props.opportunity.ownerUserId);
+  const activeUsers = props.users.filter((user) => user.status === "active");
+
+  async function save() {
+    setError("");
+    setIsSaving(true);
+    try {
+      await props.onSave(draft || null);
+      setIsEditing(false);
+    } catch (saveError) {
+      setError(getErrorMessage(saveError));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <button
+        aria-label="Редактировать поле Ответственный"
+        className="deal-owner-trigger"
+        disabled={props.disabled}
+        type="button"
+        onClick={() => {
+          setDraft(props.opportunity.ownerUserId ?? "");
+          setError("");
+          setIsEditing(true);
+        }}
+      >
+        <UserRound aria-hidden="true" size={14} />
+        <span>Ответственный:</span>
+        <strong>{owner?.name ?? "Не назначен"}</strong>
+      </button>
+    );
+  }
+
+  return (
+    <span className="deal-owner-editor">
+      <label htmlFor="deal-owner-user">Ответственный</label>
+      <select
+        autoFocus
+        disabled={isSaving}
+        id="deal-owner-user"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      >
+        <option value="">Не назначен</option>
+        {activeUsers.map((user) => (
+          <option key={user.id} value={user.id}>
+            {user.name}
+          </option>
+        ))}
+      </select>
+      <span className="deal-owner-actions">
+        <button
+          className="primary-button compact"
+          disabled={isSaving}
+          type="button"
+          onClick={save}
+        >
+          Сохранить
+        </button>
+        <button
+          className="secondary-button compact"
+          disabled={isSaving}
+          type="button"
+          onClick={() => setIsEditing(false)}
+        >
+          Отмена
+        </button>
       </span>
       {error ? <small className="deal-title-edit-error" role="alert">{error}</small> : null}
     </span>

@@ -1,10 +1,14 @@
 "use client";
 
 import {
+  closestCorners,
+  type CollisionDetection,
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
@@ -15,7 +19,6 @@ import {
 } from "@dnd-kit/core";
 import {
   ArrowRightLeft,
-  BriefcaseBusiness,
   CalendarDays,
   GripVertical,
   Loader2,
@@ -31,6 +34,7 @@ import {
   getOpportunityStageOptions
 } from "./opportunityDisplay";
 import { StatusPill } from "./components/workspace-ui";
+import { formatMoney } from "./workspaceViewHelpers";
 import type { WorkspaceData } from "./workspaceData";
 
 export function DealsKanban(props: {
@@ -63,6 +67,9 @@ export function DealsKanban(props: {
     }
     return grouped;
   }, [props.opportunities, props.stages]);
+  const draggingOpportunity = draggingOpportunityId
+    ? props.opportunities.find((item) => item.id === draggingOpportunityId) ?? null
+    : null;
 
   if (props.stages.length === 0) {
     return <p className="empty-state">Создайте хотя бы один этап сделки для канбана.</p>;
@@ -92,12 +99,12 @@ export function DealsKanban(props: {
   }
 
   function handleDragOver(event: DragOverEvent) {
-    setActiveDropStageId(event.over ? String(event.over.id) : null);
+    setActiveDropStageId(getStageIdFromDragOver(event));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     const opportunityId = String(event.active.id);
-    const targetStageId = event.over ? String(event.over.id) : null;
+    const targetStageId = getStageIdFromDragOver(event);
     setDraggingOpportunityId(null);
     setActiveDropStageId(null);
     if (!targetStageId) return;
@@ -109,7 +116,7 @@ export function DealsKanban(props: {
 
   return (
     <DndContext
-      collisionDetection={pointerWithin}
+      collisionDetection={kanbanCollisionDetection}
       sensors={sensors}
       onDragCancel={() => {
         setDraggingOpportunityId(null);
@@ -136,6 +143,11 @@ export function DealsKanban(props: {
           />
         ))}
       </div>
+      <DragOverlay>
+        {draggingOpportunity ? (
+          <DealKanbanCardPreview data={props.data} opportunity={draggingOpportunity} />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -154,9 +166,14 @@ function DealKanbanColumn(props: {
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: props.stage.id,
+    data: { stageId: props.stage.id },
     disabled: props.stage.status !== "active"
   });
   const isActiveDrop = isOver || props.activeDropStageId === props.stage.id;
+  const stageTotal = props.opportunities.reduce(
+    (sum, opportunity) => sum + opportunity.contractValue,
+    0
+  );
 
   return (
     <section
@@ -175,7 +192,7 @@ function DealKanbanColumn(props: {
             {props.stage.status === "archived" ? `${props.stage.name} · архив` : props.stage.name}
           </strong>
           <small>
-            {props.stage.status === "active" ? "Можно переносить сюда" : "Нельзя переносить сюда"}
+            {props.opportunities.length} сделок · {formatMoney(stageTotal)}
           </small>
         </span>
         <span className="deal-kanban-counter">{props.opportunities.length}</span>
@@ -219,7 +236,7 @@ function DealKanbanCard(props: {
     isPending: props.isPending || Boolean(props.pendingMove),
     opportunity: props.opportunity
   });
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform } = useDraggable({
     id: props.opportunity.id,
     disabled: Boolean(disabledReason),
     data: {
@@ -257,32 +274,19 @@ function DealKanbanCard(props: {
           {card.contactLabel}
         </span>
       </div>
-      <div className="deal-card-facts">
+      <div className="deal-card-facts" aria-label={card.periodLabel}>
         <span>
           <CalendarDays aria-hidden="true" size={12} />
           {card.periodLabel}
-        </span>
-        <span>
-          <BriefcaseBusiness aria-hidden="true" size={12} />
-          {card.demandLabel}
         </span>
       </div>
       <div
         aria-label={`Экономика сделки: необходимые часы ${card.plannedHoursLabel}; стоимость ${card.contractValueLabel}; плановая норма часа ${card.plannedHourlyRateLabel}`}
         className="deal-card-economics"
       >
-        <span>
-          <small>Часы</small>
-          <strong>{card.plannedHoursLabel}</strong>
-        </span>
-        <span>
-          <small>Стоимость</small>
-          <strong>{card.contractValueLabel}</strong>
-        </span>
-        <span>
-          <small>Норма</small>
-          <strong>{card.plannedHourlyRateLabel}</strong>
-        </span>
+        <strong>{card.contractValueLabel}</strong>
+        <span>{card.plannedHoursLabel}</span>
+        <span>{card.plannedHourlyRateLabel}</span>
       </div>
       <div className="deal-card-feasibility">
         <StatusPill label={card.feasibilityLabel} tone={card.feasibilityTone} />
@@ -296,13 +300,14 @@ function DealKanbanCard(props: {
           }
           className="drag-handle-button"
           disabled={Boolean(disabledReason)}
+          ref={setActivatorNodeRef}
           title={disabledReason ?? "Перетащите в другой этап"}
           type="button"
           {...attributes}
           {...listeners}
         >
           {isMoving ? <Loader2 aria-hidden="true" size={14} /> : <GripVertical aria-hidden="true" size={14} />}
-          <span>{isMoving ? "Переносим" : "Перенести"}</span>
+          <span>{isMoving ? "Переносим" : "DnD"}</span>
         </button>
         <label htmlFor={`${props.opportunity.id}-stage`}>
           <span className="sr-only">Сменить этап без перетаскивания</span>
@@ -326,12 +331,48 @@ function DealKanbanCard(props: {
       ) : (
         <p className="deal-card-move-hint">
           <ArrowRightLeft aria-hidden="true" size={12} />
-          Перетащите карточку или выберите этап
+          Перетащите за ручку или выберите этап
         </p>
       )}
     </article>
   );
 }
+
+function DealKanbanCardPreview(props: {
+  data: WorkspaceData;
+  opportunity: Opportunity;
+}) {
+  const card = buildOpportunityKanbanCardViewModel(props.data, props.opportunity);
+
+  return (
+    <article className="deal-card deal-card-overlay">
+      <div className="deal-card-main">
+        <strong>{props.opportunity.title}</strong>
+        <small>{card.clientLabel}</small>
+      </div>
+      <div className="deal-card-economics">
+        <strong>{card.contractValueLabel}</strong>
+        <span>{card.plannedHoursLabel}</span>
+      </div>
+    </article>
+  );
+}
+
+function getStageIdFromDragOver(event: DragEndEvent | DragOverEvent): string | null {
+  if (!event.over) return null;
+  const stageId = event.over.data.current?.stageId;
+  return typeof stageId === "string" ? stageId : String(event.over.id);
+}
+
+const kanbanCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+
+  const intersections = rectIntersection(args);
+  if (intersections.length > 0) return intersections;
+
+  return closestCorners(args);
+};
 
 function getCardMoveDisabledReason(input: {
   canManageOpportunities: boolean;

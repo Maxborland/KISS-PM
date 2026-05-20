@@ -262,6 +262,7 @@ export const opportunities = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     clientId: text("client_id"),
     primaryContactId: text("primary_contact_id"),
+    ownerUserId: text("owner_user_id"),
     projectTypeId: text("project_type_id"),
     stageId: text("stage_id"),
     clientName: text("client_name").notNull(),
@@ -313,6 +314,7 @@ export const opportunities = pgTable(
     }).onDelete("restrict"),
     index("opportunities_tenant_id_idx").on(table.tenantId),
     index("opportunities_status_idx").on(table.status),
+    index("opportunities_owner_user_id_idx").on(table.tenantId, table.ownerUserId),
     index("opportunities_stage_id_idx").on(table.tenantId, table.stageId)
   ]
 );
@@ -810,6 +812,7 @@ const tableColumns = {
     "tenant_id",
     "client_id",
     "primary_contact_id",
+    "owner_user_id",
     "project_type_id",
     "stage_id",
     "client_name",

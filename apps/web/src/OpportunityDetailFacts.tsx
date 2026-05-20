@@ -22,7 +22,7 @@ import {
 } from "./opportunityDisplay";
 import { toDateInputValue } from "./opportunityInlineEdit";
 import type { WorkspaceData } from "./workspaceData";
-import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
+import { formatDate, formatDateOnly, formatHours } from "./workspaceViewHelpers";
 import { getErrorMessage } from "./workspaceShellState";
 import { DatePickerField } from "./components/DatePickerField";
 import { StatusPill } from "./components/workspace-ui";
@@ -36,7 +36,6 @@ export function DealOverviewCard(props: {
   onUpdateStage: (stageId: string) => void;
 }) {
   const economics = formatOpportunityEconomics(props.opportunity);
-  const timeline = buildOpportunityStageTimeline(props.data.dealStages, props.opportunity);
   const canInlineEdit =
     props.canManageOpportunities && !isFinalOpportunity(props.opportunity);
   const activeContacts = props.data.contacts.filter(
@@ -56,21 +55,6 @@ export function DealOverviewCard(props: {
           </p>
         </div>
       </header>
-      <ol className="deal-stage-timeline" aria-label="Этапы сделки">
-        {timeline.map((stage) => (
-          <li
-            className={[
-              stage.isReached ? "is-reached" : "",
-              stage.isCurrent ? "is-current" : "",
-              stage.isArchived ? "is-archived" : ""
-            ].filter(Boolean).join(" ")}
-            key={stage.id}
-          >
-            <span aria-hidden="true" />
-            <strong>{stage.label}</strong>
-          </li>
-        ))}
-      </ol>
       <div className="deal-overview-grid">
         <dl className="deal-fact-list">
           <DealFact label="Этап">
@@ -223,7 +207,10 @@ export function DealOverviewCard(props: {
             />
           </DealFact>
           <DealFact label="Дата создания">{formatDate(props.opportunity.createdAt)}</DealFact>
-          <DealFact label="Ответственный">{props.data.me.name}</DealFact>
+          <DealFact label="Ответственный">
+            {props.data.users.find((user) => user.id === props.opportunity.ownerUserId)?.name ??
+              "Не назначен"}
+          </DealFact>
           <DealFact label="Тип клиента">Клиент</DealFact>
           <DealFact label="Отрасль">-</DealFact>
           <DealFact label="Описание">
@@ -245,6 +232,47 @@ export function DealOverviewCard(props: {
           />
         </dl>
       </div>
+    </section>
+  );
+}
+
+export function DealStageStrip(props: {
+  canManageOpportunities: boolean;
+  data: WorkspaceData;
+  isPending: boolean;
+  opportunity: Opportunity;
+  onUpdateStage: (stageId: string) => void;
+}) {
+  const timeline = buildOpportunityStageTimeline(props.data.dealStages, props.opportunity);
+  const canChangeStage =
+    props.canManageOpportunities && !props.isPending && !isFinalOpportunity(props.opportunity);
+
+  return (
+    <section className="deal-stage-strip-card" aria-label="Этапы сделки">
+      <ol className="deal-stage-strip">
+        {timeline.map((stage) => (
+          <li
+            className={[
+              stage.isReached ? "is-reached" : "",
+              stage.isCurrent ? "is-current" : "",
+              stage.isArchived ? "is-archived" : ""
+            ].filter(Boolean).join(" ")}
+            key={stage.id}
+          >
+            <button
+              disabled={!canChangeStage || stage.isCurrent || stage.isArchived}
+              title={stage.isCurrent ? "Текущий этап" : `Перевести на этап ${stage.label}`}
+              type="button"
+              onClick={() => props.onUpdateStage(stage.id)}
+            >
+              <span className="deal-stage-strip-title">{stage.label}</span>
+              <span className="deal-stage-strip-meta">
+                {stage.isCurrent ? "Текущий этап" : "Можно перенести сюда"}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -692,7 +720,7 @@ function renderDemand(data: WorkspaceData, opportunity: Opportunity) {
     <span className="chip-list">
       {opportunity.demand.map((line) => (
         <span className="permission-chip" key={line.positionId}>
-          {getPositionName(data, line.positionId)}: {line.requiredHours} ч
+          {getPositionName(data, line.positionId)}: {formatHours(line.requiredHours)}
         </span>
       ))}
     </span>

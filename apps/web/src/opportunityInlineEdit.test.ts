@@ -14,6 +14,7 @@ describe("opportunity inline edit input builders", () => {
     expect(buildOpportunityUpdateInput(opportunity, { title: "Новый заголовок" })).toMatchObject({
       clientId: "client-1",
       primaryContactId: "contact-1",
+      ownerUserId: "user-owner",
       projectTypeId: "type-1",
       stageId: "stage-1",
       title: "Новый заголовок",
@@ -75,6 +76,7 @@ function makeOpportunity(): Opportunity {
     tenantId: "tenant-1",
     clientId: "client-1",
     primaryContactId: "contact-1",
+    ownerUserId: "user-owner",
     projectTypeId: "type-1",
     stageId: "stage-1",
     clientName: "ООО Ромашка",
