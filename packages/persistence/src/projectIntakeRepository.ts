@@ -112,15 +112,15 @@ export type ProjectIntakeRepository = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity(input: OpportunityInput): Promise<OpportunityRecord>;
-  updateOpportunity(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity(input: OpportunityInput): Promise<OpportunityRecord | undefined>;
   updateOpportunityFeasibility(
     input: OpportunityFeasibilityUpdate
-  ): Promise<OpportunityRecord>;
+  ): Promise<OpportunityRecord | undefined>;
   updateOpportunityStage(input: {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity(input: {
     tenantId: TenantId;
     opportunityId: string;
@@ -282,7 +282,7 @@ export function createProjectIntakeRepository(
         )
         .returning();
 
-      if (!row) throw new Error("Opportunity feasibility update returned no row");
+      if (!row) return undefined;
       const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
         input.opportunityId
       ]);
@@ -328,7 +328,7 @@ export function createProjectIntakeRepository(
           )
           .returning();
 
-        if (!row) throw new Error("Opportunity update returned no row");
+        if (!row) return undefined;
 
         await transaction
           .delete(opportunityDemands)
@@ -363,12 +363,13 @@ export function createProjectIntakeRepository(
         .where(
           and(
             eq(opportunities.tenantId, input.tenantId),
-            eq(opportunities.id, input.opportunityId)
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
           )
         )
         .returning();
 
-      if (!row) throw new Error("Opportunity stage update returned no row");
+      if (!row) return undefined;
       const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
         input.opportunityId
       ]);

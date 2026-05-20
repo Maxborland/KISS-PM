@@ -354,19 +354,19 @@ export type ApiTenantDataSource = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
-  updateOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity?(input: OpportunityInput): Promise<OpportunityRecord | undefined>;
   updateOpportunityFeasibility?(input: {
     tenantId: TenantId;
     opportunityId: string;
     status: string;
     feasibilityStatus: string;
     feasibilityResult: Record<string, unknown>;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
   updateOpportunityStage?(input: {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity?(input: {
     tenantId: TenantId;
     opportunityId: string;
@@ -379,7 +379,7 @@ export type ApiTenantDataSource = {
   ): Promise<CrmActivityRecord[]>;
   createCrmActivity?(
     input: CrmActivityInput
-  ): Promise<CrmActivityRecord>;
+  ): Promise<CrmActivityRecord | undefined>;
   updateCrmActivity?(
     input: CrmActivityUpdateInput
   ): Promise<CrmActivityRecord | undefined>;

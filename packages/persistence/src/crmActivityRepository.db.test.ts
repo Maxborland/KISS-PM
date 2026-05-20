@@ -181,6 +181,9 @@ describe("CRM activity repository", () => {
       fileSizeBytes: 2048,
       mimeType: "application/pdf"
     });
+    expect(comment).toBeDefined();
+    expect(task).toBeDefined();
+    expect(file).toBeDefined();
     await activityRepository.createCrmActivity({
       id: "activity-opportunity",
       tenantId: "tenant-alpha",
@@ -200,15 +203,15 @@ describe("CRM activity repository", () => {
 
     await expect(
       activityRepository.listCrmActivities("tenant-alpha", "client", "client-alpha")
-    ).resolves.toMatchObject([{ id: comment.id, entityType: "client" }]);
+    ).resolves.toMatchObject([{ id: comment!.id, entityType: "client" }]);
     await expect(
       activityRepository.listCrmActivities("tenant-alpha", "contact", "contact-alpha")
-    ).resolves.toMatchObject([{ id: task.id, entityType: "contact" }]);
+    ).resolves.toMatchObject([{ id: task!.id, entityType: "contact" }]);
     await expect(
       activityRepository.listCrmActivities("tenant-alpha", "product", "product-alpha")
     ).resolves.toMatchObject([
       {
-        id: file.id,
+        id: file!.id,
         entityType: "product",
         fileUrl: "https://example.test/brief.pdf",
         fileSizeBytes: 2048,
@@ -352,6 +355,75 @@ describe("CRM activity repository", () => {
         status: "done"
       })
     ).resolves.toEqual({ found: false });
+  });
+
+  it("blocks opportunity activity writes and task transitions after finalization", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const activityRepository = createCrmActivityRepository(db);
+    await createOpportunity(intakeRepository, {
+      id: "opportunity-final",
+      tenantId: "tenant-alpha",
+      clientId: "client-alpha",
+      projectTypeId: "project-type-alpha",
+      positionId: "position-engineer"
+    });
+    await activityRepository.createCrmActivity({
+      id: "activity-final-task",
+      tenantId: "tenant-alpha",
+      entityType: "opportunity",
+      entityId: "opportunity-final",
+      type: "task",
+      title: "Закрыть вопрос",
+      body: null,
+      status: "todo",
+      dueDate: null,
+      assigneeUserId: "user-alpha-assignee",
+      authorUserId: "user-alpha-admin",
+      fileUrl: null,
+      fileSizeBytes: null,
+      mimeType: null
+    });
+    await intakeRepository.finalizeOpportunity({
+      tenantId: "tenant-alpha",
+      opportunityId: "opportunity-final",
+      status: "lost_rejected"
+    });
+
+    await expect(
+      activityRepository.createCrmActivity({
+        id: "activity-after-final",
+        tenantId: "tenant-alpha",
+        entityType: "opportunity",
+        entityId: "opportunity-final",
+        type: "comment",
+        title: null,
+        body: "Комментарий после закрытия не должен сохраниться.",
+        status: null,
+        dueDate: null,
+        assigneeUserId: null,
+        authorUserId: "user-alpha-admin",
+        fileUrl: null,
+        fileSizeBytes: null,
+        mimeType: null
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      activityRepository.transitionCrmActivityStatus({
+        tenantId: "tenant-alpha",
+        entityType: "opportunity",
+        entityId: "opportunity-final",
+        activityId: "activity-final-task",
+        status: "done"
+      })
+    ).resolves.toEqual({ locked: true });
+    await expect(
+      activityRepository.listCrmActivities(
+        "tenant-alpha",
+        "opportunity",
+        "opportunity-final"
+      )
+    ).resolves.toMatchObject([{ id: "activity-final-task", status: "todo" }]);
   });
 
   it("rejects malformed shared activity rows", async () => {

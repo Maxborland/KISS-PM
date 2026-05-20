@@ -155,6 +155,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         fileSizeBytes: null,
         mimeType: null
       });
+      if (!created) return undefined;
       await appendActivityAudit({
         actor,
         afterState: created,
@@ -173,6 +174,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       return created;
     });
 
+    if (!activity) return context.json({ error: "crm_activity_locked" }, 409);
     return context.json({ activity: serializeCrmActivity(activity) }, 201);
   });
 
@@ -224,6 +226,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         fileSizeBytes: null,
         mimeType: null
       });
+      if (!created) return undefined;
       await appendActivityAudit({
         actor,
         afterState: created,
@@ -244,6 +247,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       return created;
     });
 
+    if (!activity) return context.json({ error: "crm_activity_locked" }, 409);
     return context.json({ activity: serializeCrmActivity(activity) }, 201);
   });
 
@@ -286,6 +290,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         fileSizeBytes: parsed.value.fileSizeBytes,
         mimeType: parsed.value.mimeType
       });
+      if (!created) return undefined;
       await appendActivityAudit({
         actor,
         afterState: created,
@@ -305,6 +310,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       return created;
     });
 
+    if (!activity) return context.json({ error: "crm_activity_locked" }, 409);
     return context.json({ activity: serializeCrmActivity(activity) }, 201);
   });
 
@@ -339,6 +345,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         activityId,
         status: parsed.value.status
       });
+      if ("locked" in transitionResult) return transitionResult;
       if (!transitionResult.found || !transitionResult.changed) return transitionResult;
 
       await appendActivityAudit({
@@ -361,6 +368,9 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       return transitionResult;
     });
 
+    if ("locked" in transition) {
+      return context.json({ error: "crm_activity_locked" }, 409);
+    }
     if (!transition.found) return context.json({ error: "crm_task_not_found" }, 404);
     return context.json({ activity: serializeCrmActivity(transition.activity) });
   });

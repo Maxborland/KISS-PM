@@ -54,6 +54,16 @@ describe("project work parsers", () => {
     expect(
       parseCreateTaskBody({
         title: "Подготовить план",
+        plannedStart: "2026-02-31",
+        plannedFinish: "2026-03-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    ).toEqual({ ok: false, error: "invalid_task_dates" });
+
+    expect(
+      parseCreateTaskBody({
+        title: "Подготовить план",
         plannedStart: "2026-06-02",
         plannedFinish: "2026-06-05",
         plannedWork: 0,
@@ -82,5 +92,30 @@ describe("project work parsers", () => {
         participants: [{ userId: "user-alpha-admin", role: "controller" }]
       })
     ).toEqual({ ok: false, error: "task_executor_required" });
+  });
+
+  it("treats blank task id as absent so callers can generate one", () => {
+    expect(
+      parseCreateTaskBody({
+        id: "   ",
+        title: "Подготовить план",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    ).toEqual({
+      ok: true,
+      value: {
+        id: undefined,
+        title: "Подготовить план",
+        description: null,
+        priority: "normal",
+        plannedStart: new Date("2026-06-02T00:00:00.000Z"),
+        plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      }
+    });
   });
 });

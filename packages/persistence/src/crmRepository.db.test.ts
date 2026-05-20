@@ -162,6 +162,18 @@ describe("Phase 3.1 CRM persistence", () => {
       id: "opportunity-alpha",
       stageId: "deal-stage-qualified"
     });
+    await dataSource.finalizeOpportunity({
+      tenantId: "tenant-alpha",
+      opportunityId: opportunity.id,
+      status: "lost_rejected"
+    });
+    await expect(
+      dataSource.updateOpportunityStage({
+        tenantId: "tenant-alpha",
+        opportunityId: opportunity.id,
+        stageId: stage.id
+      })
+    ).resolves.toBeUndefined();
 
     const otherClient = await dataSource.createClient({
       id: "client-other",

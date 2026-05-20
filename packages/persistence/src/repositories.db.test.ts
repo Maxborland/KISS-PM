@@ -297,21 +297,22 @@ describe("PostgreSQL tenant data source", () => {
         rows: []
       }
     });
+    expect(assessed).toBeDefined();
     const project = await dataSource.createProjectDraftFromOpportunity({
       id: "project-alpha",
       tenantId: "tenant-alpha",
       sourceOpportunityId: "opportunity-alpha",
-      clientId: assessed.clientId,
-      projectTypeId: assessed.projectTypeId,
-      title: assessed.title,
-      clientName: assessed.clientName,
+      clientId: assessed!.clientId,
+      projectTypeId: assessed!.projectTypeId,
+      title: assessed!.title,
+      clientName: assessed!.clientName,
       status: "draft",
-      plannedStart: assessed.plannedStart,
-      plannedFinish: assessed.plannedFinish,
-      contractValue: assessed.contractValue,
-      plannedHours: assessed.plannedHours,
-      templateId: assessed.templateId,
-      demand: assessed.demand
+      plannedStart: assessed!.plannedStart,
+      plannedFinish: assessed!.plannedFinish,
+      contractValue: assessed!.contractValue,
+      plannedHours: assessed!.plannedHours,
+      templateId: assessed!.templateId,
+      demand: assessed!.demand
     });
 
     expect(opportunity).toMatchObject({
@@ -366,17 +367,17 @@ describe("PostgreSQL tenant data source", () => {
         id: "project-alpha-copy",
         tenantId: "tenant-alpha",
         sourceOpportunityId: "opportunity-alpha",
-        clientId: assessed.clientId,
-        projectTypeId: assessed.projectTypeId,
-        title: assessed.title,
-        clientName: assessed.clientName,
+        clientId: assessed!.clientId,
+        projectTypeId: assessed!.projectTypeId,
+        title: assessed!.title,
+        clientName: assessed!.clientName,
         status: "draft",
-        plannedStart: assessed.plannedStart,
-        plannedFinish: assessed.plannedFinish,
-        contractValue: assessed.contractValue,
-        plannedHours: assessed.plannedHours,
-        templateId: assessed.templateId,
-        demand: assessed.demand
+        plannedStart: assessed!.plannedStart,
+        plannedFinish: assessed!.plannedFinish,
+        contractValue: assessed!.contractValue,
+        plannedHours: assessed!.plannedHours,
+        templateId: assessed!.templateId,
+        demand: assessed!.demand
       })
     ).rejects.toThrow("source_opportunity_not_draftable");
     await expect(

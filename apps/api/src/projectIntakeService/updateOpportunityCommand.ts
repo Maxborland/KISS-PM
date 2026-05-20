@@ -64,6 +64,9 @@ export async function updateOpportunity(
         projectType: linked.projectType.name,
         customFieldValues: customFieldValidation.values
       });
+      if (!updated) {
+        return undefined;
+      }
       await deps.appendManagementAuditEvent(
         {
           tenantId: input.actor.tenantId,
@@ -92,6 +95,10 @@ export async function updateOpportunity(
       return updated;
     }
   );
+
+  if (!updatedOpportunity) {
+    return { ok: false, status: 409, error: "opportunity_update_locked" };
+  }
 
   return { ok: true, status: 200, opportunity: updatedOpportunity };
 }
