@@ -179,4 +179,107 @@ describe("project work repository", () => {
       workRepository.listMyWorkTasks("tenant-alpha", "user-alpha-admin")
     ).resolves.toEqual([]);
   });
+
+  it("updates task status and keeps tenant/project boundaries", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const opportunity = await intakeRepository.createOpportunity({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      clientId: "client-romashka",
+      primaryContactId: null,
+      projectTypeId: "project-type-implementation",
+      stageId: null,
+      clientName: "ООО Ромашка",
+      contactName: "Ирина Клиент",
+      title: "Внедрение KISS PM",
+      projectType: "Внедрение",
+      description: null,
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+      contractValue: 1000000,
+      plannedHourlyRate: 5000,
+      plannedHours: 200,
+      probability: 80,
+      status: "ready_to_activate",
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
+    });
+    const draft = await intakeRepository.createProjectDraftFromOpportunity({
+      id: "project-alpha",
+      tenantId: "tenant-alpha",
+      sourceOpportunityId: opportunity.id,
+      clientId: opportunity.clientId,
+      projectTypeId: opportunity.projectTypeId,
+      title: opportunity.title,
+      clientName: opportunity.clientName,
+      status: "draft",
+      plannedStart: opportunity.plannedStart,
+      plannedFinish: opportunity.plannedFinish,
+      contractValue: opportunity.contractValue,
+      plannedHours: opportunity.plannedHours,
+      templateId: null,
+      demand: opportunity.demand
+    });
+    await intakeRepository.activateProjectDraft({
+      tenantId: "tenant-alpha",
+      projectId: draft.id
+    });
+    await workRepository.createTask({
+      id: "task-alpha",
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      stageId: null,
+      title: "Подготовить план внедрения",
+      description: null,
+      status: "todo",
+      priority: "normal",
+      plannedStart: new Date("2026-06-02T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
+      plannedWork: 24,
+      actualWork: 0,
+      progress: 0,
+      source: "manual",
+      participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    });
+
+    const updated = await workRepository.updateTaskStatus({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      taskId: "task-alpha",
+      expectedStatus: "todo",
+      status: "done",
+      progress: 100
+    });
+    const wrongProject = await workRepository.updateTaskStatus({
+      tenantId: "tenant-alpha",
+      projectId: "project-missing",
+      taskId: "task-alpha",
+      expectedStatus: "todo",
+      status: "blocked",
+      progress: 0
+    });
+
+    expect(updated).toMatchObject({
+      id: "task-alpha",
+      status: "done",
+      progress: 100,
+      participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    });
+    expect(wrongProject).toBeUndefined();
+    await expect(
+      workRepository.listProjectTasks("tenant-alpha", "project-alpha")
+    ).resolves.toEqual([expect.objectContaining({ id: "task-alpha", status: "done" })]);
+    await expect(
+      workRepository.updateTaskStatus({
+        tenantId: "tenant-alpha",
+        projectId: "project-alpha",
+        taskId: "task-alpha",
+        expectedStatus: "todo",
+        status: "blocked",
+        progress: 100
+      })
+    ).resolves.toBeUndefined();
+  });
 });

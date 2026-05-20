@@ -13,6 +13,7 @@ import {
   fetchProjectDetail,
   fetchProjectTasks,
   fetchProjectTemplates,
+  updateProjectTaskStatus,
   updateClient,
   updateContact,
   updateDealStage,
@@ -194,6 +195,9 @@ describe("web api helpers", () => {
       plannedWork: 24,
       participants: [{ userId: "user-alpha-executor", role: "executor" }]
     });
+    await updateProjectTaskStatus("project/unsafe", "task/unsafe", {
+      status: "in_progress"
+    });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -215,6 +219,17 @@ describe("web api helpers", () => {
       "/api/workspace/projects/project%2Funsafe/tasks",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/workspace/projects/project%2Funsafe/tasks/task%2Funsafe/status",
+      expect.objectContaining({
+        method: "PATCH",
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin"

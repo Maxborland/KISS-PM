@@ -308,6 +308,10 @@ export type TaskInput = {
   participants: TaskParticipant[];
 };
 
+export type TaskStatusInput = {
+  status: TaskStatus;
+};
+
 export type OpportunityInput = {
   id?: string;
   clientId: string;
@@ -896,6 +900,20 @@ export async function createProjectTask(
     method: "POST",
     body: input
   });
+}
+
+export async function updateProjectTaskStatus(
+  projectId: string,
+  taskId: string,
+  input: TaskStatusInput
+): Promise<{ task: Task }> {
+  return requestJson(
+    `/api/workspace/projects/${encodePathSegment(projectId)}/tasks/${encodePathSegment(taskId)}/status`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
 }
 
 async function requestJson<T>(

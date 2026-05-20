@@ -1,9 +1,9 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
-import { taskParticipants, tasks } from "./schema";
+import { projects, taskParticipants, tasks } from "./schema";
 
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "normal" | "high" | "critical";
@@ -43,10 +43,20 @@ export type TaskRecord = {
 
 export type TaskInput = Omit<TaskRecord, "createdAt" | "updatedAt">;
 
+export type TaskStatusUpdateInput = {
+  tenantId: TenantId;
+  projectId: string;
+  taskId: string;
+  expectedStatus: TaskStatus;
+  status: TaskStatus;
+  progress: number;
+};
+
 export type ProjectWorkRepository = {
   listProjectTasks(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   createTask(input: TaskInput): Promise<TaskRecord>;
+  updateTaskStatus(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
 };
 
 export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepository {
@@ -162,6 +172,36 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
 
         return mapTaskRecord(row, input.participants);
       });
+    },
+    async updateTaskStatus(input) {
+      const [row] = await db
+        .update(tasks)
+        .set({
+          status: input.status,
+          progress: input.progress,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(tasks.tenantId, input.tenantId),
+            eq(tasks.projectId, input.projectId),
+            eq(tasks.id, input.taskId),
+            eq(tasks.status, input.expectedStatus),
+            sql`exists (
+              select 1
+              from ${projects}
+              where ${projects.tenantId} = ${input.tenantId}
+                and ${projects.id} = ${input.projectId}
+                and ${projects.status} = 'active'
+            )`
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+
+      const participantsByTask = await listTaskParticipants(input.tenantId, [input.taskId]);
+      return mapTaskRecord(row, participantsByTask.get(input.taskId) ?? []);
     }
   };
 }

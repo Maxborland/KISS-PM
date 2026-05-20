@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCreateTaskBody } from "./projectWorkParsers";
+import {
+  parseCreateTaskBody,
+  parseUpdateTaskStatusBody
+} from "./projectWorkParsers";
 
 describe("project work parsers", () => {
   it("parses a valid manual task creation payload", () => {
@@ -116,6 +119,17 @@ describe("project work parsers", () => {
         plannedWork: 8,
         participants: [{ userId: "user-alpha-executor", role: "executor" }]
       }
+    });
+  });
+
+  it("parses supported task status transitions and rejects unknown statuses", () => {
+    expect(parseUpdateTaskStatusBody({ status: "in_progress" })).toEqual({
+      ok: true,
+      value: { status: "in_progress" }
+    });
+    expect(parseUpdateTaskStatusBody({ status: "cancelled" })).toEqual({
+      ok: false,
+      error: "invalid_task_status"
     });
   });
 });

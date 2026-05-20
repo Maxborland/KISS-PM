@@ -225,6 +225,273 @@ describe("project work API routes", () => {
     });
   });
 
+  it("lets an assigned executor transition their task status and writes audit", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-transition",
+        title: "Собрать контекст проекта",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    const transitioned = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-transition/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: executorCookie
+        },
+        body: JSON.stringify({ status: "in_progress" })
+      }
+    );
+    const myWork = await app.request("/api/workspace/my-work", {
+      headers: { cookie: executorCookie }
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(transitioned.status).toBe(200);
+    await expect(transitioned.json()).resolves.toMatchObject({
+      task: {
+        id: "task-transition",
+        status: "in_progress",
+        progress: 10
+      }
+    });
+    await expect(myWork.json()).resolves.toMatchObject({
+      tasks: [expect.objectContaining({ id: "task-transition", status: "in_progress" })]
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.status_changed",
+          sourceEntity: { type: "Task", id: "task-transition" },
+          permissionResult: expect.objectContaining({
+            authorizationBasis: "task_participant_role",
+            participantRole: "executor",
+            permission: null
+          })
+        })
+      ])
+    });
+  });
+
+  it("denies task status transition for non-participant readers", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-admin-only",
+        title: "Проверить контур проекта",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-admin", role: "executor" }]
+      })
+    });
+
+    const denied = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-admin-only/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: readerCookie
+        },
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({
+      error: "task_participant_role_required"
+    });
+  });
+
+  it("denies task status transition for observer participants", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const observerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-observer-only",
+        title: "Наблюдать за контуром",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [
+          { userId: "user-alpha-admin", role: "executor" },
+          { userId: "user-alpha-executor", role: "observer" }
+        ]
+      })
+    });
+
+    const denied = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-observer-only/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: observerCookie
+        },
+        body: JSON.stringify({ status: "in_progress" })
+      }
+    );
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({
+      error: "task_participant_role_required"
+    });
+  });
+
+  it("rejects unsupported task statuses", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-invalid-status",
+        title: "Проверить статус",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    const invalid = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-invalid-status/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "cancelled" })
+      }
+    );
+
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toEqual({
+      error: "invalid_task_status"
+    });
+  });
+
+  it("rejects status rollbacks after task completion", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-terminal-status",
+        title: "Финальная задача",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-terminal-status/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "in_progress" })
+      }
+    );
+    await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-terminal-status/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+
+    const rollback = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-terminal-status/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "in_progress" })
+      }
+    );
+
+    expect(rollback.status).toBe(409);
+    await expect(rollback.json()).resolves.toEqual({
+      error: "task_status_transition_not_allowed"
+    });
+  });
+
+  it("requires same-origin action header for task status transitions", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+
+    const denied = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-any/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "in_progress" })
+      }
+    );
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({
+      error: "same_origin_action_required"
+    });
+  });
+
   it("enforces project read and manage permissions", async () => {
     const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
     const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
