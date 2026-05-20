@@ -24,8 +24,7 @@ import type {
 } from "./api";
 import {
   DealOverviewCard,
-  DealRelationshipCards,
-  InlineEditableValue
+  DealRelationshipCards
 } from "./OpportunityDetailFacts";
 import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
@@ -413,7 +412,7 @@ function DealPageHeader(props: {
         </nav>
         <div className="deal-page-title-row">
           <h1 aria-label={props.opportunity.title}>
-            <InlineEditableValue
+            <DealTitleInlineEditor
               disabled={
                 props.isPending ||
                 !props.canManageOpportunities ||
@@ -629,6 +628,108 @@ function ResourceProgressRow(props: {
       </div>
       <small>{percent}%</small>
     </div>
+  );
+}
+
+function DealTitleInlineEditor(props: {
+  disabled: boolean;
+  label: string;
+  value: string;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(props.value);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  function startEdit() {
+    setDraft(props.value);
+    setError("");
+    setIsEditing(true);
+  }
+
+  function cancelEdit() {
+    setDraft(props.value);
+    setError("");
+    setIsEditing(false);
+  }
+
+  async function save() {
+    const nextTitle = draft.trim();
+    if (nextTitle.length < 3) {
+      setError("Название сделки должно быть не короче 3 символов.");
+      return;
+    }
+    if (nextTitle === props.value) {
+      setIsEditing(false);
+      return;
+    }
+
+    setError("");
+    setIsSaving(true);
+    try {
+      await props.onSave(nextTitle);
+      setIsEditing(false);
+    } catch (saveError) {
+      setError(getErrorMessage(saveError));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!isEditing) {
+    if (props.disabled) {
+      return <span className="deal-title-readonly">{props.value}</span>;
+    }
+
+    return (
+      <button
+        className="deal-title-edit-trigger"
+        type="button"
+        aria-label={`Редактировать поле ${props.label}`}
+        onClick={startEdit}
+      >
+        {props.value}
+      </button>
+    );
+  }
+
+  return (
+    <span className="deal-title-edit-control">
+      <span className="deal-title-edit-input-row">
+        <input
+          aria-label={props.label}
+          autoFocus
+          className="deal-title-edit-input"
+          disabled={isSaving}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") cancelEdit();
+            if (event.key === "Enter") void save();
+          }}
+        />
+        <span className="deal-title-edit-actions">
+          <button
+            className="primary-button compact"
+            disabled={isSaving}
+            type="button"
+            onClick={save}
+          >
+            {isSaving ? "Сохраняем..." : "Сохранить"}
+          </button>
+          <button
+            className="secondary-button compact"
+            disabled={isSaving}
+            type="button"
+            onClick={cancelEdit}
+          >
+            Отмена
+          </button>
+        </span>
+      </span>
+      {error ? <small className="deal-title-edit-error" role="alert">{error}</small> : null}
+    </span>
   );
 }
 
