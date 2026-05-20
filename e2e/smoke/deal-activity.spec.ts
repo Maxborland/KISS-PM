@@ -49,18 +49,30 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Рабочее окно сделки" })).toBeVisible();
   const activityPanel = page.getByLabel("Рабочая лента сделки");
+  await expect(
+    activityPanel.getByRole("tablist", { name: "Разделы активности сделки" })
+  ).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Лента/ })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
 
   await page.getByRole("button", { name: "Проверить ресурсы" }).click();
   await expect(
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Чат" }).click();
+  await activityPanel.getByRole("tab", { name: /Чат/ }).click();
+  await expect(activityPanel.getByRole("tab", { name: /Чат/ })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
   await activityPanel.getByLabel("Сообщение").fill(comment);
   await activityPanel.getByRole("button", { name: "Отправить" }).click();
   await expect(activityPanel.getByText(comment)).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Чат 1 элемент/ })).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Задачи" }).click();
+  await activityPanel.getByRole("tab", { name: /Задачи/ }).click();
   await activityPanel.getByLabel("Новая задача").fill(taskTitle);
   await activityPanel.getByLabel("Описание").fill("Подготовить следующий контакт");
   await activityPanel.getByLabel("Срок").fill("2031-03-10");
@@ -70,10 +82,11 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
   await activityPanel.getByRole("button", { name: "Создать задачу" }).click();
   const taskRow = activityPanel.locator(".activity-row").filter({ hasText: taskTitle });
   await expect(taskRow).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Задачи 1 элемент/ })).toBeVisible();
   await taskRow.getByRole("button", { name: "Выполнить" }).click();
   await expect(taskRow.getByText("Выполнена")).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Лента" }).click();
+  await activityPanel.getByRole("tab", { name: /Лента/ }).click();
   await expect(activityPanel.getByText(comment)).toBeVisible();
   await expect(activityPanel.getByText(taskTitle)).toBeVisible();
   await expect(activityPanel.getByText("Комментарий по сделке создан")).toBeVisible();
@@ -81,7 +94,7 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Аудит" }).click();
+  await activityPanel.getByRole("tab", { name: /Аудит/ }).click();
   await expect(
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
@@ -219,10 +232,13 @@ test("deal activity panel is read-only for users without manage and audit permis
   const activityPanel = page.getByLabel("Рабочая лента сделки");
   await expect(activityPanel.getByText(comment)).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Чат" }).click();
+  await activityPanel.getByRole("tab", { name: /Чат/ }).click();
   await expect(activityPanel.getByLabel("Сообщение")).toBeDisabled();
   await expect(activityPanel.getByRole("button", { name: "Отправить" })).toBeDisabled();
-  await activityPanel.getByRole("button", { name: "Задачи" }).click();
+  await expect(
+    activityPanel.getByText("Только чтение: нужно право tenant.opportunities.manage.")
+  ).toBeVisible();
+  await activityPanel.getByRole("tab", { name: /Задачи/ }).click();
   const taskRow = activityPanel.locator(".activity-row").filter({
     hasText: `Задача для чтения ${suffix}`
   });
@@ -230,7 +246,7 @@ test("deal activity panel is read-only for users without manage and audit permis
   await expect(taskRow.getByRole("button", { name: "Выполнить" })).toBeDisabled();
   await expect(activityPanel.getByLabel("Новая задача")).toBeDisabled();
   await expect(activityPanel.getByRole("button", { name: "Создать задачу" })).toBeDisabled();
-  await activityPanel.getByRole("button", { name: "Аудит" }).click();
+  await activityPanel.getByRole("tab", { name: /Аудит/ }).click();
   await expect(activityPanel.getByText("Исходный аудит доступен только пользователям")).toBeVisible();
 
   expect(

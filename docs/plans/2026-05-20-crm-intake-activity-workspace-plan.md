@@ -232,6 +232,38 @@ Review notes:
 - Full `pnpm test:e2e:smoke` passes in parallel mode: 4 tests, 3 workers.
 - [x] Commit: `test: cover crm intake activity workspace`.
 
+## Block 7. Product UI polish after activity workspace
+
+- [x] Tighten CRM intake UI after the activity workspace without adding new domain scope.
+- [x] Fix deal list readability:
+  - plan/economics cell must visually and accessibly separate planned hours, contract value and hourly rate;
+  - row text must not read as glued `100 чНеобходимые часы`.
+- [x] Improve activity workspace semantics:
+  - activity sections use real tab roles and selected state;
+  - tab labels show real persisted counts where available;
+  - read-only forms explain the missing permission in visible UI, not only as disabled controls.
+- [x] Improve kanban polish:
+  - remove English `Drag-and-drop` copy;
+  - keep both pointer drag and explicit stage select as real movement paths.
+- [x] Browser smoke desktop and narrow viewport:
+  - `/opportunities`;
+  - `/opportunities/:id`;
+  - activity tabs.
+- [x] Run:
+  - `pnpm --filter @kiss-pm/web typecheck`;
+  - `pnpm test`;
+  - `pnpm --filter @kiss-pm/web build`;
+  - `pnpm test:e2e:smoke`;
+  - `git diff --check`.
+
+Review notes:
+
+- Bug Hunt found one Important data-retention risk while validating the block: a previously applied `opportunity_activities` FK could stay on stale cascade behavior. Fixed with migration `0013_phase_4_repair_opportunity_activity_fk.sql` and migration test coverage for `ON DELETE restrict`.
+- Code Review found two Important UI issues: inactive tabs used panel references that did not exist in the DOM, and deal-list plan/economics text read as a glued string for assistive/searchable row text. Fixed with proper tab semantics, keyboard navigation, real counts and a structured plan/economics cell.
+- Security Review found no new Critical/Important issues in the UI slice; existing backend permission checks remain authoritative. Read-only users now also get visible denial text in chat/task forms.
+- Browser smoke found minor Russian UI polish issues: visible `/Норма` separator artifact in the deal-list plan cell and `1 элементов` in activity tab labels. Fixed by removing the decorative pseudo-separator, adding Russian counter formatting and covering both in tests/E2E.
+- Full smoke on worktree ports verifies login/RBAC, deal list, Kanban stage movement, persisted chat/tasks/audit and restricted read-only activity panel.
+
 ## Review Gates
 
 After each block:

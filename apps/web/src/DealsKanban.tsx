@@ -288,7 +288,7 @@ function DealKanbanCard(props: {
       ) : (
         <p className="deal-card-move-hint">
           <ArrowRightLeft aria-hidden="true" size={12} />
-          Drag-and-drop или выбор этапа
+          Перетащите карточку или выберите этап
         </p>
       )}
     </article>

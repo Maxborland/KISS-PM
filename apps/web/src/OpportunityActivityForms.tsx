@@ -40,6 +40,11 @@ export function OpportunityChatView(props: {
         )}
       </div>
       <form className="activity-form" onSubmit={props.onSubmit}>
+        {!props.canManageOpportunities ? (
+          <p className="empty-state compact">
+            Только чтение: нужно право tenant.opportunities.manage.
+          </p>
+        ) : null}
         <label htmlFor="deal-comment-body">
           Сообщение
           <textarea
@@ -100,6 +105,11 @@ export function OpportunityTaskView(props: {
         )}
       </div>
       <form className="activity-form" onSubmit={props.onSubmit}>
+        {!props.canManageOpportunities ? (
+          <p className="empty-state compact">
+            Только чтение: нужно право tenant.opportunities.manage.
+          </p>
+        ) : null}
         <label htmlFor="deal-task-title">
           Новая задача
           <input
