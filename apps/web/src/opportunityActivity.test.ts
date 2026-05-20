@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
-import { composeOpportunityFeedItems } from "./opportunityActivity";
+import { composeOpportunityFeedItems, formatActivityCountLabel } from "./opportunityActivity";
 
 describe("opportunity activity helpers", () => {
   it("combines persisted activity and system events from newest to oldest", () => {
@@ -51,5 +51,14 @@ describe("opportunity activity helpers", () => {
       "2026-05-20T09:00:00.000Z",
       "2026-05-20T08:00:00.000Z"
     ]);
+  });
+
+  it("formats Russian activity counter labels", () => {
+    expect(formatActivityCountLabel(0)).toBe("0 элементов");
+    expect(formatActivityCountLabel(1)).toBe("1 элемент");
+    expect(formatActivityCountLabel(2)).toBe("2 элемента");
+    expect(formatActivityCountLabel(5)).toBe("5 элементов");
+    expect(formatActivityCountLabel(11)).toBe("11 элементов");
+    expect(formatActivityCountLabel(21)).toBe("21 элемент");
   });
 });

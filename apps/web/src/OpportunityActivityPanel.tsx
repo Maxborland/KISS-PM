@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 
 import { OpportunityAuditTab } from "./OpportunityActivityAudit";
@@ -13,6 +13,7 @@ import {
 } from "./OpportunityActivityForms";
 import {
   composeOpportunityFeedItems,
+  formatActivityCountLabel,
   type ActivityTab
 } from "./opportunityActivity";
 import type { WorkspaceData } from "./workspaceData";
@@ -57,6 +58,12 @@ export function OpportunityActivityPanel(props: {
     () => composeOpportunityFeedItems(activities, systemEvents),
     [activities, systemEvents]
   );
+  const tabCounts: Record<ActivityTab, number> = {
+    feed: feedItems.length,
+    chat: comments.length,
+    tasks: tasks.length,
+    audit: activityQuery.data?.auditEvents?.length ?? 0
+  };
   const activeUsers = props.data.users.filter((user) => user.status !== "inactive");
   const isSaving =
     mutations.createComment.isPending ||
@@ -113,6 +120,31 @@ export function OpportunityActivityPanel(props: {
     }
   }
 
+  function selectTab(tabId: ActivityTab) {
+    setActiveTab(tabId);
+    window.requestAnimationFrame(() => {
+      document.getElementById(getTabId(tabId))?.focus();
+    });
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tabId: ActivityTab) {
+    const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
+    if (currentIndex < 0) return;
+    const lastIndex = tabs.length - 1;
+    const keyToIndex: Record<string, number> = {
+      ArrowLeft: currentIndex === 0 ? lastIndex : currentIndex - 1,
+      ArrowRight: currentIndex === lastIndex ? 0 : currentIndex + 1,
+      Home: 0,
+      End: lastIndex
+    };
+    const nextIndex = keyToIndex[event.key];
+    if (nextIndex === undefined) return;
+    const nextTab = tabs[nextIndex];
+    if (!nextTab) return;
+    event.preventDefault();
+    selectTab(nextTab.id);
+  }
+
   return (
     <aside className="deal-activity-panel" aria-label="Рабочая лента сделки">
       <header className="deal-activity-header">
@@ -126,12 +158,23 @@ export function OpportunityActivityPanel(props: {
       <div className="activity-tabs" role="tablist" aria-label="Разделы активности сделки">
         {tabs.map((tab) => (
           <button
-            aria-pressed={activeTab === tab.id}
+            aria-controls={activeTab === tab.id ? getPanelId(tab.id) : undefined}
+            aria-selected={activeTab === tab.id}
+            id={getTabId(tab.id)}
             key={tab.id}
+            role="tab"
+            tabIndex={activeTab === tab.id ? 0 : -1}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => selectTab(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            <span
+              aria-label={formatActivityCountLabel(tabCounts[tab.id])}
+              className="activity-tab-count"
+            >
+              {tabCounts[tab.id]}
+            </span>
           </button>
         ))}
       </div>
@@ -142,44 +185,59 @@ export function OpportunityActivityPanel(props: {
       ) : null}
       {!activityQuery.isLoading && !activityQuery.isError ? (
         <>
-          {activeTab === "feed" ? (
-            <OpportunityFeedView data={props.data} items={feedItems} />
-          ) : null}
-          {activeTab === "chat" ? (
-            <OpportunityChatView
-              canManageOpportunities={props.canManageOpportunities}
-              comments={comments}
-              commentBody={commentBody}
-              data={props.data}
-              error={commentError}
-              isSaving={isSaving}
-              onCommentBodyChange={setCommentBody}
-              onSubmit={submitComment}
-            />
-          ) : null}
-          {activeTab === "tasks" ? (
-            <OpportunityTaskView
-              activeUsers={activeUsers}
-              canManageOpportunities={props.canManageOpportunities}
-              data={props.data}
-              error={taskError}
-              form={taskForm}
-              isSaving={isSaving}
-              tasks={tasks}
-              onComplete={completeTask}
-              onFormChange={setTaskForm}
-              onSubmit={submitTask}
-            />
-          ) : null}
-          {activeTab === "audit" ? (
-            <OpportunityAuditTab
-              auditEvents={activityQuery.data?.auditEvents ?? null}
-              canReadRawAudit={Boolean(activityQuery.data?.canReadRawAudit)}
-              data={props.data}
-            />
-          ) : null}
+          <div
+            aria-labelledby={getTabId(activeTab)}
+            className="activity-tab-panel"
+            id={getPanelId(activeTab)}
+            role="tabpanel"
+          >
+            {activeTab === "feed" ? (
+              <OpportunityFeedView data={props.data} items={feedItems} />
+            ) : null}
+            {activeTab === "chat" ? (
+              <OpportunityChatView
+                canManageOpportunities={props.canManageOpportunities}
+                comments={comments}
+                commentBody={commentBody}
+                data={props.data}
+                error={commentError}
+                isSaving={isSaving}
+                onCommentBodyChange={setCommentBody}
+                onSubmit={submitComment}
+              />
+            ) : null}
+            {activeTab === "tasks" ? (
+              <OpportunityTaskView
+                activeUsers={activeUsers}
+                canManageOpportunities={props.canManageOpportunities}
+                data={props.data}
+                error={taskError}
+                form={taskForm}
+                isSaving={isSaving}
+                tasks={tasks}
+                onComplete={completeTask}
+                onFormChange={setTaskForm}
+                onSubmit={submitTask}
+              />
+            ) : null}
+            {activeTab === "audit" ? (
+              <OpportunityAuditTab
+                auditEvents={activityQuery.data?.auditEvents ?? null}
+                canReadRawAudit={Boolean(activityQuery.data?.canReadRawAudit)}
+                data={props.data}
+              />
+            ) : null}
+          </div>
         </>
       ) : null}
     </aside>
   );
+}
+
+function getTabId(tabId: ActivityTab): string {
+  return `opportunity-activity-tab-${tabId}`;
+}
+
+function getPanelId(tabId: ActivityTab): string {
+  return `opportunity-activity-panel-${tabId}`;
 }

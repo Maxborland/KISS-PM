@@ -461,11 +461,21 @@ function DealsTable(props: {
                     </small>
                   </td>
                   <td>
-                    <strong>{economics.plannedHoursLabel}</strong>
-                    <small className="muted">Необходимые часы</small>
-                    <small className="muted">
-                      {economics.contractValueLabel} · {economics.plannedHourlyRateLabel}
-                    </small>
+                    <span
+                      aria-label={`План: ${economics.plannedHoursLabel}; стоимость ${economics.contractValueLabel}; норма часа ${economics.plannedHourlyRateLabel}`}
+                      className="deal-plan-cell"
+                    >
+                      <span className="deal-plan-main">
+                        <small className="muted">Необходимые часы:</small>
+                        {" "}
+                        <strong>{economics.plannedHoursLabel}</strong>
+                      </span>
+                      <span className="sr-only">; </span>
+                      <span className="deal-plan-meta">
+                        <small>Стоимость: {economics.contractValueLabel}</small>
+                        <small>Норма: {economics.plannedHourlyRateLabel}</small>
+                      </span>
+                    </span>
                   </td>
                   <td>{formatDemand(opportunity, props.data)}</td>
                   <td>{renderFeasibility(opportunity)}</td>

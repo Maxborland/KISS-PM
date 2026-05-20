@@ -42,6 +42,10 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
 
   await page.goto("/opportunities");
   await page.setViewportSize({ width: 1440, height: 1000 });
+  const listRow = page.getByRole("row", { name: new RegExp(title) });
+  await expect(listRow).toContainText("Необходимые часы: 100 ч");
+  await expect(listRow).not.toContainText("100 чНеобходимые");
+  await expect(listRow).not.toContainText("/Норма");
   await page.getByRole("button", { name: "Канбан", exact: true }).click();
 
   const kanban = page.getByLabel("Канбан сделок");
@@ -51,6 +55,8 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
 
   await expect(newCard).toBeVisible();
   await expect(newCard.getByRole("button", { name: new RegExp(`Перетащить сделку ${title}`) })).toBeVisible();
+  await expect(newCard.getByText("Перетащите карточку или выберите этап")).toBeVisible();
+  await expect(page.getByText("Drag-and-drop")).toHaveCount(0);
 
   await dragDealCardToColumn(
     page,

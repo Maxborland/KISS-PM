@@ -100,6 +100,37 @@
   font-weight: 700;
 }
 
+.deal-plan-cell {
+  display: grid;
+  gap: 3px;
+  min-width: 118px;
+  line-height: 1.25;
+}
+
+.deal-plan-cell small {
+  display: block;
+  font-size: 12px;
+}
+
+.deal-plan-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.deal-plan-main strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.deal-plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--muted);
+}
+
 .deal-kanban {
   display: grid;
   grid-auto-columns: minmax(260px, 1fr);
@@ -338,10 +369,43 @@
   cursor: pointer;
 }
 
-.activity-tabs button[aria-pressed="true"] {
+.activity-tabs button[aria-selected="true"] {
   background: var(--panel);
   color: var(--text);
   box-shadow: 0 1px 5px rgba(15, 23, 42, 0.08);
+}
+
+.activity-tabs button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.activity-tab-count {
+  min-width: 20px;
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-tabs button[aria-selected="true"] .activity-tab-count {
+  border-color: rgba(37, 99, 235, 0.25);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.activity-tab-panel {
+  min-height: 0;
+  display: grid;
+  overflow: hidden;
 }
 
 .activity-tab-body,

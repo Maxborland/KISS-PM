@@ -68,6 +68,13 @@ const phase4CrmActivityMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4CrmActivityFkRepairMigration = readFileSync(
+  new URL(
+    "../migrations/0013_phase_4_repair_opportunity_activity_fk.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -263,5 +270,15 @@ describe("Phase 4 CRM activity SQL migration", () => {
     expect(phase4CrmActivityMigration).toContain(
       'CREATE INDEX IF NOT EXISTS "opportunity_activities_tenant_opportunity_created_idx"'
     );
+  });
+
+  it("repairs previously applied opportunity activity FK to restrict deletes", () => {
+    expect(phase4CrmActivityFkRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairMigration).toContain("ON DELETE restrict");
   });
 });
