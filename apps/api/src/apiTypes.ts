@@ -1,5 +1,14 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
+import type {
+  CrmActivityEntityType,
+  CrmActivityInput,
+  CrmActivityRecord,
+  CrmActivityTransitionResult,
+  CrmActivityUpdateInput,
+  TaskInput,
+  TaskRecord
+} from "@kiss-pm/persistence";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -71,6 +80,24 @@ export type ContactRecord = {
 
 export type ContactInput = Omit<ContactRecord, "createdAt" | "updatedAt">;
 
+export type ProductType = "service" | "goods";
+
+export type ProductRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  sku: string | null;
+  type: ProductType;
+  unit: string;
+  price: number;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProductInput = Omit<ProductRecord, "createdAt" | "updatedAt">;
+
 export type ProjectTypeRecord = {
   id: string;
   tenantId: TenantId;
@@ -134,11 +161,15 @@ export type PositionDemandRecord = {
   requiredHours: number;
 };
 
+export type OpportunityCustomFieldValues = Record<string, string>;
+export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
+
 export type OpportunityRecord = {
   id: string;
   tenantId: TenantId;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -160,11 +191,25 @@ export type OpportunityRecord = {
   createdAt: Date;
   updatedAt: Date;
   demand: PositionDemandRecord[];
+  customFieldValues: OpportunityCustomFieldValues;
 };
 
 export type OpportunityInput = Omit<
   OpportunityRecord,
-  "createdAt" | "updatedAt" | "feasibilityStatus" | "feasibilityResult" | "feasibilityCheckedAt"
+  | "createdAt"
+  | "updatedAt"
+  | "feasibilityStatus"
+  | "feasibilityResult"
+  | "feasibilityCheckedAt"
+  | "ownerUserId"
+  | "customFieldValues"
+> & {
+  ownerUserId?: string | null;
+  customFieldValues?: OpportunityCustomFieldValues;
+};
+export type OpportunityUpdateInput = Omit<
+  OpportunityInput,
+  "id" | "clientName" | "contactName" | "projectType" | "status"
 >;
 
 export type ProjectRecord = {
@@ -266,6 +311,13 @@ export type ApiTenantDataSource = {
   ): Promise<ContactRecord | undefined>;
   createContact?(input: ContactInput): Promise<ContactRecord>;
   updateContact?(input: ContactInput): Promise<ContactRecord>;
+  listProducts?(tenantId: TenantId): Promise<ProductRecord[]>;
+  findProductById?(
+    tenantId: TenantId,
+    productId: string
+  ): Promise<ProductRecord | undefined>;
+  createProduct?(input: ProductInput): Promise<ProductRecord>;
+  updateProduct?(input: ProductInput): Promise<ProductRecord>;
   listProjectTypes?(tenantId: TenantId): Promise<ProjectTypeRecord[]>;
   findProjectTypeById?(
     tenantId: TenantId,
@@ -302,21 +354,44 @@ export type ApiTenantDataSource = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity?(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity?(input: OpportunityInput): Promise<OpportunityRecord | undefined>;
   updateOpportunityFeasibility?(input: {
     tenantId: TenantId;
     opportunityId: string;
     status: string;
     feasibilityStatus: string;
     feasibilityResult: Record<string, unknown>;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
   updateOpportunityStage?(input: {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
+  finalizeOpportunity?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    status: OpportunityFinalStatus;
+  }): Promise<OpportunityRecord | undefined>;
+  listCrmActivities?(
+    tenantId: TenantId,
+    entityType: CrmActivityEntityType,
+    entityId: string
+  ): Promise<CrmActivityRecord[]>;
+  createCrmActivity?(
+    input: CrmActivityInput
+  ): Promise<CrmActivityRecord | undefined>;
+  updateCrmActivity?(
+    input: CrmActivityUpdateInput
+  ): Promise<CrmActivityRecord | undefined>;
+  transitionCrmActivityStatus?(
+    input: CrmActivityUpdateInput
+  ): Promise<CrmActivityTransitionResult>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
+  listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
+  listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  createTask?(input: TaskInput): Promise<TaskRecord>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;

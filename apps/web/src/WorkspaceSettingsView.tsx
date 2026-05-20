@@ -97,7 +97,7 @@ export function WorkspaceSettingsView(props: {
     const input = {
       systemKey,
       tenantLabel: String(form.get("tenantLabel")),
-      targetEntity: "project" as const,
+      targetEntity: String(form.get("targetEntity")) as CustomFieldDefinition["targetEntity"],
       fieldType: String(form.get("fieldType")) as CustomFieldDefinition["fieldType"],
       required: form.get("required") === "on",
       status: String(form.get("status")) as CustomFieldDefinition["status"]
@@ -182,7 +182,7 @@ export function WorkspaceSettingsView(props: {
       <div className="settings-grid">
         <Panel
           title="Пользовательские поля"
-          subtitle="Названия рабочего пространства поверх стабильных системных ключей. Пока применяются к проектам."
+          subtitle="Настраиваемые поля для сделок и проектов поверх стабильных системных ключей."
           actions={
             canManageConfig ? (
               <button
@@ -223,6 +223,7 @@ export function WorkspaceSettingsView(props: {
                 <thead>
                   <tr>
                     <th>Поле</th>
+                    <th>Сущность</th>
                     <th>Тип</th>
                     <th>Обязательное</th>
                     <th>Статус</th>
@@ -232,7 +233,7 @@ export function WorkspaceSettingsView(props: {
                 </thead>
                 <tbody>
                   {filteredFields.length === 0 ? (
-                    <TableEmpty colSpan={6} label="Пользовательских полей пока нет." />
+                    <TableEmpty colSpan={7} label="Пользовательских полей пока нет." />
                   ) : (
                     filteredFields.map((field) => (
                       <tr key={field.id}>
@@ -245,6 +246,7 @@ export function WorkspaceSettingsView(props: {
                             </span>
                           </span>
                         </td>
+                        <td>{getCustomFieldTargetLabel(field.targetEntity)}</td>
                         <td>{getFieldTypeLabel(field.fieldType)}</td>
                         <td>{field.required ? "Да" : "Нет"}</td>
                         <td>
@@ -426,7 +428,24 @@ export function WorkspaceSettingsView(props: {
               />
               <FieldError formId="custom-field" field="tenantLabel" errors={fieldErrors} />
             </label>
-            <input name="targetEntity" type="hidden" value="project" />
+            <label htmlFor="custom-field-targetEntity">
+              Сущность
+              <select
+                id="custom-field-targetEntity"
+                name="targetEntity"
+                aria-describedby={
+                  fieldErrors.targetEntity
+                    ? getFieldErrorId("custom-field", "targetEntity")
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.targetEntity)}
+                defaultValue={editingField?.targetEntity ?? "opportunity"}
+              >
+                <option value="opportunity">Сделка</option>
+                <option value="project">Проект</option>
+              </select>
+              <FieldError formId="custom-field" field="targetEntity" errors={fieldErrors} />
+            </label>
             <label htmlFor="custom-field-fieldType">
               Тип поля
               <select
@@ -594,4 +613,8 @@ export function WorkspaceSettingsView(props: {
       ) : null}
     </>
   );
+}
+
+function getCustomFieldTargetLabel(targetEntity: CustomFieldDefinition["targetEntity"]): string {
+  return targetEntity === "opportunity" ? "Сделка" : "Проект";
 }

@@ -13,6 +13,8 @@ import { parseDealStageChangeBody } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseOpportunityBody,
+  parseOpportunityFinalActionBody,
+  parseOpportunityUpdateBody,
   parseProjectActivationBody
 } from "./projectIntakeParsers";
 import { createProjectIntakeService } from "./projectIntakeService";
@@ -104,6 +106,32 @@ export function registerProjectIntakeRoutes(
     return context.json({ opportunity: result.opportunity }, result.status);
   });
 
+  app.patch("/api/workspace/opportunities/:opportunityId", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const opportunityId = context.req.param("opportunityId");
+
+    const preflight = await projectIntakeService.preflightUpdateOpportunity({
+      actor,
+      opportunityId
+    });
+    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseOpportunityUpdateBody(body.value, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const result = await projectIntakeService.updateOpportunity({
+      actor,
+      opportunityId,
+      input: parsed.value
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+
+    return context.json({ opportunity: result.opportunity });
+  });
+
   app.patch("/api/workspace/opportunities/:opportunityId/stage", async (context) => {
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -124,6 +152,32 @@ export function registerProjectIntakeRoutes(
       actor,
       opportunityId,
       stageId: parsed.value.stageId
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+
+    return context.json({ opportunity: result.opportunity });
+  });
+
+  app.patch("/api/workspace/opportunities/:opportunityId/finalize", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const opportunityId = context.req.param("opportunityId");
+
+    const preflight = await projectIntakeService.preflightFinalizeOpportunity({
+      actor,
+      opportunityId
+    });
+    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseOpportunityFinalActionBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const result = await projectIntakeService.finalizeOpportunity({
+      actor,
+      opportunityId,
+      finalAction: parsed.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 

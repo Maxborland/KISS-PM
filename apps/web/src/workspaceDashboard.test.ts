@@ -89,6 +89,7 @@ describe("workspace dashboard", () => {
     expect(getAuditActionLabel("opportunity.stage_updated")).toBe(
       "Этап сделки изменен"
     );
+    expect(getAuditActionLabel("opportunity.lost_rejected")).toBe("Сделка отклонена");
     expect(getAuditActionLabel("client.updated")).toBe("Клиент обновлен");
     expect(getAuditActionLabel("contact.updated")).toBe("Контакт обновлен");
     expect(getAuditActionLabel("project_type.updated")).toBe("Тип проекта обновлен");

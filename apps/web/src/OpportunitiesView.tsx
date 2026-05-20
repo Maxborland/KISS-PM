@@ -1,38 +1,33 @@
 import {
   Calculator,
+  CheckCircle2,
   ClipboardCheck,
   KanbanSquare,
   List,
   PlayCircle,
-  PlusCircle
+  PlusCircle,
+  XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type {
-  Client,
-  Contact,
-  DealStage,
-  Opportunity,
-  OpportunityInput,
-  ProjectType
-} from "./api";
+import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
+import { DealFinalActionModal } from "./DealFinalActionModal";
+import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
+import { DealsKanban } from "./DealsKanban";
 import {
   buildKanbanStages,
-  getOpportunityClientLabel,
+  formatOpportunityEconomics,
   getOpportunityRelationshipLabel,
-  getOpportunityStageLabel,
-  getOpportunityStageOptions
+  getOpportunityStageLabel
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
 import { useProjectIntakeMutations } from "./workspaceQueries";
 import {
   type FormErrors,
   getFieldErrorId,
-  hasFormErrors,
-  validateOpportunityForm,
 } from "./workspaceForms";
 import { filterOpportunitiesForTable } from "./workspaceTables";
-import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
+import { formatDate, formatDateOnly, formatMoney } from "./workspaceViewHelpers";
 import {
   canStartDealCreation,
   getErrorMessage,
@@ -53,18 +48,6 @@ import {
 
 type DealViewMode = "list" | "kanban";
 type ModalKind = "deal" | null;
-
-type DemandFormLine = {
-  key: string;
-  positionId: string;
-  requiredHours: string;
-};
-
-const defaultDemandLine = (): DemandFormLine => ({
-  key: `demand-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-  positionId: "",
-  requiredHours: ""
-});
 
 export function OpportunitiesView(props: {
   data: WorkspaceData;
@@ -90,16 +73,14 @@ export function OpportunitiesView(props: {
   const projectMutations = useProjectIntakeMutations();
   const [modal, setModal] = useState<ModalKind>(null);
   const [activationTargetId, setActivationTargetId] = useState<string | null>(null);
+  const [finalActionTarget, setFinalActionTarget] = useState<{
+    opportunityId: string;
+    action: OpportunityFinalStatus;
+  } | null>(null);
   const [viewMode, setViewMode] = useState<DealViewMode>("list");
   const [tableSearch, setTableSearch] = useState("");
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [demandLines, setDemandLines] = useState<DemandFormLine[]>([
-    defaultDemandLine()
-  ]);
-  const [contractValue, setContractValue] = useState("");
-  const [plannedHourlyRate, setPlannedHourlyRate] = useState("");
   const filteredOpportunities = useMemo(
     () => filterOpportunitiesForTable(props.data.opportunities, tableSearch),
     [props.data.opportunities, tableSearch]
@@ -124,9 +105,6 @@ export function OpportunitiesView(props: {
       props.data.projectTypes.filter((projectType) => projectType.status === "active"),
     [props.data.projectTypes]
   );
-  const selectedClientContacts = props.data.contacts.filter(
-    (contact) => contact.clientId === selectedClientId && contact.status === "active"
-  );
   const readyToActivate = props.data.opportunities.filter(
     (opportunity) => opportunity.status === "ready_to_activate"
   ).length;
@@ -137,22 +115,16 @@ export function OpportunitiesView(props: {
     (sum, opportunity) => sum + opportunity.contractValue,
     0
   );
-  const plannedHoursPreview = calculatePlannedHoursPreview(
-    contractValue,
-    plannedHourlyRate
-  );
-  const demandedHoursPreview = demandLines.reduce(
-    (sum, line) => sum + parsePositiveInteger(line.requiredHours),
-    0
-  );
   const activationTarget = props.data.opportunities.find(
     (opportunity) => opportunity.id === activationTargetId
   ) ?? null;
   const isSaving =
     projectMutations.createOpportunity.isPending ||
+    projectMutations.updateOpportunity.isPending ||
     projectMutations.checkFeasibility.isPending ||
     projectMutations.updateStage.isPending ||
-    projectMutations.activateProject.isPending;
+    projectMutations.activateProject.isPending ||
+    projectMutations.finalizeOpportunity.isPending;
 
   useEffect(() => {
     if (!props.openCreateRequested) return;
@@ -164,71 +136,19 @@ export function OpportunitiesView(props: {
     if (isSaving) return;
     setModal(null);
     setActivationTargetId(null);
+    setFinalActionTarget(null);
     resetFormState();
   }
 
   function resetFormState() {
     setFormError("");
     setFieldErrors({});
-    setSelectedClientId("");
-    setDemandLines([defaultDemandLine()]);
-    setContractValue("");
-    setPlannedHourlyRate("");
   }
 
-  async function submitOpportunity(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const validationInput = {
-      clientId: String(form.get("clientId") ?? ""),
-      primaryContactId: String(form.get("primaryContactId") ?? ""),
-      title: String(form.get("title") ?? ""),
-      projectTypeId: String(form.get("projectTypeId") ?? ""),
-      stageId: String(form.get("stageId") ?? ""),
-      plannedStart: String(form.get("plannedStart") ?? ""),
-      plannedFinish: String(form.get("plannedFinish") ?? ""),
-      contractValue: String(form.get("contractValue") ?? ""),
-      plannedHourlyRate: String(form.get("plannedHourlyRate") ?? ""),
-      probability: String(form.get("probability") ?? ""),
-      demand: demandLines.map((line) => ({
-        positionId: line.positionId,
-        requiredHours: line.requiredHours
-      }))
-    };
-    const validationErrors = validateOpportunityForm(validationInput);
-    setFormError("");
-    setFieldErrors(validationErrors);
-
-    if (hasFormErrors(validationErrors)) return;
-
-    const input: OpportunityInput = {
-      clientId: validationInput.clientId,
-      primaryContactId: validationInput.primaryContactId,
-      projectTypeId: validationInput.projectTypeId,
-      stageId: validationInput.stageId,
-      title: validationInput.title.trim(),
-      description: String(form.get("description") ?? "").trim(),
-      plannedStart: validationInput.plannedStart,
-      plannedFinish: validationInput.plannedFinish,
-      contractValue: Number(validationInput.contractValue),
-      plannedHourlyRate: Number(validationInput.plannedHourlyRate),
-      probability: Number(validationInput.probability),
-      templateId: String(form.get("templateId") ?? "") || null,
-      demand: demandLines
-        .filter((line) => line.positionId.trim())
-        .map((line) => ({
-          positionId: line.positionId,
-          requiredHours: Number(line.requiredHours)
-        }))
-    };
-
-    try {
-      await projectMutations.createOpportunity.mutateAsync(input);
-      closeModal();
-      props.onChanged("Сделка создана");
-    } catch (submitError) {
-      setFormError(getErrorMessage(submitError));
-    }
+  async function submitOpportunity(input: DealFormSubmitInput) {
+    await projectMutations.createOpportunity.mutateAsync(input);
+    closeModal();
+    props.onChanged("Сделка создана");
   }
 
   async function checkFeasibility(opportunity: Opportunity) {
@@ -279,9 +199,18 @@ export function OpportunitiesView(props: {
     }
   }
 
-  function updateDemandLine(index: number, patch: Partial<DemandFormLine>) {
-    setDemandLines((lines) =>
-      lines.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line)
+  async function finalizeOpportunity(input: {
+    status: OpportunityFinalStatus;
+    reason: string;
+  }) {
+    if (!finalActionTarget) return;
+    await projectMutations.finalizeOpportunity.mutateAsync({
+      opportunityId: finalActionTarget.opportunityId,
+      input
+    });
+    closeModal();
+    props.onChanged(
+      input.status === "won_closed" ? "Сделка закрыта как выигранная" : "Сделка отклонена"
     );
   }
 
@@ -354,6 +283,7 @@ export function OpportunitiesView(props: {
             <DealsTable
               canActivateProjects={canActivateProjects}
               canCheckFeasibility={canCheckFeasibility}
+              canManageOpportunities={canManageOpportunities}
               data={props.data}
               isPending={isSaving}
               opportunities={filteredOpportunities}
@@ -363,6 +293,9 @@ export function OpportunitiesView(props: {
                 setActivationTargetId(opportunity.id);
               }}
               onCheckFeasibility={checkFeasibility}
+              onFinalize={(opportunity, action) =>
+                setFinalActionTarget({ opportunityId: opportunity.id, action })
+              }
               onOpenOpportunity={props.onOpenOpportunity}
             />
           ) : (
@@ -380,31 +313,18 @@ export function OpportunitiesView(props: {
       </Panel>
 
       {modal === "deal" ? (
-        <DealModal
+        <DealFormModal
           activeStages={activeStages}
           clients={activeClients}
-          contacts={selectedClientContacts}
-          contractValue={contractValue}
-          demandedHoursPreview={demandedHoursPreview}
-          demandLines={demandLines}
+          allContacts={props.data.contacts}
           error={formError}
-          fieldErrors={fieldErrors}
+          customFields={props.data.customFields}
           isSaving={isSaving}
-          plannedHourlyRate={plannedHourlyRate}
-          plannedHoursPreview={plannedHoursPreview}
           positions={props.data.positions}
           projectTemplates={props.data.projectTemplates}
           projectTypes={activeProjectTypes}
-          selectedClientId={selectedClientId}
-          onAddDemandLine={() => setDemandLines((lines) => [...lines, defaultDemandLine()])}
+          users={props.data.users}
           onClose={closeModal}
-          onContractValueChange={setContractValue}
-          onDemandLineChange={updateDemandLine}
-          onPlannedHourlyRateChange={setPlannedHourlyRate}
-          onRemoveDemandLine={(index) =>
-            setDemandLines((lines) => lines.filter((_, lineIndex) => lineIndex !== index))
-          }
-          onSelectedClientChange={setSelectedClientId}
           onSubmit={submitOpportunity}
         />
       ) : null}
@@ -417,6 +337,23 @@ export function OpportunitiesView(props: {
           onClose={closeModal}
           onSubmit={activateProject}
         />
+      ) : null}
+      {finalActionTarget ? (
+        (() => {
+          const target = props.data.opportunities.find(
+            (opportunity) => opportunity.id === finalActionTarget.opportunityId
+          );
+          return target ? (
+            <DealFinalActionModal
+              action={finalActionTarget.action}
+              error={formError}
+              isSaving={isSaving}
+              opportunity={target}
+              onClose={closeModal}
+              onSubmit={finalizeOpportunity}
+            />
+          ) : null;
+        })()
       ) : null}
     </>
   );
@@ -450,11 +387,13 @@ function ReferenceTile(props: {
 function DealsTable(props: {
   canActivateProjects: boolean;
   canCheckFeasibility: boolean;
+  canManageOpportunities: boolean;
   data: WorkspaceData;
   isPending: boolean;
   opportunities: Opportunity[];
   onActivate: (opportunity: Opportunity) => void;
   onCheckFeasibility: (opportunity: Opportunity) => void;
+  onFinalize: (opportunity: Opportunity, action: OpportunityFinalStatus) => void;
   onOpenOpportunity: (opportunityId: string) => void;
 }) {
   return (
@@ -484,6 +423,7 @@ function DealsTable(props: {
           ) : (
             props.opportunities.map((opportunity) => {
               const relationshipLabel = getOpportunityRelationshipLabel(props.data, opportunity);
+              const economics = formatOpportunityEconomics(opportunity);
 
               return (
                 <tr
@@ -522,10 +462,21 @@ function DealsTable(props: {
                     </small>
                   </td>
                   <td>
-                    <strong>{opportunity.plannedHours} ч</strong>
-                    <small className="muted">
-                      {formatMoney(opportunity.contractValue)} / {formatMoney(opportunity.plannedHourlyRate)}
-                    </small>
+                    <span
+                      aria-label={`План: ${economics.plannedHoursLabel}; стоимость ${economics.contractValueLabel}; норма часа ${economics.plannedHourlyRateLabel}`}
+                      className="deal-plan-cell"
+                    >
+                      <span className="deal-plan-main">
+                        <small className="muted">Необходимые часы:</small>
+                        {" "}
+                        <strong>{economics.plannedHoursLabel}</strong>
+                      </span>
+                      <span className="sr-only">; </span>
+                      <span className="deal-plan-meta">
+                        <small>Стоимость: {economics.contractValueLabel}</small>
+                        <small>Норма: {economics.plannedHourlyRateLabel}</small>
+                      </span>
+                    </span>
                   </td>
                   <td>{formatDemand(opportunity, props.data)}</td>
                   <td>{renderFeasibility(opportunity)}</td>
@@ -547,6 +498,28 @@ function DealsTable(props: {
                         opportunity,
                         onActivate: () => props.onActivate(opportunity)
                       })}
+                      {props.canManageOpportunities && !isFinalOpportunity(opportunity) ? (
+                        <>
+                          <button
+                            className="secondary-button"
+                            disabled={props.isPending}
+                            type="button"
+                            onClick={() => props.onFinalize(opportunity, "won_closed")}
+                          >
+                            <CheckCircle2 aria-hidden="true" size={14} />
+                            Закрыть
+                          </button>
+                          <button
+                            className="danger-button"
+                            disabled={props.isPending}
+                            type="button"
+                            onClick={() => props.onFinalize(opportunity, "lost_rejected")}
+                          >
+                            <XCircle aria-hidden="true" size={14} />
+                            Отклонить
+                          </button>
+                        </>
+                      ) : null}
                     </span>
                   </td>
                 </tr>
@@ -556,304 +529,6 @@ function DealsTable(props: {
         </tbody>
       </table>
     </div>
-  );
-}
-
-function DealsKanban(props: {
-  canManageOpportunities: boolean;
-  data: WorkspaceData;
-  isPending: boolean;
-  opportunities: Opportunity[];
-  stages: DealStage[];
-  onOpenOpportunity: (opportunityId: string) => void;
-  onUpdateStage: (opportunity: Opportunity, stageId: string) => void;
-}) {
-  if (props.stages.length === 0) {
-    return <p className="empty-state">Создайте хотя бы один этап сделки для канбана.</p>;
-  }
-
-  return (
-    <div className="deal-kanban" aria-label="Канбан сделок">
-      {props.stages.map((stage) => {
-        const columnDeals = props.opportunities.filter(
-          (opportunity) => opportunity.stageId === stage.id
-        );
-
-        return (
-          <section className="deal-kanban-column" key={stage.id}>
-            <header>
-              <strong>{stage.status === "archived" ? `${stage.name} · архив` : stage.name}</strong>
-              <span>{columnDeals.length}</span>
-            </header>
-            <div className="deal-card-list">
-              {columnDeals.length === 0 ? (
-                <p className="empty-state compact">Нет сделок на этапе</p>
-              ) : (
-                columnDeals.map((opportunity) => (
-                  <article className="deal-card" key={opportunity.id}>
-                    <button
-                      className="inline-link-button"
-                      type="button"
-                      onClick={() => props.onOpenOpportunity(opportunity.id)}
-                    >
-                      {opportunity.title}
-                    </button>
-                    <small>{getOpportunityClientLabel(props.data, opportunity)}</small>
-                    <span className="chip-list">
-                      <span className="permission-chip">{opportunity.plannedHours} ч</span>
-                      <span className="permission-chip">{formatMoney(opportunity.contractValue)}</span>
-                    </span>
-                    <label htmlFor={`${opportunity.id}-stage`}>
-                      <span className="sr-only">Этап сделки</span>
-                      <select
-                        id={`${opportunity.id}-stage`}
-                        disabled={
-                          props.isPending ||
-                          isFinalOpportunity(opportunity) ||
-                          !props.canManageOpportunities
-                        }
-                        title={
-                          props.canManageOpportunities
-                            ? undefined
-                            : "Нужно право tenant.opportunities.manage"
-                        }
-                        value={opportunity.stageId ?? ""}
-                        onChange={(event) => props.onUpdateStage(opportunity, event.target.value)}
-                      >
-                        {getOpportunityStageOptions(props.data.dealStages, opportunity).map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.status === "archived" ? `${item.name} · архив` : item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function DealModal(props: {
-  activeStages: DealStage[];
-  clients: Client[];
-  contacts: Contact[];
-  contractValue: string;
-  demandedHoursPreview: number;
-  demandLines: DemandFormLine[];
-  error: string;
-  fieldErrors: FormErrors;
-  isSaving: boolean;
-  plannedHourlyRate: string;
-  plannedHoursPreview: number;
-  positions: WorkspaceData["positions"];
-  projectTemplates: WorkspaceData["projectTemplates"];
-  projectTypes: ProjectType[];
-  selectedClientId: string;
-  onAddDemandLine: () => void;
-  onClose: () => void;
-  onContractValueChange: (value: string) => void;
-  onDemandLineChange: (index: number, patch: Partial<DemandFormLine>) => void;
-  onPlannedHourlyRateChange: (value: string) => void;
-  onRemoveDemandLine: (index: number) => void;
-  onSelectedClientChange: (value: string) => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <Modal
-      title="Создать сделку"
-      description="Плановые часы считаются как стоимость контракта / плановая норма часа."
-      isDismissDisabled={props.isSaving}
-      onClose={props.onClose}
-    >
-      <form className="stack-form" noValidate onSubmit={props.onSubmit}>
-        <div className="grid-3">
-          <label htmlFor="opportunity-clientId">
-            Клиент
-            <select
-              id="opportunity-clientId"
-              name="clientId"
-              data-autofocus
-              value={props.selectedClientId}
-              onChange={(event) => props.onSelectedClientChange(event.target.value)}
-            >
-              <option value="">Выберите клиента</option>
-              {props.clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-            <FieldError formId="opportunity" field="clientId" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-primaryContactId">
-            Контакт
-            <select id="opportunity-primaryContactId" name="primaryContactId" defaultValue="">
-              <option value="">Выберите контакт</option>
-              {props.contacts.map((contact) => (
-                <option key={contact.id} value={contact.id}>
-                  {contact.name}
-                </option>
-              ))}
-            </select>
-            <FieldError formId="opportunity" field="primaryContactId" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-stageId">
-            Этап
-            <select id="opportunity-stageId" name="stageId" defaultValue={props.activeStages[0]?.id ?? ""}>
-              <option value="">Выберите этап</option>
-              {props.activeStages.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.name}
-                </option>
-              ))}
-            </select>
-            <FieldError formId="opportunity" field="stageId" errors={props.fieldErrors} />
-          </label>
-        </div>
-        <label htmlFor="opportunity-title">
-          Название входящего проекта
-          <input id="opportunity-title" name="title" />
-          <FieldError formId="opportunity" field="title" errors={props.fieldErrors} />
-        </label>
-        <div className="grid-3">
-          <label htmlFor="opportunity-projectTypeId">
-            Тип проекта
-            <select id="opportunity-projectTypeId" name="projectTypeId" defaultValue="">
-              <option value="">Выберите тип</option>
-              {props.projectTypes.map((projectType) => (
-                <option key={projectType.id} value={projectType.id}>
-                  {projectType.name}
-                </option>
-              ))}
-            </select>
-            <FieldError formId="opportunity" field="projectTypeId" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-plannedStart">
-            Старт
-            <input id="opportunity-plannedStart" name="plannedStart" type="date" />
-            <FieldError formId="opportunity" field="plannedStart" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-plannedFinish">
-            Плановый финиш
-            <input id="opportunity-plannedFinish" name="plannedFinish" type="date" />
-            <FieldError formId="opportunity" field="plannedFinish" errors={props.fieldErrors} />
-          </label>
-        </div>
-        <label htmlFor="opportunity-description">
-          Описание
-          <textarea id="opportunity-description" name="description" rows={3} />
-        </label>
-        <div className="grid-3">
-          <label htmlFor="opportunity-contractValue">
-            Стоимость контракта
-            <input
-              id="opportunity-contractValue"
-              name="contractValue"
-              type="number"
-              min="1"
-              value={props.contractValue}
-              onChange={(event) => props.onContractValueChange(event.target.value)}
-            />
-            <FieldError formId="opportunity" field="contractValue" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-plannedHourlyRate">
-            Плановая норма часа
-            <input
-              id="opportunity-plannedHourlyRate"
-              name="plannedHourlyRate"
-              type="number"
-              min="1"
-              value={props.plannedHourlyRate}
-              onChange={(event) => props.onPlannedHourlyRateChange(event.target.value)}
-            />
-            <FieldError formId="opportunity" field="plannedHourlyRate" errors={props.fieldErrors} />
-          </label>
-          <label htmlFor="opportunity-probability">
-            Вероятность, %
-            <input id="opportunity-probability" name="probability" type="number" min="0" max="100" defaultValue="70" />
-            <FieldError formId="opportunity" field="probability" errors={props.fieldErrors} />
-          </label>
-        </div>
-        <label htmlFor="opportunity-templateId">
-          Шаблон проекта
-          <select id="opportunity-templateId" name="templateId" defaultValue="">
-            <option value="">Без шаблона</option>
-            {props.projectTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.tenantLabel}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="danger-callout neutral" aria-live="polite">
-          <strong>Плановая емкость: {props.plannedHoursPreview} ч</strong>
-          <span>Потребность по должностям: {props.demandedHoursPreview} ч.</span>
-        </div>
-        <fieldset className="permission-grid">
-          <legend>Потребность: должность + часы</legend>
-          {props.demandLines.map((line, index) => (
-            <div className="grid-3" key={line.key}>
-              <label htmlFor={`${line.key}-position`}>
-                Должность
-                <select
-                  id={`${line.key}-position`}
-                  value={line.positionId}
-                  onChange={(event) =>
-                    props.onDemandLineChange(index, { positionId: event.target.value })
-                  }
-                >
-                  <option value="">Выберите должность</option>
-                  {props.positions.map((position) => (
-                    <option key={position.id} value={position.id}>
-                      {position.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor={`${line.key}-requiredHours`}>
-                Часы
-                <input
-                  id={`${line.key}-requiredHours`}
-                  type="number"
-                  min="1"
-                  value={line.requiredHours}
-                  onChange={(event) =>
-                    props.onDemandLineChange(index, { requiredHours: event.target.value })
-                  }
-                />
-              </label>
-              <span className="form-actions">
-                <button
-                  className="secondary-button"
-                  disabled={props.demandLines.length === 1}
-                  type="button"
-                  onClick={() => props.onRemoveDemandLine(index)}
-                >
-                  Удалить строку
-                </button>
-              </span>
-            </div>
-          ))}
-          <button className="secondary-button" type="button" onClick={props.onAddDemandLine}>
-            Добавить строку потребности
-          </button>
-          <FieldError formId="opportunity" field="demand" errors={props.fieldErrors} />
-          <FieldError formId="opportunity" field="demandDuplicates" errors={props.fieldErrors} />
-        </fieldset>
-        <ModalActions
-          error={props.error}
-          isSaving={props.isSaving}
-          primaryLabel="Создать сделку"
-          savingLabel="Создаем..."
-          onClose={props.onClose}
-        />
-      </form>
-    </Modal>
   );
 }
 
@@ -938,10 +613,10 @@ function renderActivationAction(input: {
   opportunity: Opportunity;
   onActivate: () => void;
 }) {
-  if (input.opportunity.status === "converted") {
-    return <span className="muted">Проект создан</span>;
+  if (input.opportunity.status === "won_closed") {
+    return <span className="muted">Закрыта</span>;
   }
-  if (input.opportunity.status === "rejected") {
+  if (input.opportunity.status === "lost_rejected") {
     return <span className="muted">Отклонена</span>;
   }
   if (!input.canActivateProjects) {
@@ -976,7 +651,7 @@ function renderActivationAction(input: {
 }
 
 function isFinalOpportunity(opportunity: Opportunity): boolean {
-  return opportunity.status === "converted" || opportunity.status === "rejected";
+  return opportunity.status === "won_closed" || opportunity.status === "lost_rejected";
 }
 
 function renderFeasibility(opportunity: Opportunity) {
@@ -1055,29 +730,6 @@ function getFeasibilityLabel(status: Opportunity["feasibilityStatus"]): string {
   if (status === "conflict") return "Конфликт ресурса";
   if (status === "blocked") return "Заблокировано";
   return "Не проверено";
-}
-
-function calculatePlannedHoursPreview(contractValue: string, plannedHourlyRate: string): number {
-  const value = Number(contractValue);
-  const rate = Number(plannedHourlyRate);
-  if (!Number.isFinite(value) || !Number.isFinite(rate) || value <= 0 || rate <= 0) {
-    return 0;
-  }
-
-  return Math.floor(value / rate);
-}
-
-function parsePositiveInteger(value: string): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }
 
 function isInteractiveElement(target: EventTarget): boolean {

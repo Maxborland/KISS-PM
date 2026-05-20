@@ -53,6 +53,10 @@ export function WorkspaceShell() {
   } = useWorkspaceShellData();
   const activeRouteId = getRouteIdFromPathname(pathname);
   const activeOpportunityId = getOpportunityIdFromPathname(pathname);
+  const activeClientId = getClientIdFromPathname(pathname);
+  const activeContactId = getContactIdFromPathname(pathname);
+  const activeProductId = getProductIdFromPathname(pathname);
+  const activeProjectId = getProjectIdFromPathname(pathname);
 
   useEffect(() => {
     if (!meQuery.data) return;
@@ -410,6 +414,10 @@ export function WorkspaceShell() {
         <WorkspaceRouteRenderer
           activeRouteId={activeRouteId}
           activeOpportunityId={activeOpportunityId}
+          activeClientId={activeClientId}
+          activeContactId={activeContactId}
+          activeProductId={activeProductId}
+          activeProjectId={activeProjectId}
           data={data}
           openCreateRequested={quickCreateRequested}
           onChanged={setMessage}
@@ -419,8 +427,32 @@ export function WorkspaceShell() {
           onOpenOpportunity={(opportunityId) => {
             router.push(`/opportunities/${encodeURIComponent(opportunityId)}`);
           }}
+          onOpenClient={(clientId) => {
+            router.push(`/clients/${encodeURIComponent(clientId)}`);
+          }}
+          onOpenContact={(contactId) => {
+            router.push(`/contacts/${encodeURIComponent(contactId)}`);
+          }}
+          onOpenProduct={(productId) => {
+            router.push(`/products/${encodeURIComponent(productId)}`);
+          }}
+          onOpenProject={(projectId) => {
+            router.push(`/projects/${encodeURIComponent(projectId)}`);
+          }}
           onBackToOpportunities={() => {
             router.push(getRoutePath("opportunities"));
+          }}
+          onBackToClients={() => {
+            router.push(getRoutePath("clients"));
+          }}
+          onBackToContacts={() => {
+            router.push(getRoutePath("contacts"));
+          }}
+          onBackToProducts={() => {
+            router.push(getRoutePath("products"));
+          }}
+          onBackToProjects={() => {
+            router.push(getRoutePath("projects"));
           }}
           sectionStates={sectionStates}
         />
@@ -433,4 +465,28 @@ function getOpportunityIdFromPathname(pathname: string): string | null {
   const match = /^\/opportunities\/([^/]+)\/?$/.exec(pathname);
   const rawOpportunityId = match?.[1];
   return rawOpportunityId ? decodeURIComponent(rawOpportunityId) : null;
+}
+
+function getProjectIdFromPathname(pathname: string): string | null {
+  const match = /^\/projects\/([^/]+)\/?$/.exec(pathname);
+  const rawProjectId = match?.[1];
+  return rawProjectId ? decodeURIComponent(rawProjectId) : null;
+}
+
+function getClientIdFromPathname(pathname: string): string | null {
+  const match = /^\/clients\/([^/]+)\/?$/.exec(pathname);
+  const rawClientId = match?.[1];
+  return rawClientId ? decodeURIComponent(rawClientId) : null;
+}
+
+function getContactIdFromPathname(pathname: string): string | null {
+  const match = /^\/contacts\/([^/]+)\/?$/.exec(pathname);
+  const rawContactId = match?.[1];
+  return rawContactId ? decodeURIComponent(rawContactId) : null;
+}
+
+function getProductIdFromPathname(pathname: string): string | null {
+  const match = /^\/products\/([^/]+)\/?$/.exec(pathname);
+  const rawProductId = match?.[1];
+  return rawProductId ? decodeURIComponent(rawProductId) : null;
 }

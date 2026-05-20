@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseOpportunityBody } from "./projectIntakeParsers";
+import {
+  parseOpportunityFinalActionBody,
+  parseOpportunityBody,
+  parseOpportunityUpdateBody
+} from "./projectIntakeParsers";
 
 describe("project intake parsers", () => {
   const validOpportunityBody = {
@@ -30,6 +34,139 @@ describe("project intake parsers", () => {
         plannedHours: 160
       }
     });
+  });
+
+  it("parses opportunity updates and recalculates required hours from value and hourly norm", () => {
+    const parsed = parseOpportunityUpdateBody(
+      {
+        ...validOpportunityBody,
+        title: "Внедрение KISS PM обновлено",
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }]
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        tenantId: "tenant-alpha",
+        title: "Внедрение KISS PM обновлено",
+        contractValue: 1_200_000,
+        plannedHourlyRate: 6_000,
+        plannedHours: 200,
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }]
+      }
+    });
+  });
+
+  it("parses optional owner user id on create and update", () => {
+    const parsed = parseOpportunityBody(
+      {
+        ...validOpportunityBody,
+        ownerUserId: "user-owner-1"
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        ownerUserId: "user-owner-1"
+      }
+    });
+
+    const updated = parseOpportunityUpdateBody(
+      {
+        ...validOpportunityBody,
+        ownerUserId: null
+      },
+      "tenant-alpha"
+    );
+
+    expect(updated).toMatchObject({
+      ok: true,
+      value: {
+        ownerUserId: null
+      }
+    });
+  });
+
+  it("rejects malformed owner user id", () => {
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          ownerUserId: "not allowed"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_owner_user_id" });
+  });
+
+  it("parses runtime custom field values on create and update", () => {
+    const parsed = parseOpportunityBody(
+      {
+        ...validOpportunityBody,
+        customFieldValues: {
+          priority_model: "Высокий",
+          expected_margin: "31"
+        }
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        customFieldValues: {
+          priority_model: "Высокий",
+          expected_margin: "31"
+        }
+      }
+    });
+
+    const updated = parseOpportunityUpdateBody(
+      {
+        ...validOpportunityBody,
+        customFieldValues: {
+          priority_model: "Средний"
+        }
+      },
+      "tenant-alpha"
+    );
+
+    expect(updated).toMatchObject({
+      ok: true,
+      value: {
+        customFieldValues: {
+          priority_model: "Средний"
+        }
+      }
+    });
+  });
+
+  it("parses governed final deal actions with a decision reason", () => {
+    expect(
+      parseOpportunityFinalActionBody({
+        status: "lost_rejected",
+        reason: "Клиент заморозил бюджет"
+      })
+    ).toEqual({
+      ok: true,
+      value: {
+        status: "lost_rejected",
+        reason: "Клиент заморозил бюджет"
+      }
+    });
+
+    expect(
+      parseOpportunityFinalActionBody({
+        status: "won_closed",
+        reason: ""
+      })
+    ).toEqual({ ok: false, error: "invalid_opportunity_final_reason" });
   });
 
   it("rejects calendar dates that JavaScript Date would otherwise roll over", () => {

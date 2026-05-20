@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Project } from "./api";
 import type { WorkspaceData } from "./workspaceData";
 import { filterProjectsForTable } from "./workspaceTables";
-import { formatDateOnly } from "./workspaceViewHelpers";
+import { formatDateOnly, formatHours, formatMoney } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
 import {
   CrudToolbar,
@@ -17,6 +17,7 @@ import {
 
 export function ProjectsView(props: {
   data: WorkspaceData;
+  onOpenProject: (projectId: string) => void;
   sectionState: SectionState;
 }) {
   const [tableSearch, setTableSearch] = useState("");
@@ -40,8 +41,8 @@ export function ProjectsView(props: {
     >
       <div className="surface-summary-grid">
         <SummaryCard label="Активные проекты" value={props.data.projects.length} />
-        <SummaryCard label="Плановые часы" value={totalPlannedHours} tone="success" />
-        <SummaryCard label="Контракты, руб." value={Math.round(totalContractValue)} tone="muted" />
+        <SummaryCard label="Плановые часы" value={formatHours(totalPlannedHours)} tone="success" />
+        <SummaryCard label="Контракты" value={formatMoney(totalContractValue)} tone="muted" />
       </div>
       <CrudToolbar
         searchLabel="Поиск проектов"
@@ -71,12 +72,13 @@ export function ProjectsView(props: {
                 <th>План</th>
                 <th>Потребность</th>
                 <th>Статус</th>
+                <th>Действие</th>
               </tr>
             </thead>
             <tbody>
               {filteredProjects.length === 0 ? (
                 <TableEmpty
-                  colSpan={5}
+                  colSpan={6}
                   label={
                     props.data.projects.length === 0
                       ? "Активных проектов пока нет."
@@ -85,7 +87,7 @@ export function ProjectsView(props: {
                 />
               ) : (
                 filteredProjects.map((project) => (
-                  <tr key={project.id}>
+                  <tr key={project.id} className="clickable-row">
                     <td>
                       <span className="entity-name-cell">
                         <span className="row-avatar">P</span>
@@ -105,7 +107,7 @@ export function ProjectsView(props: {
                       </small>
                     </td>
                     <td>
-                      <strong>{project.plannedHours} ч</strong>
+                      <strong>{formatHours(project.plannedHours)}</strong>
                       <small className="muted">{formatMoney(project.contractValue)}</small>
                     </td>
                     <td>{formatProjectDemand(project, props.data)}</td>
@@ -114,6 +116,15 @@ export function ProjectsView(props: {
                         label={project.status === "active" ? "Активен" : project.status}
                         tone={project.status === "active" ? "success" : "muted"}
                       />
+                    </td>
+                    <td>
+                      <button
+                        className="secondary-button compact"
+                        type="button"
+                        onClick={() => props.onOpenProject(project.id)}
+                      >
+                        Открыть
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -133,17 +144,9 @@ function formatProjectDemand(project: Project, data: WorkspaceData) {
         <span className="permission-chip" key={line.positionId}>
           {data.positions.find((position) => position.id === line.positionId)?.name ??
             line.positionId}
-          : {line.requiredHours} ч
+          : {formatHours(line.requiredHours)}
         </span>
       ))}
     </span>
   );
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }

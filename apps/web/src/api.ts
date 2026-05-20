@@ -82,7 +82,7 @@ export type CustomFieldDefinition = {
   tenantId: string;
   systemKey: string;
   tenantLabel: string;
-  targetEntity: "project";
+  targetEntity: "project" | "opportunity";
   fieldType: WorkspaceConfigFieldType;
   required: boolean;
   status: WorkspaceConfigStatus;
@@ -137,6 +137,22 @@ export type Contact = {
   updatedAt: string;
 };
 
+export type ProductType = "service" | "goods";
+
+export type Product = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sku: string | null;
+  type: ProductType;
+  unit: string;
+  price: number;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProjectType = {
   id: string;
   tenantId: string;
@@ -167,6 +183,14 @@ export type ContactUpdateInput = Pick<
   Contact,
   "clientId" | "name" | "email" | "phone" | "telegram" | "role" | "status"
 >;
+export type ProductInput = Pick<
+  Product,
+  "id" | "name" | "sku" | "type" | "unit" | "price" | "description"
+>;
+export type ProductUpdateInput = Pick<
+  Product,
+  "name" | "sku" | "type" | "unit" | "price" | "description" | "status"
+>;
 export type ProjectTypeInput = Pick<ProjectType, "id" | "name" | "description">;
 export type ProjectTypeUpdateInput = Pick<ProjectType, "name" | "description" | "status">;
 export type DealStageInput = Pick<DealStage, "id" | "name" | "sortOrder">;
@@ -182,8 +206,10 @@ export type OpportunityStatus =
   | "intake"
   | "feasibility"
   | "ready_to_activate"
-  | "rejected"
-  | "converted";
+  | "won_closed"
+  | "lost_rejected";
+
+export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
 
 export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
 
@@ -192,6 +218,7 @@ export type Opportunity = {
   tenantId: string;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -213,6 +240,7 @@ export type Opportunity = {
   createdAt: string;
   updatedAt: string;
   demand: PositionDemand[];
+  customFieldValues: Record<string, string>;
 };
 
 export type Project = {
@@ -234,10 +262,57 @@ export type Project = {
   demand: PositionDemand[];
 };
 
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+export type TaskPriority = "low" | "normal" | "high" | "critical";
+export type TaskParticipantRole =
+  | "executor"
+  | "co_executor"
+  | "requester"
+  | "controller"
+  | "approver"
+  | "observer";
+
+export type TaskParticipant = {
+  userId: string;
+  role: TaskParticipantRole;
+};
+
+export type Task = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  stageId: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  plannedStart: string;
+  plannedFinish: string;
+  plannedWork: number;
+  actualWork: number;
+  progress: number;
+  source: "manual";
+  createdAt: string;
+  updatedAt: string;
+  participants: TaskParticipant[];
+};
+
+export type TaskInput = {
+  id?: string | undefined;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  plannedStart: string;
+  plannedFinish: string;
+  plannedWork: number;
+  participants: TaskParticipant[];
+};
+
 export type OpportunityInput = {
   id?: string;
   clientId: string;
   primaryContactId: string;
+  ownerUserId?: string | null;
   projectTypeId: string;
   stageId: string;
   title: string;
@@ -249,10 +324,79 @@ export type OpportunityInput = {
   probability: number;
   templateId: string | null;
   demand: PositionDemand[];
+  customFieldValues?: Record<string, string>;
 };
+export type OpportunityUpdateInput = Omit<OpportunityInput, "id">;
 
 export type OpportunityStageInput = {
   stageId: string;
+};
+
+export type OpportunityFinalActionInput = {
+  status: OpportunityFinalStatus;
+  reason: string;
+};
+
+export type CrmActivityEntityType = "opportunity" | "client" | "contact" | "product";
+export type CrmActivityType = "comment" | "task" | "file";
+export type CrmActivityStatus = "todo" | "done";
+
+export type CrmActivity = {
+  id: string;
+  tenantId: string;
+  entityType: CrmActivityEntityType;
+  entityId: string;
+  type: CrmActivityType;
+  title: string | null;
+  body: string | null;
+  status: CrmActivityStatus | null;
+  dueDate: string | null;
+  assigneeUserId: string | null;
+  authorUserId: string;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CrmSystemEvent = {
+  id: string;
+  actorUserId: string;
+  actionType: string;
+  sourceWorkflow: string | null;
+  createdAt: string;
+  executionStatus: unknown;
+};
+
+export type CrmActivityFeed = {
+  activities: CrmActivity[];
+  systemEvents: CrmSystemEvent[];
+  canReadRawAudit: boolean;
+  auditEvents: AuditEvent[] | null;
+};
+
+export type CrmCommentInput = {
+  body: string;
+};
+
+export type CrmTaskInput = {
+  title: string;
+  body?: string | null;
+  dueDate?: string | null;
+  assigneeUserId?: string | null;
+};
+
+export type CrmFileInput = {
+  title: string;
+  fileUrl: string;
+  body?: string | null;
+  fileSizeBytes?: number | null;
+  mimeType?: string | null;
+};
+
+export type CrmTaskUpdateInput = {
+  status: CrmActivityStatus;
 };
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
@@ -509,6 +653,27 @@ export async function updateContact(
   });
 }
 
+export async function fetchProducts(): Promise<{ products: Product[] }> {
+  return requestJson("/api/workspace/products");
+}
+
+export async function createProduct(input: ProductInput): Promise<{ product: Product }> {
+  return requestJson("/api/workspace/products", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function updateProduct(
+  productId: string,
+  input: ProductUpdateInput
+): Promise<{ product: Product }> {
+  return requestJson(`/api/workspace/products/${encodePathSegment(productId)}`, {
+    method: "PATCH",
+    body: input
+  });
+}
+
 export async function fetchProjectTypes(): Promise<{ projectTypes: ProjectType[] }> {
   return requestJson("/api/workspace/project-types");
 }
@@ -577,6 +742,16 @@ export async function createOpportunity(
   });
 }
 
+export async function updateOpportunity(
+  opportunityId: string,
+  input: OpportunityUpdateInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(`/api/workspace/opportunities/${encodePathSegment(opportunityId)}`, {
+    method: "PATCH",
+    body: input
+  });
+}
+
 export async function checkOpportunityFeasibility(
   opportunityId: string
 ): Promise<{ opportunity: Opportunity; assessment: OpportunityFeasibilityAssessment }> {
@@ -601,6 +776,19 @@ export async function updateOpportunityStage(
   );
 }
 
+export async function finalizeOpportunity(
+  opportunityId: string,
+  input: OpportunityFinalActionInput
+): Promise<{ opportunity: Opportunity }> {
+  return requestJson(
+    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/finalize`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
 export async function activateOpportunityProject(
   opportunityId: string,
   input: { id?: string; acceptedRiskReason: string | null }
@@ -614,8 +802,100 @@ export async function activateOpportunityProject(
   );
 }
 
+export async function fetchCrmActivity(
+  entityType: CrmActivityEntityType,
+  entityId: string
+): Promise<CrmActivityFeed> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/activity`
+  );
+}
+
+export async function createCrmComment(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmCommentInput
+): Promise<{ activity: CrmActivity }> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/comments`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function createCrmTask(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmTaskInput
+): Promise<{ activity: CrmActivity }> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/tasks`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function createCrmFile(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmFileInput
+): Promise<{ activity: CrmActivity }> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/files`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function updateCrmTask(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  activityId: string,
+  input: CrmTaskUpdateInput
+): Promise<{ activity: CrmActivity }> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/tasks/${encodePathSegment(activityId)}`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
 export async function fetchProjects(): Promise<{ projects: Project[] }> {
   return requestJson("/api/workspace/projects");
+}
+
+export async function fetchProjectDetail(
+  projectId: string
+): Promise<{ project: Project; tasks: Task[] }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}`);
+}
+
+export async function fetchProjectTasks(
+  projectId: string
+): Promise<{ tasks: Task[] }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}/tasks`);
+}
+
+export async function fetchMyWork(): Promise<{ tasks: Task[] }> {
+  return requestJson("/api/workspace/my-work");
+}
+
+export async function createProjectTask(
+  projectId: string,
+  input: TaskInput
+): Promise<{ task: Task }> {
+  return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}/tasks`, {
+    method: "POST",
+    body: input
+  });
 }
 
 async function requestJson<T>(

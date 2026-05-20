@@ -5,6 +5,7 @@ import {
   isWorkspaceConfigTenantLabelInput,
   workspaceConfigDescriptionMaxLength
 } from "@kiss-pm/domain";
+import type { CustomFieldDefinition } from "./api";
 
 export type FormErrors = Record<string, string>;
 export type UserFormMode = "create" | "edit";
@@ -114,6 +115,37 @@ export function validateProjectTypeForm(input: {
   return errors;
 }
 
+export function validateProductForm(input: {
+  name: string;
+  sku: string;
+  type: string;
+  unit: string;
+  price: string;
+  description?: string;
+  status?: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+  const price = Number(input.price);
+
+  if (!input.name.trim()) errors.name = "Укажите товар или услугу.";
+  if (input.sku.length > 80) errors.sku = "Артикул должен быть не длиннее 80 символов.";
+  if (input.type !== "service" && input.type !== "goods") {
+    errors.type = "Выберите тип позиции.";
+  }
+  if (!input.unit.trim()) errors.unit = "Укажите единицу измерения.";
+  if (!Number.isInteger(price) || price <= 0) {
+    errors.price = "Цена должна быть положительным целым числом.";
+  }
+  if ((input.description ?? "").length > 1000) {
+    errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
+  }
+
+  return errors;
+}
+
 export function validateDealStageForm(input: {
   name: string;
   sortOrder: string;
@@ -152,8 +184,8 @@ export function validateCustomFieldForm(input: {
   if (!isWorkspaceConfigTenantLabelInput(input.tenantLabel)) {
     errors.tenantLabel = "Укажите русское название поля.";
   }
-  if (input.targetEntity !== "project") {
-    errors.targetEntity = "Пока доступны только поля проекта.";
+  if (!["project", "opportunity"].includes(input.targetEntity)) {
+    errors.targetEntity = "Выберите сущность: проект или сделка.";
   }
   if (!isWorkspaceConfigFieldType(input.fieldType)) {
     errors.fieldType = "Выберите тип поля.";
@@ -253,6 +285,33 @@ export function validateOpportunityForm(input: {
   return errors;
 }
 
+export function validateOpportunityCustomFields(
+  customFields: CustomFieldDefinition[],
+  values: Record<string, string>
+): FormErrors {
+  const errors: FormErrors = {};
+  const activeOpportunityFields = customFields.filter(
+    (field) => field.targetEntity === "opportunity" && field.status === "active"
+  );
+
+  for (const field of activeOpportunityFields) {
+    const value = (values[field.id] ?? "").trim();
+    if (field.required && !value) {
+      errors[field.id] = `Заполните поле «${field.tenantLabel}».`;
+      continue;
+    }
+    if (!value) continue;
+    if (field.fieldType === "number" && !Number.isFinite(Number(value))) {
+      errors[field.id] = `Поле «${field.tenantLabel}» должно быть числом.`;
+    }
+    if (field.fieldType === "date" && !parseDateInput(value)) {
+      errors[field.id] = `Поле «${field.tenantLabel}» должно быть датой.`;
+    }
+  }
+
+  return errors;
+}
+
 export function hasFormErrors(errors: FormErrors): boolean {
   return Object.keys(errors).length > 0;
 }
@@ -278,7 +337,20 @@ function isEmail(value: string): boolean {
 }
 
 function parseDateInput(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
 }

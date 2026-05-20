@@ -2,10 +2,15 @@ import { describe, expect, test } from "vitest";
 
 import type { DealStage, Opportunity } from "./api";
 import {
+  buildOpportunityKanbanCardViewModel,
+  buildOpportunityStageTimeline,
   buildKanbanStages,
+  canMoveOpportunityToStage,
+  formatOpportunityEconomics,
   getOpportunityClientLabel,
   getOpportunityContactLabel,
   getOpportunityProjectTypeLabel,
+  getOpportunityStageMoveBlocker,
   getOpportunityStageOptions
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
@@ -15,6 +20,7 @@ const baseOpportunity: Opportunity = {
   tenantId: "tenant-1",
   clientId: "client-1",
   primaryContactId: "contact-1",
+  ownerUserId: "user-owner",
   projectTypeId: "project-type-1",
   stageId: "stage-archived",
   clientName: "Старый клиент",
@@ -35,7 +41,8 @@ const baseOpportunity: Opportunity = {
   feasibilityCheckedAt: null,
   createdAt: "2026-05-19T00:00:00.000Z",
   updatedAt: "2026-05-19T00:00:00.000Z",
-  demand: []
+  demand: [],
+  customFieldValues: {}
 };
 
 const stages: DealStage[] = [
@@ -105,8 +112,19 @@ const data = {
       createdAt: "2026-05-19T00:00:00.000Z",
       updatedAt: "2026-05-19T00:00:00.000Z"
     }
+  ],
+  positions: [
+    {
+      id: "position-engineer",
+      tenantId: "tenant-1",
+      name: "Инженер",
+      description: null,
+      status: "active",
+      createdAt: "2026-05-19T00:00:00.000Z",
+      updatedAt: "2026-05-19T00:00:00.000Z"
+    }
   ]
-} as WorkspaceData;
+} as unknown as WorkspaceData;
 
 describe("opportunity display helpers", () => {
   test("resolves current reference labels instead of stale opportunity snapshots", () => {
@@ -126,6 +144,25 @@ describe("opportunity display helpers", () => {
     ]);
   });
 
+  test("builds deal overview timeline from tenant stages without fake hardcoded steps", () => {
+    expect(buildOpportunityStageTimeline(stages, baseOpportunity)).toEqual([
+      {
+        id: "stage-active",
+        isArchived: false,
+        isCurrent: false,
+        isReached: true,
+        label: "Новый"
+      },
+      {
+        id: "stage-archived",
+        isArchived: true,
+        isCurrent: true,
+        isReached: true,
+        label: "Архивный этап · архив"
+      }
+    ]);
+  });
+
   test("limits stage select options to active stages plus the opportunity current archived stage", () => {
     expect(getOpportunityStageOptions(stages, baseOpportunity).map((stage) => stage.id)).toEqual([
       "stage-active",
@@ -138,5 +175,99 @@ describe("opportunity display helpers", () => {
         stageId: "stage-active"
       }).map((stage) => stage.id)
     ).toEqual(["stage-active"]);
+  });
+
+  test("formats deal economics as separate value, hourly norm and required hours", () => {
+    expect(formatOpportunityEconomics(baseOpportunity)).toEqual({
+      contractValueLabel: "1 000 000 ₽",
+      plannedHourlyRateLabel: "5 000 ₽ / ч",
+      plannedHoursLabel: "200 ч"
+    });
+  });
+
+  test("builds a CRM-rich Kanban card view model from deal references and intake facts", () => {
+    expect(
+      buildOpportunityKanbanCardViewModel(data, {
+        ...baseOpportunity,
+        demand: [{ positionId: "position-engineer", requiredHours: 120 }],
+        feasibilityStatus: "warning",
+        plannedStart: "2026-07-01",
+        plannedFinish: "2026-07-31"
+      })
+    ).toEqual({
+      clientLabel: "Обновленный клиент",
+      contactLabel: "Обновленный контакт · updated@example.test",
+      contractValueLabel: "1 000 000 ₽",
+      demandLabel: "Инженер: 120 ч",
+      feasibilityLabel: "Есть предупреждения",
+      feasibilityTone: "muted",
+      periodLabel: "01.07.2026 -> 31.07.2026",
+      plannedHourlyRateLabel: "5 000 ₽ / ч",
+      plannedHoursLabel: "200 ч"
+    });
+  });
+
+  test("allows moving a non-final opportunity to an active target stage", () => {
+    expect(
+      canMoveOpportunityToStage({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe(true);
+  });
+
+  test("explains why stage movement is disabled", () => {
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: false,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe("Нужно право tenant.opportunities.manage");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: true,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-active"
+      })
+    ).toBe("Дождитесь завершения текущего действия");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: { ...baseOpportunity, status: "won_closed" },
+        targetStageId: "stage-active"
+      })
+    ).toBe("Этап завершенной сделки нельзя менять");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-unused-archived"
+      })
+    ).toBe("Переносить можно только в активный этап");
+
+    expect(
+      getOpportunityStageMoveBlocker({
+        canManageOpportunities: true,
+        dealStages: stages,
+        isPending: false,
+        opportunity: baseOpportunity,
+        targetStageId: "stage-archived"
+      })
+    ).toBe("Сделка уже на этом этапе");
   });
 });

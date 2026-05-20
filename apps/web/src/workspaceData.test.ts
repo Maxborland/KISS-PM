@@ -72,6 +72,23 @@ describe("workspace data derivation", () => {
           }
         ]
       },
+      products: {
+        products: [
+          {
+            id: "product-1",
+            tenantId: "tenant-1",
+            name: "Stale product",
+            sku: "STALE",
+            type: "service",
+            unit: "час",
+            price: 6000,
+            description: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
       projectTypes: {
         projectTypes: [
           {
@@ -135,6 +152,7 @@ describe("workspace data derivation", () => {
             tenantId: "tenant-1",
             clientId: "client-1",
             primaryContactId: "contact-1",
+            ownerUserId: "user-1",
             projectTypeId: "project-type-1",
             stageId: "deal-stage-1",
             clientName: "Stale",
@@ -155,7 +173,8 @@ describe("workspace data derivation", () => {
             feasibilityCheckedAt: null,
             createdAt: "2026-05-18T00:00:00.000Z",
             updatedAt: "2026-05-18T00:00:00.000Z",
-            demand: []
+            demand: [],
+            customFieldValues: {}
           }
         ]
       },
@@ -180,6 +199,29 @@ describe("workspace data derivation", () => {
             demand: []
           }
         ]
+      },
+      myWork: {
+        tasks: [
+          {
+            id: "task-1",
+            tenantId: "tenant-1",
+            projectId: "project-1",
+            stageId: null,
+            title: "Stale task",
+            description: null,
+            status: "todo",
+            priority: "normal",
+            plannedStart: "2026-06-01T00:00:00.000Z",
+            plannedFinish: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            actualWork: 0,
+            progress: 0,
+            source: "manual",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z",
+            participants: [{ userId: "user-1", role: "executor" }]
+          }
+        ]
       }
     });
 
@@ -189,11 +231,13 @@ describe("workspace data derivation", () => {
     expect(data.auditEvents).toEqual([]);
     expect(data.clients).toEqual([]);
     expect(data.contacts).toEqual([]);
+    expect(data.products).toEqual([]);
     expect(data.projectTypes).toEqual([]);
     expect(data.dealStages).toEqual([]);
     expect(data.customFields).toEqual([]);
     expect(data.projectTemplates).toEqual([]);
     expect(data.opportunities).toEqual([]);
     expect(data.projects).toEqual([]);
+    expect(data.myWorkTasks).toEqual([]);
   });
 });

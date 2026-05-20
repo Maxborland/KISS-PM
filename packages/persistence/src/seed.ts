@@ -11,6 +11,7 @@ import {
   contacts,
   dealStages,
   positions,
+  products,
   projectTypes,
   tenantUsers,
   tenants,
@@ -49,6 +50,18 @@ export type SeedContact = {
   status?: string;
 };
 
+export type SeedProduct = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sku?: string | null;
+  type: "service" | "goods";
+  unit: string;
+  price: number;
+  description?: string | null;
+  status?: string;
+};
+
 export type SeedProjectType = {
   id: string;
   tenantId: string;
@@ -82,6 +95,7 @@ export type SeedTenantDataset = {
   positions?: readonly SeedPosition[];
   clients?: readonly SeedClient[];
   contacts?: readonly SeedContact[];
+  products?: readonly SeedProduct[];
   projectTypes?: readonly SeedProjectType[];
   dealStages?: readonly SeedDealStage[];
   users: readonly SeedTenantUser[];
@@ -196,6 +210,37 @@ export async function seedTenantDataset(
             phone: sql`excluded.phone`,
             telegram: sql`excluded.telegram`,
             role: sql`excluded.role`,
+            status: sql`excluded.status`,
+            updatedAt: sql`excluded.updated_at`
+          }
+        });
+    }
+
+    for (const product of dataset.products ?? []) {
+      await transaction
+        .insert(products)
+        .values({
+          id: product.id,
+          tenantId: product.tenantId,
+          name: product.name,
+          sku: product.sku ?? null,
+          type: product.type,
+          unit: product.unit,
+          price: product.price,
+          description: product.description ?? null,
+          status: product.status ?? "active",
+          createdAt,
+          updatedAt: createdAt
+        })
+        .onConflictDoUpdate({
+          target: [products.tenantId, products.id],
+          set: {
+            name: sql`excluded.name`,
+            sku: sql`excluded.sku`,
+            type: sql`excluded.type`,
+            unit: sql`excluded.unit`,
+            price: sql`excluded.price`,
+            description: sql`excluded.description`,
             status: sql`excluded.status`,
             updatedAt: sql`excluded.updated_at`
           }
@@ -327,6 +372,8 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.clients.manage",
     "tenant.contacts.read",
     "tenant.contacts.manage",
+    "tenant.products.read",
+    "tenant.products.manage",
     "tenant.project_types.read",
     "tenant.project_types.manage",
     "tenant.deal_stages.read",

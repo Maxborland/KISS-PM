@@ -50,6 +50,60 @@ const phase32ProjectLifecycleMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4ProjectTasksMigration = readFileSync(
+  new URL("../migrations/0010_phase_4_project_tasks.sql", import.meta.url),
+  "utf8"
+);
+const phase4CrmFinalActionsMigration = readFileSync(
+  new URL(
+    "../migrations/0011_phase_4_crm_final_actions_custom_fields.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4CrmActivityMigration = readFileSync(
+  new URL(
+    "../migrations/0012_phase_4_crm_opportunity_activities.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4CrmActivityFkRepairMigration = readFileSync(
+  new URL(
+    "../migrations/0013_phase_4_repair_opportunity_activity_fk.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4CrmProductsMigration = readFileSync(
+  new URL("../migrations/0014_phase_4_crm_products.sql", import.meta.url),
+  "utf8"
+);
+const phase4CrmActivityFkRepairAgainMigration = readFileSync(
+  new URL(
+    "../migrations/0015_phase_4_repair_opportunity_activity_fk_again.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4CrmActivityChecksRepairMigration = readFileSync(
+  new URL(
+    "../migrations/0016_phase_4_repair_opportunity_activity_checks.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4OpportunityOwnerMigration = readFileSync(
+  new URL("../migrations/0017_phase_4_opportunity_owner.sql", import.meta.url),
+  "utf8"
+);
+const phase4GeneralCrmActivityMigration = readFileSync(
+  new URL(
+    "../migrations/0018_phase_4_general_crm_activities.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -178,6 +232,176 @@ describe("Phase 3.2 project lifecycle SQL migration", () => {
   it("allows project drafts before governed activation", () => {
     expect(phase32ProjectLifecycleMigration).toContain(
       'ALTER TABLE "projects" ALTER COLUMN "activated_at" DROP NOT NULL'
+    );
+  });
+});
+
+describe("Phase 4 project tasks SQL migration", () => {
+  it("adds tenant-scoped task and participant tables for active project work", () => {
+    expect(phase4ProjectTasksMigration).toContain('CREATE TABLE "tasks"');
+    expect(phase4ProjectTasksMigration).toContain('CREATE TABLE "task_participants"');
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "tasks_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "task_participants_pkey" PRIMARY KEY("tenant_id","task_id","user_id","role")'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "tasks_project_fk"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CONSTRAINT "task_participants_user_fk"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CREATE INDEX "tasks_tenant_project_id_idx"'
+    );
+    expect(phase4ProjectTasksMigration).toContain(
+      'CREATE INDEX "task_participants_tenant_user_id_idx"'
+    );
+  });
+});
+
+describe("Phase 4 CRM final actions SQL migration", () => {
+  it("stores runtime custom field values on opportunities", () => {
+    expect(phase4CrmFinalActionsMigration).toContain(
+      'ALTER TABLE "opportunities"'
+    );
+    expect(phase4CrmFinalActionsMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "custom_field_values" jsonb NOT NULL DEFAULT'
+    );
+  });
+});
+
+describe("Phase 4 CRM activity SQL migration", () => {
+  it("adds tenant-scoped opportunity activity with opportunity and user guards", () => {
+    expect(phase4CrmActivityMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "opportunity_activities"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'FOREIGN KEY ("tenant_id","opportunity_id")'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_author_user_fk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityMigration).toContain(
+      'CONSTRAINT "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityMigration).toContain("ON DELETE restrict");
+    expect(phase4CrmActivityMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "opportunity_activities_tenant_opportunity_created_idx"'
+    );
+  });
+
+  it("repairs previously applied opportunity activity FK to restrict deletes", () => {
+    expect(phase4CrmActivityFkRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairMigration).toContain("ON DELETE restrict");
+  });
+
+  it("reapplies the activity repair for environments that marked the first repair stale", () => {
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain("ON DELETE restrict");
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_status_chk"'
+    );
+  });
+
+  it("reapplies activity CHECK constraints when a local database already applied the FK repair", () => {
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain("NOT VALID");
+  });
+});
+
+describe("Phase 4 CRM products SQL migration", () => {
+  it("adds tenant-scoped products as first-class CRM entities", () => {
+    expect(phase4CrmProductsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "products"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_type_chk"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_price_chk"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "products_tenant_id_name_uidx"'
+    );
+  });
+});
+
+describe("Phase 4 opportunity owner SQL migration", () => {
+  it("adds owner user id for CRM responsibility without changing the deal lifecycle", () => {
+    expect(phase4OpportunityOwnerMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "owner_user_id" text'
+    );
+    expect(phase4OpportunityOwnerMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "opportunities_owner_user_id_idx"'
+    );
+    expect(phase4OpportunityOwnerMigration).toContain('"tenant_id", "owner_user_id"');
+  });
+});
+
+describe("Phase 4 general CRM activity SQL migration", () => {
+  it("moves runtime activity to the shared CRM entity contract", () => {
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_activities"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain('"entity_type" text NOT NULL');
+    expect(phase4GeneralCrmActivityMigration).toContain('"entity_id" text NOT NULL');
+    expect(phase4GeneralCrmActivityMigration).toContain('"file_url" text');
+    expect(phase4GeneralCrmActivityMigration).toContain('"file_size_bytes" integer');
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CONSTRAINT "crm_activities_entity_type_chk"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toMatch(
+      /"entity_type" in \('opportunity', 'client', 'contact', 'product'\)/
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "crm_activities_tenant_entity_created_idx"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'DROP TABLE IF EXISTS "opportunity_activities"'
     );
   });
 });

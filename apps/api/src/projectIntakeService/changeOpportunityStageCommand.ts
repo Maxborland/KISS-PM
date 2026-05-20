@@ -45,6 +45,9 @@ export async function changeOpportunityStage(
         opportunityId: opportunity.id,
         stageId: stage.id
       });
+      if (!updated) {
+        return undefined;
+      }
       await deps.appendManagementAuditEvent(
         {
           tenantId: input.actor.tenantId,
@@ -69,6 +72,10 @@ export async function changeOpportunityStage(
       return updated;
     }
   );
+
+  if (!opportunityAfterChange) {
+    return { ok: false, status: 409, error: "opportunity_stage_locked" };
+  }
 
   return { ok: true, status: 200, opportunity: opportunityAfterChange };
 }
