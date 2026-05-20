@@ -24,6 +24,20 @@
 5. UI: pages, widgets, forms, state/query bindings.
 6. E2E: доказательство пользовательских контуров.
 
+## Scenario planning boundary
+
+Scenario planning — это отдельный proposal-layer над deterministic scheduling engine и resource planning. Он принимает `PlanSnapshot`, генерирует несколько `ScenarioProposal`, но не пишет состояние проекта напрямую.
+
+Правильное направление зависимостей:
+
+```txt
+planning-scenarios
+  -> scheduling-engine
+  -> resource-planning
+```
+
+`planning-scenarios` может импортировать `scheduling-engine` и `resource-planning`. `scheduling-engine` и `resource-planning` не импортируют scenario planning и не знают про AI, UI, API, конкретные risk profiles или approvals. Application service превращает выбранный proposal в governed action: проверяет права, preconditions, пишет audit и только после этого применяет `PlanDelta`.
+
 ## Будущая структура
 
 ```txt
@@ -38,6 +52,7 @@ packages/
   project-core/
   scheduling-engine/
   resource-planning/
+  planning-scenarios/
   kpi-engine/
   control-surfaces/
   action-engine/
@@ -70,3 +85,4 @@ packages/
 - Первый CRM-адаптер.
 - Billing/licensing модель.
 - Граница MS Project parity для первой коммерческой версии.
+- Cost function и лимиты поиска для первых planning scenarios.

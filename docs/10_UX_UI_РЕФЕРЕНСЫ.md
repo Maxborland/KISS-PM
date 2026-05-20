@@ -55,6 +55,23 @@
 
 KISS PM не должен быть пустой SaaS-страницей с большими карточками. Для менеджеров и resource managers нужны плотные таблицы, матрицы, фильтры, сохраненные views, sticky headers, drilldowns и быстрые действия.
 
+## Design system baseline
+
+Визуальный baseline KISS PM закреплен в `27_UX_UI_DESIGN_SYSTEM.md`.
+
+Дизайн-система описывает:
+
+- цвета, surface tokens, состояния и stage lines;
+- типографику, числовые форматы и плотность operational surfaces;
+- workspace shell, responsive layout и page anatomy;
+- buttons, inputs, tabs, segmented controls, chips, menus и dialogs;
+- kanban карточки сделок с прозрачными данными: клиент, контакт, владелец, деньги, часы, потребность, ресурсный статус и давность сигнала;
+- таблицы, списки, resource status matrix и состояния loading/empty/error/forbidden;
+- two-block detail layout для CRM-карточек и activity feed;
+- dark theme parity, accessibility и visual QA checklist.
+
+Визуальные boards лежат в `references/design-system/` и используются как reference surfaces для ревью и реализации. Они не заменяют E2E, permission checks, audit и реальные application commands.
+
 ## Русский UI
 
 Пользовательский интерфейс проектируется на русском языке. Tenant labels могут отличаться по компаниям. Code identifiers остаются стабильными английскими ключами.

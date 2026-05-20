@@ -60,6 +60,7 @@
 - constraints;
 - critical path;
 - resource leveling;
+- scenario planning proposals;
 - MSPDI/XML import/export.
 
 ## Resource planning
@@ -81,3 +82,35 @@ Resource planning должен показывать загрузку людей,
 ## Матрица загрузки
 
 Матрица загрузки — обязательное наследие BR2 как capability. Она должна быть плотной, интерактивной и управленческой: пользователь видит перегруз, открывает причину, выбирает действие, получает audit и пересчет.
+
+## Scenario Planning Engine
+
+Scenario Planning Engine — future capability над Gantt scheduling и resource matrix. Он не заменяет MS Project-class scheduling engine, а использует его для оценки последствий сценариев.
+
+Модель поиска:
+
+```txt
+нода = состояние плана / PlanSnapshot
+ребро = управленческое действие / PlanDelta
+ресурс = ограничение capacity, календарь, availability, skill, deadline
+цель = выбранный допустимый компромисс
+```
+
+Первый набор действий:
+
+- shift task;
+- split work;
+- reassign participant/resource;
+- reserve capacity;
+- accept overload risk with reason;
+- move deadline.
+
+Система должна возвращать несколько `PlanningScenario`, а не один ответ:
+
+- aggressive — минимизировать дату финиша или удержать дедлайн, допускает явные перегрузы;
+- balanced — сохранить дедлайн и минимизировать перегрузы;
+- resilient — убрать перегрузы и показать сдвиг фактического дедлайна.
+
+Каждый сценарий обязан содержать explainable preview: finish date, deadline delta, overload hours, overloaded people, changed tasks, changed assignments, dependency warnings, required approvals, risk score и plan delta.
+
+Применение сценария всегда проходит через command/action layer: permission check, preconditions, audit, recalculation. Нельзя делать auto-apply без явного управленческого решения.

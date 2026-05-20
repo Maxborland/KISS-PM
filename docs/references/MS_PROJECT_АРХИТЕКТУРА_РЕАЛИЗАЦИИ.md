@@ -22,6 +22,20 @@ Critical Path Method требует графа задач, расчетов earl
 
 Resource leveling не должен быть магической автокнопкой без объяснения. KISS PM должен показывать preview: какие задачи сдвигаются, какие риски появляются, что изменится в KPI и deadline.
 
+## Scenario planning
+
+Поверх deterministic scheduling и resource leveling нужен Scenario Planning Engine. Он ищет не единственный правильный ответ, а несколько управленческих компромиссов: aggressive, balanced и resilient.
+
+Поисковая модель:
+
+```txt
+нода = состояние плана
+ребро = допустимое действие
+стоимость = дата финиша + перегруз + риск + нарушение дедлайна + сложность изменения
+```
+
+Этот слой не мутирует проект напрямую. Он возвращает `ScenarioProposal` с `PlanDelta`, explainability и списком required approvals. Application/action layer применяет выбранный сценарий через permission check и audit.
+
 ## MSPDI/XML
 
 Import/export MS Project полезен как future integration adapter. Он не должен менять внутреннюю модель на MS Project-specific core. Внутри KISS PM остается canonical project/task/assignment model.
@@ -38,4 +52,5 @@ Table, Gantt, timeline, workload matrix и Kanban должны быть views н
 4. Work/Duration/Units recalc.
 5. Critical path.
 6. Resource leveling preview.
-7. MSPDI import/export adapter.
+7. Scenario planning proposals: aggressive / balanced / resilient.
+8. MSPDI import/export adapter.

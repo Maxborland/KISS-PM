@@ -45,6 +45,16 @@ Scheduling должен учитывать рабочие календари, в
 
 Critical path нужен для понимания задач, влияющих на дату завершения проекта. Это future requirement после Gantt MVP.
 
+## Scenario planning поверх MS Project-like модели
+
+MS Project-like scheduling дает расчет допустимости, дат, критического пути, перегрузов и влияния изменений. KISS PM должен использовать эти расчеты для scenario planning: предлагать не один автоплан, а несколько explainable вариантов с разным профилем риска.
+
+- Aggressive — раньше завершить или удержать дедлайн ценой видимых перегрузов.
+- Balanced — удержать дедлайн и минимизировать перегрузы.
+- Resilient — убрать перегрузы и показать честный сдвиг дедлайна.
+
+Scenario planning не заменяет Work / Duration / Units, calendars, constraints и critical path. Это слой выбора управленческого компромисса над ними.
+
 ## Для первой версии KISS PM
 
-В первой реализации достаточно WBS, дат, duration, planned work, assignments, FS dependencies и baseline basics. Но архитектура не должна блокировать будущие Work/Duration/Units, calendars, constraints и critical path.
+В первой реализации достаточно WBS, дат, duration, planned work, assignments, FS dependencies и baseline basics. Но архитектура не должна блокировать будущие Work/Duration/Units, calendars, constraints, critical path и scenario planning proposals.

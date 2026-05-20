@@ -47,6 +47,7 @@ Control signal создается, когда KPI, ресурс, schedule, proje
 - explanation;
 - owner/assignee;
 - allowed actions;
+- опциональные `ScenarioProposal` для schedule/resource conflicts;
 - lifecycle state;
 - links to audit/actions.
 
@@ -79,6 +80,8 @@ Corrective action — задача/инициатива, созданная дл
 - reassign resource;
 - shift task dates;
 - split work;
+- generate planning scenarios;
+- apply selected planning scenario;
 - request explanation;
 - escalate;
 - accept risk with reason;
