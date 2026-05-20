@@ -18,16 +18,20 @@ export async function createOpportunity(
   const authorization = await authorizeOpportunityCreate(deps, input.actor);
   if (!authorization.ok) return authorization;
 
+  const inputWithOwner = {
+    ...input.input,
+    ownerUserId: input.input.ownerUserId ?? input.actor.id
+  };
   const linked = await resolveOpportunityLinks(
     deps.dataSource,
     input.actor.tenantId,
-    input.input
+    inputWithOwner
   );
   if (!linked.ok) return linked;
   const customFieldValidation = await validateOpportunityCustomFieldValues(
     deps.dataSource,
     input.actor.tenantId,
-    input.input.customFieldValues
+    inputWithOwner.customFieldValues
   );
   if (!customFieldValidation.ok) return customFieldValidation;
 
@@ -43,7 +47,7 @@ export async function createOpportunity(
 
     const createdOpportunity =
       await transactionDataSource.createOpportunity({
-        ...input.input,
+        ...inputWithOwner,
         clientName: linked.client.name,
         contactName: linked.contact.name,
         projectType: linked.projectType.name,
@@ -60,7 +64,7 @@ export async function createOpportunity(
           id: createdOpportunity.id
         },
         commandInput: {
-          ...input.input,
+          ...inputWithOwner,
           clientName: linked.client.name,
           contactName: linked.contact.name,
           projectType: linked.projectType.name,

@@ -18,6 +18,7 @@ import {
   validateOpportunityForm
 } from "./workspaceForms";
 import { getErrorMessage } from "./workspaceShellState";
+import { formatHourlyRate, formatHours, formatMoney } from "./workspaceViewHelpers";
 import { DatePickerField } from "./components/DatePickerField";
 import { FieldError, Modal } from "./components/workspace-ui";
 
@@ -39,6 +40,7 @@ export function DealFormModal(props: {
   positions: WorkspaceData["positions"];
   projectTemplates: WorkspaceData["projectTemplates"];
   projectTypes: ProjectType[];
+  users: WorkspaceData["users"];
   allContacts: Contact[];
   onClose: () => void;
   onSubmit: (input: DealFormSubmitInput) => Promise<void>;
@@ -49,6 +51,9 @@ export function DealFormModal(props: {
   const [selectedClientId, setSelectedClientId] = useState(initial?.clientId ?? "");
   const [selectedContactId, setSelectedContactId] = useState(
     initial?.primaryContactId ?? ""
+  );
+  const [selectedOwnerUserId, setSelectedOwnerUserId] = useState(
+    initial?.ownerUserId ?? props.users.find((user) => user.status === "active")?.id ?? ""
   );
   const [contractValue, setContractValue] = useState(
     initial ? String(initial.contractValue) : ""
@@ -123,6 +128,7 @@ export function DealFormModal(props: {
       ...(initial ? {} : { id: String(form.get("id") ?? "") || undefined }),
       clientId: validationInput.clientId,
       primaryContactId: validationInput.primaryContactId,
+      ownerUserId: selectedOwnerUserId || null,
       projectTypeId: validationInput.projectTypeId,
       stageId: validationInput.stageId,
       title: validationInput.title.trim(),
@@ -160,10 +166,11 @@ export function DealFormModal(props: {
       title={initial ? "Редактировать сделку" : "Создать сделку"}
       description="Стоимость и плановая норма часа вводятся отдельно; необходимые часы считаются автоматически."
       isDismissDisabled={props.isSaving}
+      size="wide"
       onClose={props.onClose}
     >
-      <form className="stack-form" noValidate onSubmit={submit}>
-        <div className="grid-3">
+      <form className="stack-form deal-form-dense" noValidate onSubmit={submit}>
+        <div className="grid-4">
           <label htmlFor={`${formId}-clientId`}>
             Клиент
             <select
@@ -217,6 +224,24 @@ export function DealFormModal(props: {
               ))}
             </select>
             <FieldError formId={formId} field="stageId" errors={fieldErrors} />
+          </label>
+          <label htmlFor={`${formId}-ownerUserId`}>
+            Ответственный
+            <select
+              id={`${formId}-ownerUserId`}
+              name="ownerUserId"
+              value={selectedOwnerUserId}
+              onChange={(event) => setSelectedOwnerUserId(event.target.value)}
+            >
+              <option value="">Не назначен</option>
+              {props.users
+                .filter((user) => user.status === "active")
+                .map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+            </select>
           </label>
         </div>
         <label htmlFor={`${formId}-title`}>
@@ -362,15 +387,15 @@ export function DealFormModal(props: {
             Стоимость
           </span>
           <span>
-            <strong>{formatMoney(Number(plannedHourlyRate) || 0)}/ч</strong>
+            <strong>{formatHourlyRate(Number(plannedHourlyRate) || 0)}</strong>
             Норма часа
           </span>
           <span>
-            <strong>{plannedHoursPreview} ч</strong>
+            <strong>{formatHours(plannedHoursPreview)}</strong>
             Необходимые часы
           </span>
           <span>
-            <strong>{demandedHoursPreview} ч</strong>
+            <strong>{formatHours(demandedHoursPreview)}</strong>
             Потребность по должностям
           </span>
         </div>
@@ -497,12 +522,4 @@ function parsePositiveInteger(value: string): number {
 
 function toDateInputValue(value: string | undefined): string {
   return value ? value.slice(0, 10) : "";
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }

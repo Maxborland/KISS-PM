@@ -93,6 +93,10 @@ const phase4CrmActivityChecksRepairMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4OpportunityOwnerMigration = readFileSync(
+  new URL("../migrations/0017_phase_4_opportunity_owner.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -356,5 +360,17 @@ describe("Phase 4 CRM products SQL migration", () => {
     expect(phase4CrmProductsMigration).toContain(
       'CREATE UNIQUE INDEX IF NOT EXISTS "products_tenant_id_name_uidx"'
     );
+  });
+});
+
+describe("Phase 4 opportunity owner SQL migration", () => {
+  it("adds owner user id for CRM responsibility without changing the deal lifecycle", () => {
+    expect(phase4OpportunityOwnerMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "owner_user_id" text'
+    );
+    expect(phase4OpportunityOwnerMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "opportunities_owner_user_id_idx"'
+    );
+    expect(phase4OpportunityOwnerMigration).toContain('"tenant_id", "owner_user_id"');
   });
 });

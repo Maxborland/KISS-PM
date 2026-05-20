@@ -152,6 +152,7 @@ describe("workspace data derivation", () => {
             tenantId: "tenant-1",
             clientId: "client-1",
             primaryContactId: "contact-1",
+            ownerUserId: "user-1",
             projectTypeId: "project-type-1",
             stageId: "deal-stage-1",
             clientName: "Stale",

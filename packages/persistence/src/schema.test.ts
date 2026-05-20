@@ -66,6 +66,7 @@ describe("PostgreSQL persistence schema", () => {
     expect(getPersistenceTableColumns("opportunities")).toEqual(
       expect.arrayContaining([
         "client_id",
+        "owner_user_id",
         "primary_contact_id",
         "project_type_id",
         "stage_id"

@@ -20,6 +20,7 @@ const opportunityInput: OpportunityInput = {
   tenantId: "tenant-alpha",
   clientId: "client-alpha",
   primaryContactId: "contact-alpha",
+  ownerUserId: "user-admin",
   projectTypeId: "project-type-alpha",
   stageId: "deal-stage-alpha",
   clientName: "",
@@ -49,8 +50,8 @@ describe("project intake application service", () => {
       async listDevUsers() {
         return [];
       },
-      async findUserById() {
-        return undefined;
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
       },
       async findTenantById() {
         return undefined;
@@ -113,6 +114,7 @@ describe("project intake application service", () => {
         createdInput = input;
         return {
           ...input,
+          ownerUserId: input.ownerUserId ?? null,
           customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
@@ -185,6 +187,7 @@ describe("project intake application service", () => {
     let transactionUsed = false;
     const existingOpportunity = {
       ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
       customFieldValues: {},
       status: "ready_to_activate",
       feasibilityStatus: "ok",
@@ -198,8 +201,8 @@ describe("project intake application service", () => {
       async listDevUsers() {
         return [];
       },
-      async findUserById() {
-        return undefined;
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
       },
       async findTenantById() {
         return undefined;
@@ -265,6 +268,7 @@ describe("project intake application service", () => {
         updatedInput = input;
         return {
           ...input,
+          ownerUserId: input.ownerUserId ?? null,
           customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
@@ -349,6 +353,7 @@ describe("project intake application service", () => {
       null;
     const existingOpportunity = {
       ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
       customFieldValues: {},
       status: "feasibility",
       feasibilityStatus: null,

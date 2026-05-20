@@ -33,6 +33,7 @@ export type OpportunityRecord = {
   tenantId: TenantId;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -64,8 +65,10 @@ export type OpportunityInput = Omit<
   | "feasibilityStatus"
   | "feasibilityResult"
   | "feasibilityCheckedAt"
+  | "ownerUserId"
   | "customFieldValues"
 > & {
+  ownerUserId?: string | null;
   customFieldValues?: Record<string, string>;
 };
 
@@ -222,6 +225,7 @@ export function createProjectIntakeRepository(
             tenantId: input.tenantId,
             clientId: input.clientId,
             primaryContactId: input.primaryContactId,
+            ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
             clientName: input.clientName,
@@ -293,6 +297,7 @@ export function createProjectIntakeRepository(
           .set({
             clientId: input.clientId,
             primaryContactId: input.primaryContactId,
+            ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
             clientName: input.clientName,
@@ -550,6 +555,7 @@ function mapOpportunityRecord(
     tenantId: row.tenantId,
     clientId: row.clientId,
     primaryContactId: row.primaryContactId,
+    ownerUserId: row.ownerUserId,
     projectTypeId: row.projectTypeId,
     stageId: row.stageId,
     clientName: row.clientName,

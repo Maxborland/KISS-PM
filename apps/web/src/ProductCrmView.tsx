@@ -28,7 +28,7 @@ import {
   filterContactsForTable,
   filterProductsForTable
 } from "./workspaceTables";
-import { formatDate } from "./workspaceViewHelpers";
+import { formatDate, formatMoney } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
   hasPermission,
@@ -460,15 +460,6 @@ function ProductModal(props: {
   );
 }
 
-
 function getProductTypeLabel(type: Product["type"]): string {
   return type === "service" ? "Услуга" : "Товар";
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }

@@ -27,7 +27,7 @@ import {
   getFieldErrorId,
 } from "./workspaceForms";
 import { filterOpportunitiesForTable } from "./workspaceTables";
-import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
+import { formatDate, formatDateOnly, formatMoney } from "./workspaceViewHelpers";
 import {
   canStartDealCreation,
   getErrorMessage,
@@ -323,6 +323,7 @@ export function OpportunitiesView(props: {
           positions={props.data.positions}
           projectTemplates={props.data.projectTemplates}
           projectTypes={activeProjectTypes}
+          users={props.data.users}
           onClose={closeModal}
           onSubmit={submitOpportunity}
         />
@@ -729,14 +730,6 @@ function getFeasibilityLabel(status: Opportunity["feasibilityStatus"]): string {
   if (status === "conflict") return "Конфликт ресурса";
   if (status === "blocked") return "Заблокировано";
   return "Не проверено";
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }
 
 function isInteractiveElement(target: EventTarget): boolean {

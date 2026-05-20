@@ -61,6 +61,50 @@ describe("project intake parsers", () => {
     });
   });
 
+  it("parses optional owner user id on create and update", () => {
+    const parsed = parseOpportunityBody(
+      {
+        ...validOpportunityBody,
+        ownerUserId: "user-owner-1"
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        ownerUserId: "user-owner-1"
+      }
+    });
+
+    const updated = parseOpportunityUpdateBody(
+      {
+        ...validOpportunityBody,
+        ownerUserId: null
+      },
+      "tenant-alpha"
+    );
+
+    expect(updated).toMatchObject({
+      ok: true,
+      value: {
+        ownerUserId: null
+      }
+    });
+  });
+
+  it("rejects malformed owner user id", () => {
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          ownerUserId: "not allowed"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_owner_user_id" });
+  });
+
   it("parses runtime custom field values on create and update", () => {
     const parsed = parseOpportunityBody(
       {

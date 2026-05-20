@@ -1,4 +1,5 @@
 import type { DealStage, Opportunity } from "./api";
+import { formatDateOnly, formatHourlyRate, formatHours, formatMoney } from "./workspaceViewHelpers";
 import type { WorkspaceData } from "./workspaceData";
 
 type OpportunityReferenceData = Pick<
@@ -163,8 +164,8 @@ export function formatOpportunityEconomics(opportunity: Opportunity): {
 } {
   return {
     contractValueLabel: formatMoney(opportunity.contractValue),
-    plannedHourlyRateLabel: `${formatMoney(opportunity.plannedHourlyRate)}/ч`,
-    plannedHoursLabel: `${opportunity.plannedHours} ч`
+    plannedHourlyRateLabel: formatHourlyRate(opportunity.plannedHourlyRate),
+    plannedHoursLabel: formatHours(opportunity.plannedHours)
   };
 }
 
@@ -219,14 +220,6 @@ function isFinalOpportunity(opportunity: Opportunity): boolean {
   return opportunity.status === "won_closed" || opportunity.status === "lost_rejected";
 }
 
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
-}
-
 function formatOpportunityDemand(
   data: Pick<WorkspaceData, "positions">,
   opportunity: Opportunity
@@ -238,16 +231,7 @@ function formatOpportunityDemand(
       const positionName =
         data.positions.find((position) => position.id === line.positionId)?.name ??
         line.positionId;
-      return `${positionName}: ${line.requiredHours} ч`;
+      return `${positionName}: ${formatHours(line.requiredHours)}`;
     })
     .join(", ");
-}
-
-function formatDateOnly(value: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC",
-    year: "numeric"
-  }).format(new Date(value));
 }

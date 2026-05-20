@@ -218,6 +218,7 @@ export type Opportunity = {
   tenantId: string;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -311,6 +312,7 @@ export type OpportunityInput = {
   id?: string;
   clientId: string;
   primaryContactId: string;
+  ownerUserId?: string | null;
   projectTypeId: string;
   stageId: string;
   title: string;

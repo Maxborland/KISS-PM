@@ -82,6 +82,7 @@ function parseOpportunityFields(
   const id = getOptionalString(input, "id") ?? `opportunity-${crypto.randomUUID()}`;
   const clientId = getOptionalString(input, "clientId");
   const primaryContactId = getOptionalString(input, "primaryContactId");
+  const ownerUserId = getOptionalString(input, "ownerUserId") ?? null;
   const projectTypeId = getOptionalString(input, "projectTypeId");
   const stageId = getOptionalString(input, "stageId");
   const clientName = getOptionalString(input, "clientName") ?? "";
@@ -104,6 +105,9 @@ function parseOpportunityFields(
   }
   if (!primaryContactId || !idPattern.test(primaryContactId)) {
     return { ok: false, error: "invalid_primary_contact_id" };
+  }
+  if (ownerUserId !== null && !idPattern.test(ownerUserId)) {
+    return { ok: false, error: "invalid_owner_user_id" };
   }
   if (!projectTypeId || !idPattern.test(projectTypeId)) {
     return { ok: false, error: "invalid_project_type_id" };
@@ -153,6 +157,7 @@ function parseOpportunityFields(
         tenantId,
         clientId,
         primaryContactId,
+        ownerUserId,
         projectTypeId,
         stageId,
         clientName,

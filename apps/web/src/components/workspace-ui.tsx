@@ -188,6 +188,7 @@ export function Modal(props: {
   description?: string;
   children: ReactNode;
   isDismissDisabled?: boolean;
+  size?: "default" | "wide";
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
@@ -252,7 +253,9 @@ export function Modal(props: {
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="modal-panel"
+        className={["modal-panel", props.size === "wide" ? "wide" : ""]
+          .filter(Boolean)
+          .join(" ")}
         role="dialog"
         tabIndex={-1}
         onKeyDown={handlePanelKeyDown}

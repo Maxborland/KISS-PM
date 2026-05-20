@@ -132,6 +132,28 @@
   background: #fbfcfd;
 }
 
+.deal-form-dense {
+  gap: 12px;
+}
+
+.deal-form-dense .grid-3,
+.deal-form-dense .grid-4 {
+  gap: 10px;
+}
+
+.deal-form-dense label,
+.deal-form-dense .date-picker-field {
+  gap: 5px;
+}
+
+.deal-form-dense textarea {
+  min-height: 86px;
+}
+
+.deal-form-dense fieldset {
+  margin: 0;
+}
+
 .reference-tile strong,
 .deal-economics-preview strong {
   color: var(--text);
@@ -181,20 +203,21 @@
   display: grid;
   grid-auto-columns: minmax(260px, 1fr);
   grid-auto-flow: column;
-  gap: 12px;
+  gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 0 0 6px;
 }
 
 .deal-kanban-column {
   min-height: 360px;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fbfcfd;
+  gap: 6px;
+  padding: 0 6px 8px;
+  border: 1px solid #d9dde5;
+  border-top: 4px solid #60a5fa;
+  border-radius: 10px;
+  background: #f3f6fa;
   transition:
     border-color 160ms ease,
     background 160ms ease;
@@ -216,23 +239,36 @@
 }
 
 .deal-kanban-column header {
+  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 8px 2px 6px;
   color: var(--text);
+  text-align: left;
 }
 
 .deal-kanban-column header > span:first-child {
   min-width: 0;
   display: grid;
-  gap: 3px;
+  gap: 2px;
+  flex: 1;
+}
+
+.deal-kanban-column header strong,
+.deal-kanban-column header small {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deal-kanban-column header small {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .deal-kanban-counter {
@@ -252,17 +288,18 @@
 .deal-card-list {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 5px;
 }
 
 .deal-card {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  gap: 5px;
+  padding: 8px 8px 7px;
+  border: 1px solid #cfd4dc;
+  border-radius: 7px;
   background: #ffffff;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
+  touch-action: none;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -271,14 +308,17 @@
 }
 
 .deal-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1px);
+  border-color: #94a3b8;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
 .deal-card.is-dragging {
-  opacity: 0.55;
-  transform: scale(0.98);
+  opacity: 0.28;
+}
+
+.deal-card-overlay {
+  width: 270px;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.18);
 }
 
 .deal-card.is-moving {
@@ -289,7 +329,21 @@
 .deal-card-main {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 2px;
+}
+
+.deal-card-main .inline-link-button,
+.deal-card-main strong {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  color: #0b5cab;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deal-card-main small,
@@ -310,38 +364,37 @@
 }
 
 .deal-card-contact {
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deal-card-facts {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
-  padding: 7px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel-subtle);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .deal-card-economics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
 }
 
 .deal-card-economics span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-}
-
-.deal-card-economics small {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
+  min-width: auto;
+  display: inline-flex;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .deal-card-economics strong {
@@ -358,8 +411,8 @@
 
 .deal-card-stage-controls {
   display: grid;
-  grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 6px;
   align-items: center;
 }
 
@@ -369,12 +422,12 @@
 }
 
 .drag-handle-button {
-  min-height: 34px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
@@ -382,6 +435,8 @@
   font-size: 12px;
   font-weight: 800;
   cursor: grab;
+  touch-action: none;
+  user-select: none;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -906,6 +961,71 @@
   line-height: 1.4;
 }
 
+.deal-owner-trigger {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.deal-owner-trigger strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deal-owner-trigger:hover:not(:disabled),
+.deal-owner-trigger:focus-visible {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #1d4ed8;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.deal-owner-trigger:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.deal-owner-editor {
+  width: min(520px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 11px;
+  background: #f8fbff;
+}
+
+.deal-owner-editor label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.deal-owner-editor select {
+  height: 34px;
+}
+
+.deal-owner-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
 .deal-page-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1085,6 +1205,116 @@
 .deal-stage-timeline li.is-current strong,
 .deal-stage-timeline li.is-reached strong {
   color: #2563eb;
+}
+
+.deal-stage-strip-card {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.deal-stage-strip {
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  grid-auto-columns: minmax(156px, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.deal-stage-strip li {
+  min-width: 0;
+}
+
+.deal-stage-strip button {
+  position: relative;
+  width: 100%;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px 12px;
+  overflow: hidden;
+  border: 1px solid #d6dde7;
+  border-radius: 10px;
+  background: #eef2f7;
+  color: var(--muted-strong);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.deal-stage-strip button::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #cbd5e1;
+}
+
+.deal-stage-strip button:disabled {
+  cursor: default;
+}
+
+.deal-stage-strip button:not(:disabled):hover,
+.deal-stage-strip button:not(:disabled):focus-visible {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: #f8fbff;
+  color: var(--text);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.deal-stage-strip li.is-reached button::after {
+  background: #60a5fa;
+}
+
+.deal-stage-strip li.is-current button {
+  border-color: rgba(37, 99, 235, 0.42);
+  background: #ffffff;
+  color: var(--text);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.deal-stage-strip li.is-current button::after {
+  background: #2563eb;
+}
+
+.deal-stage-strip li.is-archived button {
+  opacity: 0.68;
+}
+
+.deal-stage-strip-title,
+.deal-stage-strip-meta {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deal-stage-strip-title {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.deal-stage-strip-meta {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
 }
 
 .deal-overview-grid {

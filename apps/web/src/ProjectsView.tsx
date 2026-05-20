@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Project } from "./api";
 import type { WorkspaceData } from "./workspaceData";
 import { filterProjectsForTable } from "./workspaceTables";
-import { formatDateOnly } from "./workspaceViewHelpers";
+import { formatDateOnly, formatHours, formatMoney } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
 import {
   CrudToolbar,
@@ -41,8 +41,8 @@ export function ProjectsView(props: {
     >
       <div className="surface-summary-grid">
         <SummaryCard label="Активные проекты" value={props.data.projects.length} />
-        <SummaryCard label="Плановые часы" value={totalPlannedHours} tone="success" />
-        <SummaryCard label="Контракты, руб." value={Math.round(totalContractValue)} tone="muted" />
+        <SummaryCard label="Плановые часы" value={formatHours(totalPlannedHours)} tone="success" />
+        <SummaryCard label="Контракты" value={formatMoney(totalContractValue)} tone="muted" />
       </div>
       <CrudToolbar
         searchLabel="Поиск проектов"
@@ -107,7 +107,7 @@ export function ProjectsView(props: {
                       </small>
                     </td>
                     <td>
-                      <strong>{project.plannedHours} ч</strong>
+                      <strong>{formatHours(project.plannedHours)}</strong>
                       <small className="muted">{formatMoney(project.contractValue)}</small>
                     </td>
                     <td>{formatProjectDemand(project, props.data)}</td>
@@ -144,17 +144,9 @@ function formatProjectDemand(project: Project, data: WorkspaceData) {
         <span className="permission-chip" key={line.positionId}>
           {data.positions.find((position) => position.id === line.positionId)?.name ??
             line.positionId}
-          : {line.requiredHours} ч
+          : {formatHours(line.requiredHours)}
         </span>
       ))}
     </span>
   );
-}
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 0,
-    style: "currency",
-    currency: "RUB"
-  }).format(value);
 }

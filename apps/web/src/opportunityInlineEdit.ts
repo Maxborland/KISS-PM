@@ -14,6 +14,7 @@ export function buildOpportunityUpdateInput(
   return {
     clientId: opportunity.clientId ?? "",
     primaryContactId: opportunity.primaryContactId ?? "",
+    ownerUserId: opportunity.ownerUserId ?? null,
     projectTypeId: opportunity.projectTypeId ?? "",
     stageId: opportunity.stageId ?? "",
     title: opportunity.title,

@@ -41,6 +41,23 @@ const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   year: "numeric"
 });
 
+const dateOnlyFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "UTC",
+  year: "numeric"
+});
+
+const moneyFormatter = new Intl.NumberFormat("ru-RU", {
+  currency: "RUB",
+  maximumFractionDigits: 0,
+  style: "currency"
+});
+
+const integerFormatter = new Intl.NumberFormat("ru-RU", {
+  maximumFractionDigits: 0
+});
+
 export function filterCustomFields(
   fields: readonly CustomFieldDefinition[],
   query: string
@@ -94,10 +111,17 @@ export function formatDate(value: string): string {
 }
 
 export function formatDateOnly(value: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC",
-    year: "numeric"
-  }).format(new Date(value));
+  return dateOnlyFormatter.format(new Date(value));
+}
+
+export function formatMoney(value: number): string {
+  return moneyFormatter.format(value);
+}
+
+export function formatHours(value: number): string {
+  return `${integerFormatter.format(value)} ч`;
+}
+
+export function formatHourlyRate(value: number): string {
+  return `${formatMoney(value)} / ч`;
 }
