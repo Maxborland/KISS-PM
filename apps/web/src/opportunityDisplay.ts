@@ -76,6 +76,31 @@ export function getOpportunityStageOptions(
   );
 }
 
+export type OpportunityStageTimelineItem = {
+  id: string;
+  isArchived: boolean;
+  isCurrent: boolean;
+  isReached: boolean;
+  label: string;
+};
+
+export function buildOpportunityStageTimeline(
+  dealStages: DealStage[],
+  opportunity: Opportunity
+): OpportunityStageTimelineItem[] {
+  const stages = getOpportunityStageOptions(dealStages, opportunity);
+  const currentIndex = stages.findIndex((stage) => stage.id === opportunity.stageId);
+  const reachedIndex = currentIndex === -1 ? 0 : currentIndex;
+
+  return stages.map((stage, index) => ({
+    id: stage.id,
+    isArchived: stage.status === "archived",
+    isCurrent: stage.id === opportunity.stageId,
+    isReached: index <= reachedIndex,
+    label: stage.status === "archived" ? `${stage.name} · архив` : stage.name
+  }));
+}
+
 export type OpportunityStageMoveCheck = {
   canManageOpportunities: boolean;
   dealStages: DealStage[];

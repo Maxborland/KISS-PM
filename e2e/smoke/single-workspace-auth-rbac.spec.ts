@@ -405,15 +405,16 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByRole("button", { name: new RegExp(`Контур внедрения ${suffix}`) }).click();
   await expect(page).toHaveURL(/\/opportunities\/.+/);
   const opportunityId = page.url().split("/opportunities/")[1] ?? "";
-  await expect(page.getByRole("heading", { name: "Детали сделки" }).first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Карточка сделки" })).toBeVisible();
   await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix}` })).toBeVisible();
   await expect(
-    page.getByText(`Клиент ${suffix} обновлен · Контакт ${suffix} обновлен`)
+    page.getByText(`Клиент: Клиент ${suffix} обновлен`)
   ).toBeVisible();
-  const dealDetailFields = page.locator(".detail-list").first();
-  await expect(dealDetailFields.locator("dt", { hasText: "Стоимость" })).toBeVisible();
-  await expect(dealDetailFields.locator("dt", { hasText: "Норма часа" })).toBeVisible();
-  await expect(dealDetailFields.locator("dt", { hasText: "Необходимые часы" })).toBeVisible();
+  await expect(page.getByText(`Контакт: Контакт ${suffix} обновлен`)).toBeVisible();
+  const dealDetailFields = page.getByRole("region", { name: "Обзор сделки" });
+  await expect(dealDetailFields.locator("dt", { hasText: "Бюджет (экономика)" })).toBeVisible();
+  await expect(dealDetailFields.locator("dt", { hasText: "Ставка" })).toBeVisible();
+  await expect(dealDetailFields.locator("dt", { hasText: "Плановые часы" })).toBeVisible();
   await expect(page.getByText("Поля сделки")).toBeVisible();
   await expect(page.getByText("Высокий")).toBeVisible();
   await page.getByRole("button", { name: `Клиент ${suffix} обновлен` }).click();
@@ -440,7 +441,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Сделка обновлена")).toBeVisible();
   await expect(page.getByRole("heading", { name: `Контур внедрения ${suffix} edited` })).toBeVisible();
   await expect(page.getByText("Средний")).toBeVisible();
-  await page.getByRole("button", { name: "К списку сделок" }).click();
+  await page.getByRole("navigation", { name: "Навигация сделки" }).getByRole("button", { name: "Сделки" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
 
   await page.getByRole("button", { name: "Клиенты" }).click();
@@ -501,14 +502,13 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: new RegExp(`Контур внедрения ${suffix} edited`) }).click();
   await expect(page).toHaveURL(/\/opportunities\/.+/);
-  await expect(
-    page.getByText(`Клиент ${suffix} финал · Контакт ${suffix} финал`)
-  ).toBeVisible();
+  await expect(page.getByText(`Клиент: Клиент ${suffix} финал`)).toBeVisible();
+  await expect(page.getByText(`Контакт: Контакт ${suffix} финал`)).toBeVisible();
   await expect(page.getByText(`Тип проекта ${suffix} финал`)).toBeVisible();
   await expect(page.getByLabel("Этап сделки").locator("option:checked")).toHaveText(
     `Этап ${suffix} архив · архив`
   );
-  await page.getByRole("button", { name: "К списку сделок" }).click();
+  await page.getByRole("navigation", { name: "Навигация сделки" }).getByRole("button", { name: "Сделки" }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
 
   await page.getByRole("button", { name: "Канбан", exact: true }).click();

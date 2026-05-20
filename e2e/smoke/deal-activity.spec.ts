@@ -7,7 +7,7 @@ import {
   logoutThroughUserMenu
 } from "./smokeHelpers";
 
-test("deal detail shows persisted chat, tasks and audit in one workspace", async ({
+test("deal detail shows persisted feed and tasks in one CRM activity rail", async ({
   page
 }) => {
   const suffix = Date.now().toString(36);
@@ -47,17 +47,14 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
 
   await page.goto(`/opportunities/${opportunityId}`);
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
-  const commercialSummary = page.getByRole("region", {
-    name: "Коммерческая модель сделки"
-  });
-  await expect(commercialSummary).toBeVisible();
-  await expect(commercialSummary.getByText("Стоимость контракта", { exact: true })).toBeVisible();
-  await expect(commercialSummary.getByText("Плановая ставка", { exact: true })).toBeVisible();
-  await expect(commercialSummary.getByText("Расчетные часы", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "CRM-связи и параметры" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Потребность по ролям" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Рабочее окно сделки" })).toBeVisible();
-  const activityPanel = page.getByLabel("Рабочая лента сделки");
+  const metricGrid = page.getByLabel("Ключевые показатели сделки");
+  await expect(metricGrid.getByText("Экономика проекта")).toBeVisible();
+  await expect(metricGrid.getByText("Плановые часы")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Обзор сделки" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Компания" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Контакт" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Активность по сделке" })).toBeVisible();
+  const activityPanel = page.getByLabel("Активность по сделке");
   await expect(
     activityPanel.getByRole("tablist", { name: "Разделы активности сделки" })
   ).toBeVisible();
@@ -65,38 +62,33 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
     "aria-selected",
     "true"
   );
-  await expect(activityPanel.getByText("Открытые задачи")).toBeVisible();
-  await expect(activityPanel.getByRole("form", { name: "Быстрое действие по сделке" })).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Событие/ })).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
+  await expect(activityPanel.getByLabel("Написать сообщение или добавить активность")).toBeVisible();
 
   await page.getByRole("button", { name: "Проверить ресурсы" }).click();
   await expect(
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
 
-  await activityPanel.getByLabel("Текст комментария").fill(comment);
-  await activityPanel.getByRole("button", { name: "Добавить комментарий" }).click();
+  await activityPanel.getByLabel("Написать сообщение или добавить активность").fill(comment);
+  await activityPanel.getByRole("button", { name: "Отправить сообщение" }).click();
   await expect(activityPanel.getByText(comment)).toBeVisible();
   await expect(activityPanel.getByText("Сегодня")).toBeVisible();
-  await expect(activityPanel.getByRole("tab", { name: /Чат 1 элемент/ })).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Лента/ })).toBeVisible();
 
-  await activityPanel.getByRole("button", { name: "Задача" }).click();
-  await activityPanel.getByLabel("Название задачи").fill(taskTitle);
-  await activityPanel.getByLabel("Описание задачи").fill("Подготовить следующий контакт");
-  await activityPanel.getByLabel("Срок задачи").fill("2031-03-10");
+  await activityPanel.getByRole("tab", { name: /Задачи/ }).click();
+  await activityPanel.getByLabel("Новая задача").fill(taskTitle);
+  await activityPanel.getByLabel("Описание").fill("Подготовить следующий контакт");
+  await activityPanel.getByLabel("Срок").fill("2031-03-10");
   await activityPanel
-    .getByLabel("Ответственный за задачу")
+    .getByLabel("Ответственный")
     .selectOption({ label: "Анна Администратор" });
-  await activityPanel.getByRole("button", { name: "Создать follow-up задачу" }).click();
+  await activityPanel.getByRole("button", { name: "Создать задачу" }).click();
   await expect(activityPanel.getByText(taskTitle)).toBeVisible();
   await expect(activityPanel.getByRole("tab", { name: /Задачи 1 элемент/ })).toBeVisible();
-
-  await activityPanel.getByRole("tab", { name: /Чат/ }).click();
-  await expect(activityPanel.getByRole("tab", { name: /Чат/ })).toHaveAttribute(
-    "aria-selected",
-    "true"
-  );
-  await expect(activityPanel.getByText(comment)).toBeVisible();
-  await expect(activityPanel.getByRole("tab", { name: /Чат 1 элемент/ })).toBeVisible();
 
   await activityPanel.getByRole("tab", { name: /Задачи/ }).click();
   const taskRow = activityPanel.locator(".activity-row").filter({ hasText: taskTitle });
@@ -113,18 +105,10 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
 
-  await activityPanel.getByRole("tab", { name: /Аудит/ }).click();
-  await expect(
-    activityPanel.getByText("Ресурсная проверка сделки выполнена")
-  ).toBeVisible();
-  await expect(activityPanel.getByText("Комментарий по сделке создан")).toBeVisible();
-  await expect(activityPanel.getByText("Задача по сделке создана")).toBeVisible();
-  await expect(activityPanel.getByText("Задача по сделке выполнена")).toBeVisible();
-
   await page.reload();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
-  await expect(page.getByLabel("Рабочая лента сделки").getByText(comment)).toBeVisible();
-  await expect(page.getByLabel("Рабочая лента сделки").getByText(taskTitle)).toBeVisible();
+  await expect(page.getByLabel("Активность по сделке").getByText(comment)).toBeVisible();
+  await expect(page.getByLabel("Активность по сделке").getByText(taskTitle)).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
@@ -248,15 +232,14 @@ test("deal activity panel is read-only for users without manage and audit permis
   });
   await page.goto(`/opportunities/${opportunityId}`);
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
-  const activityPanel = page.getByLabel("Рабочая лента сделки");
+  const activityPanel = page.getByLabel("Активность по сделке");
   await expect(activityPanel.getByText(comment)).toBeVisible();
   await expect(
     activityPanel.getByText("Только чтение: нужно право tenant.opportunities.manage.")
   ).toBeVisible();
 
-  await activityPanel.getByRole("tab", { name: /Чат/ }).click();
-  await expect(activityPanel.getByLabel("Сообщение")).toBeDisabled();
-  await expect(activityPanel.getByRole("button", { name: "Отправить" })).toBeDisabled();
+  await expect(activityPanel.getByLabel("Написать сообщение или добавить активность")).toBeDisabled();
+  await expect(activityPanel.getByRole("button", { name: "Отправить сообщение" })).toBeDisabled();
   await expect(
     activityPanel.getByText("Только чтение: нужно право tenant.opportunities.manage.")
   ).toBeVisible();
@@ -268,8 +251,6 @@ test("deal activity panel is read-only for users without manage and audit permis
   await expect(taskRow.getByRole("button", { name: "Выполнить" })).toBeDisabled();
   await expect(activityPanel.getByLabel("Новая задача")).toBeDisabled();
   await expect(activityPanel.getByRole("button", { name: "Создать задачу" })).toBeDisabled();
-  await activityPanel.getByRole("tab", { name: /Аудит/ }).click();
-  await expect(activityPanel.getByText("Исходный аудит доступен только пользователям")).toBeVisible();
 
   expect(
     (

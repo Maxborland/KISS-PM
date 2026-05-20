@@ -1,10 +1,10 @@
-import { CheckCircle2, MessageSquare, PlusCircle } from "lucide-react";
+import { CheckCircle2, PlusCircle, SquareCheckBig } from "lucide-react";
 import type { FormEvent } from "react";
 
 import type { OpportunityActivity } from "./api";
 import { StatusPill } from "./components/workspace-ui";
 import { sortOpportunityTasks } from "./opportunityActivity";
-import { getWorkspaceUserName, OpportunityActivityRow } from "./OpportunityActivityFeed";
+import { getWorkspaceUserName } from "./OpportunityActivityFeed";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
 
@@ -14,66 +14,6 @@ export type OpportunityTaskFormState = {
   dueDate: string;
   assigneeUserId: string;
 };
-
-export function OpportunityChatView(props: {
-  canManageOpportunities: boolean;
-  comments: OpportunityActivity[];
-  commentBody: string;
-  data: WorkspaceData;
-  error: string;
-  isSaving: boolean;
-  onCommentBodyChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <div className="activity-tab-body">
-      <div className="activity-list compact-list">
-        {props.comments.length === 0 ? (
-          <p className="empty-state compact">Сообщений по сделке пока нет.</p>
-        ) : (
-          props.comments.map((comment) => (
-            <OpportunityActivityRow
-              activity={comment}
-              data={props.data}
-              key={comment.id}
-            />
-          ))
-        )}
-      </div>
-      <form className="activity-form" onSubmit={props.onSubmit}>
-        {!props.canManageOpportunities ? (
-          <p className="empty-state compact">
-            Только чтение: нужно право tenant.opportunities.manage.
-          </p>
-        ) : null}
-        <label htmlFor="deal-comment-body">
-          Сообщение
-          <textarea
-            id="deal-comment-body"
-            disabled={!props.canManageOpportunities || props.isSaving}
-            rows={3}
-            value={props.commentBody}
-            onChange={(event) => props.onCommentBodyChange(event.target.value)}
-          />
-        </label>
-        {props.error ? <p className="error">{props.error}</p> : null}
-        <button
-          className="primary-button"
-          disabled={!props.canManageOpportunities || props.isSaving}
-          title={
-            props.canManageOpportunities
-              ? undefined
-              : "Нужно право tenant.opportunities.manage"
-          }
-          type="submit"
-        >
-          <MessageSquare aria-hidden="true" size={14} />
-          {props.isSaving ? "Отправляем..." : "Отправить"}
-        </button>
-      </form>
-    </div>
-  );
-}
 
 export function OpportunityTaskView(props: {
   activeUsers: WorkspaceData["users"];
@@ -196,8 +136,12 @@ function OpportunityTaskRow(props: {
   onComplete: (activityId: string) => void;
 }) {
   return (
-    <article className="activity-row">
-      <div>
+    <article className="activity-row task-row">
+      <time dateTime={props.task.createdAt}>{formatActivityTime(props.task.createdAt)}</time>
+      <span className="activity-row-marker">
+        <SquareCheckBig aria-hidden="true" size={15} />
+      </span>
+      <div className="activity-row-content">
         <strong>{props.task.title}</strong>
         <p>{props.task.body || "Без описания"}</p>
         <small>
@@ -233,4 +177,13 @@ function OpportunityTaskRow(props: {
       </span>
     </article>
   );
+}
+
+function formatActivityTime(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    timeZone: "UTC"
+  }).format(new Date(value));
 }

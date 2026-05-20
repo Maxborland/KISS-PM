@@ -1,4 +1,5 @@
 import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
+import { CheckCircle2, MessageCircle, SquareCheckBig } from "lucide-react";
 import {
   groupOpportunityFeedItemsByDay,
   type OpportunityFeedItem
@@ -49,10 +50,15 @@ export function OpportunityActivityRow(props: {
   data: WorkspaceData;
 }) {
   const isTask = props.activity.type === "task";
+  const Icon = isTask ? SquareCheckBig : MessageCircle;
 
   return (
-    <article className="activity-row">
-      <div>
+    <article className={`activity-row ${isTask ? "task-row" : "comment-row"}`}>
+      <time dateTime={props.activity.createdAt}>{formatActivityTime(props.activity.createdAt)}</time>
+      <span className="activity-row-marker">
+        <Icon aria-hidden="true" size={15} />
+      </span>
+      <div className="activity-row-content">
         <strong>{isTask ? props.activity.title : "Комментарий"}</strong>
         <p>{props.activity.body || (isTask ? "Без описания" : "")}</p>
         <small>
@@ -76,7 +82,11 @@ export function OpportunitySystemEventRow(props: {
 }) {
   return (
     <article className="activity-row system-row">
-      <div>
+      <time dateTime={props.event.createdAt}>{formatActivityTime(props.event.createdAt)}</time>
+      <span className="activity-row-marker">
+        <CheckCircle2 aria-hidden="true" size={15} />
+      </span>
+      <div className="activity-row-content">
         <strong>{getAuditActionLabel(props.event.actionType)}</strong>
         <p>{getWorkspaceUserName(props.data, props.event.actorUserId)}</p>
         <small>{formatDate(props.event.createdAt)}</small>
@@ -87,4 +97,13 @@ export function OpportunitySystemEventRow(props: {
 
 export function getWorkspaceUserName(data: WorkspaceData, userId: string): string {
   return data.users.find((user) => user.id === userId)?.name ?? `Пользователь ${userId}`;
+}
+
+function formatActivityTime(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    timeZone: "UTC"
+  }).format(new Date(value));
 }
