@@ -22,6 +22,7 @@ import {
   parseCreateOpportunityTaskBody,
   parseUpdateOpportunityTaskBody
 } from "./opportunityActivityParsers";
+import { isFinalOpportunityStatus } from "./projectIntakeService/opportunityStatus";
 
 type OpportunityActivityRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -136,6 +137,9 @@ export function registerOpportunityActivityRoutes(
 
     const opportunity = await findTenantOpportunity(dataSource, actor, opportunityId);
     if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
+    if (isFinalOpportunityStatus(opportunity.status)) {
+      return context.json({ error: "opportunity_activity_locked" }, 409);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -214,6 +218,9 @@ export function registerOpportunityActivityRoutes(
 
     const opportunity = await findTenantOpportunity(dataSource, actor, opportunityId);
     if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
+    if (isFinalOpportunityStatus(opportunity.status)) {
+      return context.json({ error: "opportunity_activity_locked" }, 409);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -310,6 +317,9 @@ export function registerOpportunityActivityRoutes(
 
       const opportunity = await findTenantOpportunity(dataSource, actor, opportunityId);
       if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
+      if (isFinalOpportunityStatus(opportunity.status)) {
+        return context.json({ error: "opportunity_activity_locked" }, 409);
+      }
 
       const body = await readLimitedJsonBody(context);
       if (!body.ok) return context.json({ error: body.error }, body.status);

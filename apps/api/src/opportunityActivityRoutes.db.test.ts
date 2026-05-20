@@ -446,6 +446,81 @@ describe("opportunity activity API", () => {
     ).toHaveLength(1);
   });
 
+  it("blocks comments, task creation and task transitions after opportunity finalization", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await createAlphaOpportunity(cookie, "opportunity-final");
+
+    const task = await app.request(
+      "/api/workspace/opportunities/opportunity-final/tasks",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ title: "Подготовить резюме закрытия" })
+      }
+    );
+    expect(task.status).toBe(201);
+    const taskPayload = (await task.json()) as { activity: { id: string } };
+
+    const finalized = await app.request(
+      "/api/workspace/opportunities/opportunity-final/finalize",
+      {
+        method: "PATCH",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({
+          status: "lost_rejected",
+          reason: "Клиент отказался от запуска проекта"
+        })
+      }
+    );
+    expect(finalized.status).toBe(200);
+
+    const lockedComment = await app.request(
+      "/api/workspace/opportunities/opportunity-final/comments",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ body: "Пост-фактум комментарий" })
+      }
+    );
+    const lockedTask = await app.request(
+      "/api/workspace/opportunities/opportunity-final/tasks",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ title: "Пост-фактум задача" })
+      }
+    );
+    const lockedTransition = await app.request(
+      `/api/workspace/opportunities/opportunity-final/tasks/${taskPayload.activity.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+
+    for (const response of [lockedComment, lockedTask, lockedTransition]) {
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error: "opportunity_activity_locked"
+      });
+    }
+
+    const feed = await app.request(
+      "/api/workspace/opportunities/opportunity-final/activity",
+      { headers: { cookie } }
+    );
+    expect(feed.status).toBe(200);
+    const feedPayload = await feed.json();
+    expect(feedPayload.activities).toHaveLength(1);
+    expect(feedPayload.activities[0]).toMatchObject({
+      id: taskPayload.activity.id,
+      status: "todo",
+      title: "Подготовить резюме закрытия"
+    });
+    expect(JSON.stringify(feedPayload)).not.toContain("Пост-фактум");
+  });
+
   async function loginAs(email: string, password: string) {
     const response = await app.request("/api/auth/login", {
       method: "POST",
