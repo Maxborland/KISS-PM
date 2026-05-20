@@ -1,9 +1,7 @@
 import {
-  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Clock3,
-  ExternalLink,
   MoreHorizontal,
   Pencil,
   PlayCircle,
@@ -15,21 +13,43 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 
-import type { DealStage, Opportunity, OpportunityFinalStatus } from "./api";
+import type {
+  Client,
+  ClientUpdateInput,
+  Contact,
+  ContactUpdateInput,
+  Opportunity,
+  OpportunityFinalStatus,
+  OpportunityUpdateInput
+} from "./api";
+import { DealOverviewCard, DealRelationshipCards } from "./OpportunityDetailFacts";
 import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
-  buildOpportunityStageTimeline,
+  buildClientUpdateInput,
+  buildContactUpdateInput,
+  buildOpportunityUpdateInput,
+  toDateInputValue
+} from "./opportunityInlineEdit";
+import {
   formatOpportunityEconomics,
   getOpportunityClientLabel,
-  getOpportunityContactLabel,
-  getOpportunityProjectTypeLabel,
-  getOpportunityStageLabel,
-  getOpportunityStageOptions
+  getOpportunityContactLabel
 } from "./opportunityDisplay";
 import type { WorkspaceData } from "./workspaceData";
-import { useOpportunityQuery, useProjectIntakeMutations } from "./workspaceQueries";
+import {
+  useCrmMutations,
+  useOpportunityQuery,
+  useProjectIntakeMutations
+} from "./workspaceQueries";
+import {
+  hasFormErrors,
+  validateClientForm,
+  validateContactForm,
+  validateOpportunityCustomFields,
+  validateOpportunityForm
+} from "./workspaceForms";
 import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
@@ -72,6 +92,7 @@ export function OpportunityDetailView(props: {
     props.sectionState.canRead
   );
   const mutations = useProjectIntakeMutations();
+  const crmMutations = useCrmMutations();
   const [riskReason, setRiskReason] = useState("");
   const [actionError, setActionError] = useState("");
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -85,7 +106,9 @@ export function OpportunityDetailView(props: {
     mutations.updateOpportunity.isPending ||
     mutations.updateStage.isPending ||
     mutations.activateProject.isPending ||
-    mutations.finalizeOpportunity.isPending;
+    mutations.finalizeOpportunity.isPending ||
+    crmMutations.updateClient.isPending ||
+    crmMutations.updateContact.isPending;
   const activeClients = props.data.clients.filter((client) => client.status === "active");
   const activeProjectTypes = props.data.projectTypes.filter(
     (projectType) => projectType.status === "active"
@@ -151,6 +174,98 @@ export function OpportunityDetailView(props: {
     props.onChanged("Сделка обновлена");
   }
 
+  async function saveOpportunityInline(patch: Partial<OpportunityUpdateInput>) {
+    if (!opportunity) return;
+    const input = buildOpportunityUpdateInput(opportunity, patch);
+    const activeOpportunityFields = props.data.customFields.filter(
+      (field) => field.targetEntity === "opportunity" && field.status === "active"
+    );
+    const errors = {
+      ...validateOpportunityForm({
+        clientId: input.clientId,
+        primaryContactId: input.primaryContactId,
+        title: input.title,
+        projectTypeId: input.projectTypeId,
+        stageId: input.stageId,
+        plannedStart: input.plannedStart,
+        plannedFinish: input.plannedFinish,
+        contractValue: String(input.contractValue),
+        plannedHourlyRate: String(input.plannedHourlyRate),
+        probability: String(input.probability),
+        demand: input.demand.map((line) => ({
+          positionId: line.positionId,
+          requiredHours: String(line.requiredHours)
+        }))
+      }),
+      ...validateOpportunityCustomFields(
+        activeOpportunityFields,
+        input.customFieldValues ?? {}
+      )
+    };
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте значение поля.");
+    }
+
+    await mutations.updateOpportunity.mutateAsync({
+      opportunityId: opportunity.id,
+      input
+    });
+    props.onChanged("Поле сделки обновлено");
+  }
+
+  async function saveClientInline(client: Client, patch: Partial<Client>) {
+    const patchInput: Partial<ClientUpdateInput> = {};
+    if (typeof patch.name === "string") patchInput.name = patch.name.trim();
+    if (typeof patch.description === "string") {
+      patchInput.description = patch.description.trim() || null;
+    }
+    if (patch.status) patchInput.status = patch.status;
+    const input = buildClientUpdateInput(client, patchInput);
+    const errors = validateClientForm({
+      name: input.name,
+      description: input.description ?? "",
+      status: input.status
+    });
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте значение поля.");
+    }
+
+    await crmMutations.updateClient.mutateAsync({
+      clientId: client.id,
+      input
+    });
+    props.onChanged("Поле компании обновлено");
+  }
+
+  async function saveContactInline(contact: Contact, patch: Partial<Contact>) {
+    const patchInput: Partial<ContactUpdateInput> = {};
+    if (typeof patch.clientId === "string") patchInput.clientId = patch.clientId;
+    if (typeof patch.name === "string") patchInput.name = patch.name.trim();
+    if (typeof patch.email === "string") patchInput.email = patch.email.trim() || null;
+    if (typeof patch.phone === "string") patchInput.phone = patch.phone.trim() || null;
+    if (typeof patch.telegram === "string") {
+      patchInput.telegram = patch.telegram.trim() || null;
+    }
+    if (typeof patch.role === "string") patchInput.role = patch.role.trim() || null;
+    if (patch.status) patchInput.status = patch.status;
+    const input = buildContactUpdateInput(contact, patchInput);
+    const errors = validateContactForm({
+      clientId: input.clientId,
+      name: input.name,
+      email: input.email ?? "",
+      status: input.status
+    });
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте значение поля.");
+    }
+
+    await crmMutations.updateContact.mutateAsync({
+      contactId: contact.id,
+      input
+    });
+    props.onChanged("Поле контакта обновлено");
+  }
+
   async function submitFinalAction(input: {
     status: OpportunityFinalStatus;
     reason: string;
@@ -200,12 +315,18 @@ export function OpportunityDetailView(props: {
                 isPending={isPending}
                 opportunity={opportunity}
                 onUpdateStage={updateStage}
+                onSaveOpportunity={saveOpportunityInline}
               />
               <DealRelationshipCards
+                canManageClients={hasPermission(props.data.permissions, "tenant.clients.manage")}
+                canManageContacts={hasPermission(props.data.permissions, "tenant.contacts.manage")}
                 data={props.data}
+                isPending={isPending}
                 opportunity={opportunity}
                 onOpenClient={props.onOpenClient}
                 onOpenContact={props.onOpenContact}
+                onSaveClient={saveClientInline}
+                onSaveContact={saveContactInline}
               />
               <DealResourceCard
                 canCheckFeasibility={canCheckFeasibility}
@@ -215,7 +336,6 @@ export function OpportunityDetailView(props: {
                 onCheckFeasibility={checkFeasibility}
                 onRiskReasonChange={setRiskReason}
               />
-              <RuntimeCustomFieldsCard data={props.data} opportunity={opportunity} />
               {actionError ? <p className="error deal-action-error">{actionError}</p> : null}
             </div>
             <OpportunityActivityPanel
@@ -405,195 +525,6 @@ function DealMetric(props: {
   );
 }
 
-function DealOverviewCard(props: {
-  canManageOpportunities: boolean;
-  data: WorkspaceData;
-  isPending: boolean;
-  opportunity: Opportunity;
-  onUpdateStage: (stageId: string) => void;
-}) {
-  const economics = formatOpportunityEconomics(props.opportunity);
-  const timeline = buildOpportunityStageTimeline(props.data.dealStages, props.opportunity);
-
-  return (
-    <section className="deal-overview-card" aria-label="Обзор сделки">
-      <header className="deal-card-header">
-        <div>
-          <h2>Обзор сделки</h2>
-          <p>
-            Период: {formatDateOnly(props.opportunity.plannedStart)} {"->"}{" "}
-            {formatDateOnly(props.opportunity.plannedFinish)}
-          </p>
-        </div>
-      </header>
-      <ol className="deal-stage-timeline" aria-label="Этапы сделки">
-        {timeline.map((stage) => (
-          <li
-            className={[
-              stage.isReached ? "is-reached" : "",
-              stage.isCurrent ? "is-current" : "",
-              stage.isArchived ? "is-archived" : ""
-            ].filter(Boolean).join(" ")}
-            key={stage.id}
-          >
-            <span aria-hidden="true" />
-            <strong>{stage.label}</strong>
-          </li>
-        ))}
-      </ol>
-      <div className="deal-overview-grid">
-        <dl className="deal-fact-list">
-          <DealFact label="Этап">
-            {props.canManageOpportunities && !isFinalOpportunity(props.opportunity) ? (
-              <select
-                aria-label="Этап сделки"
-                disabled={props.isPending}
-                value={props.opportunity.stageId ?? ""}
-                onChange={(event) => props.onUpdateStage(event.target.value)}
-              >
-                <option value="">Этап не задан</option>
-                {getOpportunityStageOptions(props.data.dealStages, props.opportunity).map((stage) => (
-                  <option key={stage.id} value={stage.id}>
-                    {stage.status === "archived" ? `${stage.name} · архив` : stage.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              formatStage(props.opportunity, props.data.dealStages)
-            )}
-          </DealFact>
-          <DealFact label="Тип проекта">
-            {getOpportunityProjectTypeLabel(props.data, props.opportunity)}
-          </DealFact>
-          <DealFact label="Плановые часы">{economics.plannedHoursLabel}</DealFact>
-          <DealFact label="Вероятность">{props.opportunity.probability}%</DealFact>
-          <DealFact label="Потребность">{renderDemand(props.data, props.opportunity)}</DealFact>
-          <DealFact label="Бюджет (экономика)">{economics.contractValueLabel}</DealFact>
-          <DealFact label="Ставка">{economics.plannedHourlyRateLabel}</DealFact>
-        </dl>
-        <dl className="deal-fact-list secondary">
-          <DealFact label="Период">
-            <span className="deal-inline-icon">
-              <CalendarDays aria-hidden="true" size={14} />
-              {formatDateOnly(props.opportunity.plannedStart)} {"->"}{" "}
-              {formatDateOnly(props.opportunity.plannedFinish)}
-            </span>
-          </DealFact>
-          <DealFact label="Дата создания">{formatDate(props.opportunity.createdAt)}</DealFact>
-          <DealFact label="Ответственный">{props.data.me.name}</DealFact>
-          <DealFact label="Тип клиента">Клиент</DealFact>
-          <DealFact label="Отрасль">-</DealFact>
-          <DealFact label="Описание">{props.opportunity.description || "-"}</DealFact>
-        </dl>
-      </div>
-    </section>
-  );
-}
-
-function DealFact(props: { children: React.ReactNode; label: string }) {
-  return (
-    <div>
-      <dt>{props.label}</dt>
-      <dd>{props.children}</dd>
-    </div>
-  );
-}
-
-function DealRelationshipCards(props: {
-  data: WorkspaceData;
-  opportunity: Opportunity;
-  onOpenClient: (clientId: string) => void;
-  onOpenContact: (contactId: string) => void;
-}) {
-  const client = props.data.clients.find((item) => item.id === props.opportunity.clientId);
-  const contact = props.data.contacts.find(
-    (item) => item.id === props.opportunity.primaryContactId
-  );
-
-  return (
-    <div className="deal-relationship-grid">
-      <section className="deal-linked-card">
-        <header>
-          <h2>Компания</h2>
-          {props.opportunity.clientId ? (
-            <button
-              className="secondary-button compact"
-              type="button"
-              onClick={() => props.onOpenClient(props.opportunity.clientId!)}
-            >
-              Открыть
-              <ExternalLink aria-hidden="true" size={13} />
-            </button>
-          ) : null}
-        </header>
-        <div className="deal-linked-identity">
-          <span className="row-avatar">К</span>
-          <div>
-            {props.opportunity.clientId ? (
-              <button
-                className="inline-link-button"
-                type="button"
-                onClick={() => props.onOpenClient(props.opportunity.clientId!)}
-              >
-                {getOpportunityClientLabel(props.data, props.opportunity)}
-              </button>
-            ) : (
-              <strong>{getOpportunityClientLabel(props.data, props.opportunity)}</strong>
-            )}
-            <small>{contact?.email ?? props.opportunity.contactName ?? "Контакт не задан"}</small>
-            <small>{contact?.phone ?? "-"}</small>
-          </div>
-        </div>
-        <dl className="deal-mini-list">
-          <DealFact label="Тип клиента">Клиент</DealFact>
-          <DealFact label="Отрасль">-</DealFact>
-          <DealFact label="Сайт">-</DealFact>
-          <DealFact label="Ответственный">{props.data.me.name}</DealFact>
-        </dl>
-      </section>
-
-      <section className="deal-linked-card">
-        <header>
-          <h2>Контакт</h2>
-          {props.opportunity.primaryContactId ? (
-            <button
-              className="secondary-button compact"
-              type="button"
-              onClick={() => props.onOpenContact(props.opportunity.primaryContactId!)}
-            >
-              Открыть
-              <ExternalLink aria-hidden="true" size={13} />
-            </button>
-          ) : null}
-        </header>
-        <div className="deal-linked-identity">
-          <span className="row-avatar">C</span>
-          <div>
-            {props.opportunity.primaryContactId ? (
-              <button
-                className="inline-link-button"
-                type="button"
-                onClick={() => props.onOpenContact(props.opportunity.primaryContactId!)}
-              >
-                {contact?.name ?? props.opportunity.contactName ?? "Контакт не задан"}
-              </button>
-            ) : (
-              <strong>{contact?.name ?? props.opportunity.contactName ?? "Контакт не задан"}</strong>
-            )}
-            <small>{contact?.email ?? "-"}</small>
-            <small>{contact?.phone ?? "-"}</small>
-          </div>
-        </div>
-        <dl className="deal-mini-list">
-          <DealFact label="Должность">{contact?.role ?? "-"}</DealFact>
-          <DealFact label="Роль в сделке">{contact?.role ?? "-"}</DealFact>
-          <DealFact label="Ответственный">{props.data.me.name}</DealFact>
-        </dl>
-      </section>
-    </div>
-  );
-}
-
 function DealResourceCard(props: {
   canCheckFeasibility: boolean;
   isPending: boolean;
@@ -682,59 +613,6 @@ function ResourceProgressRow(props: {
       <small>{percent}%</small>
     </div>
   );
-}
-
-function RuntimeCustomFieldsCard(props: {
-  data: WorkspaceData;
-  opportunity: Opportunity;
-}) {
-  const fields = props.data.customFields.filter(
-    (field) => field.targetEntity === "opportunity" && field.status === "active"
-  );
-  if (fields.length === 0) return null;
-
-  return (
-    <section className="deal-linked-card">
-      <header>
-        <h2>Поля сделки</h2>
-      </header>
-      <dl className="deal-mini-list">
-        {fields.map((field) => (
-          <DealFact key={field.id} label={field.tenantLabel}>
-            {props.opportunity.customFieldValues[field.id] || "Не заполнено"}
-          </DealFact>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-function renderDemand(data: WorkspaceData, opportunity: Opportunity) {
-  if (opportunity.demand.length === 0) return "-";
-
-  return (
-    <span className="chip-list">
-      {opportunity.demand.map((line) => (
-        <span className="permission-chip" key={line.positionId}>
-          {getPositionName(data, line.positionId)}: {line.requiredHours} ч
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function formatStage(opportunity: Opportunity, stages: DealStage[]) {
-  const stage = stages.find((item) => item.id === opportunity.stageId);
-  return (
-    <StatusPill
-      label={getOpportunityStageLabel(stages, opportunity)}
-      tone={stage?.status === "active" ? "success" : "muted"}
-    />
-  );
-}
-
-function getPositionName(data: WorkspaceData, positionId: string): string {
-  return data.positions.find((position) => position.id === positionId)?.name ?? positionId;
 }
 
 function getCreateProjectDisabledReason(input: {
