@@ -104,6 +104,10 @@ const phase4GeneralCrmActivityMigration = readFileSync(
   ),
   "utf8"
 );
+const phase42TaskWorkspaceMigration = readFileSync(
+  new URL("../migrations/0019_phase_4_2_task_workspace.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -402,6 +406,35 @@ describe("Phase 4 general CRM activity SQL migration", () => {
     );
     expect(phase4GeneralCrmActivityMigration).toContain(
       'DROP TABLE IF EXISTS "opportunity_activities"'
+    );
+  });
+});
+
+describe("Phase 4.2 task workspace SQL migration", () => {
+  it("adds tenant-scoped task statuses, extended task fields and task activities", () => {
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "task_statuses"'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'CONSTRAINT "task_statuses_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "status_id" text'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "requester_user_id" text'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "owner_user_id" text'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "requires_acceptance" boolean'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "task_activities"'
+    );
+    expect(phase42TaskWorkspaceMigration).toContain(
+      'CONSTRAINT "task_activities_pkey" PRIMARY KEY("tenant_id","id")'
     );
   });
 });

@@ -23,8 +23,10 @@ describe("PostgreSQL persistence schema", () => {
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "task_statuses",
       "tasks",
       "task_participants",
+      "task_activities",
       "crm_activities",
       "tenant_users",
       "user_credentials",
@@ -48,8 +50,10 @@ describe("PostgreSQL persistence schema", () => {
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "task_statuses",
       "tasks",
       "task_participants",
+      "task_activities",
       "crm_activities",
       "tenant_users",
       "user_credentials",
@@ -98,6 +102,39 @@ describe("PostgreSQL persistence schema", () => {
         "file_url",
         "file_size_bytes",
         "mime_type"
+      ])
+    );
+  });
+
+  it("stores the Phase 4.2 task workspace contract", () => {
+    expect(getPersistenceTableColumns("task_statuses")).toEqual(
+      expect.arrayContaining([
+        "id",
+        "tenant_id",
+        "name",
+        "category",
+        "sort_order",
+        "status",
+        "is_system"
+      ])
+    );
+    expect(getPersistenceTableColumns("tasks")).toEqual(
+      expect.arrayContaining([
+        "status_id",
+        "requester_user_id",
+        "owner_user_id",
+        "duration_working_days",
+        "requires_acceptance",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("task_activities")).toEqual(
+      expect.arrayContaining([
+        "task_id",
+        "type",
+        "body",
+        "file_url",
+        "author_user_id"
       ])
     );
   });
