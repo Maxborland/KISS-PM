@@ -1,5 +1,8 @@
 import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
-import type { OpportunityFeedItem } from "./opportunityActivity";
+import {
+  groupOpportunityFeedItemsByDay,
+  type OpportunityFeedItem
+} from "./opportunityActivity";
 import type { WorkspaceData } from "./workspaceData";
 import { StatusPill } from "./components/workspace-ui";
 import { getAuditActionLabel } from "./workspaceDashboard";
@@ -15,21 +18,28 @@ export function OpportunityFeedView(props: {
 
   return (
     <div className="activity-list">
-      {props.items.map((item) =>
-        item.kind === "activity" ? (
-          <OpportunityActivityRow
-            activity={item.activity}
-            data={props.data}
-            key={`activity-${item.activity.id}`}
-          />
-        ) : (
-          <OpportunitySystemEventRow
-            data={props.data}
-            event={item.event}
-            key={`system-${item.event.id}`}
-          />
-        )
-      )}
+      {groupOpportunityFeedItemsByDay(props.items).map((group) => (
+        <section className="activity-day-group" key={group.dateKey}>
+          <h3>{group.label}</h3>
+          <div className="activity-day-items">
+            {group.items.map((item) =>
+              item.kind === "activity" ? (
+                <OpportunityActivityRow
+                  activity={item.activity}
+                  data={props.data}
+                  key={`activity-${item.activity.id}`}
+                />
+              ) : (
+                <OpportunitySystemEventRow
+                  data={props.data}
+                  event={item.event}
+                  key={`system-${item.event.id}`}
+                />
+              )
+            )}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

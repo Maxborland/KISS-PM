@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 
 import type { OpportunityActivity } from "./api";
 import { StatusPill } from "./components/workspace-ui";
+import { sortOpportunityTasks } from "./opportunityActivity";
 import { getWorkspaceUserName, OpportunityActivityRow } from "./OpportunityActivityFeed";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDate, formatDateOnly } from "./workspaceViewHelpers";
@@ -92,7 +93,7 @@ export function OpportunityTaskView(props: {
         {props.tasks.length === 0 ? (
           <p className="empty-state compact">Контрольных задач пока нет.</p>
         ) : (
-          props.tasks.map((task) => (
+          sortOpportunityTasks(props.tasks).map((task) => (
             <OpportunityTaskRow
               canManageOpportunities={props.canManageOpportunities}
               data={props.data}
