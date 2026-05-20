@@ -17,7 +17,8 @@ describe("CRM entity workspace contract", () => {
       const text = readText(viewPath);
 
       expect(text).toContain("CrmEntityWorkspace");
-      expect(text).toContain("CrmEntityActivityPlaceholder");
+      expect(text).toContain("CrmActivityPanel");
+      expect(text).not.toContain("CrmEntityActivityPlaceholder");
       expect(text).toContain("CrmEntityFactList");
       expect(text).not.toContain("crm-card-layout");
     }

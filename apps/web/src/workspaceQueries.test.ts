@@ -33,9 +33,10 @@ describe("workspace query keys", () => {
       "opportunities",
       "opportunity-1"
     ]);
-    expect(workspaceQueryKeys.opportunityActivity("opportunity-1")).toEqual([
+    expect(workspaceQueryKeys.crmActivity("opportunity", "opportunity-1")).toEqual([
       "workspace",
-      "opportunities",
+      "crm",
+      "opportunity",
       "opportunity-1",
       "activity"
     ]);
@@ -117,7 +118,7 @@ describe("workspace query keys", () => {
       queryKey: workspaceQueryKeys.opportunity("opportunity-1")
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: workspaceQueryKeys.opportunityActivity("opportunity-1")
+      queryKey: workspaceQueryKeys.crmActivity("opportunity", "opportunity-1")
     });
   });
 });

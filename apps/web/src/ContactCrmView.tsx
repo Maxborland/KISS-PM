@@ -2,8 +2,8 @@ import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Client, Contact, ContactUpdateInput } from "./api";
+import { CrmActivityPanel } from "./CrmActivityPanel";
 import {
-  CrmEntityActivityPlaceholder,
   CrmEntityFact,
   CrmEntityFactList,
   CrmEntitySection,
@@ -176,9 +176,14 @@ export function ContactsView(props: {
         {activeContact ? (
           <CrmEntityWorkspace
             activity={
-              <CrmEntityActivityPlaceholder
+              <CrmActivityPanel
+                canManage={canManageContacts}
+                data={props.data}
+                entityId={activeContact.id}
                 entityLabel="контакт"
-                summary="0 задач · 0 сообщений"
+                entityType="contact"
+                managePermission="tenant.contacts.manage"
+                onChanged={props.onChanged}
               />
             }
             actions={

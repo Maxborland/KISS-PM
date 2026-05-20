@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCustomField,
   createClient,
-  createOpportunityComment,
-  createOpportunityTask,
+  createCrmComment,
+  createCrmFile,
+  createCrmTask,
   createProjectTask,
-  fetchOpportunityActivity,
+  fetchCrmActivity,
   fetchCustomFields,
   fetchMyWork,
   fetchProjectDetail,
@@ -15,7 +16,7 @@ import {
   updateClient,
   updateContact,
   updateDealStage,
-  updateOpportunityTask,
+  updateCrmTask,
   updateProjectType,
   updateProjectTemplate,
   encodePathSegment
@@ -222,35 +223,42 @@ describe("web api helpers", () => {
     );
   });
 
-  it("uses encoded opportunity activity endpoints and same-origin mutation headers", async () => {
+  it("uses encoded CRM activity endpoints and same-origin mutation headers", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(
         async () => new Response(JSON.stringify({ activities: [], systemEvents: [] }), { status: 200 })
       );
 
-    await fetchOpportunityActivity("opportunity/unsafe");
-    await createOpportunityComment("opportunity/unsafe", {
+    await fetchCrmActivity("opportunity", "opportunity/unsafe");
+    await createCrmComment("opportunity", "opportunity/unsafe", {
       body: "Комментарий по сделке"
     });
-    await createOpportunityTask("opportunity/unsafe", {
+    await createCrmTask("opportunity", "opportunity/unsafe", {
       title: "Позвонить клиенту",
       body: "Уточнить дату старта",
       dueDate: "2026-06-10",
       assigneeUserId: "user-alpha-admin"
     });
-    await updateOpportunityTask("opportunity/unsafe", "activity/unsafe", {
+    await createCrmFile("client", "client/unsafe", {
+      title: "Бриф клиента",
+      body: "Ссылка на внешний файл",
+      fileUrl: "https://example.test/brief.pdf",
+      fileSizeBytes: 2048,
+      mimeType: "application/pdf"
+    });
+    await updateCrmTask("opportunity", "opportunity/unsafe", "activity/unsafe", {
       status: "done"
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/workspace/opportunities/opportunity%2Funsafe/activity",
+      "/api/workspace/crm/opportunity/opportunity%2Funsafe/activity",
       expect.objectContaining({ method: "GET" })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/workspace/opportunities/opportunity%2Funsafe/comments",
+      "/api/workspace/crm/opportunity/opportunity%2Funsafe/comments",
       expect.objectContaining({
         method: "POST",
         headers: {
@@ -261,12 +269,17 @@ describe("web api helpers", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "/api/workspace/opportunities/opportunity%2Funsafe/tasks",
+      "/api/workspace/crm/opportunity/opportunity%2Funsafe/tasks",
       expect.objectContaining({ method: "POST" })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/workspace/opportunities/opportunity%2Funsafe/tasks/activity%2Funsafe",
+      "/api/workspace/crm/client/client%2Funsafe/files",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/workspace/crm/opportunity/opportunity%2Funsafe/tasks/activity%2Funsafe",
       expect.objectContaining({ method: "PATCH" })
     );
   });

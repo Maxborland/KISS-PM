@@ -2,7 +2,7 @@ export * from "./auditEvent";
 export * from "./auth";
 export * from "./connection";
 export * from "./crmRepository";
-export * from "./opportunityActivityRepository";
+export * from "./crmActivityRepository";
 export * from "./projectIntakeRepository";
 export * from "./projectWorkRepository";
 export * from "./repositories";

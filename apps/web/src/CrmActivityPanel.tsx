@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CalendarDays,
   ListPlus,
   Loader2,
   Paperclip,
@@ -11,66 +10,82 @@ import {
 import type { FormEvent, KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 
-import { OpportunityFeedView } from "./OpportunityActivityFeed";
+import { CrmFeedView } from "./CrmActivityFeed";
 import {
-  OpportunityTaskView,
-  type OpportunityTaskFormState
-} from "./OpportunityActivityForms";
+  CrmTaskView,
+  CrmFileView,
+  type CrmFileFormState,
+  type CrmTaskFormState
+} from "./CrmActivityForms";
 import {
-  composeOpportunityFeedItems,
-  getOpportunityActivitySummary,
-  getOpportunityActivityTabs,
+  composeCrmFeedItems,
+  getCrmActivitySummary,
+  getCrmActivityTabs,
   type ActivityRailTabId,
   type ActivityTab,
   formatActivityCountLabel
-} from "./opportunityActivity";
+} from "./crmActivity";
+import type { CrmActivityEntityType } from "./api";
 import type { WorkspaceData } from "./workspaceData";
 import {
-  useOpportunityActivityMutations,
-  useOpportunityActivityQuery
+  useCrmActivityMutations,
+  useCrmActivityQuery
 } from "./workspaceQueries";
 import { getErrorMessage } from "./workspaceShellState";
 
 const tabIcons = {
   feed: ListPlus,
   tasks: SquareCheckBig,
-  events: CalendarDays,
   files: Paperclip
 } satisfies Record<ActivityRailTabId, typeof ListPlus>;
 
-const emptyTaskForm: OpportunityTaskFormState = {
+const emptyTaskForm: CrmTaskFormState = {
   title: "",
   body: "",
   dueDate: "",
   assigneeUserId: ""
 };
 
-export function OpportunityActivityPanel(props: {
-  canManageOpportunities: boolean;
+const emptyFileForm: CrmFileFormState = {
+  body: "",
+  fileSizeBytes: "",
+  fileUrl: "",
+  mimeType: "",
+  title: ""
+};
+
+export function CrmActivityPanel(props: {
+  canManage: boolean;
   data: WorkspaceData;
-  opportunityId: string;
+  entityId: string;
+  entityLabel: string;
+  entityType: CrmActivityEntityType;
+  managePermission: string;
   onChanged: (message: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ActivityTab>("feed");
   const [commentBody, setCommentBody] = useState("");
   const [commentError, setCommentError] = useState("");
-  const [taskForm, setTaskForm] = useState<OpportunityTaskFormState>(emptyTaskForm);
+  const [taskForm, setTaskForm] = useState<CrmTaskFormState>(emptyTaskForm);
   const [taskError, setTaskError] = useState("");
-  const activityQuery = useOpportunityActivityQuery(props.opportunityId, true);
-  const mutations = useOpportunityActivityMutations(props.opportunityId);
+  const [fileForm, setFileForm] = useState<CrmFileFormState>(emptyFileForm);
+  const [fileError, setFileError] = useState("");
+  const activityQuery = useCrmActivityQuery(props.entityType, props.entityId, true);
+  const mutations = useCrmActivityMutations(props.entityType, props.entityId);
   const activities = activityQuery.data?.activities ?? [];
-  const comments = activities.filter((activity) => activity.type === "comment");
   const tasks = activities.filter((activity) => activity.type === "task");
+  const files = activities.filter((activity) => activity.type === "file");
   const systemEvents = activityQuery.data?.systemEvents ?? [];
   const feedItems = useMemo(
-    () => composeOpportunityFeedItems(activities, systemEvents),
+    () => composeCrmFeedItems(activities, systemEvents),
     [activities, systemEvents]
   );
-  const activityTabs = getOpportunityActivityTabs({
+  const activityTabs = getCrmActivityTabs({
     feedCount: feedItems.length,
+    fileCount: files.length,
     taskCount: tasks.length
   });
-  const activitySummary = getOpportunityActivitySummary({
+  const activitySummary = getCrmActivitySummary({
     activities,
     feedItems
   });
@@ -78,6 +93,7 @@ export function OpportunityActivityPanel(props: {
   const isSaving =
     mutations.createComment.isPending ||
     mutations.createTask.isPending ||
+    mutations.createFile.isPending ||
     mutations.updateTask.isPending;
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
@@ -92,7 +108,7 @@ export function OpportunityActivityPanel(props: {
     try {
       await mutations.createComment.mutateAsync({ body });
       setCommentBody("");
-      props.onChanged("Комментарий добавлен в сделку");
+      props.onChanged("Комментарий добавлен");
     } catch (error) {
       setCommentError(getErrorMessage(error));
     }
@@ -116,7 +132,7 @@ export function OpportunityActivityPanel(props: {
       });
       setTaskForm(emptyTaskForm);
       setActiveTab("tasks");
-      props.onChanged("Задача по сделке создана");
+      props.onChanged("Задача создана");
     } catch (error) {
       setTaskError(getErrorMessage(error));
     }
@@ -125,9 +141,51 @@ export function OpportunityActivityPanel(props: {
   async function completeTask(activityId: string) {
     try {
       await mutations.updateTask.mutateAsync({ activityId, status: "done" });
-      props.onChanged("Задача по сделке выполнена");
+      props.onChanged("Задача выполнена");
     } catch (error) {
       setTaskError(getErrorMessage(error));
+    }
+  }
+
+  async function submitFile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = fileForm.title.trim();
+    const fileUrl = fileForm.fileUrl.trim();
+    setFileError("");
+    if (!title) {
+      setFileError("Укажите название файла.");
+      return;
+    }
+    if (!fileUrl) {
+      setFileError("Укажите ссылку на файл.");
+      return;
+    }
+    if (!isSafeExternalFileUrl(fileUrl)) {
+      setFileError("Ссылка должна начинаться с http:// или https://.");
+      return;
+    }
+
+    const fileSizeBytes = fileForm.fileSizeBytes.trim()
+      ? Number(fileForm.fileSizeBytes)
+      : null;
+    if (fileSizeBytes !== null && (!Number.isInteger(fileSizeBytes) || fileSizeBytes < 0)) {
+      setFileError("Размер файла должен быть целым числом байт.");
+      return;
+    }
+
+    try {
+      await mutations.createFile.mutateAsync({
+        body: fileForm.body.trim() || null,
+        fileSizeBytes,
+        fileUrl,
+        mimeType: fileForm.mimeType.trim() || null,
+        title
+      });
+      setFileForm(emptyFileForm);
+      setActiveTab("files");
+      props.onChanged("Файл добавлен");
+    } catch (error) {
+      setFileError(getErrorMessage(error));
     }
   }
 
@@ -162,19 +220,19 @@ export function OpportunityActivityPanel(props: {
   }
 
   return (
-    <aside className="deal-activity-panel" aria-label="Активность по сделке">
+    <aside className="deal-activity-panel" aria-label={`Активность: ${props.entityLabel}`}>
       <header className="deal-activity-header">
         <div>
-          <h2>Активность по сделке</h2>
+          <h2>Активность</h2>
           <p>
             {activitySummary.openTaskCount} открытых задач ·{" "}
-            {activitySummary.commentCount} сообщений
+            {activitySummary.commentCount} сообщений · {files.length} файлов
           </p>
         </div>
         {activityQuery.isFetching ? <Loader2 aria-hidden="true" size={16} /> : null}
       </header>
 
-      <div className="activity-tabs" role="tablist" aria-label="Разделы активности сделки">
+      <div className="activity-tabs" role="tablist" aria-label={`Разделы активности: ${props.entityLabel}`}>
         {activityTabs.map((tab) => {
           const Icon = tabIcons[tab.id];
           const isSelected = activeTab === tab.id;
@@ -209,14 +267,14 @@ export function OpportunityActivityPanel(props: {
         <button
           aria-label="Добавить активность"
           className="activity-add-button"
-          disabled={!props.canManageOpportunities}
+          disabled={!props.canManage}
           title={
-            props.canManageOpportunities
+            props.canManage
               ? "Напишите сообщение в ленте ниже"
-              : "Нужно право tenant.opportunities.manage"
+              : `Нужно право ${props.managePermission}`
           }
           type="button"
-          onClick={() => document.getElementById("deal-feed-message")?.focus()}
+          onClick={() => document.getElementById(getComposerId(props.entityType, props.entityId))?.focus()}
         >
           +
         </button>
@@ -236,12 +294,15 @@ export function OpportunityActivityPanel(props: {
           {activeTab === "feed" ? (
             <div className="activity-feed-workspace">
               <form className="activity-inline-composer" onSubmit={submitComment}>
-                <label className="sr-only" htmlFor="deal-feed-message">
+                <label
+                  className="sr-only"
+                  htmlFor={getComposerId(props.entityType, props.entityId)}
+                >
                   Написать сообщение или добавить активность
                 </label>
                 <textarea
-                  id="deal-feed-message"
-                  disabled={!props.canManageOpportunities || isSaving}
+                  id={getComposerId(props.entityType, props.entityId)}
+                  disabled={!props.canManage || isSaving}
                   placeholder="Написать сообщение или добавить активность..."
                   rows={1}
                   value={commentBody}
@@ -250,38 +311,52 @@ export function OpportunityActivityPanel(props: {
                 <button
                   aria-label="Отправить сообщение"
                   className="activity-send-button"
-                  disabled={!props.canManageOpportunities || isSaving}
+                  disabled={!props.canManage || isSaving}
                   title={
-                    props.canManageOpportunities
+                    props.canManage
                       ? undefined
-                      : "Нужно право tenant.opportunities.manage"
+                      : `Нужно право ${props.managePermission}`
                   }
                   type="submit"
                 >
                   <SendHorizonal aria-hidden="true" size={16} />
                 </button>
                 {commentError ? <p className="error">{commentError}</p> : null}
-                {!props.canManageOpportunities ? (
+                {!props.canManage ? (
                   <p className="empty-state compact">
-                    Только чтение: нужно право tenant.opportunities.manage.
+                    Только чтение: нужно право {props.managePermission}.
                   </p>
                 ) : null}
               </form>
-              <OpportunityFeedView data={props.data} items={feedItems} />
+              <CrmFeedView data={props.data} items={feedItems} />
             </div>
           ) : null}
           {activeTab === "tasks" ? (
-            <OpportunityTaskView
+            <CrmTaskView
               activeUsers={activeUsers}
-              canManageOpportunities={props.canManageOpportunities}
+              canManage={props.canManage}
               data={props.data}
               error={taskError}
               form={taskForm}
               isSaving={isSaving}
+              managePermission={props.managePermission}
               tasks={tasks}
               onComplete={completeTask}
               onFormChange={setTaskForm}
               onSubmit={submitTask}
+            />
+          ) : null}
+          {activeTab === "files" ? (
+            <CrmFileView
+              canManage={props.canManage}
+              data={props.data}
+              error={fileError}
+              files={files}
+              form={fileForm}
+              isSaving={isSaving}
+              managePermission={props.managePermission}
+              onFormChange={setFileForm}
+              onSubmit={submitFile}
             />
           ) : null}
         </div>
@@ -290,10 +365,23 @@ export function OpportunityActivityPanel(props: {
   );
 }
 
+function isSafeExternalFileUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function getTabId(tabId: ActivityRailTabId): string {
-  return `opportunity-activity-tab-${tabId}`;
+  return `crm-activity-tab-${tabId}`;
 }
 
 function getPanelId(tabId: ActivityRailTabId): string {
-  return `opportunity-activity-panel-${tabId}`;
+  return `crm-activity-panel-${tabId}`;
+}
+
+function getComposerId(entityType: CrmActivityEntityType, entityId: string): string {
+  return `crm-${entityType}-${entityId}-feed-message`;
 }

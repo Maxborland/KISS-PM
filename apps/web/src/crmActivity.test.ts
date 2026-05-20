@@ -1,28 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
+import type { CrmActivity, CrmSystemEvent } from "./api";
 import {
-  composeOpportunityFeedItems,
+  composeCrmFeedItems,
   formatActivityCountLabel,
-  getOpportunityActivityTabs,
-  getOpportunityActivitySummary,
-  groupOpportunityFeedItemsByDay,
-  sortOpportunityTasks
-} from "./opportunityActivity";
+  getCrmActivityTabs,
+  getCrmActivitySummary,
+  groupCrmFeedItemsByDay,
+  sortCrmTasks
+} from "./crmActivity";
 
 const baseActivity = {
   tenantId: "tenant-1",
-  opportunityId: "opportunity-1",
+  entityType: "opportunity",
+  entityId: "opportunity-1",
   body: null,
   dueDate: null,
   assigneeUserId: null,
   authorUserId: "user-1",
+  fileUrl: null,
+  fileSizeBytes: null,
+  mimeType: null,
   updatedAt: "2026-05-20T10:00:00.000Z"
-} satisfies Omit<OpportunityActivity, "id" | "type" | "title" | "status" | "createdAt">;
+} satisfies Omit<CrmActivity, "id" | "type" | "title" | "status" | "createdAt">;
 
-describe("opportunity activity helpers", () => {
+describe("CRM activity helpers", () => {
   it("keeps the CRM activity rail honest: only backed tabs are enabled", () => {
-    expect(getOpportunityActivityTabs({ feedCount: 3, taskCount: 1 })).toEqual([
+    expect(getCrmActivityTabs({ feedCount: 3, fileCount: 2, taskCount: 1 })).toEqual([
       {
         count: 3,
         disabledReason: null,
@@ -38,18 +42,11 @@ describe("opportunity activity helpers", () => {
         label: "Задачи"
       },
       {
-        count: 0,
-        disabledReason: "Модель событий будет добавлена отдельным CRM-slice",
-        id: "events",
-        isEnabled: false,
-        label: "Событие"
-      },
-      {
-        count: 0,
-        disabledReason: "Файлы сделки будут добавлены отдельным CRM-slice",
+        count: 2,
+        disabledReason: null,
         id: "files",
-        isEnabled: false,
-        label: "Файл"
+        isEnabled: true,
+        label: "Файлы"
       }
     ]);
   });
@@ -58,7 +55,8 @@ describe("opportunity activity helpers", () => {
     const activities = [
       {
         id: "activity-old",
-        opportunityId: "opportunity-1",
+        entityType: "opportunity",
+        entityId: "opportunity-1",
         tenantId: "tenant-1",
         type: "comment",
         title: null,
@@ -67,12 +65,16 @@ describe("opportunity activity helpers", () => {
         dueDate: null,
         assigneeUserId: null,
         authorUserId: "user-1",
+        fileUrl: null,
+        fileSizeBytes: null,
+        mimeType: null,
         createdAt: "2026-05-20T08:00:00.000Z",
         updatedAt: "2026-05-20T08:00:00.000Z"
       },
       {
         id: "activity-new",
-        opportunityId: "opportunity-1",
+        entityType: "opportunity",
+        entityId: "opportunity-1",
         tenantId: "tenant-1",
         type: "task",
         title: "Новая задача",
@@ -81,10 +83,13 @@ describe("opportunity activity helpers", () => {
         dueDate: null,
         assigneeUserId: null,
         authorUserId: "user-1",
+        fileUrl: null,
+        fileSizeBytes: null,
+        mimeType: null,
         createdAt: "2026-05-20T10:00:00.000Z",
         updatedAt: "2026-05-20T10:00:00.000Z"
       }
-    ] satisfies OpportunityActivity[];
+    ] satisfies CrmActivity[];
     const systemEvents = [
       {
         id: "audit-mid",
@@ -94,9 +99,9 @@ describe("opportunity activity helpers", () => {
         sourceWorkflow: "opportunity",
         createdAt: "2026-05-20T09:00:00.000Z"
       }
-    ] satisfies OpportunitySystemEvent[];
+    ] satisfies CrmSystemEvent[];
 
-    expect(composeOpportunityFeedItems(activities, systemEvents).map((item) => item.createdAt)).toEqual([
+    expect(composeCrmFeedItems(activities, systemEvents).map((item) => item.createdAt)).toEqual([
       "2026-05-20T10:00:00.000Z",
       "2026-05-20T09:00:00.000Z",
       "2026-05-20T08:00:00.000Z"
@@ -139,10 +144,10 @@ describe("opportunity activity helpers", () => {
         status: "done",
         createdAt: "2026-05-20T08:00:00.000Z"
       }
-    ] satisfies OpportunityActivity[];
-    const feedItems = composeOpportunityFeedItems(activities, []);
+    ] satisfies CrmActivity[];
+    const feedItems = composeCrmFeedItems(activities, []);
 
-    expect(getOpportunityActivitySummary({ activities, feedItems })).toEqual({
+    expect(getCrmActivitySummary({ activities, feedItems })).toEqual({
       commentCount: 1,
       openTaskCount: 1,
       latestActivityAt: "2026-05-20T10:00:00.000Z"
@@ -169,9 +174,9 @@ describe("opportunity activity helpers", () => {
         status: null,
         createdAt: "2026-05-19T08:00:00.000Z"
       }
-    ] satisfies OpportunityActivity[];
-    const groups = groupOpportunityFeedItemsByDay(
-      composeOpportunityFeedItems(activities, []),
+    ] satisfies CrmActivity[];
+    const groups = groupCrmFeedItemsByDay(
+      composeCrmFeedItems(activities, []),
       new Date("2026-05-20T12:00:00.000Z")
     );
 
@@ -208,9 +213,9 @@ describe("opportunity activity helpers", () => {
         status: "todo",
         createdAt: "2026-05-20T10:00:00.000Z"
       }
-    ] satisfies OpportunityActivity[];
+    ] satisfies CrmActivity[];
 
-    expect(sortOpportunityTasks(tasks).map((task) => task.id)).toEqual([
+    expect(sortCrmTasks(tasks).map((task) => task.id)).toEqual([
       "todo-new",
       "todo-old",
       "done-new"

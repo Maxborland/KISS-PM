@@ -6,8 +6,9 @@ import {
   createCustomField,
   createContact,
   createDealStage,
-  createOpportunityComment,
-  createOpportunityTask,
+  createCrmComment,
+  createCrmFile,
+  createCrmTask,
   createOpportunity,
   createProduct,
   createProjectTask,
@@ -30,7 +31,7 @@ import {
   fetchMe,
   fetchMyWork,
   fetchOpportunity,
-  fetchOpportunityActivity,
+  fetchCrmActivity,
   fetchOpportunities,
   fetchPositions,
   fetchProducts,
@@ -49,7 +50,7 @@ import {
   updateContact,
   updateDealStage,
   updateOpportunity,
-  updateOpportunityTask,
+  updateCrmTask,
   updateOpportunityStage,
   updatePosition,
   updateProduct,
@@ -59,6 +60,7 @@ import {
   updateTheme,
   updateUser
 } from "./api";
+import type { CrmActivityEntityType } from "./api";
 
 export const workspaceQueryKeys = {
   health: () => ["health"] as const,
@@ -75,8 +77,8 @@ export const workspaceQueryKeys = {
   opportunities: () => ["workspace", "opportunities"] as const,
   opportunity: (opportunityId: string) =>
     ["workspace", "opportunities", opportunityId] as const,
-  opportunityActivity: (opportunityId: string) =>
-    ["workspace", "opportunities", opportunityId, "activity"] as const,
+  crmActivity: (entityType: CrmActivityEntityType, entityId: string) =>
+    ["workspace", "crm", entityType, entityId, "activity"] as const,
   projects: () => ["workspace", "projects"] as const,
   projectDetail: (projectId: string) => ["workspace", "projects", projectId] as const,
   projectTasks: (projectId: string) =>
@@ -202,14 +204,15 @@ export function useOpportunityQuery(opportunityId: string | null, enabled: boole
   });
 }
 
-export function useOpportunityActivityQuery(
-  opportunityId: string | null,
+export function useCrmActivityQuery(
+  entityType: CrmActivityEntityType,
+  entityId: string | null,
   enabled: boolean
 ) {
   return useQuery({
-    queryKey: workspaceQueryKeys.opportunityActivity(opportunityId ?? "unknown"),
-    queryFn: () => fetchOpportunityActivity(opportunityId ?? ""),
-    enabled: enabled && Boolean(opportunityId)
+    queryKey: workspaceQueryKeys.crmActivity(entityType, entityId ?? "unknown"),
+    queryFn: () => fetchCrmActivity(entityType, entityId ?? ""),
+    enabled: enabled && Boolean(entityId)
   });
 }
 
@@ -521,7 +524,7 @@ export async function invalidateProjectIntakeQueries(
         queryKey: workspaceQueryKeys.opportunity(opportunityId)
       }),
       queryClient.invalidateQueries({
-        queryKey: workspaceQueryKeys.opportunityActivity(opportunityId)
+        queryKey: workspaceQueryKeys.crmActivity("opportunity", opportunityId)
       })
     );
   }
@@ -529,13 +532,16 @@ export async function invalidateProjectIntakeQueries(
   await Promise.all(invalidations);
 }
 
-export function useOpportunityActivityMutations(opportunityId: string | null) {
+export function useCrmActivityMutations(
+  entityType: CrmActivityEntityType,
+  entityId: string | null
+) {
   const queryClient = useQueryClient();
   const invalidateActivity = async () => {
-    if (!opportunityId) return;
+    if (!entityId) return;
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: workspaceQueryKeys.opportunityActivity(opportunityId)
+        queryKey: workspaceQueryKeys.crmActivity(entityType, entityId)
       }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
     ]);
@@ -543,26 +549,33 @@ export function useOpportunityActivityMutations(opportunityId: string | null) {
 
   return {
     createComment: useMutation({
-      mutationFn: (input: Parameters<typeof createOpportunityComment>[1]) => {
-        if (!opportunityId) throw new Error("opportunity_id_required");
-        return createOpportunityComment(opportunityId, input);
+      mutationFn: (input: Parameters<typeof createCrmComment>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmComment(entityType, entityId, input);
       },
       onSuccess: invalidateActivity
     }),
     createTask: useMutation({
-      mutationFn: (input: Parameters<typeof createOpportunityTask>[1]) => {
-        if (!opportunityId) throw new Error("opportunity_id_required");
-        return createOpportunityTask(opportunityId, input);
+      mutationFn: (input: Parameters<typeof createCrmTask>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmTask(entityType, entityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    createFile: useMutation({
+      mutationFn: (input: Parameters<typeof createCrmFile>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmFile(entityType, entityId, input);
       },
       onSuccess: invalidateActivity
     }),
     updateTask: useMutation({
       mutationFn: (input: {
         activityId: string;
-        status: Parameters<typeof updateOpportunityTask>[2]["status"];
+        status: Parameters<typeof updateCrmTask>[3]["status"];
       }) => {
-        if (!opportunityId) throw new Error("opportunity_id_required");
-        return updateOpportunityTask(opportunityId, input.activityId, {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return updateCrmTask(entityType, entityId, input.activityId, {
           status: input.status
         });
       },

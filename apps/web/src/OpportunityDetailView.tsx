@@ -27,7 +27,7 @@ import {
   DealRelationshipCards,
   DealStageStrip
 } from "./OpportunityDetailFacts";
-import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
+import { CrmActivityPanel } from "./CrmActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
 import {
@@ -350,10 +350,13 @@ export function OpportunityDetailView(props: {
               />
               {actionError ? <p className="error deal-action-error">{actionError}</p> : null}
             </div>
-            <OpportunityActivityPanel
-              canManageOpportunities={canManageOpportunities}
+            <CrmActivityPanel
+              canManage={canManageOpportunities}
               data={props.data}
-              opportunityId={opportunity.id}
+              entityId={opportunity.id}
+              entityLabel="сделка"
+              entityType="opportunity"
+              managePermission="tenant.opportunities.manage"
               onChanged={props.onChanged}
             />
           </div>

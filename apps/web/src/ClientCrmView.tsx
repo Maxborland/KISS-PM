@@ -2,8 +2,8 @@ import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Client } from "./api";
+import { CrmActivityPanel } from "./CrmActivityPanel";
 import {
-  CrmEntityActivityPlaceholder,
   CrmEntityFact,
   CrmEntityFactList,
   CrmEntitySection,
@@ -161,9 +161,14 @@ export function ClientsView(props: {
         {activeClient ? (
           <CrmEntityWorkspace
             activity={
-              <CrmEntityActivityPlaceholder
+              <CrmActivityPanel
+                canManage={canManageClients}
+                data={props.data}
+                entityId={activeClient.id}
                 entityLabel="клиент"
-                summary={`${activeClientContacts.length} контактов · ${activeClientOpportunities.length} сделок`}
+                entityType="client"
+                managePermission="tenant.clients.manage"
+                onChanged={props.onChanged}
               />
             }
             actions={

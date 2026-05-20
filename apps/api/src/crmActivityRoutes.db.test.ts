@@ -106,6 +106,16 @@ const dataset: SeedTenantDataset = {
       name: "Иван Бета"
     }
   ],
+  products: [
+    {
+      id: "product-alpha",
+      tenantId: "tenant-alpha",
+      name: "Внедрение KISS PM",
+      type: "service",
+      unit: "час",
+      price: 6000
+    }
+  ],
   projectTypes: [
     {
       id: "project-type-alpha",
@@ -176,7 +186,7 @@ const dataset: SeedTenantDataset = {
   ]
 };
 
-describe("opportunity activity API", () => {
+describe("CRM activity API", () => {
   let client: PostgresClient;
   let app: ReturnType<typeof createApp>;
 
@@ -189,7 +199,7 @@ describe("opportunity activity API", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, opportunity_activities, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, crm_activities, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -198,7 +208,7 @@ describe("opportunity activity API", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, opportunity_activities, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, crm_activities, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -207,7 +217,7 @@ describe("opportunity activity API", () => {
     await createAlphaOpportunity(cookie, "opportunity-alpha");
 
     const comment = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/comments",
+      "/api/workspace/crm/opportunity/opportunity-alpha/comments",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -217,7 +227,8 @@ describe("opportunity activity API", () => {
     expect(comment.status).toBe(201);
     await expect(comment.json()).resolves.toMatchObject({
       activity: {
-        opportunityId: "opportunity-alpha",
+        entityType: "opportunity",
+        entityId: "opportunity-alpha",
         type: "comment",
         title: null,
         body: "Команда подтвердила ресурсное окно",
@@ -227,7 +238,7 @@ describe("opportunity activity API", () => {
     });
 
     const task = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/tasks",
+      "/api/workspace/crm/opportunity/opportunity-alpha/tasks",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -243,7 +254,7 @@ describe("opportunity activity API", () => {
     const taskPayload = (await task.json()) as { activity: { id: string } };
 
     const complete = await app.request(
-      `/api/workspace/opportunities/opportunity-alpha/tasks/${taskPayload.activity.id}`,
+      `/api/workspace/crm/opportunity/opportunity-alpha/tasks/${taskPayload.activity.id}`,
       {
         method: "PATCH",
         headers: jsonHeaders(cookie),
@@ -260,7 +271,7 @@ describe("opportunity activity API", () => {
     });
 
     const feed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie } }
     );
     expect(feed.status).toBe(200);
@@ -272,12 +283,12 @@ describe("opportunity activity API", () => {
         expect.objectContaining({ type: "task", title: "Подготовить КП", status: "done" })
       ]),
       systemEvents: expect.arrayContaining([
-        expect.objectContaining({ actionType: "opportunity.comment.created" }),
-        expect.objectContaining({ actionType: "opportunity.task.created" }),
-        expect.objectContaining({ actionType: "opportunity.task.completed" })
+        expect.objectContaining({ actionType: "crm_activity.opportunity.comment.created" }),
+        expect.objectContaining({ actionType: "crm_activity.opportunity.task.created" }),
+        expect.objectContaining({ actionType: "crm_activity.opportunity.task.completed" })
       ]),
       auditEvents: expect.arrayContaining([
-        expect.objectContaining({ actionType: "opportunity.task.completed" })
+        expect.objectContaining({ actionType: "crm_activity.opportunity.task.completed" })
       ])
     });
     expect(feedPayload.systemEvents[0]).not.toHaveProperty("input");
@@ -293,7 +304,7 @@ describe("opportunity activity API", () => {
     await createBetaOpportunity(betaCookie, "opportunity-beta");
 
     const alphaComment = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/comments",
+      "/api/workspace/crm/opportunity/opportunity-alpha/comments",
       {
         method: "POST",
         headers: jsonHeaders(alphaCookie),
@@ -302,7 +313,7 @@ describe("opportunity activity API", () => {
     );
     expect(alphaComment.status).toBe(201);
     const neighborComment = await app.request(
-      "/api/workspace/opportunities/opportunity-neighbor/comments",
+      "/api/workspace/crm/opportunity/opportunity-neighbor/comments",
       {
         method: "POST",
         headers: jsonHeaders(alphaCookie),
@@ -311,7 +322,7 @@ describe("opportunity activity API", () => {
     );
     expect(neighborComment.status).toBe(201);
     const betaComment = await app.request(
-      "/api/workspace/opportunities/opportunity-beta/comments",
+      "/api/workspace/crm/opportunity/opportunity-beta/comments",
       {
         method: "POST",
         headers: jsonHeaders(betaCookie),
@@ -321,27 +332,116 @@ describe("opportunity activity API", () => {
     expect(betaComment.status).toBe(201);
 
     const feed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie: alphaCookie } }
     );
     expect(feed.status).toBe(200);
     const feedPayload = await feed.json();
     expect(feedPayload.activities).toEqual([
-      expect.objectContaining({ opportunityId: "opportunity-alpha", body: "Комментарий альфа" })
+      expect.objectContaining({
+        entityType: "opportunity",
+        entityId: "opportunity-alpha",
+        body: "Комментарий альфа"
+      })
     ]);
     expect(feedPayload.systemEvents).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ actionType: "opportunity.comment.created" })
+        expect.objectContaining({ actionType: "crm_activity.opportunity.comment.created" })
       ])
     );
     expect(JSON.stringify(feedPayload)).not.toContain("Комментарий соседней сделки");
     expect(JSON.stringify(feedPayload)).not.toContain("Комментарий бета");
 
     const crossTenant = await app.request(
-      "/api/workspace/opportunities/opportunity-beta/activity",
+      "/api/workspace/crm/opportunity/opportunity-beta/activity",
       { headers: { cookie: alphaCookie } }
     );
     expect(crossTenant.status).toBe(404);
+  });
+
+  it("persists real activity for client, contact and product detail workspaces", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+
+    const clientComment = await app.request(
+      "/api/workspace/crm/client/client-alpha/comments",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ body: "Клиент подтвердил контактное лицо" })
+      }
+    );
+    expect(clientComment.status).toBe(201);
+
+    const contactTask = await app.request(
+      "/api/workspace/crm/contact/contact-alpha/tasks",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({ title: "Уточнить ожидания ЛПР" })
+      }
+    );
+    expect(contactTask.status).toBe(201);
+
+    const productFile = await app.request(
+      "/api/workspace/crm/product/product-alpha/files",
+      {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({
+          title: "Описание услуги",
+          fileUrl: "https://example.test/service.pdf",
+          fileSizeBytes: 4096,
+          mimeType: "application/pdf"
+        })
+      }
+    );
+    expect(productFile.status).toBe(201);
+
+    const [clientFeed, contactFeed, productFeed] = await Promise.all([
+      app.request("/api/workspace/crm/client/client-alpha/activity", {
+        headers: { cookie }
+      }),
+      app.request("/api/workspace/crm/contact/contact-alpha/activity", {
+        headers: { cookie }
+      }),
+      app.request("/api/workspace/crm/product/product-alpha/activity", {
+        headers: { cookie }
+      })
+    ]);
+    expect(clientFeed.status).toBe(200);
+    expect(contactFeed.status).toBe(200);
+    expect(productFeed.status).toBe(200);
+
+    await expect(clientFeed.json()).resolves.toMatchObject({
+      activities: [
+        expect.objectContaining({
+          entityType: "client",
+          entityId: "client-alpha",
+          type: "comment",
+          body: "Клиент подтвердил контактное лицо"
+        })
+      ]
+    });
+    await expect(contactFeed.json()).resolves.toMatchObject({
+      activities: [
+        expect.objectContaining({
+          entityType: "contact",
+          entityId: "contact-alpha",
+          type: "task",
+          title: "Уточнить ожидания ЛПР"
+        })
+      ]
+    });
+    await expect(productFeed.json()).resolves.toMatchObject({
+      activities: [
+        expect.objectContaining({
+          entityType: "product",
+          entityId: "product-alpha",
+          type: "file",
+          fileUrl: "https://example.test/service.pdf"
+        })
+      ]
+    });
   });
 
   it("hides raw audit without audit permission and denies restricted mutations", async () => {
@@ -351,7 +451,7 @@ describe("opportunity activity API", () => {
     await createAlphaOpportunity(adminCookie, "opportunity-alpha");
 
     const deniedComment = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/comments",
+      "/api/workspace/crm/opportunity/opportunity-alpha/comments",
       {
         method: "POST",
         headers: jsonHeaders(readerCookie),
@@ -361,7 +461,7 @@ describe("opportunity activity API", () => {
     expect(deniedComment.status).toBe(403);
 
     const readerFeed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie: readerCookie } }
     );
     expect(readerFeed.status).toBe(200);
@@ -373,12 +473,12 @@ describe("opportunity activity API", () => {
     expect(
       readerPayload.systemEvents.some(
         (event: { actionType: string }) =>
-          event.actionType === "opportunity.comment.create_denied"
+          event.actionType === "crm_activity.mutation_denied"
       )
     ).toBe(false);
 
     const adminFeed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie: adminCookie } }
     );
     expect(adminFeed.status).toBe(200);
@@ -386,14 +486,14 @@ describe("opportunity activity API", () => {
       canReadRawAudit: true,
       auditEvents: expect.arrayContaining([
         expect.objectContaining({
-          actionType: "opportunity.comment.create_denied",
+          actionType: "crm_activity.mutation_denied",
           executionResult: expect.objectContaining({ status: "denied" })
         })
       ])
     });
 
     const noCrmFeed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie: noCrmCookie } }
     );
     expect(noCrmFeed.status).toBe(403);
@@ -404,7 +504,7 @@ describe("opportunity activity API", () => {
     await createAlphaOpportunity(cookie, "opportunity-alpha");
 
     const task = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/tasks",
+      "/api/workspace/crm/opportunity/opportunity-alpha/tasks",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -416,7 +516,7 @@ describe("opportunity activity API", () => {
 
     const completions = await Promise.all([
       app.request(
-        `/api/workspace/opportunities/opportunity-alpha/tasks/${taskPayload.activity.id}`,
+        `/api/workspace/crm/opportunity/opportunity-alpha/tasks/${taskPayload.activity.id}`,
         {
           method: "PATCH",
           headers: jsonHeaders(cookie),
@@ -424,7 +524,7 @@ describe("opportunity activity API", () => {
         }
       ),
       app.request(
-        `/api/workspace/opportunities/opportunity-alpha/tasks/${taskPayload.activity.id}`,
+        `/api/workspace/crm/opportunity/opportunity-alpha/tasks/${taskPayload.activity.id}`,
         {
           method: "PATCH",
           headers: jsonHeaders(cookie),
@@ -437,7 +537,7 @@ describe("opportunity activity API", () => {
     }
 
     const feed = await app.request(
-      "/api/workspace/opportunities/opportunity-alpha/activity",
+      "/api/workspace/crm/opportunity/opportunity-alpha/activity",
       { headers: { cookie } }
     );
     expect(feed.status).toBe(200);
@@ -445,7 +545,7 @@ describe("opportunity activity API", () => {
     expect(
       feedPayload.auditEvents.filter(
         (event: { actionType: string }) =>
-          event.actionType === "opportunity.task.completed"
+          event.actionType === "crm_activity.opportunity.task.completed"
       )
     ).toHaveLength(1);
   });
@@ -455,7 +555,7 @@ describe("opportunity activity API", () => {
     await createAlphaOpportunity(cookie, "opportunity-final");
 
     const task = await app.request(
-      "/api/workspace/opportunities/opportunity-final/tasks",
+      "/api/workspace/crm/opportunity/opportunity-final/tasks",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -479,7 +579,7 @@ describe("opportunity activity API", () => {
     expect(finalized.status).toBe(200);
 
     const lockedComment = await app.request(
-      "/api/workspace/opportunities/opportunity-final/comments",
+      "/api/workspace/crm/opportunity/opportunity-final/comments",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -487,7 +587,7 @@ describe("opportunity activity API", () => {
       }
     );
     const lockedTask = await app.request(
-      "/api/workspace/opportunities/opportunity-final/tasks",
+      "/api/workspace/crm/opportunity/opportunity-final/tasks",
       {
         method: "POST",
         headers: jsonHeaders(cookie),
@@ -495,7 +595,7 @@ describe("opportunity activity API", () => {
       }
     );
     const lockedTransition = await app.request(
-      `/api/workspace/opportunities/opportunity-final/tasks/${taskPayload.activity.id}`,
+      `/api/workspace/crm/opportunity/opportunity-final/tasks/${taskPayload.activity.id}`,
       {
         method: "PATCH",
         headers: jsonHeaders(cookie),
@@ -506,12 +606,12 @@ describe("opportunity activity API", () => {
     for (const response of [lockedComment, lockedTask, lockedTransition]) {
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toEqual({
-        error: "opportunity_activity_locked"
+        error: "crm_activity_locked"
       });
     }
 
     const feed = await app.request(
-      "/api/workspace/opportunities/opportunity-final/activity",
+      "/api/workspace/crm/opportunity/opportunity-final/activity",
       { headers: { cookie } }
     );
     expect(feed.status).toBe(200);
