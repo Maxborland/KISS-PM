@@ -5,6 +5,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 
 import { OpportunityAuditTab } from "./OpportunityActivityAudit";
+import { OpportunityActivityComposer } from "./OpportunityActivityComposer";
 import { OpportunityFeedView } from "./OpportunityActivityFeed";
 import {
   OpportunityChatView,
@@ -13,6 +14,8 @@ import {
 } from "./OpportunityActivityForms";
 import {
   composeOpportunityFeedItems,
+  getOpportunityActivitySummary,
+  type ActivityComposerMode,
   formatActivityCountLabel,
   type ActivityTab
 } from "./opportunityActivity";
@@ -44,6 +47,7 @@ export function OpportunityActivityPanel(props: {
   onChanged: (message: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ActivityTab>("feed");
+  const [composerMode, setComposerMode] = useState<ActivityComposerMode>("comment");
   const [commentBody, setCommentBody] = useState("");
   const [commentError, setCommentError] = useState("");
   const [taskForm, setTaskForm] = useState<OpportunityTaskFormState>(emptyTaskForm);
@@ -64,6 +68,10 @@ export function OpportunityActivityPanel(props: {
     tasks: tasks.length,
     audit: activityQuery.data?.auditEvents?.length ?? 0
   };
+  const activitySummary = getOpportunityActivitySummary({
+    activities,
+    feedItems
+  });
   const activeUsers = props.data.users.filter((user) => user.status !== "inactive");
   const isSaving =
     mutations.createComment.isPending ||
@@ -120,6 +128,12 @@ export function OpportunityActivityPanel(props: {
     }
   }
 
+  function changeComposerMode(mode: ActivityComposerMode) {
+    setComposerMode(mode);
+    setCommentError("");
+    setTaskError("");
+  }
+
   function selectTab(tabId: ActivityTab) {
     setActiveTab(tabId);
     window.requestAnimationFrame(() => {
@@ -154,6 +168,21 @@ export function OpportunityActivityPanel(props: {
         </div>
         {activityQuery.isFetching ? <Loader2 aria-hidden="true" size={16} /> : null}
       </header>
+
+      <dl className="activity-summary-strip" aria-label="Сводка активности сделки">
+        <div>
+          <dt>Открытые задачи</dt>
+          <dd>{activitySummary.openTaskCount}</dd>
+        </div>
+        <div>
+          <dt>Комментарии</dt>
+          <dd>{activitySummary.commentCount}</dd>
+        </div>
+        <div>
+          <dt>Последнее действие</dt>
+          <dd>{activitySummary.latestActivityAt ? formatActivitySummaryDate(activitySummary.latestActivityAt) : "Нет"}</dd>
+        </div>
+      </dl>
 
       <div className="activity-tabs" role="tablist" aria-label="Разделы активности сделки">
         {tabs.map((tab) => (
@@ -192,7 +221,24 @@ export function OpportunityActivityPanel(props: {
             role="tabpanel"
           >
             {activeTab === "feed" ? (
-              <OpportunityFeedView data={props.data} items={feedItems} />
+              <div className="activity-feed-workspace">
+                <OpportunityActivityComposer
+                  activeUsers={activeUsers}
+                  canManageOpportunities={props.canManageOpportunities}
+                  commentBody={commentBody}
+                  commentError={commentError}
+                  isSaving={isSaving}
+                  mode={composerMode}
+                  taskError={taskError}
+                  taskForm={taskForm}
+                  onCommentBodyChange={setCommentBody}
+                  onModeChange={changeComposerMode}
+                  onSubmitComment={submitComment}
+                  onSubmitTask={submitTask}
+                  onTaskFormChange={setTaskForm}
+                />
+                <OpportunityFeedView data={props.data} items={feedItems} />
+              </div>
             ) : null}
             {activeTab === "chat" ? (
               <OpportunityChatView
@@ -240,4 +286,15 @@ function getTabId(tabId: ActivityTab): string {
 
 function getPanelId(tabId: ActivityTab): string {
   return `opportunity-activity-panel-${tabId}`;
+}
+
+function formatActivitySummaryDate(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC"
+  }).format(new Date(value));
 }

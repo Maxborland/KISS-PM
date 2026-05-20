@@ -56,30 +56,40 @@ test("deal detail shows persisted chat, tasks and audit in one workspace", async
     "aria-selected",
     "true"
   );
+  await expect(activityPanel.getByText("Открытые задачи")).toBeVisible();
+  await expect(activityPanel.getByRole("form", { name: "Быстрое действие по сделке" })).toBeVisible();
 
   await page.getByRole("button", { name: "Проверить ресурсы" }).click();
   await expect(
     activityPanel.getByText("Ресурсная проверка сделки выполнена")
   ).toBeVisible();
 
+  await activityPanel.getByLabel("Текст комментария").fill(comment);
+  await activityPanel.getByRole("button", { name: "Добавить комментарий" }).click();
+  await expect(activityPanel.getByText(comment)).toBeVisible();
+  await expect(activityPanel.getByText("Сегодня")).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Чат 1 элемент/ })).toBeVisible();
+
+  await activityPanel.getByRole("button", { name: "Задача" }).click();
+  await activityPanel.getByLabel("Название задачи").fill(taskTitle);
+  await activityPanel.getByLabel("Описание задачи").fill("Подготовить следующий контакт");
+  await activityPanel.getByLabel("Срок задачи").fill("2031-03-10");
+  await activityPanel
+    .getByLabel("Ответственный за задачу")
+    .selectOption({ label: "Анна Администратор" });
+  await activityPanel.getByRole("button", { name: "Создать follow-up задачу" }).click();
+  await expect(activityPanel.getByText(taskTitle)).toBeVisible();
+  await expect(activityPanel.getByRole("tab", { name: /Задачи 1 элемент/ })).toBeVisible();
+
   await activityPanel.getByRole("tab", { name: /Чат/ }).click();
   await expect(activityPanel.getByRole("tab", { name: /Чат/ })).toHaveAttribute(
     "aria-selected",
     "true"
   );
-  await activityPanel.getByLabel("Сообщение").fill(comment);
-  await activityPanel.getByRole("button", { name: "Отправить" }).click();
   await expect(activityPanel.getByText(comment)).toBeVisible();
   await expect(activityPanel.getByRole("tab", { name: /Чат 1 элемент/ })).toBeVisible();
 
   await activityPanel.getByRole("tab", { name: /Задачи/ }).click();
-  await activityPanel.getByLabel("Новая задача").fill(taskTitle);
-  await activityPanel.getByLabel("Описание").fill("Подготовить следующий контакт");
-  await activityPanel.getByLabel("Срок").fill("2031-03-10");
-  await activityPanel
-    .getByLabel("Ответственный")
-    .selectOption({ label: "Анна Администратор" });
-  await activityPanel.getByRole("button", { name: "Создать задачу" }).click();
   const taskRow = activityPanel.locator(".activity-row").filter({ hasText: taskTitle });
   await expect(taskRow).toBeVisible();
   await expect(activityPanel.getByRole("tab", { name: /Задачи 1 элемент/ })).toBeVisible();
@@ -231,6 +241,9 @@ test("deal activity panel is read-only for users without manage and audit permis
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   const activityPanel = page.getByLabel("Рабочая лента сделки");
   await expect(activityPanel.getByText(comment)).toBeVisible();
+  await expect(
+    activityPanel.getByText("Только чтение: нужно право tenant.opportunities.manage.")
+  ).toBeVisible();
 
   await activityPanel.getByRole("tab", { name: /Чат/ }).click();
   await expect(activityPanel.getByLabel("Сообщение")).toBeDisabled();

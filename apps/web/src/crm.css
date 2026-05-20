@@ -319,7 +319,7 @@
   min-width: 0;
   max-height: calc(100dvh - 96px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--border);
@@ -346,6 +346,38 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.activity-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.activity-summary-strip div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-subtle);
+}
+
+.activity-summary-strip dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.activity-summary-strip dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .activity-tabs {
@@ -408,6 +440,84 @@
   overflow: hidden;
 }
 
+.activity-feed-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  overflow: hidden;
+}
+
+.activity-composer {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel-subtle);
+}
+
+.activity-composer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.activity-composer-header div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.activity-composer-header strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.activity-composer-header span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.activity-composer-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.activity-composer-mode button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.activity-composer-mode button[aria-pressed="true"] {
+  background: var(--control-bg);
+  color: var(--text);
+}
+
+.activity-composer-form {
+  display: grid;
+  gap: 9px;
+}
+
+.activity-composer-form .primary-button {
+  justify-self: start;
+}
+
 .activity-tab-body,
 .activity-list {
   min-height: 0;
@@ -435,6 +545,29 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
+}
+
+.activity-day-group {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-day-group h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 3px 0;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.activity-day-items {
+  display: grid;
+  gap: 8px;
 }
 
 .activity-row.system-row {
@@ -494,11 +627,20 @@
     position: static;
     max-height: none;
   }
+
+  .activity-summary-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
   .activity-tabs,
+  .activity-summary-strip,
   .activity-form-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .activity-composer-header {
+    display: grid;
   }
 }
