@@ -1126,6 +1126,165 @@
   font-weight: 750;
 }
 
+.form-field-shell,
+.date-picker-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.date-picker-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 6px;
+  align-items: center;
+}
+
+.date-picker-control input {
+  width: 100%;
+}
+
+.date-picker-trigger {
+  width: 38px;
+  min-height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.date-picker-trigger:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.date-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.date-picker-popover {
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.date-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.kiss-calendar {
+  --rdp-accent-color: #2563eb;
+  --rdp-day_button-width: 32px;
+  --rdp-day_button-height: 32px;
+  position: relative;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.kiss-calendar .rdp-months {
+  display: grid;
+}
+
+.kiss-calendar .rdp-month {
+  display: grid;
+  gap: 8px;
+}
+
+.kiss-calendar .rdp-month_caption {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.kiss-calendar .rdp-nav {
+  position: absolute;
+  right: 12px;
+  left: 12px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.kiss-calendar .rdp-button_previous,
+.kiss-calendar .rdp-button_next {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted-strong);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.kiss-calendar .rdp-weekdays,
+.kiss-calendar .rdp-week {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+}
+
+.kiss-calendar .rdp-weekday {
+  display: grid;
+  place-items: center;
+  height: 28px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.kiss-calendar .rdp-day {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.kiss-calendar .rdp-day_button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.kiss-calendar .rdp-day_button:hover {
+  background: var(--accent-soft);
+}
+
+.kiss-calendar .rdp-outside .rdp-day_button {
+  color: var(--muted);
+  opacity: 0.58;
+}
+
+.kiss-calendar .rdp-today .rdp-day_button {
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.kiss-calendar .rdp-selected .rdp-day_button {
+  background: #2563eb;
+  color: #ffffff;
+}
+
 .deal-relationship-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

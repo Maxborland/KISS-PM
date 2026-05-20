@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { TaskInput } from "./api";
+import { DatePickerField } from "./components/DatePickerField";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDateOnly } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
@@ -212,11 +213,15 @@ function CreateTaskModal(props: {
   onSubmit: (input: TaskInput) => Promise<void>;
 }) {
   const [errors, setErrors] = useState<TaskFormErrors>({});
+  const [plannedStart, setPlannedStart] = useState("");
+  const [plannedFinish, setPlannedFinish] = useState("");
   const [submitError, setSubmitError] = useState("");
   const formId = "project-task-create";
 
   useEffect(() => {
     setErrors({});
+    setPlannedStart("");
+    setPlannedFinish("");
     setSubmitError("");
   }, [props.projectId]);
 
@@ -228,8 +233,8 @@ function CreateTaskModal(props: {
       title: String(form.get("title") ?? "").trim(),
       description: String(form.get("description") ?? "").trim(),
       priority: String(form.get("priority") ?? "normal") as TaskInput["priority"],
-      plannedStart: String(form.get("plannedStart") ?? ""),
-      plannedFinish: String(form.get("plannedFinish") ?? ""),
+      plannedStart,
+      plannedFinish,
       plannedWork: Number(form.get("plannedWork") ?? 0),
       participants: [
         {
@@ -305,26 +310,30 @@ function CreateTaskModal(props: {
           </label>
         </div>
         <div className="form-grid">
-          <label>
-            Старт
-            <input
-              aria-describedby={errors.plannedStart ? `${formId}-plannedStart-error` : undefined}
-              aria-invalid={Boolean(errors.plannedStart)}
-              name="plannedStart"
-              type="date"
+          <span className="form-field-shell">
+            <DatePickerField
+              describedBy={errors.plannedStart ? `${formId}-plannedStart-error` : undefined}
+              disabled={props.isPending}
+              id={`${formId}-plannedStart`}
+              invalid={Boolean(errors.plannedStart)}
+              label="Старт"
+              value={plannedStart}
+              onChange={setPlannedStart}
             />
             <FieldError errors={errors} field="plannedStart" formId={formId} />
-          </label>
-          <label>
-            Финиш
-            <input
-              aria-describedby={errors.plannedFinish ? `${formId}-plannedFinish-error` : undefined}
-              aria-invalid={Boolean(errors.plannedFinish)}
-              name="plannedFinish"
-              type="date"
+          </span>
+          <span className="form-field-shell">
+            <DatePickerField
+              describedBy={errors.plannedFinish ? `${formId}-plannedFinish-error` : undefined}
+              disabled={props.isPending}
+              id={`${formId}-plannedFinish`}
+              invalid={Boolean(errors.plannedFinish)}
+              label="Финиш"
+              value={plannedFinish}
+              onChange={setPlannedFinish}
             />
             <FieldError errors={errors} field="plannedFinish" formId={formId} />
-          </label>
+          </span>
         </div>
         <label>
           Плановые часы

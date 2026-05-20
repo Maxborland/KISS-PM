@@ -22,7 +22,11 @@ import type {
   OpportunityFinalStatus,
   OpportunityUpdateInput
 } from "./api";
-import { DealOverviewCard, DealRelationshipCards } from "./OpportunityDetailFacts";
+import {
+  DealOverviewCard,
+  DealRelationshipCards,
+  InlineEditableValue
+} from "./OpportunityDetailFacts";
 import { OpportunityActivityPanel } from "./OpportunityActivityPanel";
 import { DealFinalActionModal } from "./DealFinalActionModal";
 import { DealFormModal, type DealFormSubmitInput } from "./DealFormModal";
@@ -307,6 +311,7 @@ export function OpportunityDetailView(props: {
                 onBack={props.onBack}
                 onEdit={() => setIsEditOpen(true)}
                 onFinalize={setFinalAction}
+                onSaveOpportunity={saveOpportunityInline}
               />
               <DealMetricGrid opportunity={opportunity} />
               <DealOverviewCard
@@ -388,6 +393,7 @@ function DealPageHeader(props: {
   onBack: () => void;
   onEdit: () => void;
   onFinalize: (action: OpportunityFinalStatus) => void;
+  onSaveOpportunity: (patch: Partial<OpportunityUpdateInput>) => Promise<void>;
 }) {
   const createProjectDisabledReason = getCreateProjectDisabledReason({
     canActivateProjects: props.canActivateProjects,
@@ -406,7 +412,18 @@ function DealPageHeader(props: {
           <span>{props.opportunity.title}</span>
         </nav>
         <div className="deal-page-title-row">
-          <h1>{props.opportunity.title}</h1>
+          <h1 aria-label={props.opportunity.title}>
+            <InlineEditableValue
+              disabled={
+                props.isPending ||
+                !props.canManageOpportunities ||
+                isFinalOpportunity(props.opportunity)
+              }
+              label="Название сделки"
+              value={props.opportunity.title}
+              onSave={(value) => props.onSaveOpportunity({ title: value.trim() })}
+            />
+          </h1>
           <StatusPill
             label={getOpportunityStatusLabel(props.opportunity.status)}
             tone={props.opportunity.status === "won_closed" ? "success" : "muted"}
