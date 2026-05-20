@@ -1,9 +1,16 @@
 import { BriefcaseBusiness, Clock3 } from "lucide-react";
+import { useState } from "react";
 
-import type { Task } from "./api";
+import type { Task, TaskStatus } from "./api";
+import {
+  canUserTransitionTask,
+  formatTaskStatus,
+  getNextTaskAction
+} from "./taskStatusView";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDateOnly } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
+import { useProjectWorkMutations } from "./workspaceQueries";
 import {
   Panel,
   SectionFeedback,
@@ -15,13 +22,35 @@ import {
 export function MyWorkView(props: {
   data: WorkspaceData;
   sectionState: SectionState;
+  onChanged: (message: string) => void;
   onOpenProject: (projectId: string) => void;
 }) {
+  const projectWorkMutations = useProjectWorkMutations();
+  const [transitionError, setTransitionError] = useState("");
   const activeTasks = props.data.myWorkTasks.filter((task) => task.status !== "done");
   const plannedWork = props.data.myWorkTasks.reduce(
     (sum, task) => sum + task.plannedWork,
     0
   );
+  const pendingTaskId = projectWorkMutations.updateTaskStatus.variables
+    ? String(projectWorkMutations.updateTaskStatus.variables.taskId)
+    : null;
+
+  async function transitionTask(task: Task, status: TaskStatus) {
+    setTransitionError("");
+    try {
+      await projectWorkMutations.updateTaskStatus.mutateAsync({
+        projectId: task.projectId,
+        taskId: task.id,
+        input: { status }
+      });
+      props.onChanged("Статус задачи обновлен и записан в аудит.");
+    } catch (error) {
+      setTransitionError(
+        error instanceof Error ? error.message : "Не удалось обновить статус задачи."
+      );
+    }
+  }
 
   return (
     <Panel
@@ -34,6 +63,7 @@ export function MyWorkView(props: {
         <SummaryCard label="Плановые часы" value={plannedWork} tone="muted" />
       </div>
       <SectionFeedback state={props.sectionState} emptyLabel="Моя работа недоступна." />
+      {transitionError ? <p className="error">{transitionError}</p> : null}
       {props.sectionState.canRead && !props.sectionState.error ? (
         <div className="table-wrap">
           <table className="data-table" aria-label="Моя работа">
@@ -91,13 +121,35 @@ export function MyWorkView(props: {
                       />
                     </td>
                     <td>
-                      <button
-                        className="secondary-button compact"
-                        type="button"
-                        onClick={() => props.onOpenProject(task.projectId)}
-                      >
-                        Открыть проект
-                      </button>
+                      <span className="table-actions">
+                        {canUserTransitionTask(task, props.data.me.id) &&
+                        getNextTaskAction(task.status) ? (
+                          <button
+                            className="primary-button compact"
+                            disabled={
+                              projectWorkMutations.updateTaskStatus.isPending &&
+                              pendingTaskId === task.id
+                            }
+                            type="button"
+                            onClick={() => {
+                              const action = getNextTaskAction(task.status);
+                              if (action) void transitionTask(task, action.status);
+                            }}
+                          >
+                            {projectWorkMutations.updateTaskStatus.isPending &&
+                            pendingTaskId === task.id
+                              ? "Сохраняем..."
+                              : getNextTaskAction(task.status)?.label}
+                          </button>
+                        ) : null}
+                        <button
+                          className="secondary-button compact"
+                          type="button"
+                          onClick={() => props.onOpenProject(task.projectId)}
+                        >
+                          Открыть проект
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -118,16 +170,6 @@ function formatTaskParticipantRoles(task: Task): string {
   return task.participants
     .map((participant) => formatParticipantRole(participant.role))
     .join(", ");
-}
-
-export function formatTaskStatus(status: Task["status"]): string {
-  const labels: Record<Task["status"], string> = {
-    todo: "К выполнению",
-    in_progress: "В работе",
-    blocked: "Блокер",
-    done: "Готово"
-  };
-  return labels[status];
 }
 
 function formatParticipantRole(role: Task["participants"][number]["role"]): string {

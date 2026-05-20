@@ -7,7 +7,8 @@ import type {
   CrmActivityTransitionResult,
   CrmActivityUpdateInput,
   TaskInput,
-  TaskRecord
+  TaskRecord,
+  TaskStatusUpdateInput
 } from "@kiss-pm/persistence";
 
 export type AccessProfileRecord = AccessProfile & {
@@ -392,6 +393,7 @@ export type ApiTenantDataSource = {
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   createTask?(input: TaskInput): Promise<TaskRecord>;
+  updateTaskStatus?(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;

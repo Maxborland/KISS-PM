@@ -54,6 +54,7 @@ import {
   updateOpportunityStage,
   updatePosition,
   updateProduct,
+  updateProjectTaskStatus,
   updateProjectType,
   updateProfile,
   updateProjectTemplate,
@@ -586,24 +587,33 @@ export function useCrmActivityMutations(
 
 export function useProjectWorkMutations() {
   const queryClient = useQueryClient();
+  const invalidateProjectWork = async (projectId: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.projectDetail(projectId)
+      }),
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.projectTasks(projectId)
+      }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
 
   return {
     createTask: useMutation({
       mutationFn: ({ projectId, input }: Parameters<typeof createProjectTask> extends [infer ProjectId, infer Input] ? { projectId: ProjectId; input: Input } : never) =>
         createProjectTask(projectId, input),
       onSuccess: async (_result, variables) => {
-        const projectId = String(variables.projectId);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.projectDetail(projectId)
-          }),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.projectTasks(projectId)
-          }),
-          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
-          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
-        ]);
+        await invalidateProjectWork(String(variables.projectId));
+      }
+    }),
+    updateTaskStatus: useMutation({
+      mutationFn: ({ projectId, taskId, input }: Parameters<typeof updateProjectTaskStatus> extends [infer ProjectId, infer TaskId, infer Input] ? { projectId: ProjectId; taskId: TaskId; input: Input } : never) =>
+        updateProjectTaskStatus(projectId, taskId, input),
+      onSuccess: async (_result, variables) => {
+        await invalidateProjectWork(String(variables.projectId));
       }
     })
   };

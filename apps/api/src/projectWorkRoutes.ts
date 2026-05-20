@@ -4,6 +4,7 @@ import {
   type AccessProfile
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
+import type { TaskRecord, TaskStatus } from "@kiss-pm/persistence";
 import type { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
@@ -13,7 +14,10 @@ import type {
   ProjectRecord
 } from "./apiTypes";
 import { readLimitedJsonBody } from "./jsonBody";
-import { parseCreateTaskBody } from "./projectWorkParsers";
+import {
+  parseCreateTaskBody,
+  parseUpdateTaskStatusBody
+} from "./projectWorkParsers";
 
 type ProjectWorkRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -210,6 +214,158 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
 
     return context.json({ task }, 201);
   });
+
+  app.patch(
+    "/api/workspace/projects/:projectId/tasks/:taskId/status",
+    async (context) => {
+      const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+      if (
+        !dataSource.listProjects ||
+        !dataSource.listProjectTasks ||
+        !dataSource.updateTaskStatus ||
+        !dataSource.withTransaction
+      ) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+
+      const profile = await getActorProfile(actor);
+      const readDecision = canReadProjects({
+        actor,
+        profile,
+        targetTenantId: actor.tenantId
+      });
+      if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+
+      const initialProject = await findActiveProject(
+        dataSource,
+        actor.tenantId,
+        context.req.param("projectId")
+      );
+      if (!initialProject) return context.json({ error: "project_not_found" }, 404);
+
+      const body = await readLimitedJsonBody(context);
+      if (!body.ok) return context.json({ error: body.error }, body.status);
+      const parsed = parseUpdateTaskStatusBody(body.value);
+      if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+      const transition = await deps.runDataSourceTransaction(
+        async (transactionDataSource) => {
+          if (
+            !transactionDataSource.listProjects ||
+            !transactionDataSource.listProjectTasks ||
+            !transactionDataSource.updateTaskStatus
+          ) {
+            throw new Error("persistence_not_configured");
+          }
+
+          const project = await findActiveProject(
+            transactionDataSource,
+            actor.tenantId,
+            initialProject.id
+          );
+          if (!project) return { ok: false as const, status: 404, error: "project_not_found" };
+
+          const tasks = await transactionDataSource.listProjectTasks(
+            actor.tenantId,
+            project.id
+          );
+          const task = tasks.find(
+            (candidate) => candidate.id === context.req.param("taskId")
+          );
+          if (!task) return { ok: false as const, status: 404, error: "task_not_found" };
+
+          const manageDecision = canManageProjects({
+            actor,
+            profile,
+            targetTenantId: actor.tenantId
+          });
+          if (!manageDecision.allowed && !canParticipantTransitionTask(actor.id, task)) {
+            return {
+              ok: false as const,
+              status: 403,
+              error: "task_participant_role_required"
+            };
+          }
+
+          if (!isTaskStatusTransitionAllowed(task.status, parsed.value.status)) {
+            return {
+              ok: false as const,
+              status: 409,
+              error: "task_status_transition_not_allowed"
+            };
+          }
+
+          const nextProgress = deriveTaskProgress(parsed.value.status, task.progress);
+          const updated = await transactionDataSource.updateTaskStatus({
+            tenantId: actor.tenantId,
+            projectId: project.id,
+            taskId: task.id,
+            expectedStatus: task.status,
+            status: parsed.value.status,
+            progress: nextProgress
+          });
+          if (!updated) {
+            return {
+              ok: false as const,
+              status: 409,
+              error: "task_status_transition_conflict"
+            };
+          }
+
+          await deps.appendManagementAuditEvent(
+            {
+              tenantId: actor.tenantId,
+              actorUserId: actor.id,
+              actionType: "task.status_changed",
+              sourceWorkflow: "project_work",
+              sourceEntity: { type: "Task", id: updated.id },
+              commandInput: {
+                projectId: project.id,
+                title: task.title,
+                status: parsed.value.status
+              },
+              beforeState: {
+                id: task.id,
+                projectId: task.projectId,
+                status: task.status,
+                progress: task.progress
+              },
+              afterState: {
+                id: updated.id,
+                projectId: updated.projectId,
+                status: updated.status,
+                progress: updated.progress
+              },
+              permissionResult: {
+                allowed: true,
+                reason: manageDecision.allowed ? manageDecision.reason : "task_participant",
+                authorizationBasis: manageDecision.allowed
+                  ? "permission"
+                  : "task_participant_role",
+                permission: manageDecision.allowed ? "tenant.projects.manage" : null,
+                participantRole: getActorTaskParticipantRole(actor.id, task)
+              }
+            },
+            transactionDataSource
+          );
+
+          return { ok: true as const, task: updated };
+        }
+      );
+
+      if (!transition.ok) {
+        if (transition.status === 403) {
+          return context.json({ error: transition.error }, 403);
+        }
+        if (transition.status === 404) {
+          return context.json({ error: transition.error }, 404);
+        }
+        return context.json({ error: transition.error }, 409);
+      }
+      return context.json({ task: transition.task });
+    }
+  );
 }
 
 async function findActiveProject(
@@ -219,4 +375,41 @@ async function findActiveProject(
 ): Promise<ProjectRecord | undefined> {
   const projects = await dataSource.listProjects?.(tenantId);
   return projects?.find((project) => project.id === projectId && project.status === "active");
+}
+
+function canParticipantTransitionTask(
+  actorUserId: string,
+  task: TaskRecord
+): boolean {
+  const transitionRoles = new Set(["executor", "co_executor", "controller"]);
+  const participantRole = getActorTaskParticipantRole(actorUserId, task);
+  return participantRole ? transitionRoles.has(participantRole) : false;
+}
+
+function getActorTaskParticipantRole(
+  actorUserId: string,
+  task: TaskRecord
+): string | undefined {
+  return task.participants.find((participant) => participant.userId === actorUserId)
+    ?.role;
+}
+
+function isTaskStatusTransitionAllowed(from: TaskStatus, to: TaskStatus): boolean {
+  const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
+    todo: ["in_progress", "blocked"],
+    in_progress: ["blocked", "done"],
+    blocked: ["in_progress", "done"],
+    done: []
+  };
+  return allowedTransitions[from].includes(to);
+}
+
+function deriveTaskProgress(
+  status: TaskStatus,
+  currentProgress: number
+): number {
+  if (status === "done") return 100;
+  if (status === "todo") return 0;
+  if (status === "in_progress") return Math.max(currentProgress, 10);
+  return currentProgress;
 }

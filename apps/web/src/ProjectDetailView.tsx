@@ -1,7 +1,7 @@
 import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { TaskInput } from "./api";
+import type { Task, TaskInput, TaskStatus } from "./api";
 import { DatePickerField } from "./components/DatePickerField";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDateOnly } from "./workspaceViewHelpers";
@@ -16,7 +16,11 @@ import {
   SummaryCard,
   TableEmpty
 } from "./components/workspace-ui";
-import { formatTaskStatus } from "./MyWorkView";
+import {
+  canUserTransitionTask,
+  formatTaskStatus,
+  getNextTaskAction
+} from "./taskStatusView";
 import {
   useProjectDetailQuery,
   useProjectWorkMutations
@@ -38,6 +42,7 @@ export function ProjectDetailView(props: {
   );
   const projectWorkMutations = useProjectWorkMutations();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [transitionError, setTransitionError] = useState("");
   const project = projectDetailQuery.data?.project ??
     props.data.projects.find((candidate) => candidate.id === props.projectId);
   const tasks = projectDetailQuery.data?.tasks ?? [];
@@ -49,6 +54,25 @@ export function ProjectDetailView(props: {
     [props.data.me, props.data.users]
   );
   const plannedTaskWork = tasks.reduce((sum, task) => sum + task.plannedWork, 0);
+  const pendingTaskId = projectWorkMutations.updateTaskStatus.variables
+    ? String(projectWorkMutations.updateTaskStatus.variables.taskId)
+    : null;
+
+  async function transitionTask(task: Task, status: TaskStatus) {
+    setTransitionError("");
+    try {
+      await projectWorkMutations.updateTaskStatus.mutateAsync({
+        projectId: task.projectId,
+        taskId: task.id,
+        input: { status }
+      });
+      props.onChanged("Статус задачи обновлен и записан в аудит.");
+    } catch (error) {
+      setTransitionError(
+        error instanceof Error ? error.message : "Не удалось обновить статус задачи."
+      );
+    }
+  }
 
   if (!props.sectionState.canRead) {
     return (
@@ -126,6 +150,7 @@ export function ProjectDetailView(props: {
             </section>
           </div>
           <div className="table-wrap">
+            {transitionError ? <p className="error">{transitionError}</p> : null}
             <table className="data-table" aria-label="Задачи проекта">
               <thead>
                 <tr>
@@ -134,11 +159,12 @@ export function ProjectDetailView(props: {
                   <th>План</th>
                   <th>Участники</th>
                   <th>Статус</th>
+                  <th>Действие</th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.length === 0 ? (
-                  <TableEmpty colSpan={5} label="В проекте пока нет задач." />
+                  <TableEmpty colSpan={6} label="В проекте пока нет задач." />
                 ) : (
                   tasks.map((task) => (
                     <tr key={task.id}>
@@ -174,6 +200,46 @@ export function ProjectDetailView(props: {
                           label={formatTaskStatus(task.status)}
                           tone={task.status === "done" ? "muted" : "success"}
                         />
+                      </td>
+                      <td>
+                        <span className="table-actions">
+                          {getNextTaskAction(task.status) ? (
+                            <button
+                              className="primary-button compact"
+                              disabled={
+                                (!canManageProjects &&
+                                  !canUserTransitionTask(task, props.data.me.id)) ||
+                                (projectWorkMutations.updateTaskStatus.isPending &&
+                                  pendingTaskId === task.id)
+                              }
+                              title={
+                                canManageProjects ||
+                                canUserTransitionTask(task, props.data.me.id)
+                                  ? undefined
+                                  : "Нужно право tenant.projects.manage или роль executor/co_executor/controller в задаче"
+                              }
+                              type="button"
+                              onClick={() => {
+                                const action = getNextTaskAction(task.status);
+                                if (action) void transitionTask(task, action.status);
+                              }}
+                            >
+                              {projectWorkMutations.updateTaskStatus.isPending &&
+                              pendingTaskId === task.id
+                                ? "Сохраняем..."
+                                : getNextTaskAction(task.status)?.label}
+                            </button>
+                          ) : (
+                            <button
+                              className="secondary-button compact"
+                              disabled
+                              title="Задача уже завершена."
+                              type="button"
+                            >
+                              Готово
+                            </button>
+                          )}
+                        </span>
                       </td>
                     </tr>
                   ))

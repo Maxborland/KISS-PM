@@ -28,6 +28,16 @@ export type CreateTaskParseResult =
   | { ok: true; value: CreateTaskBody }
   | { ok: false; error: string };
 
+export type UpdateTaskStatusBody = {
+  status: (typeof taskStatuses)[number];
+};
+
+export type UpdateTaskStatusParseResult =
+  | { ok: true; value: UpdateTaskStatusBody }
+  | { ok: false; error: string };
+
+const taskStatuses = ["todo", "in_progress", "blocked", "done"] as const;
+
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const id = getOptionalString(input, "id") ?? undefined;
   const title = getStringField(input, "title") ?? "";
@@ -70,6 +80,17 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
       participants: participants.value
     }
   };
+}
+
+export function parseUpdateTaskStatusBody(
+  input: unknown
+): UpdateTaskStatusParseResult {
+  const status = getStringField(input, "status") ?? "";
+  if (!isTaskStatus(status)) {
+    return { ok: false, error: "invalid_task_status" };
+  }
+
+  return { ok: true, value: { status } };
 }
 
 function parseParticipants(
@@ -145,6 +166,10 @@ function getIntegerField(input: unknown, key: string): number | null {
 
 function isTaskPriority(value: string): value is CreateTaskBody["priority"] {
   return taskPriorities.includes(value as CreateTaskBody["priority"]);
+}
+
+function isTaskStatus(value: string): value is UpdateTaskStatusBody["status"] {
+  return taskStatuses.includes(value as UpdateTaskStatusBody["status"]);
 }
 
 function isTaskParticipantRole(

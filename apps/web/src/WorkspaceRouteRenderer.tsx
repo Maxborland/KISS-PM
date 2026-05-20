@@ -106,6 +106,7 @@ export function WorkspaceRouteRenderer(props: {
       <MyWorkView
         data={props.data}
         sectionState={props.sectionStates.myWork}
+        onChanged={props.onChanged}
         onOpenProject={props.onOpenProject}
       />
     );

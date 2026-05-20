@@ -636,7 +636,11 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await page.getByRole("button", { name: "Моя работа" }).click();
   await expect(page).toHaveURL(/\/my-work$/);
   await expect(page.getByRole("heading", { name: "Моя работа" }).first()).toBeVisible();
-  await expect(page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) })).toBeVisible();
+  const myWorkTaskRow = page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) });
+  await expect(myWorkTaskRow).toBeVisible();
+  await myWorkTaskRow.getByRole("button", { name: "Начать" }).click();
+  await expect(page.getByText("Статус задачи обновлен и записан в аудит.")).toBeVisible();
+  await expect(myWorkTaskRow.getByText("В работе")).toBeVisible();
 
   await page
     .getByRole("complementary")
@@ -661,6 +665,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByText("Ресурсная проверка сделки выполнена").first()).toBeVisible();
   await expect(page.getByText("Проект активирован").first()).toBeVisible();
   await expect(page.getByText("Задача создана").first()).toBeVisible();
+  await expect(page.getByText("Статус задачи изменен").first()).toBeVisible();
   await expect(page.getByText(new RegExp(`Название: Приоритет ${suffix} -> Приоритет проекта ${suffix}`))).toBeVisible();
   await expect(page.getByText(new RegExp(`Название: Внедрение ${suffix} -> Внедрение проекта ${suffix}`))).toBeVisible();
   await expectAuditEventForCurrentRun(page, {
@@ -706,6 +711,10 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   });
   await expectAuditEventForCurrentRun(page, {
     actionType: "task.created",
+    suffix
+  });
+  await expectAuditEventForCurrentRun(page, {
+    actionType: "task.status_changed",
     suffix
   });
 
