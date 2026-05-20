@@ -1,9 +1,9 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, notInArray } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
-import { crmActivities } from "./schema";
+import { crmActivities, opportunities } from "./schema";
 
 export type CrmActivityEntityType = "opportunity" | "client" | "contact" | "product";
 export type CrmActivityType = "comment" | "task" | "file";
@@ -43,6 +43,9 @@ export type CrmActivityUpdateInput = {
 
 export type CrmActivityTransitionResult =
   | {
+      locked: true;
+    }
+  | {
       found: false;
     }
   | {
@@ -65,7 +68,7 @@ export type CrmActivityRepository = {
   ): Promise<CrmActivityRecord[]>;
   createCrmActivity(
     input: CrmActivityInput
-  ): Promise<CrmActivityRecord>;
+  ): Promise<CrmActivityRecord | undefined>;
   updateCrmActivity(
     input: CrmActivityUpdateInput
   ): Promise<CrmActivityRecord | undefined>;
@@ -97,6 +100,8 @@ export function createCrmActivityRepository(
       return rows.map(mapCrmActivityRecord);
     },
     async createCrmActivity(input) {
+      if (!(await isCrmActivityEntityWritable(db, input))) return undefined;
+
       const now = new Date();
       const [row] = await db
         .insert(crmActivities)
@@ -124,6 +129,8 @@ export function createCrmActivityRepository(
       return mapCrmActivityRecord(row);
     },
     async updateCrmActivity(input) {
+      if (!(await isCrmActivityEntityWritable(db, input))) return undefined;
+
       const [row] = await db
         .update(crmActivities)
         .set({
@@ -167,6 +174,10 @@ export function createCrmActivityRepository(
           changed: false,
           activity: beforeState
         };
+      }
+
+      if (!(await isCrmActivityEntityWritable(db, input))) {
+        return { locked: true };
       }
 
       const [updatedRow] = await db
@@ -218,6 +229,34 @@ export function createCrmActivityRepository(
       };
     }
   };
+}
+
+const finalOpportunityStatuses = ["won_closed", "lost_rejected"];
+
+async function isCrmActivityEntityWritable(
+  db: KissPmDatabase,
+  input: {
+    tenantId: TenantId;
+    entityType: CrmActivityEntityType;
+    entityId: string;
+  }
+): Promise<boolean> {
+  if (input.entityType !== "opportunity") return true;
+
+  const [row] = await db
+    .select({ id: opportunities.id })
+    .from(opportunities)
+    .where(
+      and(
+        eq(opportunities.tenantId, input.tenantId),
+        eq(opportunities.id, input.entityId),
+        notInArray(opportunities.status, finalOpportunityStatuses)
+      )
+    )
+    .for("update")
+    .limit(1);
+
+  return Boolean(row);
 }
 
 function mapCrmActivityRecord(

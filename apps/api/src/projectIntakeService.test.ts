@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { createProjectIntakeService } from "./projectIntakeService";
+import { isSingleUseActivationError } from "./projectIntakeService/activationErrors";
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
@@ -41,6 +42,12 @@ const opportunityInput: OpportunityInput = {
 };
 
 describe("project intake application service", () => {
+  it("treats finalized source opportunity draft race as activation conflict", () => {
+    expect(
+      isSingleUseActivationError(new Error("source_opportunity_not_draftable"))
+    ).toBe(true);
+  });
+
   it("creates opportunities with linked snapshot labels and management audit inside a transaction", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let createdInput: OpportunityInput | null = null;
@@ -345,6 +352,256 @@ describe("project intake application service", () => {
         allowed: true
       }
     });
+  });
+
+  it("returns conflict instead of throwing when opportunity update loses a finalization race", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    const existingOpportunity = {
+      ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
+      customFieldValues: {},
+      feasibilityStatus: null,
+      feasibilityResult: null,
+      feasibilityCheckedAt: null,
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async findClientById() {
+        return {
+          id: "client-alpha",
+          tenantId: "tenant-alpha",
+          name: "Ромашка",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findContactById() {
+        return {
+          id: "contact-alpha",
+          tenantId: "tenant-alpha",
+          clientId: "client-alpha",
+          name: "Ирина Заказчик",
+          email: "irina@example.test",
+          phone: null,
+          telegram: null,
+          role: "спонсор",
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findProjectTypeById() {
+        return {
+          id: "project-type-alpha",
+          tenantId: "tenant-alpha",
+          name: "Внедрение",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findDealStageById() {
+        return {
+          id: "deal-stage-alpha",
+          tenantId: "tenant-alpha",
+          name: "Квалификация",
+          sortOrder: 10,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async updateOpportunity() {
+        return undefined;
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+      }
+    });
+
+    const result = await service.updateOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      input: opportunityInput
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "opportunity_update_locked"
+    });
+    expect(audits).toEqual([]);
+  });
+
+  it("returns conflict instead of throwing when stage update loses a finalization race", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    const existingOpportunity = {
+      ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
+      customFieldValues: {},
+      feasibilityStatus: null,
+      feasibilityResult: null,
+      feasibilityCheckedAt: null,
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async findDealStageById() {
+        return {
+          id: "deal-stage-next",
+          tenantId: "tenant-alpha",
+          name: "Следующий этап",
+          sortOrder: 20,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async updateOpportunityStage() {
+        return undefined;
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+      }
+    });
+
+    const result = await service.changeOpportunityStage({
+      actor,
+      opportunityId: opportunityInput.id,
+      stageId: "deal-stage-next"
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "opportunity_stage_locked"
+    });
+    expect(audits).toEqual([]);
+  });
+
+  it("returns conflict instead of throwing when feasibility update loses a finalization race", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    const existingOpportunity = {
+      ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
+      customFieldValues: {},
+      feasibilityStatus: null,
+      feasibilityResult: null,
+      feasibilityCheckedAt: null,
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async listPositions() {
+        return [];
+      },
+      async listWorkspaceUsers() {
+        return [];
+      },
+      async listProjects() {
+        return [];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async updateOpportunityFeasibility() {
+        return undefined;
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+      }
+    });
+
+    const result = await service.checkOpportunityFeasibility({
+      actor,
+      opportunityId: opportunityInput.id
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "opportunity_not_feasible"
+    });
+    expect(audits).toEqual([]);
   });
 
   it("finalizes an opportunity through a governed close/reject action and records management audit", async () => {
