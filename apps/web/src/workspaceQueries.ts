@@ -12,11 +12,15 @@ import {
   createOpportunity,
   createProduct,
   createProjectTask,
+  createTaskComment,
+  createTaskStatus,
   createPosition,
   createProjectType,
   createProjectTemplate,
   createUser,
   activateOpportunityProject,
+  archiveTask,
+  archiveTaskStatus,
   checkOpportunityFeasibility,
   deleteAccessRole,
   deletePosition,
@@ -40,6 +44,9 @@ import {
   fetchProjectTemplates,
   fetchProjectDetail,
   fetchProjectTasks,
+  fetchTaskActivity,
+  fetchTaskDetail,
+  fetchTaskStatuses,
   fetchUsers,
   finalizeOpportunity,
   login,
@@ -54,7 +61,9 @@ import {
   updateOpportunityStage,
   updatePosition,
   updateProduct,
+  updateProjectTask,
   updateProjectTaskStatus,
+  updateTaskStatusDefinition,
   updateProjectType,
   updateProfile,
   updateProjectTemplate,
@@ -84,6 +93,10 @@ export const workspaceQueryKeys = {
   projectDetail: (projectId: string) => ["workspace", "projects", projectId] as const,
   projectTasks: (projectId: string) =>
     ["workspace", "projects", projectId, "tasks"] as const,
+  taskStatuses: () => ["workspace", "tasks", "statuses"] as const,
+  task: (taskId: string) => ["workspace", "tasks", taskId] as const,
+  taskActivity: (taskId: string) =>
+    ["workspace", "tasks", taskId, "activity"] as const,
   myWork: () => ["workspace", "myWork"] as const,
   customFields: () => ["workspace", "config", "customFields"] as const,
   projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
@@ -246,6 +259,30 @@ export function useMyWorkQuery(enabled: boolean) {
     queryKey: workspaceQueryKeys.myWork(),
     queryFn: fetchMyWork,
     enabled
+  });
+}
+
+export function useTaskStatusesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.taskStatuses(),
+    queryFn: fetchTaskStatuses,
+    enabled
+  });
+}
+
+export function useTaskDetailQuery(taskId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.task(taskId ?? "unknown"),
+    queryFn: () => fetchTaskDetail(taskId ?? ""),
+    enabled: enabled && Boolean(taskId)
+  });
+}
+
+export function useTaskActivityQuery(taskId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.taskActivity(taskId ?? "unknown"),
+    queryFn: () => fetchTaskActivity(taskId ?? ""),
+    enabled: enabled && Boolean(taskId)
   });
 }
 
@@ -600,8 +637,46 @@ export function useProjectWorkMutations() {
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
     ]);
   };
+  const invalidateTask = async (projectId: string, taskId: string) => {
+    await Promise.all([
+      invalidateProjectWork(projectId),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.task(taskId) }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.taskActivity(taskId) })
+    ]);
+  };
 
   return {
+    createTaskStatus: useMutation({
+      mutationFn: createTaskStatus,
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.taskStatuses() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+        ]);
+      }
+    }),
+    updateTaskStatusDefinition: useMutation({
+      mutationFn: ({ statusId, input }: Parameters<typeof updateTaskStatusDefinition> extends [infer StatusId, infer Input] ? { statusId: StatusId; input: Input } : never) =>
+        updateTaskStatusDefinition(statusId, input),
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.taskStatuses() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+        ]);
+      }
+    }),
+    archiveTaskStatus: useMutation({
+      mutationFn: archiveTaskStatus,
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.taskStatuses() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+        ]);
+      }
+    }),
     createTask: useMutation({
       mutationFn: ({ projectId, input }: Parameters<typeof createProjectTask> extends [infer ProjectId, infer Input] ? { projectId: ProjectId; input: Input } : never) =>
         createProjectTask(projectId, input),
@@ -613,7 +688,33 @@ export function useProjectWorkMutations() {
       mutationFn: ({ projectId, taskId, input }: Parameters<typeof updateProjectTaskStatus> extends [infer ProjectId, infer TaskId, infer Input] ? { projectId: ProjectId; taskId: TaskId; input: Input } : never) =>
         updateProjectTaskStatus(projectId, taskId, input),
       onSuccess: async (_result, variables) => {
-        await invalidateProjectWork(String(variables.projectId));
+        await invalidateTask(String(variables.projectId), String(variables.taskId));
+      }
+    }),
+    updateTask: useMutation({
+      mutationFn: ({ taskId, input }: Parameters<typeof updateProjectTask> extends [infer TaskId, infer Input] ? { taskId: TaskId; input: Input } : never) =>
+        updateProjectTask(taskId, input),
+      onSuccess: async (result, variables) => {
+        await invalidateTask(result.task.projectId, String(variables.taskId));
+      }
+    }),
+    archiveTask: useMutation({
+      mutationFn: archiveTask,
+      onSuccess: async (result) => {
+        await invalidateTask(result.task.projectId, result.task.id);
+      }
+    }),
+    createTaskComment: useMutation({
+      mutationFn: ({ taskId, body }: { taskId: string; body: string }) =>
+        createTaskComment(taskId, { body }),
+      onSuccess: async (_result, variables) => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.task(variables.taskId) }),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.taskActivity(variables.taskId)
+          }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+        ]);
       }
     })
   };

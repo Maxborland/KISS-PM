@@ -2,10 +2,11 @@ import type { Task, TaskStatus } from "./api";
 
 export function formatTaskStatus(status: TaskStatus): string {
   const labels: Record<TaskStatus, string> = {
-    todo: "К выполнению",
+    new: "Новая",
+    waiting: "Ожидает",
     in_progress: "В работе",
-    blocked: "Блокер",
-    done: "Готово"
+    review: "На контроле",
+    done: "Выполнено"
   };
   return labels[status];
 }
@@ -13,10 +14,9 @@ export function formatTaskStatus(status: TaskStatus): string {
 export function getNextTaskAction(
   status: TaskStatus
 ): { label: string; status: TaskStatus } | null {
-  if (status === "todo") return { label: "Начать", status: "in_progress" };
-  if (status === "in_progress" || status === "blocked") {
-    return { label: "Завершить", status: "done" };
-  }
+  if (status === "new" || status === "waiting") return { label: "В работу", status: "in_progress" };
+  if (status === "in_progress") return { label: "На контроль", status: "review" };
+  if (status === "review") return { label: "Принять", status: "done" };
   return null;
 }
 

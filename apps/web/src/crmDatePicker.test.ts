@@ -12,7 +12,7 @@ describe("CRM date picker foundation", () => {
       "apps/web/src/DealFormModal.tsx",
       "apps/web/src/CrmActivityForms.tsx",
       "apps/web/src/CrmInlineEdit.tsx",
-      "apps/web/src/ProjectDetailView.tsx"
+      "apps/web/src/TaskFormDialog.tsx"
     ];
 
     for (const source of sources) {

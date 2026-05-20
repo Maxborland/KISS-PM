@@ -20,6 +20,14 @@ import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceTopbar } from "./WorkspaceTopbar";
 import { canStartDealCreation } from "./workspaceShellState";
 import { useWorkspaceShellData } from "./useWorkspaceShellData";
+import {
+  getClientIdFromPathname,
+  getContactIdFromPathname,
+  getOpportunityIdFromPathname,
+  getProductIdFromPathname,
+  getProjectIdFromPathname,
+  getTaskIdFromPathname
+} from "./workspacePathIds";
 
 const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
 
@@ -57,6 +65,7 @@ export function WorkspaceShell() {
   const activeContactId = getContactIdFromPathname(pathname);
   const activeProductId = getProductIdFromPathname(pathname);
   const activeProjectId = getProjectIdFromPathname(pathname);
+  const activeTaskId = getTaskIdFromPathname(pathname);
 
   useEffect(() => {
     if (!meQuery.data) return;
@@ -418,6 +427,7 @@ export function WorkspaceShell() {
           activeContactId={activeContactId}
           activeProductId={activeProductId}
           activeProjectId={activeProjectId}
+          activeTaskId={activeTaskId}
           data={data}
           openCreateRequested={quickCreateRequested}
           onChanged={setMessage}
@@ -439,6 +449,9 @@ export function WorkspaceShell() {
           onOpenProject={(projectId) => {
             router.push(`/projects/${encodeURIComponent(projectId)}`);
           }}
+          onOpenTask={(taskId) => {
+            router.push(`/tasks/${encodeURIComponent(taskId)}`);
+          }}
           onBackToOpportunities={() => {
             router.push(getRoutePath("opportunities"));
           }}
@@ -454,39 +467,12 @@ export function WorkspaceShell() {
           onBackToProjects={() => {
             router.push(getRoutePath("projects"));
           }}
+          onBackToMyWork={() => {
+            router.push(getRoutePath("my-work"));
+          }}
           sectionStates={sectionStates}
         />
       </section>
     </main>
   );
-}
-
-function getOpportunityIdFromPathname(pathname: string): string | null {
-  const match = /^\/opportunities\/([^/]+)\/?$/.exec(pathname);
-  const rawOpportunityId = match?.[1];
-  return rawOpportunityId ? decodeURIComponent(rawOpportunityId) : null;
-}
-
-function getProjectIdFromPathname(pathname: string): string | null {
-  const match = /^\/projects\/([^/]+)\/?$/.exec(pathname);
-  const rawProjectId = match?.[1];
-  return rawProjectId ? decodeURIComponent(rawProjectId) : null;
-}
-
-function getClientIdFromPathname(pathname: string): string | null {
-  const match = /^\/clients\/([^/]+)\/?$/.exec(pathname);
-  const rawClientId = match?.[1];
-  return rawClientId ? decodeURIComponent(rawClientId) : null;
-}
-
-function getContactIdFromPathname(pathname: string): string | null {
-  const match = /^\/contacts\/([^/]+)\/?$/.exec(pathname);
-  const rawContactId = match?.[1];
-  return rawContactId ? decodeURIComponent(rawContactId) : null;
-}
-
-function getProductIdFromPathname(pathname: string): string | null {
-  const match = /^\/products\/([^/]+)\/?$/.exec(pathname);
-  const rawProductId = match?.[1];
-  return rawProductId ? decodeURIComponent(rawProductId) : null;
 }

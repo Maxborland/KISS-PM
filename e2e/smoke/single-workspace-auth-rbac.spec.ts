@@ -627,9 +627,9 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   const createTaskDialog = page.getByRole("dialog", { name: "Создать задачу" });
   await expect(createTaskDialog).toBeVisible();
   await createTaskDialog.getByLabel("Название").fill(`План работ ${suffix}`);
-  await createTaskDialog.getByLabel("Старт").fill("2026-06-02");
-  await createTaskDialog.getByLabel("Финиш").fill("2026-06-05");
-  await createTaskDialog.getByLabel("Плановые часы").fill("24");
+  await createTaskDialog.getByLabel("Начало").fill("02.06.2026");
+  await createTaskDialog.getByLabel("Окончание").fill("05.06.2026");
+  await createTaskDialog.getByLabel("Трудозатраты").fill("24");
   await createTaskDialog.getByRole("button", { name: "Создать задачу" }).click();
   await expect(page.getByText("Задача создана и записана в аудит.")).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) })).toBeVisible();
@@ -638,9 +638,19 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByRole("heading", { name: "Моя работа" }).first()).toBeVisible();
   const myWorkTaskRow = page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) });
   await expect(myWorkTaskRow).toBeVisible();
-  await myWorkTaskRow.getByRole("button", { name: "Начать" }).click();
-  await expect(page.getByText("Статус задачи обновлен и записан в аудит.")).toBeVisible();
+  await myWorkTaskRow.getByRole("button", { name: "В работу" }).click();
+  await expect(page.getByText("Статус задачи обновлен.")).toBeVisible();
   await expect(myWorkTaskRow.getByText("В работе")).toBeVisible();
+  await page.getByRole("button", { name: "Канбан" }).click();
+  await expect(page.locator(".task-kanban-column").filter({ hasText: "В работе" })).toBeVisible();
+  await page.getByRole("button", { name: "Таблица" }).click();
+  await myWorkTaskRow.getByRole("button", { name: "Открыть" }).click();
+  await expect(page).toHaveURL(/\/tasks\/task-/);
+  await expect(page.getByRole("heading", { name: `План работ ${suffix}` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Активность задачи" })).toBeVisible();
+  await page.getByPlaceholder("Написать комментарий, @упомянуть участника или добавить файл...").first().fill("Smoke комментарий по задаче");
+  await page.getByRole("button", { name: "Отправить комментарий" }).first().click();
+  await expect(page.getByText("Smoke комментарий по задаче")).toBeVisible();
 
   await page
     .getByRole("complementary")

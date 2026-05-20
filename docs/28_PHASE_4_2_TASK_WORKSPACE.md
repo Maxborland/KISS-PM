@@ -4,6 +4,12 @@
 
 Этот slice расширяет Phase 4 starter после появления базовых `Task`, участников и `Моя работа`.
 
+Реализация в текущей ветке:
+
+- backend-модель задач, tenant-статусов и task activity добавлена в persistence/API;
+- web-контур получил `Моя работа` в режимах список/канбан, CRUD-модалку задачи, bulk-панель, `/tasks/:taskId`, комментарии задачи и настройку статусов задач;
+- вложения и связи-предшественники намеренно оставлены read-only с объяснением до storage/connector и Gantt slices.
+
 Цель не в отдельном таск-трекере, а в единой задаче KISS PM, которая позже будет использоваться в Gantt, Kanban, resource matrix, KPI/control signals и governed actions.
 
 ## Product intent

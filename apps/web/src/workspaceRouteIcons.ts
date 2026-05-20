@@ -3,6 +3,7 @@ import {
   BriefcaseBusiness,
   Building2,
   ClipboardList,
+  Columns3,
   ContactRound,
   FolderKanban,
   LayoutDashboard,
@@ -34,6 +35,7 @@ export const workspaceRouteIcons = {
   settings: Settings,
   "project-types": FolderKanban,
   "deal-stages": ClipboardList,
+  "task-statuses": Columns3,
   profile: UserCircle,
   theme: Palette
 } satisfies Record<WorkspaceRouteId, LucideIcon>;
