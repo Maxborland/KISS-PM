@@ -1161,6 +1161,18 @@ h2 {
   color: var(--muted-strong);
 }
 
+.status-pill.warning {
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  background: rgba(245, 158, 11, 0.1);
+  color: #92400e;
+}
+
+.status-pill.danger {
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--danger);
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -1526,106 +1538,6 @@ input[type="color"] {
 }
 
 .modal-panel.wide { width: min(1120px, 100%); }
-
-.icon-button {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  font-size: 22px;
-  line-height: 1;
-  transition:
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.icon-button:hover {
-  border-color: var(--border-strong);
-  transform: rotate(4deg);
-}
-
-.modal-description {
-  margin: 5px 0 0;
-  color: var(--muted-strong);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.confirm-body {
-  display: grid;
-  gap: 16px;
-}
-
-.danger-callout {
-  display: grid;
-  gap: 3px;
-  padding: 12px;
-  border: 1px solid rgba(180, 35, 24, 0.18);
-  border-radius: 10px;
-  background: #fff7f6;
-  color: var(--danger);
-}
-
-.danger-callout span {
-  color: #7a271a;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-@keyframes overlay-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
-
-@media (max-width: 1180px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .topbar {
-    grid-template-columns: auto auto minmax(0, 1fr);
-  }
-
-  .topbar-context {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-}
 
 @media (max-width: 900px) {
   .workspace-shell,

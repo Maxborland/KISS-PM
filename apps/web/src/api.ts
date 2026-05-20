@@ -262,7 +262,26 @@ export type Project = {
   demand: PositionDemand[];
 };
 
-export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+export type TaskStatus = "new" | "waiting" | "in_progress" | "review" | "done";
+export type TaskStatusDefinitionStatus = "active" | "archived";
+export type TaskStatusDefinition = {
+  id: string;
+  tenantId: string;
+  name: string;
+  category: TaskStatus;
+  sortOrder: number;
+  status: TaskStatusDefinitionStatus;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type TaskStatusDefinitionInput = {
+  id?: string;
+  name: string;
+  category: TaskStatus;
+  sortOrder: number;
+  status?: TaskStatusDefinitionStatus;
+};
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 export type TaskParticipantRole =
   | "executor"
@@ -285,15 +304,23 @@ export type Task = {
   title: string;
   description: string | null;
   status: TaskStatus;
+  statusId: string;
+  statusName: string;
+  statusCategory: TaskStatus;
   priority: TaskPriority;
+  requesterUserId: string;
+  ownerUserId: string;
   plannedStart: string;
   plannedFinish: string;
+  durationWorkingDays: number;
   plannedWork: number;
   actualWork: number;
   progress: number;
+  requiresAcceptance: boolean;
   source: "manual";
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
   participants: TaskParticipant[];
 };
 
@@ -304,12 +331,32 @@ export type TaskInput = {
   priority: TaskPriority;
   plannedStart: string;
   plannedFinish: string;
+  statusId?: string;
+  durationWorkingDays: number;
   plannedWork: number;
+  requiresAcceptance: boolean;
   participants: TaskParticipant[];
+};
+export type TaskUpdateInput = Omit<TaskInput, "id"> & {
+  statusId: string;
 };
 
 export type TaskStatusInput = {
-  status: TaskStatus;
+  statusId: string;
+};
+
+export type TaskActivity = {
+  id: string;
+  tenantId: string;
+  taskId: string;
+  type: "comment" | "file";
+  body: string | null;
+  title: string | null;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
+  authorUserId: string;
+  createdAt: string;
 };
 
 export type OpportunityInput = {
@@ -892,6 +939,48 @@ export async function fetchMyWork(): Promise<{ tasks: Task[] }> {
   return requestJson("/api/workspace/my-work");
 }
 
+export async function fetchTaskStatuses(): Promise<{
+  taskStatuses: TaskStatusDefinition[];
+}> {
+  return requestJson("/api/workspace/task-statuses");
+}
+
+export async function createTaskStatus(
+  input: TaskStatusDefinitionInput
+): Promise<{ taskStatus: TaskStatusDefinition }> {
+  return requestJson("/api/workspace/task-statuses", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function updateTaskStatusDefinition(
+  statusId: string,
+  input: TaskStatusDefinitionInput
+): Promise<{ taskStatus: TaskStatusDefinition }> {
+  return requestJson(
+    `/api/workspace/task-statuses/${encodePathSegment(statusId)}`,
+    {
+      method: "PATCH",
+      body: input
+    }
+  );
+}
+
+export async function archiveTaskStatus(
+  statusId: string
+): Promise<{ taskStatus: TaskStatusDefinition }> {
+  return requestJson(`/api/workspace/task-statuses/${encodePathSegment(statusId)}`, {
+    method: "DELETE"
+  });
+}
+
+export async function fetchTaskDetail(
+  taskId: string
+): Promise<{ task: Task; activities: TaskActivity[] }> {
+  return requestJson(`/api/workspace/tasks/${encodePathSegment(taskId)}`);
+}
+
 export async function createProjectTask(
   projectId: string,
   input: TaskInput
@@ -899,6 +988,22 @@ export async function createProjectTask(
   return requestJson(`/api/workspace/projects/${encodePathSegment(projectId)}/tasks`, {
     method: "POST",
     body: input
+  });
+}
+
+export async function updateProjectTask(
+  taskId: string,
+  input: TaskUpdateInput
+): Promise<{ task: Task }> {
+  return requestJson(`/api/workspace/tasks/${encodePathSegment(taskId)}`, {
+    method: "PATCH",
+    body: input
+  });
+}
+
+export async function archiveTask(taskId: string): Promise<{ task: Task }> {
+  return requestJson(`/api/workspace/tasks/${encodePathSegment(taskId)}`, {
+    method: "DELETE"
   });
 }
 
@@ -914,6 +1019,22 @@ export async function updateProjectTaskStatus(
       body: input
     }
   );
+}
+
+export async function fetchTaskActivity(
+  taskId: string
+): Promise<{ activities: TaskActivity[] }> {
+  return requestJson(`/api/workspace/tasks/${encodePathSegment(taskId)}/activity`);
+}
+
+export async function createTaskComment(
+  taskId: string,
+  input: { body: string }
+): Promise<{ activity: TaskActivity }> {
+  return requestJson(`/api/workspace/tasks/${encodePathSegment(taskId)}/comments`, {
+    method: "POST",
+    body: input
+  });
 }
 
 async function requestJson<T>(

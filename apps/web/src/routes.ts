@@ -112,6 +112,14 @@ export const workspaceRoutes = [
     description: "Tenant-настраиваемые этапы, из которых строится канбан сделок"
   },
   {
+    id: "task-statuses",
+    label: "Статусы задач",
+    group: "settings",
+    path: "/settings/task-statuses",
+    permission: "tenant.task_statuses.manage",
+    description: "Tenant-настраиваемые статусы задач для списка, канбана и карточки"
+  },
+  {
     id: "profile",
     label: "Профиль",
     group: "personal",
@@ -187,6 +195,7 @@ export function getRouteIdFromPathname(pathname: string): WorkspaceRouteId {
   if (normalizedPath.startsWith("/clients/")) return "clients";
   if (normalizedPath.startsWith("/contacts/")) return "contacts";
   if (normalizedPath.startsWith("/products/")) return "products";
+  if (normalizedPath.startsWith("/tasks/")) return "my-work";
 
   return (
     workspaceRoutes.find((route) => route.path === normalizedPath)?.id ??
