@@ -1,23 +1,28 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import {
+  CalendarDays,
+  ListPlus,
+  Loader2,
+  Paperclip,
+  SendHorizonal,
+  SquareCheckBig
+} from "lucide-react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 
-import { OpportunityAuditTab } from "./OpportunityActivityAudit";
-import { OpportunityActivityComposer } from "./OpportunityActivityComposer";
 import { OpportunityFeedView } from "./OpportunityActivityFeed";
 import {
-  OpportunityChatView,
   OpportunityTaskView,
   type OpportunityTaskFormState
 } from "./OpportunityActivityForms";
 import {
   composeOpportunityFeedItems,
   getOpportunityActivitySummary,
-  type ActivityComposerMode,
-  formatActivityCountLabel,
-  type ActivityTab
+  getOpportunityActivityTabs,
+  type ActivityRailTabId,
+  type ActivityTab,
+  formatActivityCountLabel
 } from "./opportunityActivity";
 import type { WorkspaceData } from "./workspaceData";
 import {
@@ -26,12 +31,12 @@ import {
 } from "./workspaceQueries";
 import { getErrorMessage } from "./workspaceShellState";
 
-const tabs: Array<{ id: ActivityTab; label: string }> = [
-  { id: "feed", label: "Лента" },
-  { id: "chat", label: "Чат" },
-  { id: "tasks", label: "Задачи" },
-  { id: "audit", label: "Аудит" }
-];
+const tabIcons = {
+  feed: ListPlus,
+  tasks: SquareCheckBig,
+  events: CalendarDays,
+  files: Paperclip
+} satisfies Record<ActivityRailTabId, typeof ListPlus>;
 
 const emptyTaskForm: OpportunityTaskFormState = {
   title: "",
@@ -47,7 +52,6 @@ export function OpportunityActivityPanel(props: {
   onChanged: (message: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ActivityTab>("feed");
-  const [composerMode, setComposerMode] = useState<ActivityComposerMode>("comment");
   const [commentBody, setCommentBody] = useState("");
   const [commentError, setCommentError] = useState("");
   const [taskForm, setTaskForm] = useState<OpportunityTaskFormState>(emptyTaskForm);
@@ -62,12 +66,10 @@ export function OpportunityActivityPanel(props: {
     () => composeOpportunityFeedItems(activities, systemEvents),
     [activities, systemEvents]
   );
-  const tabCounts: Record<ActivityTab, number> = {
-    feed: feedItems.length,
-    chat: comments.length,
-    tasks: tasks.length,
-    audit: activityQuery.data?.auditEvents?.length ?? 0
-  };
+  const activityTabs = getOpportunityActivityTabs({
+    feedCount: feedItems.length,
+    taskCount: tasks.length
+  });
   const activitySummary = getOpportunityActivitySummary({
     activities,
     feedItems
@@ -113,6 +115,7 @@ export function OpportunityActivityPanel(props: {
         assigneeUserId: taskForm.assigneeUserId || null
       });
       setTaskForm(emptyTaskForm);
+      setActiveTab("tasks");
       props.onChanged("Задача по сделке создана");
     } catch (error) {
       setTaskError(getErrorMessage(error));
@@ -128,23 +131,23 @@ export function OpportunityActivityPanel(props: {
     }
   }
 
-  function changeComposerMode(mode: ActivityComposerMode) {
-    setComposerMode(mode);
-    setCommentError("");
-    setTaskError("");
-  }
-
-  function selectTab(tabId: ActivityTab) {
-    setActiveTab(tabId);
+  function selectTab(tabId: ActivityRailTabId) {
+    const tab = activityTabs.find((item) => item.id === tabId);
+    if (!tab?.isEnabled) return;
+    setActiveTab(tab.id as ActivityTab);
     window.requestAnimationFrame(() => {
-      document.getElementById(getTabId(tabId))?.focus();
+      document.getElementById(getTabId(tab.id))?.focus();
     });
   }
 
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tabId: ActivityTab) {
-    const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    tabId: ActivityRailTabId
+  ) {
+    const enabledTabs = activityTabs.filter((tab) => tab.isEnabled);
+    const currentIndex = enabledTabs.findIndex((tab) => tab.id === tabId);
     if (currentIndex < 0) return;
-    const lastIndex = tabs.length - 1;
+    const lastIndex = enabledTabs.length - 1;
     const keyToIndex: Record<string, number> = {
       ArrowLeft: currentIndex === 0 ? lastIndex : currentIndex - 1,
       ArrowRight: currentIndex === lastIndex ? 0 : currentIndex + 1,
@@ -152,60 +155,71 @@ export function OpportunityActivityPanel(props: {
       End: lastIndex
     };
     const nextIndex = keyToIndex[event.key];
-    if (nextIndex === undefined) return;
-    const nextTab = tabs[nextIndex];
+    const nextTab = nextIndex === undefined ? null : enabledTabs[nextIndex];
     if (!nextTab) return;
     event.preventDefault();
     selectTab(nextTab.id);
   }
 
   return (
-    <aside className="deal-activity-panel" aria-label="Рабочая лента сделки">
+    <aside className="deal-activity-panel" aria-label="Активность по сделке">
       <header className="deal-activity-header">
         <div>
-          <h2>Рабочее окно сделки</h2>
-          <p>Лента, чат, контрольные задачи и аудит по этой сделке.</p>
+          <h2>Активность по сделке</h2>
+          <p>
+            {activitySummary.openTaskCount} открытых задач ·{" "}
+            {activitySummary.commentCount} сообщений
+          </p>
         </div>
         {activityQuery.isFetching ? <Loader2 aria-hidden="true" size={16} /> : null}
       </header>
 
-      <dl className="activity-summary-strip" aria-label="Сводка активности сделки">
-        <div>
-          <dt>Открытые задачи</dt>
-          <dd>{activitySummary.openTaskCount}</dd>
-        </div>
-        <div>
-          <dt>Комментарии</dt>
-          <dd>{activitySummary.commentCount}</dd>
-        </div>
-        <div>
-          <dt>Последнее действие</dt>
-          <dd>{activitySummary.latestActivityAt ? formatActivitySummaryDate(activitySummary.latestActivityAt) : "Нет"}</dd>
-        </div>
-      </dl>
-
       <div className="activity-tabs" role="tablist" aria-label="Разделы активности сделки">
-        {tabs.map((tab) => (
-          <button
-            aria-controls={activeTab === tab.id ? getPanelId(tab.id) : undefined}
-            aria-selected={activeTab === tab.id}
-            id={getTabId(tab.id)}
-            key={tab.id}
-            role="tab"
-            tabIndex={activeTab === tab.id ? 0 : -1}
-            type="button"
-            onClick={() => selectTab(tab.id)}
-            onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-          >
-            <span>{tab.label}</span>
-            <span
-              aria-label={formatActivityCountLabel(tabCounts[tab.id])}
-              className="activity-tab-count"
+        {activityTabs.map((tab) => {
+          const Icon = tabIcons[tab.id];
+          const isSelected = activeTab === tab.id;
+
+          return (
+            <button
+              aria-controls={isSelected ? getPanelId(tab.id) : undefined}
+              aria-disabled={!tab.isEnabled}
+              aria-selected={isSelected}
+              id={getTabId(tab.id)}
+              key={tab.id}
+              role="tab"
+              tabIndex={isSelected ? 0 : -1}
+              title={tab.disabledReason ?? undefined}
+              type="button"
+              onClick={() => selectTab(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
             >
-              {tabCounts[tab.id]}
-            </span>
-          </button>
-        ))}
+              <Icon aria-hidden="true" size={14} />
+              <span>{tab.label}</span>
+              {tab.isEnabled ? (
+                <span
+                  aria-label={formatActivityCountLabel(tab.count)}
+                  className="activity-tab-count"
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+        <button
+          aria-label="Добавить активность"
+          className="activity-add-button"
+          disabled={!props.canManageOpportunities}
+          title={
+            props.canManageOpportunities
+              ? "Напишите сообщение в ленте ниже"
+              : "Нужно право tenant.opportunities.manage"
+          }
+          type="button"
+          onClick={() => document.getElementById("deal-feed-message")?.focus()}
+        >
+          +
+        </button>
       </div>
 
       {activityQuery.isLoading ? <p className="loading-state">Загружаем ленту...</p> : null}
@@ -213,88 +227,73 @@ export function OpportunityActivityPanel(props: {
         <p className="error">{getErrorMessage(activityQuery.error)}</p>
       ) : null}
       {!activityQuery.isLoading && !activityQuery.isError ? (
-        <>
-          <div
-            aria-labelledby={getTabId(activeTab)}
-            className="activity-tab-panel"
-            id={getPanelId(activeTab)}
-            role="tabpanel"
-          >
-            {activeTab === "feed" ? (
-              <div className="activity-feed-workspace">
-                <OpportunityActivityComposer
-                  activeUsers={activeUsers}
-                  canManageOpportunities={props.canManageOpportunities}
-                  commentBody={commentBody}
-                  commentError={commentError}
-                  isSaving={isSaving}
-                  mode={composerMode}
-                  taskError={taskError}
-                  taskForm={taskForm}
-                  onCommentBodyChange={setCommentBody}
-                  onModeChange={changeComposerMode}
-                  onSubmitComment={submitComment}
-                  onSubmitTask={submitTask}
-                  onTaskFormChange={setTaskForm}
+        <div
+          aria-labelledby={getTabId(activeTab)}
+          className="activity-tab-panel"
+          id={getPanelId(activeTab)}
+          role="tabpanel"
+        >
+          {activeTab === "feed" ? (
+            <div className="activity-feed-workspace">
+              <form className="activity-inline-composer" onSubmit={submitComment}>
+                <label className="sr-only" htmlFor="deal-feed-message">
+                  Написать сообщение или добавить активность
+                </label>
+                <textarea
+                  id="deal-feed-message"
+                  disabled={!props.canManageOpportunities || isSaving}
+                  placeholder="Написать сообщение или добавить активность..."
+                  rows={1}
+                  value={commentBody}
+                  onChange={(event) => setCommentBody(event.target.value)}
                 />
-                <OpportunityFeedView data={props.data} items={feedItems} />
-              </div>
-            ) : null}
-            {activeTab === "chat" ? (
-              <OpportunityChatView
-                canManageOpportunities={props.canManageOpportunities}
-                comments={comments}
-                commentBody={commentBody}
-                data={props.data}
-                error={commentError}
-                isSaving={isSaving}
-                onCommentBodyChange={setCommentBody}
-                onSubmit={submitComment}
-              />
-            ) : null}
-            {activeTab === "tasks" ? (
-              <OpportunityTaskView
-                activeUsers={activeUsers}
-                canManageOpportunities={props.canManageOpportunities}
-                data={props.data}
-                error={taskError}
-                form={taskForm}
-                isSaving={isSaving}
-                tasks={tasks}
-                onComplete={completeTask}
-                onFormChange={setTaskForm}
-                onSubmit={submitTask}
-              />
-            ) : null}
-            {activeTab === "audit" ? (
-              <OpportunityAuditTab
-                auditEvents={activityQuery.data?.auditEvents ?? null}
-                canReadRawAudit={Boolean(activityQuery.data?.canReadRawAudit)}
-                data={props.data}
-              />
-            ) : null}
-          </div>
-        </>
+                <button
+                  aria-label="Отправить сообщение"
+                  className="activity-send-button"
+                  disabled={!props.canManageOpportunities || isSaving}
+                  title={
+                    props.canManageOpportunities
+                      ? undefined
+                      : "Нужно право tenant.opportunities.manage"
+                  }
+                  type="submit"
+                >
+                  <SendHorizonal aria-hidden="true" size={16} />
+                </button>
+                {commentError ? <p className="error">{commentError}</p> : null}
+                {!props.canManageOpportunities ? (
+                  <p className="empty-state compact">
+                    Только чтение: нужно право tenant.opportunities.manage.
+                  </p>
+                ) : null}
+              </form>
+              <OpportunityFeedView data={props.data} items={feedItems} />
+            </div>
+          ) : null}
+          {activeTab === "tasks" ? (
+            <OpportunityTaskView
+              activeUsers={activeUsers}
+              canManageOpportunities={props.canManageOpportunities}
+              data={props.data}
+              error={taskError}
+              form={taskForm}
+              isSaving={isSaving}
+              tasks={tasks}
+              onComplete={completeTask}
+              onFormChange={setTaskForm}
+              onSubmit={submitTask}
+            />
+          ) : null}
+        </div>
       ) : null}
     </aside>
   );
 }
 
-function getTabId(tabId: ActivityTab): string {
+function getTabId(tabId: ActivityRailTabId): string {
   return `opportunity-activity-tab-${tabId}`;
 }
 
-function getPanelId(tabId: ActivityTab): string {
+function getPanelId(tabId: ActivityRailTabId): string {
   return `opportunity-activity-panel-${tabId}`;
-}
-
-function formatActivitySummaryDate(value: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC"
-  }).format(new Date(value));
 }

@@ -4,6 +4,7 @@ import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
 import {
   composeOpportunityFeedItems,
   formatActivityCountLabel,
+  getOpportunityActivityTabs,
   getOpportunityActivitySummary,
   groupOpportunityFeedItemsByDay,
   sortOpportunityTasks
@@ -20,6 +21,39 @@ const baseActivity = {
 } satisfies Omit<OpportunityActivity, "id" | "type" | "title" | "status" | "createdAt">;
 
 describe("opportunity activity helpers", () => {
+  it("keeps the CRM activity rail honest: only backed tabs are enabled", () => {
+    expect(getOpportunityActivityTabs({ feedCount: 3, taskCount: 1 })).toEqual([
+      {
+        count: 3,
+        disabledReason: null,
+        id: "feed",
+        isEnabled: true,
+        label: "Лента"
+      },
+      {
+        count: 1,
+        disabledReason: null,
+        id: "tasks",
+        isEnabled: true,
+        label: "Задачи"
+      },
+      {
+        count: 0,
+        disabledReason: "Модель событий будет добавлена отдельным CRM-slice",
+        id: "events",
+        isEnabled: false,
+        label: "Событие"
+      },
+      {
+        count: 0,
+        disabledReason: "Файлы сделки будут добавлены отдельным CRM-slice",
+        id: "files",
+        isEnabled: false,
+        label: "Файл"
+      }
+    ]);
+  });
+
   it("combines persisted activity and system events from newest to oldest", () => {
     const activities = [
       {

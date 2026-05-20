@@ -1,7 +1,15 @@
 import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
 
-export type ActivityTab = "feed" | "chat" | "tasks" | "audit";
-export type ActivityComposerMode = "comment" | "task";
+export type ActivityTab = "feed" | "tasks";
+export type ActivityRailTabId = ActivityTab | "events" | "files";
+
+export type OpportunityActivityTabDescriptor = {
+  count: number;
+  disabledReason: string | null;
+  id: ActivityRailTabId;
+  isEnabled: boolean;
+  label: string;
+};
 
 export type OpportunityFeedItem =
   | { kind: "activity"; activity: OpportunityActivity; createdAt: string }
@@ -18,6 +26,42 @@ export type OpportunityFeedGroup = {
   label: string;
   items: OpportunityFeedItem[];
 };
+
+export function getOpportunityActivityTabs(input: {
+  feedCount: number;
+  taskCount: number;
+}): OpportunityActivityTabDescriptor[] {
+  return [
+    {
+      count: input.feedCount,
+      disabledReason: null,
+      id: "feed",
+      isEnabled: true,
+      label: "Лента"
+    },
+    {
+      count: input.taskCount,
+      disabledReason: null,
+      id: "tasks",
+      isEnabled: true,
+      label: "Задачи"
+    },
+    {
+      count: 0,
+      disabledReason: "Модель событий будет добавлена отдельным CRM-slice",
+      id: "events",
+      isEnabled: false,
+      label: "Событие"
+    },
+    {
+      count: 0,
+      disabledReason: "Файлы сделки будут добавлены отдельным CRM-slice",
+      id: "files",
+      isEnabled: false,
+      label: "Файл"
+    }
+  ];
+}
 
 export function composeOpportunityFeedItems(
   activities: OpportunityActivity[],

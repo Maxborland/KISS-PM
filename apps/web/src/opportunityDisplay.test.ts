@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { DealStage, Opportunity } from "./api";
 import {
   buildOpportunityKanbanCardViewModel,
+  buildOpportunityStageTimeline,
   buildKanbanStages,
   canMoveOpportunityToStage,
   formatOpportunityEconomics,
@@ -139,6 +140,25 @@ describe("opportunity display helpers", () => {
     expect(kanbanStages.map((stage) => stage.id)).toEqual([
       "stage-active",
       "stage-archived"
+    ]);
+  });
+
+  test("builds deal overview timeline from tenant stages without fake hardcoded steps", () => {
+    expect(buildOpportunityStageTimeline(stages, baseOpportunity)).toEqual([
+      {
+        id: "stage-active",
+        isArchived: false,
+        isCurrent: false,
+        isReached: true,
+        label: "Новый"
+      },
+      {
+        id: "stage-archived",
+        isArchived: true,
+        isCurrent: true,
+        isReached: true,
+        label: "Архивный этап · архив"
+      }
     ]);
   });
 
