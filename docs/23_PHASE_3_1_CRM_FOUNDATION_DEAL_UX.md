@@ -212,6 +212,7 @@ Tenant admin с правом `tenant.workspace_config.manage` может соз�
 ## Non-goals
 
 - external CRM connector runtime;
+- binary storage и connector runtime для вложений: они вынесены в Phase 4.2 `Storage and connector foundation`;
 - Gantt/WBS/tasks;
 - полноценная дневная resource matrix;
 - project lifecycle beyond active project shell;
