@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 
 import type { TenantId } from "@kiss-pm/domain";
 
@@ -15,8 +15,11 @@ export type OpportunityStatus =
   | "intake"
   | "feasibility"
   | "ready_to_activate"
-  | "rejected"
-  | "converted";
+  | "won_closed"
+  | "lost_rejected";
+
+export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
+const finalOpportunityStatuses: string[] = ["won_closed", "lost_rejected"];
 
 export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
 
@@ -30,6 +33,7 @@ export type OpportunityRecord = {
   tenantId: TenantId;
   clientId: string | null;
   primaryContactId: string | null;
+  ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
   clientName: string;
@@ -51,12 +55,22 @@ export type OpportunityRecord = {
   createdAt: Date;
   updatedAt: Date;
   demand: PositionDemandRecord[];
+  customFieldValues: Record<string, string>;
 };
 
 export type OpportunityInput = Omit<
   OpportunityRecord,
-  "createdAt" | "updatedAt" | "feasibilityStatus" | "feasibilityResult" | "feasibilityCheckedAt"
->;
+  | "createdAt"
+  | "updatedAt"
+  | "feasibilityStatus"
+  | "feasibilityResult"
+  | "feasibilityCheckedAt"
+  | "ownerUserId"
+  | "customFieldValues"
+> & {
+  ownerUserId?: string | null;
+  customFieldValues?: Record<string, string>;
+};
 
 export type OpportunityFeasibilityUpdate = {
   tenantId: TenantId;
@@ -98,14 +112,20 @@ export type ProjectIntakeRepository = {
     opportunityId: string
   ): Promise<OpportunityRecord | undefined>;
   createOpportunity(input: OpportunityInput): Promise<OpportunityRecord>;
+  updateOpportunity(input: OpportunityInput): Promise<OpportunityRecord | undefined>;
   updateOpportunityFeasibility(
     input: OpportunityFeasibilityUpdate
-  ): Promise<OpportunityRecord>;
+  ): Promise<OpportunityRecord | undefined>;
   updateOpportunityStage(input: {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
-  }): Promise<OpportunityRecord>;
+  }): Promise<OpportunityRecord | undefined>;
+  finalizeOpportunity(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    status: OpportunityFinalStatus;
+  }): Promise<OpportunityRecord | undefined>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
   createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
@@ -205,6 +225,7 @@ export function createProjectIntakeRepository(
             tenantId: input.tenantId,
             clientId: input.clientId,
             primaryContactId: input.primaryContactId,
+            ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
             clientName: input.clientName,
@@ -220,6 +241,7 @@ export function createProjectIntakeRepository(
             probability: input.probability,
             status: input.status,
             templateId: input.templateId,
+            customFieldValues: input.customFieldValues ?? {},
             createdAt: new Date(),
             updatedAt: new Date()
           })
@@ -254,17 +276,82 @@ export function createProjectIntakeRepository(
         .where(
           and(
             eq(opportunities.tenantId, input.tenantId),
-            eq(opportunities.id, input.opportunityId)
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
           )
         )
         .returning();
 
-      if (!row) throw new Error("Opportunity feasibility update returned no row");
+      if (!row) return undefined;
       const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
         input.opportunityId
       ]);
 
       return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async updateOpportunity(input) {
+      return db.transaction(async (transaction) => {
+        const now = new Date();
+        const [row] = await transaction
+          .update(opportunities)
+          .set({
+            clientId: input.clientId,
+            primaryContactId: input.primaryContactId,
+            ownerUserId: input.ownerUserId ?? null,
+            projectTypeId: input.projectTypeId,
+            stageId: input.stageId,
+            clientName: input.clientName,
+            contactName: input.contactName,
+            title: input.title,
+            projectType: input.projectType,
+            description: input.description,
+            plannedStart: input.plannedStart,
+            plannedFinish: input.plannedFinish,
+            contractValue: input.contractValue,
+            plannedHourlyRate: input.plannedHourlyRate,
+            plannedHours: input.plannedHours,
+            probability: input.probability,
+            status: input.status,
+            templateId: input.templateId,
+            customFieldValues: input.customFieldValues ?? {},
+            feasibilityStatus: null,
+            feasibilityResult: null,
+            feasibilityCheckedAt: null,
+            updatedAt: now
+          })
+          .where(
+            and(
+              eq(opportunities.tenantId, input.tenantId),
+              eq(opportunities.id, input.id),
+              notInArray(opportunities.status, finalOpportunityStatuses)
+            )
+          )
+          .returning();
+
+        if (!row) return undefined;
+
+        await transaction
+          .delete(opportunityDemands)
+          .where(
+            and(
+              eq(opportunityDemands.tenantId, input.tenantId),
+              eq(opportunityDemands.opportunityId, input.id)
+            )
+          );
+
+        if (input.demand.length > 0) {
+          await transaction.insert(opportunityDemands).values(
+            input.demand.map((line) => ({
+              tenantId: input.tenantId,
+              opportunityId: input.id,
+              positionId: line.positionId,
+              requiredHours: line.requiredHours
+            }))
+          );
+        }
+
+        return mapOpportunityRecord(row, input.demand);
+      });
     },
     async updateOpportunityStage(input) {
       const [row] = await db
@@ -276,12 +363,36 @@ export function createProjectIntakeRepository(
         .where(
           and(
             eq(opportunities.tenantId, input.tenantId),
-            eq(opportunities.id, input.opportunityId)
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
           )
         )
         .returning();
 
-      if (!row) throw new Error("Opportunity stage update returned no row");
+      if (!row) return undefined;
+      const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
+        input.opportunityId
+      ]);
+
+      return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async finalizeOpportunity(input) {
+      const [row] = await db
+        .update(opportunities)
+        .set({
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunities.tenantId, input.tenantId),
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
       const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
         input.opportunityId
       ]);
@@ -317,8 +428,7 @@ export function createProjectIntakeRepository(
             and(
               eq(opportunities.tenantId, input.tenantId),
               eq(opportunities.id, input.sourceOpportunityId),
-              ne(opportunities.status, "converted"),
-              ne(opportunities.status, "rejected")
+              notInArray(opportunities.status, finalOpportunityStatuses)
             )
           )
           .limit(1);
@@ -391,15 +501,14 @@ export function createProjectIntakeRepository(
         const [updatedOpportunity] = await transaction
           .update(opportunities)
           .set({
-            status: "converted",
+            status: "won_closed",
             updatedAt: now
           })
           .where(
             and(
               eq(opportunities.tenantId, input.tenantId),
               eq(opportunities.id, draft.sourceOpportunityId),
-              ne(opportunities.status, "converted"),
-              ne(opportunities.status, "rejected")
+              notInArray(opportunities.status, finalOpportunityStatuses)
             )
           )
           .returning({ id: opportunities.id });
@@ -447,6 +556,7 @@ function mapOpportunityRecord(
     tenantId: row.tenantId,
     clientId: row.clientId,
     primaryContactId: row.primaryContactId,
+    ownerUserId: row.ownerUserId,
     projectTypeId: row.projectTypeId,
     stageId: row.stageId,
     clientName: row.clientName,
@@ -467,8 +577,20 @@ function mapOpportunityRecord(
     feasibilityCheckedAt: row.feasibilityCheckedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    demand
+    demand,
+    customFieldValues: normalizeCustomFieldValues(row.customFieldValues)
   };
+}
+
+function normalizeCustomFieldValues(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const result: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(value)) {
+    if (typeof rawValue === "string") result[key] = rawValue;
+  }
+
+  return result;
 }
 
 function mapProjectRecord(

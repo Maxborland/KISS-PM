@@ -1,3 +1,5 @@
+import type { TenantUser } from "@kiss-pm/domain";
+
 import type {
   ApiTenantDataSource,
   ClientRecord,
@@ -16,6 +18,7 @@ export async function resolveOpportunityLinks(
       ok: true;
       client: ClientRecord;
       contact: ContactRecord;
+      owner: TenantUser | null;
       projectType: ProjectTypeRecord;
       stage: DealStageRecord;
     }
@@ -38,6 +41,13 @@ export async function resolveOpportunityLinks(
     return { ok: false, status: 404, error: "contact_not_found" };
   }
 
+  const owner = input.ownerUserId
+    ? await dataSource.findUserById(input.ownerUserId)
+    : null;
+  if (input.ownerUserId && (!owner || owner.tenantId !== tenantId)) {
+    return { ok: false, status: 404, error: "owner_user_not_found" };
+  }
+
   const projectType = await dataSource.findProjectTypeById?.(
     tenantId,
     input.projectTypeId ?? ""
@@ -51,5 +61,5 @@ export async function resolveOpportunityLinks(
     return { ok: false, status: 404, error: "deal_stage_not_found" };
   }
 
-  return { ok: true, client, contact, projectType, stage };
+  return { ok: true, client, contact, owner: owner ?? null, projectType, stage };
 }

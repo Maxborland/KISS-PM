@@ -6,6 +6,7 @@ import type {
   Opportunity,
   Position,
   Project,
+  Product,
   ProjectType,
   WorkspaceUser
 } from "./api";
@@ -124,6 +125,27 @@ export function filterContactsForTable(
         .join(" ")
     ).includes(normalizedQuery);
   });
+}
+
+export function filterProductsForTable(products: Product[], query: string): Product[] {
+  const normalizedQuery = normalizeTableQuery(query);
+  if (!normalizedQuery) return products;
+
+  return products.filter((product) =>
+    normalizeTableQuery(
+      [
+        product.name,
+        product.sku,
+        product.type === "service" ? "услуга" : "товар",
+        product.unit,
+        product.price,
+        product.description,
+        product.status
+      ]
+        .filter(Boolean)
+        .join(" ")
+    ).includes(normalizedQuery)
+  );
 }
 
 export function filterProjectTypesForTable(

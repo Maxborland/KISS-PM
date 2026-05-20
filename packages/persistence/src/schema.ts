@@ -4,12 +4,14 @@ import {
   index,
   integer,
   jsonb,
+  check,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(),
@@ -171,6 +173,36 @@ export const contacts = pgTable(
   ]
 );
 
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sku: text("sku"),
+    type: text("type").notNull(),
+    unit: text("unit").notNull(),
+    price: integer("price").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "products_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("products_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("products_tenant_id_name_uidx").on(table.tenantId, table.name),
+    uniqueIndex("products_tenant_id_sku_uidx").on(table.tenantId, table.sku),
+    check("products_type_chk", sql`${table.type} in ('service', 'goods')`),
+    check("products_price_chk", sql`${table.price} > 0`)
+  ]
+);
+
 export const projectTypes = pgTable(
   "project_types",
   {
@@ -230,6 +262,7 @@ export const opportunities = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     clientId: text("client_id"),
     primaryContactId: text("primary_contact_id"),
+    ownerUserId: text("owner_user_id"),
     projectTypeId: text("project_type_id"),
     stageId: text("stage_id"),
     clientName: text("client_name").notNull(),
@@ -248,6 +281,9 @@ export const opportunities = pgTable(
     feasibilityStatus: text("feasibility_status"),
     feasibilityResult: jsonb("feasibility_result").$type<Record<string, unknown> | null>(),
     feasibilityCheckedAt: timestamp("feasibility_checked_at", { withTimezone: true }),
+    customFieldValues: jsonb("custom_field_values")
+      .$type<Record<string, string>>()
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
   },
@@ -278,6 +314,7 @@ export const opportunities = pgTable(
     }).onDelete("restrict"),
     index("opportunities_tenant_id_idx").on(table.tenantId),
     index("opportunities_status_idx").on(table.status),
+    index("opportunities_owner_user_id_idx").on(table.tenantId, table.ownerUserId),
     index("opportunities_stage_id_idx").on(table.tenantId, table.stageId)
   ]
 );
@@ -462,6 +499,134 @@ export const userSessions = pgTable(
   ]
 );
 
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    stageId: text("stage_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("todo"),
+    priority: text("priority").notNull().default("normal"),
+    plannedStart: timestamp("planned_start", { withTimezone: true }).notNull(),
+    plannedFinish: timestamp("planned_finish", { withTimezone: true }).notNull(),
+    plannedWork: integer("planned_work").notNull(),
+    actualWork: integer("actual_work").notNull().default(0),
+    progress: integer("progress").notNull().default(0),
+    source: text("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tasks_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "tasks_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    index("tasks_tenant_project_id_idx").on(table.tenantId, table.projectId),
+    index("tasks_tenant_status_idx").on(table.tenantId, table.status)
+  ]
+);
+
+export const taskParticipants = pgTable(
+  "task_participants",
+  {
+    tenantId: text("tenant_id").notNull(),
+    taskId: text("task_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_participants_pkey",
+      columns: [table.tenantId, table.taskId, table.userId, table.role]
+    }),
+    foreignKey({
+      name: "task_participants_task_fk",
+      columns: [table.tenantId, table.taskId],
+      foreignColumns: [tasks.tenantId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_participants_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("task_participants_tenant_user_id_idx").on(table.tenantId, table.userId)
+  ]
+);
+
+export const crmActivities = pgTable(
+  "crm_activities",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    type: text("type").notNull(),
+    title: text("title"),
+    body: text("body"),
+    status: text("status"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    assigneeUserId: text("assignee_user_id"),
+    authorUserId: text("author_user_id").notNull(),
+    fileUrl: text("file_url"),
+    fileSizeBytes: integer("file_size_bytes"),
+    mimeType: text("mime_type"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "crm_activities_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "crm_activities_author_user_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "crm_activities_assignee_user_fk",
+      columns: [table.tenantId, table.assigneeUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("crm_activities_tenant_entity_created_idx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId,
+      table.createdAt
+    ),
+    index("crm_activities_tenant_assignee_idx").on(
+      table.tenantId,
+      table.assigneeUserId
+    ),
+    check(
+      "crm_activities_entity_type_chk",
+      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product')`
+    ),
+    check(
+      "crm_activities_type_chk",
+      sql`${table.type} in ('comment', 'task', 'file')`
+    ),
+    check(
+      "crm_activities_payload_chk",
+      sql`(
+        (${table.type} = 'comment' and ${table.status} is null and ${table.body} is not null)
+        or
+        (${table.type} = 'task' and ${table.status} in ('todo', 'done') and ${table.title} is not null)
+        or
+        (${table.type} = 'file' and ${table.status} is null and ${table.title} is not null and ${table.fileUrl} is not null)
+      )`
+    )
+  ]
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -500,12 +665,16 @@ export type PersistenceTableName =
   | "project_templates"
   | "clients"
   | "contacts"
+  | "products"
   | "project_types"
   | "deal_stages"
   | "opportunities"
   | "opportunity_demands"
   | "projects"
   | "project_position_demands"
+  | "tasks"
+  | "task_participants"
+  | "crm_activities"
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
@@ -526,12 +695,16 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_templates",
   "clients",
   "contacts",
+  "products",
   "project_types",
   "deal_stages",
   "opportunities",
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "tasks",
+  "task_participants",
+  "crm_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -545,12 +718,16 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_templates",
   "clients",
   "contacts",
+  "products",
   "project_types",
   "deal_stages",
   "opportunities",
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "tasks",
+  "task_participants",
+  "crm_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -605,6 +782,19 @@ const tableColumns = {
     "created_at",
     "updated_at"
   ],
+  products: [
+    "id",
+    "tenant_id",
+    "name",
+    "sku",
+    "type",
+    "unit",
+    "price",
+    "description",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
   project_types: [
     "id",
     "tenant_id",
@@ -628,6 +818,7 @@ const tableColumns = {
     "tenant_id",
     "client_id",
     "primary_contact_id",
+    "owner_user_id",
     "project_type_id",
     "stage_id",
     "client_name",
@@ -646,6 +837,7 @@ const tableColumns = {
     "feasibility_status",
     "feasibility_result",
     "feasibility_checked_at",
+    "custom_field_values",
     "created_at",
     "updated_at"
   ],
@@ -677,6 +869,43 @@ const tableColumns = {
     "project_id",
     "position_id",
     "required_hours"
+  ],
+  tasks: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "stage_id",
+    "title",
+    "description",
+    "status",
+    "priority",
+    "planned_start",
+    "planned_finish",
+    "planned_work",
+    "actual_work",
+    "progress",
+    "source",
+    "created_at",
+    "updated_at"
+  ],
+  task_participants: ["tenant_id", "task_id", "user_id", "role"],
+  crm_activities: [
+    "id",
+    "tenant_id",
+    "entity_type",
+    "entity_id",
+    "type",
+    "title",
+    "body",
+    "status",
+    "due_date",
+    "assignee_user_id",
+    "author_user_id",
+    "file_url",
+    "file_size_bytes",
+    "mime_type",
+    "created_at",
+    "updated_at"
   ],
   tenant_users: [
     "id",

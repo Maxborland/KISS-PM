@@ -14,8 +14,8 @@ manual opportunity -> intake readiness -> demand by position -> feasibility by a
 
 Сделать проверяемый путь:
 
-- пользователь вручную создает opportunity внутри KISS PM;
-- в карточке opportunity задает стоимость контракта и плановую норму часа;
+- пользователь вручную создает сделку/opportunity внутри KISS PM;
+- в карточке сделки задает стоимость контракта и плановую норму часа;
 - система считает общий часовой бюджет входящего проекта как `contractValue / plannedHourlyRate`;
 - пользователь задает demand строками `должность + часы`;
 - система проверяет доступные часы должностей между датой старта и плановым финишем;
@@ -34,7 +34,7 @@ manual opportunity -> intake readiness -> demand by position -> feasibility by a
 - `active project` — тот же `Project` после governed transition в статус `active`.
 - Для совместимости Phase 3 UI endpoint активации создает draft и сразу переводит его в active внутри governed flow.
 - Решение закреплено в `docs/decisions/2026-05-19-project-draft-lifecycle-status.md`.
-- Activation является single-use: одна opportunity может породить не более одного проекта.
+- Activation является single-use: одна сделка/opportunity может породить не более одного проекта.
 - Перед activation система повторно пересчитывает текущую ресурсную доступность, чтобы не доверять устаревшему feasibility result.
 - Финальный пересчет capacity выполняется внутри транзакции под tenant resource lock, чтобы параллельные activation не обходили ресурсный конфликт.
 - Gantt/WBS/tasks пока не реализуются. Активный проект показывает только lifecycle shell и исходные intake/demand данные.
@@ -57,7 +57,7 @@ manual opportunity -> intake readiness -> demand by position -> feasibility by a
 - `plannedHourlyRate`;
 - `plannedHours`;
 - `probability`;
-- `status`: `new`, `intake`, `feasibility`, `ready_to_activate`, `rejected`, `converted`;
+- `status`: `new`, `intake`, `feasibility`, `ready_to_activate`, `won_closed`, `lost_rejected`;
 - `templateId`;
 - `createdAt`;
 - `updatedAt`.
@@ -152,8 +152,8 @@ Preconditions:
 
 - actor имеет право `tenant.project_activation.manage`;
 - actor имеет право `tenant.projects.manage`;
-- opportunity принадлежит tenant actor;
-- opportunity не `rejected` и не `converted`;
+- сделка/opportunity принадлежит tenant actor;
+- сделка/opportunity не находится в финальном статусе `won_closed` или `lost_rejected`;
 - даты валидны;
 - `contractValue` и `plannedHourlyRate` валидны;
 - demand заполнен;
@@ -170,13 +170,15 @@ Lifecycle transition:
 Opportunity ready_to_activate
   -> Project status=draft, activatedAt=null
   -> Project status=active, activatedAt=now
-  -> Opportunity status=converted
+  -> Opportunity status=won_closed
 ```
 
 Audit action types:
 
 - `opportunity.created`;
 - `opportunity.feasibility_checked`;
+- `opportunity.won_closed`;
+- `opportunity.lost_rejected`;
 - `project.activated`.
 
 Редактирование opportunity не входит в Phase 3.
@@ -185,6 +187,7 @@ Denied privileged Phase 3 mutation attempts also write audit with `executionResu
 
 - `opportunity.create_denied`;
 - `opportunity.feasibility_denied`;
+- `opportunity.finalize_denied`;
 - `project.activation_denied`.
 
 ## Права
@@ -204,8 +207,8 @@ Authenticated `/api/*` responses должны отдавать `Cache-Control: n
 
 ## UX/UI требования
 
-- Новый раздел `Возможности` показывает плотную таблицу opportunity, readiness/status, плановые даты, контракт, часы и действия.
-- Карточка opportunity показывает секции: `Данные сделки`, `Потребность`, `Проверка ресурсов`, `Решение`.
+- Новый раздел `Сделки` показывает плотную таблицу opportunity, readiness/status, плановые даты, контракт, часы и действия.
+- Карточка сделки показывает секции: `Данные сделки`, `Потребность`, `Проверка ресурсов`, `Решение`.
 - Новый раздел `Проекты` показывает активные проекты без fake Gantt/KPI controls.
 - Feasibility table показывает должность, требуемые часы, доступные часы, резерв, дефицит и статус.
 - Ошибки validation показываются рядом с формой.
@@ -220,14 +223,14 @@ Authenticated `/api/*` responses должны отдавать `Cache-Control: n
 - `pnpm test` проходит.
 - `pnpm test:db` проходит против Docker PostgreSQL.
 - `pnpm test:e2e:smoke` проходит и доказывает:
-  - admin видит `Возможности` и `Проекты`;
-  - admin создает opportunity вручную;
+  - admin видит `Сделки` и `Проекты`;
+  - admin создает сделку вручную;
   - admin задает стоимость контракта, плановую норму часа и demand `должность + часы`;
   - система показывает рассчитанные плановые часы;
   - admin запускает feasibility и видит доступные/требуемые часы;
   - проект появляется в `Проекты`;
   - audit показывает `opportunity.created`, `opportunity.feasibility_checked`, `project.activated`;
-  - restricted user не видит `Возможности`/`Проекты`;
+  - restricted user не видит `Сделки`/`Проекты`;
   - restricted user получает API `403` на read и mutation endpoints Phase 3.
 
 DB/API phase tests дополнительно доказывают conflict/stale-capacity сценарии: при изменившейся емкости activation требует `acceptedRiskReason`, а параллельные activation по одному tenant/resource window сериализуются.

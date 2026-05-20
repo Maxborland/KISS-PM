@@ -1,7 +1,11 @@
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { clearSessionQueries, workspaceQueryKeys } from "./workspaceQueries";
+import {
+  clearSessionQueries,
+  invalidateProjectIntakeQueries,
+  workspaceQueryKeys
+} from "./workspaceQueries";
 
 describe("workspace query keys", () => {
   it("uses stable readable keys for server-state groups", () => {
@@ -29,7 +33,26 @@ describe("workspace query keys", () => {
       "opportunities",
       "opportunity-1"
     ]);
+    expect(workspaceQueryKeys.crmActivity("opportunity", "opportunity-1")).toEqual([
+      "workspace",
+      "crm",
+      "opportunity",
+      "opportunity-1",
+      "activity"
+    ]);
     expect(workspaceQueryKeys.projects()).toEqual(["workspace", "projects"]);
+    expect(workspaceQueryKeys.projectDetail("project-1")).toEqual([
+      "workspace",
+      "projects",
+      "project-1"
+    ]);
+    expect(workspaceQueryKeys.projectTasks("project-1")).toEqual([
+      "workspace",
+      "projects",
+      "project-1",
+      "tasks"
+    ]);
+    expect(workspaceQueryKeys.myWork()).toEqual(["workspace", "myWork"]);
     expect(workspaceQueryKeys.customFields()).toEqual([
       "workspace",
       "config",
@@ -74,5 +97,28 @@ describe("workspace query keys", () => {
 
     expect(observer.getCurrentResult().data).toBeUndefined();
     unsubscribe();
+  });
+
+  it("invalidates the deal activity feed after deal state changes", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+    await invalidateProjectIntakeQueries(queryClient, "opportunity-1");
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: workspaceQueryKeys.opportunities()
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: workspaceQueryKeys.projects()
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: workspaceQueryKeys.auditEvents()
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: workspaceQueryKeys.opportunity("opportunity-1")
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: workspaceQueryKeys.crmActivity("opportunity", "opportunity-1")
+    });
   });
 });

@@ -8,7 +8,9 @@ import type {
   DealStage,
   Opportunity,
   Position,
+  Product,
   Project,
+  Task,
   ProjectType,
   ProjectTemplate,
   WorkspaceUser
@@ -24,10 +26,12 @@ export type WorkspaceData = {
   auditEvents: AuditEvent[];
   clients: Client[];
   contacts: Contact[];
+  products: Product[];
   projectTypes: ProjectType[];
   dealStages: DealStage[];
   opportunities: Opportunity[];
   projects: Project[];
+  myWorkTasks: Task[];
   customFields: CustomFieldDefinition[];
   projectTemplates: ProjectTemplate[];
 };
@@ -42,10 +46,12 @@ export function buildWorkspaceData(input: {
   auditEvents: { auditEvents: AuditEvent[] } | undefined;
   clients: { clients: Client[] } | undefined;
   contacts: { contacts: Contact[] } | undefined;
+  products: { products: Product[] } | undefined;
   projectTypes: { projectTypes: ProjectType[] } | undefined;
   dealStages: { dealStages: DealStage[] } | undefined;
   opportunities: { opportunities: Opportunity[] } | undefined;
   projects: { projects: Project[] } | undefined;
+  myWork: { tasks: Task[] } | undefined;
   customFields: { customFields: CustomFieldDefinition[] } | undefined;
   projectTemplates: { projectTemplates: ProjectTemplate[] } | undefined;
 }): WorkspaceData {
@@ -55,6 +61,7 @@ export function buildWorkspaceData(input: {
   const canReadAudit = input.permissions.includes("tenant.audit_events.read");
   const canReadClients = input.permissions.includes("tenant.clients.read");
   const canReadContacts = input.permissions.includes("tenant.contacts.read");
+  const canReadProducts = input.permissions.includes("tenant.products.read");
   const canReadProjectTypes = input.permissions.includes("tenant.project_types.read");
   const canReadDealStages = input.permissions.includes("tenant.deal_stages.read");
   const canReadOpportunities = input.permissions.includes("tenant.opportunities.read");
@@ -71,10 +78,12 @@ export function buildWorkspaceData(input: {
     auditEvents: canReadAudit ? input.auditEvents?.auditEvents ?? [] : [],
     clients: canReadClients ? input.clients?.clients ?? [] : [],
     contacts: canReadContacts ? input.contacts?.contacts ?? [] : [],
+    products: canReadProducts ? input.products?.products ?? [] : [],
     projectTypes: canReadProjectTypes ? input.projectTypes?.projectTypes ?? [] : [],
     dealStages: canReadDealStages ? input.dealStages?.dealStages ?? [] : [],
     opportunities: canReadOpportunities ? input.opportunities?.opportunities ?? [] : [],
     projects: canReadProjects ? input.projects?.projects ?? [] : [],
+    myWorkTasks: canReadProjects ? input.myWork?.tasks ?? [] : [],
     customFields: canReadWorkspaceConfig ? input.customFields?.customFields ?? [] : [],
     projectTemplates: canReadWorkspaceConfig
       ? input.projectTemplates?.projectTemplates ?? []

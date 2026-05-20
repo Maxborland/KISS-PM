@@ -6,7 +6,12 @@ import {
   createCustomField,
   createContact,
   createDealStage,
+  createCrmComment,
+  createCrmFile,
+  createCrmTask,
   createOpportunity,
+  createProduct,
+  createProjectTask,
   createPosition,
   createProjectType,
   createProjectTemplate,
@@ -24,13 +29,19 @@ import {
   fetchCustomFields,
   fetchDealStages,
   fetchMe,
+  fetchMyWork,
   fetchOpportunity,
+  fetchCrmActivity,
   fetchOpportunities,
   fetchPositions,
+  fetchProducts,
   fetchProjects,
   fetchProjectTypes,
   fetchProjectTemplates,
+  fetchProjectDetail,
+  fetchProjectTasks,
   fetchUsers,
+  finalizeOpportunity,
   login,
   logout,
   updateAccessRole,
@@ -38,14 +49,18 @@ import {
   updateCustomField,
   updateContact,
   updateDealStage,
+  updateOpportunity,
+  updateCrmTask,
   updateOpportunityStage,
   updatePosition,
+  updateProduct,
   updateProjectType,
   updateProfile,
   updateProjectTemplate,
   updateTheme,
   updateUser
 } from "./api";
+import type { CrmActivityEntityType } from "./api";
 
 export const workspaceQueryKeys = {
   health: () => ["health"] as const,
@@ -56,12 +71,19 @@ export const workspaceQueryKeys = {
   auditEvents: () => ["workspace", "auditEvents"] as const,
   clients: () => ["workspace", "crm", "clients"] as const,
   contacts: () => ["workspace", "crm", "contacts"] as const,
+  products: () => ["workspace", "crm", "products"] as const,
   projectTypes: () => ["workspace", "crm", "projectTypes"] as const,
   dealStages: () => ["workspace", "crm", "dealStages"] as const,
   opportunities: () => ["workspace", "opportunities"] as const,
   opportunity: (opportunityId: string) =>
     ["workspace", "opportunities", opportunityId] as const,
+  crmActivity: (entityType: CrmActivityEntityType, entityId: string) =>
+    ["workspace", "crm", entityType, entityId, "activity"] as const,
   projects: () => ["workspace", "projects"] as const,
+  projectDetail: (projectId: string) => ["workspace", "projects", projectId] as const,
+  projectTasks: (projectId: string) =>
+    ["workspace", "projects", projectId, "tasks"] as const,
+  myWork: () => ["workspace", "myWork"] as const,
   customFields: () => ["workspace", "config", "customFields"] as const,
   projectTemplates: () => ["workspace", "config", "projectTemplates"] as const
 };
@@ -142,6 +164,14 @@ export function useContactsQuery(enabled: boolean) {
   });
 }
 
+export function useProductsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.products(),
+    queryFn: fetchProducts,
+    enabled
+  });
+}
+
 export function useProjectTypesQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.projectTypes(),
@@ -174,10 +204,46 @@ export function useOpportunityQuery(opportunityId: string | null, enabled: boole
   });
 }
 
+export function useCrmActivityQuery(
+  entityType: CrmActivityEntityType,
+  entityId: string | null,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.crmActivity(entityType, entityId ?? "unknown"),
+    queryFn: () => fetchCrmActivity(entityType, entityId ?? ""),
+    enabled: enabled && Boolean(entityId)
+  });
+}
+
 export function useProjectsQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.projects(),
     queryFn: fetchProjects,
+    enabled
+  });
+}
+
+export function useProjectDetailQuery(projectId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectDetail(projectId ?? "unknown"),
+    queryFn: () => fetchProjectDetail(projectId ?? ""),
+    enabled: enabled && Boolean(projectId)
+  });
+}
+
+export function useProjectTasksQuery(projectId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.projectTasks(projectId ?? "unknown"),
+    queryFn: () => fetchProjectTasks(projectId ?? ""),
+    enabled: enabled && Boolean(projectId)
+  });
+}
+
+export function useMyWorkQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.myWork(),
+    queryFn: fetchMyWork,
     enabled
   });
 }
@@ -336,6 +402,7 @@ export function useCrmMutations() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.clients() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.contacts() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.products() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projectTypes() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.dealStages() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
@@ -362,6 +429,15 @@ export function useCrmMutations() {
         updateContact(contactId, input),
       onSuccess: invalidateCrm
     }),
+    createProduct: useMutation({
+      mutationFn: createProduct,
+      onSuccess: invalidateCrm
+    }),
+    updateProduct: useMutation({
+      mutationFn: ({ productId, input }: Parameters<typeof updateProduct> extends [infer Id, infer Input] ? { productId: Id; input: Input } : never) =>
+        updateProduct(productId, input),
+      onSuccess: invalidateCrm
+    }),
     createProjectType: useMutation({
       mutationFn: createProjectType,
       onSuccess: invalidateCrm
@@ -385,51 +461,148 @@ export function useCrmMutations() {
 
 export function useProjectIntakeMutations() {
   const queryClient = useQueryClient();
-  const invalidateProjectIntake = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
-      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
-    ]);
-  };
+  const invalidateProjectIntake = (opportunityId?: string | null) =>
+    invalidateProjectIntakeQueries(queryClient, opportunityId);
 
   return {
     createOpportunity: useMutation({
       mutationFn: createOpportunity,
-      onSuccess: invalidateProjectIntake
+      onSuccess: async () => {
+        await invalidateProjectIntake();
+      }
+    }),
+    updateOpportunity: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        updateOpportunity(opportunityId, input),
+      onSuccess: async (_result, variables) => {
+        await invalidateProjectIntake(String(variables.opportunityId));
+      }
     }),
     checkFeasibility: useMutation({
       mutationFn: checkOpportunityFeasibility,
       onSuccess: async (_result, opportunityId) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(opportunityId)
-          })
-        ]);
+        await invalidateProjectIntake(opportunityId);
       }
     }),
     updateStage: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof updateOpportunityStage> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         updateOpportunityStage(opportunityId, input),
       onSuccess: async (_result, variables) => {
-        await Promise.all([
-          invalidateProjectIntake(),
-          queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
-        ]);
+        await invalidateProjectIntake(String(variables.opportunityId));
       }
     }),
     activateProject: useMutation({
       mutationFn: ({ opportunityId, input }: Parameters<typeof activateOpportunityProject> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
         activateOpportunityProject(opportunityId, input),
       onSuccess: async (_result, variables) => {
+        await invalidateProjectIntake(String(variables.opportunityId));
+      }
+    }),
+    finalizeOpportunity: useMutation({
+      mutationFn: ({ opportunityId, input }: Parameters<typeof finalizeOpportunity> extends [infer Id, infer Input] ? { opportunityId: Id; input: Input } : never) =>
+        finalizeOpportunity(opportunityId, input),
+      onSuccess: async (_result, variables) => {
+        await invalidateProjectIntake(String(variables.opportunityId));
+      }
+    })
+  };
+}
+
+export async function invalidateProjectIntakeQueries(
+  queryClient: QueryClient,
+  opportunityId?: string | null
+): Promise<void> {
+  const invalidations = [
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
+    queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+  ];
+
+  if (opportunityId) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.opportunity(opportunityId)
+      }),
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.crmActivity("opportunity", opportunityId)
+      })
+    );
+  }
+
+  await Promise.all(invalidations);
+}
+
+export function useCrmActivityMutations(
+  entityType: CrmActivityEntityType,
+  entityId: string | null
+) {
+  const queryClient = useQueryClient();
+  const invalidateActivity = async () => {
+    if (!entityId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.crmActivity(entityType, entityId)
+      }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
+    ]);
+  };
+
+  return {
+    createComment: useMutation({
+      mutationFn: (input: Parameters<typeof createCrmComment>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmComment(entityType, entityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    createTask: useMutation({
+      mutationFn: (input: Parameters<typeof createCrmTask>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmTask(entityType, entityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    createFile: useMutation({
+      mutationFn: (input: Parameters<typeof createCrmFile>[2]) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return createCrmFile(entityType, entityId, input);
+      },
+      onSuccess: invalidateActivity
+    }),
+    updateTask: useMutation({
+      mutationFn: (input: {
+        activityId: string;
+        status: Parameters<typeof updateCrmTask>[3]["status"];
+      }) => {
+        if (!entityId) throw new Error("crm_entity_id_required");
+        return updateCrmTask(entityType, entityId, input.activityId, {
+          status: input.status
+        });
+      },
+      onSuccess: invalidateActivity
+    })
+  };
+}
+
+export function useProjectWorkMutations() {
+  const queryClient = useQueryClient();
+
+  return {
+    createTask: useMutation({
+      mutationFn: ({ projectId, input }: Parameters<typeof createProjectTask> extends [infer ProjectId, infer Input] ? { projectId: ProjectId; input: Input } : never) =>
+        createProjectTask(projectId, input),
+      onSuccess: async (_result, variables) => {
+        const projectId = String(variables.projectId);
         await Promise.all([
-          invalidateProjectIntake(),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projects() }),
           queryClient.invalidateQueries({
-            queryKey: workspaceQueryKeys.opportunity(String(variables.opportunityId))
-          })
+            queryKey: workspaceQueryKeys.projectDetail(projectId)
+          }),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.projectTasks(projectId)
+          }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.myWork() }),
+          queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.auditEvents() })
         ]);
       }
     })

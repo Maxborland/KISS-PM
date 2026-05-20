@@ -19,6 +19,11 @@ import {
   userSessions
 } from "./schema";
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
+import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
+import {
+  createCrmActivityRepository,
+  type CrmActivityRepository
+} from "./crmActivityRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -28,6 +33,8 @@ import {
   type CrmRepository,
   type DealStageInput,
   type DealStageRecord,
+  type ProductInput,
+  type ProductRecord,
   type ProjectTypeInput,
   type ProjectTypeRecord
 } from "./crmRepository";
@@ -74,10 +81,7 @@ export type CustomFieldDefinitionRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type CustomFieldDefinitionInput = Omit<
-  CustomFieldDefinitionRecord,
-  "createdAt" | "updatedAt"
->;
+export type CustomFieldDefinitionInput = Omit<CustomFieldDefinitionRecord, "createdAt" | "updatedAt">;
 export type ProjectTemplateRecord = {
   id: string;
   tenantId: TenantId;
@@ -88,20 +92,8 @@ export type ProjectTemplateRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
-export type ProjectTemplateInput = Omit<
-  ProjectTemplateRecord,
-  "createdAt" | "updatedAt"
->;
-export type {
-  ClientInput,
-  ClientRecord,
-  ContactInput,
-  ContactRecord,
-  DealStageInput,
-  DealStageRecord,
-  ProjectTypeInput,
-  ProjectTypeRecord
-};
+export type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
+export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;
@@ -116,8 +108,7 @@ export type UserSessionRecord = {
   tokenHash: string;
   expiresAt: Date;
 };
-
-export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & {
+export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & ProjectWorkRepository & CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -172,6 +163,8 @@ export function createPostgresTenantDataSource(
     db,
     ...createCrmRepository(db),
     ...createProjectIntakeRepository(db),
+    ...createProjectWorkRepository(db),
+    ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
       const rows = await db.select().from(tenantUsers).orderBy(tenantUsers.id);

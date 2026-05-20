@@ -7,7 +7,9 @@ import {
   FolderKanban,
   LayoutDashboard,
   Palette,
+  PackageOpen,
   PanelsTopLeft,
+  SquareCheckBig,
   Settings,
   ShieldCheck,
   UserCircle,
@@ -19,10 +21,12 @@ import type { WorkspaceRouteId } from "./routes";
 
 export const workspaceRouteIcons = {
   dashboard: LayoutDashboard,
+  "my-work": SquareCheckBig,
   opportunities: ClipboardList,
   projects: PanelsTopLeft,
   clients: Building2,
   contacts: ContactRound,
+  products: PackageOpen,
   users: Users,
   "access-roles": ShieldCheck,
   positions: BriefcaseBusiness,

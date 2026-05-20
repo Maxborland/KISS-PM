@@ -21,7 +21,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client`
       INSERT INTO tenants (id, name, created_at)
       VALUES
@@ -35,7 +35,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -70,6 +70,17 @@ describe("Phase 3.1 CRM persistence", () => {
       tenantId: "tenant-alpha",
       name: "Новая",
       sortOrder: 10,
+      status: "active"
+    });
+    const product = await dataSource.createProduct({
+      id: "product-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение KISS PM",
+      sku: "KISS-IMPL",
+      type: "service",
+      unit: "час",
+      price: 6000,
+      description: "Проектная услуга",
       status: "active"
     });
     const opportunity = await dataSource.createOpportunity({
@@ -108,6 +119,27 @@ describe("Phase 3.1 CRM persistence", () => {
     await expect(dataSource.listClients("tenant-alpha")).resolves.toHaveLength(1);
     await expect(dataSource.listClients("tenant-beta")).resolves.toEqual([]);
     await expect(dataSource.listContacts("tenant-alpha")).resolves.toHaveLength(1);
+    await expect(dataSource.listProducts("tenant-alpha")).resolves.toEqual([
+      expect.objectContaining({
+        id: "product-implementation",
+        name: "Внедрение KISS PM",
+        sku: "KISS-IMPL",
+        type: "service",
+        price: 6000
+      })
+    ]);
+    await expect(dataSource.listProducts("tenant-beta")).resolves.toEqual([]);
+    await expect(
+      dataSource.updateProduct({
+        ...product,
+        name: "Внедрение KISS PM расширенное",
+        status: "archived"
+      })
+    ).resolves.toMatchObject({
+      id: "product-implementation",
+      name: "Внедрение KISS PM расширенное",
+      status: "archived"
+    });
     await expect(dataSource.listProjectTypes("tenant-alpha")).resolves.toHaveLength(1);
     await expect(dataSource.listDealStages("tenant-alpha")).resolves.toEqual([
       expect.objectContaining({ id: "deal-stage-new", sortOrder: 10 })
@@ -130,6 +162,18 @@ describe("Phase 3.1 CRM persistence", () => {
       id: "opportunity-alpha",
       stageId: "deal-stage-qualified"
     });
+    await dataSource.finalizeOpportunity({
+      tenantId: "tenant-alpha",
+      opportunityId: opportunity.id,
+      status: "lost_rejected"
+    });
+    await expect(
+      dataSource.updateOpportunityStage({
+        tenantId: "tenant-alpha",
+        opportunityId: opportunity.id,
+        stageId: stage.id
+      })
+    ).resolves.toBeUndefined();
 
     const otherClient = await dataSource.createClient({
       id: "client-other",

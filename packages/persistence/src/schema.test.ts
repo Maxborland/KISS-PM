@@ -7,7 +7,7 @@ import {
 } from "./index";
 
 describe("PostgreSQL persistence schema", () => {
-  it("defines the persistence tables through Phase 3.1", () => {
+  it("defines the persistence tables through Phase 4 starter", () => {
     expect(persistenceTableNames).toEqual([
       "tenants",
       "access_profiles",
@@ -16,12 +16,16 @@ describe("PostgreSQL persistence schema", () => {
       "project_templates",
       "clients",
       "contacts",
+      "products",
       "project_types",
       "deal_stages",
       "opportunities",
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "tasks",
+      "task_participants",
+      "crm_activities",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -37,12 +41,16 @@ describe("PostgreSQL persistence schema", () => {
       "project_templates",
       "clients",
       "contacts",
+      "products",
       "project_types",
       "deal_stages",
       "opportunities",
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "tasks",
+      "task_participants",
+      "crm_activities",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -58,6 +66,7 @@ describe("PostgreSQL persistence schema", () => {
     expect(getPersistenceTableColumns("opportunities")).toEqual(
       expect.arrayContaining([
         "client_id",
+        "owner_user_id",
         "primary_contact_id",
         "project_type_id",
         "stage_id"
@@ -68,6 +77,28 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("deal_stages")).toEqual(
       expect.arrayContaining(["sort_order"])
+    );
+    expect(getPersistenceTableColumns("products")).toEqual(
+      expect.arrayContaining(["sku", "type", "unit", "price", "status"])
+    );
+  });
+
+  it("stores CRM activity on the shared CRM entity contract", () => {
+    expect(getPersistenceTableColumns("crm_activities")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "type",
+        "title",
+        "body",
+        "status",
+        "due_date",
+        "assignee_user_id",
+        "author_user_id",
+        "file_url",
+        "file_size_bytes",
+        "mime_type"
+      ])
     );
   });
 });

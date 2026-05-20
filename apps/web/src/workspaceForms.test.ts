@@ -5,9 +5,11 @@ import {
   validateClientForm,
   validateContactForm,
   validateDealStageForm,
+  validateOpportunityCustomFields,
   validateOpportunityForm,
   validateCustomFieldForm,
   validatePositionForm,
+  validateProductForm,
   validateProjectTypeForm,
   validateProjectTemplateForm,
   validateRoleForm,
@@ -148,6 +150,20 @@ describe("workspace form quality baseline", () => {
     expect(validateProjectTypeForm({ name: "", description: "" })).toEqual({
       name: "Укажите тип проекта."
     });
+    expect(
+      validateProductForm({
+        name: "",
+        sku: "",
+        type: "invalid",
+        unit: "",
+        price: "0"
+      })
+    ).toEqual({
+      name: "Укажите товар или услугу.",
+      type: "Выберите тип позиции.",
+      unit: "Укажите единицу измерения.",
+      price: "Цена должна быть положительным целым числом."
+    });
     expect(validateDealStageForm({ name: "", sortOrder: "0" })).toEqual({
       name: "Укажите этап сделки.",
       sortOrder: "Порядок должен быть положительным целым числом."
@@ -177,7 +193,7 @@ describe("workspace form quality baseline", () => {
       validateCustomFieldForm({
         systemKey: `a${"x".repeat(79)}`,
         tenantLabel: "x".repeat(120),
-        targetEntity: "project",
+        targetEntity: "opportunity",
         fieldType: "select",
         status: "active"
       })
@@ -214,6 +230,89 @@ describe("workspace form quality baseline", () => {
       })
     ).toEqual({
       description: "Описание должно быть не длиннее 1000 символов."
+    });
+  });
+
+  it("validates runtime opportunity custom field values", () => {
+    expect(
+      validateOpportunityCustomFields(
+        [
+          {
+            id: "field-priority",
+            tenantId: "tenant-alpha",
+            systemKey: "priority",
+            tenantLabel: "Приоритет",
+            targetEntity: "opportunity",
+            fieldType: "text",
+            required: true,
+            status: "active",
+            createdAt: "2026-05-19T00:00:00.000Z",
+            updatedAt: "2026-05-19T00:00:00.000Z"
+          },
+          {
+            id: "field-margin",
+            tenantId: "tenant-alpha",
+            systemKey: "margin",
+            tenantLabel: "Маржинальность",
+            targetEntity: "opportunity",
+            fieldType: "number",
+            required: false,
+            status: "active",
+            createdAt: "2026-05-19T00:00:00.000Z",
+            updatedAt: "2026-05-19T00:00:00.000Z"
+          }
+        ],
+        {
+          "field-priority": " ",
+          "field-margin": "abc"
+        }
+      )
+    ).toEqual({
+      "field-priority": "Заполните поле «Приоритет».",
+      "field-margin": "Поле «Маржинальность» должно быть числом."
+    });
+  });
+
+  it("rejects rolled-over calendar dates in deal forms", () => {
+    const baseDeal = {
+      clientId: "client-alpha",
+      primaryContactId: "contact-alpha",
+      title: "Контур внедрения",
+      projectTypeId: "project-type-implementation",
+      stageId: "deal-stage-qualification",
+      plannedStart: "2026-02-31",
+      plannedFinish: "2026-03-10",
+      contractValue: "960000",
+      plannedHourlyRate: "6000",
+      probability: "70",
+      demand: [{ positionId: "position-engineer", requiredHours: "160" }]
+    };
+
+    expect(validateOpportunityForm(baseDeal)).toMatchObject({
+      plannedStart: "Укажите дату старта."
+    });
+    expect(
+      validateOpportunityCustomFields(
+        [
+          {
+            id: "field-review-date",
+            tenantId: "tenant-alpha",
+            systemKey: "review_date",
+            tenantLabel: "Дата ревью",
+            targetEntity: "opportunity",
+            fieldType: "date",
+            required: false,
+            status: "active",
+            createdAt: "2026-05-19T00:00:00.000Z",
+            updatedAt: "2026-05-19T00:00:00.000Z"
+          }
+        ],
+        {
+          "field-review-date": "2026-02-31"
+        }
+      )
+    ).toEqual({
+      "field-review-date": "Поле «Дата ревью» должно быть датой."
     });
   });
 

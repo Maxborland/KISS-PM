@@ -52,7 +52,7 @@ export function parseCustomFieldDefinitionBody(
   if (!tenantLabel || !isWorkspaceConfigTenantLabel(tenantLabel)) {
     return { ok: false, error: "invalid_tenant_label" };
   }
-  if (targetEntity !== "project") {
+  if (!["project", "opportunity"].includes(targetEntity)) {
     return { ok: false, error: "invalid_target_entity" };
   }
   if (!fieldType || !isWorkspaceConfigFieldType(fieldType)) {

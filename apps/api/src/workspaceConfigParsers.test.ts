@@ -35,6 +35,29 @@ describe("workspace config parsers", () => {
     });
   });
 
+  it("allows opportunity custom fields for the deal CRUD baseline", () => {
+    expect(
+      parseCustomFieldDefinitionBody(
+        {
+          id: "field-opportunity-budget-model",
+          systemKey: "opportunity_budget_model",
+          tenantLabel: "Экономическая модель сделки",
+          targetEntity: "opportunity",
+          fieldType: "text",
+          required: false,
+          status: "active"
+        },
+        "tenant-alpha"
+      )
+    ).toMatchObject({
+      ok: true,
+      value: {
+        targetEntity: "opportunity",
+        systemKey: "opportunity_budget_model"
+      }
+    });
+  });
+
   it("rejects invalid custom field system keys and labels", () => {
     expect(
       parseCustomFieldDefinitionBody(

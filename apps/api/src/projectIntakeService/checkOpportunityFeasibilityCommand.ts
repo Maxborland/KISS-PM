@@ -46,6 +46,9 @@ export async function checkOpportunityFeasibility(
         feasibilityStatus: assessment.status,
         feasibilityResult: assessment as unknown as Record<string, unknown>
       });
+      if (!updated) {
+        return undefined;
+      }
       await deps.appendManagementAuditEvent(
         {
           tenantId: input.actor.tenantId,
@@ -67,6 +70,10 @@ export async function checkOpportunityFeasibility(
       return updated;
     }
   );
+
+  if (!updatedOpportunity) {
+    return { ok: false, status: 409, error: "opportunity_not_feasible" };
+  }
 
   return {
     ok: true,
