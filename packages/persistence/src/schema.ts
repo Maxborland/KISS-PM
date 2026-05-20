@@ -561,12 +561,13 @@ export const taskParticipants = pgTable(
   ]
 );
 
-export const opportunityActivities = pgTable(
-  "opportunity_activities",
+export const crmActivities = pgTable(
+  "crm_activities",
   {
     id: text("id").notNull(),
     tenantId: text("tenant_id").notNull(),
-    opportunityId: text("opportunity_id").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
     type: text("type").notNull(),
     title: text("title"),
     body: text("body"),
@@ -574,48 +575,53 @@ export const opportunityActivities = pgTable(
     dueDate: timestamp("due_date", { withTimezone: true }),
     assigneeUserId: text("assignee_user_id"),
     authorUserId: text("author_user_id").notNull(),
+    fileUrl: text("file_url"),
+    fileSizeBytes: integer("file_size_bytes"),
+    mimeType: text("mime_type"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
   },
   (table) => [
     primaryKey({
-      name: "opportunity_activities_pkey",
+      name: "crm_activities_pkey",
       columns: [table.tenantId, table.id]
     }),
     foreignKey({
-      name: "opportunity_activities_opportunity_fk",
-      columns: [table.tenantId, table.opportunityId],
-      foreignColumns: [opportunities.tenantId, opportunities.id]
-    }).onDelete("restrict"),
-    foreignKey({
-      name: "opportunity_activities_author_user_fk",
+      name: "crm_activities_author_user_fk",
       columns: [table.tenantId, table.authorUserId],
       foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
     }).onDelete("restrict"),
     foreignKey({
-      name: "opportunity_activities_assignee_user_fk",
+      name: "crm_activities_assignee_user_fk",
       columns: [table.tenantId, table.assigneeUserId],
       foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
     }).onDelete("restrict"),
-    index("opportunity_activities_tenant_opportunity_created_idx").on(
+    index("crm_activities_tenant_entity_created_idx").on(
       table.tenantId,
-      table.opportunityId,
+      table.entityType,
+      table.entityId,
       table.createdAt
     ),
-    index("opportunity_activities_tenant_assignee_idx").on(
+    index("crm_activities_tenant_assignee_idx").on(
       table.tenantId,
       table.assigneeUserId
     ),
     check(
-      "opportunity_activities_type_chk",
-      sql`${table.type} in ('comment', 'task')`
+      "crm_activities_entity_type_chk",
+      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product')`
     ),
     check(
-      "opportunity_activities_status_chk",
+      "crm_activities_type_chk",
+      sql`${table.type} in ('comment', 'task', 'file')`
+    ),
+    check(
+      "crm_activities_payload_chk",
       sql`(
-        (${table.type} = 'comment' and ${table.status} is null)
+        (${table.type} = 'comment' and ${table.status} is null and ${table.body} is not null)
         or
         (${table.type} = 'task' and ${table.status} in ('todo', 'done') and ${table.title} is not null)
+        or
+        (${table.type} = 'file' and ${table.status} is null and ${table.title} is not null and ${table.fileUrl} is not null)
       )`
     )
   ]
@@ -668,7 +674,7 @@ export type PersistenceTableName =
   | "project_position_demands"
   | "tasks"
   | "task_participants"
-  | "opportunity_activities"
+  | "crm_activities"
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
@@ -698,7 +704,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_position_demands",
   "tasks",
   "task_participants",
-  "opportunity_activities",
+  "crm_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -721,7 +727,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_position_demands",
   "tasks",
   "task_participants",
-  "opportunity_activities",
+  "crm_activities",
   "tenant_users",
   "user_credentials",
   "user_sessions",
@@ -883,10 +889,11 @@ const tableColumns = {
     "updated_at"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],
-  opportunity_activities: [
+  crm_activities: [
     "id",
     "tenant_id",
-    "opportunity_id",
+    "entity_type",
+    "entity_id",
     "type",
     "title",
     "body",
@@ -894,6 +901,9 @@ const tableColumns = {
     "due_date",
     "assignee_user_id",
     "author_user_id",
+    "file_url",
+    "file_size_bytes",
+    "mime_type",
     "created_at",
     "updated_at"
   ],

@@ -1,17 +1,17 @@
-import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
-import { CheckCircle2, MessageCircle, SquareCheckBig } from "lucide-react";
+import type { CrmActivity, CrmSystemEvent } from "./api";
+import { CheckCircle2, MessageCircle, Paperclip, SquareCheckBig } from "lucide-react";
 import {
-  groupOpportunityFeedItemsByDay,
-  type OpportunityFeedItem
-} from "./opportunityActivity";
+  groupCrmFeedItemsByDay,
+  type CrmFeedItem
+} from "./crmActivity";
 import type { WorkspaceData } from "./workspaceData";
 import { StatusPill } from "./components/workspace-ui";
 import { getAuditActionLabel } from "./workspaceDashboard";
 import { formatDate } from "./workspaceViewHelpers";
 
-export function OpportunityFeedView(props: {
+export function CrmFeedView(props: {
   data: WorkspaceData;
-  items: OpportunityFeedItem[];
+  items: CrmFeedItem[];
 }) {
   if (props.items.length === 0) {
     return <p className="empty-state compact">В ленте сделки пока нет событий.</p>;
@@ -19,19 +19,19 @@ export function OpportunityFeedView(props: {
 
   return (
     <div className="activity-list">
-      {groupOpportunityFeedItemsByDay(props.items).map((group) => (
+      {groupCrmFeedItemsByDay(props.items).map((group) => (
         <section className="activity-day-group" key={group.dateKey}>
           <h3>{group.label}</h3>
           <div className="activity-day-items">
             {group.items.map((item) =>
               item.kind === "activity" ? (
-                <OpportunityActivityRow
+                <CrmActivityRow
                   activity={item.activity}
                   data={props.data}
                   key={`activity-${item.activity.id}`}
                 />
               ) : (
-                <OpportunitySystemEventRow
+                <CrmSystemEventRow
                   data={props.data}
                   event={item.event}
                   key={`system-${item.event.id}`}
@@ -45,12 +45,13 @@ export function OpportunityFeedView(props: {
   );
 }
 
-export function OpportunityActivityRow(props: {
-  activity: OpportunityActivity;
+export function CrmActivityRow(props: {
+  activity: CrmActivity;
   data: WorkspaceData;
 }) {
   const isTask = props.activity.type === "task";
-  const Icon = isTask ? SquareCheckBig : MessageCircle;
+  const isFile = props.activity.type === "file";
+  const Icon = isTask ? SquareCheckBig : isFile ? Paperclip : MessageCircle;
 
   return (
     <article className={`activity-row ${isTask ? "task-row" : "comment-row"}`}>
@@ -59,8 +60,10 @@ export function OpportunityActivityRow(props: {
         <Icon aria-hidden="true" size={15} />
       </span>
       <div className="activity-row-content">
-        <strong>{isTask ? props.activity.title : "Комментарий"}</strong>
-        <p>{props.activity.body || (isTask ? "Без описания" : "")}</p>
+        <strong>
+          {isTask ? props.activity.title : isFile ? props.activity.title : "Комментарий"}
+        </strong>
+        <p>{props.activity.body || (isTask ? "Без описания" : props.activity.fileUrl ?? "")}</p>
         <small>
           {getWorkspaceUserName(props.data, props.activity.authorUserId)} ·{" "}
           {formatDate(props.activity.createdAt)}
@@ -76,9 +79,9 @@ export function OpportunityActivityRow(props: {
   );
 }
 
-export function OpportunitySystemEventRow(props: {
+export function CrmSystemEventRow(props: {
   data: WorkspaceData;
-  event: OpportunitySystemEvent;
+  event: CrmSystemEvent;
 }) {
   return (
     <article className="activity-row system-row">

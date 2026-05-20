@@ -25,7 +25,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_position_demands",
       "tasks",
       "task_participants",
-      "opportunity_activities",
+      "crm_activities",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -50,7 +50,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_position_demands",
       "tasks",
       "task_participants",
-      "opportunity_activities",
+      "crm_activities",
       "tenant_users",
       "user_credentials",
       "user_sessions",
@@ -80,6 +80,25 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("products")).toEqual(
       expect.arrayContaining(["sku", "type", "unit", "price", "status"])
+    );
+  });
+
+  it("stores CRM activity on the shared CRM entity contract", () => {
+    expect(getPersistenceTableColumns("crm_activities")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "type",
+        "title",
+        "body",
+        "status",
+        "due_date",
+        "assignee_user_id",
+        "author_user_id",
+        "file_url",
+        "file_size_bytes",
+        "mime_type"
+      ])
     );
   });
 });

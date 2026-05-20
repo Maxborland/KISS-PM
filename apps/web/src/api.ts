@@ -337,25 +337,30 @@ export type OpportunityFinalActionInput = {
   reason: string;
 };
 
-export type OpportunityActivityType = "comment" | "task";
-export type OpportunityActivityStatus = "todo" | "done";
+export type CrmActivityEntityType = "opportunity" | "client" | "contact" | "product";
+export type CrmActivityType = "comment" | "task" | "file";
+export type CrmActivityStatus = "todo" | "done";
 
-export type OpportunityActivity = {
+export type CrmActivity = {
   id: string;
   tenantId: string;
-  opportunityId: string;
-  type: OpportunityActivityType;
+  entityType: CrmActivityEntityType;
+  entityId: string;
+  type: CrmActivityType;
   title: string | null;
   body: string | null;
-  status: OpportunityActivityStatus | null;
+  status: CrmActivityStatus | null;
   dueDate: string | null;
   assigneeUserId: string | null;
   authorUserId: string;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type OpportunitySystemEvent = {
+export type CrmSystemEvent = {
   id: string;
   actorUserId: string;
   actionType: string;
@@ -364,26 +369,34 @@ export type OpportunitySystemEvent = {
   executionStatus: unknown;
 };
 
-export type OpportunityActivityFeed = {
-  activities: OpportunityActivity[];
-  systemEvents: OpportunitySystemEvent[];
+export type CrmActivityFeed = {
+  activities: CrmActivity[];
+  systemEvents: CrmSystemEvent[];
   canReadRawAudit: boolean;
   auditEvents: AuditEvent[] | null;
 };
 
-export type OpportunityCommentInput = {
+export type CrmCommentInput = {
   body: string;
 };
 
-export type OpportunityTaskInput = {
+export type CrmTaskInput = {
   title: string;
   body?: string | null;
   dueDate?: string | null;
   assigneeUserId?: string | null;
 };
 
-export type OpportunityTaskUpdateInput = {
-  status: OpportunityActivityStatus;
+export type CrmFileInput = {
+  title: string;
+  fileUrl: string;
+  body?: string | null;
+  fileSizeBytes?: number | null;
+  mimeType?: string | null;
+};
+
+export type CrmTaskUpdateInput = {
+  status: CrmActivityStatus;
 };
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
@@ -789,20 +802,22 @@ export async function activateOpportunityProject(
   );
 }
 
-export async function fetchOpportunityActivity(
-  opportunityId: string
-): Promise<OpportunityActivityFeed> {
+export async function fetchCrmActivity(
+  entityType: CrmActivityEntityType,
+  entityId: string
+): Promise<CrmActivityFeed> {
   return requestJson(
-    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/activity`
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/activity`
   );
 }
 
-export async function createOpportunityComment(
-  opportunityId: string,
-  input: OpportunityCommentInput
-): Promise<{ activity: OpportunityActivity }> {
+export async function createCrmComment(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmCommentInput
+): Promise<{ activity: CrmActivity }> {
   return requestJson(
-    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/comments`,
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/comments`,
     {
       method: "POST",
       body: input
@@ -810,12 +825,13 @@ export async function createOpportunityComment(
   );
 }
 
-export async function createOpportunityTask(
-  opportunityId: string,
-  input: OpportunityTaskInput
-): Promise<{ activity: OpportunityActivity }> {
+export async function createCrmTask(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmTaskInput
+): Promise<{ activity: CrmActivity }> {
   return requestJson(
-    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/tasks`,
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/tasks`,
     {
       method: "POST",
       body: input
@@ -823,13 +839,28 @@ export async function createOpportunityTask(
   );
 }
 
-export async function updateOpportunityTask(
-  opportunityId: string,
+export async function createCrmFile(
+  entityType: CrmActivityEntityType,
+  entityId: string,
+  input: CrmFileInput
+): Promise<{ activity: CrmActivity }> {
+  return requestJson(
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/files`,
+    {
+      method: "POST",
+      body: input
+    }
+  );
+}
+
+export async function updateCrmTask(
+  entityType: CrmActivityEntityType,
+  entityId: string,
   activityId: string,
-  input: OpportunityTaskUpdateInput
-): Promise<{ activity: OpportunityActivity }> {
+  input: CrmTaskUpdateInput
+): Promise<{ activity: CrmActivity }> {
   return requestJson(
-    `/api/workspace/opportunities/${encodePathSegment(opportunityId)}/tasks/${encodePathSegment(activityId)}`,
+    `/api/workspace/crm/${encodePathSegment(entityType)}/${encodePathSegment(entityId)}/tasks/${encodePathSegment(activityId)}`,
     {
       method: "PATCH",
       body: input

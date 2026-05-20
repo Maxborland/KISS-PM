@@ -97,6 +97,13 @@ const phase4OpportunityOwnerMigration = readFileSync(
   new URL("../migrations/0017_phase_4_opportunity_owner.sql", import.meta.url),
   "utf8"
 );
+const phase4GeneralCrmActivityMigration = readFileSync(
+  new URL(
+    "../migrations/0018_phase_4_general_crm_activities.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -372,5 +379,29 @@ describe("Phase 4 opportunity owner SQL migration", () => {
       'CREATE INDEX IF NOT EXISTS "opportunities_owner_user_id_idx"'
     );
     expect(phase4OpportunityOwnerMigration).toContain('"tenant_id", "owner_user_id"');
+  });
+});
+
+describe("Phase 4 general CRM activity SQL migration", () => {
+  it("moves runtime activity to the shared CRM entity contract", () => {
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_activities"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain('"entity_type" text NOT NULL');
+    expect(phase4GeneralCrmActivityMigration).toContain('"entity_id" text NOT NULL');
+    expect(phase4GeneralCrmActivityMigration).toContain('"file_url" text');
+    expect(phase4GeneralCrmActivityMigration).toContain('"file_size_bytes" integer');
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CONSTRAINT "crm_activities_entity_type_chk"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toMatch(
+      /"entity_type" in \('opportunity', 'client', 'contact', 'product'\)/
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "crm_activities_tenant_entity_created_idx"'
+    );
+    expect(phase4GeneralCrmActivityMigration).toContain(
+      'DROP TABLE IF EXISTS "opportunity_activities"'
+    );
   });
 });

@@ -2,8 +2,8 @@ import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Product, ProductUpdateInput } from "./api";
+import { CrmActivityPanel } from "./CrmActivityPanel";
 import {
-  CrmEntityActivityPlaceholder,
   CrmEntityFact,
   CrmEntityFactList,
   CrmEntitySection,
@@ -189,16 +189,15 @@ export function ProductsView(props: {
         {activeProduct ? (
           <CrmEntityWorkspace
             activity={
-              <CrmEntityActivityPlaceholder
+              <CrmActivityPanel
+                canManage={canManageProducts}
+                data={props.data}
+                entityId={activeProduct.id}
                 entityLabel="товар или услуга"
-                summary="0 сделок · 0 файлов"
-              >
-                <strong>Состав сделки еще не подключен</strong>
-                <p>
-                  Связь товаров со сделками появится через <code>DealLineItem</code>. До этого
-                  карточка хранит только каталоговую позицию без неработающих действий.
-                </p>
-              </CrmEntityActivityPlaceholder>
+                entityType="product"
+                managePermission="tenant.products.manage"
+                onChanged={props.onChanged}
+              />
             }
             actions={
               canManageProducts ? (

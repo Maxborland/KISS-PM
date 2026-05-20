@@ -1,10 +1,11 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 import type {
-  OpportunityActivityInput,
-  OpportunityActivityRecord,
-  OpportunityActivityTransitionResult,
-  OpportunityActivityUpdateInput,
+  CrmActivityEntityType,
+  CrmActivityInput,
+  CrmActivityRecord,
+  CrmActivityTransitionResult,
+  CrmActivityUpdateInput,
   TaskInput,
   TaskRecord
 } from "@kiss-pm/persistence";
@@ -371,19 +372,20 @@ export type ApiTenantDataSource = {
     opportunityId: string;
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
-  listOpportunityActivities?(
+  listCrmActivities?(
     tenantId: TenantId,
-    opportunityId: string
-  ): Promise<OpportunityActivityRecord[]>;
-  createOpportunityActivity?(
-    input: OpportunityActivityInput
-  ): Promise<OpportunityActivityRecord>;
-  updateOpportunityActivity?(
-    input: OpportunityActivityUpdateInput
-  ): Promise<OpportunityActivityRecord | undefined>;
-  transitionOpportunityActivityStatus?(
-    input: OpportunityActivityUpdateInput
-  ): Promise<OpportunityActivityTransitionResult>;
+    entityType: CrmActivityEntityType,
+    entityId: string
+  ): Promise<CrmActivityRecord[]>;
+  createCrmActivity?(
+    input: CrmActivityInput
+  ): Promise<CrmActivityRecord>;
+  updateCrmActivity?(
+    input: CrmActivityUpdateInput
+  ): Promise<CrmActivityRecord | undefined>;
+  transitionCrmActivityStatus?(
+    input: CrmActivityUpdateInput
+  ): Promise<CrmActivityTransitionResult>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;

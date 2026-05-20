@@ -1,5 +1,6 @@
 import type {
-  OpportunityActivityStatus
+  CrmActivityEntityType,
+  CrmActivityStatus
 } from "@kiss-pm/persistence";
 
 type ParseResult<T> =
@@ -12,24 +13,47 @@ type ParseResult<T> =
       error: string;
     };
 
-export type CreateOpportunityCommentBody = {
+export type CreateCrmCommentBody = {
   body: string;
 };
 
-export type CreateOpportunityTaskBody = {
+export type CreateCrmTaskBody = {
   title: string;
   body: string | null;
   dueDate: Date | null;
   assigneeUserId: string | null;
 };
 
-export type UpdateOpportunityTaskBody = {
-  status: OpportunityActivityStatus;
+export type CreateCrmFileBody = {
+  title: string;
+  fileUrl: string;
+  body: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
 };
 
-export function parseCreateOpportunityCommentBody(
+export type UpdateCrmTaskBody = {
+  status: CrmActivityStatus;
+};
+
+export function parseCrmActivityEntityType(
+  value: string
+): ParseResult<CrmActivityEntityType> {
+  if (
+    value === "opportunity" ||
+    value === "client" ||
+    value === "contact" ||
+    value === "product"
+  ) {
+    return { ok: true, value };
+  }
+
+  return { ok: false, error: "crm_entity_type_invalid" };
+}
+
+export function parseCreateCrmCommentBody(
   value: unknown
-): ParseResult<CreateOpportunityCommentBody> {
+): ParseResult<CreateCrmCommentBody> {
   if (!isObjectBody(value)) return { ok: false, error: "invalid_body" };
 
   const body = parseRequiredString(value.body, 4000);
@@ -43,9 +67,9 @@ export function parseCreateOpportunityCommentBody(
   };
 }
 
-export function parseCreateOpportunityTaskBody(
+export function parseCreateCrmTaskBody(
   value: unknown
-): ParseResult<CreateOpportunityTaskBody> {
+): ParseResult<CreateCrmTaskBody> {
   if (!isObjectBody(value)) return { ok: false, error: "invalid_body" };
 
   const title = parseRequiredString(value.title, 180);
@@ -73,9 +97,9 @@ export function parseCreateOpportunityTaskBody(
   };
 }
 
-export function parseUpdateOpportunityTaskBody(
+export function parseUpdateCrmTaskBody(
   value: unknown
-): ParseResult<UpdateOpportunityTaskBody> {
+): ParseResult<UpdateCrmTaskBody> {
   if (!isObjectBody(value)) return { ok: false, error: "invalid_body" };
   if (value.status !== "todo" && value.status !== "done") {
     return { ok: false, error: "task_status_invalid" };
@@ -85,6 +109,43 @@ export function parseUpdateOpportunityTaskBody(
     ok: true,
     value: {
       status: value.status
+    }
+  };
+}
+
+export function parseCreateCrmFileBody(
+  value: unknown
+): ParseResult<CreateCrmFileBody> {
+  if (!isObjectBody(value)) return { ok: false, error: "invalid_body" };
+
+  const title = parseRequiredString(value.title, 240);
+  if (!title.ok) return { ok: false, error: "file_title_required" };
+
+  const fileUrl = parseRequiredUrl(value.fileUrl, 1200);
+  if (!fileUrl.ok) {
+    return {
+      ok: false,
+      error: fileUrl.error === "invalid_url" ? "file_url_invalid" : "file_url_required"
+    };
+  }
+
+  const body = parseOptionalString(value.body, 4000);
+  if (!body.ok) return { ok: false, error: "file_description_invalid" };
+
+  const mimeType = parseOptionalString(value.mimeType, 160);
+  if (!mimeType.ok) return { ok: false, error: "file_mime_type_invalid" };
+
+  const fileSizeBytes = parseOptionalNonNegativeInteger(value.fileSizeBytes);
+  if (!fileSizeBytes.ok) return { ok: false, error: "file_size_invalid" };
+
+  return {
+    ok: true,
+    value: {
+      title: title.value,
+      fileUrl: fileUrl.value,
+      body: body.value,
+      fileSizeBytes: fileSizeBytes.value,
+      mimeType: mimeType.value
     }
   };
 }
@@ -100,6 +161,25 @@ function parseRequiredString(
   }
 
   return { ok: true, value: trimmed };
+}
+
+function parseRequiredUrl(
+  value: unknown,
+  maxLength: number
+): ParseResult<string> {
+  const parsed = parseRequiredString(value, maxLength);
+  if (!parsed.ok) return parsed;
+
+  try {
+    const url = new URL(parsed.value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return { ok: false, error: "invalid_url" };
+    }
+  } catch {
+    return { ok: false, error: "invalid_url" };
+  }
+
+  return parsed;
 }
 
 function parseOptionalString(
@@ -138,6 +218,20 @@ function parseOptionalDate(value: unknown): ParseResult<Date | null> {
   }
 
   return { ok: true, value: date };
+}
+
+function parseOptionalNonNegativeInteger(
+  value: unknown
+): ParseResult<number | null> {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: null };
+  }
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return { ok: false, error: "invalid_integer" };
+  }
+
+  return { ok: true, value };
 }
 
 function isObjectBody(value: unknown): value is Record<string, unknown> {

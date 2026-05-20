@@ -21,9 +21,9 @@ import {
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
 import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
 import {
-  createOpportunityActivityRepository,
-  type OpportunityActivityRepository
-} from "./opportunityActivityRepository";
+  createCrmActivityRepository,
+  type CrmActivityRepository
+} from "./crmActivityRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -108,7 +108,7 @@ export type UserSessionRecord = {
   tokenHash: string;
   expiresAt: Date;
 };
-export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & ProjectWorkRepository & OpportunityActivityRepository & {
+export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & ProjectWorkRepository & CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -164,7 +164,7 @@ export function createPostgresTenantDataSource(
     ...createCrmRepository(db),
     ...createProjectIntakeRepository(db),
     ...createProjectWorkRepository(db),
-    ...createOpportunityActivityRepository(db),
+    ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
       const rows = await db.select().from(tenantUsers).orderBy(tenantUsers.id);

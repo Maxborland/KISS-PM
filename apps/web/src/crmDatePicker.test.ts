@@ -10,7 +10,7 @@ describe("CRM date picker foundation", () => {
   it("does not use native browser date inputs in interactive web surfaces", () => {
     const sources = [
       "apps/web/src/DealFormModal.tsx",
-      "apps/web/src/OpportunityActivityForms.tsx",
+      "apps/web/src/CrmActivityForms.tsx",
       "apps/web/src/CrmInlineEdit.tsx",
       "apps/web/src/ProjectDetailView.tsx"
     ];

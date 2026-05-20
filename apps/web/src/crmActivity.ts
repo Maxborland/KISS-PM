@@ -1,9 +1,9 @@
-import type { OpportunityActivity, OpportunitySystemEvent } from "./api";
+import type { CrmActivity, CrmSystemEvent } from "./api";
 
-export type ActivityTab = "feed" | "tasks";
-export type ActivityRailTabId = ActivityTab | "events" | "files";
+export type ActivityTab = "feed" | "tasks" | "files";
+export type ActivityRailTabId = ActivityTab;
 
-export type OpportunityActivityTabDescriptor = {
+export type CrmActivityTabDescriptor = {
   count: number;
   disabledReason: string | null;
   id: ActivityRailTabId;
@@ -11,26 +11,27 @@ export type OpportunityActivityTabDescriptor = {
   label: string;
 };
 
-export type OpportunityFeedItem =
-  | { kind: "activity"; activity: OpportunityActivity; createdAt: string }
-  | { kind: "system"; event: OpportunitySystemEvent; createdAt: string };
+export type CrmFeedItem =
+  | { kind: "activity"; activity: CrmActivity; createdAt: string }
+  | { kind: "system"; event: CrmSystemEvent; createdAt: string };
 
-export type OpportunityActivitySummary = {
+export type CrmActivitySummary = {
   commentCount: number;
   openTaskCount: number;
   latestActivityAt: string | null;
 };
 
-export type OpportunityFeedGroup = {
+export type CrmFeedGroup = {
   dateKey: string;
   label: string;
-  items: OpportunityFeedItem[];
+  items: CrmFeedItem[];
 };
 
-export function getOpportunityActivityTabs(input: {
+export function getCrmActivityTabs(input: {
   feedCount: number;
+  fileCount: number;
   taskCount: number;
-}): OpportunityActivityTabDescriptor[] {
+}): CrmActivityTabDescriptor[] {
   return [
     {
       count: input.feedCount,
@@ -47,26 +48,19 @@ export function getOpportunityActivityTabs(input: {
       label: "Задачи"
     },
     {
-      count: 0,
-      disabledReason: "Модель событий будет добавлена отдельным CRM-slice",
-      id: "events",
-      isEnabled: false,
-      label: "Событие"
-    },
-    {
-      count: 0,
-      disabledReason: "Файлы сделки будут добавлены отдельным CRM-slice",
+      count: input.fileCount,
+      disabledReason: null,
       id: "files",
-      isEnabled: false,
-      label: "Файл"
+      isEnabled: true,
+      label: "Файлы"
     }
   ];
 }
 
-export function composeOpportunityFeedItems(
-  activities: OpportunityActivity[],
-  systemEvents: OpportunitySystemEvent[]
-): OpportunityFeedItem[] {
+export function composeCrmFeedItems(
+  activities: CrmActivity[],
+  systemEvents: CrmSystemEvent[]
+): CrmFeedItem[] {
   return [
     ...activities.map((activity) => ({
       kind: "activity" as const,
@@ -94,10 +88,10 @@ export function formatActivityCountLabel(count: number): string {
   return `${count} элементов`;
 }
 
-export function getOpportunityActivitySummary(input: {
-  activities: OpportunityActivity[];
-  feedItems: OpportunityFeedItem[];
-}): OpportunityActivitySummary {
+export function getCrmActivitySummary(input: {
+  activities: CrmActivity[];
+  feedItems: CrmFeedItem[];
+}): CrmActivitySummary {
   return {
     commentCount: input.activities.filter((activity) => activity.type === "comment").length,
     openTaskCount: input.activities.filter(
@@ -107,16 +101,16 @@ export function getOpportunityActivitySummary(input: {
   };
 }
 
-export function groupOpportunityFeedItemsByDay(
-  items: OpportunityFeedItem[],
+export function groupCrmFeedItemsByDay(
+  items: CrmFeedItem[],
   now = new Date()
-): OpportunityFeedGroup[] {
+): CrmFeedGroup[] {
   const todayKey = toUtcDateKey(now);
   const yesterday = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)
   );
   const yesterdayKey = toUtcDateKey(yesterday);
-  const groups = new Map<string, OpportunityFeedGroup>();
+  const groups = new Map<string, CrmFeedGroup>();
 
   for (const item of items) {
     const date = new Date(item.createdAt);
@@ -137,9 +131,9 @@ export function groupOpportunityFeedItemsByDay(
   return [...groups.values()];
 }
 
-export function sortOpportunityTasks(
-  tasks: OpportunityActivity[]
-): OpportunityActivity[] {
+export function sortCrmTasks(
+  tasks: CrmActivity[]
+): CrmActivity[] {
   return [...tasks].sort((left, right) => {
     const leftDone = left.status === "done";
     const rightDone = right.status === "done";

@@ -21,7 +21,7 @@ import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
-import { registerOpportunityActivityRoutes } from "./opportunityActivityRoutes";
+import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
@@ -184,7 +184,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAuditRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
-  registerOpportunityActivityRoutes(app, routeDeps);
+  registerCrmActivityRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
