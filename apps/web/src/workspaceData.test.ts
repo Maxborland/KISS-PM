@@ -72,6 +72,23 @@ describe("workspace data derivation", () => {
           }
         ]
       },
+      products: {
+        products: [
+          {
+            id: "product-1",
+            tenantId: "tenant-1",
+            name: "Stale product",
+            sku: "STALE",
+            type: "service",
+            unit: "час",
+            price: 6000,
+            description: null,
+            status: "active",
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
       projectTypes: {
         projectTypes: [
           {
@@ -213,6 +230,7 @@ describe("workspace data derivation", () => {
     expect(data.auditEvents).toEqual([]);
     expect(data.clients).toEqual([]);
     expect(data.contacts).toEqual([]);
+    expect(data.products).toEqual([]);
     expect(data.projectTypes).toEqual([]);
     expect(data.dealStages).toEqual([]);
     expect(data.customFields).toEqual([]);

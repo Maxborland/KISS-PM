@@ -115,6 +115,37 @@ export function validateProjectTypeForm(input: {
   return errors;
 }
 
+export function validateProductForm(input: {
+  name: string;
+  sku: string;
+  type: string;
+  unit: string;
+  price: string;
+  description?: string;
+  status?: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+  const price = Number(input.price);
+
+  if (!input.name.trim()) errors.name = "Укажите товар или услугу.";
+  if (input.sku.length > 80) errors.sku = "Артикул должен быть не длиннее 80 символов.";
+  if (input.type !== "service" && input.type !== "goods") {
+    errors.type = "Выберите тип позиции.";
+  }
+  if (!input.unit.trim()) errors.unit = "Укажите единицу измерения.";
+  if (!Number.isInteger(price) || price <= 0) {
+    errors.price = "Цена должна быть положительным целым числом.";
+  }
+  if ((input.description ?? "").length > 1000) {
+    errors.description = "Описание должно быть не длиннее 1000 символов.";
+  }
+  if (input.status !== undefined && !isCrmStatus(input.status)) {
+    errors.status = "Выберите корректный статус справочника.";
+  }
+
+  return errors;
+}
+
 export function validateDealStageForm(input: {
   name: string;
   sortOrder: string;

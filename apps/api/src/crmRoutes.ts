@@ -2,10 +2,12 @@ import {
   canManageClients,
   canManageContacts,
   canManageDealStages,
+  canManageProducts,
   canManageProjectTypes,
   canReadClients,
   canReadContacts,
   canReadDealStages,
+  canReadProducts,
   canReadProjectTypes,
   type AccessProfile,
   type PolicyDecision
@@ -20,6 +22,7 @@ import {
   parseClientBody,
   parseContactBody,
   parseDealStageBody,
+  parseProductBody,
   parseProjectTypeBody
 } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
@@ -319,6 +322,140 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     });
 
     return context.json({ contact });
+  });
+
+  app.get("/api/workspace/products", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.listProducts) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canReadProducts({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    return context.json({ products: await dataSource.listProducts(actor.tenantId) });
+  });
+
+  app.post("/api/workspace/products", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.createProduct ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageProducts({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "product.create_denied",
+        sourceEntity: { type: "Product", id: "unknown" },
+        commandInput: { endpoint: "createProduct" },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseProductBody(body.value, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const product = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createProduct) {
+        throw new Error("transactional_product_create_not_configured");
+      }
+      const created = await transactionDataSource.createProduct(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "product.created",
+          sourceEntity: { type: "Product", id: created.id },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return created;
+    });
+
+    return context.json({ product }, 201);
+  });
+
+  app.patch("/api/workspace/products/:productId", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findProductById ||
+      !dataSource.updateProduct ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageProducts({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const productId = context.req.param("productId");
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "product.update_denied",
+        sourceEntity: { type: "Product", id: productId },
+        commandInput: { endpoint: "updateProduct", productId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findProductById(actor.tenantId, productId);
+    if (!beforeState) return context.json({ error: "product_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    const parsed = parseProductBody({ ...body.value, id: productId }, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const product = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateProduct) {
+        throw new Error("transactional_product_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateProduct(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "product.updated",
+          sourceEntity: { type: "Product", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ product });
   });
 
   app.get("/api/workspace/project-types", async (context) => {

@@ -56,6 +56,28 @@ const dataset: SeedTenantDataset = {
       role: "Заказчик"
     }
   ],
+  products: [
+    {
+      id: "product-kiss-pm-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение KISS PM",
+      sku: "KISS-IMPL",
+      type: "service",
+      unit: "час",
+      price: 6000,
+      description: "Проектная услуга внедрения и настройки управленческого контура"
+    },
+    {
+      id: "product-project-audit",
+      tenantId: "tenant-alpha",
+      name: "Аудит проектного контура",
+      sku: "KISS-AUDIT",
+      type: "service",
+      unit: "пакет",
+      price: 180000,
+      description: "Разовый аудит проектов, ресурсов и управленческих сигналов"
+    }
+  ],
   projectTypes: [
     {
       id: "project-type-implementation",

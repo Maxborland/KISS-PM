@@ -18,6 +18,7 @@ import {
   useMyWorkQuery,
   useOpportunitiesQuery,
   usePositionsQuery,
+  useProductsQuery,
   useProjectsQuery,
   useProjectTypesQuery,
   useProjectTemplatesQuery,
@@ -39,6 +40,7 @@ export function useWorkspaceShellData() {
   const canReadAudit = hasPermission(permissions, "tenant.audit_events.read");
   const canReadClients = hasPermission(permissions, "tenant.clients.read");
   const canReadContacts = hasPermission(permissions, "tenant.contacts.read");
+  const canReadProducts = hasPermission(permissions, "tenant.products.read");
   const canReadProjectTypes = hasPermission(permissions, "tenant.project_types.read");
   const canReadDealStages = hasPermission(permissions, "tenant.deal_stages.read");
   const canReadOpportunities = hasPermission(permissions, "tenant.opportunities.read");
@@ -50,6 +52,7 @@ export function useWorkspaceShellData() {
   const auditEventsQuery = useAuditEventsQuery(canReadAudit);
   const clientsQuery = useClientsQuery(canReadClients);
   const contactsQuery = useContactsQuery(canReadContacts);
+  const productsQuery = useProductsQuery(canReadProducts);
   const projectTypesQuery = useProjectTypesQuery(canReadProjectTypes);
   const dealStagesQuery = useDealStagesQuery(canReadDealStages);
   const opportunitiesQuery = useOpportunitiesQuery(canReadOpportunities);
@@ -72,6 +75,7 @@ export function useWorkspaceShellData() {
       auditEvents: auditEventsQuery.data,
       clients: clientsQuery.data,
       contacts: contactsQuery.data,
+      products: productsQuery.data,
       projectTypes: projectTypesQuery.data,
       dealStages: dealStagesQuery.data,
       opportunities: opportunitiesQuery.data,
@@ -85,6 +89,7 @@ export function useWorkspaceShellData() {
     auditEventsQuery.data?.auditEvents,
     clientsQuery.data?.clients,
     contactsQuery.data?.contacts,
+    productsQuery.data?.products,
     dealStagesQuery.data?.dealStages,
     healthQuery.data?.status,
     healthQuery.isError,
@@ -121,6 +126,7 @@ export function useWorkspaceShellData() {
       auditEvents: getSectionState(canReadAudit, auditEventsQuery.isFetching, auditEventsQuery.error),
       clients: getSectionState(canReadClients, clientsQuery.isFetching, clientsQuery.error),
       contacts: getSectionState(canReadContacts, contactsQuery.isFetching, contactsQuery.error),
+      products: getSectionState(canReadProducts, productsQuery.isFetching, productsQuery.error),
       projectTypes: getSectionState(
         canReadProjectTypes,
         projectTypesQuery.isFetching,

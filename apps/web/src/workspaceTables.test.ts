@@ -6,6 +6,7 @@ import {
   filterDealStagesForTable,
   filterOpportunitiesForTable,
   filterPositionsForTable,
+  filterProductsForTable,
   filterProjectTypesForTable,
   filterRolesForTable,
   filterUsersForTable
@@ -17,6 +18,7 @@ import type {
   DealStage,
   Opportunity,
   Position,
+  Product,
   ProjectType,
   WorkspaceUser
 } from "./api";
@@ -165,6 +167,22 @@ const dealStages: DealStage[] = [
   }
 ];
 
+const products: Product[] = [
+  {
+    id: "product-implementation",
+    tenantId: "tenant-alpha",
+    name: "Внедрение KISS PM",
+    sku: "KISS-IMPL",
+    type: "service",
+    unit: "час",
+    price: 6000,
+    description: "Проектная услуга внедрения",
+    status: "active",
+    createdAt: "2026-05-18T00:00:00.000Z",
+    updatedAt: "2026-05-18T00:00:00.000Z"
+  }
+];
+
 describe("workspace table filters", () => {
   it("filters users by person, role, position and status text", () => {
     expect(filterUsersForTable(users, roles, "админ")).toHaveLength(1);
@@ -199,6 +217,8 @@ describe("workspace table filters", () => {
   it("filters CRM entities on their own list pages", () => {
     expect(filterClientsForTable(clients, "стратегический")).toEqual(clients);
     expect(filterContactsForTable(contacts, clients, "ромашка")).toEqual(contacts);
+    expect(filterProductsForTable(products, "kiss-impl")).toEqual(products);
+    expect(filterProductsForTable(products, "услуга внедрения")).toEqual(products);
     expect(filterProjectTypesForTable(projectTypes, "запуска")).toEqual(projectTypes);
     expect(filterDealStagesForTable(dealStages, "20")).toEqual(dealStages);
     expect(filterClientsForTable(clients, "missing")).toEqual([]);

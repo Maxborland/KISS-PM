@@ -1,6 +1,6 @@
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
-import { ClientsView, ContactsView } from "./CrmEntityViews";
+import { ClientsView, ContactsView, ProductsView } from "./CrmEntityViews";
 import { DashboardView } from "./DashboardView";
 import { OpportunityDetailView } from "./OpportunityDetailView";
 import { OpportunitiesView } from "./OpportunitiesView";
@@ -21,6 +21,7 @@ export function WorkspaceRouteRenderer(props: {
   activeOpportunityId: string | null;
   activeClientId: string | null;
   activeContactId: string | null;
+  activeProductId: string | null;
   activeProjectId: string | null;
   data: WorkspaceData;
   openCreateRequested: boolean;
@@ -31,6 +32,8 @@ export function WorkspaceRouteRenderer(props: {
   onOpenClient: (clientId: string) => void;
   onBackToContacts: () => void;
   onOpenContact: (contactId: string) => void;
+  onBackToProducts: () => void;
+  onOpenProduct: (productId: string) => void;
   onBackToProjects: () => void;
   onOpenProject: (projectId: string) => void;
   onQuickCreateConsumed: () => void;
@@ -41,6 +44,7 @@ export function WorkspaceRouteRenderer(props: {
     auditEvents: SectionState;
     clients: SectionState;
     contacts: SectionState;
+    products: SectionState;
     projectTypes: SectionState;
     dealStages: SectionState;
     opportunities: SectionState;
@@ -113,6 +117,8 @@ export function WorkspaceRouteRenderer(props: {
         data={props.data}
         activeClientId={props.activeClientId}
         onBack={props.onBackToClients}
+        onOpenClient={props.onOpenClient}
+        onOpenContact={props.onOpenContact}
         sectionState={props.sectionStates.clients}
         onChanged={props.onChanged}
       />
@@ -125,7 +131,22 @@ export function WorkspaceRouteRenderer(props: {
         data={props.data}
         activeContactId={props.activeContactId}
         onBack={props.onBackToContacts}
+        onOpenClient={props.onOpenClient}
+        onOpenContact={props.onOpenContact}
         sectionState={props.sectionStates.contacts}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "products") {
+    return (
+      <ProductsView
+        data={props.data}
+        activeProductId={props.activeProductId}
+        onBack={props.onBackToProducts}
+        onOpenProduct={props.onOpenProduct}
+        sectionState={props.sectionStates.products}
         onChanged={props.onChanged}
       />
     );

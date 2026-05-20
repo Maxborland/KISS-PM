@@ -173,6 +173,36 @@ export const contacts = pgTable(
   ]
 );
 
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sku: text("sku"),
+    type: text("type").notNull(),
+    unit: text("unit").notNull(),
+    price: integer("price").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "products_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("products_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("products_tenant_id_name_uidx").on(table.tenantId, table.name),
+    uniqueIndex("products_tenant_id_sku_uidx").on(table.tenantId, table.sku),
+    check("products_type_chk", sql`${table.type} in ('service', 'goods')`),
+    check("products_price_chk", sql`${table.price} > 0`)
+  ]
+);
+
 export const projectTypes = pgTable(
   "project_types",
   {
@@ -627,6 +657,7 @@ export type PersistenceTableName =
   | "project_templates"
   | "clients"
   | "contacts"
+  | "products"
   | "project_types"
   | "deal_stages"
   | "opportunities"
@@ -656,6 +687,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_templates",
   "clients",
   "contacts",
+  "products",
   "project_types",
   "deal_stages",
   "opportunities",
@@ -678,6 +710,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_templates",
   "clients",
   "contacts",
+  "products",
   "project_types",
   "deal_stages",
   "opportunities",
@@ -737,6 +770,19 @@ const tableColumns = {
     "phone",
     "telegram",
     "role",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  products: [
+    "id",
+    "tenant_id",
+    "name",
+    "sku",
+    "type",
+    "unit",
+    "price",
+    "description",
     "status",
     "created_at",
     "updated_at"

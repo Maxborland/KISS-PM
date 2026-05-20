@@ -20,6 +20,7 @@ describe("workspace route model", () => {
       "projects",
       "clients",
       "contacts",
+      "products",
       "users",
       "access-roles",
       "positions",
@@ -54,12 +55,12 @@ describe("workspace route model", () => {
       {
         id: "admin",
         label: "Администрирование",
-        routes: [workspaceRoutes[6], workspaceRoutes[7]]
+        routes: [workspaceRoutes[7], workspaceRoutes[8]]
       },
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[13]]
+        routes: [workspaceRoutes[14]]
       }
     ]);
   });
@@ -68,6 +69,7 @@ describe("workspace route model", () => {
     const routeGroups = getVisibleRouteGroups([
       "tenant.clients.read",
       "tenant.contacts.read",
+      "tenant.products.read",
       "tenant.project_types.read",
       "tenant.deal_stages.read"
     ]);
@@ -81,12 +83,12 @@ describe("workspace route model", () => {
       {
         id: "crm",
         label: "CRM",
-        routes: [workspaceRoutes[4], workspaceRoutes[5]]
+        routes: [workspaceRoutes[4], workspaceRoutes[5], workspaceRoutes[6]]
       },
       {
         id: "settings",
         label: "Настройки",
-        routes: [workspaceRoutes[11], workspaceRoutes[12]]
+        routes: [workspaceRoutes[12], workspaceRoutes[13]]
       }
     ]);
   });
@@ -114,6 +116,8 @@ describe("workspace route model", () => {
     expect(getRouteIdFromPathname("/clients/client-1")).toBe("clients");
     expect(getRouteIdFromPathname("/contacts")).toBe("contacts");
     expect(getRouteIdFromPathname("/contacts/contact-1")).toBe("contacts");
+    expect(getRouteIdFromPathname("/products")).toBe("products");
+    expect(getRouteIdFromPathname("/products/product-1")).toBe("products");
     expect(getRouteIdFromPathname("/opportunities")).toBe("opportunities");
     expect(getRouteIdFromPathname("/opportunities/opportunity-1")).toBe("opportunities");
     expect(getRouteIdFromPathname("/projects")).toBe("projects");
@@ -133,6 +137,7 @@ describe("workspace route model", () => {
     expect(getRoutePath("projects")).toBe("/projects");
     expect(getRoutePath("clients")).toBe("/clients");
     expect(getRoutePath("contacts")).toBe("/contacts");
+    expect(getRoutePath("products")).toBe("/products");
     expect(getRoutePath("users")).toBe("/users");
     expect(getRoutePath("settings")).toBe("/settings");
     expect(getRoutePath("project-types")).toBe("/settings/project-types");

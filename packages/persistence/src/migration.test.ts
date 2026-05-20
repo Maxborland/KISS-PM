@@ -75,6 +75,24 @@ const phase4CrmActivityFkRepairMigration = readFileSync(
   ),
   "utf8"
 );
+const phase4CrmProductsMigration = readFileSync(
+  new URL("../migrations/0014_phase_4_crm_products.sql", import.meta.url),
+  "utf8"
+);
+const phase4CrmActivityFkRepairAgainMigration = readFileSync(
+  new URL(
+    "../migrations/0015_phase_4_repair_opportunity_activity_fk_again.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase4CrmActivityChecksRepairMigration = readFileSync(
+  new URL(
+    "../migrations/0016_phase_4_repair_opportunity_activity_checks.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -280,5 +298,63 @@ describe("Phase 4 CRM activity SQL migration", () => {
       'ADD CONSTRAINT "opportunity_activities_opportunity_fk"'
     );
     expect(phase4CrmActivityFkRepairMigration).toContain("ON DELETE restrict");
+  });
+
+  it("reapplies the activity repair for environments that marked the first repair stale", () => {
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_opportunity_fk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain("ON DELETE restrict");
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityFkRepairAgainMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_status_chk"'
+    );
+  });
+
+  it("reapplies activity CHECK constraints when a local database already applied the FK repair", () => {
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_type_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain(
+      'ADD CONSTRAINT "opportunity_activities_status_chk"'
+    );
+    expect(phase4CrmActivityChecksRepairMigration).toContain("NOT VALID");
+  });
+});
+
+describe("Phase 4 CRM products SQL migration", () => {
+  it("adds tenant-scoped products as first-class CRM entities", () => {
+    expect(phase4CrmProductsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "products"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_pkey" PRIMARY KEY("tenant_id","id")'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_type_chk"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CONSTRAINT "products_price_chk"'
+    );
+    expect(phase4CrmProductsMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "products_tenant_id_name_uidx"'
+    );
   });
 });

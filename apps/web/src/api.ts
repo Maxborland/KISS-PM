@@ -137,6 +137,22 @@ export type Contact = {
   updatedAt: string;
 };
 
+export type ProductType = "service" | "goods";
+
+export type Product = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sku: string | null;
+  type: ProductType;
+  unit: string;
+  price: number;
+  description: string | null;
+  status: CrmEntityStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProjectType = {
   id: string;
   tenantId: string;
@@ -166,6 +182,14 @@ export type ContactInput = Pick<
 export type ContactUpdateInput = Pick<
   Contact,
   "clientId" | "name" | "email" | "phone" | "telegram" | "role" | "status"
+>;
+export type ProductInput = Pick<
+  Product,
+  "id" | "name" | "sku" | "type" | "unit" | "price" | "description"
+>;
+export type ProductUpdateInput = Pick<
+  Product,
+  "name" | "sku" | "type" | "unit" | "price" | "description" | "status"
 >;
 export type ProjectTypeInput = Pick<ProjectType, "id" | "name" | "description">;
 export type ProjectTypeUpdateInput = Pick<ProjectType, "name" | "description" | "status">;
@@ -609,6 +633,27 @@ export async function updateContact(
   input: ContactUpdateInput
 ): Promise<{ contact: Contact }> {
   return requestJson(`/api/workspace/contacts/${encodePathSegment(contactId)}`, {
+    method: "PATCH",
+    body: input
+  });
+}
+
+export async function fetchProducts(): Promise<{ products: Product[] }> {
+  return requestJson("/api/workspace/products");
+}
+
+export async function createProduct(input: ProductInput): Promise<{ product: Product }> {
+  return requestJson("/api/workspace/products", {
+    method: "POST",
+    body: input
+  });
+}
+
+export async function updateProduct(
+  productId: string,
+  input: ProductUpdateInput
+): Promise<{ product: Product }> {
+  return requestJson(`/api/workspace/products/${encodePathSegment(productId)}`, {
     method: "PATCH",
     body: input
   });

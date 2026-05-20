@@ -54,6 +54,17 @@ const seedDataset: SeedTenantDataset = {
       name: "Ирина Клиент"
     }
   ],
+  products: [
+    {
+      id: "product-implementation",
+      tenantId: "tenant-alpha",
+      name: "Внедрение KISS PM",
+      sku: "KISS-IMPL",
+      type: "service",
+      unit: "час",
+      price: 6000
+    }
+  ],
   projectTypes: [
     {
       id: "project-type-implementation",
@@ -99,11 +110,11 @@ describe("dev tenant seed", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -118,6 +129,7 @@ describe("dev tenant seed", () => {
         (SELECT count(*)::int FROM positions) AS positions,
         (SELECT count(*)::int FROM clients) AS clients,
         (SELECT count(*)::int FROM contacts) AS contacts,
+        (SELECT count(*)::int FROM products) AS products,
         (SELECT count(*)::int FROM project_types) AS project_types,
         (SELECT count(*)::int FROM deal_stages) AS deal_stages,
         (SELECT count(*)::int FROM tenant_users) AS tenant_users,
@@ -131,6 +143,7 @@ describe("dev tenant seed", () => {
         positions: 1,
         clients: 1,
         contacts: 1,
+        products: 1,
         project_types: 1,
         deal_stages: 1,
         tenant_users: 2,

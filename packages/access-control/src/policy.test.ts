@@ -7,6 +7,7 @@ import {
   canManageDealStages,
   canManageOpportunities,
   canManagePositions,
+  canManageProducts,
   canManageProjectActivation,
   canManageProjectTypes,
   canManageProjects,
@@ -18,6 +19,7 @@ import {
   canReadContacts,
   canReadDealStages,
   canReadOpportunities,
+  canReadProducts,
   canReadProjects,
   canReadProjectTypes,
   canReadResourceFeasibility,
@@ -44,6 +46,8 @@ describe("access-control tenant policy", () => {
       "tenant.clients.manage",
       "tenant.contacts.read",
       "tenant.contacts.manage",
+      "tenant.products.read",
+      "tenant.products.manage",
       "tenant.project_types.read",
       "tenant.project_types.manage",
       "tenant.deal_stages.read",
@@ -358,6 +362,7 @@ describe("access-control tenant policy", () => {
       permissions: [
         "tenant.clients.read",
         "tenant.contacts.read",
+        "tenant.products.read",
         "tenant.project_types.read",
         "tenant.deal_stages.read"
       ]
@@ -379,6 +384,10 @@ describe("access-control tenant policy", () => {
       }).allowed
     ).toBe(true);
     expect(
+      canReadProducts({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
       canReadDealStages({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
         .allowed
     ).toBe(true);
@@ -389,11 +398,24 @@ describe("access-control tenant policy", () => {
       reason: "permission_missing"
     });
     expect(
+      canManageProducts({ actor, profile: crmReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
       canManageClients({ actor, profile: adminProfile, targetTenantId: "tenant-alpha" })
         .allowed
     ).toBe(true);
     expect(
       canManageContacts({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageProducts({
         actor,
         profile: adminProfile,
         targetTenantId: "tenant-alpha"

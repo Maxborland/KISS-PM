@@ -48,6 +48,14 @@ export const workspaceRoutes = [
     description: "Контакты клиентов для сделок и будущих коммуникаций"
   },
   {
+    id: "products",
+    label: "Товары и услуги",
+    group: "crm",
+    path: "/products",
+    permission: "tenant.products.read",
+    description: "CRM-позиции, которые можно связать со сделками и документами"
+  },
+  {
     id: "users",
     label: "Пользователи",
     group: "admin",
@@ -178,6 +186,7 @@ export function getRouteIdFromPathname(pathname: string): WorkspaceRouteId {
   if (normalizedPath.startsWith("/projects/")) return "projects";
   if (normalizedPath.startsWith("/clients/")) return "clients";
   if (normalizedPath.startsWith("/contacts/")) return "contacts";
+  if (normalizedPath.startsWith("/products/")) return "products";
 
   return (
     workspaceRoutes.find((route) => route.path === normalizedPath)?.id ??

@@ -9,6 +9,7 @@ import {
   createOpportunityComment,
   createOpportunityTask,
   createOpportunity,
+  createProduct,
   createProjectTask,
   createPosition,
   createProjectType,
@@ -32,6 +33,7 @@ import {
   fetchOpportunityActivity,
   fetchOpportunities,
   fetchPositions,
+  fetchProducts,
   fetchProjects,
   fetchProjectTypes,
   fetchProjectTemplates,
@@ -50,6 +52,7 @@ import {
   updateOpportunityTask,
   updateOpportunityStage,
   updatePosition,
+  updateProduct,
   updateProjectType,
   updateProfile,
   updateProjectTemplate,
@@ -66,6 +69,7 @@ export const workspaceQueryKeys = {
   auditEvents: () => ["workspace", "auditEvents"] as const,
   clients: () => ["workspace", "crm", "clients"] as const,
   contacts: () => ["workspace", "crm", "contacts"] as const,
+  products: () => ["workspace", "crm", "products"] as const,
   projectTypes: () => ["workspace", "crm", "projectTypes"] as const,
   dealStages: () => ["workspace", "crm", "dealStages"] as const,
   opportunities: () => ["workspace", "opportunities"] as const,
@@ -154,6 +158,14 @@ export function useContactsQuery(enabled: boolean) {
   return useQuery({
     queryKey: workspaceQueryKeys.contacts(),
     queryFn: fetchContacts,
+    enabled
+  });
+}
+
+export function useProductsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: workspaceQueryKeys.products(),
+    queryFn: fetchProducts,
     enabled
   });
 }
@@ -387,6 +399,7 @@ export function useCrmMutations() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.clients() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.contacts() }),
+      queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.products() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.projectTypes() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.dealStages() }),
       queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.opportunities() }),
@@ -411,6 +424,15 @@ export function useCrmMutations() {
     updateContact: useMutation({
       mutationFn: ({ contactId, input }: Parameters<typeof updateContact> extends [infer Id, infer Input] ? { contactId: Id; input: Input } : never) =>
         updateContact(contactId, input),
+      onSuccess: invalidateCrm
+    }),
+    createProduct: useMutation({
+      mutationFn: createProduct,
+      onSuccess: invalidateCrm
+    }),
+    updateProduct: useMutation({
+      mutationFn: ({ productId, input }: Parameters<typeof updateProduct> extends [infer Id, infer Input] ? { productId: Id; input: Input } : never) =>
+        updateProduct(productId, input),
       onSuccess: invalidateCrm
     }),
     createProjectType: useMutation({

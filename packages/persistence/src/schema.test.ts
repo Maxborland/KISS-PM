@@ -16,6 +16,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_templates",
       "clients",
       "contacts",
+      "products",
       "project_types",
       "deal_stages",
       "opportunities",
@@ -40,6 +41,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_templates",
       "clients",
       "contacts",
+      "products",
       "project_types",
       "deal_stages",
       "opportunities",
@@ -74,6 +76,9 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("deal_stages")).toEqual(
       expect.arrayContaining(["sort_order"])
+    );
+    expect(getPersistenceTableColumns("products")).toEqual(
+      expect.arrayContaining(["sku", "type", "unit", "price", "status"])
     );
   });
 });
