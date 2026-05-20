@@ -1,7 +1,15 @@
 import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { Client, Contact, Product } from "./api";
+import type { Client } from "./api";
+import {
+  CrmEntityActivityPlaceholder,
+  CrmEntityFact,
+  CrmEntityFactList,
+  CrmEntitySection,
+  CrmEntityWorkspace
+} from "./CrmEntityWorkspace";
+import { InlineEditableValue } from "./CrmInlineEdit";
 import {
   canRenderSectionTable,
   EntityActions,
@@ -19,15 +27,9 @@ import {
   type FormErrors,
   getFieldErrorId,
   hasFormErrors,
-  validateClientForm,
-  validateContactForm,
-  validateProductForm
+  validateClientForm
 } from "./workspaceForms";
-import {
-  filterClientsForTable,
-  filterContactsForTable,
-  filterProductsForTable
-} from "./workspaceTables";
+import { filterClientsForTable } from "./workspaceTables";
 import { formatDate } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
@@ -127,15 +129,45 @@ export function ClientsView(props: {
     setIsModalOpen(true);
   }
 
+  async function saveClientInline(client: Client, patch: Partial<Client>) {
+    const input = {
+      name: typeof patch.name === "string" ? patch.name.trim() : client.name,
+      description:
+        typeof patch.description === "string"
+          ? patch.description.trim() || null
+          : client.description,
+      status: patch.status ?? client.status
+    };
+    const errors = validateClientForm({
+      name: input.name,
+      description: input.description ?? "",
+      status: input.status
+    });
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте поле клиента.");
+    }
+
+    await crmMutations.updateClient.mutateAsync({
+      clientId: client.id,
+      input
+    });
+    props.onChanged("Поле клиента обновлено");
+  }
+
   if (props.activeClientId) {
     return (
       <>
-        <Panel
-          title="Карточка клиента"
-          subtitle="Source of truth клиента для сделок, контактов и будущих проектов."
-          actions={
-            <span className="table-actions">
-              {canManageClients && activeClient ? (
+        <SectionFeedback state={props.sectionState} emptyLabel="Клиенты недоступны." />
+        {activeClient ? (
+          <CrmEntityWorkspace
+            activity={
+              <CrmEntityActivityPlaceholder
+                entityLabel="клиент"
+                summary={`${activeClientContacts.length} контактов · ${activeClientOpportunities.length} сделок`}
+              />
+            }
+            actions={
+              canManageClients ? (
                 <button
                   className="primary-button"
                   disabled={isSaving}
@@ -144,68 +176,114 @@ export function ClientsView(props: {
                 >
                   Редактировать
                 </button>
-              ) : null}
-              <button className="secondary-button" type="button" onClick={props.onBack}>
-                <ArrowLeft aria-hidden="true" size={14} />
-                К списку клиентов
-              </button>
-            </span>
-          }
-        >
-          <SectionFeedback state={props.sectionState} emptyLabel="Клиенты недоступны." />
-          {activeClient ? (
-            <div className="crm-card-layout">
-              <section className="detail-card">
-                <h2>{activeClient.name}</h2>
-                <dl className="detail-list">
-                  <div>
-                    <dt>Статус</dt>
-                    <dd>{renderCrmStatus(activeClient.status)}</dd>
-                  </div>
-                  <div>
-                    <dt>Описание</dt>
-                    <dd>{activeClient.description || "Описание не задано"}</dd>
-                  </div>
-                  <div>
-                    <dt>Контакты</dt>
-                    <dd>{activeClientContacts.length}</dd>
-                  </div>
-                  <div>
-                    <dt>Открытые сделки</dt>
-                    <dd>{activeClientOpportunities.length}</dd>
-                  </div>
-                  <div>
-                    <dt>Обновлено</dt>
-                    <dd>{formatDate(activeClient.updatedAt)}</dd>
-                  </div>
-                </dl>
-              </section>
-              <aside className="detail-card">
-                <h3>Связи клиента</h3>
-                {activeClientContacts.length > 0 ? (
-                  <ul className="entity-link-list">
-                    {activeClientContacts.map((contact) => (
-                      <li key={contact.id}>
-                        <button
-                          className="entity-row-link"
-                          type="button"
-                          onClick={() => props.onOpenContact?.(contact.id)}
-                        >
-                          {contact.name}
-                        </button>
-                        <span className="muted">{contact.email || "email не задан"}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted">Контакты клиента пока не заведены.</p>
-                )}
-              </aside>
-            </div>
-          ) : (
+              ) : null
+            }
+            backLabel="Клиенты"
+            eyebrow="Клиент"
+            meta="Source of truth клиента для сделок, контактов и будущих проектов."
+            status={renderCrmStatus(activeClient.status)}
+            title={
+              <InlineEditableValue
+                disabled={!canManageClients || isSaving}
+                label="Название клиента"
+                value={activeClient.name}
+                onSave={(value) => saveClientInline(activeClient, { name: value })}
+              />
+            }
+            onBack={props.onBack ?? (() => undefined)}
+          >
+            <CrmEntitySection title="О клиенте">
+              <CrmEntityFactList>
+                <CrmEntityFact label="Название">
+                  <InlineEditableValue
+                    disabled={!canManageClients || isSaving}
+                    label="Название клиента"
+                    value={activeClient.name}
+                    onSave={(value) => saveClientInline(activeClient, { name: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Описание">
+                  <InlineEditableValue
+                    disabled={!canManageClients || isSaving}
+                    display={activeClient.description || "Описание не задано"}
+                    label="Описание клиента"
+                    mode="textarea"
+                    value={activeClient.description ?? ""}
+                    onSave={(value) => saveClientInline(activeClient, { description: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Статус">
+                  <InlineEditableValue
+                    disabled={!canManageClients || isSaving}
+                    display={activeClient.status === "active" ? "Активно" : "Архив"}
+                    label="Статус клиента"
+                    mode="select"
+                    options={crmStatusOptions}
+                    value={activeClient.status}
+                    onSave={(value) =>
+                      saveClientInline(activeClient, { status: value as Client["status"] })
+                    }
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Контакты">{activeClientContacts.length}</CrmEntityFact>
+                <CrmEntityFact label="Открытые сделки">
+                  {activeClientOpportunities.length}
+                </CrmEntityFact>
+                <CrmEntityFact label="Обновлено">{formatDate(activeClient.updatedAt)}</CrmEntityFact>
+              </CrmEntityFactList>
+            </CrmEntitySection>
+            <CrmEntitySection title="Контакты клиента">
+              {activeClientContacts.length > 0 ? (
+                <ul className="crm-related-list">
+                  {activeClientContacts.map((contact) => (
+                    <li key={contact.id}>
+                      <button
+                        className="entity-row-link"
+                        type="button"
+                        onClick={() => props.onOpenContact?.(contact.id)}
+                      >
+                        <EntityNameCell
+                          avatar="К"
+                          primary={contact.name}
+                          secondary={contact.email || contact.phone || "Контакт без связи"}
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="empty-state compact">Контакты клиента пока не заведены.</p>
+              )}
+            </CrmEntitySection>
+            <CrmEntitySection title="Сделки клиента">
+              {activeClientOpportunities.length > 0 ? (
+                <ul className="crm-related-list">
+                  {activeClientOpportunities.map((opportunity) => (
+                    <li key={opportunity.id}>
+                      <span className="entity-name-cell">
+                        <span className="row-avatar">С</span>
+                        <span>
+                          <strong>{opportunity.title}</strong>
+                          <small>{opportunity.status}</small>
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="empty-state compact">Сделок по клиенту пока нет.</p>
+              )}
+            </CrmEntitySection>
+          </CrmEntityWorkspace>
+        ) : (
+          <Panel title="Клиент не найден" subtitle="Запись не найдена в текущем workspace.">
             <p className="empty-state">Клиент не найден.</p>
-          )}
-        </Panel>
+            <button className="secondary-button" type="button" onClick={props.onBack}>
+              <ArrowLeft aria-hidden="true" size={14} />
+              К списку клиентов
+            </button>
+          </Panel>
+        )}
         {isModalOpen ? (
           <ClientModal
             client={editingClient}
@@ -289,6 +367,11 @@ export function ClientsView(props: {
     </>
   );
 }
+
+const crmStatusOptions = [
+  { label: "Активно", value: "active" },
+  { label: "Архив", value: "archived" }
+];
 
 
 function ClientsTable(props: {

@@ -1,7 +1,15 @@
 import { ArrowLeft, PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { Client, Contact, Product } from "./api";
+import type { Product, ProductUpdateInput } from "./api";
+import {
+  CrmEntityActivityPlaceholder,
+  CrmEntityFact,
+  CrmEntityFactList,
+  CrmEntitySection,
+  CrmEntityWorkspace
+} from "./CrmEntityWorkspace";
+import { InlineEditableValue } from "./CrmInlineEdit";
 import {
   canRenderSectionTable,
   EntityActions,
@@ -17,17 +25,10 @@ import { makeClientGeneratedId } from "./workspaceIds";
 import { useCrmMutations } from "./workspaceQueries";
 import {
   type FormErrors,
-  getFieldErrorId,
   hasFormErrors,
-  validateClientForm,
-  validateContactForm,
   validateProductForm
 } from "./workspaceForms";
-import {
-  filterClientsForTable,
-  filterContactsForTable,
-  filterProductsForTable
-} from "./workspaceTables";
+import { filterProductsForTable } from "./workspaceTables";
 import { formatDate, formatMoney } from "./workspaceViewHelpers";
 import {
   getErrorMessage,
@@ -140,15 +141,67 @@ export function ProductsView(props: {
     setIsModalOpen(true);
   }
 
+  async function saveProductInline(product: Product, patch: Partial<Product>) {
+    const patchInput: Partial<ProductUpdateInput> = {};
+    if (typeof patch.name === "string") patchInput.name = patch.name.trim();
+    if (typeof patch.sku === "string") patchInput.sku = patch.sku.trim() || null;
+    if (patch.type) patchInput.type = patch.type;
+    if (typeof patch.unit === "string") patchInput.unit = patch.unit.trim();
+    if (typeof patch.price === "number") patchInput.price = patch.price;
+    if (typeof patch.description === "string") {
+      patchInput.description = patch.description.trim() || null;
+    }
+    if (patch.status) patchInput.status = patch.status;
+    const input = {
+      name: patchInput.name ?? product.name,
+      sku: "sku" in patchInput ? patchInput.sku ?? null : product.sku,
+      type: patchInput.type ?? product.type,
+      unit: patchInput.unit ?? product.unit,
+      price: patchInput.price ?? product.price,
+      description:
+        "description" in patchInput ? patchInput.description ?? null : product.description,
+      status: patchInput.status ?? product.status
+    };
+    const errors = validateProductForm({
+      name: input.name,
+      sku: input.sku ?? "",
+      type: input.type,
+      unit: input.unit,
+      price: String(input.price),
+      description: input.description ?? "",
+      status: input.status
+    });
+    if (hasFormErrors(errors)) {
+      throw new Error(Object.values(errors)[0] ?? "Проверьте поле позиции.");
+    }
+
+    await crmMutations.updateProduct.mutateAsync({
+      productId: product.id,
+      input
+    });
+    props.onChanged("Поле товара или услуги обновлено");
+  }
+
   if (props.activeProductId) {
     return (
       <>
-        <Panel
-          title="Карточка товара или услуги"
-          subtitle="CRM-позиция для будущего состава сделки, КП и документов."
-          actions={
-            <span className="table-actions">
-              {canManageProducts && activeProduct ? (
+        <SectionFeedback state={props.sectionState} emptyLabel="Товары и услуги недоступны." />
+        {activeProduct ? (
+          <CrmEntityWorkspace
+            activity={
+              <CrmEntityActivityPlaceholder
+                entityLabel="товар или услуга"
+                summary="0 сделок · 0 файлов"
+              >
+                <strong>Состав сделки еще не подключен</strong>
+                <p>
+                  Связь товаров со сделками появится через <code>DealLineItem</code>. До этого
+                  карточка хранит только каталоговую позицию без неработающих действий.
+                </p>
+              </CrmEntityActivityPlaceholder>
+            }
+            actions={
+              canManageProducts ? (
                 <button
                   className="primary-button"
                   disabled={isSaving}
@@ -157,58 +210,110 @@ export function ProductsView(props: {
                 >
                   Редактировать
                 </button>
-              ) : null}
-              <button className="secondary-button" type="button" onClick={props.onBack}>
-                <ArrowLeft aria-hidden="true" size={14} />
-                К списку товаров
-              </button>
-            </span>
-          }
-        >
-          <SectionFeedback state={props.sectionState} emptyLabel="Товары и услуги недоступны." />
-          {activeProduct ? (
-            <div className="crm-card-layout">
-              <section className="detail-card">
-                <h2>{activeProduct.name}</h2>
-                <dl className="detail-list">
-                  <div>
-                    <dt>Тип</dt>
-                    <dd>{getProductTypeLabel(activeProduct.type)}</dd>
-                  </div>
-                  <div>
-                    <dt>Артикул</dt>
-                    <dd>{activeProduct.sku || "Не задан"}</dd>
-                  </div>
-                  <div>
-                    <dt>Единица</dt>
-                    <dd>{activeProduct.unit}</dd>
-                  </div>
-                  <div>
-                    <dt>Цена</dt>
-                    <dd>{formatMoney(activeProduct.price)}</dd>
-                  </div>
-                  <div>
-                    <dt>Статус</dt>
-                    <dd>{renderCrmStatus(activeProduct.status)}</dd>
-                  </div>
-                  <div>
-                    <dt>Обновлено</dt>
-                    <dd>{formatDate(activeProduct.updatedAt)}</dd>
-                  </div>
-                </dl>
-              </section>
-              <aside className="detail-card crm-side-panel">
-                <h3>Использование</h3>
-                <p className="muted">
-                  Связь товаров со сделками будет добавлена отдельной моделью состава
-                  сделки. Сейчас карточка хранит каталоговую позицию без fake actions.
-                </p>
-              </aside>
-            </div>
-          ) : (
+              ) : null
+            }
+            backLabel="Товары и услуги"
+            eyebrow="Товар или услуга"
+            meta="CRM-позиция для будущего состава сделки, КП и документов."
+            status={renderCrmStatus(activeProduct.status)}
+            title={
+              <InlineEditableValue
+                disabled={!canManageProducts || isSaving}
+                label="Название позиции"
+                value={activeProduct.name}
+                onSave={(value) => saveProductInline(activeProduct, { name: value })}
+              />
+            }
+            onBack={props.onBack ?? (() => undefined)}
+          >
+            <CrmEntitySection title="О позиции">
+              <CrmEntityFactList>
+                <CrmEntityFact label="Тип">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    display={getProductTypeLabel(activeProduct.type)}
+                    label="Тип позиции"
+                    mode="select"
+                    options={productTypeOptions}
+                    value={activeProduct.type}
+                    onSave={(value) =>
+                      saveProductInline(activeProduct, { type: value as Product["type"] })
+                    }
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Название">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    label="Название позиции"
+                    value={activeProduct.name}
+                    onSave={(value) => saveProductInline(activeProduct, { name: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Артикул">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    display={activeProduct.sku || "Не задан"}
+                    label="Артикул позиции"
+                    value={activeProduct.sku ?? ""}
+                    onSave={(value) => saveProductInline(activeProduct, { sku: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Единица">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    label="Единица измерения"
+                    value={activeProduct.unit}
+                    onSave={(value) => saveProductInline(activeProduct, { unit: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Цена">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    display={formatMoney(activeProduct.price)}
+                    label="Цена позиции"
+                    mode="number"
+                    value={String(activeProduct.price)}
+                    onSave={(value) =>
+                      saveProductInline(activeProduct, { price: Number(value) })
+                    }
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Описание">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    display={activeProduct.description || "Описание не задано"}
+                    label="Описание позиции"
+                    mode="textarea"
+                    value={activeProduct.description ?? ""}
+                    onSave={(value) => saveProductInline(activeProduct, { description: value })}
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Статус">
+                  <InlineEditableValue
+                    disabled={!canManageProducts || isSaving}
+                    display={activeProduct.status === "active" ? "Активно" : "Архив"}
+                    label="Статус позиции"
+                    mode="select"
+                    options={crmStatusOptions}
+                    value={activeProduct.status}
+                    onSave={(value) =>
+                      saveProductInline(activeProduct, { status: value as Product["status"] })
+                    }
+                  />
+                </CrmEntityFact>
+                <CrmEntityFact label="Обновлено">{formatDate(activeProduct.updatedAt)}</CrmEntityFact>
+              </CrmEntityFactList>
+            </CrmEntitySection>
+          </CrmEntityWorkspace>
+        ) : (
+          <Panel title="Позиция не найдена" subtitle="Запись не найдена в текущем workspace.">
             <p className="empty-state">Товар или услуга не найдены.</p>
-          )}
-        </Panel>
+            <button className="secondary-button" type="button" onClick={props.onBack}>
+              <ArrowLeft aria-hidden="true" size={14} />
+              К списку товаров и услуг
+            </button>
+          </Panel>
+        )}
         {isModalOpen ? (
           <ProductModal
             error={formState.formError}
@@ -459,6 +564,16 @@ function ProductModal(props: {
     </Modal>
   );
 }
+
+const crmStatusOptions = [
+  { label: "Активно", value: "active" },
+  { label: "Архив", value: "archived" }
+];
+
+const productTypeOptions = [
+  { label: "Услуга", value: "service" },
+  { label: "Товар", value: "goods" }
+];
 
 function getProductTypeLabel(type: Product["type"]): string {
   return type === "service" ? "Услуга" : "Товар";
