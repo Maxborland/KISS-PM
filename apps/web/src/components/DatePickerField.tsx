@@ -124,7 +124,7 @@ export function DatePickerField(props: {
 }
 
 function parseDateInput(value: string): Date | undefined {
-  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value.trim());
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:T.*)?$/.exec(value.trim());
   if (!match) return undefined;
   const year = Number(match[1]);
   const month = Number(match[2]);
