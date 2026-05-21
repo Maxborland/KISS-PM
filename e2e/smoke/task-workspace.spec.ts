@@ -13,6 +13,7 @@ test("task workspace supports kanban creation, detail activity, drag status and 
   expect(health.status()).toBe(200);
   const suffix = Date.now().toString(36);
   const taskTitle = `Smoke task workspace ${suffix}`;
+  const editedTaskTitle = `${taskTitle} edited`;
 
   await page.goto("/");
   await loginToWorkspace(page, { password: "local-admin-password" });
@@ -40,6 +41,14 @@ test("task workspace supports kanban creation, detail activity, drag status and 
   const taskId = page.url().split("/tasks/")[1] ?? "";
   expect(taskId).toMatch(/^task-/);
   await expect(page.getByRole("heading", { name: "Активность задачи" })).toBeVisible();
+  await page.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать задачу" });
+  await expect(editDialog).toBeVisible();
+  await editDialog.getByLabel("Название").fill(editedTaskTitle);
+  await editDialog.getByLabel("Трудозатраты").fill("14");
+  await editDialog.getByRole("button", { name: "Сохранить задачу" }).click();
+  await expect(page.getByText("Задача обновлена.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: editedTaskTitle })).toBeVisible();
   await page
     .getByPlaceholder("Написать комментарий, @упомянуть участника или добавить файл...")
     .first()
@@ -52,19 +61,19 @@ test("task workspace supports kanban creation, detail activity, drag status and 
   await page.getByRole("complementary").getByRole("button", { name: "Моя работа" }).click();
   await expect(page).toHaveURL(/\/my-work$/);
   await page.getByRole("button", { name: "Канбан", exact: true }).click();
-  await page.getByPlaceholder("Поиск задачи...").fill(taskTitle);
+  await page.getByPlaceholder("Поиск задачи...").fill(editedTaskTitle);
   const filteredWaitingColumn = getKanbanColumn(page, "Ожидает");
   const inProgressColumn = getKanbanColumn(page, "В работе");
-  await expect(filteredWaitingColumn.getByText(taskTitle)).toBeVisible();
+  await expect(filteredWaitingColumn.getByText(editedTaskTitle)).toBeVisible();
   await dragTaskToColumn(page, {
     sourceColumn: filteredWaitingColumn,
-    taskTitle,
+    taskTitle: editedTaskTitle,
     targetColumn: inProgressColumn
   });
-  await expect(inProgressColumn.getByText(taskTitle)).toBeVisible();
+  await expect(inProgressColumn.getByText(editedTaskTitle)).toBeVisible();
 
   await page.getByRole("button", { name: "Таблица", exact: true }).click();
-  const taskRow = page.getByRole("row", { name: new RegExp(escapeRegExp(taskTitle)) });
+  const taskRow = page.getByRole("row", { name: new RegExp(escapeRegExp(editedTaskTitle)) });
   await expect(taskRow).toBeVisible();
   await page.getByRole("button", { name: "Включить массовый режим" }).click();
   await taskRow.getByRole("checkbox", { name: new RegExp(escapeRegExp(taskTitle)) }).check();
@@ -73,6 +82,11 @@ test("task workspace supports kanban creation, detail activity, drag status and 
 
   await expectAuditEventForSource(page, {
     actionType: "task.created",
+    sourceEntityId: taskId,
+    sourceEntityType: "Task"
+  });
+  await expectAuditEventForSource(page, {
+    actionType: "task.updated",
     sourceEntityId: taskId,
     sourceEntityType: "Task"
   });

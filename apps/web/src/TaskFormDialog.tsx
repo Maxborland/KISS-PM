@@ -11,6 +11,7 @@ import {
   getRoleLabel,
   sortTaskStatuses
 } from "./taskWorkspace";
+import { normalizeTaskFormDate } from "./taskFormDates";
 import type { WorkspaceData } from "./workspaceData";
 
 type TaskFormErrors = Record<string, string>;
@@ -47,8 +48,8 @@ export function TaskFormDialog(props: {
     activeStatuses.find((status) => status.category === "new")?.id ??
     activeStatuses[0]?.id ??
     "";
-  const [plannedStart, setPlannedStart] = useState(props.task?.plannedStart ?? "");
-  const [plannedFinish, setPlannedFinish] = useState(props.task?.plannedFinish ?? "");
+  const [plannedStart, setPlannedStart] = useState(normalizeTaskFormDate(props.task?.plannedStart));
+  const [plannedFinish, setPlannedFinish] = useState(normalizeTaskFormDate(props.task?.plannedFinish));
   const [errors, setErrors] = useState<TaskFormErrors>({});
   const [submitError, setSubmitError] = useState("");
   const initialExecutorId =
@@ -70,8 +71,8 @@ export function TaskFormDialog(props: {
   useEffect(() => {
     setErrors({});
     setSubmitError("");
-    setPlannedStart(props.task?.plannedStart ?? "");
-    setPlannedFinish(props.task?.plannedFinish ?? "");
+    setPlannedStart(normalizeTaskFormDate(props.task?.plannedStart));
+    setPlannedFinish(normalizeTaskFormDate(props.task?.plannedFinish));
   }, [props.task?.id]);
 
   async function submitTask(event: React.FormEvent<HTMLFormElement>) {
