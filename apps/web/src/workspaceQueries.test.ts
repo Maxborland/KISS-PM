@@ -52,6 +52,22 @@ describe("workspace query keys", () => {
       "project-1",
       "tasks"
     ]);
+    expect(workspaceQueryKeys.taskStatuses()).toEqual([
+      "workspace",
+      "tasks",
+      "statuses"
+    ]);
+    expect(workspaceQueryKeys.task("task-1")).toEqual([
+      "workspace",
+      "tasks",
+      "task-1"
+    ]);
+    expect(workspaceQueryKeys.taskActivity("task-1")).toEqual([
+      "workspace",
+      "tasks",
+      "task-1",
+      "activity"
+    ]);
     expect(workspaceQueryKeys.myWork()).toEqual(["workspace", "myWork"]);
     expect(workspaceQueryKeys.customFields()).toEqual([
       "workspace",

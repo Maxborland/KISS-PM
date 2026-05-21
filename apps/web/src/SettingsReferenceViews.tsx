@@ -1,7 +1,7 @@
 import { PlusCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { DealStage, ProjectType } from "./api";
+import type { DealStage, ProjectType, TaskStatus, TaskStatusDefinition } from "./api";
 import {
   canRenderSectionTable,
   EntityActions,
@@ -15,6 +15,7 @@ import {
 import type { WorkspaceData } from "./workspaceData";
 import { makeClientGeneratedId } from "./workspaceIds";
 import { useCrmMutations } from "./workspaceQueries";
+import { useProjectWorkMutations } from "./workspaceQueries";
 import {
   type FormErrors,
   hasFormErrors,
@@ -40,6 +41,240 @@ import {
   SectionFeedback,
   TableEmpty
 } from "./components/workspace-ui";
+
+export function TaskStatusesView(props: {
+  data: WorkspaceData;
+  sectionState: SectionState;
+  onChanged: (message: string) => void;
+}) {
+  const canManage = hasPermission(props.data.permissions, "tenant.task_statuses.manage");
+  const mutations = useProjectWorkMutations();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const statuses = useMemo(
+    () => [...props.data.taskStatuses].sort((left, right) => left.sortOrder - right.sortOrder),
+    [props.data.taskStatuses]
+  );
+  const editingStatus = editingId
+    ? props.data.taskStatuses.find((status) => status.id === editingId) ?? null
+    : null;
+  const isSaving =
+    mutations.createTaskStatus.isPending ||
+    mutations.updateTaskStatusDefinition.isPending ||
+    mutations.archiveTaskStatus.isPending;
+
+  async function submitStatus(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
+    const category = String(form.get("category") ?? "waiting") as TaskStatus;
+    const sortOrder = Number(form.get("sortOrder") ?? 0);
+    const status = String(form.get("status") ?? "active") as TaskStatusDefinition["status"];
+    const errors: FormErrors = {};
+    if (name.length < 2) errors.name = "Укажите название статуса.";
+    if (!Number.isInteger(sortOrder) || sortOrder < 1) errors.sortOrder = "Укажите порядок.";
+    setFieldErrors(errors);
+    setFormError("");
+    if (hasFormErrors(errors)) return;
+
+    try {
+      if (editingStatus) {
+        await mutations.updateTaskStatusDefinition.mutateAsync({
+          statusId: editingStatus.id,
+          input: { name, category, sortOrder, status }
+        });
+      } else {
+        await mutations.createTaskStatus.mutateAsync({
+          id: makeClientGeneratedId("task-status", name),
+          name,
+          category,
+          sortOrder
+        });
+      }
+      setIsModalOpen(false);
+      setEditingId(null);
+      props.onChanged(editingStatus ? "Статус задачи обновлен" : "Статус задачи создан");
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <>
+      <Panel
+        title="Статусы задач"
+        subtitle="Tenant-настройка рабочего workflow задач. Новая и Выполнено остаются обязательными."
+        actions={
+          canManage ? (
+            <button className="primary-button" type="button" onClick={() => {
+              setEditingId(null);
+              setFieldErrors({});
+              setFormError("");
+              setIsModalOpen(true);
+            }}>
+              <PlusCircle aria-hidden="true" size={15} />
+              Создать статус
+            </button>
+          ) : (
+            <DisabledAction reason="Нужно право tenant.task_statuses.manage" />
+          )
+        }
+      >
+        <EntitySummary
+          total={props.data.taskStatuses.length}
+          active={props.data.taskStatuses.filter((status) => status.status === "active").length}
+          archived={props.data.taskStatuses.filter((status) => status.status === "archived").length}
+        />
+        <SectionFeedback state={props.sectionState} emptyLabel="Статусы задач недоступны." />
+        {canRenderSectionTable(props.sectionState) ? (
+          <div className="table-wrap">
+            <table className="data-table" aria-label="Статусы задач">
+              <thead>
+                <tr>
+                  <th>Статус</th>
+                  <th>Категория</th>
+                  <th>Порядок</th>
+                  <th>Состояние</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statuses.length === 0 ? (
+                  <TableEmpty colSpan={5} label="Статусы задач пока не настроены." />
+                ) : (
+                  statuses.map((status) => (
+                    <tr key={status.id}>
+                      <td>
+                        <EntityNameCell
+                          avatar={status.name.slice(0, 1)}
+                          primary={status.name}
+                          secondary={status.isSystem ? "Системный обязательный статус" : status.id}
+                        />
+                      </td>
+                      <td>{renderTaskStatusCategory(status.category)}</td>
+                      <td>{status.sortOrder}</td>
+                      <td>{renderCrmStatus(status.status)}</td>
+                      <td>
+                        <span className="table-actions">
+                          <button
+                            className="secondary-button compact"
+                            disabled={!canManage}
+                            type="button"
+                            onClick={() => {
+                              setEditingId(status.id);
+                              setFieldErrors({});
+                              setFormError("");
+                              setIsModalOpen(true);
+                            }}
+                          >
+                            Изменить
+                          </button>
+                          <button
+                            className="danger-button compact"
+                            disabled={!canManage || status.isSystem}
+                            title={status.isSystem ? "Обязательный системный статус нельзя архивировать" : undefined}
+                            type="button"
+                            onClick={() => void mutations.archiveTaskStatus.mutateAsync(status.id)}
+                          >
+                            Архив
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </Panel>
+      {isModalOpen ? (
+        <Modal
+          title={editingStatus ? "Изменить статус задачи" : "Создать статус задачи"}
+          description="Статус хранится в tenant-настройках и используется списком, канбаном и карточкой задачи."
+          isDismissDisabled={isSaving}
+          onClose={() => {
+            if (isSaving) return;
+            setIsModalOpen(false);
+            setEditingId(null);
+          }}
+        >
+          <form className="stack-form modal-form" onSubmit={submitStatus}>
+            <label>
+              Название
+              <input
+                aria-describedby={fieldErrors.name ? "task-status-name-error" : undefined}
+                aria-invalid={Boolean(fieldErrors.name)}
+                data-autofocus
+                defaultValue={editingStatus?.name ?? ""}
+                name="name"
+                placeholder="Ждет клиента"
+              />
+              <FieldError errors={fieldErrors} field="name" formId="task-status" />
+            </label>
+            <div className="form-grid">
+              <label>
+                Категория
+                <select
+                  defaultValue={editingStatus?.category ?? "waiting"}
+                  disabled={editingStatus?.isSystem}
+                  name="category"
+                >
+                  <option value="new">Новая</option>
+                  <option value="waiting">Ожидает</option>
+                  <option value="in_progress">В работе</option>
+                  <option value="review">На контроле</option>
+                  <option value="done">Выполнено</option>
+                </select>
+              </label>
+              <label>
+                Порядок
+                <input
+                  aria-describedby={fieldErrors.sortOrder ? "task-status-sortOrder-error" : undefined}
+                  aria-invalid={Boolean(fieldErrors.sortOrder)}
+                  defaultValue={editingStatus?.sortOrder ?? 30}
+                  min={1}
+                  name="sortOrder"
+                  type="number"
+                />
+                <FieldError errors={fieldErrors} field="sortOrder" formId="task-status" />
+              </label>
+            </div>
+            <label>
+              Состояние
+              <select defaultValue={editingStatus?.status ?? "active"} name="status">
+                <option value="active">Активен</option>
+                <option value="archived">Архив</option>
+              </select>
+            </label>
+            <ModalActions
+              error={formError}
+              isSaving={isSaving}
+              primaryLabel={editingStatus ? "Сохранить" : "Создать"}
+              savingLabel="Сохраняем..."
+              onClose={() => {
+                setIsModalOpen(false);
+                setEditingId(null);
+              }}
+            />
+          </form>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+function renderTaskStatusCategory(category: TaskStatus): string {
+  return {
+    new: "Новая",
+    waiting: "Ожидает",
+    in_progress: "В работе",
+    review: "На контроле",
+    done: "Выполнено"
+  }[category];
+}
 
 export function ProjectTypesView(props: {
   data: WorkspaceData;

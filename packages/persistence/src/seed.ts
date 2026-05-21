@@ -13,6 +13,7 @@ import {
   positions,
   products,
   projectTypes,
+  taskStatuses,
   tenantUsers,
   tenants,
   userCredentials
@@ -121,6 +122,12 @@ export async function seedTenantDataset(
             name: sql`excluded.name`
           }
         });
+      for (const status of createDefaultTaskStatuses(tenant.id, createdAt)) {
+        await transaction
+          .insert(taskStatuses)
+          .values(status)
+          .onConflictDoNothing();
+      }
     }
 
     for (const profile of dataset.accessProfiles) {
@@ -382,6 +389,10 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.opportunities.manage",
     "tenant.projects.read",
     "tenant.projects.manage",
+    "tenant.tasks.create",
+    "tenant.tasks.edit",
+    "tenant.tasks.delete",
+    "tenant.task_statuses.manage",
     "tenant.project_activation.manage",
     "tenant.resource_feasibility.read",
     "profile.read",
@@ -395,4 +406,64 @@ export function createTenantAdminSeedProfile(input: {
     name: input.name ?? "Администратор",
     permissions: adminPermissions
   };
+}
+
+function createDefaultTaskStatuses(tenantId: string, createdAt: Date) {
+  return [
+    {
+      id: "task-status-new",
+      tenantId,
+      name: "Новая",
+      category: "new",
+      sortOrder: 10,
+      status: "active",
+      isSystem: true,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "task-status-waiting",
+      tenantId,
+      name: "Ожидает",
+      category: "waiting",
+      sortOrder: 20,
+      status: "active",
+      isSystem: false,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "task-status-in-progress",
+      tenantId,
+      name: "В работе",
+      category: "in_progress",
+      sortOrder: 30,
+      status: "active",
+      isSystem: false,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "task-status-review",
+      tenantId,
+      name: "На контроле",
+      category: "review",
+      sortOrder: 40,
+      status: "active",
+      isSystem: false,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "task-status-done",
+      tenantId,
+      name: "Выполнено",
+      category: "done",
+      sortOrder: 50,
+      status: "active",
+      isSystem: true,
+      createdAt,
+      updatedAt: createdAt
+    }
+  ];
 }

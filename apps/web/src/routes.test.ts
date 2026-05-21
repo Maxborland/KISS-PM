@@ -28,6 +28,7 @@ describe("workspace route model", () => {
       "settings",
       "project-types",
       "deal-stages",
+      "task-statuses",
       "profile",
       "theme"
     ]);
@@ -60,7 +61,7 @@ describe("workspace route model", () => {
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[14]]
+        routes: [workspaceRoutes[15]]
       }
     ]);
   });

@@ -22,6 +22,7 @@ import {
   useProjectsQuery,
   useProjectTypesQuery,
   useProjectTemplatesQuery,
+  useTaskStatusesQuery,
   useUsersQuery
 } from "./workspaceQueries";
 import { buildWorkspaceData, type WorkspaceData } from "./workspaceData";
@@ -57,6 +58,7 @@ export function useWorkspaceShellData() {
   const dealStagesQuery = useDealStagesQuery(canReadDealStages);
   const opportunitiesQuery = useOpportunitiesQuery(canReadOpportunities);
   const projectsQuery = useProjectsQuery(canReadProjects);
+  const taskStatusesQuery = useTaskStatusesQuery(canReadProjects);
   const myWorkQuery = useMyWorkQuery(canReadProjects);
   const customFieldsQuery = useCustomFieldsQuery(canReadWorkspaceConfig);
   const projectTemplatesQuery = useProjectTemplatesQuery(canReadWorkspaceConfig);
@@ -80,6 +82,7 @@ export function useWorkspaceShellData() {
       dealStages: dealStagesQuery.data,
       opportunities: opportunitiesQuery.data,
       projects: projectsQuery.data,
+      taskStatuses: taskStatusesQuery.data,
       myWork: myWorkQuery.data,
       customFields: customFieldsQuery.data,
       projectTemplates: projectTemplatesQuery.data
@@ -99,6 +102,7 @@ export function useWorkspaceShellData() {
     opportunitiesQuery.data?.opportunities,
     projectTypesQuery.data?.projectTypes,
     projectsQuery.data?.projects,
+    taskStatusesQuery.data?.taskStatuses,
     customFieldsQuery.data?.customFields,
     projectTemplatesQuery.data?.projectTemplates,
     positionsQuery.data?.positions,
@@ -143,7 +147,16 @@ export function useWorkspaceShellData() {
         opportunitiesQuery.error
       ),
       projects: getSectionState(canReadProjects, projectsQuery.isFetching, projectsQuery.error),
-      myWork: getSectionState(canReadProjects, myWorkQuery.isFetching, myWorkQuery.error),
+      myWork: getSectionState(
+        canReadProjects,
+        myWorkQuery.isFetching || taskStatusesQuery.isFetching,
+        myWorkQuery.error ?? taskStatusesQuery.error
+      ),
+      taskStatuses: getSectionState(
+        canReadProjects,
+        taskStatusesQuery.isFetching,
+        taskStatusesQuery.error
+      ),
       workspaceConfig: getSectionState(
         canReadWorkspaceConfig,
         customFieldsQuery.isFetching || projectTemplatesQuery.isFetching,
