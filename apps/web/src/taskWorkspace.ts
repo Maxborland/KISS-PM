@@ -128,6 +128,42 @@ export function canTransitionTaskStatus(
   );
 }
 
+export function getTaskStatusTransitionState(
+  task: Task,
+  targetStatus: TaskStatusDefinition,
+  currentUserId: string,
+  permissions: readonly string[]
+): { canTransition: boolean; reason?: string } {
+  if (targetStatus.id === task.statusId) {
+    return { canTransition: false, reason: "Текущий статус задачи" };
+  }
+  if (!canTransitionTaskStatus(task, currentUserId, permissions)) {
+    return {
+      canTransition: false,
+      reason: "Нужна роль участника задачи или право редактирования задач"
+    };
+  }
+  const allowedCategories = transitionGraph[task.statusCategory] ?? [];
+  if (!allowedCategories.includes(targetStatus.category)) {
+    return {
+      canTransition: false,
+      reason: `Из статуса "${task.statusName}" нельзя сразу перейти в "${targetStatus.name}"`
+    };
+  }
+  if (
+    task.requiresAcceptance &&
+    task.statusCategory === "in_progress" &&
+    targetStatus.category === "done" &&
+    !canEditTaskFields(task, currentUserId, permissions)
+  ) {
+    return {
+      canTransition: false,
+      reason: "Сначала отправьте задачу на контроль постановщику"
+    };
+  }
+  return { canTransition: true };
+}
+
 export function getNextTaskStatusAction(
   task: Task,
   statuses: readonly TaskStatusDefinition[],

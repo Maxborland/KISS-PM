@@ -25,10 +25,10 @@ import {
   canArchiveTask,
   canCommentTask,
   canEditTaskFields,
-  canTransitionTaskStatus,
   getNextTaskStatusAction,
   getPriorityLabel,
   getProjectName,
+  getTaskStatusTransitionState,
   getStatusTone,
   getUserName,
   sortTaskStatuses
@@ -137,7 +137,7 @@ export function TaskDetailView(props: {
           </nav>
           <h1>{task.title}</h1>
           <div className="task-detail-meta">
-            <span>{task.id}</span>
+            <span>{formatTaskKey(task.id)}</span>
             <span>|</span>
             <StatusPill label={task.statusName} tone={getStatusTone(task.statusCategory)} />
             <span>|</span>
@@ -191,7 +191,8 @@ export function TaskDetailView(props: {
       </header>
 
       <TaskStatusRail
-        canTransition={canTransitionTaskStatus(task, props.data.me.id, props.data.permissions)}
+        currentUserId={props.data.me.id}
+        permissions={props.data.permissions}
         isPending={projectWorkMutations.updateTaskStatus.isPending}
         statuses={props.data.taskStatuses}
         task={task}
@@ -364,8 +365,9 @@ export function TaskDetailView(props: {
 }
 
 function TaskStatusRail(props: {
-  canTransition: boolean;
+  currentUserId: string;
   isPending: boolean;
+  permissions: readonly string[];
   task: Task;
   statuses: readonly TaskStatusDefinition[];
   onSelect: (statusId: string) => void | Promise<void>;
@@ -375,23 +377,23 @@ function TaskStatusRail(props: {
     <div className="task-status-rail" aria-label="Статусы задачи">
       {statuses.map((status) => {
         const isCurrent = status.id === props.task.statusId;
-        const disabled = isCurrent || props.isPending || !props.canTransition;
+        const transitionState = getTaskStatusTransitionState(
+          props.task,
+          status,
+          props.currentUserId,
+          props.permissions
+        );
+        const disabled = props.isPending || !transitionState.canTransition;
         return (
           <button
             className={isCurrent ? "active" : ""}
             disabled={disabled}
             key={status.id}
-            title={
-              isCurrent
-                ? "Текущий статус задачи"
-                : props.canTransition
-                  ? `Перевести задачу в статус "${status.name}"`
-                  : "Нужна роль участника задачи или право редактирования задач"
-            }
+            title={transitionState.reason ?? `Перевести задачу в статус "${status.name}"`}
             type="button"
             onClick={() => void props.onSelect(status.id)}
           >
-            {status.name}
+            <span>{status.name}</span>
           </button>
         );
       })}
@@ -650,4 +652,12 @@ function getAuditSummary(event: AuditEvent): string {
   if (event.actionType === "task.comment_created") return "Добавлен комментарий.";
   if (event.actionType === "task.archived") return "Задача архивирована.";
   return "Событие записано в общий аудит.";
+}
+
+function formatTaskKey(taskId: string): string {
+  let hash = 0;
+  for (let index = 0; index < taskId.length; index += 1) {
+    hash = (hash * 31 + taskId.charCodeAt(index)) % 1_000_000;
+  }
+  return `TASK-${String(hash).padStart(6, "0")}`;
 }
