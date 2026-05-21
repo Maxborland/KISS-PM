@@ -935,15 +935,16 @@
 
 .task-detail-page {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
 .task-detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
 }
 
 .task-detail-header > div:first-child {
@@ -951,12 +952,13 @@
 }
 
 .task-detail-header h1 {
-  max-width: 860px;
+  max-width: 940px;
   margin: 4px 0 8px;
-  font-size: 30px;
+  color: var(--text);
+  font-size: 28px;
   line-height: 1.1;
   letter-spacing: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .task-breadcrumbs,
@@ -972,7 +974,15 @@
 .task-detail-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
-  max-width: 560px;
+  flex-wrap: nowrap;
+  max-width: 660px;
+  min-width: 0;
+}
+
+.task-detail-actions .primary-button,
+.task-detail-actions .secondary-button {
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .task-breadcrumbs {
@@ -988,13 +998,26 @@
 }
 
 .task-detail-meta {
+  max-width: 100%;
   color: var(--muted-strong);
   font-size: 13px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.task-detail-meta > span {
+  min-width: 0;
+}
+
+.task-detail-meta > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-status-rail {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1047,7 +1070,9 @@
 
 .task-status-rail button {
   position: relative;
-  min-height: 42px;
+  min-width: 0;
+  min-height: 40px;
+  flex: 1 1 0;
   display: grid;
   place-items: center;
   padding: 0 10px;
@@ -1067,6 +1092,15 @@
     background 160ms ease,
     color 160ms ease,
     box-shadow 160ms ease;
+}
+
+.task-status-rail button span {
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-status-rail button:disabled {
@@ -1098,7 +1132,7 @@
 
 .task-detail-layout {
   display: grid;
-  grid-template-columns: minmax(560px, 0.95fr) minmax(520px, 1.05fr);
+  grid-template-columns: minmax(600px, 0.92fr) minmax(560px, 1.08fr);
   gap: 16px;
   align-items: start;
   min-width: 0;
@@ -1149,7 +1183,7 @@
 
 .task-facts-list div {
   display: grid;
-  grid-template-columns: minmax(118px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(126px, 0.72fr) minmax(0, 1.28fr);
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -1215,6 +1249,20 @@
   min-width: 0;
 }
 
+.task-activity-panel header > div:first-child {
+  min-width: 0;
+}
+
+.task-activity-tools {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.task-activity-tools .secondary-button.compact {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
 .task-activity-panel header p {
   margin: 2px 0 0;
   color: var(--muted-strong);
@@ -1246,17 +1294,26 @@
 
 .task-comment-composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px 40px 40px auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 34px 34px 34px 40px;
+  gap: 7px;
   align-items: center;
   min-width: 0;
 }
 
 .task-comment-composer input {
-  min-height: 42px;
+  min-width: 0;
+  min-height: 38px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 12px;
+}
+
+.task-comment-composer .icon-button,
+.task-comment-composer .primary-button.compact {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
 }
 
 .task-activity-timeline {
@@ -1445,7 +1502,7 @@
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1500px) {
   .task-detail-layout {
     grid-template-columns: 1fr;
   }
@@ -1454,7 +1511,9 @@
     position: static;
     max-height: none;
   }
+}
 
+@media (max-width: 1100px) {
   .task-form-plan-grid,
   .task-facts-list,
   .task-history-snapshot,
@@ -1464,6 +1523,20 @@
 
   .task-detail-header {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .task-detail-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .task-status-rail {
+    overflow-x: auto;
+  }
+
+  .task-status-rail button {
+    min-width: 156px;
   }
 }
 

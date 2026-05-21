@@ -6,6 +6,7 @@ import {
   canEditTaskFields,
   filterTasks,
   getNextTaskStatusAction,
+  getTaskStatusTransitionState,
   getTaskCounters,
   groupTasksByStatus
 } from "./taskWorkspace";
@@ -129,6 +130,48 @@ describe("task workspace helpers", () => {
       label: "Закрыть",
       statusId: "task-status-done",
       category: "done"
+    });
+  });
+
+  it("keeps the status rail honest by disabling impossible transitions", () => {
+    const task = makeTask("task-1", {
+      statusId: "task-status-progress",
+      statusName: "В работе",
+      statusCategory: "in_progress",
+      requesterUserId: "user-admin",
+      ownerUserId: "user-executor",
+      requiresAcceptance: true,
+      participants: [{ userId: "user-executor", role: "executor" }]
+    });
+
+    expect(
+      getTaskStatusTransitionState(
+        task,
+        statuses.find((status) => status.id === "task-status-review")!,
+        "user-executor",
+        []
+      )
+    ).toEqual({ canTransition: true });
+    expect(
+      getTaskStatusTransitionState(
+        task,
+        statuses.find((status) => status.id === "task-status-done")!,
+        "user-executor",
+        []
+      )
+    ).toMatchObject({
+      canTransition: false,
+      reason: "Сначала отправьте задачу на контроль постановщику"
+    });
+    expect(
+      getTaskStatusTransitionState(
+        task,
+        statuses.find((status) => status.id === "task-status-new")!,
+        "user-executor",
+        []
+      )
+    ).toMatchObject({
+      canTransition: false
     });
   });
 
