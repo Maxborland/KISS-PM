@@ -137,6 +137,9 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       (status) => status.id === context.req.param("statusId")
     );
     if (!before) return context.json({ error: "task_status_not_found" }, 404);
+    if (before.isSystem && parsed.value.status === "archived") {
+      return context.json({ error: "system_task_status_required" }, 409);
+    }
     if (before.isSystem && before.category !== parsed.value.category) {
       return context.json({ error: "system_task_status_category_locked" }, 409);
     }
@@ -593,7 +596,14 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         profile,
         targetTenantId: actor.tenantId
       });
-      if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+      const initialManageDecision = canManageProjects({
+        actor,
+        profile,
+        targetTenantId: actor.tenantId
+      });
+      if (!readDecision.allowed && !initialManageDecision.allowed) {
+        return context.json({ error: readDecision.reason }, 403);
+      }
 
       const initialProject = await findActiveProject(
         dataSource,
@@ -838,7 +848,7 @@ function canParticipantTransitionTask(
   actorUserId: string,
   task: TaskRecord
 ): boolean {
-  const transitionRoles = new Set(["executor", "co_executor", "controller"]);
+  const transitionRoles = new Set(["requester", "executor", "co_executor", "controller"]);
   const participantRole = getActorTaskParticipantRole(actorUserId, task);
   return participantRole ? transitionRoles.has(participantRole) : false;
 }
@@ -949,7 +959,7 @@ function canDeleteTask(
       authorizationBasis: "permission"
     };
   }
-  return canEditTaskFields(actor, profile, task);
+  return deleteDecision;
 }
 
 function canAcceptTaskResult(
