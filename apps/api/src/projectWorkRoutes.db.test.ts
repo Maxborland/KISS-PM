@@ -47,6 +47,12 @@ const projectWorkApiSeed: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Без проектов",
       permissions: []
+    },
+    {
+      id: "access-profile-manager-only",
+      tenantId: "tenant-alpha",
+      name: "Менеджер без чтения",
+      permissions: ["tenant.projects.manage"]
     }
   ],
   positions: [
@@ -83,6 +89,15 @@ const projectWorkApiSeed: SeedTenantDataset = {
       name: "Дина Без Прав",
       accessProfileId: "access-profile-denied",
       password: "local-denied-password"
+    },
+    {
+      id: "user-alpha-manager-only",
+      tenantId: "tenant-alpha",
+      email: "manager-only@kiss-pm.local",
+      name: "Марк Менеджер",
+      accessProfileId: "access-profile-manager-only",
+      positionId: "position-manager",
+      password: "local-manager-password"
     }
   ]
 };
@@ -471,6 +486,23 @@ describe("project work API routes", () => {
         cookie: adminCookie
       }
     });
+    const systemPatchArchive = await app.request(
+      "/api/workspace/task-statuses/task-status-new",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          name: "Новая",
+          category: "new",
+          sortOrder: 10,
+          status: "archived"
+        })
+      }
+    );
 
     expect(initial.status).toBe(200);
     await expect(initial.json()).resolves.toMatchObject({
@@ -493,6 +525,96 @@ describe("project work API routes", () => {
       taskStatus: { id: "task-status-client-wait", status: "archived" }
     });
     expect(systemArchive.status).toBe(409);
+    await expect(systemArchive.json()).resolves.toEqual({
+      error: "system_task_status_required"
+    });
+    expect(systemPatchArchive.status).toBe(409);
+    await expect(systemPatchArchive.json()).resolves.toEqual({
+      error: "system_task_status_required"
+    });
+  });
+
+  it("lets requester accept review tasks without manage permission", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-requester-acceptance",
+        title: "Принять результат без manage",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        requiresAcceptance: true,
+        participants: [
+          { userId: "user-alpha-executor", role: "requester" },
+          { userId: "user-alpha-admin", role: "executor" }
+        ]
+      })
+    });
+    await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-requester-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+    await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-requester-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-review" })
+      }
+    );
+
+    const accepted = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-requester-acceptance/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: requesterCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-done" })
+      }
+    );
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(accepted.status).toBe(200);
+    await expect(accepted.json()).resolves.toMatchObject({
+      task: { id: "task-requester-acceptance", status: "done", progress: 100 }
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.status_changed",
+          sourceEntity: { type: "Task", id: "task-requester-acceptance" },
+          permissionResult: expect.objectContaining({
+            authorizationBasis: "task_participant_role",
+            participantRole: "requester",
+            permission: null
+          })
+        })
+      ])
+    });
   });
 
   it("persists task comments for task participants and blocks unrelated readers", async () => {
@@ -662,6 +784,111 @@ describe("project work API routes", () => {
           sourceEntity: { type: "Task", id: "task-field-guard" }
         })
       ])
+    });
+  });
+
+  it("requires explicit delete permission to archive requester-owned tasks", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-requester-delete-guard",
+        title: "Проверить удаление постановщиком",
+        description: "Постановщик может редактировать, но не архивировать без delete.",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [
+          { userId: "user-alpha-executor", role: "requester" },
+          { userId: "user-alpha-admin", role: "executor" }
+        ]
+      })
+    });
+
+    const allowedRequesterEdit = await app.request(
+      "/api/workspace/tasks/task-requester-delete-guard",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: requesterCookie
+        },
+        body: JSON.stringify({
+          title: "Постановщик изменил задачу",
+          description: "Редактирование по роли постановщика разрешено.",
+          priority: "normal",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-02",
+          plannedFinish: "2026-06-05",
+          durationWorkingDays: 4,
+          plannedWork: 8,
+          requiresAcceptance: false,
+          participants: [
+            { userId: "user-alpha-executor", role: "requester" },
+            { userId: "user-alpha-admin", role: "executor" }
+          ]
+        })
+      }
+    );
+    const deniedArchive = await app.request(
+      "/api/workspace/tasks/task-requester-delete-guard",
+      {
+        method: "DELETE",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: requesterCookie
+        }
+      }
+    );
+
+    expect(allowedRequesterEdit.status).toBe(200);
+    expect(deniedArchive.status).toBe(403);
+    await expect(deniedArchive.json()).resolves.toEqual({ error: "permission_missing" });
+  });
+
+  it("lets manage-only actors transition task status without project read permission", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const managerCookie = await loginAs("manager-only@kiss-pm.local", "local-manager-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-manager-only-transition",
+        title: "Проверить manage-only переход",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    const transitioned = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-manager-only-transition/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: managerCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+
+    expect(transitioned.status).toBe(200);
+    await expect(transitioned.json()).resolves.toMatchObject({
+      task: { id: "task-manager-only-transition", status: "in_progress" }
     });
   });
 
