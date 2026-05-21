@@ -315,6 +315,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       !dataSource.listWorkspaceUsers ||
       !dataSource.listTaskStatuses ||
       !dataSource.createTask ||
+      !dataSource.createTaskActivity ||
       !dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
@@ -371,10 +372,12 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     if (!ownerUserId || !requesterUserId) {
       return context.json({ error: "task_executor_required" }, 400);
     }
+    const ownerUserName =
+      workspaceUsers.find((user) => user.id === ownerUserId)?.name ?? ownerUserId;
 
     const taskId = parsed.value.id ?? `task-${randomUUID()}`;
     const task = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createTask) {
+      if (!transactionDataSource.createTask || !transactionDataSource.createTaskActivity) {
         throw new Error("persistence_not_configured");
       }
 
@@ -433,6 +436,13 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         },
         transactionDataSource
       );
+      await createTaskSystemActivity(transactionDataSource, {
+        tenantId: actor.tenantId,
+        taskId: createdTask.id,
+        actorUserId: actor.id,
+        title: "Задача создана",
+        body: `Статус: ${taskStatus.name}. Ответственный: ${ownerUserName}.`
+      });
 
       return createdTask;
     });
@@ -447,7 +457,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       !dataSource.findTaskById ||
       !dataSource.updateTask ||
       !dataSource.listTaskStatuses ||
-      !dataSource.listWorkspaceUsers
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.createTaskActivity
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -520,6 +531,13 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       afterState: summarizeTask(updated),
       permissionResult: editDecision
     });
+    await createTaskSystemActivity(dataSource, {
+      tenantId: actor.tenantId,
+      taskId: updated.id,
+      actorUserId: actor.id,
+      title: "Задача обновлена",
+      body: "Поля задачи изменены через карточку задачи."
+    });
 
     return context.json({ task: updated });
   });
@@ -563,6 +581,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         !dataSource.listProjectTasks ||
         !dataSource.listTaskStatuses ||
         !dataSource.updateTaskStatus ||
+        !dataSource.createTaskActivity ||
         !dataSource.withTransaction
       ) {
         return context.json({ error: "persistence_not_configured" }, 501);
@@ -594,7 +613,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
             !transactionDataSource.listProjects ||
             !transactionDataSource.listProjectTasks ||
             !transactionDataSource.listTaskStatuses ||
-            !transactionDataSource.updateTaskStatus
+            !transactionDataSource.updateTaskStatus ||
+            !transactionDataSource.createTaskActivity
           ) {
             throw new Error("persistence_not_configured");
           }
@@ -711,6 +731,13 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
             },
             transactionDataSource
           );
+          await createTaskSystemActivity(transactionDataSource, {
+            tenantId: actor.tenantId,
+            taskId: updated.id,
+            actorUserId: actor.id,
+            title: "Статус задачи изменен",
+            body: `${task.statusName} -> ${targetStatus.name}`
+          });
 
           return { ok: true as const, task: updated };
         }
@@ -947,4 +974,32 @@ function summarizeTask(task: TaskRecord): Record<string, unknown> {
     plannedWork: task.plannedWork,
     requiresAcceptance: task.requiresAcceptance
   };
+}
+
+async function createTaskSystemActivity(
+  dataSource: ApiTenantDataSource,
+  input: {
+    tenantId: string;
+    taskId: string;
+    actorUserId: string;
+    title: string;
+    body: string;
+  }
+) {
+  if (!dataSource.createTaskActivity) {
+    throw new Error("persistence_not_configured");
+  }
+
+  await dataSource.createTaskActivity({
+    id: `task-activity-${randomUUID()}`,
+    tenantId: input.tenantId,
+    taskId: input.taskId,
+    type: "system",
+    body: input.body,
+    title: input.title,
+    fileUrl: null,
+    fileSizeBytes: null,
+    mimeType: null,
+    authorUserId: input.actorUserId
+  });
 }

@@ -118,7 +118,7 @@ export function TaskFormDialog(props: {
   return (
     <Modal
       title={props.task ? "Редактировать задачу" : "Создать задачу"}
-      description="Поля проверяются правами и записываются в аудит. Предшественники задаются в Gantt."
+      description="Заполните рабочие поля задачи. Предшественники задаются в Gantt."
       isDismissDisabled={props.isPending}
       size="wide"
       onClose={props.onClose}
