@@ -571,6 +571,100 @@ describe("project work API routes", () => {
     });
   });
 
+  it("blocks task field edits and archive for executors without edit/delete permission", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-field-guard",
+        title: "Проверить права редактирования",
+        description: "Исполнитель видит задачу, но не редактирует поля.",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    const deniedEdit = await app.request("/api/workspace/tasks/task-field-guard", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: executorCookie
+      },
+      body: JSON.stringify({
+        title: "Исполнитель не должен изменить поля",
+        description: "Попытка изменения без tenant.tasks.edit.",
+        priority: "high",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 12,
+        requiresAcceptance: false,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const deniedArchive = await app.request("/api/workspace/tasks/task-field-guard", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: executorCookie
+      }
+    });
+    const allowedEdit = await app.request("/api/workspace/tasks/task-field-guard", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: "Права редактирования проверены",
+        description: "Постановщик и администратор могут изменить задачу.",
+        priority: "high",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 12,
+        requiresAcceptance: false,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(deniedEdit.status).toBe(403);
+    await expect(deniedEdit.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(deniedArchive.status).toBe(403);
+    await expect(deniedArchive.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(allowedEdit.status).toBe(200);
+    await expect(allowedEdit.json()).resolves.toMatchObject({
+      task: {
+        id: "task-field-guard",
+        title: "Права редактирования проверены",
+        plannedWork: 12
+      }
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.updated",
+          sourceEntity: { type: "Task", id: "task-field-guard" }
+        })
+      ])
+    });
+  });
+
   it("denies task status transition for non-participant readers", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
