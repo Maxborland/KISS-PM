@@ -9,7 +9,8 @@ import { ProjectDetailView } from "./ProjectDetailView";
 import { MyWorkView } from "./MyWorkView";
 import { ProjectsView } from "./ProjectsView";
 import { RolesView } from "./RolesView";
-import { DealStagesView, ProjectTypesView } from "./SettingsReferenceViews";
+import { DealStagesView, ProjectTypesView, TaskStatusesView } from "./SettingsReferenceViews";
+import { TaskDetailView } from "./TaskDetailView";
 import { UsersView } from "./UsersView";
 import { WorkspaceSettingsView } from "./WorkspaceSettingsView";
 import { type WorkspaceRouteId } from "./routes";
@@ -23,6 +24,7 @@ export function WorkspaceRouteRenderer(props: {
   activeContactId: string | null;
   activeProductId: string | null;
   activeProjectId: string | null;
+  activeTaskId: string | null;
   data: WorkspaceData;
   openCreateRequested: boolean;
   onChanged: (message: string) => void;
@@ -36,6 +38,8 @@ export function WorkspaceRouteRenderer(props: {
   onOpenProduct: (productId: string) => void;
   onBackToProjects: () => void;
   onOpenProject: (projectId: string) => void;
+  onBackToMyWork: () => void;
+  onOpenTask: (taskId: string) => void;
   onQuickCreateConsumed: () => void;
   sectionStates: {
     users: SectionState;
@@ -50,6 +54,7 @@ export function WorkspaceRouteRenderer(props: {
     opportunities: SectionState;
     projects: SectionState;
     myWork: SectionState;
+    taskStatuses: SectionState;
     workspaceConfig: SectionState;
   };
 }) {
@@ -102,11 +107,26 @@ export function WorkspaceRouteRenderer(props: {
   }
 
   if (props.activeRouteId === "my-work") {
+    if (props.activeTaskId) {
+      return (
+        <TaskDetailView
+          data={props.data}
+          taskId={props.activeTaskId}
+          onBackToMyWork={props.onBackToMyWork}
+          onChanged={props.onChanged}
+          onOpenProject={props.onOpenProject}
+          sectionState={props.sectionStates.myWork}
+        />
+      );
+    }
+
     return (
       <MyWorkView
         data={props.data}
         sectionState={props.sectionStates.myWork}
+        onChanged={props.onChanged}
         onOpenProject={props.onOpenProject}
+        onOpenTask={props.onOpenTask}
       />
     );
   }
@@ -228,6 +248,16 @@ export function WorkspaceRouteRenderer(props: {
       <DealStagesView
         data={props.data}
         sectionState={props.sectionStates.dealStages}
+        onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "task-statuses") {
+    return (
+      <TaskStatusesView
+        data={props.data}
+        sectionState={props.sectionStates.taskStatuses}
         onChanged={props.onChanged}
       />
     );

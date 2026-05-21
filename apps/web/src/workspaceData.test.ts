@@ -200,6 +200,21 @@ describe("workspace data derivation", () => {
           }
         ]
       },
+      taskStatuses: {
+        taskStatuses: [
+          {
+            id: "task-status-new",
+            tenantId: "tenant-1",
+            name: "Новая",
+            category: "new",
+            sortOrder: 10,
+            status: "active",
+            isSystem: true,
+            createdAt: "2026-05-18T00:00:00.000Z",
+            updatedAt: "2026-05-18T00:00:00.000Z"
+          }
+        ]
+      },
       myWork: {
         tasks: [
           {
@@ -209,16 +224,24 @@ describe("workspace data derivation", () => {
             stageId: null,
             title: "Stale task",
             description: null,
-            status: "todo",
+            status: "new",
+            statusId: "task-status-new",
+            statusName: "Новая",
+            statusCategory: "new",
             priority: "normal",
+            requesterUserId: "user-1",
+            ownerUserId: "user-1",
             plannedStart: "2026-06-01T00:00:00.000Z",
             plannedFinish: "2026-06-02T00:00:00.000Z",
+            durationWorkingDays: 1,
             plannedWork: 8,
             actualWork: 0,
             progress: 0,
+            requiresAcceptance: false,
             source: "manual",
             createdAt: "2026-05-18T00:00:00.000Z",
             updatedAt: "2026-05-18T00:00:00.000Z",
+            archivedAt: null,
             participants: [{ userId: "user-1", role: "executor" }]
           }
         ]
@@ -238,6 +261,7 @@ describe("workspace data derivation", () => {
     expect(data.projectTemplates).toEqual([]);
     expect(data.opportunities).toEqual([]);
     expect(data.projects).toEqual([]);
+    expect(data.taskStatuses).toEqual([]);
     expect(data.myWorkTasks).toEqual([]);
   });
 });

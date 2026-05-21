@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "../styles.css";
 import "../crm.css";
+import "../task.css";
 import { AppQueryProvider } from "../queryClient";
 
 export const metadata: Metadata = {

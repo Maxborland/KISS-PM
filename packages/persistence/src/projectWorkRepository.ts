@@ -1,11 +1,23 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
-import { taskParticipants, tasks } from "./schema";
+import {
+  projects,
+  taskActivities,
+  taskParticipants,
+  taskStatuses,
+  tasks
+} from "./schema";
 
-export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+export type TaskStatusCategory =
+  | "new"
+  | "waiting"
+  | "in_progress"
+  | "review"
+  | "done";
+export type TaskStatus = TaskStatusCategory;
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 export type TaskSource = "manual";
 export type TaskParticipantRole =
@@ -15,6 +27,25 @@ export type TaskParticipantRole =
   | "controller"
   | "approver"
   | "observer";
+
+export type TaskStatusRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  category: TaskStatusCategory;
+  sortOrder: number;
+  status: "active" | "archived";
+  isSystem: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TaskStatusInput = Omit<
+  TaskStatusRecord,
+  "createdAt" | "updatedAt" | "isSystem"
+> & {
+  isSystem?: boolean;
+};
 
 export type TaskParticipantRecord = {
   userId: UserId;
@@ -28,25 +59,76 @@ export type TaskRecord = {
   stageId: string | null;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  status: TaskStatusCategory;
+  statusId: string;
+  statusName: string;
+  statusCategory: TaskStatusCategory;
   priority: TaskPriority;
+  requesterUserId: UserId;
+  ownerUserId: UserId;
   plannedStart: Date;
   plannedFinish: Date;
+  durationWorkingDays: number;
   plannedWork: number;
   actualWork: number;
   progress: number;
+  requiresAcceptance: boolean;
   source: TaskSource;
   createdAt: Date;
   updatedAt: Date;
+  archivedAt: Date | null;
   participants: TaskParticipantRecord[];
 };
 
-export type TaskInput = Omit<TaskRecord, "createdAt" | "updatedAt">;
+export type TaskInput = Omit<TaskRecord, "createdAt" | "updatedAt" | "archivedAt">;
+
+export type TaskStatusUpdateInput = {
+  tenantId: TenantId;
+  projectId: string;
+  taskId: string;
+  expectedStatus: TaskStatusCategory;
+  status: TaskStatusCategory;
+  statusId: string;
+  progress: number;
+};
+
+export type TaskActivityRecord = {
+  id: string;
+  tenantId: TenantId;
+  taskId: string;
+  type: "comment" | "file" | "system";
+  body: string | null;
+  title: string | null;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
+  authorUserId: UserId;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TaskActivityInput = Omit<
+  TaskActivityRecord,
+  "createdAt" | "updatedAt"
+>;
 
 export type ProjectWorkRepository = {
+  listTaskStatuses(tenantId: TenantId): Promise<TaskStatusRecord[]>;
+  createTaskStatus(input: TaskStatusInput): Promise<TaskStatusRecord>;
+  updateTaskStatusDefinition(input: TaskStatusInput): Promise<TaskStatusRecord>;
+  archiveTaskStatus(
+    tenantId: TenantId,
+    statusId: string
+  ): Promise<TaskStatusRecord | undefined>;
   listProjectTasks(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  findTaskById(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   createTask(input: TaskInput): Promise<TaskRecord>;
+  updateTask(input: TaskInput): Promise<TaskRecord | undefined>;
+  archiveTask(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
+  updateTaskStatus(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
+  listTaskActivities(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
+  createTaskActivity(input: TaskActivityInput): Promise<TaskActivityRecord>;
 };
 
 export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepository {
@@ -81,24 +163,122 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
 
   async function hydrateTasks(
     tenantId: TenantId,
-    rows: Array<typeof tasks.$inferSelect>
+    rows: Array<{
+      task: typeof tasks.$inferSelect;
+      status: typeof taskStatuses.$inferSelect | null;
+    }>
   ): Promise<TaskRecord[]> {
     const participantsByTask = await listTaskParticipants(
       tenantId,
-      rows.map((row) => row.id)
+      rows.map((row) => row.task.id)
     );
 
     return rows.map((row) =>
-      mapTaskRecord(row, participantsByTask.get(row.id) ?? [])
+      mapTaskRecord(
+        row.task,
+        row.status,
+        participantsByTask.get(row.task.id) ?? []
+      )
     );
   }
 
+  const listTaskRows = (tenantId: TenantId) =>
+    db
+      .select({ task: tasks, status: taskStatuses })
+      .from(tasks)
+      .leftJoin(
+        taskStatuses,
+        and(
+          eq(taskStatuses.tenantId, tasks.tenantId),
+          eq(taskStatuses.id, tasks.statusId)
+        )
+      )
+      .where(and(eq(tasks.tenantId, tenantId), isNull(tasks.archivedAt)));
+
   return {
-    async listProjectTasks(tenantId, projectId) {
+    async listTaskStatuses(tenantId) {
       const rows = await db
         .select()
+        .from(taskStatuses)
+        .where(eq(taskStatuses.tenantId, tenantId))
+        .orderBy(asc(taskStatuses.sortOrder), asc(taskStatuses.id));
+
+      return rows.map(mapTaskStatusRecord);
+    },
+    async createTaskStatus(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(taskStatuses)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          name: input.name,
+          category: input.category,
+          sortOrder: input.sortOrder,
+          status: input.status,
+          isSystem: input.isSystem ?? false,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+
+      if (!row) throw new Error("Task status insert returned no row");
+      return mapTaskStatusRecord(row);
+    },
+    async updateTaskStatusDefinition(input) {
+      const [row] = await db
+        .update(taskStatuses)
+        .set({
+          name: input.name,
+          category: input.category,
+          sortOrder: input.sortOrder,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(eq(taskStatuses.tenantId, input.tenantId), eq(taskStatuses.id, input.id))
+        )
+        .returning();
+
+      if (!row) throw new Error("Task status update returned no row");
+      return mapTaskStatusRecord(row);
+    },
+    async archiveTaskStatus(tenantId, statusId) {
+      const [row] = await db
+        .update(taskStatuses)
+        .set({
+          status: "archived",
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(taskStatuses.tenantId, tenantId),
+            eq(taskStatuses.id, statusId),
+            eq(taskStatuses.isSystem, false)
+          )
+        )
+        .returning();
+
+      return row ? mapTaskStatusRecord(row) : undefined;
+    },
+    async listProjectTasks(tenantId, projectId) {
+      const rows = await db
+        .select({ task: tasks, status: taskStatuses })
         .from(tasks)
-        .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId)))
+        .leftJoin(
+          taskStatuses,
+          and(
+            eq(taskStatuses.tenantId, tasks.tenantId),
+            eq(taskStatuses.id, tasks.statusId)
+          )
+        )
+        .where(
+          and(
+            eq(tasks.tenantId, tenantId),
+            eq(tasks.projectId, projectId),
+            isNull(tasks.archivedAt)
+          )
+        )
         .orderBy(desc(tasks.createdAt), desc(tasks.id));
 
       return hydrateTasks(tenantId, rows);
@@ -117,12 +297,31 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
       if (taskIds.length === 0) return [];
 
       const rows = await db
-        .select()
+        .select({ task: tasks, status: taskStatuses })
         .from(tasks)
-        .where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, taskIds)))
+        .leftJoin(
+          taskStatuses,
+          and(
+            eq(taskStatuses.tenantId, tasks.tenantId),
+            eq(taskStatuses.id, tasks.statusId)
+          )
+        )
+        .where(
+          and(
+            eq(tasks.tenantId, tenantId),
+            inArray(tasks.id, taskIds),
+            isNull(tasks.archivedAt)
+          )
+        )
         .orderBy(desc(tasks.createdAt), desc(tasks.id));
 
       return hydrateTasks(tenantId, rows);
+    },
+    async findTaskById(tenantId, taskId) {
+      const rows = await listTaskRows(tenantId);
+      const task = rows.find((row) => row.task.id === taskId);
+      if (!task) return undefined;
+      return (await hydrateTasks(tenantId, [task]))[0];
     },
     async createTask(input) {
       return db.transaction(async (transaction) => {
@@ -137,12 +336,17 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
             title: input.title,
             description: input.description,
             status: input.status,
+            statusId: input.statusId,
             priority: input.priority,
+            requesterUserId: input.requesterUserId,
+            ownerUserId: input.ownerUserId,
             plannedStart: input.plannedStart,
             plannedFinish: input.plannedFinish,
+            durationWorkingDays: input.durationWorkingDays,
             plannedWork: input.plannedWork,
             actualWork: input.actualWork,
             progress: input.progress,
+            requiresAcceptance: input.requiresAcceptance,
             source: input.source,
             createdAt: now,
             updatedAt: now
@@ -160,16 +364,166 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
           }))
         );
 
-        return mapTaskRecord(row, input.participants);
+        return mapTaskRecord(row, null, input.participants);
       });
+    },
+    async updateTask(input) {
+      return db.transaction(async (transaction) => {
+        const [row] = await transaction
+          .update(tasks)
+          .set({
+            title: input.title,
+            description: input.description,
+            status: input.status,
+            statusId: input.statusId,
+            priority: input.priority,
+            requesterUserId: input.requesterUserId,
+            ownerUserId: input.ownerUserId,
+            plannedStart: input.plannedStart,
+            plannedFinish: input.plannedFinish,
+            durationWorkingDays: input.durationWorkingDays,
+            plannedWork: input.plannedWork,
+            actualWork: input.actualWork,
+            progress: input.progress,
+            requiresAcceptance: input.requiresAcceptance,
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(tasks.tenantId, input.tenantId),
+              eq(tasks.id, input.id),
+              isNull(tasks.archivedAt)
+            )
+          )
+          .returning();
+
+        if (!row) return undefined;
+
+        await transaction
+          .delete(taskParticipants)
+          .where(
+            and(
+              eq(taskParticipants.tenantId, input.tenantId),
+              eq(taskParticipants.taskId, input.id)
+            )
+          );
+        await transaction.insert(taskParticipants).values(
+          input.participants.map((participant) => ({
+            tenantId: input.tenantId,
+            taskId: input.id,
+            userId: participant.userId,
+            role: participant.role
+          }))
+        );
+
+        return mapTaskRecord(row, null, input.participants);
+      });
+    },
+    async archiveTask(tenantId, taskId) {
+      const [row] = await db
+        .update(tasks)
+        .set({
+          archivedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(and(eq(tasks.tenantId, tenantId), eq(tasks.id, taskId)))
+        .returning();
+
+      if (!row) return undefined;
+      const participantsByTask = await listTaskParticipants(tenantId, [taskId]);
+      return mapTaskRecord(row, null, participantsByTask.get(taskId) ?? []);
+    },
+    async updateTaskStatus(input) {
+      const [row] = await db
+        .update(tasks)
+        .set({
+          status: input.status,
+          statusId: input.statusId,
+          progress: input.progress,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(tasks.tenantId, input.tenantId),
+            eq(tasks.projectId, input.projectId),
+            eq(tasks.id, input.taskId),
+            eq(tasks.status, input.expectedStatus),
+            isNull(tasks.archivedAt),
+            sql`exists (
+              select 1
+              from ${projects}
+              where ${projects.tenantId} = ${input.tenantId}
+                and ${projects.id} = ${input.projectId}
+                and ${projects.status} = 'active'
+            )`
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+
+      const participantsByTask = await listTaskParticipants(input.tenantId, [input.taskId]);
+      return mapTaskRecord(row, null, participantsByTask.get(input.taskId) ?? []);
+    },
+    async listTaskActivities(tenantId, taskId) {
+      const rows = await db
+        .select()
+        .from(taskActivities)
+        .where(
+          and(eq(taskActivities.tenantId, tenantId), eq(taskActivities.taskId, taskId))
+        )
+        .orderBy(asc(taskActivities.createdAt), asc(taskActivities.id));
+
+      return rows.map(mapTaskActivityRecord);
+    },
+    async createTaskActivity(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(taskActivities)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          taskId: input.taskId,
+          type: input.type,
+          body: input.body,
+          title: input.title,
+          fileUrl: input.fileUrl,
+          fileSizeBytes: input.fileSizeBytes,
+          mimeType: input.mimeType,
+          authorUserId: input.authorUserId,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+
+      if (!row) throw new Error("Task activity insert returned no row");
+      return mapTaskActivityRecord(row);
     }
+  };
+}
+
+function mapTaskStatusRecord(
+  row: typeof taskStatuses.$inferSelect
+): TaskStatusRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    name: row.name,
+    category: row.category as TaskStatusCategory,
+    sortOrder: row.sortOrder,
+    status: row.status as TaskStatusRecord["status"],
+    isSystem: row.isSystem,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
   };
 }
 
 function mapTaskRecord(
   row: typeof tasks.$inferSelect,
+  status: typeof taskStatuses.$inferSelect | null,
   participants: TaskParticipantRecord[]
 ): TaskRecord {
+  const statusCategory = (status?.category ?? row.status) as TaskStatusCategory;
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -177,16 +531,43 @@ function mapTaskRecord(
     stageId: row.stageId,
     title: row.title,
     description: row.description,
-    status: row.status as TaskStatus,
+    status: statusCategory,
+    statusId: row.statusId,
+    statusName: status?.name ?? row.status,
+    statusCategory,
     priority: row.priority as TaskPriority,
+    requesterUserId: row.requesterUserId,
+    ownerUserId: row.ownerUserId,
     plannedStart: row.plannedStart,
     plannedFinish: row.plannedFinish,
+    durationWorkingDays: row.durationWorkingDays,
     plannedWork: row.plannedWork,
     actualWork: row.actualWork,
     progress: row.progress,
+    requiresAcceptance: row.requiresAcceptance,
     source: row.source as TaskSource,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    archivedAt: row.archivedAt,
     participants
+  };
+}
+
+function mapTaskActivityRecord(
+  row: typeof taskActivities.$inferSelect
+): TaskActivityRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    taskId: row.taskId,
+    type: row.type as TaskActivityRecord["type"],
+    body: row.body,
+    title: row.title,
+    fileUrl: row.fileUrl,
+    fileSizeBytes: row.fileSizeBytes,
+    mimeType: row.mimeType,
+    authorUserId: row.authorUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
   };
 }

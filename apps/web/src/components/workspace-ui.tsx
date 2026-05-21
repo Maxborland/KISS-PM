@@ -388,7 +388,7 @@ export function PermissionList({ permissions }: { permissions: string[] }) {
   );
 }
 
-export function StatusPill(props: { label: string; tone: "success" | "muted" }) {
+export function StatusPill(props: { label: string; tone: "success" | "muted" | "warning" | "danger" }) {
   return <span className={`status-pill ${props.tone}`}>{props.label}</span>;
 }
 

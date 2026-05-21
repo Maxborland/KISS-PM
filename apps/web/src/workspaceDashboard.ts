@@ -45,6 +45,7 @@ const auditActionLabels: Record<string, string> = {
   "opportunity.task.reopened": "Задача по сделке переоткрыта",
   "project.activated": "Проект активирован",
   "task.created": "Задача создана",
+  "task.status_changed": "Статус задачи изменен",
   "profile.updated": "Профиль обновлен",
   "profile.theme.updated": "Оформление обновлено"
 };

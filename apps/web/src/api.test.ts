@@ -7,12 +7,22 @@ import {
   createCrmFile,
   createCrmTask,
   createProjectTask,
+  createTaskComment,
+  createTaskStatus,
+  archiveTask,
+  archiveTaskStatus,
   fetchCrmActivity,
   fetchCustomFields,
   fetchMyWork,
   fetchProjectDetail,
   fetchProjectTasks,
   fetchProjectTemplates,
+  fetchTaskActivity,
+  fetchTaskDetail,
+  fetchTaskStatuses,
+  updateProjectTask,
+  updateProjectTaskStatus,
+  updateTaskStatusDefinition,
   updateClient,
   updateContact,
   updateDealStage,
@@ -192,7 +202,13 @@ describe("web api helpers", () => {
       plannedStart: "2026-06-02",
       plannedFinish: "2026-06-05",
       plannedWork: 24,
+      durationWorkingDays: 4,
+      requiresAcceptance: true,
+      statusId: "task-status-new",
       participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    });
+    await updateProjectTaskStatus("project/unsafe", "task/unsafe", {
+      statusId: "task-status-in-progress"
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -213,6 +229,108 @@ describe("web api helpers", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
       "/api/workspace/projects/project%2Funsafe/tasks",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/workspace/projects/project%2Funsafe/tasks/task%2Funsafe/status",
+      expect.objectContaining({
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        }
+      })
+    );
+  });
+
+  it("uses task workspace endpoints and same-origin mutation headers", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ taskStatuses: [], task: {}, activities: [] }), { status: 200 })
+      );
+
+    await fetchTaskStatuses();
+    await createTaskStatus({
+      id: "task-status/custom",
+      name: "Ждет клиента",
+      category: "waiting",
+      sortOrder: 20
+    });
+    await updateTaskStatusDefinition("task-status/custom", {
+      name: "Ждет клиента",
+      category: "waiting",
+      sortOrder: 30,
+      status: "active"
+    });
+    await archiveTaskStatus("task-status/custom");
+    await fetchTaskDetail("task/unsafe");
+    await updateProjectTask("task/unsafe", {
+      title: "Обновить задачу",
+      description: "Новый контекст",
+      priority: "normal",
+      statusId: "task-status-in-progress",
+      plannedStart: "2026-06-02",
+      plannedFinish: "2026-06-05",
+      plannedWork: 12,
+      durationWorkingDays: 3,
+      requiresAcceptance: false,
+      participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    });
+    await archiveTask("task/unsafe");
+    await fetchTaskActivity("task/unsafe");
+    await createTaskComment("task/unsafe", { body: "Проверил контекст задачи." });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/workspace/task-statuses",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/workspace/task-statuses",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/workspace/task-statuses/task-status%2Fcustom",
+      expect.objectContaining({ method: "PATCH" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/workspace/task-statuses/task-status%2Fcustom",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/workspace/tasks/task%2Funsafe",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      "/api/workspace/tasks/task%2Funsafe",
+      expect.objectContaining({ method: "PATCH" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
+      "/api/workspace/tasks/task%2Funsafe",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
+      "/api/workspace/tasks/task%2Funsafe/activity",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      9,
+      "/api/workspace/tasks/task%2Funsafe/comments",
       expect.objectContaining({
         method: "POST",
         headers: {

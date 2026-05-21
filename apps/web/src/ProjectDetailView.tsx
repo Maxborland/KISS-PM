@@ -1,28 +1,27 @@
 import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
-import type { TaskInput } from "./api";
-import { DatePickerField } from "./components/DatePickerField";
+import type { Task } from "./api";
+import { TaskFormDialog } from "./TaskFormDialog";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDateOnly } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
 import { hasPermission } from "./workspaceShellState";
 import {
-  FieldError,
-  Modal,
   Panel,
   SectionFeedback,
   StatusPill,
   SummaryCard,
   TableEmpty
 } from "./components/workspace-ui";
-import { formatTaskStatus } from "./MyWorkView";
+import {
+  getNextTaskStatusAction,
+  getStatusTone
+} from "./taskWorkspace";
 import {
   useProjectDetailQuery,
   useProjectWorkMutations
 } from "./workspaceQueries";
-
-type TaskFormErrors = Record<string, string>;
 
 export function ProjectDetailView(props: {
   data: WorkspaceData;
@@ -38,17 +37,30 @@ export function ProjectDetailView(props: {
   );
   const projectWorkMutations = useProjectWorkMutations();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [transitionError, setTransitionError] = useState("");
   const project = projectDetailQuery.data?.project ??
     props.data.projects.find((candidate) => candidate.id === props.projectId);
   const tasks = projectDetailQuery.data?.tasks ?? [];
-  const participantOptions = useMemo(
-    () =>
-      props.data.users.length > 0
-        ? props.data.users.filter((user) => user.status !== "inactive")
-        : [props.data.me],
-    [props.data.me, props.data.users]
-  );
   const plannedTaskWork = tasks.reduce((sum, task) => sum + task.plannedWork, 0);
+  const pendingTaskId = projectWorkMutations.updateTaskStatus.variables
+    ? String(projectWorkMutations.updateTaskStatus.variables.taskId)
+    : null;
+
+  async function transitionTask(task: Task, statusId: string) {
+    setTransitionError("");
+    try {
+      await projectWorkMutations.updateTaskStatus.mutateAsync({
+        projectId: task.projectId,
+        taskId: task.id,
+        input: { statusId }
+      });
+      props.onChanged("Статус задачи обновлен и записан в аудит.");
+    } catch (error) {
+      setTransitionError(
+        error instanceof Error ? error.message : "Не удалось обновить статус задачи."
+      );
+    }
+  }
 
   if (!props.sectionState.canRead) {
     return (
@@ -126,6 +138,7 @@ export function ProjectDetailView(props: {
             </section>
           </div>
           <div className="table-wrap">
+            {transitionError ? <p className="error">{transitionError}</p> : null}
             <table className="data-table" aria-label="Задачи проекта">
               <thead>
                 <tr>
@@ -134,11 +147,12 @@ export function ProjectDetailView(props: {
                   <th>План</th>
                   <th>Участники</th>
                   <th>Статус</th>
+                  <th>Действие</th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.length === 0 ? (
-                  <TableEmpty colSpan={5} label="В проекте пока нет задач." />
+                  <TableEmpty colSpan={6} label="В проекте пока нет задач." />
                 ) : (
                   tasks.map((task) => (
                     <tr key={task.id}>
@@ -171,9 +185,70 @@ export function ProjectDetailView(props: {
                       </td>
                       <td>
                         <StatusPill
-                          label={formatTaskStatus(task.status)}
-                          tone={task.status === "done" ? "muted" : "success"}
+                          label={task.statusName}
+                          tone={getStatusTone(task.statusCategory)}
                         />
+                      </td>
+                      <td>
+                        <span className="table-actions">
+                          {getNextTaskStatusAction(
+                            task,
+                            props.data.taskStatuses,
+                            props.data.me.id,
+                            props.data.permissions
+                          ) ? (
+                            <button
+                              className="primary-button compact"
+                              disabled={
+                                Boolean(getNextTaskStatusAction(
+                                  task,
+                                  props.data.taskStatuses,
+                                  props.data.me.id,
+                                  props.data.permissions
+                                )?.disabledReason) ||
+                                (projectWorkMutations.updateTaskStatus.isPending &&
+                                  pendingTaskId === task.id)
+                              }
+                              title={
+                                getNextTaskStatusAction(
+                                  task,
+                                  props.data.taskStatuses,
+                                  props.data.me.id,
+                                  props.data.permissions
+                                )?.disabledReason
+                              }
+                              type="button"
+                              onClick={() => {
+                                const action = getNextTaskStatusAction(
+                                  task,
+                                  props.data.taskStatuses,
+                                  props.data.me.id,
+                                  props.data.permissions
+                                );
+                                if (action && !action.disabledReason) void transitionTask(task, action.statusId);
+                              }}
+                            >
+                              {projectWorkMutations.updateTaskStatus.isPending &&
+                              pendingTaskId === task.id
+                                ? "Сохраняем..."
+                                : getNextTaskStatusAction(
+                                    task,
+                                    props.data.taskStatuses,
+                                    props.data.me.id,
+                                    props.data.permissions
+                                  )?.label}
+                            </button>
+                          ) : (
+                            <button
+                              className="secondary-button compact"
+                              disabled
+                              title="Задача уже завершена."
+                              type="button"
+                            >
+                              Готово
+                            </button>
+                          )}
+                        </span>
                       </td>
                     </tr>
                   ))
@@ -186,15 +261,19 @@ export function ProjectDetailView(props: {
         <p className="empty-state">Проект не найден или уже не активен.</p>
       )}
       {isCreateOpen && project ? (
-        <CreateTaskModal
+        <TaskFormDialog
+          data={props.data}
           isPending={projectWorkMutations.createTask.isPending}
-          participantOptions={participantOptions}
           projectId={project.id}
+          taskStatuses={props.data.taskStatuses}
           onClose={() => setIsCreateOpen(false)}
           onSubmit={async (input) => {
             await projectWorkMutations.createTask.mutateAsync({
               projectId: project.id,
-              input
+              input: {
+                ...input,
+                id: "id" in input ? input.id : undefined
+              }
             });
             setIsCreateOpen(false);
             props.onChanged("Задача создана и записана в аудит.");
@@ -203,197 +282,6 @@ export function ProjectDetailView(props: {
       ) : null}
     </Panel>
   );
-}
-
-function CreateTaskModal(props: {
-  isPending: boolean;
-  participantOptions: WorkspaceData["users"];
-  projectId: string;
-  onClose: () => void;
-  onSubmit: (input: TaskInput) => Promise<void>;
-}) {
-  const [errors, setErrors] = useState<TaskFormErrors>({});
-  const [plannedStart, setPlannedStart] = useState("");
-  const [plannedFinish, setPlannedFinish] = useState("");
-  const [submitError, setSubmitError] = useState("");
-  const formId = "project-task-create";
-
-  useEffect(() => {
-    setErrors({});
-    setPlannedStart("");
-    setPlannedFinish("");
-    setSubmitError("");
-  }, [props.projectId]);
-
-  async function submitTask(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const input: TaskInput = {
-      id: String(form.get("id") ?? "").trim() || undefined,
-      title: String(form.get("title") ?? "").trim(),
-      description: String(form.get("description") ?? "").trim(),
-      priority: String(form.get("priority") ?? "normal") as TaskInput["priority"],
-      plannedStart,
-      plannedFinish,
-      plannedWork: Number(form.get("plannedWork") ?? 0),
-      participants: [
-        {
-          userId: String(form.get("executorId") ?? ""),
-          role: "executor"
-        }
-      ]
-    };
-    const validationErrors = validateTaskForm(input);
-    setErrors(validationErrors);
-    setSubmitError("");
-    if (Object.keys(validationErrors).length > 0) return;
-
-    try {
-      await props.onSubmit(input);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Не удалось создать задачу.");
-    }
-  }
-
-  return (
-    <Modal
-      title="Создать задачу"
-      description="Task создается в активном проекте и сразу попадает в My Work назначенного исполнителя."
-      isDismissDisabled={props.isPending}
-      onClose={props.onClose}
-    >
-      <form className="stack-form modal-form" noValidate onSubmit={submitTask}>
-        <label>
-          Код задачи
-          <input name="id" placeholder="task-project-plan" />
-        </label>
-        <label>
-          Название
-          <input
-            aria-describedby={errors.title ? `${formId}-title-error` : undefined}
-            aria-invalid={Boolean(errors.title)}
-            data-autofocus
-            name="title"
-            placeholder="Подготовить план внедрения"
-          />
-          <FieldError errors={errors} field="title" formId={formId} />
-        </label>
-        <label>
-          Описание
-          <textarea name="description" placeholder="Короткий рабочий контекст" />
-        </label>
-        <div className="form-grid">
-          <label>
-            Приоритет
-            <select name="priority" defaultValue="normal">
-              <option value="low">Низкий</option>
-              <option value="normal">Обычный</option>
-              <option value="high">Высокий</option>
-              <option value="critical">Критичный</option>
-            </select>
-          </label>
-          <label>
-            Исполнитель
-            <select
-              aria-describedby={errors.executorId ? `${formId}-executorId-error` : undefined}
-              aria-invalid={Boolean(errors.executorId)}
-              name="executorId"
-              defaultValue={props.participantOptions[0]?.id ?? ""}
-            >
-              {props.participantOptions.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-            <FieldError errors={errors} field="executorId" formId={formId} />
-          </label>
-        </div>
-        <div className="form-grid">
-          <span className="form-field-shell">
-            <DatePickerField
-              describedBy={errors.plannedStart ? `${formId}-plannedStart-error` : undefined}
-              disabled={props.isPending}
-              id={`${formId}-plannedStart`}
-              invalid={Boolean(errors.plannedStart)}
-              label="Старт"
-              value={plannedStart}
-              onChange={setPlannedStart}
-            />
-            <FieldError errors={errors} field="plannedStart" formId={formId} />
-          </span>
-          <span className="form-field-shell">
-            <DatePickerField
-              describedBy={errors.plannedFinish ? `${formId}-plannedFinish-error` : undefined}
-              disabled={props.isPending}
-              id={`${formId}-plannedFinish`}
-              invalid={Boolean(errors.plannedFinish)}
-              label="Финиш"
-              value={plannedFinish}
-              onChange={setPlannedFinish}
-            />
-            <FieldError errors={errors} field="plannedFinish" formId={formId} />
-          </span>
-        </div>
-        <label>
-          Плановые часы
-          <input
-            aria-describedby={errors.plannedWork ? `${formId}-plannedWork-error` : undefined}
-            aria-invalid={Boolean(errors.plannedWork)}
-            min={1}
-            name="plannedWork"
-            type="number"
-          />
-          <FieldError errors={errors} field="plannedWork" formId={formId} />
-        </label>
-        {submitError ? <p className="error">{submitError}</p> : null}
-        <div className="form-actions">
-          <button
-            className="primary-button"
-            disabled={props.isPending}
-            type="submit"
-          >
-            {props.isPending ? "Создаем..." : "Создать задачу"}
-          </button>
-          <button
-            className="secondary-button"
-            disabled={props.isPending}
-            type="button"
-            onClick={props.onClose}
-          >
-            Отменить
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function validateTaskForm(input: TaskInput): TaskFormErrors {
-  const errors: TaskFormErrors = {};
-  if (input.title.length < 3) {
-    errors.title = "Укажите название задачи.";
-  }
-  if (!input.participants[0]?.userId) {
-    errors.executorId = "Выберите исполнителя.";
-  }
-  if (!input.plannedStart) {
-    errors.plannedStart = "Укажите дату старта.";
-  }
-  if (!input.plannedFinish) {
-    errors.plannedFinish = "Укажите дату финиша.";
-  }
-  if (
-    input.plannedStart &&
-    input.plannedFinish &&
-    input.plannedFinish < input.plannedStart
-  ) {
-    errors.plannedFinish = "Финиш не может быть раньше старта.";
-  }
-  if (!Number.isInteger(input.plannedWork) || input.plannedWork < 1) {
-    errors.plannedWork = "Укажите плановые часы целым числом.";
-  }
-  return errors;
 }
 
 function getUserName(userId: string, data: WorkspaceData): string {

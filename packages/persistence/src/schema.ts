@@ -499,6 +499,43 @@ export const userSessions = pgTable(
   ]
 );
 
+export const taskStatuses = pgTable(
+  "task_statuses",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    status: text("status").notNull().default("active"),
+    isSystem: boolean("is_system").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_statuses_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("task_statuses_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("task_statuses_tenant_sort_order_uidx").on(
+      table.tenantId,
+      table.sortOrder
+    ),
+    uniqueIndex("task_statuses_tenant_name_uidx").on(table.tenantId, table.name),
+    check(
+      "task_statuses_category_chk",
+      sql`${table.category} in ('new', 'waiting', 'in_progress', 'review', 'done')`
+    ),
+    check(
+      "task_statuses_status_chk",
+      sql`${table.status} in ('active', 'archived')`
+    )
+  ]
+);
+
 export const tasks = pgTable(
   "tasks",
   {
@@ -508,16 +545,22 @@ export const tasks = pgTable(
     stageId: text("stage_id"),
     title: text("title").notNull(),
     description: text("description"),
-    status: text("status").notNull().default("todo"),
+    status: text("status").notNull().default("new"),
+    statusId: text("status_id").notNull().default("task-status-new"),
     priority: text("priority").notNull().default("normal"),
+    requesterUserId: text("requester_user_id").notNull(),
+    ownerUserId: text("owner_user_id").notNull(),
     plannedStart: timestamp("planned_start", { withTimezone: true }).notNull(),
     plannedFinish: timestamp("planned_finish", { withTimezone: true }).notNull(),
+    durationWorkingDays: integer("duration_working_days").notNull().default(1),
     plannedWork: integer("planned_work").notNull(),
     actualWork: integer("actual_work").notNull().default(0),
     progress: integer("progress").notNull().default(0),
+    requiresAcceptance: boolean("requires_acceptance").notNull().default(false),
     source: text("source").notNull().default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
   },
   (table) => [
     primaryKey({
@@ -529,8 +572,25 @@ export const tasks = pgTable(
       columns: [table.tenantId, table.projectId],
       foreignColumns: [projects.tenantId, projects.id]
     }).onDelete("cascade"),
+    foreignKey({
+      name: "tasks_status_fk",
+      columns: [table.tenantId, table.statusId],
+      foreignColumns: [taskStatuses.tenantId, taskStatuses.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tasks_requester_user_fk",
+      columns: [table.tenantId, table.requesterUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tasks_owner_user_fk",
+      columns: [table.tenantId, table.ownerUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
     index("tasks_tenant_project_id_idx").on(table.tenantId, table.projectId),
-    index("tasks_tenant_status_idx").on(table.tenantId, table.status)
+    index("tasks_tenant_status_idx").on(table.tenantId, table.status),
+    index("tasks_tenant_status_id_idx").on(table.tenantId, table.statusId),
+    index("tasks_tenant_owner_idx").on(table.tenantId, table.ownerUserId)
   ]
 );
 
@@ -558,6 +618,56 @@ export const taskParticipants = pgTable(
       foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
     }).onDelete("restrict"),
     index("task_participants_tenant_user_id_idx").on(table.tenantId, table.userId)
+  ]
+);
+
+export const taskActivities = pgTable(
+  "task_activities",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    taskId: text("task_id").notNull(),
+    type: text("type").notNull(),
+    body: text("body"),
+    title: text("title"),
+    fileUrl: text("file_url"),
+    fileSizeBytes: integer("file_size_bytes"),
+    mimeType: text("mime_type"),
+    authorUserId: text("author_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_activities_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "task_activities_task_fk",
+      columns: [table.tenantId, table.taskId],
+      foreignColumns: [tasks.tenantId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_activities_author_user_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("task_activities_tenant_task_created_idx").on(
+      table.tenantId,
+      table.taskId,
+      table.createdAt
+    ),
+    check("task_activities_type_chk", sql`${table.type} in ('comment', 'file', 'system')`),
+    check(
+      "task_activities_payload_chk",
+      sql`(
+        (${table.type} = 'comment' and ${table.body} is not null)
+        or
+        (${table.type} = 'file' and ${table.title} is not null and ${table.fileUrl} is not null)
+        or
+        (${table.type} = 'system' and ${table.title} is not null and ${table.body} is not null)
+      )`
+    )
   ]
 );
 
@@ -672,8 +782,10 @@ export type PersistenceTableName =
   | "opportunity_demands"
   | "projects"
   | "project_position_demands"
+  | "task_statuses"
   | "tasks"
   | "task_participants"
+  | "task_activities"
   | "crm_activities"
   | "tenant_users"
   | "user_credentials"
@@ -702,8 +814,10 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "task_statuses",
   "tasks",
   "task_participants",
+  "task_activities",
   "crm_activities",
   "tenant_users",
   "user_credentials",
@@ -725,8 +839,10 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "task_statuses",
   "tasks",
   "task_participants",
+  "task_activities",
   "crm_activities",
   "tenant_users",
   "user_credentials",
@@ -870,6 +986,17 @@ const tableColumns = {
     "position_id",
     "required_hours"
   ],
+  task_statuses: [
+    "id",
+    "tenant_id",
+    "name",
+    "category",
+    "sort_order",
+    "status",
+    "is_system",
+    "created_at",
+    "updated_at"
+  ],
   tasks: [
     "id",
     "tenant_id",
@@ -878,17 +1005,37 @@ const tableColumns = {
     "title",
     "description",
     "status",
+    "status_id",
     "priority",
+    "requester_user_id",
+    "owner_user_id",
     "planned_start",
     "planned_finish",
+    "duration_working_days",
     "planned_work",
     "actual_work",
     "progress",
+    "requires_acceptance",
     "source",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
+  task_participants: ["tenant_id", "task_id", "user_id", "role"],
+  task_activities: [
+    "id",
+    "tenant_id",
+    "task_id",
+    "type",
+    "body",
+    "title",
+    "file_url",
+    "file_size_bytes",
+    "mime_type",
+    "author_user_id",
     "created_at",
     "updated_at"
   ],
-  task_participants: ["tenant_id", "task_id", "user_id", "role"],
   crm_activities: [
     "id",
     "tenant_id",

@@ -11,6 +11,7 @@ import type {
   Product,
   Project,
   Task,
+  TaskStatusDefinition,
   ProjectType,
   ProjectTemplate,
   WorkspaceUser
@@ -31,6 +32,7 @@ export type WorkspaceData = {
   dealStages: DealStage[];
   opportunities: Opportunity[];
   projects: Project[];
+  taskStatuses: TaskStatusDefinition[];
   myWorkTasks: Task[];
   customFields: CustomFieldDefinition[];
   projectTemplates: ProjectTemplate[];
@@ -51,6 +53,7 @@ export function buildWorkspaceData(input: {
   dealStages: { dealStages: DealStage[] } | undefined;
   opportunities: { opportunities: Opportunity[] } | undefined;
   projects: { projects: Project[] } | undefined;
+  taskStatuses: { taskStatuses: TaskStatusDefinition[] } | undefined;
   myWork: { tasks: Task[] } | undefined;
   customFields: { customFields: CustomFieldDefinition[] } | undefined;
   projectTemplates: { projectTemplates: ProjectTemplate[] } | undefined;
@@ -83,6 +86,7 @@ export function buildWorkspaceData(input: {
     dealStages: canReadDealStages ? input.dealStages?.dealStages ?? [] : [],
     opportunities: canReadOpportunities ? input.opportunities?.opportunities ?? [] : [],
     projects: canReadProjects ? input.projects?.projects ?? [] : [],
+    taskStatuses: canReadProjects ? input.taskStatuses?.taskStatuses ?? [] : [],
     myWorkTasks: canReadProjects ? input.myWork?.tasks ?? [] : [],
     customFields: canReadWorkspaceConfig ? input.customFields?.customFields ?? [] : [],
     projectTemplates: canReadWorkspaceConfig

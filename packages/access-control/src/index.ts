@@ -24,6 +24,10 @@ export const permissions = [
   "tenant.opportunities.manage",
   "tenant.projects.read",
   "tenant.projects.manage",
+  "tenant.tasks.create",
+  "tenant.tasks.edit",
+  "tenant.tasks.delete",
+  "tenant.task_statuses.manage",
   "tenant.project_activation.manage",
   "tenant.resource_feasibility.read",
   "profile.read",
@@ -298,6 +302,50 @@ export function canManageProjects(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.projects.manage"
+  });
+}
+
+export function canCreateTasks(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.tasks.create"
+  });
+}
+
+export function canEditTasks(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.tasks.edit"
+  });
+}
+
+export function canDeleteTasks(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.tasks.delete"
+  });
+}
+
+export function canManageTaskStatuses(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.task_statuses.manage"
   });
 }
 
