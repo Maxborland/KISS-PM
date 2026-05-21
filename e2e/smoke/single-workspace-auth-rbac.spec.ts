@@ -635,15 +635,15 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) })).toBeVisible();
   await page.getByRole("button", { name: "Моя работа" }).click();
   await expect(page).toHaveURL(/\/my-work$/);
-  await expect(page.getByRole("heading", { name: "Моя работа" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мои задачи" }).first()).toBeVisible();
   const myWorkTaskRow = page.getByRole("row", { name: new RegExp(`План работ ${suffix}`) });
   await expect(myWorkTaskRow).toBeVisible();
   await myWorkTaskRow.getByRole("button", { name: "В работу" }).click();
   await expect(page.getByText("Статус задачи обновлен.")).toBeVisible();
   await expect(myWorkTaskRow.getByText("В работе")).toBeVisible();
-  await page.getByRole("button", { name: "Канбан" }).click();
+  await page.getByRole("button", { name: "Канбан", exact: true }).click();
   await expect(page.locator(".task-kanban-column").filter({ hasText: "В работе" })).toBeVisible();
-  await page.getByRole("button", { name: "Таблица" }).click();
+  await page.getByRole("button", { name: "Таблица", exact: true }).click();
   await myWorkTaskRow.getByRole("button", { name: "Открыть" }).click();
   await expect(page).toHaveURL(/\/tasks\/task-/);
   await expect(page.getByRole("heading", { name: `План работ ${suffix}` })).toBeVisible();

@@ -156,7 +156,7 @@ describe("project work API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       projectWorkApiSeed,
@@ -166,7 +166,7 @@ describe("project work API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -200,6 +200,9 @@ describe("project work API routes", () => {
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { cookie: adminCookie }
     });
+    const detail = await app.request("/api/workspace/tasks/task-alpha", {
+      headers: { cookie: adminCookie }
+    });
 
     expect(createdTask.status).toBe(201);
     await expect(createdTask.json()).resolves.toMatchObject({
@@ -229,6 +232,15 @@ describe("project work API routes", () => {
           sourceEntity: { type: "Task", id: "task-alpha" }
         })
       ])
+    });
+    await expect(detail.json()).resolves.toMatchObject({
+      activities: [
+        expect.objectContaining({
+          taskId: "task-alpha",
+          type: "system",
+          title: "Задача создана"
+        })
+      ]
     });
   });
 
@@ -270,6 +282,9 @@ describe("project work API routes", () => {
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { cookie: adminCookie }
     });
+    const detail = await app.request("/api/workspace/tasks/task-transition", {
+      headers: { cookie: adminCookie }
+    });
 
     expect(transitioned.status).toBe(200);
     await expect(transitioned.json()).resolves.toMatchObject({
@@ -292,6 +307,15 @@ describe("project work API routes", () => {
             participantRole: "executor",
             permission: null
           })
+        })
+      ])
+    });
+    await expect(detail.json()).resolves.toMatchObject({
+      activities: expect.arrayContaining([
+        expect.objectContaining({
+          type: "system",
+          title: "Статус задачи изменен",
+          body: "Новая -> В работе"
         })
       ])
     });
@@ -530,12 +554,12 @@ describe("project work API routes", () => {
     });
     await expect(detail.json()).resolves.toMatchObject({
       task: { id: "task-commented" },
-      activities: [
+      activities: expect.arrayContaining([
         expect.objectContaining({
           type: "comment",
           body: "Проверил контекст, можно брать в работу."
         })
-      ]
+      ])
     });
     await expect(audit.json()).resolves.toMatchObject({
       auditEvents: expect.arrayContaining([

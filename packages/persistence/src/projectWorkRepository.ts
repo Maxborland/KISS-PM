@@ -96,7 +96,7 @@ export type TaskActivityRecord = {
   id: string;
   tenantId: TenantId;
   taskId: string;
-  type: "comment" | "file";
+  type: "comment" | "file" | "system";
   body: string | null;
   title: string | null;
   fileUrl: string | null;

@@ -657,13 +657,15 @@ export const taskActivities = pgTable(
       table.taskId,
       table.createdAt
     ),
-    check("task_activities_type_chk", sql`${table.type} in ('comment', 'file')`),
+    check("task_activities_type_chk", sql`${table.type} in ('comment', 'file', 'system')`),
     check(
       "task_activities_payload_chk",
       sql`(
         (${table.type} = 'comment' and ${table.body} is not null)
         or
         (${table.type} = 'file' and ${table.title} is not null and ${table.fileUrl} is not null)
+        or
+        (${table.type} = 'system' and ${table.title} is not null and ${table.body} is not null)
       )`
     )
   ]

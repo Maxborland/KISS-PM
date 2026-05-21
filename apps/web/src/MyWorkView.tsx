@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   BriefcaseBusiness,
   Clock3,
+  GripVertical,
   LayoutGrid,
   ListChecks,
   Plus,
@@ -188,7 +189,7 @@ export function MyWorkView(props: {
               setSelectedIds(new Set());
             }}
           >
-            {isBulkEnabled ? "Выключить массовый режим" : "Массовый режим"}
+            {isBulkEnabled ? "Выключить массовый режим" : "Включить массовый режим"}
           </button>
           <button
             className="primary-button"
@@ -289,84 +290,74 @@ export function MyWorkView(props: {
           <span><i className="dot success" /> Выполнено: {taskCounters.done}</span>
           <span>Всего часов: {taskCounters.plannedWork}</span>
         </div>
+
+        {isBulkEnabled ? (
+          <div className="task-bulk-strip">
+            <span>
+              <CheckCircle2 aria-hidden="true" size={16} />
+              Выбрано задач: {selectedIds.size}
+            </span>
+            <div className="task-bulk-actions">
+              <select
+                aria-label="Массовая смена статуса"
+                disabled={selectedTasks.length === 0 || projectWorkMutations.updateTaskStatus.isPending}
+                defaultValue=""
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  void applyBulkStatus(event.target.value);
+                  event.currentTarget.value = "";
+                }}
+              >
+                <option value="">Сменить статус</option>
+                {activeStatuses.map((status) => (
+                  <option key={status.id} value={status.id}>{status.name}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Массовое назначение ответственного"
+                disabled={selectedTasks.length === 0 || projectWorkMutations.updateTask.isPending}
+                defaultValue=""
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  void assignBulkUser(event.target.value, "executor");
+                  event.currentTarget.value = "";
+                }}
+              >
+                <option value="">Назначить ответственного</option>
+                {activeUsers.map((user) => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Массовое назначение соисполнителя"
+                disabled={selectedTasks.length === 0 || projectWorkMutations.updateTask.isPending}
+                defaultValue=""
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  void assignBulkUser(event.target.value, "co_executor");
+                  event.currentTarget.value = "";
+                }}
+              >
+                <option value="">Назначить соисполнителя</option>
+                {activeUsers.map((user) => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
+                ))}
+              </select>
+              <button
+                className="danger-button compact"
+                disabled={selectedTasks.length === 0 || !canDelete || projectWorkMutations.archiveTask.isPending}
+                title={canDelete ? undefined : "Нужно право tenant.tasks.delete"}
+                type="button"
+                onClick={() => void archiveSelectedTasks()}
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {actionError ? <p className="error">{actionError}</p> : null}
-
-      {isBulkEnabled ? (
-        <div className="task-bulk-strip">
-          <span>
-            <CheckCircle2 aria-hidden="true" size={16} />
-            Выбрано задач: {selectedIds.size}
-          </span>
-          <div className="task-bulk-actions">
-            <button
-              className="secondary-button compact"
-              type="button"
-              onClick={() => {
-                setIsBulkEnabled(false);
-                setSelectedIds(new Set());
-              }}
-            >
-              Выключить
-            </button>
-            <select
-              aria-label="Массовая смена статуса"
-              disabled={selectedTasks.length === 0 || projectWorkMutations.updateTaskStatus.isPending}
-              defaultValue=""
-              onChange={(event) => {
-                if (!event.target.value) return;
-                void applyBulkStatus(event.target.value);
-                event.currentTarget.value = "";
-              }}
-            >
-              <option value="">Сменить статус</option>
-              {activeStatuses.map((status) => (
-                <option key={status.id} value={status.id}>{status.name}</option>
-              ))}
-            </select>
-            <select
-              aria-label="Массовое назначение ответственного"
-              disabled={selectedTasks.length === 0 || projectWorkMutations.updateTask.isPending}
-              defaultValue=""
-              onChange={(event) => {
-                if (!event.target.value) return;
-                void assignBulkUser(event.target.value, "executor");
-                event.currentTarget.value = "";
-              }}
-            >
-              <option value="">Назначить ответственного</option>
-              {activeUsers.map((user) => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </select>
-            <select
-              aria-label="Массовое назначение соисполнителя"
-              disabled={selectedTasks.length === 0 || projectWorkMutations.updateTask.isPending}
-              defaultValue=""
-              onChange={(event) => {
-                if (!event.target.value) return;
-                void assignBulkUser(event.target.value, "co_executor");
-                event.currentTarget.value = "";
-              }}
-            >
-              <option value="">Назначить соисполнителя</option>
-              {activeUsers.map((user) => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </select>
-            <button
-              className="danger-button compact"
-              disabled={selectedTasks.length === 0 || !canDelete || projectWorkMutations.archiveTask.isPending}
-              title={canDelete ? undefined : "Нужно право tenant.tasks.delete"}
-              type="button"
-              onClick={() => void archiveSelectedTasks()}
-            >
-              Удалить
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {viewMode === "table" ? (
         <>
@@ -399,6 +390,7 @@ export function MyWorkView(props: {
           <div className="task-kanban" aria-label="Канбан задач">
             {groupedTasks.map((group) => (
               <TaskKanbanColumn
+                canCreate={canCreate}
                 data={props.data}
                 group={group}
                 isBulkEnabled={isBulkEnabled}
@@ -591,6 +583,7 @@ function TaskTable(props: {
 }
 
 function TaskKanbanColumn(props: {
+  canCreate: boolean;
   data: WorkspaceData;
   group: { status: TaskStatusDefinition; tasks: Task[] };
   isBulkEnabled: boolean;
@@ -626,7 +619,13 @@ function TaskKanbanColumn(props: {
           ))
         )}
       </div>
-      <button className="task-kanban-add" type="button" onClick={props.onCreateTask}>
+      <button
+        className="task-kanban-add"
+        disabled={!props.canCreate}
+        title={props.canCreate ? undefined : "Нужно право tenant.tasks.create"}
+        type="button"
+        onClick={props.onCreateTask}
+      >
         + Добавить задачу
       </button>
     </section>
@@ -652,9 +651,20 @@ function TaskKanbanCard(props: {
       className={`task-kanban-card ${isDragging ? "dragging" : ""}`}
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
     >
+      <div className="task-kanban-card-topline">
+        <button
+          className="task-card-drag-handle"
+          aria-label={`Переместить задачу ${props.task.title}`}
+          type="button"
+          {...listeners}
+          {...attributes}
+        >
+          <GripVertical aria-hidden="true" size={15} />
+        </button>
+        <span>{getProjectName(props.data.projects, props.task.projectId)}</span>
+        <em>{formatDateOnly(props.task.plannedFinish)}</em>
+      </div>
       {props.isBulkEnabled ? (
         <label className="task-card-select" onPointerDown={(event) => event.stopPropagation()}>
           <input
@@ -666,19 +676,15 @@ function TaskKanbanCard(props: {
           Выбрать
         </label>
       ) : null}
-      <button type="button" onClick={() => props.onOpenTask(props.task.id)}>
-        <span className="task-card-project">
-          {getProjectName(props.data.projects, props.task.projectId)}
-          <em>{formatDateOnly(props.task.plannedFinish)}</em>
-        </span>
+      <button className="task-kanban-title-button" type="button" onClick={() => props.onOpenTask(props.task.id)}>
         <strong>{props.task.title}</strong>
       </button>
-      <span className="task-kanban-role">{formatCurrentUserRoles(props.task, props.data.me.id)}</span>
-      <small>
-        {getUserName(props.data.users, props.data.me, props.task.ownerUserId)} · {props.task.durationWorkingDays} раб. дн · {props.task.plannedWork} ч
-      </small>
+      <div className="task-kanban-card-meta">
+        <span className="task-kanban-role">{formatCurrentUserRoles(props.task, props.data.me.id)}</span>
+        <small>{getUserName(props.data.users, props.data.me, props.task.ownerUserId)}</small>
+      </div>
       <span className="task-kanban-card-footer">
-        <span>{props.task.statusName}</span>
+        <span>{props.task.durationWorkingDays} раб. дн · {props.task.plannedWork} ч</span>
         <span>{props.task.requiresAcceptance ? "Нужна проверка" : "Без проверки"}</span>
       </span>
     </article>

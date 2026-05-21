@@ -18,13 +18,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 
-import type { Task, TaskActivity, TaskStatusDefinition } from "./api";
+import type { AuditEvent, Task, TaskActivity, TaskStatusDefinition } from "./api";
 import { TaskFormDialog } from "./TaskFormDialog";
-import { Panel, SectionFeedback, StatusPill } from "./components/workspace-ui";
+import { ConfirmDialog, Panel, SectionFeedback, StatusPill } from "./components/workspace-ui";
 import {
   canArchiveTask,
   canCommentTask,
   canEditTaskFields,
+  canTransitionTaskStatus,
   getNextTaskStatusAction,
   getPriorityLabel,
   getProjectName,
@@ -58,6 +59,7 @@ export function TaskDetailView(props: {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [actionError, setActionError] = useState("");
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const canEdit = task ? canEditTaskFields(task, props.data.me.id, props.data.permissions) : false;
   const canDelete = canArchiveTask(props.data.permissions);
   const canComment = task ? canCommentTask(task, props.data.me.id, props.data.permissions) : false;
@@ -181,17 +183,32 @@ export function TaskDetailView(props: {
             disabled={!canDelete}
             title={canDelete ? "Архивировать задачу" : "Нужно право tenant.tasks.delete"}
             type="button"
-            onClick={() => {
-              if (!canDelete) return;
-              void projectWorkMutations.archiveTask.mutateAsync(task.id);
-            }}
+            onClick={() => setIsArchiveConfirmOpen(true)}
           >
             <MoreHorizontal aria-hidden="true" size={18} />
           </button>
         </div>
       </header>
 
-      <TaskStatusRail task={task} statuses={props.data.taskStatuses} />
+      <TaskStatusRail
+        canTransition={canTransitionTaskStatus(task, props.data.me.id, props.data.permissions)}
+        isPending={projectWorkMutations.updateTaskStatus.isPending}
+        statuses={props.data.taskStatuses}
+        task={task}
+        onSelect={async (statusId) => {
+          setActionError("");
+          try {
+            await projectWorkMutations.updateTaskStatus.mutateAsync({
+              projectId: task.projectId,
+              taskId: task.id,
+              input: { statusId }
+            });
+            props.onChanged("Статус задачи обновлен.");
+          } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Не удалось обновить статус.");
+          }
+        }}
+      />
       {actionError ? <p className="error">{actionError}</p> : null}
 
       <div className="task-detail-layout">
@@ -199,11 +216,6 @@ export function TaskDetailView(props: {
           <TaskFactsCard data={props.data} task={task} />
           <TaskTextSection title="2. Описание" icon={FileText}>
             <p>{task.description || "Описание не заполнено."}</p>
-            <span className="chip-list">
-              <span className="permission-chip">сделка</span>
-              <span className="permission-chip">ресурсная проверка</span>
-              <span className="permission-chip">активация проекта</span>
-            </span>
           </TaskTextSection>
           <TaskTextSection title="3. Проект и связи" icon={Link2}>
             <dl className="task-facts-list compact">
@@ -231,14 +243,11 @@ export function TaskDetailView(props: {
           </TaskTextSection>
           <TaskTextSection title="4. Вложения и чек-листы" icon={CheckSquare}>
             <div className="task-attachments-grid">
-              <div className="task-disabled-field">Файлы появятся после storage/connector слоя.</div>
-              <div>
-                <strong>Чек-лист</strong>
-                <ul className="task-checklist-preview">
-                  <li>Проверить роли</li>
-                  <li>Сверить часы</li>
-                  <li>Отправить на контроль</li>
-                </ul>
+              <div className="task-disabled-field">
+                Вложения отключены до storage/connector слоя: upload не имитируется.
+              </div>
+              <div className="task-disabled-field">
+                Чек-листы будут отдельной моделью задачи; в этом baseline они не выглядят как готовая функция.
               </div>
             </div>
           </TaskTextSection>
@@ -293,6 +302,14 @@ export function TaskDetailView(props: {
             data={props.data}
             task={task}
           />
+          {nextAction ? (
+            <TaskNextActionPanel
+              actionLabel={nextAction.label}
+              disabledReason={nextAction.disabledReason}
+              isPending={projectWorkMutations.updateTaskStatus.isPending}
+              onRun={() => void runStatusAction()}
+            />
+          ) : null}
           <TaskCommentComposer
             canComment={canComment}
             comment={comment}
@@ -320,25 +337,64 @@ export function TaskDetailView(props: {
           }}
         />
       ) : null}
+      {isArchiveConfirmOpen ? (
+        <ConfirmDialog
+          body={`Задача "${task.title}" будет архивирована и пропадет из рабочих списков.`}
+          confirmLabel="Архивировать задачу"
+          error={actionError}
+          isPending={projectWorkMutations.archiveTask.isPending}
+          pendingLabel="Архивируем..."
+          title="Архивировать задачу?"
+          onCancel={() => setIsArchiveConfirmOpen(false)}
+          onConfirm={async () => {
+            setActionError("");
+            try {
+              await projectWorkMutations.archiveTask.mutateAsync(task.id);
+              setIsArchiveConfirmOpen(false);
+              props.onChanged("Задача архивирована.");
+              props.onBackToMyWork();
+            } catch (error) {
+              setActionError(error instanceof Error ? error.message : "Не удалось архивировать задачу.");
+            }
+          }}
+        />
+      ) : null}
     </section>
   );
 }
 
 function TaskStatusRail(props: {
+  canTransition: boolean;
+  isPending: boolean;
   task: Task;
   statuses: readonly TaskStatusDefinition[];
+  onSelect: (statusId: string) => void | Promise<void>;
 }) {
   const statuses = sortTaskStatuses(props.statuses);
   return (
     <div className="task-status-rail" aria-label="Статусы задачи">
-      {statuses.map((status) => (
-        <span
-          className={status.id === props.task.statusId ? "active" : ""}
-          key={status.id}
-        >
-          {status.name}
-        </span>
-      ))}
+      {statuses.map((status) => {
+        const isCurrent = status.id === props.task.statusId;
+        const disabled = isCurrent || props.isPending || !props.canTransition;
+        return (
+          <button
+            className={isCurrent ? "active" : ""}
+            disabled={disabled}
+            key={status.id}
+            title={
+              isCurrent
+                ? "Текущий статус задачи"
+                : props.canTransition
+                  ? `Перевести задачу в статус "${status.name}"`
+                  : "Нужна роль участника задачи или право редактирования задач"
+            }
+            type="button"
+            onClick={() => void props.onSelect(status.id)}
+          >
+            {status.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -498,45 +554,33 @@ function TaskActivityTimeline(props: {
     return <p className="empty-state">Связи-предшественники задаются в Gantt и здесь отображаются read-only.</p>;
   }
   if (props.activeTab === "audit") {
-    return <p className="empty-state">Управленческие действия пишутся в общий аудит. Scoped audit появится после audit-фильтров.</p>;
+    return <TaskAuditList auditEvents={getTaskAuditEvents(props.data.auditEvents, props.task.id)} />;
   }
 
   const visibleActivities = props.activeTab === "comments"
     ? props.activities.filter((activity) => activity.type === "comment")
-    : props.activities;
+    : props.activities.filter((activity) => activity.type === "system");
   if (visibleActivities.length === 0 && props.activeTab === "comments") {
     return <p className="empty-state">Комментариев пока нет.</p>;
+  }
+  if (visibleActivities.length === 0 && props.activeTab === "history") {
+    return <p className="empty-state">Истории по задаче пока нет.</p>;
   }
 
   return (
     <div className="task-activity-timeline">
-      <span className="task-date-separator">20 мая</span>
-      {props.activeTab === "history" ? (
-        <article className="task-activity-event system">
-          <span className="activity-icon"><MessageCircle aria-hidden="true" size={16} /></span>
-          <div>
-            <strong>{getUserName(props.data.users, props.data.me, props.task.requesterUserId)}</strong>
-            <span>создал задачу</span>
-            <div className="task-history-snapshot">
-              <span>Статус: {props.task.statusName}</span>
-              <span>Ответственный: {getUserName(props.data.users, props.data.me, props.task.ownerUserId)}</span>
-              <span>
-                Срок: {formatDateOnly(props.task.plannedStart)}
-                {" -> "}
-                {formatDateOnly(props.task.plannedFinish)}
-              </span>
-              <span>Проект: {getProjectName(props.data.projects, props.task.projectId)}</span>
-            </div>
-          </div>
-        </article>
-      ) : null}
+      <span className="task-date-separator">{formatDateOnly(visibleActivities[0]?.createdAt ?? props.task.createdAt)}</span>
       {visibleActivities.map((activity) => (
-        <article className="task-activity-event" key={activity.id}>
-          <span className="activity-avatar">
-            {getUserName(props.data.users, props.data.me, activity.authorUserId).slice(0, 1)}
-          </span>
+        <article className={`task-activity-event ${activity.type === "system" ? "system" : ""}`} key={activity.id}>
+          {activity.type === "system" ? (
+            <span className="activity-icon"><MessageCircle aria-hidden="true" size={16} /></span>
+          ) : (
+            <span className="activity-avatar">
+              {getUserName(props.data.users, props.data.me, activity.authorUserId).slice(0, 1)}
+            </span>
+          )}
           <div>
-            <strong>{getUserName(props.data.users, props.data.me, activity.authorUserId)}</strong>
+            <strong>{activity.title ?? getUserName(props.data.users, props.data.me, activity.authorUserId)}</strong>
             <time>{formatDateOnly(activity.createdAt)}</time>
             <p>{activity.body || activity.title || "Активность без текста"}</p>
           </div>
@@ -544,4 +588,66 @@ function TaskActivityTimeline(props: {
       ))}
     </div>
   );
+}
+
+function TaskAuditList(props: { auditEvents: AuditEvent[] }) {
+  if (props.auditEvents.length === 0) {
+    return <p className="empty-state">В общем аудите пока нет событий по этой задаче.</p>;
+  }
+
+  return (
+    <div className="task-activity-timeline">
+      {props.auditEvents.map((event) => (
+        <article className="task-activity-event system" key={event.id}>
+          <span className="activity-icon"><ClipboardList aria-hidden="true" size={16} /></span>
+          <div>
+            <strong>{event.actionType}</strong>
+            <time>{formatDateOnly(event.createdAt)}</time>
+            <p>{getAuditSummary(event)}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function TaskNextActionPanel(props: {
+  actionLabel: string;
+  disabledReason?: string | undefined;
+  isPending: boolean;
+  onRun: () => void;
+}) {
+  return (
+    <section className="task-next-action">
+      <div>
+        <strong>Следующий шаг: {props.actionLabel.toLowerCase()}</strong>
+        <p>{props.disabledReason ?? "После подтверждения статус обновится, а событие появится в истории задачи."}</p>
+      </div>
+      <button
+        className="primary-button compact"
+        disabled={Boolean(props.disabledReason) || props.isPending}
+        title={props.disabledReason}
+        type="button"
+        onClick={props.onRun}
+      >
+        {props.isPending ? "Сохраняем..." : props.actionLabel}
+      </button>
+    </section>
+  );
+}
+
+function getTaskAuditEvents(auditEvents: readonly AuditEvent[], taskId: string): AuditEvent[] {
+  return auditEvents
+    .filter((event) => event.sourceEntity?.type === "Task" && event.sourceEntity.id === taskId)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function getAuditSummary(event: AuditEvent): string {
+  if (event.actionType === "task.created") return "Задача создана.";
+  if (event.actionType === "task.updated") return "Поля задачи обновлены.";
+  if (event.actionType === "task.status_changed") return "Статус задачи изменен.";
+  if (event.actionType === "task.comment_created") return "Добавлен комментарий.";
+  if (event.actionType === "task.archived") return "Задача архивирована.";
+  return "Событие записано в общий аудит.";
 }
