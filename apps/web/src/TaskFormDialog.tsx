@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { Task, TaskInput, TaskParticipant, TaskStatusDefinition, TaskUpdateInput } from "./api";
@@ -16,12 +17,17 @@ type TaskFormErrors = Record<string, string>;
 
 export function TaskFormDialog(props: {
   data: WorkspaceData;
+  initialStatusId?: string | undefined;
   task?: Task | undefined;
   projectId?: string | undefined;
   taskStatuses: readonly TaskStatusDefinition[];
   isPending: boolean;
   onClose: () => void;
-  onSubmit: (input: TaskInput | TaskUpdateInput, projectId: string) => Promise<void>;
+  onSubmit: (
+    input: TaskInput | TaskUpdateInput,
+    projectId: string,
+    intent?: "save" | "open"
+  ) => Promise<void>;
 }) {
   const formId = props.task ? "task-edit-form" : "task-create-form";
   const activeStatuses = useMemo(
@@ -37,6 +43,7 @@ export function TaskFormDialog(props: {
   );
   const defaultStatusId =
     props.task?.statusId ??
+    props.initialStatusId ??
     activeStatuses.find((status) => status.category === "new")?.id ??
     activeStatuses[0]?.id ??
     "";
@@ -69,6 +76,8 @@ export function TaskFormDialog(props: {
 
   async function submitTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const intent = submitter?.value === "open" ? "open" : "save";
     const form = new FormData(event.currentTarget);
     const projectId = props.projectId ?? props.task?.projectId ?? String(form.get("projectId") ?? "");
     const statusId = String(form.get("statusId") ?? defaultStatusId);
@@ -82,7 +91,7 @@ export function TaskFormDialog(props: {
     });
 
     const input: TaskInput | TaskUpdateInput = {
-      id: props.task ? undefined : String(form.get("id") ?? "").trim() || undefined,
+      id: undefined,
       title: String(form.get("title") ?? "").trim(),
       description: String(form.get("description") ?? "").trim(),
       priority: String(form.get("priority") ?? "normal") as Task["priority"],
@@ -100,7 +109,7 @@ export function TaskFormDialog(props: {
     if (Object.keys(validationErrors).length > 0) return;
 
     try {
-      await props.onSubmit(input, projectId);
+      await props.onSubmit(input, projectId, intent);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Не удалось сохранить задачу.");
     }
@@ -117,19 +126,12 @@ export function TaskFormDialog(props: {
       <form className="task-form-grid" noValidate onSubmit={submitTask}>
         <section className="task-form-section">
           <h3>1. Основное</h3>
-          {!props.task ? (
-            <label>
-              Код задачи
-              <input name="id" placeholder="TASK-849160" />
-            </label>
-          ) : null}
           <div className="form-grid">
             <label>
-              Название <span aria-hidden="true">*</span>
+              <span className="field-label">Название <b aria-hidden="true">*</b></span>
               <input
                 aria-describedby={errors.title ? `${formId}-title-error` : undefined}
                 aria-invalid={Boolean(errors.title)}
-                data-autofocus
                 defaultValue={props.task?.title ?? ""}
                 name="title"
                 placeholder="Например, подготовить ресурсную оценку"
@@ -137,7 +139,7 @@ export function TaskFormDialog(props: {
               <FieldError errors={errors} field="title" formId={formId} />
             </label>
             <label>
-              Статус <span aria-hidden="true">*</span>
+              <span className="field-label">Статус <b aria-hidden="true">*</b></span>
               <select
                 aria-describedby={errors.statusId ? `${formId}-statusId-error` : undefined}
                 aria-invalid={Boolean(errors.statusId)}
@@ -155,7 +157,7 @@ export function TaskFormDialog(props: {
             </label>
           </div>
           <label>
-            Проект <span aria-hidden="true">*</span>
+            <span className="field-label">Проект <b aria-hidden="true">*</b></span>
             <select
               aria-describedby={errors.projectId ? `${formId}-projectId-error` : undefined}
               aria-invalid={Boolean(errors.projectId)}
@@ -173,13 +175,14 @@ export function TaskFormDialog(props: {
             <FieldError errors={errors} field="projectId" formId={formId} />
           </label>
           <label>
-            Описание задачи
+            <span className="field-label">Описание задачи</span>
             <textarea
               defaultValue={props.task?.description ?? ""}
               maxLength={2000}
               name="description"
               placeholder="Что нужно сделать, критерии готовности, ссылки на контекст"
             />
+            <small className="task-form-counter">0 / 2000</small>
           </label>
         </section>
 
@@ -204,13 +207,13 @@ export function TaskFormDialog(props: {
             />
           </div>
           <div className="form-grid">
-            <MultiUserCheckboxes
+            <MultiUserSelect
               defaultValues={initialCoExecutors}
               label="Соисполнители"
               name="coExecutorIds"
               users={activeUsers}
             />
-            <MultiUserCheckboxes
+            <MultiUserSelect
               defaultValues={initialObservers}
               label="Наблюдатели"
               name="observerIds"
@@ -247,7 +250,7 @@ export function TaskFormDialog(props: {
               <FieldError errors={errors} field="plannedFinish" formId={formId} />
             </span>
             <label>
-              Длительность
+              <span className="field-label">Длительность <b aria-hidden="true">*</b></span>
               <input
                 aria-describedby={errors.durationWorkingDays ? `${formId}-durationWorkingDays-error` : undefined}
                 aria-invalid={Boolean(errors.durationWorkingDays)}
@@ -260,7 +263,7 @@ export function TaskFormDialog(props: {
               <FieldError errors={errors} field="durationWorkingDays" formId={formId} />
             </label>
             <label>
-              Трудозатраты
+              <span className="field-label">Трудозатраты <b aria-hidden="true">*</b></span>
               <input
                 aria-describedby={errors.plannedWork ? `${formId}-plannedWork-error` : undefined}
                 aria-invalid={Boolean(errors.plannedWork)}
@@ -273,7 +276,7 @@ export function TaskFormDialog(props: {
               <FieldError errors={errors} field="plannedWork" formId={formId} />
             </label>
           </div>
-          <label className="checkbox-row">
+          <label className="task-check-row">
             <input
               defaultChecked={props.task?.requiresAcceptance ?? true}
               name="requiresAcceptance"
@@ -293,7 +296,6 @@ export function TaskFormDialog(props: {
 
         {submitError ? <p className="error">{submitError}</p> : null}
         <footer className="task-form-actions">
-          <span>Права и изменения будут проверены API и записаны в аудит.</span>
           <div>
             <button
               className="secondary-button"
@@ -303,6 +305,17 @@ export function TaskFormDialog(props: {
             >
               Отмена
             </button>
+            {!props.task ? (
+              <button
+                className="secondary-button"
+                disabled={props.isPending}
+                name="intent"
+                type="submit"
+                value="open"
+              >
+                Создать и открыть
+              </button>
+            ) : null}
             <button className="primary-button" disabled={props.isPending} type="submit">
               {props.isPending
                 ? "Сохраняем..."
@@ -327,7 +340,7 @@ function UserSelect(props: {
 }) {
   return (
     <label>
-      {props.label} <span aria-hidden="true">*</span>
+      <span className="field-label">{props.label} <b aria-hidden="true">*</b></span>
       <select
         aria-describedby={props.error ? `${props.formId}-${props.name}-error` : undefined}
         aria-invalid={Boolean(props.error)}
@@ -346,26 +359,70 @@ function UserSelect(props: {
   );
 }
 
-function MultiUserCheckboxes(props: {
+function MultiUserSelect(props: {
   defaultValues: Set<string>;
   label: string;
   name: string;
   users: WorkspaceData["users"];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => Array.from(props.defaultValues));
+  const defaultKey = Array.from(props.defaultValues).sort().join("|");
+  const selectedUsers = props.users.filter((user) => selectedIds.includes(user.id));
+
+  useEffect(() => {
+    setSelectedIds(Array.from(props.defaultValues));
+    setIsOpen(false);
+  }, [defaultKey]);
+
+  function toggleUser(userId: string) {
+    setSelectedIds((current) =>
+      current.includes(userId)
+        ? current.filter((selectedId) => selectedId !== userId)
+        : [...current, userId]
+    );
+  }
+
   return (
-    <fieldset className="task-user-checkboxes">
+    <fieldset className="task-multi-select">
       <legend>{props.label}</legend>
-      {props.users.map((user) => (
-        <label className="checkbox-row compact" key={user.id}>
-          <input
-            defaultChecked={props.defaultValues.has(user.id)}
-            name={props.name}
-            type="checkbox"
-            value={user.id}
-          />
-          {user.name}
-        </label>
+      {selectedIds.map((userId) => (
+        <input key={userId} name={props.name} type="hidden" value={userId} />
       ))}
+      <button
+        aria-expanded={isOpen}
+        className="task-multi-trigger"
+        type="button"
+        onClick={() => setIsOpen((value) => !value)}
+      >
+        <span className={selectedUsers.length > 0 ? "task-multi-values" : "task-multi-placeholder"}>
+          {selectedUsers.length > 0
+            ? selectedUsers.map((user) => (
+                <span className="task-multi-chip" key={user.id}>{user.name}</span>
+              ))
+            : "Выберите пользователей"}
+        </span>
+        <ChevronDown aria-hidden="true" size={16} />
+      </button>
+      {isOpen ? (
+        <div className="task-multi-menu">
+          {props.users.map((user) => {
+            const isSelected = selectedIds.includes(user.id);
+            return (
+              <button
+                aria-pressed={isSelected}
+                className={isSelected ? "selected" : ""}
+                key={user.id}
+                type="button"
+                onClick={() => toggleUser(user.id)}
+              >
+                <span className="task-multi-check">{isSelected ? "✓" : ""}</span>
+                <span>{user.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </fieldset>
   );
 }
