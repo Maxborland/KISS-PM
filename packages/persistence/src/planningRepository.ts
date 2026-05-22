@@ -936,7 +936,11 @@ function mapAssignments(
       taskIdSet.has(assignment.taskId) &&
       activeResourceIds.has(assignment.resourceId)
   );
-  const explicitTaskIds = new Set(activeAssignmentRows.map((assignment) => assignment.taskId));
+  const explicitAssignmentKeys = new Set(
+    activeAssignmentRows.map((assignment) =>
+      assignmentFallbackKey(assignment.taskId, assignment.resourceId, assignment.role)
+    )
+  );
   const explicitAssignments = activeAssignmentRows.map<PlanAssignment>((assignment) => ({
     id: assignment.id,
     taskId: assignment.taskId,
@@ -951,8 +955,10 @@ function mapAssignments(
       (participant) =>
         taskIdSet.has(participant.taskId) &&
         activeResourceIds.has(participant.userId) &&
-        !explicitTaskIds.has(participant.taskId) &&
-        isPlanningParticipantRole(participant.role)
+        isPlanningParticipantRole(participant.role) &&
+        !explicitAssignmentKeys.has(
+          assignmentFallbackKey(participant.taskId, participant.userId, participant.role)
+        )
     )
     .map<PlanAssignment>((participant) => ({
       id: `${participant.taskId}-${participant.userId}-${participant.role}`,
@@ -967,6 +973,10 @@ function mapAssignments(
   return [...explicitAssignments, ...fallbackAssignments].sort((left, right) =>
     left.id.localeCompare(right.id)
   );
+}
+
+function assignmentFallbackKey(taskId: string, resourceId: string, role: string): string {
+  return `${taskId}\u0000${resourceId}\u0000${role}`;
 }
 
 function mapCalendars(

@@ -32,4 +32,26 @@ describe("auth rate limiter", () => {
 
     expect(getClientIp(headers)).toBe("198.51.100.4");
   });
+
+  it("does not place clients without a known IP into one shared throttle bucket", () => {
+    const limiter = createAuthRateLimiter({
+      maxFailures: 2,
+      windowMs: 60_000,
+      blockMs: 30_000
+    });
+    expect(getClientIp(new Headers())).toBeNull();
+
+    limiter.recordFailure({ email: "one@kiss-pm.local", ip: null, now: 1_000 });
+    limiter.recordFailure({ email: "one@kiss-pm.local", ip: null, now: 2_000 });
+
+    expect(
+      limiter.check({ email: "two@kiss-pm.local", ip: null, now: 3_000 })
+    ).toEqual({ allowed: true });
+    expect(
+      limiter.check({ email: "one@kiss-pm.local", ip: null, now: 3_000 })
+    ).toEqual({
+      allowed: false,
+      retryAfterSeconds: 29
+    });
+  });
 });
