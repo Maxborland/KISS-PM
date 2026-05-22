@@ -18,9 +18,9 @@ import {
 } from "./planningPermissions";
 import { PlanningDependencyEditor } from "./PlanningDependencyEditor";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
+import { PlanningResourcePanel } from "./PlanningResourcePanel";
 import { PlanningTaskInspector } from "./PlanningTaskInspector";
 import { PlanningValidationPanel } from "./PlanningValidationPanel";
-import { ResourceLoadSummary } from "./ResourceLoadSummary";
 import "./planningWorkspace.css";
 
 export function PlanningWorkspaceRoute(props: {
@@ -223,7 +223,7 @@ export function PlanningWorkspaceRoute(props: {
               onIntent={(intent) => void previewIntent(intent)}
             />
             <PlanningValidationPanel issues={issues} />
-            <ResourceLoadSummary readModel={afterPreview ?? readModel} />
+            <PlanningResourcePanel readModel={afterPreview ?? readModel} />
           </aside>
         </div>
       ) : null}
