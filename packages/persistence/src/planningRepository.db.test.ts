@@ -354,21 +354,53 @@ describe("planning repository", () => {
     const planningRepository = createPlanningRepository(db);
     const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
 
+    for (let index = 3; index <= 12; index += 1) {
+      await planningRepository.applyPlanningCommand({
+        tenantId: "tenant-alpha",
+        projectId,
+        actorUserId: "user-alpha-admin",
+        command: {
+          type: "task.create",
+          payload: {
+            id: `task-extra-${index}`,
+            projectId,
+            title: `Дополнительная задача ${index}`,
+            statusId: "task-status-new",
+            plannedStart: "2026-06-10",
+            plannedFinish: "2026-06-10",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        }
+      });
+    }
+
     await planningRepository.applyPlanningCommand({
       tenantId: "tenant-alpha",
       projectId,
       actorUserId: "user-alpha-admin",
       command: {
         type: "task.move_wbs",
-        payload: { taskId: "task-beta", parentTaskId: null, sortOrder: 0 }
+        payload: { taskId: "task-beta", parentTaskId: null, sortOrder: 10 }
       }
     });
 
     const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
 
     expect(snapshot?.tasks.map((task) => ({ id: task.id, wbsCode: task.wbsCode }))).toEqual([
-      { id: "task-beta", wbsCode: "1" },
-      { id: "task-alpha", wbsCode: "2" }
+      { id: "task-alpha", wbsCode: "1" },
+      { id: "task-extra-3", wbsCode: "2" },
+      { id: "task-extra-4", wbsCode: "3" },
+      { id: "task-extra-5", wbsCode: "4" },
+      { id: "task-extra-6", wbsCode: "5" },
+      { id: "task-extra-7", wbsCode: "6" },
+      { id: "task-extra-8", wbsCode: "7" },
+      { id: "task-extra-9", wbsCode: "8" },
+      { id: "task-extra-10", wbsCode: "9" },
+      { id: "task-extra-11", wbsCode: "10" },
+      { id: "task-beta", wbsCode: "11" },
+      { id: "task-extra-12", wbsCode: "12" }
     ]);
   });
 

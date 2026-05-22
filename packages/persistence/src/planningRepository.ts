@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import type {
   DependencyType,
@@ -125,7 +125,6 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       const [
         planVersion,
         taskRows,
-        participantRows,
         assignmentRows,
         dependencyRows,
         projectCalendarRows,
@@ -141,11 +140,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           .select()
           .from(tasks)
           .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)))
-          .orderBy(asc(tasks.wbsCode), asc(tasks.createdAt), asc(tasks.id)),
-        db
-          .select()
-          .from(taskParticipants)
-          .where(eq(taskParticipants.tenantId, tenantId)),
+          .orderBy(asc(tasks.createdAt), asc(tasks.id)),
         db
           .select()
           .from(taskAssignments)
@@ -192,7 +187,19 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           .where(and(eq(projectBaselineTasks.tenantId, tenantId), eq(projectBaselineTasks.projectId, projectId)))
       ]);
 
-      const activeTaskIds = new Set(taskRows.map((task) => task.id));
+      const orderedTaskRows = [...taskRows].sort(compareTaskRowsByWbs);
+      const activeTaskIds = new Set(orderedTaskRows.map((task) => task.id));
+      const participantRows = activeTaskIds.size === 0
+        ? []
+        : await db
+            .select()
+            .from(taskParticipants)
+            .where(
+              and(
+                eq(taskParticipants.tenantId, tenantId),
+                inArray(taskParticipants.taskId, [...activeTaskIds])
+              )
+            );
       const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
       const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
       const projectCalendarId = project.calendarId ?? calendars[0]?.id ?? defaultProjectCalendarId(project.id);
@@ -210,9 +217,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           deadline: project.deadline ? toPlanDate(project.deadline) : null,
           calendarId: projectCalendarId
         },
-        tasks: taskRows.map((task) => mapPlanTask(task, projectCalendarId)),
+        tasks: orderedTaskRows.map((task) => mapPlanTask(task, projectCalendarId)),
         assignments: mapAssignments(
-          taskRows.map((task) => task.id),
+          orderedTaskRows.map((task) => task.id),
           activeResourceIds,
           participantRows,
           assignmentRows
@@ -257,7 +264,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           workMinutes: reservation.workMinutes,
           reason: reservation.reason
         })),
-        constraints: taskRows.flatMap((task) => {
+        constraints: orderedTaskRows.flatMap((task) => {
           const constraint = mapConstraint(task);
           return constraint ? [constraint] : [];
         }),
@@ -817,7 +824,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     const rows = await db
       .select({
         id: tasks.id,
-        parentTaskId: tasks.parentTaskId
+        parentTaskId: tasks.parentTaskId,
+        wbsCode: tasks.wbsCode,
+        createdAt: tasks.createdAt
       })
       .from(tasks)
       .where(
@@ -827,7 +836,8 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           isNull(tasks.archivedAt)
         )
       )
-      .orderBy(asc(tasks.wbsCode), asc(tasks.createdAt), asc(tasks.id));
+      .orderBy(asc(tasks.createdAt), asc(tasks.id));
+    rows.sort(compareTaskRowsByWbs);
     const moved = rows.find((task) => task.id === input.taskId);
     if (!moved) return;
 
@@ -971,6 +981,44 @@ function mapConstraint(task: typeof tasks.$inferSelect): PlanConstraint | null {
     type: task.constraintType as PlanConstraintType,
     date: task.constraintDate ? toPlanDate(task.constraintDate) : null
   };
+}
+
+function compareTaskRowsByWbs(
+  left: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">,
+  right: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">
+): number {
+  return (
+    compareWbsCodes(left.wbsCode, right.wbsCode) ||
+    left.createdAt.getTime() - right.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function compareWbsCodes(left: string, right: string): number {
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+    if (leftPart === rightPart) continue;
+
+    const leftNumber = parseWbsPart(leftPart);
+    const rightNumber = parseWbsPart(rightPart);
+    if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) {
+      return leftNumber - rightNumber;
+    }
+    return leftPart.localeCompare(rightPart, undefined, { numeric: true });
+  }
+
+  return 0;
+}
+
+function parseWbsPart(value: string): number | null {
+  return /^\d+$/.test(value) ? Number(value) : null;
 }
 
 function mapAssignments(

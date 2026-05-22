@@ -118,11 +118,21 @@ describe("resource planning", () => {
 
     expect(matrix.buckets[0]).toMatchObject({
       capacityMinutes: 240,
-      assignedMinutes: 240,
+      assignedMinutes: 480,
       assignmentIds: ["assignment-a"],
       calendarExceptionIds: ["exception-a"]
     });
-    expect(matrix.overloads).toEqual([]);
+    expect(matrix.overloads).toEqual([
+      expect.objectContaining({
+        resourceId: "resource-alpha",
+        date: "2026-06-01",
+        overloadMinutes: 240,
+        reasons: expect.arrayContaining([
+          { type: "assignment", id: "assignment-a" },
+          { type: "calendar_exception", id: "exception-a" }
+        ])
+      })
+    ]);
   });
 
   it("splits task work across assignments without explicit assignment work", () => {
@@ -374,6 +384,97 @@ describe("resource planning", () => {
       capacityMinutes: 240,
       assignedMinutes: 0
     });
+  });
+
+  it("keeps co-executor schedules independent when one resource is absent", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      resources: [
+        ...createSnapshot().resources,
+        {
+          id: "resource-beta",
+          userId: "user-beta",
+          positionId: "engineer",
+          teamId: "team-platform",
+          name: "Beta",
+          calendarId: "calendar-default"
+        }
+      ],
+      assignments: [
+        {
+          id: "assignment-alpha",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          role: "executor" as const,
+          unitsPermille: 1000,
+          workMinutes: 480,
+          calendarId: null
+        },
+        {
+          id: "assignment-beta",
+          taskId: "task-a",
+          resourceId: "resource-beta",
+          role: "co_executor" as const,
+          unitsPermille: 1000,
+          workMinutes: 480,
+          calendarId: null
+        }
+      ],
+      reservations: [],
+      calendarExceptions: [
+        {
+          id: "exception-alpha",
+          calendarId: "calendar-default",
+          resourceId: "resource-alpha",
+          date: "2026-06-01",
+          workingMinutes: 0,
+          reason: "absence"
+        }
+      ]
+    };
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+
+    expect(plan.tasks[0]).toMatchObject({
+      calculatedStart: "2026-06-01",
+      calculatedFinish: "2026-06-01"
+    });
+    expect(matrix.buckets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          resourceId: "resource-alpha",
+          capacityMinutes: 0,
+          assignedMinutes: 480,
+          calendarExceptionIds: ["exception-alpha"]
+        }),
+        expect.objectContaining({
+          resourceId: "resource-beta",
+          capacityMinutes: 480,
+          assignedMinutes: 480,
+          calendarExceptionIds: []
+        })
+      ])
+    );
+    expect(matrix.overloads).toEqual([
+      expect.objectContaining({
+        resourceId: "resource-alpha",
+        overloadMinutes: 480
+      })
+    ]);
   });
 });
 

@@ -183,12 +183,19 @@ function calculateTaskLoadForDate(
       capacityMinutes: taskWorkingOverlapForDate(task, taskDate, calendar, calendarExceptions)
     }));
     const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
-    if (totalCapacity <= 0) continue;
+    const assignmentWork = resolveAssignmentWork(input.assignments, assignment, task.workMinutes);
+    if (totalCapacity <= 0) {
+      if (date === task.calculatedStart && assignmentWork > 0) {
+        assignedMinutes += assignmentWork;
+        taskIds.push(task.id);
+        assignmentIds.push(assignment.id);
+      }
+      continue;
+    }
 
     const currentCapacity = capacities.find((item) => item.date === date)?.capacityMinutes ?? 0;
     if (currentCapacity <= 0) continue;
 
-    const assignmentWork = resolveAssignmentWork(input.assignments, assignment, task.workMinutes);
     assignedMinutes += Math.round((assignmentWork * currentCapacity) / totalCapacity);
     taskIds.push(task.id);
     assignmentIds.push(assignment.id);
