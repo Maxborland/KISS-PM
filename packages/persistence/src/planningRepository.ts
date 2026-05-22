@@ -517,7 +517,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 1,
                 Math.ceil((input.command.payload.durationMinutes ?? input.command.payload.workMinutes) / 480)
               ),
-              plannedWork: Math.max(1, Math.ceil(input.command.payload.workMinutes / 60)),
+              plannedWork: Math.max(0, Math.ceil(input.command.payload.workMinutes / 60)),
               updatedAt: new Date()
             })
             .where(

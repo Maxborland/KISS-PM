@@ -18,7 +18,8 @@ import {
   projectCalendars,
   resourceCalendars,
   resourceReservations,
-  taskParticipants
+  taskParticipants,
+  tasks
 } from "./schema";
 
 const databaseUrl =
@@ -545,6 +546,50 @@ describe("planning repository", () => {
       durationMinutes: 1920,
       workMinutes: 480
     });
+  });
+
+  it("preserves zero work when updating task work model", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.update_work_model",
+        payload: {
+          taskId: "task-alpha",
+          taskType: "fixed_work",
+          effortDriven: false,
+          durationMinutes: 480,
+          workMinutes: 0
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.tasks.find((task) => task.id === "task-alpha")).toMatchObject({
+      durationMinutes: 480,
+      workMinutes: 0
+    });
+
+    const [storedTask] = await db
+      .select({ plannedWork: tasks.plannedWork, workMinutes: tasks.workMinutes })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.tenantId, "tenant-alpha"),
+          eq(tasks.projectId, projectId),
+          eq(tasks.id, "task-alpha")
+        )
+      )
+      .limit(1);
+
+    expect(storedTask).toEqual({ plannedWork: 0, workMinutes: 0 });
   });
 
   it("generates new WBS codes from active project tasks only", async () => {
