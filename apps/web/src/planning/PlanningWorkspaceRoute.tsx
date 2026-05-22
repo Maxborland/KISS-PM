@@ -27,9 +27,10 @@ import { PlanningBaselinePanel } from "./PlanningBaselinePanel";
 import { PlanningDependencyEditor } from "./PlanningDependencyEditor";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
 import { PlanningResourcePanel } from "./PlanningResourcePanel";
-import { PlanningScenarioPanel, scenarioTargetKey } from "./PlanningScenarioPanel";
+import { PlanningScenarioPanel } from "./PlanningScenarioPanel";
 import { PlanningTaskInspector } from "./PlanningTaskInspector";
 import { PlanningValidationPanel } from "./PlanningValidationPanel";
+import { scenarioTargetKey } from "./planningScenarioTarget";
 import "./planningWorkspace.css";
 
 export function PlanningWorkspaceRoute(props: {

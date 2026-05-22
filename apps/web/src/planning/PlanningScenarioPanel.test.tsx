@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   PlanningScenarioPanel,
-  proposalRequiresAcceptedRiskReason,
-  scenarioTargetKey
+  proposalRequiresAcceptedRiskReason
 } from "./PlanningScenarioPanel";
 import { createPlanningReadModelFixture } from "./planningReadModel.test-utils";
+import { scenarioTargetKey } from "./planningScenarioTarget";
 
 describe("PlanningScenarioPanel", () => {
   it("renders an explicit empty target state without fake scenario controls", () => {

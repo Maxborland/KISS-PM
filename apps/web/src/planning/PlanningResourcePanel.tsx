@@ -1,6 +1,8 @@
 import type { BucketGranularity, ScenarioTarget } from "@kiss-pm/domain";
 
+import { formatPlanningHours } from "./planningFormatters";
 import type { PlanningReadModel } from "./planningReadModelMapper";
+import { scenarioTargetKey } from "./planningScenarioTarget";
 import "./planningWorkspace.css";
 
 type ResourceLoadBucket = PlanningReadModel["resourceLoad"]["buckets"][number];
@@ -68,10 +70,10 @@ export function PlanningResourcePanel(props: {
                 <strong>{row.resourceId}</strong>
                 <small>{row.positionId ?? "позиция не задана"} / {row.teamId ?? "команда не задана"}</small>
               </span>
-              <span>{formatHours(row.assignedMinutes)}</span>
-              <span>{formatHours(row.capacityMinutes)}</span>
+              <span>{formatPlanningHours(row.assignedMinutes)}</span>
+              <span>{formatPlanningHours(row.capacityMinutes)}</span>
               <span className={row.overloadMinutes > 0 ? "danger" : ""}>
-                {formatHours(row.overloadMinutes)}
+                {formatPlanningHours(row.overloadMinutes)}
               </span>
               <small className="planning-resource-sheet-meta">
                 {row.taskCount} задач, {row.assignmentCount} назначений, {row.reservationCount} резервов, {row.calendarExceptionCount} исключений
@@ -95,7 +97,7 @@ export function PlanningResourcePanel(props: {
           <ul>
             {props.readModel.resourceLoad.overloads.map((overload) => (
               <li key={`${overload.resourceId}:${overload.granularity}:${overload.date}`}>
-                <strong>{overload.resourceId} / {overload.date}: {formatHours(overload.overloadMinutes)}</strong>
+                <strong>{overload.resourceId} / {overload.date}: {formatPlanningHours(overload.overloadMinutes)}</strong>
                 <span>{overload.taskIds.length} задач: {overload.taskIds.join(", ")}</span>
                 <small>{overload.reasons.map(formatOverloadReason).join("; ")}</small>
                 {props.onScenarioTarget && overload.granularity === "day" ? (
@@ -203,10 +205,6 @@ export function overloadToScenarioTarget(overload: ResourceOverload): ScenarioTa
   };
 }
 
-export function scenarioTargetKey(target: ScenarioTarget): string {
-  return `${target.type}:${target.resourceId}:${target.date}:${target.overloadMinutes}:${[...target.taskIds].sort().join(",")}`;
-}
-
 function ResourceMatrixTable(props: {
   label: string;
   rows: readonly ResourceMatrixRow[];
@@ -232,11 +230,11 @@ function ResourceMatrixTable(props: {
             <tr key={`${row.resourceId}:${row.granularity}:${row.bucketStart}`}>
               <td>{row.resourceId}</td>
               <td>{row.bucketStart}</td>
-              <td>{formatHours(row.plannedMinutes)}</td>
-              <td>{formatHours(row.availableMinutes)}</td>
-              <td>{formatHours(row.reservedMinutes)}</td>
-              <td>{formatHours(row.freeMinutes)}</td>
-              <td className={row.overloadMinutes > 0 ? "danger" : ""}>{formatHours(row.overloadMinutes)}</td>
+              <td>{formatPlanningHours(row.plannedMinutes)}</td>
+              <td>{formatPlanningHours(row.availableMinutes)}</td>
+              <td>{formatPlanningHours(row.reservedMinutes)}</td>
+              <td>{formatPlanningHours(row.freeMinutes)}</td>
+              <td className={row.overloadMinutes > 0 ? "danger" : ""}>{formatPlanningHours(row.overloadMinutes)}</td>
             </tr>
           ))}
         </tbody>
@@ -268,8 +266,4 @@ function addIds(target: Set<string>, ids: readonly string[]) {
 
 function resourceBucketKey(resourceId: string, granularity: BucketGranularity, date: string): string {
   return `${resourceId}:${granularity}:${date}`;
-}
-
-function formatHours(minutes: number): string {
-  return `${Math.round((minutes / 60) * 10) / 10} ч`;
 }
