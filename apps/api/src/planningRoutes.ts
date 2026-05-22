@@ -5,6 +5,7 @@ import {
   canApplyPlanningScenarios,
   canPreviewPlanningScenarios,
   canReadProjectPlan,
+  canReadProjectResources,
   type AccessProfile,
   type PolicyDecision
 } from "@kiss-pm/access-control";
@@ -62,7 +63,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     }
 
     const profile = await deps.getActorProfile(actor);
-    const decision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    const decision = canReadPlanningReadModel({ actor, profile });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, context.req.param("projectId"));
@@ -84,7 +85,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       return context.json({
         error: readDecision.reason,
@@ -160,7 +161,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
       return context.json({ error: decision.reason }, 403);
     }
-    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       await appendPlanningAuditIfConfigured(deps, {
         tenantId: actor.tenantId,
@@ -300,7 +301,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       targetTenantId: actor.tenantId
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       return context.json({
         error: readDecision.reason,
@@ -404,7 +405,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
       return context.json({ error: decision.reason }, 403);
     }
-    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       await appendPlanningAuditIfConfigured(deps, {
         tenantId: actor.tenantId,
@@ -774,6 +775,20 @@ function permissionForCommand(
     return canManageProjectResources(input);
   }
   return canManageProjectPlan(input);
+}
+
+function canReadPlanningReadModel(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+}): PolicyDecision {
+  const policyInput = {
+    actor: input.actor,
+    profile: input.profile,
+    targetTenantId: input.actor.tenantId
+  };
+  const planDecision = canReadProjectPlan(policyInput);
+  if (!planDecision.allowed) return planDecision;
+  return canReadProjectResources(policyInput);
 }
 
 async function validateCommandDataSourcePreconditions(

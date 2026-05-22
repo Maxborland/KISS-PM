@@ -592,26 +592,73 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             );
           return;
         case "dependency.upsert":
-          await this.upsertTaskDependency({
-            id: input.command.payload.id,
-            tenantId: input.tenantId,
-            projectId: input.projectId,
-            predecessorTaskId: input.command.payload.predecessorTaskId,
-            successorTaskId: input.command.payload.successorTaskId,
-            type: input.command.payload.dependencyType,
-            lagMinutes: input.command.payload.lagMinutes
-          });
+          {
+            const [existing] = await db
+              .select({
+                predecessorTaskId: taskDependencies.predecessorTaskId,
+                successorTaskId: taskDependencies.successorTaskId
+              })
+              .from(taskDependencies)
+              .where(
+                and(
+                  eq(taskDependencies.tenantId, input.tenantId),
+                  eq(taskDependencies.projectId, input.projectId),
+                  eq(taskDependencies.id, input.command.payload.id)
+                )
+            )
+              .limit(1);
+            await this.upsertTaskDependency({
+              id: input.command.payload.id,
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              predecessorTaskId: input.command.payload.predecessorTaskId,
+              successorTaskId: input.command.payload.successorTaskId,
+              type: input.command.payload.dependencyType,
+              lagMinutes: input.command.payload.lagMinutes
+            });
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [
+                existing?.predecessorTaskId,
+                existing?.successorTaskId,
+                input.command.payload.predecessorTaskId,
+                input.command.payload.successorTaskId
+              ]
+            });
+          }
           return;
         case "dependency.delete":
-          await db
-            .delete(taskDependencies)
-            .where(
-              and(
-                eq(taskDependencies.tenantId, input.tenantId),
-                eq(taskDependencies.projectId, input.projectId),
-                eq(taskDependencies.id, input.command.payload.dependencyId)
+          {
+            const [existing] = await db
+              .select({
+                predecessorTaskId: taskDependencies.predecessorTaskId,
+                successorTaskId: taskDependencies.successorTaskId
+              })
+              .from(taskDependencies)
+              .where(
+                and(
+                  eq(taskDependencies.tenantId, input.tenantId),
+                  eq(taskDependencies.projectId, input.projectId),
+                  eq(taskDependencies.id, input.command.payload.dependencyId)
+                )
               )
-            );
+              .limit(1);
+            await db
+              .delete(taskDependencies)
+              .where(
+                and(
+                  eq(taskDependencies.tenantId, input.tenantId),
+                  eq(taskDependencies.projectId, input.projectId),
+                  eq(taskDependencies.id, input.command.payload.dependencyId)
+                )
+              );
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [existing?.predecessorTaskId, existing?.successorTaskId]
+            });
+          }
           return;
         case "assignment.upsert":
           {
@@ -641,22 +688,27 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 role: existing.role
               });
             }
-          }
-          await this.upsertTaskAssignment({
-            ...input.command.payload,
-            tenantId: input.tenantId,
-            projectId: input.projectId,
-            calendarId: null
-          });
-          await db
-            .insert(taskParticipants)
-            .values({
+            await this.upsertTaskAssignment({
+              ...input.command.payload,
               tenantId: input.tenantId,
-              taskId: input.command.payload.taskId,
-              userId: input.command.payload.resourceId,
-              role: input.command.payload.role
-            })
-            .onConflictDoNothing();
+              projectId: input.projectId,
+              calendarId: null
+            });
+            await db
+              .insert(taskParticipants)
+              .values({
+                tenantId: input.tenantId,
+                taskId: input.command.payload.taskId,
+                userId: input.command.payload.resourceId,
+                role: input.command.payload.role
+              })
+              .onConflictDoNothing();
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [existing?.taskId, input.command.payload.taskId]
+            });
+          }
           return;
         case "assignment.delete":
           {
@@ -681,16 +733,21 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 role: existing.role
               });
             }
+            await db
+              .delete(taskAssignments)
+              .where(
+                and(
+                  eq(taskAssignments.tenantId, input.tenantId),
+                  eq(taskAssignments.projectId, input.projectId),
+                  eq(taskAssignments.id, input.command.payload.assignmentId)
+                )
+              );
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [existing?.taskId]
+            });
           }
-          await db
-            .delete(taskAssignments)
-            .where(
-              and(
-                eq(taskAssignments.tenantId, input.tenantId),
-                eq(taskAssignments.projectId, input.projectId),
-                eq(taskAssignments.id, input.command.payload.assignmentId)
-              )
-            );
           return;
         case "baseline.capture":
           await captureBaseline(input.tenantId, input.projectId, input.command.payload.baselineId, input.command.payload.label);
@@ -873,6 +930,31 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           eq(taskParticipants.role, input.role)
         )
       );
+  }
+
+  async function touchTasksUpdatedAt(input: {
+    tenantId: string;
+    projectId: string;
+    taskIds: Array<string | null | undefined>;
+  }): Promise<void> {
+    const taskIds = [...new Set(input.taskIds.filter((taskId): taskId is string => Boolean(taskId)))];
+    if (taskIds.length === 0) return;
+
+    const now = new Date();
+    await Promise.all(
+      taskIds.map((taskId) =>
+        db
+          .update(tasks)
+          .set({ updatedAt: now })
+          .where(
+            and(
+              eq(tasks.tenantId, input.tenantId),
+              eq(tasks.projectId, input.projectId),
+              eq(tasks.id, taskId)
+            )
+          )
+      )
+    );
   }
 
   async function moveTaskWbs(input: {

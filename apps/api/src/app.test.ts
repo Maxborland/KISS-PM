@@ -514,6 +514,7 @@ describe("KISS PM API Phase 1 shell", () => {
         durationWorkingDays: 1,
         plannedWork: 8,
         requiresAcceptance: false,
+        clientUpdatedAt: now.toISOString(),
         participants: [{ userId: "user-executor", role: "executor" }]
       })
     });
