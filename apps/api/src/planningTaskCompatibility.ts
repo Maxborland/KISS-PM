@@ -24,6 +24,8 @@ type TaskPlanningAssignment = {
   workMinutes: number | null;
 };
 
+type PlanningParticipantRecord = TaskParticipantRecord & { role: PlanAssignmentRole };
+
 export function buildCreateTaskPlanningCommand(input: {
   taskId: string;
   projectId: string;
@@ -42,7 +44,10 @@ export function buildCreateTaskPlanningCommand(input: {
       plannedFinish: dateToPlanDate(input.body.plannedFinish),
       durationMinutes: input.body.durationWorkingDays * 480,
       workMinutes: input.body.plannedWork * 60,
-      assignments: taskParticipantsToAssignments(input.taskId, input.participants)
+      assignments: taskParticipantsToAssignments(input.taskId, input.participants, {
+        durationMinutes: input.body.durationWorkingDays * 480,
+        workMinutes: input.body.plannedWork * 60
+      })
     }
   };
 }
@@ -110,7 +115,10 @@ export function buildUpdateTaskPlanningCommands(input: {
       currentAssignments: input.snapshot.assignments.filter(
         (assignment) => assignment.taskId === input.task.id
       ),
-      desiredAssignments: taskParticipantsToAssignments(input.task.id, input.participants)
+      desiredAssignments: taskParticipantsToAssignments(input.task.id, input.participants, {
+        durationMinutes: desiredDurationMinutes,
+        workMinutes: desiredWorkMinutes
+      })
     })
   );
 
@@ -140,18 +148,72 @@ export function dateToPlanDate(date: Date): string {
 
 export function taskParticipantsToAssignments(
   taskId: string,
-  participants: TaskParticipantRecord[]
+  participants: TaskParticipantRecord[],
+  workModel?: { durationMinutes: number; workMinutes: number }
 ): TaskPlanningAssignment[] {
-  return participants.flatMap((participant) => {
-    if (!isPlanningParticipantRole(participant.role)) return [];
-    return [{
+  const planningParticipants = participants.filter(isPlanningParticipant);
+  const workParticipants = planningParticipants.filter((participant) =>
+    isWorkPlanningRole(participant.role)
+  );
+  const workParticipantUnits = distributeUnitsPermille(
+    unitsPermilleForWorkModel(workModel),
+    workParticipants.length
+  );
+  let workParticipantIndex = 0;
+
+  return planningParticipants.map((participant) => {
+    const isWorkRole = isWorkPlanningRole(participant.role);
+    const unitsPermille = isWorkRole
+      ? workParticipantUnits[workParticipantIndex++] ?? 1000
+      : 1000;
+
+    return {
       id: taskAssignmentId(taskId, participant.userId, participant.role),
       resourceId: participant.userId,
       role: participant.role,
-      unitsPermille: 1000,
+      unitsPermille,
       workMinutes: null
-    }];
+    };
   });
+}
+
+function unitsPermilleForWorkModel(
+  workModel: { durationMinutes: number; workMinutes: number } | undefined
+): number {
+  if (!workModel || workModel.durationMinutes <= 0 || workModel.workMinutes <= 0) {
+    return 1000;
+  }
+
+  return Math.max(1, Math.round((workModel.workMinutes * 1000) / workModel.durationMinutes));
+}
+
+function distributeUnitsPermille(totalUnitsPermille: number, count: number): number[] {
+  if (count <= 0) return [];
+
+  const baseUnits = Math.floor(totalUnitsPermille / count);
+  const remainder = totalUnitsPermille % count;
+
+  return Array.from({ length: count }, (_, index) =>
+    Math.max(1, baseUnits + (index < remainder ? 1 : 0))
+  );
+}
+
+function isWorkPlanningRole(role: PlanAssignmentRole): boolean {
+  return role === "executor" || role === "co_executor";
+}
+
+function isPlanningParticipant(
+  participant: TaskParticipantRecord
+): participant is PlanningParticipantRecord {
+  return isPlanningParticipantRole(participant.role);
+}
+
+function isPlanningParticipantRole(role: string): role is PlanAssignmentRole {
+  return planningParticipantRoles.has(role as PlanAssignmentRole);
+}
+
+function taskAssignmentId(taskId: string, userId: string, role: PlanAssignmentRole): string {
+  return `${taskId}-${userId}-${role}`;
 }
 
 function buildAssignmentSyncCommands(input: {
@@ -198,12 +260,4 @@ function buildAssignmentSyncCommands(input: {
   }
 
   return commands;
-}
-
-function isPlanningParticipantRole(role: string): role is PlanAssignmentRole {
-  return planningParticipantRoles.has(role as PlanAssignmentRole);
-}
-
-function taskAssignmentId(taskId: string, userId: string, role: PlanAssignmentRole): string {
-  return `${taskId}-${userId}-${role}`;
 }

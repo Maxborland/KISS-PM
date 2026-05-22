@@ -187,6 +187,30 @@ describe("planning command reducer", () => {
     });
   });
 
+  it("rejects moving a task under one of its descendants", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      tasks: [
+        { ...createTask("task-a", "1"), parentTaskId: null },
+        { ...createTask("task-b", "1.1"), parentTaskId: "task-a" },
+        { ...createTask("task-c", "1.1.1"), parentTaskId: "task-b" }
+      ]
+    };
+
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.move_wbs",
+      payload: { taskId: "task-a", parentTaskId: "task-c", sortOrder: 2 }
+    });
+
+    expect(result.nextSnapshot).toBe(snapshot);
+    expect(result.validationIssues).toEqual([
+      expect.objectContaining({
+        code: "planning_command_invalid",
+        severity: "error"
+      })
+    ]);
+  });
+
   it("rejects invalid task, dependency, assignment and reservation command references", () => {
     const invalidCommands: PlanningCommand[] = [
       {

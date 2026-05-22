@@ -52,6 +52,16 @@ describe("scenario planning", () => {
         expect.objectContaining({ profile: "resilient", conflictEffect: "removed" })
       ])
     );
+    expect(proposals.find((proposal) => proposal.profile === "balanced")?.explainability)
+      .toMatchObject({
+        overloadMinutes: 240,
+        overloadedResourceIds: ["resource-alpha"]
+      });
+    expect(proposals.find((proposal) => proposal.profile === "resilient")?.explainability)
+      .toMatchObject({
+        overloadMinutes: 0,
+        overloadedResourceIds: []
+      });
 
     for (const proposal of proposals) {
       assertProposalEffect(snapshot, proposal);
