@@ -124,30 +124,37 @@ function createReassignmentProposal(
     }
   ];
 
-  const proposal = createProposal(profile, effect, input, commands);
-  return proposalMatchesEffect(proposal, input) ? proposal : null;
+  const provisionalProposal = createProposal(profile, effect, input, commands);
+  const evaluation = evaluateProposalEffect(input, provisionalProposal.planDelta);
+  const proposal = createProposal(
+    profile,
+    effect,
+    {
+      ...input,
+      calculatedPlan: evaluation.calculatedPlan,
+      resourceLoad: evaluation.resourceLoad
+    },
+    commands
+  );
+
+  return proposalMatchesEffect(proposal, input, evaluation.resourceLoad) ? proposal : null;
 }
 
-function proposalMatchesEffect(
-  proposal: ScenarioProposal,
+function evaluateProposalEffect(
   input: {
     snapshot: PlanSnapshot;
-    resourceLoad: ResourceLoadMatrix;
     target: ScenarioTarget;
-  }
-): boolean {
-  if (proposal.conflictEffect === "accepted") {
-    return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
-  }
-
-  const nextSnapshot = applyPlanDeltaToSnapshot(input.snapshot, proposal.planDelta);
-  const nextPlan = calculatePlan(nextSnapshot, {
+  },
+  planDelta: PlanDelta
+): { calculatedPlan: CalculatedPlan; resourceLoad: ResourceLoadMatrix } {
+  const nextSnapshot = applyPlanDeltaToSnapshot(input.snapshot, planDelta);
+  const calculatedPlan = calculatePlan(nextSnapshot, {
     calculatedAt: "2026-05-21T00:00:00.000Z",
     engineVersion: "planning-core-v1"
   });
-  const rangeFinish = nextPlan.projectFinish ?? input.target.date;
-  const nextResourceLoad = buildResourceLoadMatrix({
-    plan: nextPlan,
+  const rangeFinish = calculatedPlan.projectFinish ?? input.target.date;
+  const resourceLoad = buildResourceLoadMatrix({
+    plan: calculatedPlan,
     resources: nextSnapshot.resources,
     assignments: nextSnapshot.assignments,
     calendars: nextSnapshot.calendars,
@@ -157,6 +164,22 @@ function proposalMatchesEffect(
     rangeFinish,
     granularities: ["day"]
   });
+
+  return { calculatedPlan, resourceLoad };
+}
+
+function proposalMatchesEffect(
+  proposal: ScenarioProposal,
+  input: {
+    resourceLoad: ResourceLoadMatrix;
+    target: ScenarioTarget;
+  },
+  nextResourceLoad: ResourceLoadMatrix
+): boolean {
+  if (proposal.conflictEffect === "accepted") {
+    return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
+  }
+
   const remaining = findTargetOverload(nextResourceLoad, input.target);
   const originalDayOverload = sumDayOverload(input.resourceLoad, input.target.date);
   const nextDayOverload = sumDayOverload(nextResourceLoad, input.target.date);
@@ -216,8 +239,7 @@ function createProposal(
     explainability: {
       finishDate: input.calculatedPlan.projectFinish,
       deadlineDeltaDays: 0,
-      overloadMinutes:
-        conflictEffect === "accepted" ? input.target.overloadMinutes : Math.floor(input.target.overloadMinutes / 2),
+      overloadMinutes: sumDayOverload(input.resourceLoad, input.target.date),
       overloadedResourceIds: [...new Set(remainingOverloads.map((overload) => overload.resourceId))].sort(),
       changedTaskIds,
       changedAssignmentIds,

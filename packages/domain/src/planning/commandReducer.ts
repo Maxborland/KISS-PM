@@ -379,6 +379,12 @@ function validateCommandPreconditions(
       if (command.payload.parentTaskId !== null && !taskIds.has(command.payload.parentTaskId)) {
         return [invalid("planning_command_invalid", "Команда ссылается на неизвестную родительскую задачу")];
       }
+      if (
+        command.payload.parentTaskId !== null &&
+        isDescendantTask(snapshot.tasks, command.payload.taskId, command.payload.parentTaskId)
+      ) {
+        return [invalid("planning_command_invalid", "Задача не может быть перемещена под свою дочернюю задачу")];
+      }
       if (!Number.isFinite(command.payload.sortOrder) || command.payload.sortOrder < 0) {
         return [invalid("planning_command_invalid", "Порядок WBS должен быть неотрицательным числом")];
       }
@@ -486,6 +492,21 @@ function validateWorkModelPayload(
     return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
   }
   return [];
+}
+
+function isDescendantTask(tasks: PlanTask[], ancestorTaskId: string, candidateTaskId: string): boolean {
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  const visitedTaskIds = new Set<string>();
+  let current = tasksById.get(candidateTaskId);
+
+  while (current?.parentTaskId) {
+    if (current.parentTaskId === ancestorTaskId) return true;
+    if (visitedTaskIds.has(current.parentTaskId)) return false;
+    visitedTaskIds.add(current.parentTaskId);
+    current = tasksById.get(current.parentTaskId);
+  }
+
+  return false;
 }
 
 function invalid(code: ValidationIssue["code"], message: string): ValidationIssue {

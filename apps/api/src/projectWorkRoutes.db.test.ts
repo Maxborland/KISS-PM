@@ -284,6 +284,16 @@ describe("project work API routes", () => {
             role: "executor"
           })
         ])
+      },
+      calculatedPlan: {
+        tasks: expect.arrayContaining([
+          expect.objectContaining({
+            id: "task-alpha",
+            durationMinutes: 1920,
+            calculatedStart: "2026-06-02",
+            calculatedFinish: "2026-06-05"
+          })
+        ])
       }
     });
     await expect(detail.json()).resolves.toMatchObject({
