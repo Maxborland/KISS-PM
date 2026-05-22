@@ -160,6 +160,22 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
       return context.json({ error: decision.reason }, 403);
     }
+    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    if (!readDecision.allowed) {
+      await appendPlanningAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "planning.command_denied",
+        sourceWorkflow: "planning",
+        sourceEntity: { type: "Project", id: context.req.param("projectId") },
+        commandInput: { command: parsed.value.command },
+        beforeState: null,
+        afterState: null,
+        permissionResult: readDecision,
+        executionResult: { status: "denied" }
+      });
+      return context.json({ error: readDecision.reason }, 403);
+    }
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (
@@ -284,6 +300,13 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       targetTenantId: actor.tenantId
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    if (!readDecision.allowed) {
+      return context.json({
+        error: readDecision.reason,
+        permissionPreview: readDecision
+      }, 403);
+    }
 
     const projectId = getRequiredRouteParam(context, "projectId");
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -380,6 +403,25 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         executionResult: { status: "denied" }
       });
       return context.json({ error: decision.reason }, 403);
+    }
+    const readDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    if (!readDecision.allowed) {
+      await appendPlanningAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "planning.scenario_denied",
+        sourceWorkflow: "planning",
+        sourceEntity: { type: "Project", id: getRequiredRouteParam(context, "projectId") },
+        commandInput: {
+          scenarioRunId: getScenarioProposalId(context),
+          clientPlanVersion: parsed.value.clientPlanVersion
+        },
+        beforeState: null,
+        afterState: null,
+        permissionResult: readDecision,
+        executionResult: { status: "denied" }
+      });
+      return context.json({ error: readDecision.reason }, 403);
     }
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {

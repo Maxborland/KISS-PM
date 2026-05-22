@@ -35,6 +35,12 @@ const dataset: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Менеджер плана без чтения",
       permissions: ["tenant.project_plan.manage"]
+    },
+    {
+      id: "access-profile-scenario-operator-no-read",
+      tenantId: "tenant-alpha",
+      name: "Оператор сценариев без чтения",
+      permissions: ["tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply"]
     }
   ],
   positions: [
@@ -72,6 +78,15 @@ const dataset: SeedTenantDataset = {
       accessProfileId: "access-profile-plan-manager-no-read",
       positionId: "position-manager",
       password: "manager12345"
+    },
+    {
+      id: "user-alpha-scenario-no-read",
+      tenantId: "tenant-alpha",
+      email: "scenario-no-read@kiss-pm.local",
+      name: "Семен Без Чтения",
+      accessProfileId: "access-profile-scenario-operator-no-read",
+      positionId: "position-manager",
+      password: "scenario12345"
     }
   ]
 };
@@ -997,6 +1012,92 @@ describe("planning API routes", () => {
     });
     expect(body.before).toBeUndefined();
     expect(body.after).toBeUndefined();
+  });
+
+  it("requires plan read permission before returning apply and scenario planning details", async () => {
+    const managerWithoutReadCookie = await loginAs(
+      "plan-manager-no-read@kiss-pm.local",
+      "manager12345"
+    );
+    const scenarioOperatorWithoutReadCookie = await loginAs(
+      "scenario-no-read@kiss-pm.local",
+      "scenario12345"
+    );
+
+    const applyCommand = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: managerWithoutReadCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "task.update_identity",
+            payload: {
+              taskId: "task-plan-a",
+              title: "Не должно примениться без чтения"
+            }
+          },
+          clientPlanVersion: 1
+        })
+      }
+    );
+    const applyCommandBody = await applyCommand.json();
+    expect(applyCommand.status).toBe(403);
+    expect(applyCommandBody).toEqual({ error: "permission_missing" });
+    expect(applyCommandBody.readModel).toBeUndefined();
+
+    const scenarioPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: scenarioOperatorWithoutReadCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: 1,
+          target: {
+            type: "resource_overload",
+            resourceId: "user-alpha-executor",
+            date: "2026-06-01",
+            overloadMinutes: 60,
+            taskIds: ["task-plan-a"]
+          }
+        })
+      }
+    );
+    const scenarioPreviewBody = await scenarioPreview.json();
+    expect(scenarioPreview.status).toBe(403);
+    expect(scenarioPreviewBody).toMatchObject({
+      error: "permission_missing",
+      permissionPreview: {
+        allowed: false,
+        reason: "permission_missing"
+      }
+    });
+    expect(scenarioPreviewBody.proposals).toBeUndefined();
+
+    const scenarioApply = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals/planning-scenario-missing/apply",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: scenarioOperatorWithoutReadCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: 1 })
+      }
+    );
+    const scenarioApplyBody = await scenarioApply.json();
+    expect(scenarioApply.status).toBe(403);
+    expect(scenarioApplyBody).toEqual({ error: "permission_missing" });
+    expect(scenarioApplyBody.readModel).toBeUndefined();
   });
 
   it("returns planning validation errors for invalid commands without mutating plan state", async () => {
