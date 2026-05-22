@@ -605,7 +605,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                   eq(taskDependencies.projectId, input.projectId),
                   eq(taskDependencies.id, input.command.payload.id)
                 )
-            )
+              )
               .limit(1);
             await this.upsertTaskDependency({
               id: input.command.payload.id,
@@ -941,20 +941,16 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     if (taskIds.length === 0) return;
 
     const now = new Date();
-    await Promise.all(
-      taskIds.map((taskId) =>
-        db
-          .update(tasks)
-          .set({ updatedAt: now })
-          .where(
-            and(
-              eq(tasks.tenantId, input.tenantId),
-              eq(tasks.projectId, input.projectId),
-              eq(tasks.id, taskId)
-            )
-          )
-      )
-    );
+    await db
+      .update(tasks)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          eq(tasks.tenantId, input.tenantId),
+          eq(tasks.projectId, input.projectId),
+          inArray(tasks.id, taskIds)
+        )
+      );
   }
 
   async function moveTaskWbs(input: {

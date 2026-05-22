@@ -166,6 +166,34 @@ describe("project work API routes", () => {
     });
   }
 
+  function buildTaskPatchBody(input: {
+    clientUpdatedAt: string;
+    title?: string;
+    description?: string | null;
+    priority?: string;
+    statusId?: string;
+    plannedStart?: string;
+    plannedFinish?: string;
+    durationWorkingDays?: number;
+    plannedWork?: number;
+    requiresAcceptance?: boolean;
+    participants?: Array<{ userId: string; role: string }>;
+  }) {
+    return {
+      title: input.title ?? "Обновить задачу",
+      description: input.description ?? null,
+      priority: input.priority ?? "normal",
+      statusId: input.statusId ?? "task-status-new",
+      plannedStart: input.plannedStart ?? "2026-06-02",
+      plannedFinish: input.plannedFinish ?? "2026-06-05",
+      durationWorkingDays: input.durationWorkingDays ?? 4,
+      plannedWork: input.plannedWork ?? 8,
+      requiresAcceptance: input.requiresAcceptance ?? false,
+      clientUpdatedAt: input.clientUpdatedAt,
+      participants: input.participants ?? [{ userId: "user-alpha-executor", role: "executor" }]
+    };
+  }
+
   beforeAll(() => {
     client = createPostgresClient(databaseUrl);
     app = createApp({
@@ -905,19 +933,14 @@ describe("project work API routes", () => {
         "x-kiss-pm-action": "same-origin",
         cookie: adminCookie
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildTaskPatchBody({
         title: "Права редактирования проверены",
         description: "Постановщик и администратор могут изменить задачу.",
         priority: "high",
-        statusId: "task-status-new",
-        plannedStart: "2026-06-02",
-        plannedFinish: "2026-06-05",
-        durationWorkingDays: 4,
         plannedWork: 12,
-        requiresAcceptance: false,
         clientUpdatedAt: editVersionBody.task.updatedAt,
         participants: [{ userId: "user-alpha-executor", role: "executor" }]
-      })
+      }))
     });
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { cookie: adminCookie }
@@ -979,23 +1002,15 @@ describe("project work API routes", () => {
         "x-kiss-pm-action": "same-origin",
         cookie: requesterCookie
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildTaskPatchBody({
         title: "Постановщик пытается сменить ресурсы",
-        description: null,
-        priority: "normal",
-        statusId: "task-status-new",
-        plannedStart: "2026-06-02",
-        plannedFinish: "2026-06-05",
-        durationWorkingDays: 4,
-        plannedWork: 8,
-        requiresAcceptance: false,
         clientUpdatedAt: detailBody.task.updatedAt,
         participants: [
           { userId: "user-alpha-executor", role: "requester" },
           { userId: "user-alpha-admin", role: "executor" },
           { userId: "user-alpha-manager-only", role: "observer" }
         ]
-      })
+      }))
     });
 
     expect(denied.status).toBe(403);
@@ -1031,19 +1046,11 @@ describe("project work API routes", () => {
         "x-kiss-pm-action": "same-origin",
         cookie: adminCookie
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildTaskPatchBody({
         title: "Версия задачи обновлена",
-        description: null,
-        priority: "normal",
-        statusId: "task-status-new",
-        plannedStart: "2026-06-02",
-        plannedFinish: "2026-06-05",
-        durationWorkingDays: 4,
         plannedWork: 12,
-        requiresAcceptance: false,
-        clientUpdatedAt: firstDetailBody.task.updatedAt,
-        participants: [{ userId: "user-alpha-executor", role: "executor" }]
-      })
+        clientUpdatedAt: firstDetailBody.task.updatedAt
+      }))
     });
     const staleUpdate = await app.request("/api/workspace/tasks/task-stale-version", {
       method: "PATCH",
@@ -1052,19 +1059,10 @@ describe("project work API routes", () => {
         "x-kiss-pm-action": "same-origin",
         cookie: adminCookie
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildTaskPatchBody({
         title: "Старое сохранение",
-        description: null,
-        priority: "normal",
-        statusId: "task-status-new",
-        plannedStart: "2026-06-02",
-        plannedFinish: "2026-06-05",
-        durationWorkingDays: 4,
-        plannedWork: 8,
-        requiresAcceptance: false,
-        clientUpdatedAt: firstDetailBody.task.updatedAt,
-        participants: [{ userId: "user-alpha-executor", role: "executor" }]
-      })
+        clientUpdatedAt: firstDetailBody.task.updatedAt
+      }))
     });
 
     expect(firstUpdate.status).toBe(200);
@@ -1124,19 +1122,10 @@ describe("project work API routes", () => {
         "x-kiss-pm-action": "same-origin",
         cookie: adminCookie
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildTaskPatchBody({
         title: "Старое сохранение участников",
-        description: null,
-        priority: "normal",
-        statusId: "task-status-new",
-        plannedStart: "2026-06-02",
-        plannedFinish: "2026-06-05",
-        durationWorkingDays: 4,
-        plannedWork: 8,
-        requiresAcceptance: false,
-        clientUpdatedAt: staleDetailBody.task.updatedAt,
-        participants: [{ userId: "user-alpha-executor", role: "executor" }]
-      })
+        clientUpdatedAt: staleDetailBody.task.updatedAt
+      }))
     });
     const currentDetail = await app.request("/api/workspace/tasks/task-stale-assignment", {
       headers: { cookie: adminCookie }
@@ -1191,22 +1180,16 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: requesterCookie
         },
-        body: JSON.stringify({
+        body: JSON.stringify(buildTaskPatchBody({
           title: "Постановщик изменил задачу",
           description: "Редактирование по роли постановщика разрешено.",
-          priority: "normal",
-          statusId: "task-status-new",
-          plannedStart: "2026-06-02",
-          plannedFinish: "2026-06-05",
           durationWorkingDays: 1,
-          plannedWork: 8,
-          requiresAcceptance: false,
           clientUpdatedAt: requesterEditVersionBody.task.updatedAt,
           participants: [
             { userId: "user-alpha-executor", role: "requester" },
             { userId: "user-alpha-admin", role: "executor" }
           ]
-        })
+        }))
       }
     );
     const deniedArchive = await app.request(
