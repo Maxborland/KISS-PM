@@ -804,10 +804,15 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
 
   async function nextWbsCode(tenantId: string, projectId: string): Promise<string> {
     const rows = await db
-      .select({ id: tasks.id })
+      .select({ wbsCode: tasks.wbsCode })
       .from(tasks)
       .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)));
-    return String(rows.length + 1);
+    const maxNumericWbsCode = rows.reduce((max, task) => {
+      const topLevelCode = task.wbsCode.split(".")[0] ?? "";
+      const numericCode = parseWbsPart(topLevelCode);
+      return numericCode === null ? max : Math.max(max, numericCode);
+    }, 0);
+    return String(maxNumericWbsCode + 1);
   }
 
   async function deleteParticipantIfNoSiblingAssignment(input: {
