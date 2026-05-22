@@ -57,6 +57,17 @@ export function flattenPlanningRows(
   return result;
 }
 
+export function filterPlanningRowsByCollapsedState(
+  rows: readonly PlanningGanttTaskRow[],
+  collapsedTaskIds: ReadonlySet<string> = new Set()
+): PlanningGanttTaskRow[] {
+  const index = buildPlanningTreeIndex(rows);
+  return flattenPlanningRows(index, collapsedTaskIds).flatMap((flatRow) => {
+    const row = index.rowsById.get(flatRow.id);
+    return row ? [row] : [];
+  });
+}
+
 export function computeFallbackWbsCodes(rows: readonly PlanningGanttTaskRow[]): Map<string, string> {
   const index = buildPlanningTreeIndex(rows);
   const wbsCodes = new Map<string, string>();

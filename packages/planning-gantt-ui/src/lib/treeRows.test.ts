@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlanningTreeIndex,
   computeFallbackWbsCodes,
+  filterPlanningRowsByCollapsedState,
   flattenPlanningRows
 } from "./treeRows";
 import type { PlanningGanttTaskRow } from "../types/viewModel";
@@ -35,6 +36,16 @@ describe("planning tree rows", () => {
       { id: "task-a", depth: 0, wbsCode: "1" },
       { id: "task-b", depth: 0, wbsCode: "2" }
     ]);
+  });
+
+  it("filters visible Gantt rows with the same collapsed WBS state", () => {
+    expect(
+      filterPlanningRowsByCollapsedState([
+        task("task-a", "1", null),
+        task("task-a-1", "1.1", "task-a"),
+        task("task-b", "2", null)
+      ], new Set(["task-a"])).map((row) => row.id)
+    ).toEqual(["task-a", "task-b"]);
   });
 
   it("computes fallback WBS for draft rows only from controlled hierarchy", () => {

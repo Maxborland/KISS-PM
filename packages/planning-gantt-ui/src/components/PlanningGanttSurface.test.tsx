@@ -18,6 +18,41 @@ describe("PlanningGanttSurface", () => {
     expect(html).toContain("Критический путь");
     expect(html).toContain("Подготовка");
   });
+
+  it("keeps the Gantt timeline aligned with collapsed WBS rows", () => {
+    const firstTask = viewModel.tasks[0];
+    const secondTask = viewModel.tasks[1];
+    if (!firstTask || !secondTask) throw new Error("Gantt fixture must include two tasks");
+
+    const html = renderToStaticMarkup(
+      <PlanningGanttSurface
+        viewModel={{
+          ...viewModel,
+          tasks: [
+            {
+              ...firstTask,
+              id: "task-summary",
+              wbsCode: "1",
+              title: "Сводная",
+              isSummary: true
+            },
+            {
+              ...secondTask,
+              id: "task-child",
+              parentTaskId: "task-summary",
+              wbsCode: "1.1",
+              title: "Дочерняя"
+            }
+          ],
+          dependencies: []
+        }}
+        collapsedTaskIds={new Set(["task-summary"])}
+      />
+    );
+
+    expect(html).toContain("data-task-id=\"task-summary\"");
+    expect(html).not.toContain("data-task-id=\"task-child\"");
+  });
 });
 
 const viewModel: PlanningGanttViewModel = {

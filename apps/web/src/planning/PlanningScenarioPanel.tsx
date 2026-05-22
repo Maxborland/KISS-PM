@@ -62,11 +62,11 @@ export function PlanningScenarioPanel(props: {
   }
 
   async function applyScenario() {
-    if (!selectedProposal) return;
+    if (!selectedProposal || !preview) return;
     setApplyError("");
     try {
       const envelope: PlanningScenarioApplyEnvelope = {
-        clientPlanVersion: props.readModel.planVersion
+        clientPlanVersion: preview.planVersion
       };
       if (requiresReason) envelope.acceptedRiskReason = acceptedRiskReason.trim();
       await props.onApply(selectedProposal.id, envelope);

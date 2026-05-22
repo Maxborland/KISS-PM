@@ -119,7 +119,7 @@ export function PlanningWorkspaceRoute(props: {
     try {
       await commandMutations.applyCommand.mutateAsync({
         command: previewState.command,
-        clientPlanVersion: readModel.planVersion
+        clientPlanVersion: previewState.preview.auditPreview.planVersionBefore
       });
       setPreviewState(null);
       setScenarioTarget(null);

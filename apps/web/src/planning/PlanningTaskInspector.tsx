@@ -31,10 +31,11 @@ export function PlanningTaskInspector(props: {
   const [draft, setDraft] = useState<TaskInspectorDraft | null>(
     props.task ? createTaskInspectorDraft(props.task) : null
   );
+  const draftSyncKey = props.task ? taskInspectorDraftSyncKey(props.task) : null;
 
   useEffect(() => {
     setDraft(props.task ? createTaskInspectorDraft(props.task) : null);
-  }, [props.task?.id]);
+  }, [draftSyncKey]);
 
   const activeStatuses = useMemo(
     () => props.taskStatuses.filter((status) => status.status === "active"),
@@ -214,6 +215,20 @@ export function createTaskInspectorDraft(task: PlanningGanttTaskRow): TaskInspec
     effortDriven: task.effortDriven,
     statusId: task.statusId
   };
+}
+
+export function taskInspectorDraftSyncKey(task: PlanningGanttTaskRow): string {
+  return [
+    task.id,
+    task.title,
+    task.plannedStart ?? "",
+    task.plannedFinish ?? "",
+    task.durationMinutes ?? "",
+    task.workMinutes,
+    task.taskType,
+    task.effortDriven ? "effort" : "no-effort",
+    task.statusId
+  ].join("|");
 }
 
 export function buildTaskInspectorIntent(
