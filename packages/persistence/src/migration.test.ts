@@ -119,6 +119,13 @@ const phase56PlanningCoreMigration = readFileSync(
   new URL("../migrations/0021_phase_5_6_planning_core.sql", import.meta.url),
   "utf8"
 );
+const phase56PlanningCommandIdempotencyMigration = readFileSync(
+  new URL(
+    "../migrations/0022_phase_5_6_planning_command_idempotency.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -496,6 +503,21 @@ describe("Phase 5/6 planning core SQL migration", () => {
     );
     expect(phase56PlanningCoreMigration).toContain(
       'CONSTRAINT "task_dependencies_not_self_chk"'
+    );
+  });
+
+  it("adds tenant-scoped idempotency records for planning command apply retries", () => {
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "planning_command_idempotency_keys"'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'PRIMARY KEY("tenant_id", "project_id", "idempotency_key")'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CONSTRAINT "planning_command_idempotency_keys_project_fk"'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CONSTRAINT "planning_command_idempotency_keys_actor_fk"'
     );
   });
 });

@@ -13,6 +13,8 @@ import type {
   CrmActivityRecord,
   CrmActivityTransitionResult,
   CrmActivityUpdateInput,
+  PlanningCommandIdempotencyInput,
+  PlanningCommandIdempotencyRecord,
   PlanningScenarioRunInput,
   PlanningScenarioRunRecord,
   TaskActivityInput,
@@ -467,6 +469,14 @@ export type ApiTenantDataSource = {
     scenarioRunId: string;
     appliedAt: Date;
   }): Promise<void>;
+  findPlanningCommandIdempotency?(
+    tenantId: TenantId,
+    projectId: string,
+    idempotencyKey: string
+  ): Promise<PlanningCommandIdempotencyRecord | undefined>;
+  createPlanningCommandIdempotency?(
+    input: PlanningCommandIdempotencyInput
+  ): Promise<void>;
   applyPlanningCommand?(input: {
     tenantId: TenantId;
     projectId: string;

@@ -36,6 +36,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_baseline_assignments",
       "resource_reservations",
       "planning_scenario_runs",
+      "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -74,6 +75,7 @@ describe("PostgreSQL persistence schema", () => {
       "project_baseline_assignments",
       "resource_reservations",
       "planning_scenario_runs",
+      "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -200,6 +202,15 @@ describe("PostgreSQL persistence schema", () => {
         "proposal_payload",
         "proposal_payload_hash",
         "expires_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("planning_command_idempotency_keys")).toEqual(
+      expect.arrayContaining([
+        "idempotency_key",
+        "request_hash",
+        "response_payload",
+        "actor_user_id",
+        "created_at"
       ])
     );
   });

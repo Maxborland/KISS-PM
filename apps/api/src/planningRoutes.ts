@@ -187,9 +187,40 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       ) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
+      if (
+        parsed.value.idempotencyKey &&
+        (!transactionDataSource.findPlanningCommandIdempotency ||
+          !transactionDataSource.createPlanningCommandIdempotency)
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
 
       const projectId = context.req.param("projectId");
       await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const idempotencyKey = parsed.value.idempotencyKey;
+      const requestHash = idempotencyKey
+        ? hashJson({
+            actorUserId: actor.id,
+            clientPlanVersion: parsed.value.clientPlanVersion,
+            command: parsed.value.command
+          })
+        : null;
+      if (idempotencyKey && requestHash) {
+        const existingIdempotency = await transactionDataSource.findPlanningCommandIdempotency?.(
+          actor.tenantId,
+          projectId,
+          idempotencyKey
+        );
+        if (existingIdempotency) {
+          if (
+            existingIdempotency.actorUserId !== actor.id ||
+            existingIdempotency.requestHash !== requestHash
+          ) {
+            return { ok: false as const, status: 409, error: "idempotency_key_conflict" };
+          }
+          return { ok: true as const, body: existingIdempotency.responsePayload };
+        }
+      }
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -257,14 +288,25 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      const responseBody = {
+        applied: preview.planDelta,
+        newPlanVersion,
+        auditEventId,
+        readModel: createPlanningReadModel(appliedSnapshot)
+      };
+      if (idempotencyKey && requestHash) {
+        await transactionDataSource.createPlanningCommandIdempotency?.({
+          tenantId: actor.tenantId,
+          projectId,
+          idempotencyKey,
+          requestHash,
+          responsePayload: responseBody,
+          actorUserId: actor.id
+        });
+      }
       return {
         ok: true as const,
-        body: {
-          applied: preview.planDelta,
-          newPlanVersion,
-          auditEventId,
-          readModel: createPlanningReadModel(appliedSnapshot)
-        }
+        body: responseBody
       };
     });
 

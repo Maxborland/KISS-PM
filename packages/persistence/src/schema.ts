@@ -980,6 +980,40 @@ export const planningScenarioRuns = pgTable(
   ]
 );
 
+export const planningCommandIdempotencyKeys = pgTable(
+  "planning_command_idempotency_keys",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    responsePayload: jsonb("response_payload").$type<Record<string, unknown>>().notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_command_idempotency_keys_pkey",
+      columns: [table.tenantId, table.projectId, table.idempotencyKey]
+    }),
+    foreignKey({
+      name: "planning_command_idempotency_keys_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "planning_command_idempotency_keys_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("planning_command_idempotency_keys_tenant_project_created_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.createdAt
+    )
+  ]
+);
+
 export const taskParticipants = pgTable(
   "task_participants",
   {
@@ -1181,6 +1215,7 @@ export type PersistenceTableName =
   | "project_baseline_assignments"
   | "resource_reservations"
   | "planning_scenario_runs"
+  | "planning_command_idempotency_keys"
   | "task_participants"
   | "task_activities"
   | "crm_activities"
@@ -1224,6 +1259,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_command_idempotency_keys",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1260,6 +1296,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_command_idempotency_keys",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1546,6 +1583,15 @@ const tableColumns = {
     "actor_user_id",
     "expires_at",
     "applied_at",
+    "created_at"
+  ],
+  planning_command_idempotency_keys: [
+    "tenant_id",
+    "project_id",
+    "idempotency_key",
+    "request_hash",
+    "response_payload",
+    "actor_user_id",
     "created_at"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],

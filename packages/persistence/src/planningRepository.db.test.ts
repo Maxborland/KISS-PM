@@ -78,7 +78,7 @@ describe("planning repository", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       planningSeed,
@@ -87,7 +87,7 @@ describe("planning repository", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -511,6 +511,44 @@ describe("planning repository", () => {
       { id: "task-beta", wbsCode: "11" },
       { id: "task-extra-12", wbsCode: "12" }
     ]);
+  });
+
+  it("updates timestamps only for tasks whose WBS row changed", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    const beforeRows = await db
+      .select({ id: tasks.id, updatedAt: tasks.updatedAt })
+      .from(tasks)
+      .where(and(eq(tasks.tenantId, "tenant-alpha"), eq(tasks.projectId, projectId)));
+    const beforeUpdatedAt = new Map(beforeRows.map((task) => [task.id, task.updatedAt.getTime()]));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.move_wbs",
+        payload: { taskId: "task-beta", parentTaskId: null, sortOrder: 1 }
+      }
+    });
+
+    const afterRows = await db
+      .select({ id: tasks.id, updatedAt: tasks.updatedAt, wbsCode: tasks.wbsCode })
+      .from(tasks)
+      .where(and(eq(tasks.tenantId, "tenant-alpha"), eq(tasks.projectId, projectId)));
+    const afterById = new Map(afterRows.map((task) => [task.id, task]));
+
+    expect(afterById.get("task-alpha")?.wbsCode).toBe("1");
+    expect(afterById.get("task-alpha")?.updatedAt.getTime()).toBe(beforeUpdatedAt.get("task-alpha"));
+    expect(afterById.get("task-beta")?.wbsCode).toBe("2");
+    expect(afterById.get("task-beta")?.updatedAt.getTime()).toBeGreaterThan(
+      beforeUpdatedAt.get("task-beta") ?? 0
+    );
   });
 
   it("preserves hierarchical WBS codes when creating and moving child tasks", async () => {
