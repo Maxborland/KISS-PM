@@ -25,6 +25,18 @@ describe("PostgreSQL persistence schema", () => {
       "project_position_demands",
       "task_statuses",
       "tasks",
+      "plan_versions",
+      "project_calendars",
+      "resource_calendars",
+      "calendar_exceptions",
+      "task_assignments",
+      "task_dependencies",
+      "project_baselines",
+      "project_baseline_tasks",
+      "project_baseline_assignments",
+      "resource_reservations",
+      "planning_scenario_runs",
+      "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -52,6 +64,18 @@ describe("PostgreSQL persistence schema", () => {
       "project_position_demands",
       "task_statuses",
       "tasks",
+      "plan_versions",
+      "project_calendars",
+      "resource_calendars",
+      "calendar_exceptions",
+      "task_assignments",
+      "task_dependencies",
+      "project_baselines",
+      "project_baseline_tasks",
+      "project_baseline_assignments",
+      "resource_reservations",
+      "planning_scenario_runs",
+      "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -135,6 +159,58 @@ describe("PostgreSQL persistence schema", () => {
         "body",
         "file_url",
         "author_user_id"
+      ])
+    );
+  });
+
+  it("stores the Phase 5/6 planning persistence contract", () => {
+    expect(getPersistenceTableColumns("projects")).toEqual(
+      expect.arrayContaining(["source_type", "source_opportunity_id", "deadline", "calendar_id"])
+    );
+    expect(getPersistenceTableColumns("tasks")).toEqual(
+      expect.arrayContaining([
+        "parent_task_id",
+        "wbs_code",
+        "scheduling_mode",
+        "task_type",
+        "effort_driven",
+        "duration_minutes",
+        "work_minutes",
+        "constraint_type",
+        "constraint_date"
+      ])
+    );
+    expect(getPersistenceTableColumns("plan_versions")).toEqual(
+      expect.arrayContaining(["tenant_id", "project_id", "version"])
+    );
+    expect(getPersistenceTableColumns("task_assignments")).toEqual(
+      expect.arrayContaining(["task_id", "resource_id", "role", "units_permille", "work_minutes"])
+    );
+    expect(getPersistenceTableColumns("task_dependencies")).toEqual(
+      expect.arrayContaining([
+        "predecessor_task_id",
+        "successor_task_id",
+        "type",
+        "lag_minutes"
+      ])
+    );
+    expect(getPersistenceTableColumns("planning_scenario_runs")).toEqual(
+      expect.arrayContaining([
+        "plan_version",
+        "engine_version",
+        "target_conflict",
+        "proposal_payload",
+        "proposal_payload_hash",
+        "expires_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("planning_command_idempotency_keys")).toEqual(
+      expect.arrayContaining([
+        "idempotency_key",
+        "request_hash",
+        "response_payload",
+        "actor_user_id",
+        "created_at"
       ])
     );
   });

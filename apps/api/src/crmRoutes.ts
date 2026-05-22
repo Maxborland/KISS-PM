@@ -37,7 +37,7 @@ type CrmRouteDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {

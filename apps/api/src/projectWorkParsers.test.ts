@@ -172,6 +172,7 @@ describe("project work parsers", () => {
         durationWorkingDays: 4,
         plannedWork: 16,
         requiresAcceptance: false,
+        clientUpdatedAt: "2026-05-21T00:00:00.000Z",
         participants: [
           { userId: "user-alpha-admin", role: "requester" },
           { userId: "user-alpha-executor", role: "executor" }
@@ -182,6 +183,7 @@ describe("project work parsers", () => {
       value: expect.objectContaining({
         title: "Уточнить ресурсную оценку",
         statusId: "task-status-waiting",
+        clientUpdatedAt: new Date("2026-05-21T00:00:00.000Z"),
         durationWorkingDays: 4,
         requiresAcceptance: false
       })

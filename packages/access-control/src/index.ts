@@ -24,6 +24,13 @@ export const permissions = [
   "tenant.opportunities.manage",
   "tenant.projects.read",
   "tenant.projects.manage",
+  "tenant.project_plan.read",
+  "tenant.project_plan.manage",
+  "tenant.project_baselines.manage",
+  "tenant.project_resources.read",
+  "tenant.project_resources.manage",
+  "tenant.planning_scenarios.preview",
+  "tenant.planning_scenarios.apply",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -302,6 +309,83 @@ export function canManageProjects(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.projects.manage"
+  });
+}
+
+export function canReadProjectPlan(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_plan.read"
+  });
+}
+
+export function canManageProjectPlan(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_plan.manage"
+  });
+}
+
+export function canManageProjectBaselines(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_baselines.manage"
+  });
+}
+
+export function canReadProjectResources(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_resources.read"
+  });
+}
+
+export function canManageProjectResources(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_resources.manage"
+  });
+}
+
+export function canPreviewPlanningScenarios(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.planning_scenarios.preview"
+  });
+}
+
+export function canApplyPlanningScenarios(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.planning_scenarios.apply"
   });
 }
 

@@ -13,6 +13,7 @@ import {
   parseCustomFieldDefinitionBody,
   parseProjectTemplateBody
 } from "./workspaceConfigParsers";
+import { readLimitedJsonBody } from "./jsonBody";
 import { getStringField } from "./parseHelpers";
 
 type WorkspaceConfigRouteDeps = {
@@ -25,7 +26,7 @@ type WorkspaceConfigRouteDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 export function registerWorkspaceConfigRoutes(
@@ -82,8 +83,9 @@ export function registerWorkspaceConfigRoutes(
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseCustomFieldDefinitionBody(body, actor.tenantId);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseCustomFieldDefinitionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const existingFields = await dataSource.listCustomFieldDefinitions(actor.tenantId);
@@ -154,14 +156,15 @@ export function registerWorkspaceConfigRoutes(
       existingFields.find((field) => field.id === fieldId) ?? null;
     if (!beforeState) return context.json({ error: "custom_field_not_found" }, 404);
 
-    const body = await context.req.json().catch(() => null);
-    const systemKeyInput = getStringField(body, "systemKey");
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const systemKeyInput = getStringField(body.value, "systemKey");
     if (systemKeyInput !== undefined && systemKeyInput !== beforeState.systemKey) {
       return context.json({ error: "system_key_immutable" }, 400);
     }
     const parsed = parseCustomFieldDefinitionBody(
       {
-        ...(body && typeof body === "object" ? body : {}),
+        ...(body.value && typeof body.value === "object" ? body.value : {}),
         systemKey: beforeState.systemKey
       },
       actor.tenantId,
@@ -250,8 +253,9 @@ export function registerWorkspaceConfigRoutes(
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseProjectTemplateBody(body, actor.tenantId);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseProjectTemplateBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const existingTemplates = await dataSource.listProjectTemplates(actor.tenantId);
@@ -328,14 +332,15 @@ export function registerWorkspaceConfigRoutes(
       return context.json({ error: "project_template_not_found" }, 404);
     }
 
-    const body = await context.req.json().catch(() => null);
-    const systemKeyInput = getStringField(body, "systemKey");
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const systemKeyInput = getStringField(body.value, "systemKey");
     if (systemKeyInput !== undefined && systemKeyInput !== beforeState.systemKey) {
       return context.json({ error: "system_key_immutable" }, 400);
     }
     const parsed = parseProjectTemplateBody(
       {
-        ...(body && typeof body === "object" ? body : {}),
+        ...(body.value && typeof body.value === "object" ? body.value : {}),
         systemKey: beforeState.systemKey
       },
       actor.tenantId,
