@@ -336,6 +336,8 @@ UI должен иметь явные состояния:
 Из BR2 берем capability baseline:
 
 - плотные operational tables;
+- кастомный Gantt renderer и interaction model как стартовую реализацию,
+  которую извлекаем из BR2 и адаптируем под KISS PM;
 - resource matrix;
 - resource cell drilldown;
 - быстрые filters и entry points;
@@ -352,12 +354,22 @@ KISS PM должен быть лучше за счет:
 - отказа от Bitrix-specific naming и hardcoded company logic;
 - accessibility, keyboard navigation и clean responsive behavior.
 
-Gantt packages из BR2 можно рассматривать как reference/candidate только на
-уровне interaction density и rendering capability. Библиотека не становится
-источником доменной истины. Кандидат для Gantt должен поддерживать controlled
-state, virtualization, dependency rendering, custom task rows, baseline/critical
-path overlays, keyboard accessibility и возможность отключить hidden scheduling
-logic.
+Gantt packages из BR2 являются разрешенным исходным implementation asset для
+Phase 7: их можно переносить, выделять в пакет KISS PM и адаптировать. Это
+решение принято потому, что Gantt в BR2 был спроектирован как отдельный
+кастомный пакет, но остался внутри BR2 codebase.
+
+Ограничение остается архитектурным: BR2 Gantt отвечает за rendering,
+interaction model, timeline, drag/drop, dependency drawing и visual density, но
+не становится источником доменной истины. Даты, dependencies, critical path,
+resource load, overloads, scenario proposals, validation и apply-result приходят
+из KISS PM planning engine.
+
+WBS table не обязана переноситься из BR2. Табличный слой должен быть
+replaceable adapter: если OSS/headless grid дает лучшую virtualization, pinned
+columns, resize, keyboard navigation, accessibility и controlled state, его
+можно выбрать вместо BR2 WBS table. Первым кандидатом для оценки является
+headless table + virtualizer подход, совместимый с текущим React/Next stack.
 
 ## Frontend component boundaries
 

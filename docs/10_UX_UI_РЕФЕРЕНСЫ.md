@@ -7,7 +7,9 @@
 ## Что берем из BR2
 
 - Матричная ресурсная загрузка.
-- Gantt/WBS interaction density как reference для рабочих planning surfaces.
+- Кастомный Gantt renderer и interaction model как исходный implementation
+  asset для Phase 7 planning workspace.
+- Gantt/WBS interaction density для рабочих planning surfaces.
 - Мультипроектный контроль.
 - Интерактивные действия прямо из таблиц, карточек, ячеек и drilldown.
 - Несколько естественных путей выполнить одно действие.
@@ -58,10 +60,14 @@
 
 KISS PM не должен быть пустой SaaS-страницей с большими карточками. Для менеджеров и resource managers нужны плотные таблицы, матрицы, фильтры, сохраненные views, sticky headers, drilldowns и быстрые действия.
 
-Для Phase 7 planning workspace BR2 Gantt/resource packages можно рассматривать
-как reference или candidate для rendering, virtualization и interaction density.
-Они не являются доменным source of truth: даты, dependencies, critical path,
-resource load, overloads и scenarios приходят из KISS PM backend planning engine.
+Для Phase 7 planning workspace BR2 Gantt/resource packages можно переносить и
+адаптировать как implementation asset. Они не являются доменным source of truth:
+даты, dependencies, critical path, resource load, overloads и scenarios приходят
+из KISS PM backend planning engine.
+
+WBS table остается заменяемым слоем. Если OSS/headless table дает более сильную
+virtualization, pinned columns, resize, keyboard navigation и accessibility, его
+можно использовать вместо BR2 table при сохранении BR2 Gantt interaction model.
 
 ## Design system baseline
 
