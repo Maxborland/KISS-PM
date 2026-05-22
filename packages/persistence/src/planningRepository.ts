@@ -21,6 +21,7 @@ import type {
 import type { KissPmDatabase } from "./connection";
 import {
   calendarExceptions,
+  planningCommandIdempotencyKeys,
   planVersions,
   projectBaselineAssignments,
   projectBaselines,
@@ -76,6 +77,12 @@ export type PlanningRepository = {
     scenarioRunId: string;
     appliedAt: Date;
   }): Promise<void>;
+  findPlanningCommandIdempotency(
+    tenantId: string,
+    projectId: string,
+    idempotencyKey: string
+  ): Promise<PlanningCommandIdempotencyRecord | undefined>;
+  createPlanningCommandIdempotency(input: PlanningCommandIdempotencyInput): Promise<void>;
   applyPlanningCommand(input: {
     tenantId: string;
     projectId: string;
@@ -106,6 +113,23 @@ export type PlanningScenarioRunRecord = {
   actorUserId: string;
   expiresAt: Date;
   appliedAt: Date | null;
+  createdAt: Date;
+};
+
+export type PlanningCommandIdempotencyInput = Omit<
+  PlanningCommandIdempotencyRecord,
+  "createdAt"
+> & {
+  createdAt?: Date;
+};
+
+export type PlanningCommandIdempotencyRecord = {
+  tenantId: string;
+  projectId: string;
+  idempotencyKey: string;
+  requestHash: string;
+  responsePayload: Record<string, unknown>;
+  actorUserId: string;
   createdAt: Date;
 };
 
@@ -369,6 +393,36 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             eq(planningScenarioRuns.id, input.scenarioRunId)
           )
         );
+    },
+
+    async findPlanningCommandIdempotency(tenantId, projectId, idempotencyKey) {
+      const [row] = await db
+        .select()
+        .from(planningCommandIdempotencyKeys)
+        .where(
+          and(
+            eq(planningCommandIdempotencyKeys.tenantId, tenantId),
+            eq(planningCommandIdempotencyKeys.projectId, projectId),
+            eq(planningCommandIdempotencyKeys.idempotencyKey, idempotencyKey)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningCommandIdempotency(row) : undefined;
+    },
+
+    async createPlanningCommandIdempotency(input) {
+      await db
+        .insert(planningCommandIdempotencyKeys)
+        .values({
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          responsePayload: input.responsePayload,
+          actorUserId: input.actorUserId,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoNothing();
     },
 
     async applyPlanningCommand(input) {
@@ -994,10 +1048,19 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     const siblingOrderOverrides = new Map<string, number>();
     targetSiblingIds.forEach((id, siblingIndex) => siblingOrderOverrides.set(id, siblingIndex));
     const nextRows = reindexTaskRowsByWbs(retargeted, siblingOrderOverrides);
+    const previousRowsById = new Map(rows.map((row) => [row.id, row]));
+    const changedRows = nextRows.filter((nextRow) => {
+      const previousRow = previousRowsById.get(nextRow.id);
+      return (
+        previousRow &&
+        (previousRow.parentTaskId !== nextRow.parentTaskId || previousRow.wbsCode !== nextRow.wbsCode)
+      );
+    });
+    if (changedRows.length === 0) return;
     const now = new Date();
 
     await Promise.all(
-      nextRows.map((task) =>
+      changedRows.map((task) =>
         db
           .update(tasks)
           .set({
@@ -1384,6 +1447,20 @@ function mapPlanningScenarioRun(
     actorUserId: row.actorUserId,
     expiresAt: row.expiresAt,
     appliedAt: row.appliedAt,
+    createdAt: row.createdAt
+  };
+}
+
+function mapPlanningCommandIdempotency(
+  row: typeof planningCommandIdempotencyKeys.$inferSelect
+): PlanningCommandIdempotencyRecord {
+  return {
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    idempotencyKey: row.idempotencyKey,
+    requestHash: row.requestHash,
+    responsePayload: row.responsePayload,
+    actorUserId: row.actorUserId,
     createdAt: row.createdAt
   };
 }

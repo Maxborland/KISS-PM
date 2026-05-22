@@ -201,7 +201,7 @@ describe("planning API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -211,7 +211,7 @@ describe("planning API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -365,6 +365,52 @@ describe("planning API routes", () => {
         },
         planVersion: 5
       }
+    });
+
+    const retried = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-test-1"
+        })
+      }
+    );
+    const retriedBody = await retried.json();
+
+    expect(retried.status).toBe(200);
+    expect(retriedBody).toEqual(appliedBody);
+
+    const idempotencyConflict = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            ...command,
+            payload: { ...command.payload, id: "dep-plan-a-b-conflicting-retry" }
+          },
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-test-1"
+        })
+      }
+    );
+
+    expect(idempotencyConflict.status).toBe(409);
+    await expect(idempotencyConflict.json()).resolves.toEqual({
+      error: "idempotency_key_conflict"
     });
 
     const stale = await app.request(
