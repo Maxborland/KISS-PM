@@ -68,6 +68,8 @@ describe("PlanningWorkspaceRoute", () => {
     expect(html).toContain("planning-core-v1");
     expect(html).toContain("Инспектор задачи");
     expect(html).toContain("Preview work model");
+    expect(html).toContain("Связи задачи");
+    expect(html).toContain("Preview связи");
     expect(html).toContain("Ресурсная загрузка");
     expect(html).toContain("resource-alpha");
   });

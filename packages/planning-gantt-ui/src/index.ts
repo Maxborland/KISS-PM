@@ -1,6 +1,7 @@
 export type {
   PlanningGanttBaselineRow,
   PlanningGanttDependencyRow,
+  PlanningGanttDependencyType,
   PlanningGanttResourceLoadBucket,
   PlanningGanttSchedulingMode,
   PlanningGanttTaskRow,
