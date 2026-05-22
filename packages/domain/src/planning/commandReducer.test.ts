@@ -170,6 +170,31 @@ describe("planning command reducer", () => {
     });
   });
 
+  it("updates plannedStartInstant date when a scheduled task start changes", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      tasks: [
+        { ...createTask("task-a", "1"), plannedStartInstant: { date: "2026-06-01", minuteOfDay: 240 } },
+        createTask("task-b", "2")
+      ]
+    };
+
+    const updated = reducePlanningCommand(snapshot, {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-a",
+        plannedStart: "2026-06-05",
+        plannedFinish: "2026-06-06"
+      }
+    });
+
+    expect(updated.nextSnapshot.tasks.find((task) => task.id === "task-a")).toMatchObject({
+      plannedStart: "2026-06-05",
+      plannedFinish: "2026-06-06",
+      plannedStartInstant: { date: "2026-06-05", minuteOfDay: 240 }
+    });
+  });
+
   it("removes archived tasks and their active planning edges from preview snapshots", () => {
     const snapshot = createSnapshot();
     const result = reducePlanningCommand(snapshot, {
