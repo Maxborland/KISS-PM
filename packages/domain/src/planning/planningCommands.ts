@@ -16,6 +16,7 @@ export type CreateTaskPayload = {
   statusId: string;
   plannedStart: PlanDate | null;
   plannedFinish: PlanDate | null;
+  durationMinutes?: number | null;
   workMinutes: number;
   assignments: Array<{
     id?: string;

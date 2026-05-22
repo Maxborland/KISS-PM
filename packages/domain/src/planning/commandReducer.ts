@@ -144,7 +144,7 @@ function reduceTaskCreate(
     effortDriven: false,
     plannedStart,
     plannedFinish,
-    durationMinutes: null,
+    durationMinutes: command.payload.durationMinutes ?? null,
     workMinutes: command.payload.workMinutes,
     percentComplete: 0,
     calendarId: snapshot.project.calendarId,
@@ -339,6 +339,13 @@ function validateCommandPreconditions(
       }
       if (command.payload.workMinutes < 0) {
         return [invalid("planning_command_invalid", "Трудоемкость задачи не может быть отрицательной")];
+      }
+      if (
+        command.payload.durationMinutes !== undefined &&
+        command.payload.durationMinutes !== null &&
+        command.payload.durationMinutes <= 0
+      ) {
+        return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
       }
       if (
         command.payload.assignments.some(

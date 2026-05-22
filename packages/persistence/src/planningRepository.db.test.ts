@@ -346,6 +346,66 @@ describe("planning repository", () => {
     });
     expect(betaSnapshot?.tasks.map((task) => task.id)).toEqual(["task-beta-a", "task-beta-b"]);
   });
+
+  it("reindexes WBS codes for every active project task when moving a task", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.move_wbs",
+        payload: { taskId: "task-beta", parentTaskId: null, sortOrder: 0 }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.tasks.map((task) => ({ id: task.id, wbsCode: task.wbsCode }))).toEqual([
+      { id: "task-beta", wbsCode: "1" },
+      { id: "task-alpha", wbsCode: "2" }
+    ]);
+  });
+
+  it("preserves requested duration when applying task.create planning commands", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.create",
+        payload: {
+          id: "task-long-light",
+          projectId,
+          title: "Длинная задача с малой трудоемкостью",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-10",
+          plannedFinish: "2026-06-13",
+          durationMinutes: 1920,
+          workMinutes: 480,
+          assignments: []
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.tasks.find((task) => task.id === "task-long-light")).toMatchObject({
+      durationMinutes: 1920,
+      workMinutes: 480
+    });
+  });
 });
 
 async function createActiveProjectWithTasks(

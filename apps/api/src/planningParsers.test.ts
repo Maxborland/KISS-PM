@@ -19,6 +19,7 @@ describe("planning parsers", () => {
           statusId: "task-status-new",
           plannedStart: "2026-06-01",
           plannedFinish: null,
+          durationMinutes: 1920,
           workMinutes: 480,
           assignments: [
             {

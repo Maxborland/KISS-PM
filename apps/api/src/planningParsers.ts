@@ -103,9 +103,13 @@ export function parsePlanningCommand(input: unknown):
       const statusId = getString(payload, "statusId");
       const plannedStart = getNullableDate(payload, "plannedStart");
       const plannedFinish = getNullableDate(payload, "plannedFinish");
+      const durationMinutes = getNullableInteger(payload, "durationMinutes") ?? null;
       const workMinutes = getInteger(payload, "workMinutes");
       const assignments = parseCreateAssignments(payload.assignments);
       if (!id || !projectId || !title || !statusId || plannedStart === undefined || plannedFinish === undefined || workMinutes === null || workMinutes < 0 || !assignments.ok) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
+      if (durationMinutes !== null && durationMinutes <= 0) {
         return { ok: false, error: "planning_command_invalid" };
       }
       const createPayload: CreateTaskPayload = {
@@ -115,6 +119,7 @@ export function parsePlanningCommand(input: unknown):
         statusId,
         plannedStart,
         plannedFinish,
+        durationMinutes,
         workMinutes,
         assignments: assignments.value
       };

@@ -18,6 +18,7 @@ describe("planning command contract", () => {
         statusId: "todo",
         plannedStart: "2026-06-01",
         plannedFinish: "2026-06-05",
+        durationMinutes: 2400,
         workMinutes: 2400,
         assignments: []
       }
@@ -28,6 +29,7 @@ describe("planning command contract", () => {
       payload: {
         id: "task-alpha",
         projectId: "project-alpha",
+        durationMinutes: 2400,
         workMinutes: 2400
       }
     });

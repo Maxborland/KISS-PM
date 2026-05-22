@@ -402,7 +402,10 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             ownerUserId,
             plannedStart: fromPlanDate(plannedStart),
             plannedFinish: fromPlanDate(plannedFinish),
-            durationWorkingDays: Math.max(1, Math.ceil(payload.workMinutes / 480)),
+            durationWorkingDays: Math.max(
+              1,
+              Math.ceil((payload.durationMinutes ?? payload.workMinutes) / 480)
+            ),
             plannedWork: Math.ceil(payload.workMinutes / 60),
             actualWork: 0,
             progress: 0,
@@ -413,7 +416,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             schedulingMode: "auto",
             taskType: "fixed_units",
             effortDriven: false,
-            durationMinutes: null,
+            durationMinutes: payload.durationMinutes ?? null,
             workMinutes: payload.workMinutes,
             plannedStartMinute: 0,
             plannedFinishMinute: 0,
@@ -547,20 +550,13 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           return;
         }
         case "task.move_wbs":
-          await db
-            .update(tasks)
-            .set({
-              parentTaskId: input.command.payload.parentTaskId,
-              wbsCode: String(input.command.payload.sortOrder + 1),
-              updatedAt: new Date()
-            })
-            .where(
-              and(
-                eq(tasks.tenantId, input.tenantId),
-                eq(tasks.projectId, input.projectId),
-                eq(tasks.id, input.command.payload.taskId)
-              )
-            );
+          await moveTaskWbs({
+            tenantId: input.tenantId,
+            projectId: input.projectId,
+            taskId: input.command.payload.taskId,
+            parentTaskId: input.command.payload.parentTaskId,
+            sortOrder: input.command.payload.sortOrder
+          });
           return;
         case "task.delete_or_archive":
           if (input.command.payload.mode === "delete") {
@@ -809,6 +805,59 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       .from(tasks)
       .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId)));
     return String(rows.length + 1);
+  }
+
+  async function moveTaskWbs(input: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    parentTaskId: string | null;
+    sortOrder: number;
+  }): Promise<void> {
+    const rows = await db
+      .select({
+        id: tasks.id,
+        parentTaskId: tasks.parentTaskId
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.tenantId, input.tenantId),
+          eq(tasks.projectId, input.projectId),
+          isNull(tasks.archivedAt)
+        )
+      )
+      .orderBy(asc(tasks.wbsCode), asc(tasks.createdAt), asc(tasks.id));
+    const moved = rows.find((task) => task.id === input.taskId);
+    if (!moved) return;
+
+    const rest = rows.filter((task) => task.id !== input.taskId);
+    const index = Math.max(0, Math.min(input.sortOrder, rest.length));
+    const nextRows = [
+      ...rest.slice(0, index),
+      { ...moved, parentTaskId: input.parentTaskId },
+      ...rest.slice(index)
+    ];
+    const now = new Date();
+
+    await Promise.all(
+      nextRows.map((task, taskIndex) =>
+        db
+          .update(tasks)
+          .set({
+            parentTaskId: task.parentTaskId,
+            wbsCode: String(taskIndex + 1),
+            updatedAt: now
+          })
+          .where(
+            and(
+              eq(tasks.tenantId, input.tenantId),
+              eq(tasks.projectId, input.projectId),
+              eq(tasks.id, task.id)
+            )
+          )
+      )
+    );
   }
 
   async function captureBaseline(
