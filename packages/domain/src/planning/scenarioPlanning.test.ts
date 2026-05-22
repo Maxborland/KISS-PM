@@ -57,6 +57,53 @@ describe("scenario planning", () => {
       assertProposalEffect(snapshot, proposal);
     }
   });
+
+  it("does not mark reassignment proposals as fixes when they move overload to another resource", () => {
+    const snapshot = {
+      ...createOverloadedSnapshot(),
+      reservations: [
+        {
+          id: "reservation-beta",
+          resourceId: "resource-beta",
+          projectId: "project-beta",
+          start: "2026-06-01",
+          finish: "2026-06-01",
+          workMinutes: 480,
+          reason: "support"
+        }
+      ]
+    };
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    const resourceLoad = buildResourceLoadMatrix({
+      plan: calculatedPlan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+
+    const proposals = proposePlanningScenarios({
+      snapshot,
+      calculatedPlan,
+      resourceLoad,
+      target: {
+        type: "resource_overload",
+        resourceId: "resource-alpha",
+        date: "2026-06-01",
+        overloadMinutes: 480,
+        taskIds: ["task-a"]
+      }
+    });
+
+    expect(proposals.map((proposal) => proposal.profile)).toEqual(["aggressive"]);
+  });
 });
 
 function assertProposalEffect(snapshot: PlanSnapshot, proposal: ScenarioProposal): void {

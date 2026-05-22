@@ -132,6 +132,7 @@ function proposalMatchesEffect(
   proposal: ScenarioProposal,
   input: {
     snapshot: PlanSnapshot;
+    resourceLoad: ResourceLoadMatrix;
     target: ScenarioTarget;
   }
 ): boolean {
@@ -157,9 +158,15 @@ function proposalMatchesEffect(
     granularities: ["day"]
   });
   const remaining = findTargetOverload(nextResourceLoad, input.target);
+  const originalDayOverload = sumDayOverload(input.resourceLoad, input.target.date);
+  const nextDayOverload = sumDayOverload(nextResourceLoad, input.target.date);
 
-  if (proposal.conflictEffect === "removed") return !remaining;
-  return Boolean(remaining && remaining.overloadMinutes < input.target.overloadMinutes);
+  if (proposal.conflictEffect === "removed") return !remaining && nextDayOverload === 0;
+  return Boolean(
+    remaining &&
+    remaining.overloadMinutes < input.target.overloadMinutes &&
+    nextDayOverload < originalDayOverload
+  );
 }
 
 function createProposal(
@@ -240,6 +247,12 @@ function findTargetOverload(resourceLoad: ResourceLoadMatrix, target: ScenarioTa
       overload.resourceId === target.resourceId &&
       overload.date === target.date
   );
+}
+
+function sumDayOverload(resourceLoad: ResourceLoadMatrix, date: string): number {
+  return resourceLoad.overloads
+    .filter((overload) => overload.granularity === "day" && overload.date === date)
+    .reduce((total, overload) => total + overload.overloadMinutes, 0);
 }
 
 function isScenarioProposal(value: ScenarioProposal | null): value is ScenarioProposal {

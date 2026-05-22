@@ -81,7 +81,7 @@ export function calculatePlan(
 
     try {
       const taskCalendar = selectTaskCalendar(snapshot, task);
-      const taskCalendarExceptions = selectTaskCalendarExceptions(snapshot, task, taskCalendar);
+      const taskCalendarExceptions = selectTaskCalendarExceptions(snapshot, taskCalendar);
       const durationMinutes = resolveDurationMinutes(task, snapshot.assignments, validationIssues);
       const authoredStart = resolveAuthoredStart(task, snapshot, taskCalendar, taskCalendarExceptions);
       const dependencyStart = resolveDependencyStart(
@@ -459,23 +459,12 @@ function selectTaskCalendar(snapshot: PlanSnapshot, task: PlanTask): PlanCalenda
 
 function selectTaskCalendarExceptions(
   snapshot: PlanSnapshot,
-  task: PlanTask,
   calendar: PlanCalendar
 ): PlanSnapshot["calendarExceptions"] {
-  const taskResourceIds = new Set(
-    snapshot.assignments
-      .filter(
-        (assignment) =>
-          assignment.taskId === task.id &&
-          (assignment.role === "executor" || assignment.role === "co_executor")
-      )
-      .map((assignment) => assignment.resourceId)
-  );
-
   return snapshot.calendarExceptions.filter(
     (exception) =>
       exception.calendarId === calendar.id &&
-      (exception.resourceId === null || taskResourceIds.has(exception.resourceId))
+      exception.resourceId === null
   );
 }
 
