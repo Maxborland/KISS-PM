@@ -7,13 +7,10 @@ import type {
   PlanningScenarioApplyResponse,
   PlanningScenarioPreviewResponse
 } from "./planningApi";
+import { formatPlanningHours } from "./planningFormatters";
 import type { PlanningReadModel } from "./planningReadModelMapper";
+import { scenarioTargetKey } from "./planningScenarioTarget";
 import "./planningWorkspace.css";
-
-export type PlanningScenarioPanelState = {
-  target: ScenarioTarget | null;
-  preview: PlanningScenarioPreviewResponse | null;
-};
 
 export function PlanningScenarioPanel(props: {
   readModel: PlanningReadModel;
@@ -100,7 +97,7 @@ export function PlanningScenarioPanel(props: {
       {props.target ? (
         <div className="planning-scenario-target">
           <strong>{props.target.resourceId} / {props.target.date}</strong>
-          <span>{formatHours(props.target.overloadMinutes)} перегруза, {props.target.taskIds.length} задач</span>
+          <span>{formatPlanningHours(props.target.overloadMinutes)} перегруза, {props.target.taskIds.length} задач</span>
         </div>
       ) : (
         <p className="muted">Выберите перегруз в ресурсной матрице, чтобы построить варианты.</p>
@@ -141,7 +138,7 @@ export function PlanningScenarioPanel(props: {
                   <span>{formatConflictEffect(proposal.conflictEffect)}</span>
                   <small>
                     Финиш {proposal.explainability.finishDate ?? "не рассчитан"},
-                    перегруз {formatHours(proposal.explainability.overloadMinutes)},
+                    перегруз {formatPlanningHours(proposal.explainability.overloadMinutes)},
                     риск {proposal.explainability.riskScore}
                   </small>
                   <small>
@@ -205,10 +202,6 @@ export function PlanningScenarioPanel(props: {
   );
 }
 
-export function scenarioTargetKey(target: ScenarioTarget): string {
-  return `${target.type}:${target.resourceId}:${target.date}:${target.overloadMinutes}:${[...target.taskIds].sort().join(",")}`;
-}
-
 export function proposalRequiresAcceptedRiskReason(proposal: ScenarioProposal): boolean {
   return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
 }
@@ -250,10 +243,6 @@ function formatConflictEffect(effect: ScenarioProposal["conflictEffect"]): strin
   if (effect === "accepted") return "Риск принят";
   if (effect === "reduced") return "Перегруз снижен";
   return "Перегруз снят";
-}
-
-function formatHours(minutes: number): string {
-  return `${Math.round((minutes / 60) * 10) / 10} ч`;
 }
 
 function errorMessage(error: unknown): string {
