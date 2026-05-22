@@ -282,6 +282,7 @@ describe("web api helpers", () => {
       plannedWork: 12,
       durationWorkingDays: 3,
       requiresAcceptance: false,
+      clientUpdatedAt: "2026-05-21T00:00:00.000Z",
       participants: [{ userId: "user-alpha-executor", role: "executor" }]
     });
     await archiveTask("task/unsafe");

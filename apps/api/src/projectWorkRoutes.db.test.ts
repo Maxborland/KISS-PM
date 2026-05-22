@@ -33,6 +33,8 @@ const projectWorkApiSeed: SeedTenantDataset = {
         "tenant.tasks.delete",
         "tenant.task_statuses.manage",
         "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.project_resources.manage",
         "tenant.resource_feasibility.read",
         "tenant.audit_events.read"
       ]
@@ -892,6 +894,10 @@ describe("project work API routes", () => {
         cookie: executorCookie
       }
     });
+    const editVersionResponse = await app.request("/api/workspace/tasks/task-field-guard", {
+      headers: { cookie: adminCookie }
+    });
+    const editVersionBody = await editVersionResponse.json();
     const allowedEdit = await app.request("/api/workspace/tasks/task-field-guard", {
       method: "PATCH",
       headers: {
@@ -909,6 +915,7 @@ describe("project work API routes", () => {
         durationWorkingDays: 4,
         plannedWork: 12,
         requiresAcceptance: false,
+        clientUpdatedAt: editVersionBody.task.updatedAt,
         participants: [{ userId: "user-alpha-executor", role: "executor" }]
       })
     });
@@ -938,6 +945,214 @@ describe("project work API routes", () => {
     });
   });
 
+  it("requires resource manage permission for task PATCH participant assignment changes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-resource-permission-guard",
+        title: "Проверить права ресурсов",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [
+          { userId: "user-alpha-executor", role: "requester" },
+          { userId: "user-alpha-admin", role: "executor" }
+        ]
+      })
+    });
+    const detail = await app.request("/api/workspace/tasks/task-resource-permission-guard", {
+      headers: { cookie: adminCookie }
+    });
+    const detailBody = await detail.json();
+
+    const denied = await app.request("/api/workspace/tasks/task-resource-permission-guard", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: requesterCookie
+      },
+      body: JSON.stringify({
+        title: "Постановщик пытается сменить ресурсы",
+        description: null,
+        priority: "normal",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        requiresAcceptance: false,
+        clientUpdatedAt: detailBody.task.updatedAt,
+        participants: [
+          { userId: "user-alpha-executor", role: "requester" },
+          { userId: "user-alpha-admin", role: "executor" },
+          { userId: "user-alpha-manager-only", role: "observer" }
+        ]
+      })
+    });
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({ error: "permission_missing" });
+  });
+
+  it("rejects stale task PATCH versions before applying planning compatibility commands", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-stale-version",
+        title: "Проверить версию задачи",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const firstDetail = await app.request("/api/workspace/tasks/task-stale-version", {
+      headers: { cookie: adminCookie }
+    });
+    const firstDetailBody = await firstDetail.json();
+    const firstUpdate = await app.request("/api/workspace/tasks/task-stale-version", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: "Версия задачи обновлена",
+        description: null,
+        priority: "normal",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 12,
+        requiresAcceptance: false,
+        clientUpdatedAt: firstDetailBody.task.updatedAt,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const staleUpdate = await app.request("/api/workspace/tasks/task-stale-version", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: "Старое сохранение",
+        description: null,
+        priority: "normal",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        requiresAcceptance: false,
+        clientUpdatedAt: firstDetailBody.task.updatedAt,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    expect(firstUpdate.status).toBe(200);
+    expect(staleUpdate.status).toBe(409);
+    await expect(staleUpdate.json()).resolves.toEqual({ error: "task_version_conflict" });
+  });
+
+  it("rejects stale task PATCH after planning assignment changes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-stale-assignment",
+        title: "Проверить stale assignments",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    await client`
+      UPDATE tasks
+      SET updated_at = ${"2026-01-01T00:00:00.000Z"}::timestamptz
+      WHERE tenant_id = 'tenant-alpha' AND id = 'task-stale-assignment'
+    `;
+    const staleDetail = await app.request("/api/workspace/tasks/task-stale-assignment", {
+      headers: { cookie: adminCookie }
+    });
+    const staleDetailBody = await staleDetail.json();
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    await dataSource.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "assignment-stale-observer",
+          taskId: "task-stale-assignment",
+          resourceId: "user-alpha-manager-only",
+          role: "observer",
+          unitsPermille: 1000,
+          workMinutes: 60
+        }
+      }
+    });
+
+    const staleUpdate = await app.request("/api/workspace/tasks/task-stale-assignment", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: "Старое сохранение участников",
+        description: null,
+        priority: "normal",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        requiresAcceptance: false,
+        clientUpdatedAt: staleDetailBody.task.updatedAt,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const currentDetail = await app.request("/api/workspace/tasks/task-stale-assignment", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(staleUpdate.status).toBe(409);
+    await expect(staleUpdate.json()).resolves.toEqual({ error: "task_version_conflict" });
+    await expect(currentDetail.json()).resolves.toMatchObject({
+      task: {
+        participants: expect.arrayContaining([
+          expect.objectContaining({ userId: "user-alpha-manager-only", role: "observer" })
+        ])
+      }
+    });
+  });
+
   it("requires explicit delete permission to archive requester-owned tasks", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
@@ -961,6 +1176,11 @@ describe("project work API routes", () => {
         ]
       })
     });
+    const requesterEditVersionResponse = await app.request(
+      "/api/workspace/tasks/task-requester-delete-guard",
+      { headers: { cookie: adminCookie } }
+    );
+    const requesterEditVersionBody = await requesterEditVersionResponse.json();
 
     const allowedRequesterEdit = await app.request(
       "/api/workspace/tasks/task-requester-delete-guard",
@@ -978,9 +1198,10 @@ describe("project work API routes", () => {
           statusId: "task-status-new",
           plannedStart: "2026-06-02",
           plannedFinish: "2026-06-05",
-          durationWorkingDays: 4,
+          durationWorkingDays: 1,
           plannedWork: 8,
           requiresAcceptance: false,
+          clientUpdatedAt: requesterEditVersionBody.task.updatedAt,
           participants: [
             { userId: "user-alpha-executor", role: "requester" },
             { userId: "user-alpha-admin", role: "executor" }

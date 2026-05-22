@@ -339,6 +339,7 @@ export type TaskInput = {
 };
 export type TaskUpdateInput = Omit<TaskInput, "id"> & {
   statusId: string;
+  clientUpdatedAt: string;
 };
 
 export type TaskStatusInput = {

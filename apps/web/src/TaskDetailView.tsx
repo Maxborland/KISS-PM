@@ -331,7 +331,11 @@ export function TaskDetailView(props: {
           onSubmit={async (input) => {
             await projectWorkMutations.updateTask.mutateAsync({
               taskId: task.id,
-              input: { ...input, statusId: "statusId" in input ? input.statusId : task.statusId }
+              input: {
+                ...input,
+                statusId: "statusId" in input ? input.statusId : task.statusId,
+                clientUpdatedAt: "clientUpdatedAt" in input ? input.clientUpdatedAt : task.updatedAt
+              }
             });
             setIsEditOpen(false);
             props.onChanged("Задача обновлена.");

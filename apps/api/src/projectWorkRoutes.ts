@@ -3,6 +3,7 @@ import {
   canDeleteTasks,
   canEditTasks,
   canManageProjects,
+  canManageProjectResources,
   canManageTaskStatuses,
   canReadProjects,
   type AccessProfile,
@@ -786,6 +787,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         participants,
         snapshot
       });
+      if (currentTask.updatedAt.getTime() !== parsed.value.clientUpdatedAt.getTime()) {
+        return { ok: false as const, status: 409, error: "task_version_conflict" };
+      }
+      const planningCompatibilityDecision = canApplyTaskCompatibilityPlanningCommands(
+        actor,
+        profile,
+        planningCommands
+      );
+      if (!planningCompatibilityDecision.allowed) {
+        return { ok: false as const, status: 403, error: planningCompatibilityDecision.reason };
+      }
       for (const command of planningCommands) {
         await transactionDataSource.applyPlanningCommand({
           tenantId: actor.tenantId,
@@ -839,6 +851,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     if (!updateResult.ok) {
       if (updateResult.status === 400) return context.json({ error: updateResult.error }, 400);
       if (updateResult.status === 403) return context.json({ error: updateResult.error }, 403);
+      if (updateResult.status === 409) return context.json({ error: updateResult.error }, 409);
       return context.json({ error: updateResult.error }, 404);
     }
     const updated = updateResult.updated;
@@ -1295,6 +1308,20 @@ function canEditTaskFields(
     };
   }
   return editDecision;
+}
+
+function canApplyTaskCompatibilityPlanningCommands(
+  actor: TenantUser,
+  profile: AccessProfile,
+  commands: ReturnType<typeof buildUpdateTaskPlanningCommands>
+): PolicyDecision {
+  const touchesResourceAssignments = commands.some(
+    (command) => command.type === "assignment.upsert" || command.type === "assignment.delete"
+  );
+  if (!touchesResourceAssignments) {
+    return { allowed: true, reason: "same_tenant_permission_granted" };
+  }
+  return canManageProjectResources({ actor, profile, targetTenantId: actor.tenantId });
 }
 
 function canDeleteTask(

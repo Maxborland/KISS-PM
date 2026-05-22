@@ -28,6 +28,12 @@ const dataset: SeedTenantDataset = {
       id: "access-profile-reader",
       tenantId: "tenant-alpha",
       name: "Наблюдатель планирования",
+      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.project_resources.read"]
+    },
+    {
+      id: "access-profile-plan-reader-no-resources",
+      tenantId: "tenant-alpha",
+      name: "Наблюдатель плана без ресурсов",
       permissions: ["tenant.projects.read", "tenant.project_plan.read"]
     },
     {
@@ -69,6 +75,15 @@ const dataset: SeedTenantDataset = {
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
       password: "local-executor-password"
+    },
+    {
+      id: "user-alpha-plan-reader-no-resources",
+      tenantId: "tenant-alpha",
+      email: "plan-reader-no-resources@kiss-pm.local",
+      name: "Никита Без Ресурсов",
+      accessProfileId: "access-profile-plan-reader-no-resources",
+      positionId: "position-engineer",
+      password: "local-reader-password"
     },
     {
       id: "user-alpha-plan-manager-no-read",
@@ -203,6 +218,7 @@ describe("planning API routes", () => {
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const planOnlyReaderCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "local-reader-password");
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -231,10 +247,16 @@ describe("planning API routes", () => {
       "/api/workspace/projects/project-alpha/planning/read-model",
       { headers: { cookie: readerCookie } }
     );
+    const planOnlyReadModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: planOnlyReaderCookie } }
+    );
     const initialBody = await readModel.json();
 
     expect(readModel.status).toBe(200);
     expect(readerReadModel.status).toBe(200);
+    expect(planOnlyReadModel.status).toBe(403);
+    await expect(planOnlyReadModel.json()).resolves.toEqual({ error: "permission_missing" });
     expect(initialBody).toMatchObject({
       authored: {
         tasks: expect.arrayContaining([
