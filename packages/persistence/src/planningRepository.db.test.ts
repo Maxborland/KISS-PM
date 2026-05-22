@@ -15,6 +15,7 @@ import {
   projectBaselineTasks,
   projectBaselines,
   projectCalendars,
+  resourceCalendars,
   resourceReservations,
   taskParticipants
 } from "./schema";
@@ -310,6 +311,47 @@ describe("planning repository", () => {
 
     expect(snapshot?.resources.some((resource) => resource.id === "user-alpha-executor")).toBe(false);
     expect(snapshot?.assignments.some((assignment) => assignment.resourceId === "user-alpha-executor")).toBe(false);
+  });
+
+  it("uses a real project default calendar when only resource calendars exist", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const now = new Date("2026-05-21T00:00:00.000Z");
+
+    await db.insert(resourceCalendars).values({
+      id: "calendar-resource-alpha",
+      tenantId: "tenant-alpha",
+      resourceId: "user-alpha-executor",
+      workingWeekdays: [],
+      workingMinutesPerDay: 0,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.project.calendarId).toBe(`${projectId}-default-calendar`);
+    expect(snapshot?.tasks.every((task) => task.calendarId === `${projectId}-default-calendar`)).toBe(true);
+    expect(snapshot?.calendars).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `${projectId}-default-calendar`,
+          workingWeekdays: [1, 2, 3, 4, 5],
+          workingMinutesPerDay: 480
+        }),
+        expect.objectContaining({
+          id: "calendar-resource-alpha",
+          workingWeekdays: [],
+          workingMinutesPerDay: 0
+        })
+      ])
+    );
+    expect(
+      snapshot?.resources.find((resource) => resource.id === "user-alpha-executor")?.calendarId
+    ).toBe("calendar-resource-alpha");
   });
 
   it("scopes task mutation commands to the command project", async () => {
