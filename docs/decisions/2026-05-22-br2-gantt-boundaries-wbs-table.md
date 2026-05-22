@@ -248,7 +248,8 @@ Acceptance criteria:
 
 ## Implementation notes
 
-1. Copy BR2 packages into KISS PM only after a file-level extraction plan.
+1. Copy BR2 packages into KISS PM only by following the file-level plan:
+   `docs/plans/2026-05-22-br2-gantt-file-level-extraction-plan.md`.
 2. Rename package namespace from `@gungantt/*` to `@kiss-pm/planning-gantt-ui`
    or equivalent.
 3. Remove or quarantine `gantt-core/scheduling`, `gantt-core/planning` and

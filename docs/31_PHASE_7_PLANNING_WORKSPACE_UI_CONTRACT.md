@@ -361,6 +361,8 @@ Phase 7: их можно переносить, выделять в пакет KI
 
 Архитектурная ревизия границ переноса и WBS table candidates зафиксирована в
 `decisions/2026-05-22-br2-gantt-boundaries-wbs-table.md`.
+File-level extraction plan зафиксирован в
+`plans/2026-05-22-br2-gantt-file-level-extraction-plan.md`.
 
 Ограничение остается архитектурным: BR2 Gantt отвечает за rendering,
 interaction model, timeline, drag/drop, dependency drawing и visual density, но
@@ -471,7 +473,8 @@ Exit gate: workspace проходит E2E на create/edit dependency/resource/s
 
 ## Open decisions before implementation
 
-- File-level BR2 Gantt extraction plan and final package namespace.
+- Final package namespace after executing
+  `plans/2026-05-22-br2-gantt-file-level-extraction-plan.md`.
 - Минимальная глубина keyboard shortcuts для первой UI-фазы.
 - Будет ли Phase 7 редактировать personal calendars или только читать
   exceptions/reservations из существующего источника.
