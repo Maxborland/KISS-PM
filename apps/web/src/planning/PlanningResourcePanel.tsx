@@ -1,4 +1,4 @@
-import type { BucketGranularity } from "@kiss-pm/domain";
+import type { BucketGranularity, ScenarioTarget } from "@kiss-pm/domain";
 
 import type { PlanningReadModel } from "./planningReadModelMapper";
 import "./planningWorkspace.css";
@@ -36,6 +36,10 @@ export type ResourceMatrixRow = {
 
 export function PlanningResourcePanel(props: {
   readModel: PlanningReadModel;
+  activeScenarioTargetKey?: string | null | undefined;
+  canPreviewScenarios?: boolean | undefined;
+  scenarioDisabledReason?: string | undefined;
+  onScenarioTarget?: (target: ScenarioTarget) => void;
 }) {
   const sheetRows = buildResourceSheetRows(props.readModel);
   const dayRows = buildResourceMatrixRows(props.readModel, "day");
@@ -94,6 +98,19 @@ export function PlanningResourcePanel(props: {
                 <strong>{overload.resourceId} / {overload.date}: {formatHours(overload.overloadMinutes)}</strong>
                 <span>{overload.taskIds.length} задач: {overload.taskIds.join(", ")}</span>
                 <small>{overload.reasons.map(formatOverloadReason).join("; ")}</small>
+                {props.onScenarioTarget && overload.granularity === "day" ? (
+                  <button
+                    className="secondary-button compact"
+                    disabled={!props.canPreviewScenarios}
+                    title={props.scenarioDisabledReason ?? "Построить сценарии для этого перегруза"}
+                    type="button"
+                    onClick={() => props.onScenarioTarget?.(overloadToScenarioTarget(overload))}
+                  >
+                    {props.activeScenarioTargetKey === scenarioTargetKey(overloadToScenarioTarget(overload))
+                      ? "Сценарий выбран"
+                      : "Сценарии"}
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -174,6 +191,20 @@ export function formatOverloadReason(reason: OverloadReason): string {
   if (reason.type === "assignment") return `Назначение: ${reason.id}`;
   if (reason.type === "reservation") return `Резерв: ${reason.id}`;
   return `Исключение календаря: ${reason.id}`;
+}
+
+export function overloadToScenarioTarget(overload: ResourceOverload): ScenarioTarget {
+  return {
+    type: "resource_overload",
+    resourceId: overload.resourceId,
+    date: overload.date,
+    overloadMinutes: overload.overloadMinutes,
+    taskIds: overload.taskIds
+  };
+}
+
+export function scenarioTargetKey(target: ScenarioTarget): string {
+  return `${target.type}:${target.resourceId}:${target.date}:${target.overloadMinutes}:${[...target.taskIds].sort().join(",")}`;
 }
 
 function ResourceMatrixTable(props: {

@@ -88,6 +88,18 @@ describe("planning read model mapper", () => {
       }
     ]);
   });
+
+  it("uses backend resource overload rows instead of recomputing overloads in the mapper", () => {
+    const viewModel = mapPlanningReadModelToGanttViewModel({
+      ...createReadModel(),
+      resourceLoad: {
+        ...createReadModel().resourceLoad,
+        overloads: []
+      }
+    });
+
+    expect(viewModel.resourceLoadBuckets[0]?.overloadMinutes).toBe(0);
+  });
 });
 
 function createReadModel(): PlanningReadModel {
@@ -287,7 +299,26 @@ function createReadModel(): PlanningReadModel {
           calendarExceptionIds: []
         }
       ],
-      overloads: [],
+      overloads: [
+        {
+          resourceId: "user-alpha",
+          positionId: "position-engineer",
+          teamId: null,
+          projectId: "project-alpha",
+          date: "2026-06-02",
+          granularity: "day",
+          assignedMinutes: 600,
+          reservedMinutes: 60,
+          capacityMinutes: 480,
+          freeMinutes: 0,
+          overloadMinutes: 180,
+          taskIds: ["task-a"],
+          assignmentIds: ["assignment-a"],
+          reservationIds: ["reservation-a"],
+          calendarExceptionIds: [],
+          reasons: [{ type: "task", id: "task-a" }]
+        }
+      ],
       freeCapacityBuckets: []
     },
     validationIssues: [

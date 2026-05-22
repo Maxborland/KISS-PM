@@ -5,7 +5,8 @@ import {
   PlanningResourcePanel,
   buildResourceMatrixRows,
   buildResourceSheetRows,
-  formatOverloadReason
+  formatOverloadReason,
+  overloadToScenarioTarget
 } from "./PlanningResourcePanel";
 import { createPlanningReadModelFixture } from "./planningReadModel.test-utils";
 
@@ -23,6 +24,19 @@ describe("PlanningResourcePanel", () => {
     expect(html).toContain("8 ч");
     expect(html).toContain("Причины перегруза");
     expect(html).toContain("Задача: task-a");
+  });
+
+  it("renders real scenario entry points for day overloads when preview is allowed", () => {
+    const html = renderToStaticMarkup(
+      <PlanningResourcePanel
+        readModel={createPlanningReadModelFixture()}
+        canPreviewScenarios={true}
+        onScenarioTarget={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Сценарии");
+    expect(html).toContain("Построить сценарии для этого перегруза");
   });
 
   it("builds resource sheet rows without computing new planning facts", () => {
@@ -142,5 +156,18 @@ describe("PlanningResourcePanel", () => {
     expect(formatOverloadReason({ type: "assignment", id: "assignment-a" })).toBe("Назначение: assignment-a");
     expect(formatOverloadReason({ type: "reservation", id: "reservation-a" })).toBe("Резерв: reservation-a");
     expect(formatOverloadReason({ type: "calendar_exception", id: "exception-a" })).toBe("Исключение календаря: exception-a");
+  });
+
+  it("converts overload drilldown rows into scenario targets", () => {
+    const overload = createPlanningReadModelFixture().resourceLoad.overloads[0];
+    if (!overload) throw new Error("Resource fixture must include an overload");
+
+    expect(overloadToScenarioTarget(overload)).toEqual({
+      type: "resource_overload",
+      resourceId: "resource-alpha",
+      date: "2026-06-01",
+      overloadMinutes: 180,
+      taskIds: ["task-a"]
+    });
   });
 });

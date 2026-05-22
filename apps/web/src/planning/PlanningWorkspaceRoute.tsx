@@ -1,3 +1,4 @@
+import type { ScenarioTarget } from "@kiss-pm/domain";
 import { PlanningGanttSurface, type PlanningGanttIntent } from "@kiss-pm/planning-gantt-ui";
 import { Baseline, Plus, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -7,8 +8,11 @@ import type { TaskStatusDefinition } from "../api";
 import { SectionFeedback } from "../components/workspace-ui";
 import type { SectionState } from "../workspaceShellState";
 import { mapPlanningGanttIntentToCommand } from "./planningCommandIntentMapper";
-import type { PlanningCommandPreviewResponse } from "./planningApi";
-import { usePlanningCommandMutations, usePlanningReadModelQuery } from "./planningQueries";
+import {
+  usePlanningCommandMutations,
+  usePlanningReadModelQuery,
+  usePlanningScenarioMutations
+} from "./planningQueries";
 import { mapPlanningReadModelToGanttViewModel } from "./planningReadModelMapper";
 import {
   canApplyPlanningCommand,
@@ -19,6 +23,7 @@ import {
 import { PlanningDependencyEditor } from "./PlanningDependencyEditor";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
 import { PlanningResourcePanel } from "./PlanningResourcePanel";
+import { PlanningScenarioPanel, scenarioTargetKey } from "./PlanningScenarioPanel";
 import { PlanningTaskInspector } from "./PlanningTaskInspector";
 import { PlanningValidationPanel } from "./PlanningValidationPanel";
 import "./planningWorkspace.css";
@@ -34,10 +39,12 @@ export function PlanningWorkspaceRoute(props: {
   const readDisabledReason = planningReadDisabledReason(props.permissions);
   const readModelQuery = usePlanningReadModelQuery(props.projectId, canRead);
   const commandMutations = usePlanningCommandMutations(props.projectId);
+  const scenarioMutations = usePlanningScenarioMutations(props.projectId);
   const [previewState, setPreviewState] = useState<PlanningPreviewState | null>(null);
   const [previewError, setPreviewError] = useState("");
   const [applyError, setApplyError] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [scenarioTarget, setScenarioTarget] = useState<ScenarioTarget | null>(null);
   const readModel = canRead ? readModelQuery.data : undefined;
   const capabilities = useMemo(
     () => planningCapabilitiesFromPermissions(props.permissions),
@@ -57,6 +64,11 @@ export function PlanningWorkspaceRoute(props: {
     capabilities.canManageBaseline &&
     Boolean(readModel) &&
     !commandMutations.previewCommand.isPending;
+  const canPreviewScenarios =
+    capabilities.canPreviewScenarios &&
+    Boolean(readModel) &&
+    !previewState &&
+    !scenarioMutations.previewScenarios.isPending;
   const taskCreateDisabledReason = !capabilities.canManagePlan
     ? "Нужно право tenant.project_plan.manage"
     : !defaultStatusId
@@ -103,6 +115,7 @@ export function PlanningWorkspaceRoute(props: {
         clientPlanVersion: readModel.planVersion
       });
       setPreviewState(null);
+      setScenarioTarget(null);
       props.onChanged("Команда планирования применена и read model обновлена.");
     } catch (error) {
       setApplyError(errorMessage(error));
@@ -187,6 +200,7 @@ export function PlanningWorkspaceRoute(props: {
           setPreviewState(null);
           setPreviewError("");
           setApplyError("");
+          setScenarioTarget(null);
         }}
       />
       {displayedViewModel && readModel ? (
@@ -223,7 +237,40 @@ export function PlanningWorkspaceRoute(props: {
               onIntent={(intent) => void previewIntent(intent)}
             />
             <PlanningValidationPanel issues={issues} />
-            <PlanningResourcePanel readModel={afterPreview ?? readModel} />
+            <PlanningResourcePanel
+              readModel={afterPreview ?? readModel}
+              activeScenarioTargetKey={scenarioTarget ? scenarioTargetKey(scenarioTarget) : null}
+              canPreviewScenarios={canPreviewScenarios}
+              scenarioDisabledReason={
+                !capabilities.canPreviewScenarios
+                  ? "Нужно право tenant.planning_scenarios.preview"
+                  : previewState
+                    ? "Сначала примените или отмените command preview"
+                    : undefined
+              }
+              onScenarioTarget={setScenarioTarget}
+            />
+            <PlanningScenarioPanel
+              readModel={readModel}
+              target={scenarioTarget}
+              canPreviewScenarios={canPreviewScenarios}
+              canApplyScenarios={capabilities.canApplyScenarios}
+              isPreviewPending={scenarioMutations.previewScenarios.isPending}
+              isApplyPending={scenarioMutations.applyScenario.isPending}
+              onPreview={(target) =>
+                scenarioMutations.previewScenarios.mutateAsync({
+                  target,
+                  clientPlanVersion: readModel.planVersion
+                })
+              }
+              onApply={(proposalId, envelope) =>
+                scenarioMutations.applyScenario.mutateAsync({ proposalId, envelope })
+              }
+              onApplied={(message) => {
+                setScenarioTarget(null);
+                props.onChanged(message);
+              }}
+            />
           </aside>
         </div>
       ) : null}
