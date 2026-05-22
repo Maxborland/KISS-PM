@@ -112,6 +112,8 @@ export type PlanningScenarioRunRecord = {
 const defaultWorkingWeekdays = [1, 2, 3, 4, 5];
 const defaultWorkingMinutesPerDay = 480;
 
+type WbsTaskRow = Pick<typeof tasks.$inferSelect, "id" | "parentTaskId" | "wbsCode" | "createdAt">;
+
 export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
   return {
     async getPlanSnapshot(tenantId, projectId) {
@@ -419,7 +421,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             requiresAcceptance: false,
             source: "manual",
             parentTaskId: payload.parentTaskId ?? null,
-            wbsCode: await nextWbsCode(input.tenantId, input.projectId),
+            wbsCode: await nextWbsCode(input.tenantId, input.projectId, payload.parentTaskId ?? null),
             schedulingMode: "auto",
             taskType: "fixed_units",
             effortDriven: false,
@@ -802,14 +804,36 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     }
   };
 
-  async function nextWbsCode(tenantId: string, projectId: string): Promise<string> {
+  async function nextWbsCode(
+    tenantId: string,
+    projectId: string,
+    parentTaskId: string | null
+  ): Promise<string> {
     const rows = await db
-      .select({ wbsCode: tasks.wbsCode })
+      .select({
+        id: tasks.id,
+        parentTaskId: tasks.parentTaskId,
+        wbsCode: tasks.wbsCode,
+        createdAt: tasks.createdAt
+      })
       .from(tasks)
       .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)));
+
+    rows.sort(compareTaskRowsByWbs);
+    if (parentTaskId !== null) {
+      const parent = rows.find((task) => task.id === parentTaskId);
+      if (!parent) throw new Error("parent_task_not_found");
+      const maxChildCode = rows.reduce((max, task) => {
+        if (task.parentTaskId !== parentTaskId) return max;
+        const childCode = parseWbsPart(task.wbsCode.split(".").at(-1) ?? "");
+        return childCode === null ? max : Math.max(max, childCode);
+      }, 0);
+      return `${parent.wbsCode}.${maxChildCode + 1}`;
+    }
+
     const maxNumericWbsCode = rows.reduce((max, task) => {
-      const topLevelCode = task.wbsCode.split(".")[0] ?? "";
-      const numericCode = parseWbsPart(topLevelCode);
+      if (task.parentTaskId !== null) return max;
+      const numericCode = parseWbsPart(task.wbsCode);
       return numericCode === null ? max : Math.max(max, numericCode);
     }, 0);
     return String(maxNumericWbsCode + 1);
@@ -877,23 +901,30 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     rows.sort(compareTaskRowsByWbs);
     const moved = rows.find((task) => task.id === input.taskId);
     if (!moved) return;
+    if (input.parentTaskId !== null && !rows.some((task) => task.id === input.parentTaskId)) {
+      throw new Error("parent_task_not_found");
+    }
 
-    const rest = rows.filter((task) => task.id !== input.taskId);
-    const index = Math.max(0, Math.min(input.sortOrder, rest.length));
-    const nextRows = [
-      ...rest.slice(0, index),
-      { ...moved, parentTaskId: input.parentTaskId },
-      ...rest.slice(index)
-    ];
+    const retargeted = rows.map((task) =>
+      task.id === input.taskId ? { ...task, parentTaskId: input.parentTaskId } : task
+    );
+    const siblingIds = retargeted
+      .filter((task) => task.parentTaskId === input.parentTaskId && task.id !== input.taskId)
+      .map((task) => task.id);
+    const index = Math.max(0, Math.min(input.sortOrder, siblingIds.length));
+    const targetSiblingIds = [...siblingIds.slice(0, index), moved.id, ...siblingIds.slice(index)];
+    const siblingOrderOverrides = new Map<string, number>();
+    targetSiblingIds.forEach((id, siblingIndex) => siblingOrderOverrides.set(id, siblingIndex));
+    const nextRows = reindexTaskRowsByWbs(retargeted, siblingOrderOverrides);
     const now = new Date();
 
     await Promise.all(
-      nextRows.map((task, taskIndex) =>
+      nextRows.map((task) =>
         db
           .update(tasks)
           .set({
             parentTaskId: task.parentTaskId,
-            wbsCode: String(taskIndex + 1),
+            wbsCode: task.wbsCode,
             updatedAt: now
           })
           .where(
@@ -1018,6 +1049,49 @@ function mapConstraint(task: typeof tasks.$inferSelect): PlanConstraint | null {
     type: task.constraintType as PlanConstraintType,
     date: task.constraintDate ? toPlanDate(task.constraintDate) : null
   };
+}
+
+function reindexTaskRowsByWbs<T extends WbsTaskRow>(
+  rows: T[],
+  siblingOrderOverrides: Map<string, number> = new Map()
+): T[] {
+  const taskIds = new Set(rows.map((task) => task.id));
+  const inputOrderById = new Map(rows.map((task, index) => [task.id, index]));
+  const rowsByParentId = new Map<string | null, T[]>();
+
+  for (const row of rows) {
+    const parentId = row.parentTaskId !== null && taskIds.has(row.parentTaskId) ? row.parentTaskId : null;
+    const normalizedRow = parentId === row.parentTaskId ? row : { ...row, parentTaskId: null };
+    rowsByParentId.set(parentId, [...(rowsByParentId.get(parentId) ?? []), normalizedRow]);
+  }
+
+  const result: T[] = [];
+  const emittedTaskIds = new Set<string>();
+
+  const appendChildren = (parentId: string | null, prefix: string): void => {
+    const siblings = [...(rowsByParentId.get(parentId) ?? [])].sort((left, right) => {
+      const leftOverride = siblingOrderOverrides.get(left.id);
+      const rightOverride = siblingOrderOverrides.get(right.id);
+      if (leftOverride !== undefined || rightOverride !== undefined) {
+        return (leftOverride ?? Number.MAX_SAFE_INTEGER) - (rightOverride ?? Number.MAX_SAFE_INTEGER);
+      }
+      return (
+        compareTaskRowsByWbs(left, right) ||
+        (inputOrderById.get(left.id) ?? 0) - (inputOrderById.get(right.id) ?? 0)
+      );
+    });
+
+    siblings.forEach((task, index) => {
+      if (emittedTaskIds.has(task.id)) return;
+      const wbsCode = prefix ? `${prefix}.${index + 1}` : String(index + 1);
+      emittedTaskIds.add(task.id);
+      result.push({ ...task, wbsCode });
+      appendChildren(task.id, wbsCode);
+    });
+  };
+
+  appendChildren(null, "");
+  return result;
 }
 
 function compareTaskRowsByWbs(

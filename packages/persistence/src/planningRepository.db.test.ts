@@ -513,6 +513,92 @@ describe("planning repository", () => {
     ]);
   });
 
+  it("preserves hierarchical WBS codes when creating and moving child tasks", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.create",
+        payload: {
+          id: "task-child",
+          projectId,
+          parentTaskId: "task-alpha",
+          title: "Дочерняя задача",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-10",
+          plannedFinish: "2026-06-10",
+          durationMinutes: 480,
+          workMinutes: 480,
+          assignments: []
+        }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.move_wbs",
+        payload: { taskId: "task-beta", parentTaskId: "task-alpha", sortOrder: 0 }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(
+      snapshot?.tasks.map((task) => ({
+        id: task.id,
+        parentTaskId: task.parentTaskId,
+        wbsCode: task.wbsCode
+      }))
+    ).toEqual([
+      { id: "task-alpha", parentTaskId: null, wbsCode: "1" },
+      { id: "task-beta", parentTaskId: "task-alpha", wbsCode: "1.1" },
+      { id: "task-child", parentTaskId: "task-alpha", wbsCode: "1.2" }
+    ]);
+  });
+
+  it("rejects task.create with a missing parent before persisting orphan hierarchy rows", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await expect(
+      planningRepository.applyPlanningCommand({
+        tenantId: "tenant-alpha",
+        projectId,
+        actorUserId: "user-alpha-admin",
+        command: {
+          type: "task.create",
+          payload: {
+            id: "task-orphan",
+            projectId,
+            parentTaskId: "task-missing",
+            title: "Сиротская задача",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-10",
+            plannedFinish: "2026-06-10",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        }
+      })
+    ).rejects.toThrow("parent_task_not_found");
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.tasks.map((task) => task.id)).toEqual(["task-alpha", "task-beta"]);
+  });
+
   it("preserves requested duration when applying task.create planning commands", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

@@ -211,8 +211,100 @@ describe("planning command reducer", () => {
     ]);
   });
 
+  it("creates and moves child tasks with hierarchical WBS codes", () => {
+    const snapshot = createSnapshot();
+    const created = reducePlanningCommand(snapshot, {
+      type: "task.create",
+      payload: {
+        id: "task-child",
+        projectId: "project-alpha",
+        parentTaskId: "task-a",
+        title: "Child",
+        statusId: "todo",
+        plannedStart: null,
+        plannedFinish: null,
+        durationMinutes: 480,
+        workMinutes: 480,
+        assignments: []
+      }
+    });
+
+    expect(
+      created.nextSnapshot.tasks.map((task) => ({
+        id: task.id,
+        parentTaskId: task.parentTaskId,
+        wbsCode: task.wbsCode
+      }))
+    ).toEqual([
+      { id: "task-a", parentTaskId: null, wbsCode: "1" },
+      { id: "task-child", parentTaskId: "task-a", wbsCode: "1.1" },
+      { id: "task-b", parentTaskId: null, wbsCode: "2" }
+    ]);
+
+    const moved = reducePlanningCommand(created.nextSnapshot, {
+      type: "task.move_wbs",
+      payload: { taskId: "task-b", parentTaskId: "task-a", sortOrder: 0 }
+    });
+
+    expect(
+      moved.nextSnapshot.tasks.map((task) => ({
+        id: task.id,
+        parentTaskId: task.parentTaskId,
+        wbsCode: task.wbsCode
+      }))
+    ).toEqual([
+      { id: "task-a", parentTaskId: null, wbsCode: "1" },
+      { id: "task-b", parentTaskId: "task-a", wbsCode: "1.1" },
+      { id: "task-child", parentTaskId: "task-a", wbsCode: "1.2" }
+    ]);
+  });
+
+  it("creates top-level tasks after the highest active WBS code in preview snapshots", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      tasks: [
+        createTask("task-a", "1"),
+        createTask("task-c", "3")
+      ]
+    };
+
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.create",
+      payload: {
+        id: "task-new",
+        projectId: "project-alpha",
+        title: "New",
+        statusId: "todo",
+        plannedStart: null,
+        plannedFinish: null,
+        workMinutes: 480,
+        assignments: []
+      }
+    });
+
+    expect(result.nextSnapshot.tasks.map((task) => ({ id: task.id, wbsCode: task.wbsCode }))).toEqual([
+      { id: "task-a", wbsCode: "1" },
+      { id: "task-c", wbsCode: "3" },
+      { id: "task-new", wbsCode: "4" }
+    ]);
+  });
+
   it("rejects invalid task, dependency, assignment and reservation command references", () => {
     const invalidCommands: PlanningCommand[] = [
+      {
+        type: "task.create",
+        payload: {
+          id: "task-orphan",
+          projectId: "project-alpha",
+          parentTaskId: "task-missing",
+          title: "Orphan",
+          statusId: "todo",
+          plannedStart: null,
+          plannedFinish: null,
+          workMinutes: 480,
+          assignments: []
+        }
+      },
       {
         type: "dependency.upsert",
         payload: {

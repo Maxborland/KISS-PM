@@ -136,7 +136,7 @@ function reduceTaskCreate(
   const task: PlanTask = {
     id: command.payload.id,
     parentTaskId: command.payload.parentTaskId ?? null,
-    wbsCode: String(snapshot.tasks.length + 1),
+    wbsCode: nextPreviewWbsCode(snapshot.tasks, command.payload.parentTaskId ?? null),
     title: command.payload.title,
     statusId: command.payload.statusId,
     schedulingMode: "auto",
@@ -164,7 +164,7 @@ function reduceTaskCreate(
     snapshot,
     command,
     {
-      tasks: [...snapshot.tasks, task],
+      tasks: sortTasksByWbs([...snapshot.tasks, task]),
       assignments: [...snapshot.assignments, ...assignments]
     },
     {
@@ -336,6 +336,13 @@ function validateCommandPreconditions(
     case "task.create":
       if (taskIds.has(command.payload.id)) {
         return [invalid("planning_command_invalid", "Задача с таким идентификатором уже есть в плане")];
+      }
+      if (
+        command.payload.parentTaskId !== undefined &&
+        command.payload.parentTaskId !== null &&
+        !taskIds.has(command.payload.parentTaskId)
+      ) {
+        return [invalid("planning_command_invalid", "Команда ссылается на неизвестную родительскую задачу")];
       }
       if (command.payload.workMinutes < 0) {
         return [invalid("planning_command_invalid", "Трудоемкость задачи не может быть отрицательной")];
@@ -524,17 +531,107 @@ function moveTask(
   parentTaskId: string | null,
   sortOrder: number
 ): PlanTask[] {
-  const moved = tasks.find((task) => task.id === taskId);
+  const orderedTasks = reindexWbsHierarchy(tasks);
+  const moved = orderedTasks.find((task) => task.id === taskId);
   if (!moved) return tasks;
 
-  const rest = tasks.filter((task) => task.id !== taskId);
-  const index = Math.max(0, Math.min(sortOrder, rest.length));
-  const next = [...rest.slice(0, index), { ...moved, parentTaskId }, ...rest.slice(index)];
+  const retargeted = orderedTasks.map((task) => (task.id === taskId ? { ...task, parentTaskId } : task));
+  const siblingIds = retargeted
+    .filter((task) => task.parentTaskId === parentTaskId && task.id !== taskId)
+    .map((task) => task.id);
+  const index = Math.max(0, Math.min(sortOrder, siblingIds.length));
+  const targetSiblingIds = [...siblingIds.slice(0, index), moved.id, ...siblingIds.slice(index)];
+  const siblingOrderOverrides = new Map<string, number>();
+  targetSiblingIds.forEach((id, siblingIndex) => siblingOrderOverrides.set(id, siblingIndex));
 
-  return next.map((task, taskIndex) => ({
-    ...task,
-    wbsCode: String(taskIndex + 1)
-  }));
+  return reindexWbsHierarchy(retargeted, siblingOrderOverrides);
+}
+
+function nextPreviewWbsCode(tasks: PlanTask[], parentTaskId: string | null): string {
+  if (parentTaskId !== null) {
+    const parent = tasks.find((task) => task.id === parentTaskId);
+    if (!parent) return String(tasks.length + 1);
+    const maxChildCode = tasks.reduce((max, task) => {
+      if (task.parentTaskId !== parentTaskId) return max;
+      const childCode = parseWbsPart(task.wbsCode.split(".").at(-1));
+      return Math.max(max, childCode);
+    }, 0);
+    return `${parent.wbsCode}.${maxChildCode + 1}`;
+  }
+
+  const maxTopLevelCode = tasks.reduce((max, task) => {
+    if (task.parentTaskId !== null) return max;
+    return Math.max(max, parseWbsPart(task.wbsCode));
+  }, 0);
+  return String(maxTopLevelCode + 1);
+}
+
+function sortTasksByWbs(tasks: PlanTask[]): PlanTask[] {
+  return [...tasks].sort(
+    (left, right) => compareWbsCodes(left.wbsCode, right.wbsCode) || left.id.localeCompare(right.id)
+  );
+}
+
+function reindexWbsHierarchy(
+  tasks: PlanTask[],
+  siblingOrderOverrides: Map<string, number> = new Map()
+): PlanTask[] {
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const inputOrderById = new Map(tasks.map((task, index) => [task.id, index]));
+  const tasksByParentId = new Map<string | null, PlanTask[]>();
+
+  for (const task of tasks) {
+    const parentId = task.parentTaskId !== null && taskIds.has(task.parentTaskId) ? task.parentTaskId : null;
+    const normalizedTask = parentId === task.parentTaskId ? task : { ...task, parentTaskId: null };
+    tasksByParentId.set(parentId, [...(tasksByParentId.get(parentId) ?? []), normalizedTask]);
+  }
+
+  const result: PlanTask[] = [];
+  const emittedTaskIds = new Set<string>();
+
+  const appendChildren = (parentId: string | null, prefix: string): void => {
+    const siblings = [...(tasksByParentId.get(parentId) ?? [])].sort((left, right) => {
+      const leftOverride = siblingOrderOverrides.get(left.id);
+      const rightOverride = siblingOrderOverrides.get(right.id);
+      if (leftOverride !== undefined || rightOverride !== undefined) {
+        return (leftOverride ?? Number.MAX_SAFE_INTEGER) - (rightOverride ?? Number.MAX_SAFE_INTEGER);
+      }
+      return (
+        compareWbsCodes(left.wbsCode, right.wbsCode) ||
+        (inputOrderById.get(left.id) ?? 0) - (inputOrderById.get(right.id) ?? 0) ||
+        left.id.localeCompare(right.id)
+      );
+    });
+
+    siblings.forEach((task, index) => {
+      if (emittedTaskIds.has(task.id)) return;
+      const wbsCode = prefix ? `${prefix}.${index + 1}` : String(index + 1);
+      emittedTaskIds.add(task.id);
+      result.push({ ...task, wbsCode });
+      appendChildren(task.id, wbsCode);
+    });
+  };
+
+  appendChildren(null, "");
+  return result;
+}
+
+function compareWbsCodes(left: string, right: string): number {
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = parseWbsPart(leftParts[index]);
+    const rightPart = parseWbsPart(rightParts[index]);
+    if (leftPart !== rightPart) return leftPart - rightPart;
+  }
+  return 0;
+}
+
+function parseWbsPart(part: string | undefined): number {
+  if (part === undefined) return 0;
+  const numericPart = Number.parseInt(part, 10);
+  return Number.isFinite(numericPart) ? numericPart : 0;
 }
 
 function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
