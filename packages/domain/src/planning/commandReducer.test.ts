@@ -195,6 +195,27 @@ describe("planning command reducer", () => {
     });
   });
 
+  it("rejects task schedule updates that finish before they start", () => {
+    const snapshot = createSnapshot();
+
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-a",
+        plannedStart: "2026-06-10",
+        plannedFinish: "2026-06-09"
+      }
+    });
+
+    expect(result.nextSnapshot).toBe(snapshot);
+    expect(result.validationIssues).toEqual([
+      expect.objectContaining({
+        code: "planning_command_invalid",
+        severity: "error"
+      })
+    ]);
+  });
+
   it("removes archived tasks and their active planning edges from preview snapshots", () => {
     const snapshot = createSnapshot();
     const result = reducePlanningCommand(snapshot, {
