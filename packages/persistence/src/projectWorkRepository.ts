@@ -82,6 +82,17 @@ export type TaskRecord = {
 
 export type TaskInput = Omit<TaskRecord, "createdAt" | "updatedAt" | "archivedAt">;
 
+export type TaskMetadataInput = {
+  tenantId: TenantId;
+  taskId: string;
+  description: string | null;
+  priority: TaskPriority;
+  requesterUserId: UserId;
+  ownerUserId: UserId;
+  requiresAcceptance: boolean;
+  participants: TaskParticipantRecord[];
+};
+
 export type TaskStatusUpdateInput = {
   tenantId: TenantId;
   projectId: string;
@@ -125,6 +136,7 @@ export type ProjectWorkRepository = {
   findTaskById(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   createTask(input: TaskInput): Promise<TaskRecord>;
   updateTask(input: TaskInput): Promise<TaskRecord | undefined>;
+  updateTaskMetadata(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
   archiveTask(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   updateTaskStatus(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
   listTaskActivities(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
@@ -411,6 +423,49 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
           input.participants.map((participant) => ({
             tenantId: input.tenantId,
             taskId: input.id,
+            userId: participant.userId,
+            role: participant.role
+          }))
+        );
+
+        return mapTaskRecord(row, null, input.participants);
+      });
+    },
+    async updateTaskMetadata(input) {
+      return db.transaction(async (transaction) => {
+        const [row] = await transaction
+          .update(tasks)
+          .set({
+            description: input.description,
+            priority: input.priority,
+            requesterUserId: input.requesterUserId,
+            ownerUserId: input.ownerUserId,
+            requiresAcceptance: input.requiresAcceptance,
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(tasks.tenantId, input.tenantId),
+              eq(tasks.id, input.taskId),
+              isNull(tasks.archivedAt)
+            )
+          )
+          .returning();
+
+        if (!row) return undefined;
+
+        await transaction
+          .delete(taskParticipants)
+          .where(
+            and(
+              eq(taskParticipants.tenantId, input.tenantId),
+              eq(taskParticipants.taskId, input.taskId)
+            )
+          );
+        await transaction.insert(taskParticipants).values(
+          input.participants.map((participant) => ({
+            tenantId: input.tenantId,
+            taskId: input.taskId,
             userId: participant.userId,
             role: participant.role
           }))

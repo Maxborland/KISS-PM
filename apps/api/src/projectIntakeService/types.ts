@@ -26,7 +26,7 @@ export type ProjectIntakeServiceDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 export type ServiceErrorStatus = 400 | 403 | 404 | 409 | 501;

@@ -1,14 +1,24 @@
 import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
 import {
+  calendarExceptions,
   createDatabase,
   createPostgresClient,
   createTenantAdminSeedProfile,
   seedTenantDataset,
   opportunityDemands,
   opportunities,
+  planVersions,
+  projectBaselineAssignments,
+  projectBaselineTasks,
+  projectBaselines,
+  projectCalendars,
   projectPositionDemands,
   projects,
+  resourceCalendars,
+  resourceReservations,
   taskActivities,
+  taskAssignments,
+  taskDependencies,
   taskParticipants,
   tasks,
   type KissPmDatabase,
@@ -167,7 +177,7 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         title: "CRM intake",
         projectType: "Внедрение",
         description: "Демо-сделка для проверки задач, канбана и карточки задачи",
-        plannedStart: new Date("2026-05-20T00:00:00.000Z"),
+        plannedStart: new Date("2026-05-18T00:00:00.000Z"),
         plannedFinish: new Date("2026-06-12T00:00:00.000Z"),
         contractValue: 960000,
         plannedHourlyRate: 6000,
@@ -205,15 +215,24 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         title: "CRM intake",
         clientName: "ООО Ромашка",
         status: "active",
-        plannedStart: new Date("2026-05-20T00:00:00.000Z"),
+        plannedStart: new Date("2026-05-18T00:00:00.000Z"),
         plannedFinish: new Date("2026-06-12T00:00:00.000Z"),
+        deadline: new Date("2026-06-15T00:00:00.000Z"),
+        calendarId: "calendar-demo-project",
         contractValue: 960000,
         plannedHours: 160,
         templateId: null,
         createdAt,
         activatedAt: createdAt
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [projects.tenantId, projects.id],
+        set: {
+          plannedStart: new Date("2026-05-18T00:00:00.000Z"),
+          deadline: new Date("2026-06-15T00:00:00.000Z"),
+          calendarId: "calendar-demo-project"
+        }
+      });
 
     await transaction
       .insert(projectPositionDemands)
@@ -236,7 +255,15 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         plannedStart: new Date("2026-05-20T00:00:00.000Z"),
         plannedFinish: new Date("2026-05-22T00:00:00.000Z"),
         durationWorkingDays: 3,
-        plannedWork: 12,
+        plannedWork: 24,
+        workMinutes: 1440,
+        wbsCode: "1",
+        taskType: "fixed_work",
+        effortDriven: true,
+        plannedStartMinute: 0,
+        plannedFinishMinute: 480,
+        constraintType: "start_no_earlier_than",
+        constraintDate: new Date("2026-05-20T00:00:00.000Z"),
         requiresAcceptance: true,
         coExecutors: ["user-alpha-engineer"]
       },
@@ -251,6 +278,14 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         plannedFinish: new Date("2026-05-21T00:00:00.000Z"),
         durationWorkingDays: 1,
         plannedWork: 4,
+        workMinutes: 240,
+        wbsCode: "2",
+        taskType: "fixed_units",
+        effortDriven: false,
+        plannedStartMinute: 60,
+        plannedFinishMinute: 420,
+        constraintType: null,
+        constraintDate: null,
         requiresAcceptance: false,
         coExecutors: []
       },
@@ -265,6 +300,14 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         plannedFinish: new Date("2026-05-23T00:00:00.000Z"),
         durationWorkingDays: 2,
         plannedWork: 6,
+        workMinutes: 360,
+        wbsCode: "3",
+        taskType: "fixed_duration",
+        effortDriven: false,
+        plannedStartMinute: 0,
+        plannedFinishMinute: 360,
+        constraintType: null,
+        constraintDate: null,
         requiresAcceptance: false,
         coExecutors: []
       },
@@ -279,6 +322,14 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         plannedFinish: new Date("2026-05-19T00:00:00.000Z"),
         durationWorkingDays: 2,
         plannedWork: 2,
+        workMinutes: 120,
+        wbsCode: "4",
+        taskType: "fixed_units",
+        effortDriven: false,
+        plannedStartMinute: 120,
+        plannedFinishMinute: 360,
+        constraintType: null,
+        constraintDate: null,
         requiresAcceptance: true,
         coExecutors: ["user-alpha-engineer"]
       },
@@ -293,6 +344,14 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         plannedFinish: new Date("2026-05-20T00:00:00.000Z"),
         durationWorkingDays: 1,
         plannedWork: 1,
+        workMinutes: 60,
+        wbsCode: "5",
+        taskType: "fixed_units",
+        effortDriven: false,
+        plannedStartMinute: 0,
+        plannedFinishMinute: 120,
+        constraintType: null,
+        constraintDate: null,
         requiresAcceptance: false,
         coExecutors: []
       }
@@ -315,6 +374,17 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
           ownerUserId: "user-alpha-admin",
           plannedStart: task.plannedStart,
           plannedFinish: task.plannedFinish,
+          plannedStartMinute: task.plannedStartMinute,
+          plannedFinishMinute: task.plannedFinishMinute,
+          parentTaskId: null,
+          wbsCode: task.wbsCode,
+          schedulingMode: "auto",
+          taskType: task.taskType,
+          effortDriven: task.effortDriven,
+          durationMinutes: task.durationWorkingDays * 480,
+          workMinutes: task.workMinutes,
+          constraintType: task.constraintType,
+          constraintDate: task.constraintDate,
           durationWorkingDays: task.durationWorkingDays,
           plannedWork: task.plannedWork,
           actualWork: task.status === "done" ? task.plannedWork : 0,
@@ -325,7 +395,33 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
           updatedAt: createdAt,
           archivedAt: null
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [tasks.tenantId, tasks.id],
+          set: {
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            statusId: task.statusId,
+            priority: task.priority,
+            plannedStart: task.plannedStart,
+            plannedFinish: task.plannedFinish,
+            plannedStartMinute: task.plannedStartMinute,
+            plannedFinishMinute: task.plannedFinishMinute,
+            parentTaskId: null,
+            wbsCode: task.wbsCode,
+            schedulingMode: "auto",
+            taskType: task.taskType,
+            effortDriven: task.effortDriven,
+            durationMinutes: task.durationWorkingDays * 480,
+            workMinutes: task.workMinutes,
+            constraintType: task.constraintType,
+            constraintDate: task.constraintDate,
+            durationWorkingDays: task.durationWorkingDays,
+            plannedWork: task.plannedWork,
+            requiresAcceptance: task.requiresAcceptance,
+            updatedAt: createdAt
+          }
+        });
 
       await transaction
         .insert(taskParticipants)
@@ -369,5 +465,279 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         })
         .onConflictDoNothing();
     }
+
+    await seedDemoPlanningData(transaction, createdAt);
   });
+}
+
+async function seedDemoPlanningData(
+  db: KissPmDatabase,
+  createdAt: Date
+): Promise<void> {
+  await db
+    .insert(planVersions)
+    .values({
+      tenantId: "tenant-alpha",
+      projectId: "project-demo-crm-intake",
+      version: 1,
+      updatedAt: createdAt
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(projectCalendars)
+    .values({
+      id: "calendar-demo-project",
+      tenantId: "tenant-alpha",
+      projectId: "project-demo-crm-intake",
+      workingWeekdays: [1, 2, 3, 4, 5],
+      workingMinutesPerDay: 480,
+      createdAt,
+      updatedAt: createdAt
+    })
+    .onConflictDoUpdate({
+      target: [projectCalendars.tenantId, projectCalendars.projectId, projectCalendars.id],
+      set: {
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480,
+        updatedAt: createdAt
+      }
+    });
+
+  await db
+    .insert(resourceCalendars)
+    .values({
+      id: "calendar-demo-engineer",
+      tenantId: "tenant-alpha",
+      resourceId: "user-alpha-engineer",
+      workingWeekdays: [1, 2, 3, 4, 5],
+      workingMinutesPerDay: 480,
+      createdAt,
+      updatedAt: createdAt
+    })
+    .onConflictDoUpdate({
+      target: [resourceCalendars.tenantId, resourceCalendars.resourceId, resourceCalendars.id],
+      set: {
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480,
+        updatedAt: createdAt
+      }
+    });
+
+  await db
+    .insert(calendarExceptions)
+    .values([
+      {
+        id: "calendar-exception-demo-project-review-day",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        calendarId: "calendar-demo-project",
+        resourceId: null,
+        date: "2026-05-25",
+        workingMinutes: 240,
+        reason: "Демо: короткий день для проектного календаря",
+        createdAt,
+        updatedAt: createdAt
+      },
+      {
+        id: "calendar-exception-demo-engineer-partial",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        calendarId: "calendar-demo-engineer",
+        resourceId: "user-alpha-engineer",
+        date: "2026-05-22",
+        workingMinutes: 240,
+        reason: "Демо: частичная недоступность инженера",
+        createdAt,
+        updatedAt: createdAt
+      }
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(taskAssignments)
+    .values([
+      {
+        id: "assignment-demo-resource-estimate-admin",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-resource-estimate",
+        resourceId: "user-alpha-admin",
+        role: "executor",
+        unitsPermille: 500,
+        workMinutes: 480,
+        calendarId: null
+      },
+      {
+        id: "assignment-demo-resource-estimate-engineer",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-resource-estimate",
+        resourceId: "user-alpha-engineer",
+        role: "co_executor",
+        unitsPermille: 1000,
+        workMinutes: 1440,
+        calendarId: "calendar-demo-engineer"
+      },
+      {
+        id: "assignment-demo-team-setup-engineer",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-team-setup",
+        resourceId: "user-alpha-engineer",
+        role: "executor",
+        unitsPermille: 1000,
+        workMinutes: 300,
+        calendarId: "calendar-demo-engineer"
+      },
+      {
+        id: "assignment-demo-description-admin",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-description",
+        resourceId: "user-alpha-admin",
+        role: "executor",
+        unitsPermille: 750,
+        workMinutes: 360,
+        calendarId: null
+      },
+      {
+        id: "assignment-demo-gantt-review-engineer",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-gantt-review",
+        resourceId: "user-alpha-engineer",
+        role: "executor",
+        unitsPermille: 500,
+        workMinutes: 240,
+        calendarId: "calendar-demo-engineer"
+      },
+      {
+        id: "assignment-demo-smoke-admin",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        taskId: "task-demo-smoke",
+        resourceId: "user-alpha-admin",
+        role: "executor",
+        unitsPermille: 250,
+        workMinutes: 60,
+        calendarId: null
+      }
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(taskDependencies)
+    .values([
+      {
+        id: "dependency-demo-team-starts-after-estimate-start",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        predecessorTaskId: "task-demo-resource-estimate",
+        successorTaskId: "task-demo-team-setup",
+        type: "SS",
+        lagMinutes: 480
+      },
+      {
+        id: "dependency-demo-estimate-before-description",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        predecessorTaskId: "task-demo-resource-estimate",
+        successorTaskId: "task-demo-description",
+        type: "FS",
+        lagMinutes: 0
+      },
+      {
+        id: "dependency-demo-review-finish-before-smoke",
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        predecessorTaskId: "task-demo-gantt-review",
+        successorTaskId: "task-demo-smoke",
+        type: "FF",
+        lagMinutes: 480
+      }
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(resourceReservations)
+    .values({
+      id: "reservation-demo-engineer-support",
+      tenantId: "tenant-alpha",
+      projectId: "project-demo-crm-intake",
+      resourceId: "user-alpha-engineer",
+      start: "2026-05-21",
+      finish: "2026-05-21",
+      workMinutes: 240,
+      reason: "Демо: поддержка действующего внедрения"
+    })
+    .onConflictDoUpdate({
+      target: [resourceReservations.tenantId, resourceReservations.projectId, resourceReservations.id],
+      set: {
+        resourceId: "user-alpha-engineer",
+        start: "2026-05-21",
+        finish: "2026-05-21",
+        workMinutes: 240,
+        reason: "Демо: поддержка действующего внедрения"
+      }
+    });
+
+  await db
+    .insert(projectBaselines)
+    .values({
+      id: "baseline-demo-initial",
+      tenantId: "tenant-alpha",
+      projectId: "project-demo-crm-intake",
+      label: "Демо baseline: стартовый план",
+      capturedAt: createdAt
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(projectBaselineTasks)
+    .values([
+      {
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        baselineId: "baseline-demo-initial",
+        taskId: "task-demo-resource-estimate",
+        plannedStart: "2026-05-20",
+        plannedFinish: "2026-05-22",
+        workMinutes: 1440
+      },
+      {
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        baselineId: "baseline-demo-initial",
+        taskId: "task-demo-team-setup",
+        plannedStart: "2026-05-21",
+        plannedFinish: "2026-05-21",
+        workMinutes: 240
+      }
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(projectBaselineAssignments)
+    .values([
+      {
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        baselineId: "baseline-demo-initial",
+        assignmentId: "assignment-demo-resource-estimate-engineer",
+        taskId: "task-demo-resource-estimate",
+        resourceId: "user-alpha-engineer",
+        workMinutes: 1440
+      },
+      {
+        tenantId: "tenant-alpha",
+        projectId: "project-demo-crm-intake",
+        baselineId: "baseline-demo-initial",
+        assignmentId: "assignment-demo-team-setup-engineer",
+        taskId: "task-demo-team-setup",
+        resourceId: "user-alpha-engineer",
+        workMinutes: 300
+      }
+    ])
+    .onConflictDoNothing();
 }

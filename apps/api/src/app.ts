@@ -6,6 +6,7 @@ import {
   getSessionTokenFromCookie,
   shouldUseSecureCookies
 } from "./authSession";
+import { createAuthRateLimiter } from "./authRateLimit";
 import {
   MissingAccessProfileError,
   resolveAppErrorResponse
@@ -24,8 +25,14 @@ import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
+import { registerPlanningRoutes } from "./planningRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import {
+  isTrustedBrowserMutationRequest,
+  setApiSecurityHeaders,
+  trustedMutationOriginsFromEnv
+} from "./requestSecurity";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -36,7 +43,10 @@ export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
   const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
+  const authRateLimiter = options.authRateLimiter ?? createAuthRateLimiter();
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
+  const trustedMutationOrigins =
+    options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
 
   app.onError((error, context) => {
@@ -46,6 +56,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
   app.use("/api/*", async (context, next) => {
     context.header("Cache-Control", "no-store, private");
+    setApiSecurityHeaders(context);
     await next();
   });
 
@@ -53,6 +64,9 @@ export function createApp(options: CreateAppOptions = {}) {
     if (requiresSameOriginActionHeader(context.req.method, context.req.path)) {
       const actionHeader = context.req.header("x-kiss-pm-action");
       if (actionHeader !== "same-origin") {
+        return context.json({ error: "same_origin_action_required" }, 403);
+      }
+      if (!isTrustedBrowserMutationRequest(context.req.raw, trustedMutationOrigins)) {
         return context.json({ error: "same_origin_action_required" }, 403);
       }
     }
@@ -142,8 +156,9 @@ export function createApp(options: CreateAppOptions = {}) {
       throw new Error("audit_not_configured");
     }
 
+    const auditEventId = `audit-${randomUUID()}`;
     await auditDataSource.appendAuditEvent({
-      id: `audit-${randomUUID()}`,
+      id: auditEventId,
       tenantId: input.tenantId,
       actorUserId: input.actorUserId,
       actionType: input.actionType,
@@ -158,10 +173,12 @@ export function createApp(options: CreateAppOptions = {}) {
       correlationId: randomUUID(),
       createdAt: new Date()
     });
+    return auditEventId;
   }
 
   const routeDeps: ApiRouteDeps = {
     appendManagementAuditEvent,
+    authRateLimiter,
     dataSource,
     getActor,
     getActorProfile,
@@ -185,6 +202,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
+  registerPlanningRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);

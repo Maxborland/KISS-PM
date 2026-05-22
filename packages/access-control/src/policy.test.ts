@@ -7,6 +7,9 @@ import {
   canManageDealStages,
   canManageOpportunities,
   canManagePositions,
+  canManageProjectBaselines,
+  canManageProjectPlan,
+  canManageProjectResources,
   canManageProducts,
   canManageProjectActivation,
   canManageProjectTypes,
@@ -24,11 +27,15 @@ import {
   canReadDealStages,
   canReadOpportunities,
   canReadProducts,
+  canReadProjectPlan,
+  canReadProjectResources,
   canReadProjects,
   canReadProjectTypes,
   canReadResourceFeasibility,
   canReadTenantUsers,
   canReadWorkspaceConfig,
+  canPreviewPlanningScenarios,
+  canApplyPlanningScenarios,
   canUpdateProfile,
   createAccessProfile
 } from "./index";
@@ -60,6 +67,13 @@ describe("access-control tenant policy", () => {
       "tenant.opportunities.manage",
       "tenant.projects.read",
       "tenant.projects.manage",
+      "tenant.project_plan.read",
+      "tenant.project_plan.manage",
+      "tenant.project_baselines.manage",
+      "tenant.project_resources.read",
+      "tenant.project_resources.manage",
+      "tenant.planning_scenarios.preview",
+      "tenant.planning_scenarios.apply",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -500,6 +514,80 @@ describe("access-control tenant policy", () => {
     ).toBe(true);
     expect(
       canEditTasks({ actor, profile: adminProfile, targetTenantId: "tenant-beta" })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 5/6 planning actions only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const planReader = createAccessProfile({
+      id: "plan-reader",
+      permissions: ["tenant.project_plan.read", "tenant.project_resources.read"]
+    });
+
+    expect(
+      canReadProjectPlan({ actor, profile: planReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadProjectResources({ actor, profile: planReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageProjectPlan({ actor, profile: planReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageProjectPlan({ actor, profile: adminProfile, targetTenantId: "tenant-alpha" })
+        .allowed
+    ).toBe(true);
+    expect(
+      canManageProjectBaselines({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageProjectResources({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canPreviewPlanningScenarios({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canApplyPlanningScenarios({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canApplyPlanningScenarios({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
     ).toEqual({
       allowed: false,
       reason: "cross_tenant_denied"

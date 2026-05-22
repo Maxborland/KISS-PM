@@ -1,4 +1,4 @@
-import { and, desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 
 import type { TenantId } from "@kiss-pm/domain";
 
@@ -22,6 +22,7 @@ export type OpportunityFinalStatus = "won_closed" | "lost_rejected";
 const finalOpportunityStatuses: string[] = ["won_closed", "lost_rejected"];
 
 export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
+export type ProjectSourceType = "opportunity" | "workspace_inbox" | "manual";
 
 export type PositionDemandRecord = {
   positionId: string;
@@ -83,7 +84,8 @@ export type OpportunityFeasibilityUpdate = {
 export type ProjectRecord = {
   id: string;
   tenantId: TenantId;
-  sourceOpportunityId: string;
+  sourceType: ProjectSourceType;
+  sourceOpportunityId: string | null;
   clientId: string | null;
   projectTypeId: string | null;
   title: string;
@@ -99,10 +101,21 @@ export type ProjectRecord = {
   demand: PositionDemandRecord[];
 };
 
-export type ProjectInput = Omit<ProjectRecord, "createdAt" | "activatedAt">;
+export type ProjectInput = Omit<
+  ProjectRecord,
+  "createdAt" | "activatedAt" | "sourceType" | "sourceOpportunityId"
+> & {
+  sourceOpportunityId: string;
+};
 export type ProjectDraftActivationInput = {
   tenantId: TenantId;
   projectId: string;
+};
+
+export type WorkspaceInboxProjectInput = {
+  tenantId: TenantId;
+  plannedStart: Date;
+  plannedFinish: Date;
 };
 
 export type ProjectIntakeRepository = {
@@ -127,6 +140,7 @@ export type ProjectIntakeRepository = {
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
+  ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord>;
   createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
 };
@@ -414,6 +428,78 @@ export function createProjectIntakeRepository(
         mapProjectRecord(row, demandByProject.get(row.id) ?? [])
       );
     },
+    async ensureWorkspaceInboxProject(input) {
+      const now = new Date();
+      const [existing] = await db
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.tenantId, input.tenantId),
+            eq(projects.sourceType, "workspace_inbox"),
+            inArray(projects.status, ["draft", "active", "paused"])
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        const plannedStart =
+          existing.plannedStart.getTime() <= input.plannedStart.getTime()
+            ? existing.plannedStart
+            : input.plannedStart;
+        const plannedFinish =
+          existing.plannedFinish.getTime() >= input.plannedFinish.getTime()
+            ? existing.plannedFinish
+            : input.plannedFinish;
+        const [row] = await db
+          .update(projects)
+          .set({
+            status: "active",
+            plannedStart,
+            plannedFinish,
+            activatedAt: existing.activatedAt ?? now
+          })
+          .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, existing.id)))
+          .returning();
+        if (!row) throw new Error("Workspace inbox project update returned no row");
+        return mapProjectRecord(row, []);
+      }
+
+      const preferredInboxId = `workspace-inbox-${input.tenantId}`;
+      const [closedPreferredInbox] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, preferredInboxId)))
+        .limit(1);
+      const inboxId = closedPreferredInbox
+        ? `${preferredInboxId}-${now.getTime()}`
+        : preferredInboxId;
+
+      const [row] = await db
+        .insert(projects)
+        .values({
+          id: inboxId,
+          tenantId: input.tenantId,
+          sourceType: "workspace_inbox",
+          sourceOpportunityId: null,
+          clientId: null,
+          projectTypeId: null,
+          title: "Входящие задачи",
+          clientName: "Рабочее пространство",
+          status: "active",
+          plannedStart: input.plannedStart,
+          plannedFinish: input.plannedFinish,
+          contractValue: 0,
+          plannedHours: 0,
+          templateId: null,
+          createdAt: now,
+          activatedAt: now
+        })
+        .returning();
+
+      if (!row) throw new Error("Workspace inbox project insert returned no row");
+      return mapProjectRecord(row, []);
+    },
     async createProjectDraftFromOpportunity(input) {
       return db.transaction(async (transaction) => {
         const now = new Date();
@@ -427,7 +513,7 @@ export function createProjectIntakeRepository(
           .where(
             and(
               eq(opportunities.tenantId, input.tenantId),
-              eq(opportunities.id, input.sourceOpportunityId),
+              eq(opportunities.id, input.sourceOpportunityId ?? ""),
               notInArray(opportunities.status, finalOpportunityStatuses)
             )
           )
@@ -442,6 +528,7 @@ export function createProjectIntakeRepository(
             .values({
               id: input.id,
               tenantId: input.tenantId,
+              sourceType: "opportunity",
               sourceOpportunityId: input.sourceOpportunityId,
               clientId: input.clientId,
               projectTypeId: input.projectTypeId,
@@ -496,6 +583,9 @@ export function createProjectIntakeRepository(
           .limit(1);
         if (!draft) {
           throw new Error("project_draft_not_activatable");
+        }
+        if (!draft.sourceOpportunityId) {
+          throw new Error("source_opportunity_required");
         }
 
         const [updatedOpportunity] = await transaction
@@ -600,6 +690,7 @@ function mapProjectRecord(
   return {
     id: row.id,
     tenantId: row.tenantId,
+    sourceType: row.sourceType as ProjectSourceType,
     sourceOpportunityId: row.sourceOpportunityId,
     clientId: row.clientId,
     projectTypeId: row.projectTypeId,

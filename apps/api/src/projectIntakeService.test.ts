@@ -145,6 +145,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 
@@ -299,6 +300,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 
@@ -446,6 +448,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 
@@ -518,6 +521,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 
@@ -588,6 +592,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 
@@ -659,6 +664,7 @@ describe("project intake application service", () => {
       runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
       appendManagementAuditEvent: async (input) => {
         audits.push(input);
+        return `audit-test-${audits.length}`;
       }
     });
 

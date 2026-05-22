@@ -32,6 +32,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
         "tenant.tasks.edit",
         "tenant.tasks.delete",
         "tenant.task_statuses.manage",
+        "tenant.project_plan.read",
         "tenant.resource_feasibility.read",
         "tenant.audit_events.read"
       ]
@@ -171,7 +172,7 @@ describe("project work API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       projectWorkApiSeed,
@@ -181,7 +182,7 @@ describe("project work API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -218,6 +219,10 @@ describe("project work API routes", () => {
     const detail = await app.request("/api/workspace/tasks/task-alpha", {
       headers: { cookie: adminCookie }
     });
+    const planningReadModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
 
     expect(createdTask.status).toBe(201);
     await expect(createdTask.json()).resolves.toMatchObject({
@@ -244,9 +249,34 @@ describe("project work API routes", () => {
       auditEvents: expect.arrayContaining([
         expect.objectContaining({
           actionType: "task.created",
-          sourceEntity: { type: "Task", id: "task-alpha" }
+          sourceEntity: { type: "Task", id: "task-alpha" },
+          input: expect.objectContaining({
+            planningCommands: [
+              expect.objectContaining({
+                type: "task.create",
+                payload: expect.objectContaining({ id: "task-alpha" })
+              })
+            ]
+          })
         })
       ])
+    });
+    expect(planningReadModel.status).toBe(200);
+    await expect(planningReadModel.json()).resolves.toMatchObject({
+      planVersion: 2,
+      authored: {
+        tasks: expect.arrayContaining([
+          expect.objectContaining({ id: "task-alpha", title: "Подготовить план внедрения" })
+        ]),
+        assignments: expect.arrayContaining([
+          expect.objectContaining({
+            id: "task-alpha-user-alpha-executor-executor",
+            taskId: "task-alpha",
+            resourceId: "user-alpha-executor",
+            role: "executor"
+          })
+        ])
+      }
     });
     await expect(detail.json()).resolves.toMatchObject({
       activities: [
@@ -256,6 +286,109 @@ describe("project work API routes", () => {
           title: "Задача создана"
         })
       ]
+    });
+  });
+
+  it("creates projectless task CRUD records inside the workspace inbox planning project", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+
+    const createdTask = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-alpha",
+        title: "Быстрая задача без проекта",
+        plannedStart: "2026-07-02",
+        plannedFinish: "2026-07-03",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const createdBody = await createdTask.json();
+
+    expect(createdTask.status).toBe(201);
+    expect(createdBody).toMatchObject({
+      task: {
+        id: "task-inbox-alpha",
+        projectId: "workspace-inbox-tenant-alpha",
+        title: "Быстрая задача без проекта"
+      },
+      project: {
+        id: "workspace-inbox-tenant-alpha",
+        sourceType: "workspace_inbox",
+        sourceOpportunityId: null,
+        status: "active"
+      },
+      planVersion: 2
+    });
+
+    const secondTask = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-beta",
+        title: "Следующая задача без проекта",
+        plannedStart: "2026-08-10",
+        plannedFinish: "2026-08-11",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(secondTask.status).toBe(201);
+
+    const inboxRows = await client`
+      SELECT id, source_type, source_opportunity_id, planned_start, planned_finish
+      FROM projects
+      WHERE tenant_id = 'tenant-alpha'
+        AND source_type = 'workspace_inbox'
+    `;
+    expect(inboxRows).toHaveLength(1);
+    expect(inboxRows[0]).toMatchObject({
+      id: "workspace-inbox-tenant-alpha",
+      source_type: "workspace_inbox",
+      source_opportunity_id: null
+    });
+    expect(String(inboxRows[0]?.planned_finish)).toContain("2026-08-11");
+
+    const planningReadModel = await app.request(
+      "/api/workspace/projects/workspace-inbox-tenant-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(planningReadModel.status).toBe(200);
+    await expect(planningReadModel.json()).resolves.toMatchObject({
+      project: {
+        sourceType: "workspace_inbox",
+        sourceOpportunityId: null
+      },
+      authored: {
+        tasks: expect.arrayContaining([
+          expect.objectContaining({ id: "task-inbox-alpha" }),
+          expect.objectContaining({ id: "task-inbox-beta" })
+        ])
+      },
+      planVersion: 3
+    });
+
+    const myWork = await app.request("/api/workspace/my-work", {
+      headers: { cookie: executorCookie }
+    });
+    expect(myWork.status).toBe(200);
+    await expect(myWork.json()).resolves.toMatchObject({
+      tasks: expect.arrayContaining([
+        expect.objectContaining({
+          id: "task-inbox-alpha",
+          projectId: "workspace-inbox-tenant-alpha"
+        })
+      ])
     });
   });
 
