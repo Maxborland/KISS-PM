@@ -65,6 +65,7 @@ export function mapPlanningReadModelToGanttViewModel(
     );
   }
   const issueIdsByTaskId = mapValidationIssueIdsByTaskId(readModel.validationIssues);
+  const overloadMinutesByBucket = mapOverloadMinutesByBucket(readModel.resourceLoad.overloads);
 
   return {
     project: {
@@ -142,7 +143,7 @@ export function mapPlanningReadModelToGanttViewModel(
       availableMinutes: bucket.capacityMinutes,
       reservedMinutes: bucket.reservedMinutes,
       freeMinutes: bucket.freeMinutes,
-      overloadMinutes: Math.max(0, bucket.assignedMinutes + bucket.reservedMinutes - bucket.capacityMinutes),
+      overloadMinutes: overloadMinutesByBucket.get(resourceBucketKey(bucket.resourceId, bucket.granularity, bucket.date)) ?? 0,
       taskIds: bucket.taskIds
     })),
     planVersion: readModel.planVersion,
@@ -166,4 +167,23 @@ function mapValidationIssueIdsByTaskId(
 
 function validationIssueId(issue: ValidationIssue, index: number): string {
   return `${issue.code}:${issue.entity?.type ?? "plan"}:${issue.entity?.id ?? "global"}:${index}`;
+}
+
+function mapOverloadMinutesByBucket(
+  overloads: ResourceLoadMatrix["overloads"]
+): Map<string, number> {
+  return new Map(
+    overloads.map((overload) => [
+      resourceBucketKey(overload.resourceId, overload.granularity, overload.date),
+      overload.overloadMinutes
+    ])
+  );
+}
+
+function resourceBucketKey(
+  resourceId: string,
+  granularity: ResourceLoadMatrix["buckets"][number]["granularity"],
+  date: string
+): string {
+  return `${resourceId}:${granularity}:${date}`;
 }

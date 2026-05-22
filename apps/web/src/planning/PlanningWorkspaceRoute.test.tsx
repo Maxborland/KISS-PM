@@ -13,8 +13,12 @@ const queryMocks = vi.hoisted(() => ({
   },
   previewMutateAsync: vi.fn(),
   applyMutateAsync: vi.fn(),
+  previewScenarioMutateAsync: vi.fn(),
+  applyScenarioMutateAsync: vi.fn(),
   previewPending: false,
-  applyPending: false
+  applyPending: false,
+  scenarioPreviewPending: false,
+  scenarioApplyPending: false
 }));
 
 vi.mock("./planningQueries", () => ({
@@ -27,6 +31,16 @@ vi.mock("./planningQueries", () => ({
     applyCommand: {
       mutateAsync: queryMocks.applyMutateAsync,
       isPending: queryMocks.applyPending
+    }
+  }),
+  usePlanningScenarioMutations: () => ({
+    previewScenarios: {
+      mutateAsync: queryMocks.previewScenarioMutateAsync,
+      isPending: queryMocks.scenarioPreviewPending
+    },
+    applyScenario: {
+      mutateAsync: queryMocks.applyScenarioMutateAsync,
+      isPending: queryMocks.scenarioApplyPending
     }
   })
 }));
@@ -41,8 +55,12 @@ describe("PlanningWorkspaceRoute", () => {
     };
     queryMocks.previewPending = false;
     queryMocks.applyPending = false;
+    queryMocks.scenarioPreviewPending = false;
+    queryMocks.scenarioApplyPending = false;
     queryMocks.previewMutateAsync.mockReset();
     queryMocks.applyMutateAsync.mockReset();
+    queryMocks.previewScenarioMutateAsync.mockReset();
+    queryMocks.applyScenarioMutateAsync.mockReset();
   });
 
   it("renders planning read model, WBS/Gantt surface and resource planning for permitted users", () => {
@@ -54,7 +72,9 @@ describe("PlanningWorkspaceRoute", () => {
           "tenant.project_plan.read",
           "tenant.project_plan.manage",
           "tenant.project_resources.read",
-          "tenant.project_baselines.manage"
+          "tenant.project_baselines.manage",
+          "tenant.planning_scenarios.preview",
+          "tenant.planning_scenarios.apply"
         ]}
         taskStatuses={[activeTaskStatus]}
         sectionState={{ canRead: true, isLoading: false, error: null }}
@@ -72,6 +92,7 @@ describe("PlanningWorkspaceRoute", () => {
     expect(html).toContain("Preview связи");
     expect(html).toContain("Ресурсный лист");
     expect(html).toContain("Матрица загрузки");
+    expect(html).toContain("Сценарии");
     expect(html).toContain("resource-alpha");
   });
 
