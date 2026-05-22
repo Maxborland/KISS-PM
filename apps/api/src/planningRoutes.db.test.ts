@@ -29,6 +29,12 @@ const dataset: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Наблюдатель планирования",
       permissions: ["tenant.projects.read", "tenant.project_plan.read"]
+    },
+    {
+      id: "access-profile-plan-manager-no-read",
+      tenantId: "tenant-alpha",
+      name: "Менеджер плана без чтения",
+      permissions: ["tenant.project_plan.manage"]
     }
   ],
   positions: [
@@ -57,6 +63,15 @@ const dataset: SeedTenantDataset = {
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
       password: "local-executor-password"
+    },
+    {
+      id: "user-alpha-plan-manager-no-read",
+      tenantId: "tenant-alpha",
+      email: "plan-manager-no-read@kiss-pm.local",
+      name: "Марина Без Чтения",
+      accessProfileId: "access-profile-plan-manager-no-read",
+      positionId: "position-manager",
+      password: "local-manager-password"
     }
   ]
 };
@@ -941,6 +956,47 @@ describe("planning API routes", () => {
         })
       ])
     });
+  });
+
+  it("requires plan read permission before returning command preview read models", async () => {
+    const managerWithoutReadCookie = await loginAs(
+      "plan-manager-no-read@kiss-pm.local",
+      "local-manager-password"
+    );
+
+    const preview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/preview-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: managerWithoutReadCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "task.update_identity",
+            payload: {
+              taskId: "task-plan-a",
+              title: "Не должно раскрыть модель"
+            }
+          },
+          clientPlanVersion: 1
+        })
+      }
+    );
+    const body = await preview.json();
+
+    expect(preview.status).toBe(403);
+    expect(body).toMatchObject({
+      error: "permission_missing",
+      permissionPreview: {
+        allowed: false,
+        reason: "permission_missing"
+      }
+    });
+    expect(body.before).toBeUndefined();
+    expect(body.after).toBeUndefined();
   });
 
   it("returns planning validation errors for invalid commands without mutating plan state", async () => {
