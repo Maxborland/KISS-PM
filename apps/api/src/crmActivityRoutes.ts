@@ -44,7 +44,7 @@ type CrmActivityRouteDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 type RedactedCrmSystemEvent = {

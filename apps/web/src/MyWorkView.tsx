@@ -729,6 +729,7 @@ function buildBulkTaskUpdateInput(
     durationWorkingDays: task.durationWorkingDays,
     plannedWork: task.plannedWork,
     requiresAcceptance: task.requiresAcceptance,
+    clientUpdatedAt: task.updatedAt,
     participants
   };
 }

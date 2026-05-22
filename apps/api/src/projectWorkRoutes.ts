@@ -3,6 +3,7 @@ import {
   canDeleteTasks,
   canEditTasks,
   canManageProjects,
+  canManageProjectResources,
   canManageTaskStatuses,
   canReadProjects,
   type AccessProfile,
@@ -24,6 +25,12 @@ import type {
 } from "./apiTypes";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
+  buildArchiveTaskPlanningCommand,
+  buildCreateTaskPlanningCommand,
+  buildStatusTransitionPlanningCommand,
+  buildUpdateTaskPlanningCommands
+} from "./planningTaskCompatibility";
+import {
   parseCreateTaskBody,
   parseCreateTaskStatusBody,
   parseTaskCommentBody,
@@ -41,7 +48,7 @@ type ProjectWorkRouteDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps) {
@@ -310,6 +317,180 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     });
   });
 
+  app.post("/api/workspace/tasks", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.ensureWorkspaceInboxProject ||
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.listTaskStatuses ||
+      !dataSource.applyPlanningCommand ||
+      !dataSource.updateTaskMetadata ||
+      !dataSource.findTaskById ||
+      !dataSource.incrementPlanVersion ||
+      !dataSource.createTaskActivity ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const profile = await getActorProfile(actor);
+    const decision = canCreateTasks({ actor, profile, targetTenantId: actor.tenantId });
+    const legacyManageDecision = canManageProjects({
+      actor,
+      profile,
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed && !legacyManageDecision.allowed) {
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseCreateTaskBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const participants = normalizeTaskParticipants(actor.id, parsed.value.participants);
+    const ownerUserId = getParticipantUserId(participants, "executor");
+    const requesterUserId = getParticipantUserId(participants, "requester");
+    if (!ownerUserId || !requesterUserId) {
+      return context.json({ error: "task_executor_required" }, 400);
+    }
+    const taskId = parsed.value.id ?? `task-${randomUUID()}`;
+
+    const createResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.ensureWorkspaceInboxProject ||
+        !transactionDataSource.listWorkspaceUsers ||
+        !transactionDataSource.listTaskStatuses ||
+        !transactionDataSource.applyPlanningCommand ||
+        !transactionDataSource.updateTaskMetadata ||
+        !transactionDataSource.findTaskById ||
+        !transactionDataSource.incrementPlanVersion ||
+        !transactionDataSource.createTaskActivity
+      ) {
+        throw new Error("persistence_not_configured");
+      }
+
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const currentActiveUserIds = new Set(
+        (await transactionDataSource.listWorkspaceUsers(actor.tenantId))
+          .filter((user) => user.status !== "inactive")
+          .map((user) => user.id)
+      );
+      if (participants.some((participant) => !currentActiveUserIds.has(participant.userId))) {
+        return { ok: false as const, status: 400, error: "invalid_task_participant" };
+      }
+
+      const statuses = await transactionDataSource.listTaskStatuses(actor.tenantId);
+      const currentTaskStatus =
+        statuses.find((status) => status.id === parsed.value.statusId) ??
+        getRequiredStatusByCategory(statuses, "new");
+      if (!currentTaskStatus || currentTaskStatus.status !== "active") {
+        return { ok: false as const, status: 400, error: "task_status_not_found" };
+      }
+
+      const inboxProject = await transactionDataSource.ensureWorkspaceInboxProject({
+        tenantId: actor.tenantId,
+        plannedStart: parsed.value.plannedStart,
+        plannedFinish: parsed.value.plannedFinish
+      });
+      const planningCommand = buildCreateTaskPlanningCommand({
+        taskId,
+        projectId: inboxProject.id,
+        statusId: currentTaskStatus.id,
+        body: parsed.value,
+        participants
+      });
+      await transactionDataSource.applyPlanningCommand({
+        tenantId: actor.tenantId,
+        projectId: inboxProject.id,
+        actorUserId: actor.id,
+        command: planningCommand
+      });
+      const metadataTask = await transactionDataSource.updateTaskMetadata({
+        tenantId: actor.tenantId,
+        taskId,
+        description: parsed.value.description,
+        priority: parsed.value.priority,
+        requesterUserId,
+        ownerUserId,
+        requiresAcceptance: parsed.value.requiresAcceptance,
+        participants
+      });
+      if (!metadataTask) throw new Error("task_create_metadata_failed");
+      const createdTask =
+        (await transactionDataSource.findTaskById(actor.tenantId, taskId)) ?? metadataTask;
+      const planVersion = await transactionDataSource.incrementPlanVersion(
+        actor.tenantId,
+        inboxProject.id
+      );
+
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "task.created",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: createdTask.id },
+          commandInput: {
+            projectId: inboxProject.id,
+            sourceType: inboxProject.sourceType,
+            title: createdTask.title,
+            participants: createdTask.participants,
+            planningCommands: [planningCommand]
+          },
+          beforeState: null,
+          afterState: {
+            id: createdTask.id,
+            projectId: createdTask.projectId,
+            status: createdTask.status,
+            statusId: createdTask.statusId,
+            participants: createdTask.participants,
+            planVersion
+          },
+          permissionResult: {
+            allowed: true,
+            reason: decision.allowed ? decision.reason : legacyManageDecision.reason,
+            permission: decision.allowed
+              ? "tenant.tasks.create"
+              : "tenant.projects.manage"
+          }
+        },
+        transactionDataSource
+      );
+      await createTaskSystemActivity(transactionDataSource, {
+        tenantId: actor.tenantId,
+        taskId: createdTask.id,
+        actorUserId: actor.id,
+        title: "Задача создана",
+        body: `Статус: ${currentTaskStatus.name}. Ответственный: ${
+          (await transactionDataSource.listWorkspaceUsers(actor.tenantId)).find(
+            (user) => user.id === ownerUserId
+          )?.name ?? ownerUserId
+        }.`
+      });
+
+      return {
+        ok: true as const,
+        task: createdTask,
+        project: inboxProject,
+        planVersion
+      };
+    });
+
+    if (!createResult.ok) {
+      if (createResult.status === 400) return context.json({ error: createResult.error }, 400);
+      return context.json({ error: createResult.error }, 404);
+    }
+
+    return context.json({
+      task: createResult.task,
+      project: createResult.project,
+      planVersion: createResult.planVersion
+    }, 201);
+  });
+
   app.post("/api/workspace/projects/:projectId/tasks", async (context) => {
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -317,7 +498,10 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       !dataSource.listProjects ||
       !dataSource.listWorkspaceUsers ||
       !dataSource.listTaskStatuses ||
-      !dataSource.createTask ||
+      !dataSource.applyPlanningCommand ||
+      !dataSource.updateTaskMetadata ||
+      !dataSource.findTaskById ||
+      !dataSource.incrementPlanVersion ||
       !dataSource.createTaskActivity ||
       !dataSource.withTransaction
     ) {
@@ -375,39 +559,77 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     if (!ownerUserId || !requesterUserId) {
       return context.json({ error: "task_executor_required" }, 400);
     }
-    const ownerUserName =
-      workspaceUsers.find((user) => user.id === ownerUserId)?.name ?? ownerUserId;
-
     const taskId = parsed.value.id ?? `task-${randomUUID()}`;
-    const task = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createTask || !transactionDataSource.createTaskActivity) {
+    const createResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.listProjects ||
+        !transactionDataSource.listWorkspaceUsers ||
+        !transactionDataSource.listTaskStatuses ||
+        !transactionDataSource.applyPlanningCommand ||
+        !transactionDataSource.updateTaskMetadata ||
+        !transactionDataSource.findTaskById ||
+        !transactionDataSource.incrementPlanVersion ||
+        !transactionDataSource.createTaskActivity
+      ) {
         throw new Error("persistence_not_configured");
       }
 
-      const createdTask = await transactionDataSource.createTask({
-        id: taskId,
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const currentProject = await findActiveProject(
+        transactionDataSource,
+        actor.tenantId,
+        project.id
+      );
+      if (!currentProject) {
+        return { ok: false as const, status: 404, error: "project_not_found" };
+      }
+
+      const currentActiveUserIds = new Set(
+        (await transactionDataSource.listWorkspaceUsers(actor.tenantId))
+          .filter((user) => user.status !== "inactive")
+          .map((user) => user.id)
+      );
+      if (participants.some((participant) => !currentActiveUserIds.has(participant.userId))) {
+        return { ok: false as const, status: 400, error: "invalid_task_participant" };
+      }
+
+      const currentTaskStatus = (await transactionDataSource.listTaskStatuses(
+        actor.tenantId
+      )).find((status) => status.id === taskStatus.id && status.status === "active");
+      if (!currentTaskStatus) {
+        return { ok: false as const, status: 400, error: "task_status_not_found" };
+      }
+
+      const currentPlanningCommand = buildCreateTaskPlanningCommand({
+        taskId,
+        projectId: currentProject.id,
+        statusId: currentTaskStatus.id,
+        body: parsed.value,
+        participants
+      });
+      await transactionDataSource.applyPlanningCommand({
         tenantId: actor.tenantId,
-        projectId: project.id,
-        stageId: null,
-        title: parsed.value.title,
+        projectId: currentProject.id,
+        actorUserId: actor.id,
+        command: currentPlanningCommand
+      });
+      const metadataTask = await transactionDataSource.updateTaskMetadata({
+        tenantId: actor.tenantId,
+        taskId,
         description: parsed.value.description,
-        status: taskStatus.category,
-        statusId: taskStatus.id,
-        statusName: taskStatus.name,
-        statusCategory: taskStatus.category,
         priority: parsed.value.priority,
         requesterUserId,
         ownerUserId,
-        plannedStart: parsed.value.plannedStart,
-        plannedFinish: parsed.value.plannedFinish,
-        durationWorkingDays: parsed.value.durationWorkingDays,
-        plannedWork: parsed.value.plannedWork,
-        actualWork: 0,
-        progress: 0,
         requiresAcceptance: parsed.value.requiresAcceptance,
-        source: "manual",
         participants
       });
+      if (!metadataTask) throw new Error("task_create_metadata_failed");
+      const createdTask =
+        (await transactionDataSource.findTaskById(actor.tenantId, taskId)) ?? metadataTask;
+      const planVersion = await transactionDataSource.incrementPlanVersion(
+        actor.tenantId,
+        currentProject.id
+      );
 
       await deps.appendManagementAuditEvent(
         {
@@ -417,9 +639,10 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
           sourceWorkflow: "project_work",
           sourceEntity: { type: "Task", id: createdTask.id },
           commandInput: {
-            projectId: project.id,
+            projectId: currentProject.id,
             title: createdTask.title,
-            participants: createdTask.participants
+            participants: createdTask.participants,
+            planningCommands: [currentPlanningCommand]
           },
           beforeState: null,
           afterState: {
@@ -427,7 +650,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
             projectId: createdTask.projectId,
             status: createdTask.status,
             statusId: createdTask.statusId,
-            participants: createdTask.participants
+            participants: createdTask.participants,
+            planVersion
           },
           permissionResult: {
             allowed: true,
@@ -444,13 +668,21 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         taskId: createdTask.id,
         actorUserId: actor.id,
         title: "Задача создана",
-        body: `Статус: ${taskStatus.name}. Ответственный: ${ownerUserName}.`
+        body: `Статус: ${currentTaskStatus.name}. Ответственный: ${
+          (await transactionDataSource.listWorkspaceUsers(actor.tenantId)).find(
+            (user) => user.id === ownerUserId
+          )?.name ?? ownerUserId
+        }.`
       });
 
-      return createdTask;
+      return { ok: true as const, task: createdTask };
     });
+    if (!createResult.ok) {
+      if (createResult.status === 400) return context.json({ error: createResult.error }, 400);
+      return context.json({ error: createResult.error }, 404);
+    }
 
-    return context.json({ task }, 201);
+    return context.json({ task: createResult.task }, 201);
   });
 
   app.patch("/api/workspace/tasks/:taskId", async (context) => {
@@ -458,10 +690,14 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
       !dataSource.findTaskById ||
-      !dataSource.updateTask ||
+      !dataSource.getPlanSnapshot ||
+      !dataSource.applyPlanningCommand ||
+      !dataSource.updateTaskMetadata ||
+      !dataSource.incrementPlanVersion ||
       !dataSource.listTaskStatuses ||
       !dataSource.listWorkspaceUsers ||
-      !dataSource.createTaskActivity
+      !dataSource.createTaskActivity ||
+      !dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -497,50 +733,128 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     );
     if (!nextStatus) return context.json({ error: "task_status_not_found" }, 400);
 
-    const updated = await dataSource.updateTask({
-      id: task.id,
-      tenantId: actor.tenantId,
-      projectId: task.projectId,
-      stageId: task.stageId,
-      title: parsed.value.title,
-      description: parsed.value.description,
-      status: nextStatus.category,
-      statusId: nextStatus.id,
-      statusName: nextStatus.name,
-      statusCategory: nextStatus.category,
-      priority: parsed.value.priority,
-      requesterUserId,
-      ownerUserId,
-      plannedStart: parsed.value.plannedStart,
-      plannedFinish: parsed.value.plannedFinish,
-      durationWorkingDays: parsed.value.durationWorkingDays,
-      plannedWork: parsed.value.plannedWork,
-      actualWork: task.actualWork,
-      progress: task.progress,
-      requiresAcceptance: parsed.value.requiresAcceptance,
-      source: task.source,
-      participants
-    });
-    if (!updated) return context.json({ error: "task_not_found" }, 404);
+    const updateResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.getPlanSnapshot ||
+        !transactionDataSource.applyPlanningCommand ||
+        !transactionDataSource.updateTaskMetadata ||
+        !transactionDataSource.findTaskById ||
+        !transactionDataSource.incrementPlanVersion ||
+        !transactionDataSource.listTaskStatuses ||
+        !transactionDataSource.listWorkspaceUsers ||
+        !transactionDataSource.createTaskActivity
+      ) {
+        throw new Error("persistence_not_configured");
+      }
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const currentTask = await transactionDataSource.findTaskById(
+        actor.tenantId,
+        task.id
+      );
+      if (!currentTask) {
+        return { ok: false as const, status: 404, error: "task_not_found" };
+      }
 
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "task.updated",
-      sourceWorkflow: "project_work",
-      sourceEntity: { type: "Task", id: updated.id },
-      commandInput: { title: updated.title, statusId: updated.statusId },
-      beforeState: summarizeTask(task),
-      afterState: summarizeTask(updated),
-      permissionResult: editDecision
+      const currentEditDecision = canEditTaskFields(actor, profile, currentTask);
+      if (!currentEditDecision.allowed) {
+        return { ok: false as const, status: 403, error: currentEditDecision.reason };
+      }
+
+      const currentActiveUserIds = new Set(
+        (await transactionDataSource.listWorkspaceUsers(actor.tenantId))
+          .filter((user) => user.status !== "inactive")
+          .map((user) => user.id)
+      );
+      if (participants.some((participant) => !currentActiveUserIds.has(participant.userId))) {
+        return { ok: false as const, status: 400, error: "invalid_task_participant" };
+      }
+
+      const currentNextStatus = (await transactionDataSource.listTaskStatuses(
+        actor.tenantId
+      )).find((status) => status.id === parsed.value.statusId && status.status === "active");
+      if (!currentNextStatus) {
+        return { ok: false as const, status: 400, error: "task_status_not_found" };
+      }
+
+      const snapshot = await transactionDataSource.getPlanSnapshot(
+        actor.tenantId,
+        currentTask.projectId
+      );
+      if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      const planningCommands = buildUpdateTaskPlanningCommands({
+        task: currentTask,
+        body: parsed.value,
+        participants,
+        snapshot
+      });
+      if (currentTask.updatedAt.getTime() !== parsed.value.clientUpdatedAt.getTime()) {
+        return { ok: false as const, status: 409, error: "task_version_conflict" };
+      }
+      const planningCompatibilityDecision = canApplyTaskCompatibilityPlanningCommands(
+        actor,
+        profile,
+        planningCommands
+      );
+      if (!planningCompatibilityDecision.allowed) {
+        return { ok: false as const, status: 403, error: planningCompatibilityDecision.reason };
+      }
+      for (const command of planningCommands) {
+        await transactionDataSource.applyPlanningCommand({
+          tenantId: actor.tenantId,
+          projectId: currentTask.projectId,
+          actorUserId: actor.id,
+          command
+        });
+      }
+      const metadataTask = await transactionDataSource.updateTaskMetadata({
+        tenantId: actor.tenantId,
+        taskId: currentTask.id,
+        description: parsed.value.description,
+        priority: parsed.value.priority,
+        requesterUserId,
+        ownerUserId,
+        requiresAcceptance: parsed.value.requiresAcceptance,
+        participants
+      });
+      if (!metadataTask) return { ok: false as const, status: 404, error: "task_not_found" };
+      const updated =
+        (await transactionDataSource.findTaskById(actor.tenantId, currentTask.id)) ??
+        metadataTask;
+      const planVersion =
+        planningCommands.length > 0
+          ? await transactionDataSource.incrementPlanVersion(actor.tenantId, updated.projectId)
+          : null;
+      await deps.appendManagementAuditEvent({
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "task.updated",
+        sourceWorkflow: "project_work",
+        sourceEntity: { type: "Task", id: updated.id },
+        commandInput: {
+          title: updated.title,
+          statusId: currentNextStatus.id,
+          planningCommands
+        },
+        beforeState: summarizeTask(currentTask),
+        afterState: { ...summarizeTask(updated), planVersion },
+        permissionResult: currentEditDecision
+      }, transactionDataSource);
+      await createTaskSystemActivity(transactionDataSource, {
+        tenantId: actor.tenantId,
+        taskId: updated.id,
+        actorUserId: actor.id,
+        title: "Задача обновлена",
+        body: "Поля задачи изменены через карточку задачи."
+      });
+      return { ok: true as const, updated, planVersion };
     });
-    await createTaskSystemActivity(dataSource, {
-      tenantId: actor.tenantId,
-      taskId: updated.id,
-      actorUserId: actor.id,
-      title: "Задача обновлена",
-      body: "Поля задачи изменены через карточку задачи."
-    });
+    if (!updateResult.ok) {
+      if (updateResult.status === 400) return context.json({ error: updateResult.error }, 400);
+      if (updateResult.status === 403) return context.json({ error: updateResult.error }, 403);
+      if (updateResult.status === 409) return context.json({ error: updateResult.error }, 409);
+      return context.json({ error: updateResult.error }, 404);
+    }
+    const updated = updateResult.updated;
 
     return context.json({ task: updated });
   });
@@ -548,7 +862,12 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   app.delete("/api/workspace/tasks/:taskId", async (context) => {
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.findTaskById || !dataSource.archiveTask) {
+    if (
+      !dataSource.findTaskById ||
+      !dataSource.applyPlanningCommand ||
+      !dataSource.incrementPlanVersion ||
+      !dataSource.withTransaction
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
@@ -558,20 +877,61 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const deleteDecision = canDeleteTask(actor, profile, task);
     if (!deleteDecision.allowed) return context.json({ error: deleteDecision.reason }, 403);
 
-    const archived = await dataSource.archiveTask(actor.tenantId, task.id);
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "task.archived",
-      sourceWorkflow: "project_work",
-      sourceEntity: { type: "Task", id: task.id },
-      commandInput: { id: task.id },
-      beforeState: summarizeTask(task),
-      afterState: archived ? summarizeTask(archived) : null,
-      permissionResult: deleteDecision
-    });
+    const archiveResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.findTaskById ||
+        !transactionDataSource.applyPlanningCommand ||
+        !transactionDataSource.incrementPlanVersion
+      ) {
+        throw new Error("persistence_not_configured");
+      }
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const currentTask = await transactionDataSource.findTaskById(
+        actor.tenantId,
+        task.id
+      );
+      if (!currentTask) {
+        return { ok: false as const, status: 404, error: "task_not_found" };
+      }
 
-    return context.json({ task: archived });
+      const currentDeleteDecision = canDeleteTask(actor, profile, currentTask);
+      if (!currentDeleteDecision.allowed) {
+        return { ok: false as const, status: 403, error: currentDeleteDecision.reason };
+      }
+
+      const currentPlanningCommand = buildArchiveTaskPlanningCommand(currentTask.id);
+      await transactionDataSource.applyPlanningCommand({
+        tenantId: actor.tenantId,
+        projectId: currentTask.projectId,
+        actorUserId: actor.id,
+        command: currentPlanningCommand
+      });
+      const archived = { ...currentTask, archivedAt: new Date() };
+      const planVersion = await transactionDataSource.incrementPlanVersion(
+        actor.tenantId,
+        currentTask.projectId
+      );
+      await deps.appendManagementAuditEvent({
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "task.archived",
+        sourceWorkflow: "project_work",
+        sourceEntity: { type: "Task", id: currentTask.id },
+        commandInput: { id: currentTask.id, planningCommands: [currentPlanningCommand] },
+        beforeState: summarizeTask(currentTask),
+        afterState: { ...summarizeTask(archived), planVersion },
+        permissionResult: currentDeleteDecision
+      }, transactionDataSource);
+      return { ok: true as const, archived, planVersion };
+    });
+    if (!archiveResult.ok) {
+      if (archiveResult.status === 403) {
+        return context.json({ error: archiveResult.error }, 403);
+      }
+      return context.json({ error: archiveResult.error }, 404);
+    }
+
+    return context.json({ task: archiveResult.archived });
   });
 
   app.patch(
@@ -583,7 +943,9 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         !dataSource.listProjects ||
         !dataSource.listProjectTasks ||
         !dataSource.listTaskStatuses ||
-        !dataSource.updateTaskStatus ||
+        !dataSource.applyPlanningCommand ||
+        !dataSource.findTaskById ||
+        !dataSource.incrementPlanVersion ||
         !dataSource.createTaskActivity ||
         !dataSource.withTransaction
       ) {
@@ -623,12 +985,15 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
             !transactionDataSource.listProjects ||
             !transactionDataSource.listProjectTasks ||
             !transactionDataSource.listTaskStatuses ||
-            !transactionDataSource.updateTaskStatus ||
+            !transactionDataSource.applyPlanningCommand ||
+            !transactionDataSource.findTaskById ||
+            !transactionDataSource.incrementPlanVersion ||
             !transactionDataSource.createTaskActivity
           ) {
             throw new Error("persistence_not_configured");
           }
 
+          await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
           const project = await findActiveProject(
             transactionDataSource,
             actor.tenantId,
@@ -684,16 +1049,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
             };
           }
 
-          const nextProgress = deriveTaskProgress(targetStatus.category, task.progress);
-          const updated = await transactionDataSource.updateTaskStatus({
+          const planningCommand = buildStatusTransitionPlanningCommand({
+            taskId: task.id,
+            statusId: targetStatus.id
+          });
+          await transactionDataSource.applyPlanningCommand({
             tenantId: actor.tenantId,
             projectId: project.id,
-            taskId: task.id,
-            expectedStatus: task.status,
-            status: targetStatus.category,
-            statusId: targetStatus.id,
-            progress: nextProgress
+            actorUserId: actor.id,
+            command: planningCommand
           });
+          const updated = await transactionDataSource.findTaskById(actor.tenantId, task.id);
           if (!updated) {
             return {
               ok: false as const,
@@ -701,6 +1067,10 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
               error: "task_status_transition_conflict"
             };
           }
+          const planVersion = await transactionDataSource.incrementPlanVersion(
+            actor.tenantId,
+            project.id
+          );
 
           await deps.appendManagementAuditEvent(
             {
@@ -713,7 +1083,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
                 projectId: project.id,
                 title: task.title,
                 statusId: targetStatus.id,
-                status: targetStatus.category
+                status: targetStatus.category,
+                planningCommands: [planningCommand]
               },
               beforeState: {
                 id: task.id,
@@ -727,7 +1098,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
                 projectId: updated.projectId,
                 status: updated.status,
                 statusId: updated.statusId,
-                progress: updated.progress
+                progress: updated.progress,
+                planVersion
               },
               permissionResult: {
                 allowed: true,
@@ -879,14 +1251,6 @@ function isTaskStatusTransitionAllowed(
   return allowedTransitions[from].includes(to);
 }
 
-function deriveTaskProgress(status: TaskStatusCategory, currentProgress: number): number {
-  if (status === "done") return 100;
-  if (status === "new") return 0;
-  if (status === "in_progress") return Math.max(currentProgress, 10);
-  if (status === "review") return Math.max(currentProgress, 80);
-  return currentProgress;
-}
-
 function normalizeTaskParticipants(
   actorUserId: string,
   participants: TaskRecord["participants"]
@@ -944,6 +1308,20 @@ function canEditTaskFields(
     };
   }
   return editDecision;
+}
+
+function canApplyTaskCompatibilityPlanningCommands(
+  actor: TenantUser,
+  profile: AccessProfile,
+  commands: ReturnType<typeof buildUpdateTaskPlanningCommands>
+): PolicyDecision {
+  const touchesResourceAssignments = commands.some(
+    (command) => command.type === "assignment.upsert" || command.type === "assignment.delete"
+  );
+  if (!touchesResourceAssignments) {
+    return { allowed: true, reason: "same_tenant_permission_granted" };
+  }
+  return canManageProjectResources({ actor, profile, targetTenantId: actor.tenantId });
 }
 
 function canDeleteTask(

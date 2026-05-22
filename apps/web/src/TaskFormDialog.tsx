@@ -102,7 +102,8 @@ export function TaskFormDialog(props: {
       durationWorkingDays: Number(form.get("durationWorkingDays") ?? 0),
       plannedWork: Number(form.get("plannedWork") ?? 0),
       requiresAcceptance: form.get("requiresAcceptance") === "on",
-      participants
+      participants,
+      ...(props.task ? { clientUpdatedAt: props.task.updatedAt } : {})
     };
     const validationErrors = validateTaskForm(input, projectId);
     setErrors(validationErrors);

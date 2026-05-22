@@ -4,6 +4,8 @@
 
 В KISS PM нет разных сущностей для Gantt task, Kanban task, corrective task и task из control surface. Есть один `Task`, который отображается в разных представлениях.
 
+Любая `Task` участвует в planning model и попадает в `PlanSnapshot`. Простые task CRUD-действия являются удобным фасадом над planning command layer, а не отдельным путем изменения дат, трудоемкости, назначений, зависимостей, constraints или baseline.
+
 ## Task fields
 
 - tenantId;
@@ -32,9 +34,9 @@
 - approver;
 - observer.
 
-## Gantt MVP
+## Gantt baseline
 
-Первая реализация Gantt должна включать:
+Первая реализация Gantt/read model должна включать:
 
 - WBS hierarchy;
 - старт/финиш;
@@ -47,9 +49,9 @@
 - validation errors;
 - audit for state changes.
 
-## MS Project-class roadmap
+## MS Project-class backend scope
 
-Дальше нужны:
+Phase 5/6 backend scope подробно закреплен в `30_PHASE_5_6_MS_PROJECT_CLASS_BACKEND.md`. Движок планирования должен поддерживать:
 
 - Work / Duration / Units;
 - task types: fixed units, fixed work, fixed duration;
@@ -60,8 +62,9 @@
 - constraints;
 - critical path;
 - resource leveling;
-- scenario planning proposals;
-- MSPDI/XML import/export.
+- scenario planning proposals.
+
+MSPDI/XML import/export остается future integration adapter и не входит в Phase 5/6 backend scope.
 
 ## Resource planning
 

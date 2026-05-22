@@ -48,6 +48,7 @@ export type UpdateTaskStatusParseResult =
 
 export type UpdateTaskBody = Omit<CreateTaskBody, "id"> & {
   statusId: string;
+  clientUpdatedAt: Date;
 };
 
 export type UpdateTaskParseResult =
@@ -132,12 +133,15 @@ export function parseUpdateTaskBody(input: unknown): UpdateTaskParseResult {
 
   const statusId = getOptionalString(input, "statusId");
   if (!statusId) return { ok: false, error: "invalid_task_status" };
+  const clientUpdatedAt = parseInstantField(input, "clientUpdatedAt");
+  if (!clientUpdatedAt) return { ok: false, error: "invalid_task_version" };
 
   return {
     ok: true,
     value: {
       ...parsed.value,
-      statusId
+      statusId,
+      clientUpdatedAt
     }
   };
 }
@@ -260,6 +264,13 @@ function parseDateField(input: unknown, key: string): Date | null {
   }
 
   return date;
+}
+
+function parseInstantField(input: unknown, key: string): Date | null {
+  const value = getStringField(input, key);
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function getIntegerField(input: unknown, key: string): number | null {

@@ -29,7 +29,7 @@ type ProjectIntakeRouteDeps = {
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
-  ): Promise<void>;
+  ): Promise<string>;
 };
 
 export function registerProjectIntakeRoutes(

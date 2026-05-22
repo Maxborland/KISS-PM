@@ -4,6 +4,7 @@ import {
 } from "@kiss-pm/access-control";
 import type { UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
+import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   parseWorkspaceUserBody,
@@ -64,8 +65,9 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseWorkspaceUserBody(body, actor.tenantId);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseWorkspaceUserBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     if (!parsed.password || parsed.password.length < 8) {
       return context.json({ error: "invalid_user_password" }, 400);
@@ -164,14 +166,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const body = await context.req.json().catch(() => null);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
     const workspaceUsers = await dataSource.listWorkspaceUsers(actor.tenantId);
     const beforeState =
       workspaceUsers.find((user) => user.id === context.req.param("userId")) ?? null;
     if (!beforeState) return context.json({ error: "user_not_found" }, 404);
 
     const parsed = parseWorkspaceUserPatchBody(
-      body,
+      body.value,
       actor.tenantId,
       context.req.param("userId"),
       beforeState

@@ -115,6 +115,17 @@ const phase42TaskSystemActivityMigration = readFileSync(
   ),
   "utf8"
 );
+const phase56PlanningCoreMigration = readFileSync(
+  new URL("../migrations/0021_phase_5_6_planning_core.sql", import.meta.url),
+  "utf8"
+);
+const phase56PlanningCommandIdempotencyMigration = readFileSync(
+  new URL(
+    "../migrations/0022_phase_5_6_planning_command_idempotency.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -454,6 +465,59 @@ describe("Phase 4.2 task workspace SQL migration", () => {
     );
     expect(phase42TaskSystemActivityMigration).toContain(
       `"type" = 'system' and "title" is not null and "body" is not null`
+    );
+  });
+});
+
+describe("Phase 5/6 planning core SQL migration", () => {
+  it("adds explicit project source metadata without fake opportunities", () => {
+    expect(phase56PlanningCoreMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "source_type" text NOT NULL DEFAULT'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      'ALTER COLUMN "source_opportunity_id" DROP NOT NULL'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      '"source_type" in (\'opportunity\', \'workspace_inbox\', \'manual\')'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "projects_tenant_workspace_inbox_uidx"'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      '"source_type" = \'workspace_inbox\' and "status" in (\'draft\', \'active\', \'paused\')'
+    );
+  });
+
+  it("adds tenant-scoped authored planning tables", () => {
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "plan_versions"');
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "task_assignments"');
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "task_dependencies"');
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "project_baselines"');
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "resource_reservations"');
+    expect(phase56PlanningCoreMigration).toContain('CREATE TABLE IF NOT EXISTS "planning_scenario_runs"');
+    expect(phase56PlanningCoreMigration).toContain(
+      'CONSTRAINT "task_dependencies_predecessor_fk"'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      'FOREIGN KEY ("tenant_id", "project_id", "predecessor_task_id")'
+    );
+    expect(phase56PlanningCoreMigration).toContain(
+      'CONSTRAINT "task_dependencies_not_self_chk"'
+    );
+  });
+
+  it("adds tenant-scoped idempotency records for planning command apply retries", () => {
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "planning_command_idempotency_keys"'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'PRIMARY KEY("tenant_id", "project_id", "idempotency_key")'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CONSTRAINT "planning_command_idempotency_keys_project_fk"'
+    );
+    expect(phase56PlanningCommandIdempotencyMigration).toContain(
+      'CONSTRAINT "planning_command_idempotency_keys_actor_fk"'
     );
   });
 });
