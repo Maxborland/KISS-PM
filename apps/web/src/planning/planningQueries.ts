@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { workspaceQueryKeys } from "../workspaceQueries";
 import {
   applyPlanningCommand,
   applyPlanningScenarioProposal,
@@ -39,6 +40,9 @@ export function usePlanningCommandMutations(projectId: string) {
         await queryClient.invalidateQueries({
           queryKey: planningQueryKeys.readModel(projectId)
         });
+        await queryClient.invalidateQueries({
+          queryKey: workspaceQueryKeys.auditEvents()
+        });
       }
     })
   };
@@ -58,6 +62,9 @@ export function usePlanningScenarioMutations(projectId: string) {
       onSuccess: async () => {
         await queryClient.invalidateQueries({
           queryKey: planningQueryKeys.readModel(projectId)
+        });
+        await queryClient.invalidateQueries({
+          queryKey: workspaceQueryKeys.auditEvents()
         });
       }
     })

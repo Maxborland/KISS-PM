@@ -7,6 +7,7 @@ import { ApiError } from "../api";
 import type { TaskStatusDefinition } from "../api";
 import { SectionFeedback } from "../components/workspace-ui";
 import type { SectionState } from "../workspaceShellState";
+import { useAuditEventsQuery } from "../workspaceQueries";
 import { mapPlanningGanttIntentToCommand } from "./planningCommandIntentMapper";
 import {
   usePlanningCommandMutations,
@@ -16,10 +17,13 @@ import {
 import { mapPlanningReadModelToGanttViewModel } from "./planningReadModelMapper";
 import {
   canApplyPlanningCommand,
+  hasPlanningPermission,
   canReadPlanningWorkspace,
   planningCapabilitiesFromPermissions,
   planningReadDisabledReason
 } from "./planningPermissions";
+import { PlanningAuditPanel } from "./PlanningAuditPanel";
+import { PlanningBaselinePanel } from "./PlanningBaselinePanel";
 import { PlanningDependencyEditor } from "./PlanningDependencyEditor";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
 import { PlanningResourcePanel } from "./PlanningResourcePanel";
@@ -38,6 +42,8 @@ export function PlanningWorkspaceRoute(props: {
   const canRead = props.sectionState.canRead && canReadPlanningWorkspace(props.permissions);
   const readDisabledReason = planningReadDisabledReason(props.permissions);
   const readModelQuery = usePlanningReadModelQuery(props.projectId, canRead);
+  const canReadAudit = hasPlanningPermission(props.permissions, "tenant.audit_events.read");
+  const auditEventsQuery = useAuditEventsQuery(canRead && canReadAudit);
   const commandMutations = usePlanningCommandMutations(props.projectId);
   const scenarioMutations = usePlanningScenarioMutations(props.projectId);
   const [previewState, setPreviewState] = useState<PlanningPreviewState | null>(null);
@@ -237,6 +243,7 @@ export function PlanningWorkspaceRoute(props: {
               onIntent={(intent) => void previewIntent(intent)}
             />
             <PlanningValidationPanel issues={issues} />
+            <PlanningBaselinePanel readModel={afterPreview ?? readModel} />
             <PlanningResourcePanel
               readModel={afterPreview ?? readModel}
               activeScenarioTargetKey={scenarioTarget ? scenarioTargetKey(scenarioTarget) : null}
@@ -270,6 +277,13 @@ export function PlanningWorkspaceRoute(props: {
                 setScenarioTarget(null);
                 props.onChanged(message);
               }}
+            />
+            <PlanningAuditPanel
+              projectId={props.projectId}
+              auditEvents={auditEventsQuery.data?.auditEvents ?? []}
+              canReadAudit={canReadAudit}
+              isLoading={auditEventsQuery.isFetching}
+              error={auditEventsQuery.error ? "Не удалось загрузить audit trail." : null}
             />
           </aside>
         </div>
