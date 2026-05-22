@@ -590,6 +590,79 @@ describe("planning repository", () => {
       { id: "task-after-archive", wbsCode: "2" }
     ]);
   });
+
+  it("does not reuse an active WBS code after archiving a middle task", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.create",
+        payload: {
+          id: "task-third",
+          projectId,
+          title: "Третья задача",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-10",
+          plannedFinish: "2026-06-10",
+          durationMinutes: 480,
+          workMinutes: 480,
+          assignments: []
+        }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.move_wbs",
+        payload: { taskId: "task-beta", parentTaskId: null, sortOrder: 1 }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.delete_or_archive",
+        payload: { taskId: "task-beta", mode: "archive" }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.create",
+        payload: {
+          id: "task-after-middle-archive",
+          projectId,
+          title: "Задача после архивации середины",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-10",
+          plannedFinish: "2026-06-10",
+          durationMinutes: 480,
+          workMinutes: 480,
+          assignments: []
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.tasks.map((task) => ({ id: task.id, wbsCode: task.wbsCode }))).toEqual([
+      { id: "task-alpha", wbsCode: "1" },
+      { id: "task-third", wbsCode: "3" },
+      { id: "task-after-middle-archive", wbsCode: "4" }
+    ]);
+  });
 });
 
 async function createActiveProjectWithTasks(
