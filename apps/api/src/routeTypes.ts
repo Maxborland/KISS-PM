@@ -11,6 +11,7 @@ export type ApiRouteDeps = {
   dataSource: ApiTenantDataSource;
   authRateLimiter: AuthRateLimiter;
   secureCookies: boolean;
+  trustForwardedAuthHeaders: boolean;
   getActor(userId: string | null): Promise<TenantUser | undefined>;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getDevActorFromHeaders(input: {

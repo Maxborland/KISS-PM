@@ -26,6 +26,10 @@ type AuthRateLimiterOptions = {
   blockMs: number;
 };
 
+type ClientIpOptions = {
+  trustForwardedHeaders?: boolean;
+};
+
 const defaultOptions: AuthRateLimiterOptions = {
   maxFailures: 5,
   windowMs: 15 * 60 * 1000,
@@ -79,13 +83,21 @@ export function createAuthRateLimiter(
 
 export function getClientIp(headers: {
   get(name: string): string | null;
-}): string | null {
+}, options: ClientIpOptions = {}): string | null {
+  if (!options.trustForwardedHeaders) return null;
+
   return (
     firstForwardedIp(headers.get("cf-connecting-ip")) ??
     firstForwardedIp(headers.get("x-real-ip")) ??
     firstForwardedIp(headers.get("x-forwarded-for")) ??
     null
   );
+}
+
+export function shouldTrustForwardedAuthHeaders(
+  env: Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_TRUST_PROXY_HEADERS">> = process.env
+): boolean {
+  return env.KISS_PM_TRUST_PROXY_HEADERS === "true";
 }
 
 function getRetryAfterMs(

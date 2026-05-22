@@ -17,7 +17,8 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
     getActorProfile,
     getSessionActorFromHeaders,
     isWorkspaceUserActive,
-    secureCookies
+    secureCookies,
+    trustForwardedAuthHeaders
   } = deps;
 
   app.post("/api/auth/login", async (context) => {
@@ -41,7 +42,9 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
         : "";
     const rateLimitInput = {
       email,
-      ip: getClientIp(context.req.raw.headers)
+      ip: getClientIp(context.req.raw.headers, {
+        trustForwardedHeaders: trustForwardedAuthHeaders
+      })
     };
     const rateLimitDecision = deps.authRateLimiter.check(rateLimitInput);
     if (!rateLimitDecision.allowed) {

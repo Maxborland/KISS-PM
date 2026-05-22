@@ -6,7 +6,10 @@ import {
   getSessionTokenFromCookie,
   shouldUseSecureCookies
 } from "./authSession";
-import { createAuthRateLimiter } from "./authRateLimit";
+import {
+  createAuthRateLimiter,
+  shouldTrustForwardedAuthHeaders
+} from "./authRateLimit";
 import {
   MissingAccessProfileError,
   resolveAppErrorResponse
@@ -47,6 +50,8 @@ export function createApp(options: CreateAppOptions = {}) {
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
   const trustedMutationOrigins =
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
+  const trustForwardedAuthHeaders =
+    options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
 
   app.onError((error, context) => {
@@ -186,7 +191,8 @@ export function createApp(options: CreateAppOptions = {}) {
     getSessionActorFromHeaders,
     isWorkspaceUserActive,
     runDataSourceTransaction,
-    secureCookies
+    secureCookies,
+    trustForwardedAuthHeaders
   };
 
   app.get("/health", (context) => {

@@ -852,6 +852,97 @@ describe("planning API routes", () => {
     });
   });
 
+  it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-archive-a",
+      title: "Архивируемая задача",
+      start: "2026-06-02",
+      finish: "2026-06-02",
+      plannedWork: 8
+    });
+    await createTask(adminCookie, {
+      id: "task-delete-a",
+      title: "Удаляемая задача",
+      start: "2026-06-03",
+      finish: "2026-06-03",
+      plannedWork: 8
+    });
+
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await readModel.json();
+    expect(readModel.status).toBe(200);
+
+    const archiveApply = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "task.delete_or_archive",
+            payload: { taskId: "task-archive-a", mode: "archive" }
+          },
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    const archiveBody = await archiveApply.json();
+    expect(archiveApply.status).toBe(200);
+
+    const deleteApply = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "task.delete_or_archive",
+            payload: { taskId: "task-delete-a", mode: "delete" }
+          },
+          clientPlanVersion: archiveBody.newPlanVersion
+        })
+      }
+    );
+    expect(deleteApply.status).toBe(200);
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(audit.status).toBe(200);
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "planning.task.archived",
+          input: expect.objectContaining({
+            command: expect.objectContaining({
+              payload: expect.objectContaining({ taskId: "task-archive-a", mode: "archive" })
+            })
+          })
+        }),
+        expect.objectContaining({
+          actionType: "planning.task.deleted",
+          input: expect.objectContaining({
+            command: expect.objectContaining({
+              payload: expect.objectContaining({ taskId: "task-delete-a", mode: "delete" })
+            })
+          })
+        })
+      ])
+    });
+  });
+
   it("returns planning validation errors for invalid commands without mutating plan state", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
