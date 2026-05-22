@@ -217,6 +217,12 @@
   gap: 12px;
 }
 
+.planning-baseline-panel,
+.planning-audit-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .planning-resource-sheet,
 .planning-resource-matrix,
 .planning-resource-overloads {
@@ -396,6 +402,43 @@
   margin: 0;
   color: var(--danger);
   font-size: 12px;
+}
+
+.planning-baseline-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.planning-baseline-summary div,
+.planning-baseline-row,
+.planning-audit-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.planning-baseline-summary span,
+.planning-baseline-row span,
+.planning-baseline-row small,
+.planning-audit-row time,
+.planning-audit-row small {
+  color: var(--muted-strong);
+  font-size: 11px;
+}
+
+.planning-baseline-summary strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.planning-baseline-list,
+.planning-audit-list {
+  display: grid;
+  gap: 8px;
 }
 
 @media (max-width: 1120px) {

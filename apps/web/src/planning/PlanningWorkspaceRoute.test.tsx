@@ -11,6 +11,11 @@ const queryMocks = vi.hoisted(() => ({
     error: null as unknown,
     refetch: vi.fn()
   },
+  auditEventsResult: {
+    data: { auditEvents: [] },
+    isFetching: false,
+    error: null as unknown
+  },
   previewMutateAsync: vi.fn(),
   applyMutateAsync: vi.fn(),
   previewScenarioMutateAsync: vi.fn(),
@@ -45,6 +50,10 @@ vi.mock("./planningQueries", () => ({
   })
 }));
 
+vi.mock("../workspaceQueries", () => ({
+  useAuditEventsQuery: () => queryMocks.auditEventsResult
+}));
+
 describe("PlanningWorkspaceRoute", () => {
   beforeEach(() => {
     queryMocks.readModelResult = {
@@ -52,6 +61,11 @@ describe("PlanningWorkspaceRoute", () => {
       isFetching: false,
       error: null,
       refetch: vi.fn()
+    };
+    queryMocks.auditEventsResult = {
+      data: { auditEvents: [] },
+      isFetching: false,
+      error: null
     };
     queryMocks.previewPending = false;
     queryMocks.applyPending = false;
@@ -74,7 +88,8 @@ describe("PlanningWorkspaceRoute", () => {
           "tenant.project_resources.read",
           "tenant.project_baselines.manage",
           "tenant.planning_scenarios.preview",
-          "tenant.planning_scenarios.apply"
+          "tenant.planning_scenarios.apply",
+          "tenant.audit_events.read"
         ]}
         taskStatuses={[activeTaskStatus]}
         sectionState={{ canRead: true, isLoading: false, error: null }}
@@ -93,6 +108,8 @@ describe("PlanningWorkspaceRoute", () => {
     expect(html).toContain("Ресурсный лист");
     expect(html).toContain("Матрица загрузки");
     expect(html).toContain("Сценарии");
+    expect(html).toContain("Baseline");
+    expect(html).toContain("Аудит планирования");
     expect(html).toContain("resource-alpha");
   });
 

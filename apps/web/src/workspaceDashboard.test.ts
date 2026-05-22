@@ -95,6 +95,8 @@ describe("workspace dashboard", () => {
     expect(getAuditActionLabel("project_type.updated")).toBe("Тип проекта обновлен");
     expect(getAuditActionLabel("deal_stage.updated")).toBe("Этап сделки обновлен");
     expect(getAuditActionLabel("project.activated")).toBe("Проект активирован");
+    expect(getAuditActionLabel("planning.baseline.captured")).toBe("Baseline зафиксирован");
+    expect(getAuditActionLabel("planning.scenario.applied")).toBe("Planning сценарий применен");
     expect(getAuditActionLabel("unknown.action")).toBe("unknown.action");
   });
 
