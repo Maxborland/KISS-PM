@@ -15,7 +15,8 @@ import {
   projectBaselineTasks,
   projectBaselines,
   projectCalendars,
-  resourceReservations
+  resourceReservations,
+  taskParticipants
 } from "./schema";
 
 const databaseUrl =
@@ -127,6 +128,12 @@ describe("planning repository", () => {
       workMinutes: 960,
       calendarId: null
     });
+    await db.insert(taskParticipants).values({
+      tenantId: "tenant-alpha",
+      taskId: "task-alpha",
+      userId: "user-alpha-admin",
+      role: "controller"
+    });
     await planningRepository.upsertTaskDependency({
       id: "dep-alpha-beta",
       tenantId: "tenant-alpha",
@@ -182,6 +189,12 @@ describe("planning repository", () => {
       ]),
       assignments: expect.arrayContaining([
         expect.objectContaining({ id: "assignment-alpha" }),
+        expect.objectContaining({
+          id: "task-alpha-user-alpha-admin-controller",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-admin",
+          role: "controller"
+        }),
         expect.objectContaining({ id: "task-beta-user-alpha-executor-executor" })
       ]),
       dependencies: [expect.objectContaining({ id: "dep-alpha-beta", type: "FS" })],

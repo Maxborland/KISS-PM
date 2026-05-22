@@ -16,7 +16,7 @@ export type AuthRateLimiter = {
 
 type AuthRateLimitInput = {
   email: string;
-  ip: string;
+  ip: string | null;
   now?: number;
 };
 
@@ -41,9 +41,10 @@ export function createAuthRateLimiter(
 
   function check(input: AuthRateLimitInput): AuthRateLimitDecision {
     const now = input.now ?? Date.now();
+    const ip = normalizeIp(input.ip);
     const retryAfterMs = Math.max(
       getRetryAfterMs(emailBuckets, normalizeEmail(input.email), now),
-      getRetryAfterMs(ipBuckets, normalizeIp(input.ip), now)
+      ip ? getRetryAfterMs(ipBuckets, ip, now) : 0
     );
 
     if (retryAfterMs <= 0) return { allowed: true };
@@ -55,13 +56,14 @@ export function createAuthRateLimiter(
 
   function recordFailure(input: AuthRateLimitInput): void {
     const now = input.now ?? Date.now();
+    const ip = normalizeIp(input.ip);
     recordFailureInBucket(
       emailBuckets,
       normalizeEmail(input.email),
       now,
       resolvedOptions
     );
-    recordFailureInBucket(ipBuckets, normalizeIp(input.ip), now, resolvedOptions);
+    if (ip) recordFailureInBucket(ipBuckets, ip, now, resolvedOptions);
   }
 
   function recordSuccess(input: AuthRateLimitInput): void {
@@ -77,12 +79,12 @@ export function createAuthRateLimiter(
 
 export function getClientIp(headers: {
   get(name: string): string | null;
-}): string {
+}): string | null {
   return (
     firstForwardedIp(headers.get("cf-connecting-ip")) ??
     firstForwardedIp(headers.get("x-real-ip")) ??
     firstForwardedIp(headers.get("x-forwarded-for")) ??
-    "local"
+    null
   );
 }
 
@@ -127,8 +129,9 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase() || "unknown-email";
 }
 
-function normalizeIp(ip: string): string {
-  return ip.trim() || "local";
+function normalizeIp(ip: string | null): string | null {
+  const normalized = ip?.trim();
+  return normalized && normalized.length > 0 ? normalized : null;
 }
 
 function firstForwardedIp(value: string | null): string | undefined {
