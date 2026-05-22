@@ -359,6 +359,9 @@ Phase 7: их можно переносить, выделять в пакет KI
 решение принято потому, что Gantt в BR2 был спроектирован как отдельный
 кастомный пакет, но остался внутри BR2 codebase.
 
+Архитектурная ревизия границ переноса и WBS table candidates зафиксирована в
+`decisions/2026-05-22-br2-gantt-boundaries-wbs-table.md`.
+
 Ограничение остается архитектурным: BR2 Gantt отвечает за rendering,
 interaction model, timeline, drag/drop, dependency drawing и visual density, но
 не становится источником доменной истины. Даты, dependencies, critical path,
@@ -468,7 +471,7 @@ Exit gate: workspace проходит E2E на create/edit dependency/resource/s
 
 ## Open decisions before implementation
 
-- Выбор Gantt rendering package и license/runtime constraints.
+- File-level BR2 Gantt extraction plan and final package namespace.
 - Минимальная глубина keyboard shortcuts для первой UI-фазы.
 - Будет ли Phase 7 редактировать personal calendars или только читать
   exceptions/reservations из существующего источника.
