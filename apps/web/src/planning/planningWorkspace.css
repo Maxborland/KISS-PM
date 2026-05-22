@@ -96,7 +96,8 @@
 }
 
 .planning-task-inspector label,
-.planning-task-inspector .planning-checkbox-row {
+.planning-task-inspector .planning-checkbox-row,
+.planning-dependency-editor label {
   display: grid;
   gap: 5px;
   color: var(--text);
@@ -105,7 +106,9 @@
 }
 
 .planning-task-inspector input,
-.planning-task-inspector select {
+.planning-task-inspector select,
+.planning-dependency-editor input,
+.planning-dependency-editor select {
   min-width: 0;
   height: 34px;
   padding: 0 8px;
@@ -118,7 +121,9 @@
 }
 
 .planning-task-inspector input:disabled,
-.planning-task-inspector select:disabled {
+.planning-task-inspector select:disabled,
+.planning-dependency-editor input:disabled,
+.planning-dependency-editor select:disabled {
   opacity: 0.58;
 }
 
@@ -139,6 +144,36 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.planning-dependency-list {
+  display: grid;
+  gap: 6px;
+}
+
+.planning-dependency-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planning-dependency-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.planning-dependency-list li span {
+  min-width: 0;
+  color: var(--muted-strong);
+  font-size: 12px;
 }
 
 .planning-issue-list,

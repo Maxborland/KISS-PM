@@ -16,6 +16,7 @@ import {
   planningCapabilitiesFromPermissions,
   planningReadDisabledReason
 } from "./planningPermissions";
+import { PlanningDependencyEditor } from "./PlanningDependencyEditor";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
 import { PlanningTaskInspector } from "./PlanningTaskInspector";
 import { PlanningValidationPanel } from "./PlanningValidationPanel";
@@ -63,13 +64,17 @@ export function PlanningWorkspaceRoute(props: {
       : "Создать задачу через preview/apply";
 
   async function previewIntent(intent: PlanningGanttIntent) {
-    if (!readModel || !defaultStatusId) return;
+    if (!readModel) return;
+    if (intent.type === "task.create" && !defaultStatusId) {
+      setPreviewError("Нет активного task status для новой задачи.");
+      return;
+    }
 
     setPreviewError("");
     setApplyError("");
     const command = mapPlanningGanttIntentToCommand(intent, {
       projectId: props.projectId,
-      defaultStatusId,
+      defaultStatusId: defaultStatusId ?? "",
       defaultStart: readModel.project.plannedStart,
       defaultFinish: readModel.project.plannedStart,
       defaultWorkMinutes: 480,
@@ -206,6 +211,15 @@ export function PlanningWorkspaceRoute(props: {
               taskStatuses={props.taskStatuses}
               canManagePlan={capabilities.canManagePlan}
               isPreviewPending={commandMutations.previewCommand.isPending}
+              onIntent={(intent) => void previewIntent(intent)}
+            />
+            <PlanningDependencyEditor
+              task={selectedTask}
+              tasks={displayedViewModel.tasks}
+              dependencies={displayedViewModel.dependencies}
+              canManagePlan={capabilities.canManagePlan}
+              isPreviewPending={commandMutations.previewCommand.isPending}
+              makeDependencyId={(prefix) => `${prefix}-${crypto.randomUUID()}`}
               onIntent={(intent) => void previewIntent(intent)}
             />
             <PlanningValidationPanel issues={issues} />
