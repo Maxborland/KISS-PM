@@ -73,6 +73,14 @@ describe("planning command intent mapper", () => {
 
   it("maps dependency, assignment, WBS and baseline intents without local apply behavior", () => {
     expect(mapPlanningGanttIntentToCommand({
+      type: "task.status.update",
+      taskId: "task-a",
+      statusId: "task-status-review"
+    }, context)).toEqual({
+      type: "task.update_status",
+      payload: { taskId: "task-a", statusId: "task-status-review" }
+    });
+    expect(mapPlanningGanttIntentToCommand({
       type: "task.move_wbs",
       taskId: "task-a",
       parentTaskId: null,

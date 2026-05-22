@@ -20,6 +20,7 @@ export type PlanningGanttIntent =
       taskType: PlanningGanttTaskType;
       effortDriven: boolean;
     }
+  | { type: "task.status.update"; taskId: string; statusId: string }
   | { type: "task.move_wbs"; taskId: string; parentTaskId: string | null; sortOrder: number }
   | {
       type: "dependency.upsert";

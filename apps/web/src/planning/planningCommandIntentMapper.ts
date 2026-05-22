@@ -59,6 +59,14 @@ export function mapPlanningGanttIntentToCommand(
           workMinutes: intent.workMinutes
         }
       };
+    case "task.status.update":
+      return {
+        type: "task.update_status",
+        payload: {
+          taskId: intent.taskId,
+          statusId: intent.statusId
+        }
+      };
     case "task.move_wbs":
       return {
         type: "task.move_wbs",
