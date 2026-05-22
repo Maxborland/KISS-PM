@@ -202,7 +202,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             );
       const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
       const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
-      const projectCalendarId = project.calendarId ?? calendars[0]?.id ?? defaultProjectCalendarId(project.id);
+      const projectCalendarId = selectProjectCalendarId(project, projectCalendarRows);
 
       return {
         tenantId,
@@ -1081,21 +1081,12 @@ function mapCalendars(
   resourceCalendarRows: Array<typeof resourceCalendars.$inferSelect>,
   projectId: string
 ): PlanCalendar[] {
-  const calendars = [
-    ...projectCalendarRows.map<PlanCalendar>((calendar) => ({
-      id: calendar.id,
-      workingWeekdays: calendar.workingWeekdays,
-      workingMinutesPerDay: calendar.workingMinutesPerDay
-    })),
-    ...resourceCalendarRows.map<PlanCalendar>((calendar) => ({
-      id: calendar.id,
-      workingWeekdays: calendar.workingWeekdays,
-      workingMinutesPerDay: calendar.workingMinutesPerDay
-    }))
-  ];
-
-  return calendars.length > 0
-    ? calendars
+  const projectPlanCalendars = projectCalendarRows.length > 0
+    ? projectCalendarRows.map<PlanCalendar>((calendar) => ({
+        id: calendar.id,
+        workingWeekdays: calendar.workingWeekdays,
+        workingMinutesPerDay: calendar.workingMinutesPerDay
+      }))
     : [
         {
           id: defaultProjectCalendarId(projectId),
@@ -1103,6 +1094,24 @@ function mapCalendars(
           workingMinutesPerDay: defaultWorkingMinutesPerDay
         }
       ];
+
+  const calendars = [
+    ...projectPlanCalendars,
+    ...resourceCalendarRows.map<PlanCalendar>((calendar) => ({
+      id: calendar.id,
+      workingWeekdays: calendar.workingWeekdays,
+      workingMinutesPerDay: calendar.workingMinutesPerDay
+    }))
+  ];
+
+  return calendars;
+}
+
+function selectProjectCalendarId(
+  project: typeof projects.$inferSelect,
+  projectCalendarRows: Array<typeof projectCalendars.$inferSelect>
+): string {
+  return project.calendarId ?? projectCalendarRows[0]?.id ?? defaultProjectCalendarId(project.id);
 }
 
 function mapBaselines(
