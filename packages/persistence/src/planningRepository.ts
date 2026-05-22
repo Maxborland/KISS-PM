@@ -630,16 +630,14 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 existing.resourceId !== input.command.payload.resourceId ||
                 existing.role !== input.command.payload.role)
             ) {
-              await db
-                .delete(taskParticipants)
-                .where(
-                  and(
-                    eq(taskParticipants.tenantId, input.tenantId),
-                    eq(taskParticipants.taskId, existing.taskId),
-                    eq(taskParticipants.userId, existing.resourceId),
-                    eq(taskParticipants.role, existing.role)
-                  )
-                );
+              await deleteParticipantIfNoSiblingAssignment({
+                tenantId: input.tenantId,
+                projectId: input.projectId,
+                assignmentId: existing.id,
+                taskId: existing.taskId,
+                resourceId: existing.resourceId,
+                role: existing.role
+              });
             }
           }
           await this.upsertTaskAssignment({
@@ -672,16 +670,14 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               )
               .limit(1);
             if (existing) {
-              await db
-                .delete(taskParticipants)
-                .where(
-                  and(
-                    eq(taskParticipants.tenantId, input.tenantId),
-                    eq(taskParticipants.taskId, existing.taskId),
-                    eq(taskParticipants.userId, existing.resourceId),
-                    eq(taskParticipants.role, existing.role)
-                  )
-                );
+              await deleteParticipantIfNoSiblingAssignment({
+                tenantId: input.tenantId,
+                projectId: input.projectId,
+                assignmentId: existing.id,
+                taskId: existing.taskId,
+                resourceId: existing.resourceId,
+                role: existing.role
+              });
             }
           }
           await db
@@ -810,8 +806,44 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     const rows = await db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId)));
+      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)));
     return String(rows.length + 1);
+  }
+
+  async function deleteParticipantIfNoSiblingAssignment(input: {
+    tenantId: string;
+    projectId: string;
+    assignmentId: string;
+    taskId: string;
+    resourceId: string;
+    role: string;
+  }): Promise<void> {
+    const [sibling] = await db
+      .select({ id: taskAssignments.id })
+      .from(taskAssignments)
+      .where(
+        and(
+          eq(taskAssignments.tenantId, input.tenantId),
+          eq(taskAssignments.projectId, input.projectId),
+          eq(taskAssignments.taskId, input.taskId),
+          eq(taskAssignments.resourceId, input.resourceId),
+          eq(taskAssignments.role, input.role),
+          ne(taskAssignments.id, input.assignmentId)
+        )
+      )
+      .limit(1);
+    if (sibling) return;
+
+    await db
+      .delete(taskParticipants)
+      .where(
+        and(
+          eq(taskParticipants.tenantId, input.tenantId),
+          eq(taskParticipants.taskId, input.taskId),
+          eq(taskParticipants.userId, input.resourceId),
+          eq(taskParticipants.role, input.role)
+        )
+      );
   }
 
   async function moveTaskWbs(input: {
