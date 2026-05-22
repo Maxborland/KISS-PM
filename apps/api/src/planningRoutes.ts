@@ -788,14 +788,19 @@ function resourceIdsForCommand(command: PlanningCommand): string[] {
 }
 
 function auditActionForCommand(command: PlanningCommand): string {
-  const actionByCommand: Record<PlanningCommand["type"], string> = {
+  if (command.type === "task.delete_or_archive") {
+    return command.payload.mode === "delete"
+      ? "planning.task.deleted"
+      : "planning.task.archived";
+  }
+
+  const actionByCommand: Record<Exclude<PlanningCommand["type"], "task.delete_or_archive">, string> = {
     "task.create": "planning.task.created",
     "task.update_identity": "planning.task.updated",
     "task.update_schedule": "planning.task.updated",
     "task.update_work_model": "planning.task.updated",
     "task.update_status": "planning.task.status_changed",
     "task.move_wbs": "planning.task.updated",
-    "task.delete_or_archive": "planning.task.archived",
     "dependency.upsert": "planning.dependency.upserted",
     "dependency.delete": "planning.dependency.deleted",
     "assignment.upsert": "planning.assignment.upserted",

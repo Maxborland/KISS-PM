@@ -25,12 +25,14 @@ describe("auth rate limiter", () => {
     });
   });
 
-  it("normalizes forwarded client IP headers", () => {
+  it("ignores forwarded client IP headers unless they are explicitly trusted", () => {
     const headers = new Headers({
+      "x-real-ip": "198.51.100.5",
       "x-forwarded-for": "198.51.100.4, 10.0.0.10"
     });
 
-    expect(getClientIp(headers)).toBe("198.51.100.4");
+    expect(getClientIp(headers)).toBeNull();
+    expect(getClientIp(headers, { trustForwardedHeaders: true })).toBe("198.51.100.5");
   });
 
   it("does not place clients without a known IP into one shared throttle bucket", () => {

@@ -500,5 +500,6 @@ export type CreateAppOptions = {
   authRateLimiter?: AuthRateLimiter;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];
+  trustForwardedAuthHeaders?: boolean;
   enableDevTenantRoutes?: boolean;
 };
