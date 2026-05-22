@@ -95,6 +95,52 @@
   font-size: 14px;
 }
 
+.planning-task-inspector label,
+.planning-task-inspector .planning-checkbox-row {
+  display: grid;
+  gap: 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planning-task-inspector input,
+.planning-task-inspector select {
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.planning-task-inspector input:disabled,
+.planning-task-inspector select:disabled {
+  opacity: 0.58;
+}
+
+.planning-task-inspector .planning-checkbox-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-content: center;
+  min-height: 34px;
+  padding: 0 2px;
+}
+
+.planning-task-inspector .planning-checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.planning-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .planning-issue-list,
 .planning-overload-list {
   display: grid;

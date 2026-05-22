@@ -2,8 +2,11 @@ export type {
   PlanningGanttBaselineRow,
   PlanningGanttDependencyRow,
   PlanningGanttResourceLoadBucket,
+  PlanningGanttSchedulingMode,
   PlanningGanttTaskRow,
+  PlanningGanttTaskType,
   PlanningGanttValidationIssue,
+  PlanningGanttValidationSeverity,
   PlanningGanttViewModel
 } from "./types/viewModel";
 export type { PlanningGanttIntent } from "./types/intents";

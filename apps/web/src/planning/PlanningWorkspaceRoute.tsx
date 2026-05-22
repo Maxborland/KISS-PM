@@ -17,6 +17,7 @@ import {
   planningReadDisabledReason
 } from "./planningPermissions";
 import { PlanningPreviewApplyBar, type PlanningPreviewState } from "./PlanningPreviewApplyBar";
+import { PlanningTaskInspector } from "./PlanningTaskInspector";
 import { PlanningValidationPanel } from "./PlanningValidationPanel";
 import { ResourceLoadSummary } from "./ResourceLoadSummary";
 import "./planningWorkspace.css";
@@ -35,6 +36,7 @@ export function PlanningWorkspaceRoute(props: {
   const [previewState, setPreviewState] = useState<PlanningPreviewState | null>(null);
   const [previewError, setPreviewError] = useState("");
   const [applyError, setApplyError] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const readModel = canRead ? readModelQuery.data : undefined;
   const capabilities = useMemo(
     () => planningCapabilitiesFromPermissions(props.permissions),
@@ -107,6 +109,10 @@ export function PlanningWorkspaceRoute(props: {
   const displayedViewModel = afterPreview
     ? mapPlanningReadModelToGanttViewModel(afterPreview)
     : viewModel;
+  const selectedTask = displayedViewModel?.tasks.find((task) => task.id === selectedTaskId) ??
+    displayedViewModel?.tasks[0] ??
+    null;
+  const effectiveSelectedTaskId = selectedTask?.id ?? null;
 
   return (
     <section className="planning-workspace" aria-label="Планирование проекта">
@@ -189,10 +195,19 @@ export function PlanningWorkspaceRoute(props: {
             <PlanningGanttSurface
               viewModel={displayedViewModel}
               capabilities={capabilities}
+              selectedTaskId={effectiveSelectedTaskId}
               onIntent={(intent) => void previewIntent(intent)}
+              onSelectTask={setSelectedTaskId}
             />
           </div>
           <aside className="planning-side-column">
+            <PlanningTaskInspector
+              task={selectedTask}
+              taskStatuses={props.taskStatuses}
+              canManagePlan={capabilities.canManagePlan}
+              isPreviewPending={commandMutations.previewCommand.isPending}
+              onIntent={(intent) => void previewIntent(intent)}
+            />
             <PlanningValidationPanel issues={issues} />
             <ResourceLoadSummary readModel={afterPreview ?? readModel} />
           </aside>

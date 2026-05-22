@@ -66,6 +66,8 @@ describe("PlanningWorkspaceRoute", () => {
     expect(html).toContain("data-plan-version=\"3\"");
     expect(html).toContain("data-task-id=\"task-a\"");
     expect(html).toContain("planning-core-v1");
+    expect(html).toContain("Инспектор задачи");
+    expect(html).toContain("Preview work model");
     expect(html).toContain("Ресурсная загрузка");
     expect(html).toContain("resource-alpha");
   });
