@@ -40,13 +40,7 @@ export function reducePlanningCommand(
     case "task.update_schedule":
       return withSnapshot(snapshot, command, {
         tasks: snapshot.tasks.map((task) =>
-          task.id === command.payload.taskId
-            ? {
-                ...task,
-                plannedStart: command.payload.plannedStart ?? task.plannedStart,
-                plannedFinish: command.payload.plannedFinish ?? task.plannedFinish
-              }
-            : task
+          task.id === command.payload.taskId ? updateTaskSchedule(task, command.payload) : task
         )
       });
     case "task.update_work_model":
@@ -522,6 +516,24 @@ function invalid(code: ValidationIssue["code"], message: string): ValidationIssu
     severity: "error",
     message,
     entity: null
+  };
+}
+
+function updateTaskSchedule(
+  task: PlanTask,
+  payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
+): PlanTask {
+  const plannedStart = payload.plannedStart ?? task.plannedStart;
+  const plannedStartInstant =
+    payload.plannedStart !== null && task.plannedStartInstant
+      ? { ...task.plannedStartInstant, date: payload.plannedStart }
+      : task.plannedStartInstant;
+
+  return {
+    ...task,
+    plannedStart,
+    plannedFinish: payload.plannedFinish ?? task.plannedFinish,
+    ...(plannedStartInstant !== undefined ? { plannedStartInstant } : {})
   };
 }
 
