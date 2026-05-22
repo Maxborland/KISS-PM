@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
 
 import {
   createDatabase,
@@ -282,6 +283,71 @@ describe("planning repository", () => {
     expect(snapshot?.dependencies).toEqual([]);
   });
 
+  it("keeps participant rows while sibling assignments with the same tuple remain", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "assignment-alpha-primary",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-executor",
+          role: "executor",
+          unitsPermille: 500,
+          workMinutes: 480
+        }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "assignment-alpha-sibling",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-executor",
+          role: "executor",
+          unitsPermille: 500,
+          workMinutes: 480
+        }
+      }
+    });
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.delete",
+        payload: { assignmentId: "assignment-alpha-primary" }
+      }
+    });
+
+    const participantRows = await db
+      .select()
+      .from(taskParticipants)
+      .where(
+        and(
+          eq(taskParticipants.tenantId, "tenant-alpha"),
+          eq(taskParticipants.taskId, "task-alpha"),
+          eq(taskParticipants.userId, "user-alpha-executor"),
+          eq(taskParticipants.role, "executor")
+        )
+      );
+
+    expect(participantRows).toHaveLength(1);
+  });
+
   it("excludes inactive users and their assignments from active planning resources", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);
@@ -479,6 +545,50 @@ describe("planning repository", () => {
       durationMinutes: 1920,
       workMinutes: 480
     });
+  });
+
+  it("generates new WBS codes from active project tasks only", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.delete_or_archive",
+        payload: { taskId: "task-beta", mode: "archive" }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.create",
+        payload: {
+          id: "task-after-archive",
+          projectId,
+          title: "Задача после архивации",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-10",
+          plannedFinish: "2026-06-10",
+          durationMinutes: 480,
+          workMinutes: 480,
+          assignments: []
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.tasks.map((task) => ({ id: task.id, wbsCode: task.wbsCode }))).toEqual([
+      { id: "task-alpha", wbsCode: "1" },
+      { id: "task-after-archive", wbsCode: "2" }
+    ]);
   });
 });
 
