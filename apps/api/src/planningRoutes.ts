@@ -813,10 +813,19 @@ function permissionForCommand(
 ): PolicyDecision {
   const input = { actor, profile, targetTenantId: actor.tenantId };
   if (command.type === "baseline.capture") return canManageProjectBaselines(input);
-  if (command.type === "assignment.upsert" || command.type === "assignment.delete" || command.type === "resource.reserve") {
+  if (commandAllocatesProjectResources(command)) {
     return canManageProjectResources(input);
   }
   return canManageProjectPlan(input);
+}
+
+function commandAllocatesProjectResources(command: PlanningCommand): boolean {
+  return (
+    command.type === "assignment.upsert" ||
+    command.type === "assignment.delete" ||
+    command.type === "resource.reserve" ||
+    (command.type === "task.create" && command.payload.assignments.length > 0)
+  );
 }
 
 function canReadPlanningReadModel(input: {

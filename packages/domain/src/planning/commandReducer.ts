@@ -348,6 +348,12 @@ function validateCommandPreconditions(
       ) {
         return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
       }
+      {
+        const plannedStart = command.payload.plannedStart ?? snapshot.project.plannedStart;
+        const plannedFinish = command.payload.plannedFinish ?? plannedStart;
+        const dateOrderIssues = validateTaskDateOrder(plannedStart, plannedFinish);
+        if (dateOrderIssues.length > 0) return dateOrderIssues;
+      }
       if (
         command.payload.assignments.some(
           (assignment) =>
@@ -362,9 +368,13 @@ function validateCommandPreconditions(
       }
       return [];
     case "task.update_identity":
-    case "task.update_schedule":
     case "task.update_status":
       return requireTask(taskIds, command.payload.taskId);
+    case "task.update_schedule":
+      return [
+        ...requireTask(taskIds, command.payload.taskId),
+        ...validateTaskScheduleUpdate(snapshot.tasks, command.payload)
+      ];
     case "task.update_work_model":
       return [
         ...requireTask(taskIds, command.payload.taskId),
@@ -491,6 +501,28 @@ function validateWorkModelPayload(
   }
   if (durationMinutes !== null && durationMinutes <= 0) {
     return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
+  }
+  return [];
+}
+
+function validateTaskScheduleUpdate(
+  tasks: PlanTask[],
+  payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
+): ValidationIssue[] {
+  const task = tasks.find((candidate) => candidate.id === payload.taskId);
+  if (!task) return [];
+  return validateTaskDateOrder(
+    payload.plannedStart ?? task.plannedStart,
+    payload.plannedFinish ?? task.plannedFinish
+  );
+}
+
+function validateTaskDateOrder(
+  plannedStart: PlanTask["plannedStart"],
+  plannedFinish: PlanTask["plannedFinish"]
+): ValidationIssue[] {
+  if (plannedStart !== null && plannedFinish !== null && comparePlanDates(plannedStart, plannedFinish) > 0) {
+    return [invalid("planning_command_invalid", "Дата начала задачи не может быть позже завершения")];
   }
   return [];
 }
