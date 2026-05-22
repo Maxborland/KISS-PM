@@ -176,8 +176,7 @@
   font-size: 12px;
 }
 
-.planning-issue-list,
-.planning-overload-list {
+.planning-issue-list {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -185,8 +184,7 @@
   list-style: none;
 }
 
-.planning-issue,
-.planning-overload-list li {
+.planning-issue {
   display: grid;
   gap: 3px;
   padding: 8px;
@@ -204,42 +202,99 @@
 }
 
 .planning-issue span,
-.planning-issue small,
-.planning-overload-list span,
-.planning-overload-list small {
+.planning-issue small {
   color: var(--muted-strong);
   font-size: 12px;
 }
 
-.planning-resource-metrics {
+.planning-resource-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
+  gap: 12px;
 }
 
-.planning-resource-metrics div {
+.planning-resource-sheet,
+.planning-resource-matrix,
+.planning-resource-overloads {
   display: grid;
-  gap: 3px;
+  gap: 8px;
+}
+
+.planning-resource-sheet-header,
+.planning-resource-sheet-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) repeat(3, minmax(62px, 0.7fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.planning-resource-sheet-header {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.planning-resource-sheet-row,
+.planning-resource-overloads li {
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
 }
 
-.planning-resource-metrics dt {
-  color: var(--muted);
+.planning-resource-sheet-row {
+  font-size: 12px;
+}
+
+.planning-resource-sheet-row small,
+.planning-resource-overloads span,
+.planning-resource-overloads small {
+  display: block;
+  color: var(--muted-strong);
   font-size: 11px;
 }
 
-.planning-resource-metrics dd {
-  margin: 0;
-  color: var(--text);
+.planning-resource-sheet-meta {
+  grid-column: 1 / -1;
+}
+
+.planning-resource-sheet-row .danger,
+.planning-resource-matrix-table .danger {
+  color: var(--danger);
   font-weight: 800;
 }
 
-.planning-resource-metrics .danger dd {
-  color: var(--danger);
+.planning-resource-matrix-group {
+  display: grid;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.planning-resource-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.planning-resource-matrix-table th,
+.planning-resource-matrix-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.planning-resource-matrix-table th {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.planning-resource-overloads ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 @media (max-width: 1120px) {

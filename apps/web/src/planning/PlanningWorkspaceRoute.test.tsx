@@ -45,7 +45,7 @@ describe("PlanningWorkspaceRoute", () => {
     queryMocks.applyMutateAsync.mockReset();
   });
 
-  it("renders planning read model, WBS/Gantt surface and resource summary for permitted users", () => {
+  it("renders planning read model, WBS/Gantt surface and resource planning for permitted users", () => {
     const html = renderToStaticMarkup(
       <PlanningWorkspaceRoute
         projectId="project-alpha"
@@ -70,7 +70,8 @@ describe("PlanningWorkspaceRoute", () => {
     expect(html).toContain("Preview work model");
     expect(html).toContain("Связи задачи");
     expect(html).toContain("Preview связи");
-    expect(html).toContain("Ресурсная загрузка");
+    expect(html).toContain("Ресурсный лист");
+    expect(html).toContain("Матрица загрузки");
     expect(html).toContain("resource-alpha");
   });
 
