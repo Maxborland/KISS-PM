@@ -16,6 +16,7 @@ describe("planning command reducer", () => {
           statusId: "todo",
           plannedStart: "2026-06-04",
           plannedFinish: null,
+          durationMinutes: 1920,
           workMinutes: 480,
           assignments: []
         }
@@ -144,13 +145,15 @@ describe("planning command reducer", () => {
         statusId: "todo",
         plannedStart: null,
         plannedFinish: null,
+        durationMinutes: 1920,
         workMinutes: 480,
         assignments: []
       }
     });
     expect(created.nextSnapshot.tasks.find((task) => task.id === "task-new")).toMatchObject({
       plannedStart: "2026-06-01",
-      plannedFinish: "2026-06-01"
+      plannedFinish: "2026-06-01",
+      durationMinutes: 1920
     });
 
     const updated = reducePlanningCommand(snapshot, {

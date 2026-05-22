@@ -40,6 +40,7 @@ export function buildCreateTaskPlanningCommand(input: {
       statusId: input.statusId,
       plannedStart: dateToPlanDate(input.body.plannedStart),
       plannedFinish: dateToPlanDate(input.body.plannedFinish),
+      durationMinutes: input.body.durationWorkingDays * 480,
       workMinutes: input.body.plannedWork * 60,
       assignments: taskParticipantsToAssignments(input.taskId, input.participants)
     }

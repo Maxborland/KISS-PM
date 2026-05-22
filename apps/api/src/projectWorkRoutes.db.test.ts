@@ -203,7 +203,8 @@ describe("project work API routes", () => {
         priority: "high",
         plannedStart: "2026-06-02",
         plannedFinish: "2026-06-05",
-        plannedWork: 24,
+        durationWorkingDays: 4,
+        plannedWork: 8,
         participants: [{ userId: "user-alpha-executor", role: "executor" }]
       })
     });
@@ -230,6 +231,8 @@ describe("project work API routes", () => {
         id: "task-alpha",
         projectId: "project-alpha",
         title: "Подготовить план внедрения",
+        durationWorkingDays: 4,
+        plannedWork: 8,
         participants: expect.arrayContaining([
           { userId: "user-alpha-executor", role: "executor" },
           { userId: "user-alpha-admin", role: "requester" }
@@ -266,7 +269,12 @@ describe("project work API routes", () => {
       planVersion: 2,
       authored: {
         tasks: expect.arrayContaining([
-          expect.objectContaining({ id: "task-alpha", title: "Подготовить план внедрения" })
+          expect.objectContaining({
+            id: "task-alpha",
+            title: "Подготовить план внедрения",
+            durationMinutes: 1920,
+            workMinutes: 480
+          })
         ]),
         assignments: expect.arrayContaining([
           expect.objectContaining({
