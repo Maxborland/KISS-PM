@@ -100,6 +100,24 @@ describe("planning read model mapper", () => {
 
     expect(viewModel.resourceLoadBuckets[0]?.overloadMinutes).toBe(0);
   });
+
+  it("maps backend Task validation entities to row markers", () => {
+    const viewModel = mapPlanningReadModelToGanttViewModel({
+      ...createReadModel(),
+      validationIssues: [
+        {
+          code: "constraint_impossible",
+          severity: "warning",
+          message: "Task violates constraint",
+          entity: { type: "Task", id: "task-a" }
+        }
+      ]
+    });
+
+    expect(viewModel.tasks[0]?.validationIssueIds).toEqual([
+      "constraint_impossible:Task:task-a:0"
+    ]);
+  });
 });
 
 function createReadModel(): PlanningReadModel {

@@ -156,7 +156,7 @@ function mapValidationIssueIdsByTaskId(
 ): Map<string, string[]> {
   const result = new Map<string, string[]>();
   validationIssues.forEach((issue, index) => {
-    if (issue.entity?.type !== "task") return;
+    if (issue.entity?.type.toLowerCase() !== "task") return;
     result.set(issue.entity.id, [
       ...(result.get(issue.entity.id) ?? []),
       validationIssueId(issue, index)

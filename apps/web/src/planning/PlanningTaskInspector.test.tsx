@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   PlanningTaskInspector,
   buildTaskInspectorIntent,
-  createTaskInspectorDraft
+  createTaskInspectorDraft,
+  taskInspectorDraftSyncKey
 } from "./PlanningTaskInspector";
 import { mapPlanningReadModelToGanttViewModel } from "./planningReadModelMapper";
 import { createPlanningReadModelFixture } from "./planningReadModel.test-utils";
@@ -56,6 +57,12 @@ describe("PlanningTaskInspector", () => {
     const draft = createTaskInspectorDraft(task);
 
     expect(buildTaskInspectorIntent("work", draft, task)).toBeNull();
+  });
+
+  it("changes the draft sync key when backend fields update for the same task", () => {
+    expect(taskInspectorDraftSyncKey(task)).not.toBe(
+      taskInspectorDraftSyncKey({ ...task, title: "Переименовано на сервере" })
+    );
   });
 });
 
