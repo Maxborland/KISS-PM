@@ -1,19 +1,28 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
-import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
+import type {
+  PlanningCommand,
+  PlanSnapshot,
+  Tenant,
+  TenantId,
+  TenantUser,
+  UserId
+} from "@kiss-pm/domain";
 import type {
   CrmActivityEntityType,
   CrmActivityInput,
   CrmActivityRecord,
   CrmActivityTransitionResult,
   CrmActivityUpdateInput,
+  PlanningScenarioRunInput,
+  PlanningScenarioRunRecord,
   TaskActivityInput,
   TaskActivityRecord,
-  TaskInput,
+  TaskMetadataInput,
   TaskRecord,
   TaskStatusInput,
-  TaskStatusRecord,
-  TaskStatusUpdateInput
+  TaskStatusRecord
 } from "@kiss-pm/persistence";
+import type { AuthRateLimiter } from "./authRateLimit";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -220,7 +229,8 @@ export type OpportunityUpdateInput = Omit<
 export type ProjectRecord = {
   id: string;
   tenantId: TenantId;
-  sourceOpportunityId: string;
+  sourceType: "opportunity" | "workspace_inbox" | "manual";
+  sourceOpportunityId: string | null;
   clientId: string | null;
   projectTypeId: string | null;
   title: string;
@@ -236,10 +246,20 @@ export type ProjectRecord = {
   demand: PositionDemandRecord[];
 };
 
-export type ProjectInput = Omit<ProjectRecord, "createdAt" | "activatedAt">;
+export type ProjectInput = Omit<
+  ProjectRecord,
+  "createdAt" | "activatedAt" | "sourceType" | "sourceOpportunityId"
+> & {
+  sourceOpportunityId: string;
+};
 export type ProjectDraftActivationInput = {
   tenantId: TenantId;
   projectId: string;
+};
+export type WorkspaceInboxProjectInput = {
+  tenantId: TenantId;
+  plannedStart: Date;
+  plannedFinish: Date;
 };
 
 export type UserCredentialRecord = {
@@ -392,6 +412,9 @@ export type ApiTenantDataSource = {
     input: CrmActivityUpdateInput
   ): Promise<CrmActivityTransitionResult>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
+  ensureWorkspaceInboxProject?(
+    input: WorkspaceInboxProjectInput
+  ): Promise<ProjectRecord>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
@@ -404,10 +427,9 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     statusId: string
   ): Promise<TaskStatusRecord | undefined>;
-  createTask?(input: TaskInput): Promise<TaskRecord>;
-  updateTask?(input: TaskInput): Promise<TaskRecord | undefined>;
-  archiveTask?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
-  updateTaskStatus?(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
+  // Task planning fields are intentionally mutated only through applyPlanningCommand.
+  // Compatibility task endpoints may update non-planning metadata after the command.
+  updateTaskMetadata?(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
   listTaskActivities?(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
   createTaskActivity?(input: TaskActivityInput): Promise<TaskActivityRecord>;
   findCredentialByEmail?(
@@ -428,6 +450,29 @@ export type ApiTenantDataSource = {
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning?(tenantId: TenantId): Promise<void>;
+  getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
+  ensurePlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
+  incrementPlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
+  createPlanningScenarioRun?(
+    input: PlanningScenarioRunInput
+  ): Promise<PlanningScenarioRunRecord>;
+  findPlanningScenarioRun?(
+    tenantId: TenantId,
+    projectId: string,
+    scenarioRunId: string
+  ): Promise<PlanningScenarioRunRecord | undefined>;
+  markPlanningScenarioRunApplied?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    scenarioRunId: string;
+    appliedAt: Date;
+  }): Promise<void>;
+  applyPlanningCommand?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actorUserId: UserId;
+    command: PlanningCommand;
+  }): Promise<void>;
   appendAuditEvent?(input: {
     id: string;
     tenantId: TenantId;
@@ -452,6 +497,8 @@ export type ApiTenantDataSource = {
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
+  authRateLimiter?: AuthRateLimiter;
   secureCookies?: boolean;
+  trustedMutationOrigins?: string[];
   enableDevTenantRoutes?: boolean;
 };

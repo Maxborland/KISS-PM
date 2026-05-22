@@ -2,6 +2,7 @@ import {
   canManageAccessProfiles,
   canReadAccessProfiles
 } from "@kiss-pm/access-control";
+import { readLimitedJsonBody } from "./jsonBody";
 import { parseAccessProfileCreateBody } from "./workspaceParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
@@ -74,8 +75,9 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: decision.reason }, 403);
     }
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parseAccessProfileCreateBody(body);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseAccessProfileCreateBody(body.value);
 
     if (!parsed.ok) {
       return context.json({ error: parsed.error }, 400);
@@ -186,9 +188,10 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "self_access_role_update_forbidden" }, 400);
     }
 
-    const body = await context.req.json().catch(() => null);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseAccessProfileCreateBody({
-      ...(body && typeof body === "object" ? body : {}),
+      ...(body.value && typeof body.value === "object" ? body.value : {}),
       id: roleId
     });
 

@@ -1,0 +1,1084 @@
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+
+import type {
+  DependencyType,
+  PlanningCommand,
+  PlanAssignment,
+  PlanAssignmentRole,
+  PlanBaseline,
+  PlanCalendar,
+  PlanConstraint,
+  PlanConstraintType,
+  PlanDate,
+  PlanResource,
+  PlanSnapshot,
+  PlanTask,
+  ProjectSourceType,
+  SchedulingMode,
+  TaskType
+} from "@kiss-pm/domain";
+
+import type { KissPmDatabase } from "./connection";
+import {
+  calendarExceptions,
+  planVersions,
+  projectBaselineAssignments,
+  projectBaselines,
+  projectBaselineTasks,
+  projectCalendars,
+  projects,
+  resourceCalendars,
+  resourceReservations,
+  planningScenarioRuns,
+  taskAssignments,
+  taskDependencies,
+  taskStatuses,
+  taskParticipants,
+  tasks,
+  tenantUsers
+} from "./schema";
+
+export type PlanningDependencyInput = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  predecessorTaskId: string;
+  successorTaskId: string;
+  type: DependencyType;
+  lagMinutes: number;
+};
+
+export type PlanningAssignmentInput = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  taskId: string;
+  resourceId: string;
+  role: PlanAssignmentRole;
+  unitsPermille: number;
+  workMinutes: number | null;
+  calendarId: string | null;
+};
+
+export type PlanningRepository = {
+  getPlanSnapshot(tenantId: string, projectId: string): Promise<PlanSnapshot | undefined>;
+  ensurePlanVersion(tenantId: string, projectId: string): Promise<number>;
+  incrementPlanVersion(tenantId: string, projectId: string): Promise<number>;
+  createPlanningScenarioRun(input: PlanningScenarioRunInput): Promise<PlanningScenarioRunRecord>;
+  findPlanningScenarioRun(
+    tenantId: string,
+    projectId: string,
+    scenarioRunId: string
+  ): Promise<PlanningScenarioRunRecord | undefined>;
+  markPlanningScenarioRunApplied(input: {
+    tenantId: string;
+    projectId: string;
+    scenarioRunId: string;
+    appliedAt: Date;
+  }): Promise<void>;
+  applyPlanningCommand(input: {
+    tenantId: string;
+    projectId: string;
+    actorUserId: string;
+    command: PlanningCommand;
+  }): Promise<void>;
+  upsertTaskDependency(input: PlanningDependencyInput): Promise<void>;
+  upsertTaskAssignment(input: PlanningAssignmentInput): Promise<void>;
+};
+
+export type PlanningScenarioRunInput = Omit<
+  PlanningScenarioRunRecord,
+  "createdAt" | "appliedAt"
+> & {
+  appliedAt?: Date | null;
+  createdAt?: Date;
+};
+
+export type PlanningScenarioRunRecord = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  planVersion: number;
+  engineVersion: string;
+  targetConflict: Record<string, unknown>;
+  proposalPayload: Record<string, unknown>;
+  proposalPayloadHash: string;
+  actorUserId: string;
+  expiresAt: Date;
+  appliedAt: Date | null;
+  createdAt: Date;
+};
+
+const defaultWorkingWeekdays = [1, 2, 3, 4, 5];
+const defaultWorkingMinutesPerDay = 480;
+
+export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
+  return {
+    async getPlanSnapshot(tenantId, projectId) {
+      const [project] = await db
+        .select()
+        .from(projects)
+        .where(and(eq(projects.tenantId, tenantId), eq(projects.id, projectId)))
+        .limit(1);
+      if (!project) return undefined;
+
+      const [
+        planVersion,
+        taskRows,
+        participantRows,
+        assignmentRows,
+        dependencyRows,
+        projectCalendarRows,
+        resourceCalendarRows,
+        exceptionRows,
+        resourceRows,
+        reservationRows,
+        baselineRows,
+        baselineTaskRows
+      ] = await Promise.all([
+        this.ensurePlanVersion(tenantId, projectId),
+        db
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)))
+          .orderBy(asc(tasks.wbsCode), asc(tasks.createdAt), asc(tasks.id)),
+        db
+          .select()
+          .from(taskParticipants)
+          .where(eq(taskParticipants.tenantId, tenantId)),
+        db
+          .select()
+          .from(taskAssignments)
+          .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)))
+          .orderBy(asc(taskAssignments.id)),
+        db
+          .select()
+          .from(taskDependencies)
+          .where(and(eq(taskDependencies.tenantId, tenantId), eq(taskDependencies.projectId, projectId)))
+          .orderBy(asc(taskDependencies.id)),
+        db
+          .select()
+          .from(projectCalendars)
+          .where(and(eq(projectCalendars.tenantId, tenantId), eq(projectCalendars.projectId, projectId)))
+          .orderBy(asc(projectCalendars.id)),
+        db
+          .select()
+          .from(resourceCalendars)
+          .where(eq(resourceCalendars.tenantId, tenantId))
+          .orderBy(asc(resourceCalendars.id)),
+        db
+          .select()
+          .from(calendarExceptions)
+          .where(and(eq(calendarExceptions.tenantId, tenantId), eq(calendarExceptions.projectId, projectId)))
+          .orderBy(asc(calendarExceptions.date), asc(calendarExceptions.id)),
+        db
+          .select()
+          .from(tenantUsers)
+          .where(and(eq(tenantUsers.tenantId, tenantId), ne(tenantUsers.status, "inactive")))
+          .orderBy(asc(tenantUsers.name), asc(tenantUsers.id)),
+        db
+          .select()
+          .from(resourceReservations)
+          .where(and(eq(resourceReservations.tenantId, tenantId), eq(resourceReservations.projectId, projectId)))
+          .orderBy(asc(resourceReservations.start), asc(resourceReservations.id)),
+        db
+          .select()
+          .from(projectBaselines)
+          .where(and(eq(projectBaselines.tenantId, tenantId), eq(projectBaselines.projectId, projectId)))
+          .orderBy(asc(projectBaselines.capturedAt), asc(projectBaselines.id)),
+        db
+          .select()
+          .from(projectBaselineTasks)
+          .where(and(eq(projectBaselineTasks.tenantId, tenantId), eq(projectBaselineTasks.projectId, projectId)))
+      ]);
+
+      const activeTaskIds = new Set(taskRows.map((task) => task.id));
+      const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
+      const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
+      const projectCalendarId = project.calendarId ?? calendars[0]?.id ?? defaultProjectCalendarId(project.id);
+
+      return {
+        tenantId,
+        projectId,
+        planVersion,
+        project: {
+          id: project.id,
+          sourceType: project.sourceType as ProjectSourceType,
+          sourceOpportunityId: project.sourceOpportunityId,
+          plannedStart: toPlanDate(project.plannedStart),
+          plannedFinish: toPlanDate(project.plannedFinish),
+          deadline: project.deadline ? toPlanDate(project.deadline) : null,
+          calendarId: projectCalendarId
+        },
+        tasks: taskRows.map((task) => mapPlanTask(task, projectCalendarId)),
+        assignments: mapAssignments(
+          taskRows.map((task) => task.id),
+          activeResourceIds,
+          participantRows,
+          assignmentRows
+        ),
+        dependencies: dependencyRows
+          .filter(
+            (dependency) =>
+              activeTaskIds.has(dependency.predecessorTaskId) &&
+              activeTaskIds.has(dependency.successorTaskId)
+          )
+          .map((dependency) => ({
+            id: dependency.id,
+            predecessorTaskId: dependency.predecessorTaskId,
+            successorTaskId: dependency.successorTaskId,
+            type: dependency.type as DependencyType,
+            lagMinutes: dependency.lagMinutes
+          })),
+        baselines: mapBaselines(baselineRows, baselineTaskRows),
+        calendars,
+        calendarExceptions: exceptionRows.map((exception) => ({
+          id: exception.id,
+          calendarId: exception.calendarId,
+          resourceId: exception.resourceId,
+          date: exception.date,
+          workingMinutes: exception.workingMinutes,
+          reason: exception.reason
+        })),
+        resources: resourceRows.map<PlanResource>((resource) => ({
+          id: resource.id,
+          userId: resource.id,
+          positionId: resource.positionId,
+          teamId: null,
+          name: resource.name,
+          calendarId: resourceCalendarRows.find((calendar) => calendar.resourceId === resource.id)?.id ?? null
+        })),
+        reservations: reservationRows.map((reservation) => ({
+          id: reservation.id,
+          resourceId: reservation.resourceId,
+          projectId: reservation.projectId,
+          start: reservation.start,
+          finish: reservation.finish,
+          workMinutes: reservation.workMinutes,
+          reason: reservation.reason
+        })),
+        constraints: taskRows.flatMap((task) => {
+          const constraint = mapConstraint(task);
+          return constraint ? [constraint] : [];
+        }),
+        capturedAt: new Date().toISOString()
+      };
+    },
+
+    async ensurePlanVersion(tenantId, projectId) {
+      const now = new Date();
+      await db
+        .insert(planVersions)
+        .values({
+          tenantId,
+          projectId,
+          version: 1,
+          updatedAt: now
+        })
+        .onConflictDoNothing();
+
+      const [row] = await db
+        .select()
+        .from(planVersions)
+        .where(and(eq(planVersions.tenantId, tenantId), eq(planVersions.projectId, projectId)))
+        .limit(1);
+      return row?.version ?? 1;
+    },
+
+    async incrementPlanVersion(tenantId, projectId) {
+      const currentVersion = await this.ensurePlanVersion(tenantId, projectId);
+      const nextVersion = currentVersion + 1;
+      await db
+        .update(planVersions)
+        .set({ version: nextVersion, updatedAt: new Date() })
+        .where(and(eq(planVersions.tenantId, tenantId), eq(planVersions.projectId, projectId)));
+      return nextVersion;
+    },
+
+    async createPlanningScenarioRun(input) {
+      const [row] = await db
+        .insert(planningScenarioRuns)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          planVersion: input.planVersion,
+          engineVersion: input.engineVersion,
+          targetConflict: input.targetConflict,
+          proposalPayload: input.proposalPayload,
+          proposalPayloadHash: input.proposalPayloadHash,
+          actorUserId: input.actorUserId,
+          expiresAt: input.expiresAt,
+          appliedAt: input.appliedAt ?? null,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoUpdate({
+          target: [
+            planningScenarioRuns.tenantId,
+            planningScenarioRuns.projectId,
+            planningScenarioRuns.id
+          ],
+          set: {
+            planVersion: input.planVersion,
+            engineVersion: input.engineVersion,
+            targetConflict: input.targetConflict,
+            proposalPayload: input.proposalPayload,
+            proposalPayloadHash: input.proposalPayloadHash,
+            actorUserId: input.actorUserId,
+            expiresAt: input.expiresAt,
+            appliedAt: input.appliedAt ?? null
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Planning scenario insert returned no row");
+      return mapPlanningScenarioRun(row);
+    },
+
+    async findPlanningScenarioRun(tenantId, projectId, scenarioRunId) {
+      const [row] = await db
+        .select()
+        .from(planningScenarioRuns)
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, tenantId),
+            eq(planningScenarioRuns.projectId, projectId),
+            eq(planningScenarioRuns.id, scenarioRunId)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningScenarioRun(row) : undefined;
+    },
+
+    async markPlanningScenarioRunApplied(input) {
+      await db
+        .update(planningScenarioRuns)
+        .set({ appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, input.tenantId),
+            eq(planningScenarioRuns.projectId, input.projectId),
+            eq(planningScenarioRuns.id, input.scenarioRunId)
+          )
+        );
+    },
+
+    async applyPlanningCommand(input) {
+      switch (input.command.type) {
+        case "task.create": {
+          const payload = input.command.payload;
+          const [project] = await db
+            .select()
+            .from(projects)
+            .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)))
+            .limit(1);
+          if (!project) throw new Error("project_not_found");
+          const [status] = await db
+            .select()
+            .from(taskStatuses)
+            .where(
+              and(
+                eq(taskStatuses.tenantId, input.tenantId),
+                eq(taskStatuses.id, payload.statusId)
+              )
+            )
+            .limit(1);
+          const ownerUserId =
+            payload.assignments.find((assignment) => assignment.role === "executor")
+              ?.resourceId ?? input.actorUserId;
+          const plannedStart = payload.plannedStart ?? toPlanDate(project.plannedStart);
+          const plannedFinish = payload.plannedFinish ?? plannedStart;
+          const now = new Date();
+          await db.insert(tasks).values({
+            id: payload.id,
+            tenantId: input.tenantId,
+            projectId: input.projectId,
+            stageId: null,
+            title: payload.title,
+            description: null,
+            status: status?.category ?? "new",
+            statusId: payload.statusId,
+            priority: "normal",
+            requesterUserId: input.actorUserId,
+            ownerUserId,
+            plannedStart: fromPlanDate(plannedStart),
+            plannedFinish: fromPlanDate(plannedFinish),
+            durationWorkingDays: Math.max(1, Math.ceil(payload.workMinutes / 480)),
+            plannedWork: Math.ceil(payload.workMinutes / 60),
+            actualWork: 0,
+            progress: 0,
+            requiresAcceptance: false,
+            source: "manual",
+            parentTaskId: payload.parentTaskId ?? null,
+            wbsCode: await nextWbsCode(input.tenantId, input.projectId),
+            schedulingMode: "auto",
+            taskType: "fixed_units",
+            effortDriven: false,
+            durationMinutes: null,
+            workMinutes: payload.workMinutes,
+            plannedStartMinute: 0,
+            plannedFinishMinute: 0,
+            constraintType: null,
+            constraintDate: null,
+            createdAt: now,
+            updatedAt: now
+          });
+          await db.insert(taskParticipants).values(
+            normalizeParticipantRows({
+            tenantId: input.tenantId,
+              taskId: payload.id,
+              actorUserId: input.actorUserId,
+              assignments: payload.assignments
+            })
+          );
+          if (payload.assignments.length > 0) {
+            await db.insert(taskAssignments).values(
+              payload.assignments.map((assignment, index) => ({
+                id: assignment.id ?? `${payload.id}-assignment-${index + 1}`,
+                tenantId: input.tenantId,
+                projectId: input.projectId,
+                taskId: payload.id,
+                resourceId: assignment.resourceId,
+                role: assignment.role,
+                unitsPermille: assignment.unitsPermille,
+                workMinutes: assignment.workMinutes ?? null,
+                calendarId: null
+              }))
+            );
+          }
+          return;
+        }
+        case "task.update_identity":
+          await db
+            .update(tasks)
+            .set({ title: input.command.payload.title, updatedAt: new Date() })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        case "task.update_schedule":
+          {
+            const [task] = await db
+              .select()
+              .from(tasks)
+              .where(
+                and(
+                  eq(tasks.tenantId, input.tenantId),
+                  eq(tasks.projectId, input.projectId),
+                  eq(tasks.id, input.command.payload.taskId)
+                )
+              )
+              .limit(1);
+            if (!task) return;
+            const plannedStart = input.command.payload.plannedStart
+              ? fromPlanDate(input.command.payload.plannedStart)
+              : task.plannedStart;
+            const plannedFinish = input.command.payload.plannedFinish
+              ? fromPlanDate(input.command.payload.plannedFinish)
+              : task.plannedFinish;
+            await db
+              .update(tasks)
+              .set({
+                plannedStart,
+                plannedFinish,
+                updatedAt: new Date()
+              })
+              .where(
+                and(
+                  eq(tasks.tenantId, input.tenantId),
+                  eq(tasks.projectId, input.projectId),
+                  eq(tasks.id, input.command.payload.taskId)
+                )
+              );
+          }
+          return;
+        case "task.update_work_model":
+          await db
+            .update(tasks)
+            .set({
+              taskType: input.command.payload.taskType,
+              effortDriven: input.command.payload.effortDriven,
+              durationMinutes: input.command.payload.durationMinutes,
+              workMinutes: input.command.payload.workMinutes,
+              durationWorkingDays: Math.max(
+                1,
+                Math.ceil((input.command.payload.durationMinutes ?? input.command.payload.workMinutes) / 480)
+              ),
+              plannedWork: Math.max(1, Math.ceil(input.command.payload.workMinutes / 60)),
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        case "task.update_status": {
+          const [status] = await db
+            .select()
+            .from(taskStatuses)
+            .where(
+              and(
+                eq(taskStatuses.tenantId, input.tenantId),
+                eq(taskStatuses.id, input.command.payload.statusId)
+              )
+            )
+            .limit(1);
+          await db
+            .update(tasks)
+            .set({
+              statusId: input.command.payload.statusId,
+              status: status?.category ?? "new",
+              progress: deriveProgressExpression(status?.category),
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        }
+        case "task.move_wbs":
+          await db
+            .update(tasks)
+            .set({
+              parentTaskId: input.command.payload.parentTaskId,
+              wbsCode: String(input.command.payload.sortOrder + 1),
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        case "task.delete_or_archive":
+          if (input.command.payload.mode === "delete") {
+            await db
+              .delete(tasks)
+              .where(
+                and(
+                  eq(tasks.tenantId, input.tenantId),
+                  eq(tasks.projectId, input.projectId),
+                  eq(tasks.id, input.command.payload.taskId)
+                )
+              );
+            return;
+          }
+          await db
+            .update(tasks)
+            .set({ archivedAt: new Date(), updatedAt: new Date() })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        case "dependency.upsert":
+          await this.upsertTaskDependency({
+            id: input.command.payload.id,
+            tenantId: input.tenantId,
+            projectId: input.projectId,
+            predecessorTaskId: input.command.payload.predecessorTaskId,
+            successorTaskId: input.command.payload.successorTaskId,
+            type: input.command.payload.dependencyType,
+            lagMinutes: input.command.payload.lagMinutes
+          });
+          return;
+        case "dependency.delete":
+          await db
+            .delete(taskDependencies)
+            .where(
+              and(
+                eq(taskDependencies.tenantId, input.tenantId),
+                eq(taskDependencies.projectId, input.projectId),
+                eq(taskDependencies.id, input.command.payload.dependencyId)
+              )
+            );
+          return;
+        case "assignment.upsert":
+          {
+            const [existing] = await db
+              .select()
+              .from(taskAssignments)
+              .where(
+                and(
+                  eq(taskAssignments.tenantId, input.tenantId),
+                  eq(taskAssignments.projectId, input.projectId),
+                  eq(taskAssignments.id, input.command.payload.id)
+                )
+              )
+              .limit(1);
+            if (
+              existing &&
+              (existing.taskId !== input.command.payload.taskId ||
+                existing.resourceId !== input.command.payload.resourceId ||
+                existing.role !== input.command.payload.role)
+            ) {
+              await db
+                .delete(taskParticipants)
+                .where(
+                  and(
+                    eq(taskParticipants.tenantId, input.tenantId),
+                    eq(taskParticipants.taskId, existing.taskId),
+                    eq(taskParticipants.userId, existing.resourceId),
+                    eq(taskParticipants.role, existing.role)
+                  )
+                );
+            }
+          }
+          await this.upsertTaskAssignment({
+            ...input.command.payload,
+            tenantId: input.tenantId,
+            projectId: input.projectId,
+            calendarId: null
+          });
+          await db
+            .insert(taskParticipants)
+            .values({
+              tenantId: input.tenantId,
+              taskId: input.command.payload.taskId,
+              userId: input.command.payload.resourceId,
+              role: input.command.payload.role
+            })
+            .onConflictDoNothing();
+          return;
+        case "assignment.delete":
+          {
+            const [existing] = await db
+              .select()
+              .from(taskAssignments)
+              .where(
+                and(
+                  eq(taskAssignments.tenantId, input.tenantId),
+                  eq(taskAssignments.projectId, input.projectId),
+                  eq(taskAssignments.id, input.command.payload.assignmentId)
+                )
+              )
+              .limit(1);
+            if (existing) {
+              await db
+                .delete(taskParticipants)
+                .where(
+                  and(
+                    eq(taskParticipants.tenantId, input.tenantId),
+                    eq(taskParticipants.taskId, existing.taskId),
+                    eq(taskParticipants.userId, existing.resourceId),
+                    eq(taskParticipants.role, existing.role)
+                  )
+                );
+            }
+          }
+          await db
+            .delete(taskAssignments)
+            .where(
+              and(
+                eq(taskAssignments.tenantId, input.tenantId),
+                eq(taskAssignments.projectId, input.projectId),
+                eq(taskAssignments.id, input.command.payload.assignmentId)
+              )
+            );
+          return;
+        case "baseline.capture":
+          await captureBaseline(input.tenantId, input.projectId, input.command.payload.baselineId, input.command.payload.label);
+          return;
+        case "calendar.exception.upsert":
+          await db
+            .insert(calendarExceptions)
+            .values({
+              ...input.command.payload,
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+            .onConflictDoUpdate({
+              target: [calendarExceptions.tenantId, calendarExceptions.projectId, calendarExceptions.id],
+              set: {
+                calendarId: input.command.payload.calendarId,
+                resourceId: input.command.payload.resourceId,
+                date: input.command.payload.date,
+                workingMinutes: input.command.payload.workingMinutes,
+                reason: input.command.payload.reason,
+                updatedAt: new Date()
+              }
+            });
+          return;
+        case "constraint.update":
+          await db
+            .update(tasks)
+            .set({
+              constraintType: input.command.payload.type,
+              constraintDate: input.command.payload.date ? fromPlanDate(input.command.payload.date) : null,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        case "resource.reserve":
+          await db
+            .insert(resourceReservations)
+            .values({
+              ...input.command.payload,
+              tenantId: input.tenantId,
+              projectId: input.projectId
+            })
+            .onConflictDoUpdate({
+              target: [resourceReservations.tenantId, resourceReservations.projectId, resourceReservations.id],
+              set: {
+                resourceId: input.command.payload.resourceId,
+                start: input.command.payload.start,
+                finish: input.command.payload.finish,
+                workMinutes: input.command.payload.workMinutes,
+                reason: input.command.payload.reason
+              }
+            });
+          return;
+        case "risk.accept_overload":
+          return;
+        case "project.deadline.move":
+          await db
+            .update(projects)
+            .set({ deadline: fromPlanDate(input.command.payload.deadline) })
+            .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)));
+          return;
+      }
+    },
+
+    async upsertTaskDependency(input) {
+      await db
+        .insert(taskDependencies)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          predecessorTaskId: input.predecessorTaskId,
+          successorTaskId: input.successorTaskId,
+          type: input.type,
+          lagMinutes: input.lagMinutes
+        })
+        .onConflictDoUpdate({
+          target: [taskDependencies.tenantId, taskDependencies.projectId, taskDependencies.id],
+          set: {
+            predecessorTaskId: input.predecessorTaskId,
+            successorTaskId: input.successorTaskId,
+            type: input.type,
+            lagMinutes: input.lagMinutes
+          }
+        });
+    },
+
+    async upsertTaskAssignment(input) {
+      await db
+        .insert(taskAssignments)
+        .values(input)
+        .onConflictDoUpdate({
+          target: [taskAssignments.tenantId, taskAssignments.projectId, taskAssignments.id],
+          set: {
+            taskId: input.taskId,
+            resourceId: input.resourceId,
+            role: input.role,
+            unitsPermille: input.unitsPermille,
+            workMinutes: input.workMinutes,
+            calendarId: input.calendarId
+          }
+        });
+    }
+  };
+
+  async function nextWbsCode(tenantId: string, projectId: string): Promise<string> {
+    const rows = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId)));
+    return String(rows.length + 1);
+  }
+
+  async function captureBaseline(
+    tenantId: string,
+    projectId: string,
+    baselineId: string,
+    label: string
+  ): Promise<void> {
+    const now = new Date();
+    const taskRows = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)));
+    const assignmentRows = await db
+      .select()
+      .from(taskAssignments)
+      .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)));
+    const activeTaskIds = new Set(taskRows.map((task) => task.id));
+    const activeAssignmentRows = assignmentRows.filter((assignment) => activeTaskIds.has(assignment.taskId));
+    await db
+      .insert(projectBaselines)
+      .values({ id: baselineId, tenantId, projectId, label, capturedAt: now })
+      .onConflictDoUpdate({
+        target: [projectBaselines.tenantId, projectBaselines.projectId, projectBaselines.id],
+        set: { label, capturedAt: now }
+      });
+    await db
+      .delete(projectBaselineTasks)
+      .where(
+        and(
+          eq(projectBaselineTasks.tenantId, tenantId),
+          eq(projectBaselineTasks.projectId, projectId),
+          eq(projectBaselineTasks.baselineId, baselineId)
+        )
+      );
+    await db
+      .delete(projectBaselineAssignments)
+      .where(
+        and(
+          eq(projectBaselineAssignments.tenantId, tenantId),
+          eq(projectBaselineAssignments.projectId, projectId),
+          eq(projectBaselineAssignments.baselineId, baselineId)
+        )
+      );
+    if (taskRows.length > 0) {
+      await db.insert(projectBaselineTasks).values(
+        taskRows.map((task) => ({
+          tenantId,
+          projectId,
+          baselineId,
+          taskId: task.id,
+          plannedStart: toPlanDate(task.plannedStart),
+          plannedFinish: toPlanDate(task.plannedFinish),
+          workMinutes: task.workMinutes ?? task.plannedWork * 60
+        }))
+      );
+    }
+    if (activeAssignmentRows.length > 0) {
+      await db.insert(projectBaselineAssignments).values(
+        activeAssignmentRows.map((assignment) => ({
+          tenantId,
+          projectId,
+          baselineId,
+          assignmentId: assignment.id,
+          taskId: assignment.taskId,
+          resourceId: assignment.resourceId,
+          workMinutes: assignment.workMinutes
+        }))
+      );
+    }
+  }
+}
+
+function mapPlanTask(
+  task: typeof tasks.$inferSelect,
+  projectCalendarId: string
+): PlanTask {
+  const constraint = mapConstraint(task);
+  return {
+    id: task.id,
+    parentTaskId: task.parentTaskId,
+    wbsCode: task.wbsCode,
+    title: task.title,
+    statusId: task.statusId,
+    schedulingMode: task.schedulingMode as SchedulingMode,
+    taskType: task.taskType as TaskType,
+    effortDriven: task.effortDriven,
+    plannedStart: toPlanDate(task.plannedStart),
+    plannedFinish: toPlanDate(task.plannedFinish),
+    plannedStartInstant: {
+      date: toPlanDate(task.plannedStart),
+      minuteOfDay: task.plannedStartMinute
+    },
+    plannedFinishInstant: {
+      date: toPlanDate(task.plannedFinish),
+      minuteOfDay: task.plannedFinishMinute
+    },
+    durationMinutes: task.durationMinutes ?? Math.max(1, task.durationWorkingDays) * 480,
+    workMinutes: task.workMinutes ?? Math.max(0, task.plannedWork) * 60,
+    percentComplete: task.progress,
+    calendarId: projectCalendarId,
+    constraint
+  };
+}
+
+function mapConstraint(task: typeof tasks.$inferSelect): PlanConstraint | null {
+  if (!task.constraintType) return null;
+  return {
+    id: `constraint-${task.id}`,
+    taskId: task.id,
+    type: task.constraintType as PlanConstraintType,
+    date: task.constraintDate ? toPlanDate(task.constraintDate) : null
+  };
+}
+
+function mapAssignments(
+  taskIds: string[],
+  activeResourceIds: Set<string>,
+  participantRows: Array<typeof taskParticipants.$inferSelect>,
+  assignmentRows: Array<typeof taskAssignments.$inferSelect>
+): PlanAssignment[] {
+  const taskIdSet = new Set(taskIds);
+  const activeAssignmentRows = assignmentRows.filter(
+    (assignment) =>
+      taskIdSet.has(assignment.taskId) &&
+      activeResourceIds.has(assignment.resourceId)
+  );
+  const explicitTaskIds = new Set(activeAssignmentRows.map((assignment) => assignment.taskId));
+  const explicitAssignments = activeAssignmentRows.map<PlanAssignment>((assignment) => ({
+    id: assignment.id,
+    taskId: assignment.taskId,
+    resourceId: assignment.resourceId,
+    role: assignment.role as PlanAssignmentRole,
+    unitsPermille: assignment.unitsPermille,
+    workMinutes: assignment.workMinutes,
+    calendarId: assignment.calendarId
+  }));
+  const fallbackAssignments = participantRows
+    .filter(
+      (participant) =>
+        taskIdSet.has(participant.taskId) &&
+        activeResourceIds.has(participant.userId) &&
+        !explicitTaskIds.has(participant.taskId) &&
+        isPlanningParticipantRole(participant.role)
+    )
+    .map<PlanAssignment>((participant) => ({
+      id: `${participant.taskId}-${participant.userId}-${participant.role}`,
+      taskId: participant.taskId,
+      resourceId: participant.userId,
+      role: participant.role as PlanAssignmentRole,
+      unitsPermille: 1000,
+      workMinutes: null,
+      calendarId: null
+    }));
+
+  return [...explicitAssignments, ...fallbackAssignments].sort((left, right) =>
+    left.id.localeCompare(right.id)
+  );
+}
+
+function mapCalendars(
+  projectCalendarRows: Array<typeof projectCalendars.$inferSelect>,
+  resourceCalendarRows: Array<typeof resourceCalendars.$inferSelect>,
+  projectId: string
+): PlanCalendar[] {
+  const calendars = [
+    ...projectCalendarRows.map<PlanCalendar>((calendar) => ({
+      id: calendar.id,
+      workingWeekdays: calendar.workingWeekdays,
+      workingMinutesPerDay: calendar.workingMinutesPerDay
+    })),
+    ...resourceCalendarRows.map<PlanCalendar>((calendar) => ({
+      id: calendar.id,
+      workingWeekdays: calendar.workingWeekdays,
+      workingMinutesPerDay: calendar.workingMinutesPerDay
+    }))
+  ];
+
+  return calendars.length > 0
+    ? calendars
+    : [
+        {
+          id: defaultProjectCalendarId(projectId),
+          workingWeekdays: defaultWorkingWeekdays,
+          workingMinutesPerDay: defaultWorkingMinutesPerDay
+        }
+      ];
+}
+
+function mapBaselines(
+  baselineRows: Array<typeof projectBaselines.$inferSelect>,
+  baselineTaskRows: Array<typeof projectBaselineTasks.$inferSelect>
+): PlanBaseline[] {
+  return baselineRows.map((baseline) => ({
+    id: baseline.id,
+    capturedAt: baseline.capturedAt.toISOString(),
+    tasks: baselineTaskRows
+      .filter((task) => task.baselineId === baseline.id)
+      .map((task) => ({
+        taskId: task.taskId,
+        plannedStart: task.plannedStart,
+        plannedFinish: task.plannedFinish,
+        workMinutes: task.workMinutes
+      }))
+  }));
+}
+
+function isPlanningParticipantRole(role: string): role is PlanAssignmentRole {
+  return role !== "requester";
+}
+
+function deriveProgressExpression(statusCategory: string | undefined) {
+  if (statusCategory === "done") return 100;
+  if (statusCategory === "new") return 0;
+  if (statusCategory === "in_progress") return sql`greatest(${tasks.progress}, 10)`;
+  if (statusCategory === "review") return sql`greatest(${tasks.progress}, 80)`;
+  return sql`${tasks.progress}`;
+}
+
+function defaultProjectCalendarId(projectId: string): string {
+  return `${projectId}-default-calendar`;
+}
+
+function toPlanDate(date: Date): PlanDate {
+  return date.toISOString().slice(0, 10);
+}
+
+function fromPlanDate(date: PlanDate): Date {
+  return new Date(`${date}T00:00:00.000Z`);
+}
+
+function normalizeParticipantRows(input: {
+  tenantId: string;
+  taskId: string;
+  actorUserId: string;
+  assignments: Array<{ resourceId: string; role: PlanAssignmentRole }>;
+}) {
+  const participantRows = new Map<string, { tenantId: string; taskId: string; userId: string; role: string }>();
+  participantRows.set(`${input.actorUserId}:requester`, {
+    tenantId: input.tenantId,
+    taskId: input.taskId,
+    userId: input.actorUserId,
+    role: "requester"
+  });
+  for (const assignment of input.assignments) {
+    participantRows.set(`${assignment.resourceId}:${assignment.role}`, {
+      tenantId: input.tenantId,
+      taskId: input.taskId,
+      userId: assignment.resourceId,
+      role: assignment.role
+    });
+  }
+  return [...participantRows.values()];
+}
+
+function mapPlanningScenarioRun(
+  row: typeof planningScenarioRuns.$inferSelect
+): PlanningScenarioRunRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    planVersion: row.planVersion,
+    engineVersion: row.engineVersion,
+    targetConflict: row.targetConflict,
+    proposalPayload: row.proposalPayload,
+    proposalPayloadHash: row.proposalPayloadHash,
+    actorUserId: row.actorUserId,
+    expiresAt: row.expiresAt,
+    appliedAt: row.appliedAt,
+    createdAt: row.createdAt
+  };
+}

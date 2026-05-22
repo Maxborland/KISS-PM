@@ -8,6 +8,8 @@ import {
 } from "./authSession";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import type { TenantUser } from "@kiss-pm/domain";
+import { getClientIp } from "./authRateLimit";
+import { readLimitedJsonBody } from "./jsonBody";
 
 export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
@@ -23,19 +25,29 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "auth_not_configured" }, 501);
     }
 
-    const body = await context.req.json().catch(() => null);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
     const email =
-      body &&
-      typeof body === "object" &&
-      typeof (body as { email?: unknown }).email === "string"
-        ? (body as { email: string }).email.toLowerCase()
+      body.value &&
+      typeof body.value === "object" &&
+      typeof (body.value as { email?: unknown }).email === "string"
+        ? (body.value as { email: string }).email.toLowerCase()
         : "";
     const password =
-      body &&
-      typeof body === "object" &&
-      typeof (body as { password?: unknown }).password === "string"
-        ? (body as { password: string }).password
+      body.value &&
+      typeof body.value === "object" &&
+      typeof (body.value as { password?: unknown }).password === "string"
+        ? (body.value as { password: string }).password
         : "";
+    const rateLimitInput = {
+      email,
+      ip: getClientIp(context.req.raw.headers)
+    };
+    const rateLimitDecision = deps.authRateLimiter.check(rateLimitInput);
+    if (!rateLimitDecision.allowed) {
+      context.header("Retry-After", String(rateLimitDecision.retryAfterSeconds));
+      return context.json({ error: "too_many_login_attempts" }, 429);
+    }
     const credential = await dataSource.findCredentialByEmail(email);
 
     if (
@@ -46,8 +58,10 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
         passwordSalt: credential.passwordSalt
       })
     ) {
+      deps.authRateLimiter.recordFailure(rateLimitInput);
       return context.json({ error: "invalid_credentials" }, 401);
     }
+    deps.authRateLimiter.recordSuccess(rateLimitInput);
 
     const actor = await dataSource.findUserById(credential.userId);
     if (!actor) {

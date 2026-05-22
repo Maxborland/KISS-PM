@@ -2,6 +2,7 @@ import {
   canManagePositions,
   canReadPositions
 } from "@kiss-pm/access-control";
+import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import { parsePositionBody } from "./workspaceParsers";
 
@@ -48,8 +49,9 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const body = await context.req.json().catch(() => null);
-    const parsed = parsePositionBody(body, actor.tenantId);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parsePositionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     const existingPositions = await dataSource.listPositions(actor.tenantId);
     if (existingPositions.some((position) => position.id === parsed.value.id)) {
@@ -100,9 +102,10 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
         (position) => position.id === context.req.param("positionId")
       ) ?? null;
     if (!beforeState) return context.json({ error: "position_not_found" }, 404);
-    const body = await context.req.json().catch(() => null);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parsePositionBody(
-      body,
+      body.value,
       actor.tenantId,
       context.req.param("positionId")
     );

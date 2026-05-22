@@ -389,4 +389,66 @@ describe("PostgreSQL tenant data source", () => {
     await expect(dataSource.listProjects("tenant-alpha")).resolves.toHaveLength(1);
     await expect(dataSource.listProjects("tenant-beta")).resolves.toEqual([]);
   });
+
+  it("ensures one active workspace inbox project and keeps closed inbox history", async () => {
+    await client`
+      INSERT INTO tenants (id, name, created_at)
+      VALUES ('tenant-alpha', 'Альфа Проект', now())
+    `;
+
+    const firstInbox = await dataSource.ensureWorkspaceInboxProject({
+      tenantId: "tenant-alpha",
+      plannedStart: new Date("2026-07-02T00:00:00.000Z"),
+      plannedFinish: new Date("2026-07-03T00:00:00.000Z")
+    });
+    const widenedInbox = await dataSource.ensureWorkspaceInboxProject({
+      tenantId: "tenant-alpha",
+      plannedStart: new Date("2026-06-15T00:00:00.000Z"),
+      plannedFinish: new Date("2026-08-11T00:00:00.000Z")
+    });
+
+    expect(widenedInbox).toMatchObject({
+      id: firstInbox.id,
+      sourceType: "workspace_inbox",
+      sourceOpportunityId: null,
+      status: "active"
+    });
+    expect(widenedInbox.plannedStart.toISOString()).toContain("2026-06-15");
+    expect(widenedInbox.plannedFinish.toISOString()).toContain("2026-08-11");
+
+    await client`
+      UPDATE projects
+      SET status = 'closed'
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = ${firstInbox.id}
+    `;
+    const reopenedInbox = await dataSource.ensureWorkspaceInboxProject({
+      tenantId: "tenant-alpha",
+      plannedStart: new Date("2026-09-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-09-02T00:00:00.000Z")
+    });
+    await client`
+      UPDATE projects
+      SET status = 'cancelled'
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = ${reopenedInbox.id}
+    `;
+    const recreatedAfterCancelledInbox = await dataSource.ensureWorkspaceInboxProject({
+      tenantId: "tenant-alpha",
+      plannedStart: new Date("2026-10-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-10-02T00:00:00.000Z")
+    });
+    const inboxRows = await client`
+      SELECT id, status
+      FROM projects
+      WHERE tenant_id = 'tenant-alpha'
+        AND source_type = 'workspace_inbox'
+      ORDER BY created_at, id
+    `;
+
+    expect(reopenedInbox.id).not.toBe(firstInbox.id);
+    expect(recreatedAfterCancelledInbox.id).not.toBe(reopenedInbox.id);
+    expect(inboxRows).toHaveLength(3);
+    expect(inboxRows.filter((row) => row.status === "active")).toHaveLength(1);
+  });
 });

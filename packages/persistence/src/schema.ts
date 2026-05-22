@@ -353,7 +353,8 @@ export const projects = pgTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    sourceOpportunityId: text("source_opportunity_id").notNull(),
+    sourceType: text("source_type").notNull().default("opportunity"),
+    sourceOpportunityId: text("source_opportunity_id"),
     clientId: text("client_id"),
     projectTypeId: text("project_type_id"),
     title: text("title").notNull(),
@@ -361,6 +362,8 @@ export const projects = pgTable(
     status: text("status").notNull(),
     plannedStart: timestamp("planned_start", { withTimezone: true }).notNull(),
     plannedFinish: timestamp("planned_finish", { withTimezone: true }).notNull(),
+    deadline: timestamp("deadline", { withTimezone: true }),
+    calendarId: text("calendar_id"),
     contractValue: integer("contract_value").notNull(),
     plannedHours: integer("planned_hours").notNull(),
     templateId: text("template_id"),
@@ -391,8 +394,25 @@ export const projects = pgTable(
       table.tenantId,
       table.sourceOpportunityId
     ),
+    uniqueIndex("projects_tenant_workspace_inbox_uidx")
+      .on(table.tenantId, table.sourceType)
+      .where(
+        sql`${table.sourceType} = 'workspace_inbox' and ${table.status} in ('draft', 'active', 'paused')`
+      ),
     index("projects_tenant_id_idx").on(table.tenantId),
-    index("projects_status_idx").on(table.status)
+    index("projects_status_idx").on(table.status),
+    check(
+      "projects_source_type_chk",
+      sql`${table.sourceType} in ('opportunity', 'workspace_inbox', 'manual')`
+    ),
+    check(
+      "projects_source_opportunity_chk",
+      sql`(
+        (${table.sourceType} = 'opportunity' and ${table.sourceOpportunityId} is not null)
+        or
+        (${table.sourceType} <> 'opportunity' and ${table.sourceOpportunityId} is null)
+      )`
+    )
   ]
 );
 
@@ -552,6 +572,17 @@ export const tasks = pgTable(
     ownerUserId: text("owner_user_id").notNull(),
     plannedStart: timestamp("planned_start", { withTimezone: true }).notNull(),
     plannedFinish: timestamp("planned_finish", { withTimezone: true }).notNull(),
+    plannedStartMinute: integer("planned_start_minute").notNull().default(0),
+    plannedFinishMinute: integer("planned_finish_minute").notNull().default(0),
+    parentTaskId: text("parent_task_id"),
+    wbsCode: text("wbs_code").notNull().default("1"),
+    schedulingMode: text("scheduling_mode").notNull().default("auto"),
+    taskType: text("task_type").notNull().default("fixed_units"),
+    effortDriven: boolean("effort_driven").notNull().default(false),
+    durationMinutes: integer("duration_minutes"),
+    workMinutes: integer("work_minutes"),
+    constraintType: text("constraint_type"),
+    constraintDate: timestamp("constraint_date", { withTimezone: true }),
     durationWorkingDays: integer("duration_working_days").notNull().default(1),
     plannedWork: integer("planned_work").notNull(),
     actualWork: integer("actual_work").notNull().default(0),
@@ -587,10 +618,365 @@ export const tasks = pgTable(
       columns: [table.tenantId, table.ownerUserId],
       foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
     }).onDelete("restrict"),
+    uniqueIndex("tasks_tenant_project_id_id_uidx").on(
+      table.tenantId,
+      table.projectId,
+      table.id
+    ),
     index("tasks_tenant_project_id_idx").on(table.tenantId, table.projectId),
     index("tasks_tenant_status_idx").on(table.tenantId, table.status),
     index("tasks_tenant_status_id_idx").on(table.tenantId, table.statusId),
-    index("tasks_tenant_owner_idx").on(table.tenantId, table.ownerUserId)
+    index("tasks_tenant_owner_idx").on(table.tenantId, table.ownerUserId),
+    check("tasks_scheduling_mode_chk", sql`${table.schedulingMode} in ('auto', 'manual')`),
+    check(
+      "tasks_task_type_chk",
+      sql`${table.taskType} in ('fixed_units', 'fixed_work', 'fixed_duration')`
+    ),
+    check(
+      "tasks_constraint_type_chk",
+      sql`${table.constraintType} is null or ${table.constraintType} in (
+        'as_soon_as_possible',
+        'start_no_earlier_than',
+        'finish_no_later_than',
+        'must_start_on',
+        'must_finish_on'
+      )`
+    )
+  ]
+);
+
+export const planVersions = pgTable(
+  "plan_versions",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    version: integer("version").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "plan_versions_pkey",
+      columns: [table.tenantId, table.projectId]
+    }),
+    foreignKey({
+      name: "plan_versions_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    check("plan_versions_version_chk", sql`${table.version} > 0`)
+  ]
+);
+
+export const projectCalendars = pgTable(
+  "project_calendars",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    workingWeekdays: jsonb("working_weekdays").$type<number[]>().notNull(),
+    workingMinutesPerDay: integer("working_minutes_per_day").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_calendars_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "project_calendars_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    uniqueIndex("project_calendars_tenant_id_id_uidx").on(table.tenantId, table.id),
+    check("project_calendars_minutes_chk", sql`${table.workingMinutesPerDay} >= 0`)
+  ]
+);
+
+export const resourceCalendars = pgTable(
+  "resource_calendars",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    workingWeekdays: jsonb("working_weekdays").$type<number[]>().notNull(),
+    workingMinutesPerDay: integer("working_minutes_per_day").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_calendars_pkey",
+      columns: [table.tenantId, table.resourceId, table.id]
+    }),
+    foreignKey({
+      name: "resource_calendars_resource_fk",
+      columns: [table.tenantId, table.resourceId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    uniqueIndex("resource_calendars_tenant_id_id_uidx").on(table.tenantId, table.id),
+    check("resource_calendars_minutes_chk", sql`${table.workingMinutesPerDay} >= 0`)
+  ]
+);
+
+export const calendarExceptions = pgTable(
+  "calendar_exceptions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    calendarId: text("calendar_id").notNull(),
+    resourceId: text("resource_id"),
+    date: text("date").notNull(),
+    workingMinutes: integer("working_minutes").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "calendar_exceptions_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "calendar_exceptions_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    index("calendar_exceptions_tenant_calendar_date_idx").on(
+      table.tenantId,
+      table.calendarId,
+      table.date
+    ),
+    check("calendar_exceptions_minutes_chk", sql`${table.workingMinutes} >= 0`)
+  ]
+);
+
+export const taskAssignments = pgTable(
+  "task_assignments",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    taskId: text("task_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    role: text("role").notNull(),
+    unitsPermille: integer("units_permille").notNull(),
+    workMinutes: integer("work_minutes"),
+    calendarId: text("calendar_id")
+  },
+  (table) => [
+    primaryKey({
+      name: "task_assignments_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "task_assignments_task_fk",
+      columns: [table.tenantId, table.projectId, table.taskId],
+      foreignColumns: [tasks.tenantId, tasks.projectId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_assignments_resource_fk",
+      columns: [table.tenantId, table.resourceId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("task_assignments_tenant_project_task_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.taskId
+    ),
+    check(
+      "task_assignments_role_chk",
+      sql`${table.role} in ('executor', 'co_executor', 'controller', 'approver', 'observer')`
+    ),
+    check("task_assignments_units_chk", sql`${table.unitsPermille} > 0`)
+  ]
+);
+
+export const taskDependencies = pgTable(
+  "task_dependencies",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    predecessorTaskId: text("predecessor_task_id").notNull(),
+    successorTaskId: text("successor_task_id").notNull(),
+    type: text("type").notNull(),
+    lagMinutes: integer("lag_minutes").notNull().default(0)
+  },
+  (table) => [
+    primaryKey({
+      name: "task_dependencies_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "task_dependencies_predecessor_fk",
+      columns: [table.tenantId, table.projectId, table.predecessorTaskId],
+      foreignColumns: [tasks.tenantId, tasks.projectId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_dependencies_successor_fk",
+      columns: [table.tenantId, table.projectId, table.successorTaskId],
+      foreignColumns: [tasks.tenantId, tasks.projectId, tasks.id]
+    }).onDelete("cascade"),
+    index("task_dependencies_tenant_project_successor_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.successorTaskId
+    ),
+    check("task_dependencies_type_chk", sql`${table.type} in ('FS', 'SS', 'FF', 'SF')`),
+    check(
+      "task_dependencies_not_self_chk",
+      sql`${table.predecessorTaskId} <> ${table.successorTaskId}`
+    )
+  ]
+);
+
+export const projectBaselines = pgTable(
+  "project_baselines",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    label: text("label").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_baselines_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "project_baselines_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade")
+  ]
+);
+
+export const projectBaselineTasks = pgTable(
+  "project_baseline_tasks",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    baselineId: text("baseline_id").notNull(),
+    taskId: text("task_id").notNull(),
+    plannedStart: text("planned_start"),
+    plannedFinish: text("planned_finish"),
+    workMinutes: integer("work_minutes").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_baseline_tasks_pkey",
+      columns: [table.tenantId, table.projectId, table.baselineId, table.taskId]
+    }),
+    foreignKey({
+      name: "project_baseline_tasks_baseline_fk",
+      columns: [table.tenantId, table.projectId, table.baselineId],
+      foreignColumns: [
+        projectBaselines.tenantId,
+        projectBaselines.projectId,
+        projectBaselines.id
+      ]
+    }).onDelete("cascade")
+  ]
+);
+
+export const projectBaselineAssignments = pgTable(
+  "project_baseline_assignments",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    baselineId: text("baseline_id").notNull(),
+    assignmentId: text("assignment_id").notNull(),
+    taskId: text("task_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    workMinutes: integer("work_minutes")
+  },
+  (table) => [
+    primaryKey({
+      name: "project_baseline_assignments_pkey",
+      columns: [table.tenantId, table.projectId, table.baselineId, table.assignmentId]
+    }),
+    foreignKey({
+      name: "project_baseline_assignments_baseline_fk",
+      columns: [table.tenantId, table.projectId, table.baselineId],
+      foreignColumns: [
+        projectBaselines.tenantId,
+        projectBaselines.projectId,
+        projectBaselines.id
+      ]
+    }).onDelete("cascade")
+  ]
+);
+
+export const resourceReservations = pgTable(
+  "resource_reservations",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    start: text("start").notNull(),
+    finish: text("finish").notNull(),
+    workMinutes: integer("work_minutes").notNull(),
+    reason: text("reason")
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_reservations_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "resource_reservations_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_reservations_resource_fk",
+      columns: [table.tenantId, table.resourceId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    check("resource_reservations_work_chk", sql`${table.workMinutes} >= 0`)
+  ]
+);
+
+export const planningScenarioRuns = pgTable(
+  "planning_scenario_runs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    planVersion: integer("plan_version").notNull(),
+    engineVersion: text("engine_version").notNull(),
+    targetConflict: jsonb("target_conflict").$type<Record<string, unknown>>().notNull(),
+    proposalPayload: jsonb("proposal_payload").$type<Record<string, unknown>>().notNull(),
+    proposalPayloadHash: text("proposal_payload_hash").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_scenario_runs_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "planning_scenario_runs_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "planning_scenario_runs_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("planning_scenario_runs_tenant_project_expires_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.expiresAt
+    )
   ]
 );
 
@@ -784,6 +1170,17 @@ export type PersistenceTableName =
   | "project_position_demands"
   | "task_statuses"
   | "tasks"
+  | "plan_versions"
+  | "project_calendars"
+  | "resource_calendars"
+  | "calendar_exceptions"
+  | "task_assignments"
+  | "task_dependencies"
+  | "project_baselines"
+  | "project_baseline_tasks"
+  | "project_baseline_assignments"
+  | "resource_reservations"
+  | "planning_scenario_runs"
   | "task_participants"
   | "task_activities"
   | "crm_activities"
@@ -816,6 +1213,17 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_position_demands",
   "task_statuses",
   "tasks",
+  "plan_versions",
+  "project_calendars",
+  "resource_calendars",
+  "calendar_exceptions",
+  "task_assignments",
+  "task_dependencies",
+  "project_baselines",
+  "project_baseline_tasks",
+  "project_baseline_assignments",
+  "resource_reservations",
+  "planning_scenario_runs",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -841,6 +1249,17 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_position_demands",
   "task_statuses",
   "tasks",
+  "plan_versions",
+  "project_calendars",
+  "resource_calendars",
+  "calendar_exceptions",
+  "task_assignments",
+  "task_dependencies",
+  "project_baselines",
+  "project_baseline_tasks",
+  "project_baseline_assignments",
+  "resource_reservations",
+  "planning_scenario_runs",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -966,6 +1385,7 @@ const tableColumns = {
   projects: [
     "id",
     "tenant_id",
+    "source_type",
     "source_opportunity_id",
     "client_id",
     "project_type_id",
@@ -974,6 +1394,8 @@ const tableColumns = {
     "status",
     "planned_start",
     "planned_finish",
+    "deadline",
+    "calendar_id",
     "contract_value",
     "planned_hours",
     "template_id",
@@ -1011,6 +1433,17 @@ const tableColumns = {
     "owner_user_id",
     "planned_start",
     "planned_finish",
+    "planned_start_minute",
+    "planned_finish_minute",
+    "parent_task_id",
+    "wbs_code",
+    "scheduling_mode",
+    "task_type",
+    "effort_driven",
+    "duration_minutes",
+    "work_minutes",
+    "constraint_type",
+    "constraint_date",
     "duration_working_days",
     "planned_work",
     "actual_work",
@@ -1020,6 +1453,100 @@ const tableColumns = {
     "created_at",
     "updated_at",
     "archived_at"
+  ],
+  plan_versions: ["tenant_id", "project_id", "version", "updated_at"],
+  project_calendars: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "working_weekdays",
+    "working_minutes_per_day",
+    "created_at",
+    "updated_at"
+  ],
+  resource_calendars: [
+    "id",
+    "tenant_id",
+    "resource_id",
+    "working_weekdays",
+    "working_minutes_per_day",
+    "created_at",
+    "updated_at"
+  ],
+  calendar_exceptions: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "calendar_id",
+    "resource_id",
+    "date",
+    "working_minutes",
+    "reason",
+    "created_at",
+    "updated_at"
+  ],
+  task_assignments: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "task_id",
+    "resource_id",
+    "role",
+    "units_permille",
+    "work_minutes",
+    "calendar_id"
+  ],
+  task_dependencies: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "predecessor_task_id",
+    "successor_task_id",
+    "type",
+    "lag_minutes"
+  ],
+  project_baselines: ["id", "tenant_id", "project_id", "label", "captured_at"],
+  project_baseline_tasks: [
+    "tenant_id",
+    "project_id",
+    "baseline_id",
+    "task_id",
+    "planned_start",
+    "planned_finish",
+    "work_minutes"
+  ],
+  project_baseline_assignments: [
+    "tenant_id",
+    "project_id",
+    "baseline_id",
+    "assignment_id",
+    "task_id",
+    "resource_id",
+    "work_minutes"
+  ],
+  resource_reservations: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "resource_id",
+    "start",
+    "finish",
+    "work_minutes",
+    "reason"
+  ],
+  planning_scenario_runs: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "plan_version",
+    "engine_version",
+    "target_conflict",
+    "proposal_payload",
+    "proposal_payload_hash",
+    "actor_user_id",
+    "expires_at",
+    "applied_at",
+    "created_at"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],
   task_activities: [

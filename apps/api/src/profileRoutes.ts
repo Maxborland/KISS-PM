@@ -7,6 +7,7 @@ import {
   isAccentColor,
   isWorkspaceTheme
 } from "./parseHelpers";
+import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -38,10 +39,11 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
     );
     if (!current) return context.json({ error: "user_not_found" }, 404);
 
-    const body = await context.req.json().catch(() => ({}));
-    const nameInput = getStringField(body, "name");
-    const phoneInput = getStringField(body, "phone");
-    const telegramInput = getStringField(body, "telegram");
+    const body = await readLimitedJsonBody(context, {});
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const nameInput = getStringField(body.value, "name");
+    const phoneInput = getStringField(body.value, "phone");
+    const telegramInput = getStringField(body.value, "telegram");
     const user = await dataSource.updateWorkspaceUser({
       ...current,
       name: nameInput === undefined || nameInput.length === 0 ? current.name : nameInput,
@@ -90,9 +92,10 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
       (user) => user.id === actor.id
     );
     if (!current) return context.json({ error: "user_not_found" }, 404);
-    const body = await context.req.json().catch(() => ({}));
-    const themeInput = getStringField(body, "theme");
-    const accentInput = getStringField(body, "accentColor");
+    const body = await readLimitedJsonBody(context, {});
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const themeInput = getStringField(body.value, "theme");
+    const accentInput = getStringField(body.value, "accentColor");
     const theme = themeInput === undefined || themeInput === "" ? current.theme : themeInput;
     const accentColor =
       accentInput === undefined || accentInput === "" ? current.accentColor : accentInput;
