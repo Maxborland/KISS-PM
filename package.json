@@ -24,6 +24,7 @@
   "devDependencies": {
     "@kiss-pm/persistence": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.60.0",
     "@types/node": "^22.15.21",
     "drizzle-kit": "^0.31.10",

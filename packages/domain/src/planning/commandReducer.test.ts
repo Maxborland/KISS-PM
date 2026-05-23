@@ -101,6 +101,14 @@ describe("planning command reducer", () => {
       {
         type: "project.deadline.move",
         payload: { deadline: "2026-07-01", reason: "scope changed" }
+      },
+      {
+        type: "project.settings.update",
+        payload: { calendarId: "tenant-default" }
+      },
+      {
+        type: "task.update_custom_field",
+        payload: { taskId: "task-a", fieldKey: "sprint", value: "S1" }
       }
     ];
 
@@ -435,7 +443,10 @@ function createSnapshot(): PlanSnapshot {
       }
     ],
     baselines: [],
-    calendars: [{ id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }],
+    calendars: [
+      { id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 },
+      { id: "tenant-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }
+    ],
     calendarExceptions: [],
     resources: [
       { id: "resource-alpha", userId: "user-alpha", positionId: "engineer", teamId: null, name: "Alpha", calendarId: null }

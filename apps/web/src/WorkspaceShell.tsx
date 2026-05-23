@@ -26,7 +26,11 @@ import {
   getOpportunityIdFromPathname,
   getProductIdFromPathname,
   getProjectIdFromPathname,
-  getTaskIdFromPathname
+  getPlanningTabFromPathname,
+  getProjectPlanningPath,
+  getProjectSchedulePath,
+  getTaskIdFromPathname,
+  isProjectPlanningPath
 } from "./workspacePathIds";
 
 const navigationFocusRestoreStorageKey = "kiss-pm.restore-navigation-focus";
@@ -65,6 +69,8 @@ export function WorkspaceShell() {
   const activeContactId = getContactIdFromPathname(pathname);
   const activeProductId = getProductIdFromPathname(pathname);
   const activeProjectId = getProjectIdFromPathname(pathname);
+  const planningTab = getPlanningTabFromPathname(pathname);
+  const isProjectPlanning = isProjectPlanningPath(pathname);
   const activeTaskId = getTaskIdFromPathname(pathname);
 
   useEffect(() => {
@@ -427,8 +433,11 @@ export function WorkspaceShell() {
           activeContactId={activeContactId}
           activeProductId={activeProductId}
           activeProjectId={activeProjectId}
+          planningTab={planningTab ?? "schedule"}
+          isProjectPlanning={isProjectPlanning}
           activeTaskId={activeTaskId}
           data={data}
+          permissions={permissions}
           openCreateRequested={quickCreateRequested}
           onChanged={setMessage}
           onQuickCreateConsumed={() => {
@@ -448,6 +457,12 @@ export function WorkspaceShell() {
           }}
           onOpenProject={(projectId) => {
             router.push(`/projects/${encodeURIComponent(projectId)}`);
+          }}
+          onOpenProjectSchedule={(projectId) => {
+            router.push(getProjectSchedulePath(projectId));
+          }}
+          onNavigatePlanningTab={(projectId, tab) => {
+            router.push(getProjectPlanningPath(projectId, tab));
           }}
           onOpenTask={(taskId) => {
             router.push(`/tasks/${encodeURIComponent(taskId)}`);

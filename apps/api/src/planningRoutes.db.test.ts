@@ -1417,6 +1417,201 @@ describe("planning API routes", () => {
       )
     ).toBe(false);
   });
+
+  it("applies command batch atomically with idempotency and version conflict", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-a", title: "Batch rename A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-b", title: "Batch rename B" }
+      }
+    ];
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-test-1"
+        })
+      }
+    );
+    const appliedBody = await applied.json();
+    expect(applied.status).toBe(200);
+    expect(appliedBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+    expect(appliedBody.readModel.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-plan-a", title: "Batch rename A" }),
+        expect.objectContaining({ id: "task-plan-b", title: "Batch rename B" })
+      ])
+    );
+
+    const retried = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-test-1"
+        })
+      }
+    );
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toEqual(appliedBody);
+
+    const stale = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands: [
+            {
+              type: "task.update_identity",
+              payload: { taskId: "task-plan-a", title: "Stale batch" }
+            }
+          ],
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({
+      error: "plan_version_conflict",
+      currentPlanVersion: appliedBody.newPlanVersion
+    });
+  });
+
+  it("rejects batch when a middle command has blocking validation", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands: [
+            {
+              type: "task.update_identity",
+              payload: { taskId: "task-plan-a", title: "Still valid" }
+            },
+            {
+              type: "dependency.upsert",
+              payload: {
+                id: "dep-invalid-self",
+                predecessorTaskId: "task-plan-a",
+                successorTaskId: "task-plan-a",
+                dependencyType: "FS",
+                lagMinutes: 0
+              }
+            }
+          ],
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("planning_precondition_failed");
+    expect(body.validationIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ severity: "error" })
+      ])
+    );
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(afterBody.planVersion).toBe(initialBody.planVersion);
+    expect(
+      afterBody.authored.tasks.find((task: { id: string }) => task.id === "task-plan-a")?.title
+    ).not.toBe("Still valid");
+  });
+
+  it("lists planning baselines for a project", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const response = await app.request("/api/workspace/projects/project-alpha/planning/baselines", {
+      headers: { cookie: adminCookie }
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.baselines).toEqual(expect.any(Array));
+  });
+
+  it("opens planning events SSE stream for authorized reader", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const response = await app.request("/api/workspace/projects/project-alpha/planning/events", {
+      headers: { cookie: adminCookie, Accept: "text/event-stream" }
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+  });
+
+  it("applies project.settings.update with audit and plan recalc", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          command: {
+            type: "project.settings.update",
+            payload: { calendarId: "tenant-default" }
+          },
+          clientPlanVersion: 1
+        })
+      }
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      readModel: { project: { calendarId?: string | null } };
+      auditEventId: string;
+    };
+    expect(body.readModel.project.calendarId).toBe("tenant-default");
+    expect(body.auditEventId).toMatch(/^audit-/);
+  });
 });
 
 function hashJson(value: unknown): string {

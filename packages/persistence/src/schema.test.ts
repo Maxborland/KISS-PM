@@ -37,6 +37,10 @@ describe("PostgreSQL persistence schema", () => {
       "resource_reservations",
       "planning_scenario_runs",
       "planning_command_idempotency_keys",
+      "tenant_production_calendars",
+      "tenant_production_calendar_exceptions",
+      "planning_saved_views",
+      "resource_absences",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -76,6 +80,10 @@ describe("PostgreSQL persistence schema", () => {
       "resource_reservations",
       "planning_scenario_runs",
       "planning_command_idempotency_keys",
+      "tenant_production_calendars",
+      "tenant_production_calendar_exceptions",
+      "planning_saved_views",
+      "resource_absences",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -177,7 +185,8 @@ describe("PostgreSQL persistence schema", () => {
         "duration_minutes",
         "work_minutes",
         "constraint_type",
-        "constraint_date"
+        "constraint_date",
+        "custom_fields"
       ])
     );
     expect(getPersistenceTableColumns("plan_versions")).toEqual(

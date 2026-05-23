@@ -421,6 +421,25 @@ export type ApiTenantDataSource = {
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  listScheduledTasks?(input: {
+    tenantId: TenantId;
+    assigneeUserId: UserId;
+    fromDate: string;
+    toDate: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      title: string;
+      projectId: string;
+      projectTitle: string;
+      plannedStart: Date;
+      plannedFinish: Date;
+      workMinutes: number;
+      createdAt: Date;
+      statusId: string;
+    }>
+  >;
   findTaskById?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   listTaskStatuses?(tenantId: TenantId): Promise<TaskStatusRecord[]>;
   createTaskStatus?(input: TaskStatusInput): Promise<TaskStatusRecord>;
@@ -452,6 +471,42 @@ export type ApiTenantDataSource = {
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning?(tenantId: TenantId): Promise<void>;
+  listSavedViews?(
+    tenantId: TenantId,
+    projectId: string,
+    actorUserId: UserId
+  ): Promise<
+    Array<{
+      id: string;
+      tenantId: TenantId;
+      projectId: string;
+      ownerUserId: UserId;
+      scope: "user" | "project";
+      name: string;
+      payload: Record<string, unknown>;
+      createdAt: Date;
+    }>
+  >;
+  createSavedView?(input: {
+    id: string;
+    tenantId: TenantId;
+    projectId: string;
+    ownerUserId: UserId;
+    scope: "user" | "project";
+    name: string;
+    payload: Record<string, unknown>;
+  }): Promise<{
+    id: string;
+    name: string;
+    scope: "user" | "project";
+    payload: Record<string, unknown>;
+  }>;
+  deleteSavedView?(
+    tenantId: TenantId,
+    projectId: string,
+    viewId: string,
+    actorUserId: UserId
+  ): Promise<boolean>;
   getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
   ensurePlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
   incrementPlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;

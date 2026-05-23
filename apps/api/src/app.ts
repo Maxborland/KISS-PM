@@ -29,8 +29,11 @@ import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
+import { registerAbsencesRoutes } from "./absencesRoutes";
+import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
 import {
   isTrustedBrowserMutationRequest,
   setApiSecurityHeaders,
@@ -209,7 +212,10 @@ export function createApp(options: CreateAppOptions = {}) {
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
   registerPlanningRoutes(app, routeDeps);
+  registerProductionCalendarRoutes(app, routeDeps);
+  registerAbsencesRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
+  registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

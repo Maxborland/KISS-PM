@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
@@ -6,6 +6,7 @@ import type { KissPmDatabase } from "./connection";
 import {
   projects,
   taskActivities,
+  taskAssignments,
   taskParticipants,
   taskStatuses,
   tasks
@@ -123,7 +124,26 @@ export type TaskActivityInput = Omit<
   "createdAt" | "updatedAt"
 >;
 
+export type ScheduledTaskRecord = {
+  id: string;
+  title: string;
+  projectId: string;
+  projectTitle: string;
+  plannedStart: Date;
+  plannedFinish: Date;
+  workMinutes: number;
+  createdAt: Date;
+  statusId: string;
+};
+
 export type ProjectWorkRepository = {
+  listScheduledTasks(input: {
+    tenantId: TenantId;
+    assigneeUserId: UserId;
+    fromDate: string;
+    toDate: string;
+    limit?: number;
+  }): Promise<ScheduledTaskRecord[]>;
   listTaskStatuses(tenantId: TenantId): Promise<TaskStatusRecord[]>;
   createTaskStatus(input: TaskStatusInput): Promise<TaskStatusRecord>;
   updateTaskStatusDefinition(input: TaskStatusInput): Promise<TaskStatusRecord>;
@@ -208,6 +228,64 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
       .where(and(eq(tasks.tenantId, tenantId), isNull(tasks.archivedAt)));
 
   return {
+    async listScheduledTasks(input) {
+      const limit = input.limit ?? 50;
+      const rangeStart = new Date(`${input.fromDate}T00:00:00.000Z`);
+      const rangeFinish = new Date(`${input.toDate}T23:59:59.999Z`);
+      const assignmentRows = await db
+        .select({ taskId: taskAssignments.taskId })
+        .from(taskAssignments)
+        .where(
+          and(
+            eq(taskAssignments.tenantId, input.tenantId),
+            eq(taskAssignments.resourceId, input.assigneeUserId)
+          )
+        );
+      const assignedTaskIds = [...new Set(assignmentRows.map((row) => row.taskId))];
+      const rows = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          projectId: tasks.projectId,
+          projectTitle: projects.title,
+          plannedStart: tasks.plannedStart,
+          plannedFinish: tasks.plannedFinish,
+          workMinutes: tasks.workMinutes,
+          createdAt: tasks.createdAt,
+          statusId: tasks.statusId
+        })
+        .from(tasks)
+        .innerJoin(
+          projects,
+          and(eq(projects.tenantId, tasks.tenantId), eq(projects.id, tasks.projectId))
+        )
+        .where(
+          and(
+            eq(tasks.tenantId, input.tenantId),
+            isNull(tasks.archivedAt),
+            lte(tasks.plannedStart, rangeFinish),
+            gte(tasks.plannedFinish, rangeStart),
+            or(
+              eq(tasks.ownerUserId, input.assigneeUserId),
+              assignedTaskIds.length > 0 ? inArray(tasks.id, assignedTaskIds) : sql`false`
+            )
+          )
+        )
+        .orderBy(asc(tasks.createdAt), asc(tasks.id))
+        .limit(limit);
+
+      return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        projectId: row.projectId,
+        projectTitle: row.projectTitle,
+        plannedStart: row.plannedStart,
+        plannedFinish: row.plannedFinish,
+        workMinutes: row.workMinutes ?? 0,
+        createdAt: row.createdAt,
+        statusId: row.statusId
+      }));
+    },
     async listTaskStatuses(tenantId) {
       const rows = await db
         .select()

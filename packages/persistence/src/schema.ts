@@ -589,6 +589,10 @@ export const tasks = pgTable(
     progress: integer("progress").notNull().default(0),
     requiresAcceptance: boolean("requires_acceptance").notNull().default(false),
     source: text("source").notNull().default("manual"),
+    customFields: jsonb("custom_fields")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true })
@@ -749,6 +753,129 @@ export const calendarExceptions = pgTable(
       table.date
     ),
     check("calendar_exceptions_minutes_chk", sql`${table.workingMinutes} >= 0`)
+  ]
+);
+
+export const tenantProductionCalendars = pgTable(
+  "tenant_production_calendars",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    calendarId: text("calendar_id").notNull().default("tenant-default"),
+    workingWeekdays: jsonb("working_weekdays").$type<number[]>().notNull(),
+    workingMinutesPerDay: integer("working_minutes_per_day").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tenant_production_calendars_pkey",
+      columns: [table.tenantId]
+    }),
+    check(
+      "tenant_production_calendars_minutes_chk",
+      sql`${table.workingMinutesPerDay} >= 0`
+    )
+  ]
+);
+
+export const tenantProductionCalendarExceptions = pgTable(
+  "tenant_production_calendar_exceptions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    calendarId: text("calendar_id").notNull().default("tenant-default"),
+    resourceId: text("resource_id"),
+    date: text("date").notNull(),
+    workingMinutes: integer("working_minutes").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tenant_production_calendar_exceptions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("tenant_production_calendar_exceptions_date_idx").on(table.tenantId, table.date),
+    check(
+      "tenant_production_calendar_exceptions_minutes_chk",
+      sql`${table.workingMinutes} >= 0`
+    )
+  ]
+);
+
+export const planningSavedViews = pgTable(
+  "planning_saved_views",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    ownerUserId: text("owner_user_id").notNull(),
+    scope: text("scope").notNull().default("user"),
+    name: text("name").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_saved_views_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "planning_saved_views_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    index("planning_saved_views_owner_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.ownerUserId
+    ),
+    check("planning_saved_views_scope_chk", sql`${table.scope} in ('user', 'project')`)
+  ]
+);
+
+export const resourceAbsences = pgTable(
+  "resource_absences",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    type: text("type").notNull(),
+    dateFrom: text("date_from").notNull(),
+    dateTo: text("date_to").notNull(),
+    status: text("status").notNull().default("approved"),
+    reason: text("reason"),
+    createdBy: text("created_by"),
+    approvedBy: text("approved_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    foreignKey({
+      name: "resource_absences_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    index("resource_absences_tenant_user_from_idx").on(
+      table.tenantId,
+      table.userId,
+      table.dateFrom
+    ),
+    check(
+      "resource_absences_type_chk",
+      sql`${table.type} in ('vacation', 'admin_leave', 'sick_leave', 'maternity_leave', 'truancy')`
+    ),
+    check(
+      "resource_absences_status_chk",
+      sql`${table.status} in ('approved', 'pending', 'rejected')`
+    ),
+    check("resource_absences_date_range_chk", sql`${table.dateTo} >= ${table.dateFrom}`)
   ]
 );
 
@@ -1216,6 +1343,10 @@ export type PersistenceTableName =
   | "resource_reservations"
   | "planning_scenario_runs"
   | "planning_command_idempotency_keys"
+  | "tenant_production_calendars"
+  | "tenant_production_calendar_exceptions"
+  | "planning_saved_views"
+  | "resource_absences"
   | "task_participants"
   | "task_activities"
   | "crm_activities"
@@ -1260,6 +1391,10 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "resource_reservations",
   "planning_scenario_runs",
   "planning_command_idempotency_keys",
+  "tenant_production_calendars",
+  "tenant_production_calendar_exceptions",
+  "planning_saved_views",
+  "resource_absences",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1297,6 +1432,10 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "resource_reservations",
   "planning_scenario_runs",
   "planning_command_idempotency_keys",
+  "tenant_production_calendars",
+  "tenant_production_calendar_exceptions",
+  "planning_saved_views",
+  "resource_absences",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1487,6 +1626,7 @@ const tableColumns = {
     "progress",
     "requires_acceptance",
     "source",
+    "custom_fields",
     "created_at",
     "updated_at",
     "archived_at"
@@ -1593,6 +1733,48 @@ const tableColumns = {
     "response_payload",
     "actor_user_id",
     "created_at"
+  ],
+  tenant_production_calendars: [
+    "tenant_id",
+    "calendar_id",
+    "working_weekdays",
+    "working_minutes_per_day",
+    "updated_at"
+  ],
+  tenant_production_calendar_exceptions: [
+    "id",
+    "tenant_id",
+    "calendar_id",
+    "resource_id",
+    "date",
+    "working_minutes",
+    "reason",
+    "created_at",
+    "updated_at"
+  ],
+  planning_saved_views: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "owner_user_id",
+    "scope",
+    "name",
+    "payload",
+    "created_at"
+  ],
+  resource_absences: [
+    "id",
+    "tenant_id",
+    "user_id",
+    "type",
+    "date_from",
+    "date_to",
+    "status",
+    "reason",
+    "created_by",
+    "approved_by",
+    "created_at",
+    "updated_at"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],
   task_activities: [
