@@ -1,12 +1,17 @@
 "use client";
 
 import type { PlanningCommand } from "@kiss-pm/domain";
-import { useCallback } from "react";
+import { detectFillSeries } from "@kiss-pm/planning-client";
+import { useCallback, useState } from "react";
 
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import { buildCommandsFromTsvPaste } from "./clipboard/planningClipboard";
-import { useDragFill } from "./clipboard/useDragFill";
 import type { PlanningPermissions } from "../hooks/usePlanningPermissions";
+import {
+  buildFillCommandsForRange,
+  getWbsCellTextValue
+} from "./wbsGridCellValue";
+import { buildIndentMoveCommand, buildOutdentMoveCommand } from "./wbsIndentOutdent";
 import type { WbsGridRow } from "./wbsRows";
 
 export function useWbsGridActions(props: {
@@ -23,8 +28,13 @@ export function useWbsGridActions(props: {
   onApplyBatch: (commands: PlanningCommand[]) => Promise<unknown>;
   onDeleteRows: (taskIds: string[]) => Promise<void>;
 }) {
-  const dragFill = useDragFill();
+  const [isDragging, setIsDragging] = useState(false);
   const canEdit = props.permissions.canManageProjectPlan;
+
+  const buildFillValues = useCallback((seed: string, count: number) => {
+    const series = detectFillSeries(seed, count);
+    return series.ok ? series.values : [];
+  }, []);
 
   const createTaskBelow = useCallback(
     async (anchorTaskId: string | null) => {
@@ -49,25 +59,46 @@ export function useWbsGridActions(props: {
     [canEdit, props]
   );
 
+  const applyFillRange = useCallback(
+    async (startRowIndex: number, endRowIndex: number, columnId: string) => {
+      if (!canEdit || endRowIndex <= startRowIndex) return;
+      const startRow = props.rows[startRowIndex];
+      if (!startRow) return;
+      const seed = getWbsCellTextValue(startRow, columnId);
+      if (!seed) return;
+      const values = buildFillValues(seed, endRowIndex - startRowIndex);
+      const commands = buildFillCommandsForRange({
+        rows: props.rows,
+        startRowIndex,
+        endRowIndex,
+        columnId,
+        values
+      });
+      if (commands.length > 0) await props.onApplyBatch(commands);
+    },
+    [buildFillValues, canEdit, props]
+  );
+
+  const applyWbsHierarchyMove = useCallback(
+    async (taskId: string | null, direction: "indent" | "outdent") => {
+      if (!canEdit || !taskId) return;
+      const command =
+        direction === "indent"
+          ? buildIndentMoveCommand(props.rows, taskId)
+          : buildOutdentMoveCommand(props.rows, taskId);
+      if (command) await props.onPreviewCommand(command);
+    },
+    [canEdit, props]
+  );
+
   const fillDownActiveColumn = useCallback(async () => {
-    if (!canEdit || props.activeRowIndex === null || !props.activeColumnId) return;
-    const startRow = props.rows[props.activeRowIndex];
-    if (!startRow) return;
-    const seed = getSeedValue(startRow, props.activeColumnId);
-    if (!seed) return;
-    const targetCount = Math.min(4, props.rows.length - props.activeRowIndex - 1);
-    if (targetCount <= 0) return;
-    const values = dragFill.buildFillValues(seed, targetCount);
-    const commands: PlanningCommand[] = [];
-    for (let offset = 1; offset <= values.length; offset += 1) {
-      const row = props.rows[props.activeRowIndex + offset];
-      const value = values[offset - 1];
-      if (!row || !value) continue;
-      const command = buildFillCommand(row.id, props.activeColumnId, value, row);
-      if (command) commands.push(command);
-    }
-    if (commands.length > 0) await props.onApplyBatch(commands);
-  }, [canEdit, dragFill, props]);
+    if (props.activeRowIndex === null || !props.activeColumnId) return;
+    const endRowIndex = Math.min(
+      props.activeRowIndex + Math.min(4, props.rows.length - props.activeRowIndex - 1),
+      props.rows.length - 1
+    );
+    await applyFillRange(props.activeRowIndex, endRowIndex, props.activeColumnId);
+  }, [applyFillRange, props.activeColumnId, props.activeRowIndex, props.rows.length]);
 
   const handleContextMenuAction = useCallback(
     async (action: string) => {
@@ -75,14 +106,30 @@ export function useWbsGridActions(props: {
       switch (action) {
         case "insert-above":
         case "insert-below":
-        case "insert-child":
-          await createTaskBelow(action === "insert-child" ? anchorId : null);
+        case "insert-child": {
+          const anchorRow =
+            props.rows.find((row) => row.id === anchorId) ??
+            (props.activeRowIndex !== null ? props.rows[props.activeRowIndex] : undefined);
+          const parentTaskId =
+            action === "insert-child"
+              ? anchorId
+              : typeof anchorRow?.task.parentTaskId === "string" && anchorRow.task.parentTaskId.length > 0
+                ? anchorRow.task.parentTaskId
+                : null;
+          await createTaskBelow(parentTaskId);
           break;
+        }
         case "delete":
           await props.onDeleteRows([...props.selectedRowIds]);
           break;
         case "fill-down":
           await fillDownActiveColumn();
+          break;
+        case "indent":
+          await applyWbsHierarchyMove(anchorId, "indent");
+          break;
+        case "outdent":
+          await applyWbsHierarchyMove(anchorId, "outdent");
           break;
         case "copy":
           if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -113,73 +160,24 @@ export function useWbsGridActions(props: {
           break;
       }
     },
-    [createTaskBelow, fillDownActiveColumn, props]
+    [applyWbsHierarchyMove, createTaskBelow, fillDownActiveColumn, props]
   );
 
   const handleDragFillRelease = useCallback(
     async (startRowIndex: number, endRowIndex: number, columnId: string) => {
-      if (!canEdit || endRowIndex <= startRowIndex) return;
-      const startRow = props.rows[startRowIndex];
-      if (!startRow) return;
-      const seed = getSeedValue(startRow, columnId);
-      if (!seed) return;
-      const count = endRowIndex - startRowIndex;
-      const values = dragFill.buildFillValues(seed, count);
-      const commands: PlanningCommand[] = [];
-      for (let offset = 1; offset <= values.length; offset += 1) {
-        const row = props.rows[startRowIndex + offset];
-        const value = values[offset - 1];
-        if (!row || !value) continue;
-        const command = buildFillCommand(row.id, columnId, value, row);
-        if (command) commands.push(command);
-      }
-      if (commands.length > 0) await props.onApplyBatch(commands);
-      dragFill.setIsDragging(false);
+      await applyFillRange(startRowIndex, endRowIndex, columnId);
+      setIsDragging(false);
     },
-    [canEdit, dragFill, props]
+    [applyFillRange]
   );
 
   return {
     canEdit,
-    dragFill,
+    dragFill: { isDragging, setIsDragging },
     createTaskBelow,
     fillDownActiveColumn,
+    applyWbsHierarchyMove,
     handleContextMenuAction,
     handleDragFillRelease
   };
-}
-
-function getSeedValue(row: WbsGridRow, columnId: string): string {
-  if (columnId === "title") return row.title;
-  if (columnId === "finish") return row.finish ?? "";
-  if (columnId === "durationLabel") return row.durationLabel;
-  if (columnId === "percentComplete") return String(row.percentComplete);
-  return "";
-}
-
-function buildFillCommand(
-  taskId: string,
-  columnId: string,
-  value: string,
-  row: WbsGridRow
-): PlanningCommand | null {
-  if (columnId === "title") {
-    return { type: "task.update_identity", payload: { taskId, title: value } };
-  }
-  if (columnId === "finish") {
-    return {
-      type: "task.update_schedule",
-      payload: {
-        taskId,
-        plannedStart: (row.task.plannedStart as string | null) ?? null,
-        plannedFinish: value || null
-      }
-    };
-  }
-  if (columnId === "percentComplete") {
-    const percent = Number(value);
-    if (!Number.isFinite(percent)) return null;
-    return { type: "task.update_progress", payload: { taskId, percentComplete: percent } };
-  }
-  return null;
 }

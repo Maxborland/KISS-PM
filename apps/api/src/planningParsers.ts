@@ -49,21 +49,16 @@ export function parsePlanningCommandEnvelope(input: unknown): PlanningCommandEnv
   if (!isObject(input)) return { ok: false, error: "planning_command_invalid" };
   const commandResult = parsePlanningCommand(input.command);
   if (!commandResult.ok) return commandResult;
-  const clientPlanVersion = getInteger(input, "clientPlanVersion");
-  if (clientPlanVersion === null || clientPlanVersion < 1) {
-    return { ok: false, error: "plan_version_conflict" };
-  }
-  const idempotencyKey = parseIdempotencyKey(input);
-  if (idempotencyKey === false) return { ok: false, error: "planning_command_invalid" };
+  const envelopeFields = parseCommandEnvelopeFields(input);
+  if (!envelopeFields.ok) return envelopeFields;
   const value: PlanningCommandEnvelope = {
     command: commandResult.value,
-    clientPlanVersion
+    clientPlanVersion: envelopeFields.value.clientPlanVersion
   };
-  if (idempotencyKey !== undefined) value.idempotencyKey = idempotencyKey;
-  return {
-    ok: true,
-    value
-  };
+  if (envelopeFields.value.idempotencyKey !== undefined) {
+    value.idempotencyKey = envelopeFields.value.idempotencyKey;
+  }
+  return { ok: true, value };
 }
 
 export function parsePlanningCommandBatchEnvelope(
@@ -79,14 +74,15 @@ export function parsePlanningCommandBatchEnvelope(
     if (!commandResult.ok) return commandResult;
     commands.push(commandResult.value);
   }
-  const clientPlanVersion = getInteger(input, "clientPlanVersion");
-  if (clientPlanVersion === null || clientPlanVersion < 1) {
-    return { ok: false, error: "plan_version_conflict" };
+  const envelopeFields = parseCommandEnvelopeFields(input);
+  if (!envelopeFields.ok) return envelopeFields;
+  const value: PlanningCommandBatchEnvelope = {
+    commands,
+    clientPlanVersion: envelopeFields.value.clientPlanVersion
+  };
+  if (envelopeFields.value.idempotencyKey !== undefined) {
+    value.idempotencyKey = envelopeFields.value.idempotencyKey;
   }
-  const idempotencyKey = parseIdempotencyKey(input);
-  if (idempotencyKey === false) return { ok: false, error: "planning_command_invalid" };
-  const value: PlanningCommandBatchEnvelope = { commands, clientPlanVersion };
-  if (idempotencyKey !== undefined) value.idempotencyKey = idempotencyKey;
   return { ok: true, value };
 }
 
@@ -395,6 +391,22 @@ function getOptionalString(input: Record<string, unknown>, key: string): string 
   const value = input[key];
   if (value === null || value === undefined) return null;
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function parseCommandEnvelopeFields(input: Record<string, unknown>):
+  | { ok: true; value: { clientPlanVersion: number; idempotencyKey?: string } }
+  | { ok: false; error: string } {
+  const clientPlanVersion = getInteger(input, "clientPlanVersion");
+  if (clientPlanVersion === null || clientPlanVersion < 1) {
+    return { ok: false, error: "plan_version_conflict" };
+  }
+  const idempotencyKey = parseIdempotencyKey(input);
+  if (idempotencyKey === false) return { ok: false, error: "planning_command_invalid" };
+  const value = { clientPlanVersion };
+  if (idempotencyKey !== undefined) {
+    return { ok: true, value: { ...value, idempotencyKey } };
+  }
+  return { ok: true, value };
 }
 
 function parseIdempotencyKey(input: Record<string, unknown>): string | undefined | false {

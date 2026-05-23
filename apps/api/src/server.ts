@@ -5,6 +5,7 @@ import {
   createPostgresTenantDataSource
 } from "@kiss-pm/persistence";
 import { createApp } from "./app";
+import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
 
 const port = Number.parseInt(process.env.PORT ?? "4000", 10);
 const hostname = process.env.HOST ?? "127.0.0.1";
@@ -16,6 +17,9 @@ const dataSource = postgresClient
   ? createPostgresTenantDataSource(createDatabase(postgresClient))
   : undefined;
 const enableDevTenantRoutes = process.env.KISS_PM_ENABLE_DEV_ROUTES === "true";
+
+const publisher = await bootstrapPlanningEventPublisher();
+setPlanningEventPublisher(publisher);
 
 serve({
   fetch: (dataSource

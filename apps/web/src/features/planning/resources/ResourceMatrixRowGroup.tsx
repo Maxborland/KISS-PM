@@ -1,17 +1,17 @@
 "use client";
 
 import { ResourceMatrixCell } from "./ResourceMatrixCell";
-import type { ResourceMatrixGroup, ResourceMatrixRow } from "./useMonthlyResourceMatrix";
-
-const DAY_COLUMN_WIDTH = 28;
-const NAME_COLUMN_WIDTH = 220;
+import { resourceMatrixGridTemplateColumns } from "./resourceMatrixLayout";
+import type { ResourceMatrixGroup, ResourceMatrixRow } from "./resourceMatrixTypes";
 
 export function ResourceMatrixRowGroup(props: {
   group: ResourceMatrixGroup;
   onActivate: (input: { resourceId: string; date: string }) => void;
   onHover: (input: { resourceId: string; date: string } | null) => void;
 }) {
-  const gridTemplateColumns = `${NAME_COLUMN_WIDTH}px repeat(${props.group.positionDays.length}, ${DAY_COLUMN_WIDTH}px)`;
+  const gridTemplateColumns = resourceMatrixGridTemplateColumns(
+    props.group.positionDays.length
+  );
 
   return (
     <div

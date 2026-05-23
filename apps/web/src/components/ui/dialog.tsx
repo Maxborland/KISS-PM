@@ -3,7 +3,11 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 
-export function Dialog(props: { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
+export function Dialog(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
   return (
     <DialogPrimitive.Root open={props.open} onOpenChange={props.onOpenChange}>
       {props.children}

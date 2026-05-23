@@ -13,8 +13,10 @@
     "@kiss-pm/access-control": "workspace:*",
     "@kiss-pm/domain": "workspace:*",
     "@kiss-pm/persistence": "workspace:*",
+    "@kiss-pm/tenant-org-structure": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
-    "hono": "^4.7.10"
+    "hono": "^4.7.10",
+    "redis": "^5.12.1"
   },
   "devDependencies": {
     "tsx": "^4.19.4"

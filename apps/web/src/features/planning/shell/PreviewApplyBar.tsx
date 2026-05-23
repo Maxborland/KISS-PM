@@ -6,6 +6,7 @@ import { planningPermissionTitle, type PlanningPermissions } from "../hooks/useP
 export function PreviewApplyBar(props: {
   state: ApplyBarState;
   errorMessage: string | null;
+  previewStale?: boolean;
   permissions: PlanningPermissions;
   onApply: () => void;
   onCancel: () => void;
@@ -23,8 +24,14 @@ export function PreviewApplyBar(props: {
       aria-label="Превью изменений плана"
     >
       <div className="planning-apply-bar__message">
+        {props.previewStale && props.state === "preview-ready" ? (
+          <span className="planning-apply-bar__stale">
+            План на сервере изменился — пересчитайте превью или отмените изменения.
+          </span>
+        ) : null}
         {props.state === "preview-pending" && "Считаем превью…"}
-        {props.state === "preview-ready" && "Есть несохранённые изменения плана"}
+        {props.state === "preview-ready" &&
+          (props.previewStale ? "Превью устарело" : "Есть несохранённые изменения плана")}
         {props.state === "applying" && "Применяем…"}
         {props.state === "applied" && "Изменения сохранены, аудит записан"}
         {props.state === "conflict" && (props.errorMessage ?? "Конфликт версии плана")}
@@ -40,8 +47,14 @@ export function PreviewApplyBar(props: {
           <button
             className="primary-button"
             type="button"
-            title={manageTitle}
-            disabled={!props.permissions.canManageProjectPlan || props.isApplying}
+            title={
+              props.previewStale
+                ? "Сначала отмените или пересчитайте превью после изменения плана на сервере"
+                : manageTitle
+            }
+            disabled={
+              !props.permissions.canManageProjectPlan || props.isApplying || Boolean(props.previewStale)
+            }
             onClick={props.onApply}
           >
             Применить

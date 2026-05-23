@@ -35,7 +35,19 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         ...(init?.headers ?? {})
       }
     });
-    const body = (await response.json()) as Record<string, unknown>;
+    const rawText = await response.text();
+    let body: Record<string, unknown> = {};
+    if (rawText.length > 0) {
+      try {
+        const parsed: unknown = JSON.parse(rawText);
+        body =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : { error: "invalid_json_response" };
+      } catch {
+        body = { error: "invalid_json_response" };
+      }
+    }
     if (!response.ok) {
       throw new PlanningApiError(
         response.status,
@@ -52,10 +64,18 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/read-model`
       );
     },
-    previewCommand(projectId: string, input: PlanningCommandRequest) {
+    previewCommand(
+      projectId: string,
+      input: PlanningCommandRequest,
+      signal?: AbortSignal
+    ) {
       return requestJson<PlanningPreviewResponse>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/preview-command`,
-        { method: "POST", body: JSON.stringify(input) }
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+          ...(signal ? { signal } : {})
+        }
       );
     },
     applyCommand(projectId: string, input: PlanningCommandRequest) {

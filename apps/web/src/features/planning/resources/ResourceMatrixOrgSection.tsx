@@ -1,12 +1,8 @@
 "use client";
 
-import type { ResourceMatrixOrgDirectionGroup } from "./computeOrgResourceMatrix";
 import { ResourceMatrixRowGroup } from "./ResourceMatrixRowGroup";
 import { ResourceMatrixCell } from "./ResourceMatrixCell";
-import type { ResourceMatrixDayLoad } from "./useMonthlyResourceMatrix";
-
-const DAY_COLUMN_WIDTH = 28;
-const NAME_COLUMN_WIDTH = 220;
+import type { ResourceMatrixDayLoad, ResourceMatrixOrgDirectionGroup } from "./resourceMatrixTypes";
 
 export function ResourceMatrixOrgSection(props: {
   orgGroups: ResourceMatrixOrgDirectionGroup[];
@@ -87,4 +83,7 @@ function AggregateRow(props: {
   );
 }
 
-export { DAY_COLUMN_WIDTH, NAME_COLUMN_WIDTH };
+export {
+  RESOURCE_MATRIX_DAY_COLUMN_WIDTH as DAY_COLUMN_WIDTH,
+  RESOURCE_MATRIX_NAME_COLUMN_WIDTH as NAME_COLUMN_WIDTH
+} from "./resourceMatrixLayout";

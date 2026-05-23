@@ -16,4 +16,13 @@ test.describe("Planning accessibility", () => {
     const critical = results.violations.filter((violation) => violation.impact === "critical");
     expect(critical).toEqual([]);
   });
+
+  test("gantt pane has no critical axe violations", async ({ page }) => {
+    await page.getByTestId("planning-gantt-pane").waitFor();
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="planning-gantt-pane"]')
+      .analyze();
+    const critical = results.violations.filter((violation) => violation.impact === "critical");
+    expect(critical).toEqual([]);
+  });
 });

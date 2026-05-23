@@ -3,22 +3,23 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { CrossProjectTaskTooltip } from "./CrossProjectTaskTooltip";
-import { MonthNavigation, currentMonthIso } from "./MonthNavigation";
+import { MonthNavigation } from "./MonthNavigation";
 import { ResourceDayDrawer } from "./ResourceDayDrawer";
 import { ResourceMatrixOrgSection } from "./ResourceMatrixOrgSection";
 import { ResourceMatrixRowGroup } from "./ResourceMatrixRowGroup";
-import type { OrgMonthlyResourceMatrix } from "./computeOrgResourceMatrix";
+import { isOrgCapacityTree, type OrgCapacityTree } from "./resourceMatrixTypes";
 import { useCrossProjectTasks } from "./useCrossProjectTasks";
 import type {
   MonthlyResourceMatrix as MatrixModel,
   ResourceMatrixGroup
-} from "./useMonthlyResourceMatrix";
-
-const DAY_COLUMN_WIDTH = 28;
-const NAME_COLUMN_WIDTH = 220;
+} from "./resourceMatrixTypes";
+import { aggregateResourceMatrixRowDays } from "./resourceMatrixTypes";
+import {
+  resourceMatrixGridTemplateColumns
+} from "./resourceMatrixLayout";
 
 export function MonthlyResourceMatrix(props: {
-  matrix: MatrixModel | OrgMonthlyResourceMatrix;
+  matrix: MatrixModel | OrgCapacityTree;
   monthIso: string;
   onMonthChange: (monthIso: string) => void;
 }) {
@@ -88,10 +89,7 @@ export function MonthlyResourceMatrix(props: {
     setDrawerKey(input);
   }, []);
 
-  const orgMatrix =
-    "hierarchyMode" in props.matrix && props.matrix.hierarchyMode === "org"
-      ? (props.matrix as OrgMonthlyResourceMatrix)
-      : null;
+  const orgMatrix = isOrgCapacityTree(props.matrix) ? props.matrix : null;
 
   const resourceNameByResourceId = useMemo(() => {
     const map = new Map<string, string>();
@@ -114,7 +112,7 @@ export function MonthlyResourceMatrix(props: {
     return map;
   }, [orgMatrix, props.matrix.groups, props.matrix.unassignedRows]);
 
-  const gridTemplateColumns = `${NAME_COLUMN_WIDTH}px repeat(${props.matrix.days.length}, ${DAY_COLUMN_WIDTH}px)`;
+  const gridTemplateColumns = resourceMatrixGridTemplateColumns(props.matrix.days.length);
 
   return (
     <div className="planning-resource-matrix" data-testid="planning-resource-matrix">
@@ -196,45 +194,9 @@ function parseDayLabel(dateIso: string): string {
 }
 
 function buildUnassignedGroup(matrix: MatrixModel): ResourceMatrixGroup {
-  const positionDays = matrix.days.map((day, dayIndex) => {
-    let totalWork = 0;
-    let totalCapacity = 0;
-    let overload = false;
-    let exception = false;
-    let hasAbsence = false;
-    for (const row of matrix.unassignedRows) {
-      const cell = row.days[dayIndex];
-      if (!cell) continue;
-      totalWork += cell.workMinutes;
-      totalCapacity += cell.capacityMinutes;
-      if (cell.isOverload) overload = true;
-      if (cell.isException) exception = true;
-      if (cell.hasAbsence) hasAbsence = true;
-    }
-    const isFreeDay =
-      totalWork === 0 &&
-      !hasAbsence &&
-      totalCapacity > 0 &&
-      !day.isWeekend &&
-      !day.isHoliday;
-    return {
-      date: day.date,
-      workMinutes: totalWork,
-      capacityMinutes: totalCapacity,
-      isWeekend: day.isWeekend,
-      isHoliday: day.isHoliday,
-      hasAbsence,
-      isFreeDay,
-      isException: exception,
-      isOverload: overload,
-      heat: 0 as 0 | 1 | 2 | 3
-    };
-  });
   return {
     position: { id: "__unassigned__", name: "Внешние ресурсы", users: [] },
     rows: matrix.unassignedRows,
-    positionDays
+    positionDays: aggregateResourceMatrixRowDays(matrix.days, matrix.unassignedRows)
   };
 }
-
-export { currentMonthIso };

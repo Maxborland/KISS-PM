@@ -2,18 +2,8 @@
 
 import { useEffect } from "react";
 
-import type { WbsColumnId } from "./wbsColumns";
+import { wbsColumnIds, type WbsColumnId } from "./wbsColumns";
 import type { GridCellAddress } from "./useGridSelection";
-
-const columnOrder: WbsColumnId[] = [
-  "wbsIndex",
-  "title",
-  "durationLabel",
-  "finish",
-  "percentComplete",
-  "assignmentsLabel",
-  "validation"
-];
 
 export function useGridKeyboard(options: {
   rowCount: number;
@@ -28,6 +18,8 @@ export function useGridKeyboard(options: {
   onRedoApplied?: () => void;
   onSelectAll: () => void;
   onInsertRow?: () => void;
+  onIndentRow?: () => void;
+  onOutdentRow?: () => void;
   enabled: boolean;
 }) {
   useEffect(() => {
@@ -78,8 +70,18 @@ export function useGridKeyboard(options: {
         options.onSelectAll();
         return;
       }
+      if (event.ctrlKey && event.key === "]") {
+        event.preventDefault();
+        options.onIndentRow?.();
+        return;
+      }
+      if (event.ctrlKey && event.key === "[") {
+        event.preventDefault();
+        options.onOutdentRow?.();
+        return;
+      }
 
-      const columnIndex = columnOrder.indexOf(options.activeCell.columnId as WbsColumnId);
+      const columnIndex = wbsColumnIds.indexOf(options.activeCell.columnId as WbsColumnId);
       if (columnIndex < 0) return;
 
       if (event.key === "ArrowDown") {
@@ -96,11 +98,11 @@ export function useGridKeyboard(options: {
         });
       } else if (event.key === "ArrowRight" || (event.key === "Tab" && !event.shiftKey)) {
         event.preventDefault();
-        const nextColumn = columnOrder[Math.min(columnOrder.length - 1, columnIndex + 1)]!;
+        const nextColumn = wbsColumnIds[Math.min(wbsColumnIds.length - 1, columnIndex + 1)]!;
         options.setActiveCell({ rowIndex: options.activeCell.rowIndex, columnId: nextColumn });
       } else if (event.key === "ArrowLeft" || (event.key === "Tab" && event.shiftKey)) {
         event.preventDefault();
-        const prevColumn = columnOrder[Math.max(0, columnIndex - 1)]!;
+        const prevColumn = wbsColumnIds[Math.max(0, columnIndex - 1)]!;
         options.setActiveCell({ rowIndex: options.activeCell.rowIndex, columnId: prevColumn });
       }
     };

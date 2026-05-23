@@ -1,69 +1,34 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  OrgNodeType,
+  OrgStructureNodeInput,
+  OrgStructureNodeRecord,
+  OrgStructurePlacementInput,
+  OrgStructurePlacementRecord,
+  OrgStructureReplaceInput,
+  OrgStructureTrack,
+  OrgStructureTrackSnapshot,
+  TenantOrgStructureSnapshot
+} from "@kiss-pm/tenant-org-structure";
+
+import { getOrgStructureTrackSnapshot } from "./orgStructureTrackUtils";
+
+export type {
+  OrgNodeType,
+  OrgStructureNodeInput,
+  OrgStructurePlacementInput,
+  OrgStructureReplaceInput,
+  OrgStructureTrack,
+  TenantOrgStructureSnapshot
+};
+
+export type OrgStructureNode = OrgStructureNodeRecord;
+export type OrgStructurePlacement = OrgStructurePlacementRecord;
+export type { OrgStructureTrackSnapshot };
 
 const apiOrigin = process.env.NEXT_PUBLIC_KISS_PM_API_ORIGIN ?? "";
-
-export type OrgStructureTrack = "functional" | "project";
-export type OrgNodeType = "direction" | "department" | "team";
-
-export type OrgStructureNode = {
-  id: string;
-  tenantId: string;
-  track: OrgStructureTrack;
-  nodeType: OrgNodeType;
-  name: string;
-  parentId: string | null;
-  sortOrder: number;
-};
-
-export type OrgStructurePlacement = {
-  tenantId: string;
-  userId: string;
-  track: OrgStructureTrack;
-  directionId: string;
-  departmentId: string | null;
-  teamId: string | null;
-  positionId: string;
-};
-
-export type OrgStructureTrackSnapshot = {
-  nodes: OrgStructureNode[];
-  placements: OrgStructurePlacement[];
-};
-
-export type TenantOrgStructureSnapshot = {
-  functional: OrgStructureTrackSnapshot;
-  project: OrgStructureTrackSnapshot;
-};
-
-export type OrgStructureNodeInput = {
-  id: string;
-  nodeType: OrgNodeType;
-  name: string;
-  parentId: string | null;
-  sortOrder: number;
-};
-
-export type OrgStructurePlacementInput = {
-  userId: string;
-  directionId: string;
-  departmentId?: string | null;
-  teamId?: string | null;
-  positionId: string;
-};
-
-export type OrgStructureReplaceInput = {
-  functional: {
-    nodes: OrgStructureNodeInput[];
-    placements: OrgStructurePlacementInput[];
-  };
-  project: {
-    nodes: OrgStructureNodeInput[];
-    placements: OrgStructurePlacementInput[];
-  };
-};
-
 const orgStructureKey = ["tenant-org-structure"] as const;
 
 export function useOrgStructure(enabled: boolean) {
@@ -118,6 +83,7 @@ async function saveOrgStructure(input: OrgStructureReplaceInput): Promise<Tenant
 
 export function hasOrgDirections(snapshot: TenantOrgStructureSnapshot | undefined, track: OrgStructureTrack): boolean {
   if (!snapshot) return false;
-  const trackSnapshot = track === "functional" ? snapshot.functional : snapshot.project;
-  return trackSnapshot.nodes.some((node) => node.nodeType === "direction");
+  return getOrgStructureTrackSnapshot(snapshot, track).nodes.some(
+    (node) => node.nodeType === "direction"
+  );
 }

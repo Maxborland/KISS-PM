@@ -70,8 +70,8 @@ async function fetchSavedViews(projectId: string): Promise<{ views: SavedView[] 
     }
     throw new Error(`saved_views_load_failed_${response.status}`);
   }
-  const body = (await response.json()) as { views?: SavedView[] };
-  return { views: body.views ?? [] };
+  const body = (await response.json()) as { savedViews?: SavedView[]; views?: SavedView[] };
+  return { views: body.savedViews ?? body.views ?? [] };
 }
 
 async function createSavedView(
@@ -96,8 +96,8 @@ async function createSavedView(
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `saved_view_create_failed_${response.status}`);
   }
-  const body = (await response.json()) as { view?: SavedView };
-  return body.view ?? null;
+  const body = (await response.json()) as { savedView?: SavedView; view?: SavedView };
+  return body.savedView ?? body.view ?? null;
 }
 
 async function deleteSavedView(projectId: string, viewId: string): Promise<void> {

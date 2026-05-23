@@ -1,6 +1,6 @@
 "use client";
 
-import type { ResourceMatrixDayLoad } from "./useMonthlyResourceMatrix";
+import type { ResourceMatrixDayLoad } from "./resourceMatrixTypes";
 
 export function ResourceMatrixCell(props: {
   cell: ResourceMatrixDayLoad;
@@ -23,6 +23,7 @@ export function ResourceMatrixCell(props: {
       type="button"
       className={className}
       data-testid={`resource-matrix-cell-${props.resourceId ?? "agg"}-${props.cell.date}`}
+      data-overload-source={props.cell.isOverload ? "employee-total" : undefined}
       title={titleParts.join(" · ")}
       onMouseEnter={() => {
         if (!props.resourceId) return;

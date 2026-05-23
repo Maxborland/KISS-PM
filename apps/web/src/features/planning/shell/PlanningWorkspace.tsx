@@ -1,9 +1,8 @@
 "use client";
 
 import type { PlanningCommand } from "@kiss-pm/domain";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 
-import { PlanningSelect, PlanningSelectLabel } from "../../../components/ui/select";
 import type { PlanningProjectTab } from "../../../workspacePathIds";
 import { getProjectPlanningPath } from "../../../workspacePathIds";
 import { SectionFeedback } from "../../../components/workspace-ui";
@@ -12,9 +11,8 @@ import { ProjectAuditPane } from "../audit/ProjectAuditPane";
 import { BaselinePane } from "../baseline/BaselinePane";
 import { CalendarsPane } from "../calendars/CalendarsPane";
 import { CustomFieldDefinitionsPane } from "../customFields/CustomFieldDefinitionsPane";
-import { GanttPane } from "../gantt/GanttPane";
 import { buildCommandsFromTsvPaste } from "../grid/clipboard/planningClipboard";
-import { WbsGrid } from "../grid/WbsGrid";
+import { SchedulePane } from "../schedule/SchedulePane";
 import { usePlan } from "../hooks/usePlan";
 import { usePlanMutation } from "../hooks/usePlanMutation";
 import { usePlanningPermissions } from "../hooks/usePlanningPermissions";
@@ -28,6 +26,7 @@ import {
 import { ScenariosPane } from "../scenarios/ScenariosPane";
 import { ProjectSettingsPane } from "../settings/ProjectSettingsPane";
 import { NarrowFallback } from "./NarrowFallback";
+import { PlanningRemoteBanner } from "./PlanningRemoteBanner";
 import { PreviewApplyBar } from "./PreviewApplyBar";
 import { ProjectPlanningHeader } from "./ProjectPlanningHeader";
 import { useNarrowViewport } from "./useNarrowViewport";
@@ -45,8 +44,15 @@ export function PlanningWorkspace(props: {
   onNavigateTab: (tab: PlanningProjectTab) => void;
 }) {
   const planningPermissions = usePlanningPermissions(props.permissions);
-  const planQuery = usePlan(props.projectId, props.canRead && planningPermissions.canReadProjectPlan);
   const mutation = usePlanMutation(props.projectId);
+  const [remoteBannerMessage, setRemoteBannerMessage] = useState<string | null>(null);
+  const onRemotePlanChange = useCallback(() => {
+    mutation.markPreviewStale();
+    setRemoteBannerMessage("План обновлён на сервере. Пересчитайте превью или отмените локальные изменения.");
+  }, [mutation.markPreviewStale]);
+  const planQuery = usePlan(props.projectId, props.canRead && planningPermissions.canReadProjectPlan, {
+    onRemotePlanChange
+  });
   const isNarrow = useNarrowViewport();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [ganttZoom, setGanttZoom] = useState<"day" | "week" | "month">("day");
@@ -101,46 +107,32 @@ export function PlanningWorkspace(props: {
 
   const scheduleContent = (
     <>
-      <div className="planning-schedule-layout">
-        <WbsGrid
-          readModel={readModel}
-          projectId={props.projectId}
-          defaultStatusId={props.defaultStatusId}
-          permissions={planningPermissions}
-          previewPending={mutation.store.applyBarState === "preview-pending"}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={setSelectedTaskId}
-          onPreviewCommand={mutation.preview}
-          onApplyBatch={mutation.applyBatch}
-          onUndoApplied={() => void mutation.undoApplied()}
-          onRedoApplied={() => void mutation.redoApplied()}
-          onDeleteRows={async (taskIds) => {
-            await mutation.applyBatch(
-              taskIds.map(
-                (taskId): PlanningCommand => ({
-                  type: "task.delete_or_archive",
-                  payload: { taskId, mode: "delete" }
-                })
-              )
-            );
-          }}
-          onUndoPending={mutation.undoPending}
-        />
-        <GanttPane readModel={readModel} zoom={ganttZoom} />
-      </div>
-      <div className="planning-toolbar">
-        <PlanningSelectLabel>Масштаб</PlanningSelectLabel>
-        <PlanningSelect
-          aria-label="Масштаб диаграммы"
-          value={ganttZoom}
-          options={[
-            { value: "day", label: "День" },
-            { value: "week", label: "Неделя" },
-            { value: "month", label: "Месяц" }
-          ]}
-          onChange={(value) => setGanttZoom(value as "day" | "week" | "month")}
-        />
-      </div>
+      <SchedulePane
+        readModel={readModel}
+        projectId={props.projectId}
+        defaultStatusId={props.defaultStatusId}
+        permissions={planningPermissions}
+        previewPending={mutation.store.applyBarState === "preview-pending"}
+        selectedTaskId={selectedTaskId}
+        onSelectTask={setSelectedTaskId}
+        onPreviewCommand={mutation.preview}
+        onApplyBatch={mutation.applyBatch}
+        onUndoApplied={() => void mutation.undoApplied()}
+        onRedoApplied={() => void mutation.redoApplied()}
+        onDeleteRows={async (taskIds) => {
+          await mutation.applyBatch(
+            taskIds.map(
+              (taskId): PlanningCommand => ({
+                type: "task.delete_or_archive",
+                payload: { taskId, mode: "delete" }
+              })
+            )
+          );
+        }}
+        onUndoPending={mutation.undoPending}
+        ganttZoom={ganttZoom}
+        onGanttZoomChange={setGanttZoom}
+      />
       <TaskInspector
         readModel={readModel}
         selectedTaskId={selectedTaskId}
@@ -165,10 +157,15 @@ export function PlanningWorkspace(props: {
         activeTab={props.activeTab}
         onBack={props.onBack}
       />
+      <PlanningRemoteBanner
+        message={remoteBannerMessage}
+        onDismiss={() => setRemoteBannerMessage(null)}
+      />
       {props.activeTab === "schedule" ? scheduleContent : null}
       {props.activeTab === "resources" ? (
         <ResourcesPane
           readModel={readModel}
+          projectId={props.projectId}
           permissions={planningPermissions}
           workspaceUsers={props.workspaceUsers}
           workspacePositions={props.workspacePositions}
@@ -194,8 +191,9 @@ export function PlanningWorkspace(props: {
           projectId={props.projectId}
           readModel={readModel}
           planVersion={readModel?.planVersion ?? 1}
-          canPreview={planningPermissions.canManageProjectPlan}
-          canApply={planningPermissions.canManageProjectPlan}
+          canPreview={planningPermissions.canPreviewPlanningScenarios}
+          canApply={planningPermissions.canApplyPlanningScenarios}
+          onScenarioApplied={mutation.handleConflict}
         />
       ) : null}
       {props.activeTab === "baseline" ? (
@@ -237,6 +235,7 @@ export function PlanningWorkspace(props: {
       <PreviewApplyBar
         state={mutation.store.applyBarState}
         errorMessage={mutation.store.errorMessage}
+        previewStale={mutation.previewStale}
         permissions={planningPermissions}
         onApply={() => void mutation.apply()}
         onCancel={mutation.cancelPreview}
