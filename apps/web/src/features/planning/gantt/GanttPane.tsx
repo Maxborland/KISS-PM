@@ -3,6 +3,11 @@
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import { useMemo } from "react";
 
+import {
+  readCalculatedProjectFinish,
+  readProjectPlannedFinish,
+  readProjectPlannedStart
+} from "../planningReadModelAccess";
 import { buildWbsRows } from "../grid/wbsRows";
 
 const ROW_HEIGHT = 32;
@@ -12,10 +17,9 @@ export function GanttPane(props: {
   zoom: "day" | "week" | "month";
 }) {
   const rows = useMemo(() => buildWbsRows(props.readModel), [props.readModel]);
-  const rangeStart = props.readModel?.project.plannedStart as string | undefined;
+  const rangeStart = readProjectPlannedStart(props.readModel);
   const rangeFinish =
-    (props.readModel?.calculatedPlan as { projectFinish?: string | null })?.projectFinish ??
-    (props.readModel?.project.plannedFinish as string | undefined);
+    readCalculatedProjectFinish(props.readModel) ?? readProjectPlannedFinish(props.readModel);
   const dayWidth = props.zoom === "day" ? 28 : props.zoom === "week" ? 14 : 8;
 
   return (
@@ -38,21 +42,17 @@ export function GanttPane(props: {
           ))}
         </svg>
         {rows.map((row, index) => {
-          const calculated = (
-            props.readModel?.calculatedPlan.tasks as Array<Record<string, unknown>>
-          )?.find((task) => String(task.id) === row.id);
-          const start = String(calculated?.calculatedStart ?? row.finish ?? rangeStart ?? "");
-          const finish = String(calculated?.calculatedFinish ?? row.finish ?? start);
+          const start = row.start ?? row.finish ?? rangeStart ?? "";
+          const finish = row.finish ?? start;
           const left = start ? dayOffset(rangeStart ?? start, start) * dayWidth : index * 4;
           const width = Math.max(dayWidth, dayOffset(start || finish, finish || start) * dayWidth);
-          const isCritical = Boolean(calculated?.isCritical);
           return (
             <div
               key={row.id}
               className="planning-gantt-row"
               style={{ height: ROW_HEIGHT, transform: `translateY(${index * ROW_HEIGHT}px)` }}
             >
-              {isCritical ? <span className="planning-gantt-critical-stripe" /> : null}
+              {row.isCritical ? <span className="planning-gantt-critical-stripe" /> : null}
               <div
                 className="planning-gantt-bar"
                 style={{ left, width }}

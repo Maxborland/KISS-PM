@@ -7,7 +7,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import {
   createTenantOrgStructureRepository,
   ORG_NODE_TYPES,
-  ORG_STRUCTURE_TRACKS,
+  validateOrgStructureReplace,
   type OrgNodeType,
   type OrgStructureTrack,
   type OrgStructureTrackInput,
@@ -30,10 +30,6 @@ function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
     return dataSource.db as KissPmDatabase;
   }
   return null;
-}
-
-function isTrack(value: string): value is OrgStructureTrack {
-  return (ORG_STRUCTURE_TRACKS as readonly string[]).includes(value);
 }
 
 function isNodeType(value: string): value is OrgNodeType {
@@ -181,15 +177,12 @@ export function registerOrgStructureRoutes(app: Hono, deps: OrgStructureRouteDep
     const parsed = parseReplaceBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
+    const validationError = validateOrgStructureReplace(parsed.value);
+    if (validationError) return context.json({ error: validationError }, 400);
+
     const repository = createTenantOrgStructureRepository(db);
     const before = await repository.getOrgStructure(actor.tenantId);
-    let orgStructure;
-    try {
-      orgStructure = await repository.replaceOrgStructure(actor.tenantId, parsed.value);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "tenant_org_structure_invalid";
-      return context.json({ error: message }, 400);
-    }
+    const orgStructure = await repository.replaceOrgStructure(actor.tenantId, parsed.value);
 
     await deps.appendManagementAuditEvent({
       tenantId: actor.tenantId,

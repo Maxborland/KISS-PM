@@ -6,6 +6,7 @@ import type { PlanningCommand } from "@kiss-pm/domain";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import { Dialog, DialogContent } from "../../../components/ui/dialog";
 import type { PlanningPermissions } from "../hooks/usePlanningPermissions";
+import { readProjectCalendarId } from "../planningReadModelAccess";
 
 export function CalendarsPane(props: {
   readModel: PlanningReadModel | undefined;
@@ -13,14 +14,13 @@ export function CalendarsPane(props: {
   onPreviewCommand: (command: PlanningCommand) => Promise<unknown>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const calendars = props.readModel?.authored ? (props.readModel as PlanningReadModel & { calendars?: unknown }).calculatedPlan : null;
-  const calendarList = (props.readModel as { calendars?: Array<{ id: string }> } | undefined)?.calendars ?? [];
+  const projectCalendarId = readProjectCalendarId(props.readModel) ?? "tenant-default";
   const canManage = props.permissions.canManageProjectResources;
 
   return (
     <section className="planning-pane" data-testid="planning-calendars-pane">
       <h2>Календари</h2>
-      <p className="planning-pane__muted">Календарей в снимке: {calendarList.length || (calendars ? 1 : 0)}</p>
+      <p className="planning-pane__muted">Календарь проекта: {projectCalendarId}</p>
       <button
         className="primary-button"
         type="button"
@@ -40,7 +40,7 @@ export function CalendarsPane(props: {
                 type: "calendar.exception.upsert",
                 payload: {
                   id: `exception-${Date.now()}`,
-                  calendarId: String(form.get("calendarId") || "calendar-default"),
+                  calendarId: String(form.get("calendarId") || projectCalendarId),
                   resourceId: String(form.get("resourceId") || "") || null,
                   date: String(form.get("date")),
                   workingMinutes: Number(form.get("workingMinutes") ?? 0),

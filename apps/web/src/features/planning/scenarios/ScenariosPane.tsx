@@ -6,6 +6,7 @@ import { planningApi } from "../planningApi";
 import { AcceptRiskDialog } from "./AcceptRiskDialog";
 
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
+import { readResourceOverloads } from "../planningReadModelAccess";
 
 export function ScenariosPane(props: {
   projectId: string;
@@ -26,9 +27,7 @@ export function ScenariosPane(props: {
         type="button"
         disabled={!props.canPreview}
         onClick={async () => {
-          const overloads =
-            (props.readModel?.resourceLoad as { overloads?: Array<Record<string, unknown>> } | undefined)
-              ?.overloads ?? [];
+          const overloads = readResourceOverloads(props.readModel);
           const overload = overloads[0] ?? {
             type: "resource_overload",
             resourceId: "user-alpha-executor",

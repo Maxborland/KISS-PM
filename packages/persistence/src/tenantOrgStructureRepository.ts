@@ -103,6 +103,19 @@ function isNodeType(value: string): value is OrgNodeType {
   return (ORG_NODE_TYPES as readonly string[]).includes(value);
 }
 
+export function validateOrgStructureReplace(input: {
+  functional: OrgStructureTrackInput;
+  project: OrgStructureTrackInput;
+}): string | null {
+  try {
+    validateTrackInput("functional", input.functional);
+    validateTrackInput("project", input.project);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "tenant_org_structure_invalid";
+  }
+}
+
 function validateTrackInput(track: OrgStructureTrack, input: OrgStructureTrackInput): void {
   const nodeIds = new Set(input.nodes.map((node) => node.id));
   for (const node of input.nodes) {

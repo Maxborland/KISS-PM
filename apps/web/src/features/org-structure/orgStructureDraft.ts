@@ -1,13 +1,8 @@
-import type { OrgStructureTrack } from "./useOrgStructure";
 import type { TenantOrgStructureSnapshot } from "./useOrgStructure";
 
 type TrackSnapshot = TenantOrgStructureSnapshot["functional"];
 
-export function removeOrgNode(
-  snapshot: TrackSnapshot,
-  track: OrgStructureTrack,
-  nodeId: string
-): TrackSnapshot {
+export function removeOrgNode(snapshot: TrackSnapshot, nodeId: string): TrackSnapshot {
   const node = snapshot.nodes.find((item) => item.id === nodeId);
   if (!node) return snapshot;
 

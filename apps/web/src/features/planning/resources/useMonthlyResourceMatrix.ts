@@ -3,6 +3,7 @@
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import { useMemo } from "react";
 
+import { readCalculatedTasks } from "../planningReadModelAccess";
 import type { ResourceMatrixAbsenceInput } from "./resourceMatrixAbsences";
 import { buildAbsenceDateKeySet, hasAbsenceOnDate } from "./resourceMatrixAbsences";
 
@@ -203,7 +204,7 @@ function collectAssignedResourceIds(readModel: PlanningReadModel | undefined): S
   const set = new Set<string>();
   if (!readModel) return set;
   for (const assignment of readModel.authored.assignments) {
-    const resourceId = (assignment as { resourceId?: unknown }).resourceId;
+    const resourceId = assignment.resourceId;
     if (typeof resourceId === "string" && resourceId.length > 0) set.add(resourceId);
   }
   return set;
@@ -216,20 +217,17 @@ function buildLoadByUserDate(
   const result = new Map<string, Map<string, number>>();
   if (!readModel) return result;
   const dateSet = new Set(days.map((day) => day.date));
-  const tasksById = new Map<string, Record<string, unknown>>();
-  for (const task of (readModel.calculatedPlan.tasks as Array<Record<string, unknown>>) ?? []) {
-    tasksById.set(String(task.id), task);
-  }
+  const tasksById = new Map(readCalculatedTasks(readModel).map((task) => [String(task.id), task]));
   for (const assignment of readModel.authored.assignments) {
-    const resourceId = String((assignment as { resourceId?: unknown }).resourceId ?? "");
+    const resourceId = String(assignment.resourceId ?? "");
     if (!resourceId) continue;
-    const taskId = String((assignment as { taskId?: unknown }).taskId ?? "");
+    const taskId = String(assignment.taskId ?? "");
     const task = tasksById.get(taskId);
     if (!task) continue;
     const startIso = String(task.calculatedStart ?? task.plannedStart ?? "");
     const finishIso = String(task.calculatedFinish ?? task.plannedFinish ?? "");
     if (!startIso || !finishIso) continue;
-    const workMinutes = Number((assignment as { workMinutes?: unknown }).workMinutes ?? 0);
+    const workMinutes = Number(assignment.workMinutes ?? 0);
     const durationDays = countSpanDays(startIso, finishIso);
     if (durationDays <= 0) continue;
     const perDayMinutes = workMinutes > 0 ? workMinutes / durationDays : 0;
@@ -339,7 +337,7 @@ function aggregateRows(
   });
 }
 
-function computeHeat(workMinutes: number, capacityMinutes: number): 0 | 1 | 2 | 3 {
+export function computeHeat(workMinutes: number, capacityMinutes: number): 0 | 1 | 2 | 3 {
   if (workMinutes <= 0) return 0;
   if (capacityMinutes <= 0) return 3;
   const ratio = workMinutes / capacityMinutes;

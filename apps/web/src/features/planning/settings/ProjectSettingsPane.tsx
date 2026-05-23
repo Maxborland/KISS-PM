@@ -8,6 +8,7 @@ import { PlanningSelect, PlanningSelectLabel } from "../../../components/ui/sele
 import type { PlanningPermissions } from "../hooks/usePlanningPermissions";
 import { CalendarPreviewSummary } from "./CalendarPreviewSummary";
 import { IntegrationsPlaceholder } from "./IntegrationsPlaceholder";
+import { readProjectCalendarId } from "../planningReadModelAccess";
 
 const TENANT_DEFAULT_CALENDAR_ID = "tenant-default";
 
@@ -17,23 +18,15 @@ export function ProjectSettingsPane(props: {
   permissions: PlanningPermissions;
   onPreviewCommand: (command: PlanningCommand) => Promise<PlanningPreviewResponse>;
 }) {
-  const calendarOptions = useMemo(() => {
-    const list = (props.readModel as { calendars?: Array<{ id: string; name?: string }> } | undefined)?.calendars ?? [];
-    const fromReadModel = list.map((calendar) => ({
-      value: calendar.id,
-      label: calendar.name ?? calendar.id
-    }));
-    const hasTenantDefault = fromReadModel.some((option) => option.value === TENANT_DEFAULT_CALENDAR_ID);
-    return hasTenantDefault
-      ? fromReadModel
-      : [
-          { value: TENANT_DEFAULT_CALENDAR_ID, label: "Календарь tenant по умолчанию" },
-          ...fromReadModel
-        ];
-  }, [props.readModel]);
+  const calendarOptions = useMemo(
+    () => [
+      { value: TENANT_DEFAULT_CALENDAR_ID, label: "Календарь tenant по умолчанию" },
+      { value: "calendar-project", label: "Календарь проекта" }
+    ],
+    []
+  );
 
-  const currentCalendarId =
-    (props.readModel?.project as { calendarId?: string | null })?.calendarId ?? TENANT_DEFAULT_CALENDAR_ID;
+  const currentCalendarId = readProjectCalendarId(props.readModel) ?? TENANT_DEFAULT_CALENDAR_ID;
   const [pendingCalendarId, setPendingCalendarId] = useState<string>(currentCalendarId);
   const [preview, setPreview] = useState<PlanningPreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);

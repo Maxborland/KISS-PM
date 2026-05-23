@@ -2,6 +2,8 @@
 
 import type { PlanningPreviewResponse } from "@kiss-pm/planning-client";
 
+import { readCalculatedTasks } from "../planningReadModelAccess";
+
 export function CalendarPreviewSummary(props: { preview: PlanningPreviewResponse | null }) {
   if (!props.preview) return null;
 
@@ -30,15 +32,11 @@ function summarizeFinishDeltas(preview: PlanningPreviewResponse): {
   totalTaskCount: number;
   maxFinishShiftDays: number | null;
 } {
-  const beforeTasks = ((preview.before.calculatedPlan.tasks as Array<Record<string, unknown>>) ?? []).reduce<
-    Map<string, string | null>
-  >((acc, task) => {
+  const beforeTasks = readCalculatedTasks(preview.before).reduce<Map<string, string | null>>((acc, task) => {
     acc.set(String(task.id), normalizeIsoDate(task.calculatedFinish ?? task.plannedFinish));
     return acc;
   }, new Map());
-  const afterTasks = ((preview.after.calculatedPlan.tasks as Array<Record<string, unknown>>) ?? []) as Array<
-    Record<string, unknown>
-  >;
+  const afterTasks = readCalculatedTasks(preview.after);
   let changedTaskCount = 0;
   let maxFinishShiftDays: number | null = null;
   for (const task of afterTasks) {

@@ -38,7 +38,7 @@ const baseSnapshot = {
 
 describe("orgStructureDraft", () => {
   it("removes direction with children and related placements", () => {
-    const next = removeOrgNode(baseSnapshot, "functional", "dir-1");
+    const next = removeOrgNode(baseSnapshot, "dir-1");
     expect(next.nodes).toHaveLength(0);
     expect(next.placements).toHaveLength(0);
   });

@@ -1,6 +1,9 @@
-import type { TenantOrgStructureSnapshot } from "../../org-structure/useOrgStructure";
-import type { OrgStructureTrack } from "../../org-structure/useOrgStructure";
+import type {
+  OrgStructureTrack,
+  TenantOrgStructureSnapshot
+} from "../../org-structure/useOrgStructure";
 import {
+  computeHeat,
   computeMonthlyResourceMatrix,
   type MonthlyResourceMatrix,
   type MonthlyResourceMatrixInput,
@@ -51,9 +54,6 @@ export function computeOrgMonthlyResourceMatrix(
     unitsByDirection.set(node.parentId, units);
   }
 
-  const placementByUser = new Map(
-    trackSnapshot.placements.map((placement) => [placement.userId, placement])
-  );
   const positionNameById = new Map(
     input.workspacePositions.map((position) => [position.id, position.name])
   );
@@ -185,13 +185,4 @@ function aggregateRowDays(
       heat: computeHeat(totalWork, totalCapacity)
     };
   });
-}
-
-function computeHeat(workMinutes: number, capacityMinutes: number): 0 | 1 | 2 | 3 {
-  if (capacityMinutes <= 0 || workMinutes <= 0) return 0;
-  const ratio = workMinutes / capacityMinutes;
-  if (ratio >= 1) return 3;
-  if (ratio >= 0.75) return 2;
-  if (ratio >= 0.4) return 1;
-  return 0;
 }
