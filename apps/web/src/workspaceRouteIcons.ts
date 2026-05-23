@@ -37,6 +37,7 @@ export const workspaceRouteIcons = {
   settings: Settings,
   "production-calendar": CalendarDays,
   absences: UserMinus,
+  "org-structure": Users,
   "project-types": FolderKanban,
   "deal-stages": ClipboardList,
   "task-statuses": Columns3,

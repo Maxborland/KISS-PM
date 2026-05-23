@@ -112,6 +112,14 @@ export const workspaceRoutes = [
     description: "Отпуска, больничные и прочие отсутствия сотрудников"
   },
   {
+    id: "org-structure",
+    label: "Оргструктура",
+    group: "settings",
+    path: "/settings/org-structure",
+    permission: "tenant.org_structure.read",
+    description: "Направления, отделы/команды и привязка сотрудников к должностям"
+  },
+  {
     id: "project-types",
     label: "Типы проектов",
     group: "settings",

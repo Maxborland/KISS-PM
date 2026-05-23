@@ -1,4 +1,5 @@
 import { AbsencesPage } from "./features/absences/AbsencesPage";
+import { OrgStructurePage } from "./features/org-structure/OrgStructurePage";
 import { ProductionCalendarPage } from "./features/production-calendar/ProductionCalendarPage";
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
@@ -292,6 +293,24 @@ export function WorkspaceRouteRenderer(props: {
         users={props.data.users.map((user) => ({
           id: user.id,
           name: user.name
+        }))}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "org-structure") {
+    return (
+      <OrgStructurePage
+        canRead={props.permissions.includes("tenant.org_structure.read")}
+        canManage={props.permissions.includes("tenant.org_structure.manage")}
+        users={props.data.users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          positionId: user.positionId
+        }))}
+        positions={props.data.positions.map((position) => ({
+          id: position.id,
+          name: position.name
         }))}
       />
     );

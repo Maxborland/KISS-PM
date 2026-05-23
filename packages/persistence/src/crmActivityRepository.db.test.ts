@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -491,7 +491,7 @@ describe("CRM activity repository", () => {
 });
 
 async function truncateActivityTestTables(client: PostgresClient) {
-  await client`TRUNCATE crm_activities, audit_events, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+  await client`TRUNCATE crm_activities, audit_events, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
 }
 
 async function createOpportunity(

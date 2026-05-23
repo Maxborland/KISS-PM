@@ -377,6 +377,8 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.workspace_config.manage",
     "tenant.absences.read",
     "tenant.absences.manage",
+    "tenant.org_structure.read",
+    "tenant.org_structure.manage",
     "tenant.clients.read",
     "tenant.clients.manage",
     "tenant.contacts.read",

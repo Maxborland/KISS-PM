@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -201,7 +201,7 @@ describe("planning API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -211,7 +211,7 @@ describe("planning API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -1420,6 +1420,18 @@ describe("planning API routes", () => {
 
   it("applies command batch atomically with idempotency and version conflict", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await createTask(adminCookie, {
+      id: "task-plan-a",
+      title: "Подготовить план",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-plan-b",
+      title: "Согласовать план",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
     const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
       headers: { cookie: adminCookie }
     });
@@ -1511,6 +1523,12 @@ describe("planning API routes", () => {
 
   it("rejects batch when a middle command has blocking validation", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await createTask(adminCookie, {
+      id: "task-plan-a",
+      title: "Подготовить план",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
     const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
       headers: { cookie: adminCookie }
     });
