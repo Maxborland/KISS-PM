@@ -11,6 +11,8 @@ export const tenantAdminProfile = createAccessProfile({
     "tenant.positions.manage",
     "tenant.workspace_config.read",
     "tenant.workspace_config.manage",
+    "tenant.absences.read",
+    "tenant.absences.manage",
     "tenant.clients.read",
     "tenant.clients.manage",
     "tenant.contacts.read",

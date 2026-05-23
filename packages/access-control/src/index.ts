@@ -10,6 +10,8 @@ export const permissions = [
   "tenant.audit_events.read",
   "tenant.workspace_config.read",
   "tenant.workspace_config.manage",
+  "tenant.absences.read",
+  "tenant.absences.manage",
   "tenant.clients.read",
   "tenant.clients.manage",
   "tenant.contacts.read",
@@ -155,6 +157,28 @@ export function canManageWorkspaceConfig(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.workspace_config.manage"
+  });
+}
+
+export function canReadAbsences(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.absences.read"
+  });
+}
+
+export function canManageAbsences(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.absences.manage"
   });
 }
 
