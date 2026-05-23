@@ -1,0 +1,57 @@
+# 38. Phase D — Planning Workspace продвинутый контур
+
+Canonical doc для реализованного среза Phase D (ветка `feature/planning-ui-design-2026-05-23`).
+
+## Миграции
+
+| Файл | Содержание |
+|------|------------|
+| `0023_phase_d_tenant_production_calendar.sql` | `tenant_production_calendars`, `tenant_production_calendar_exceptions` |
+| `0024_phase_d_saved_views_custom_fields.sql` | `planning_saved_views`, `tasks.custom_fields` |
+| `0025_phase_d_absences.sql` | `resource_absences` |
+
+> `0022` занят `phase_5_6_planning_command_idempotency.sql`.
+
+## D.1 Production calendar (tenant-wide)
+
+- Storage: отдельные tenant-таблицы (не `resource_calendars`).
+- `calendar_id` по умолчанию: `tenant-default` (`tenantProductionCalendarConstants.ts`).
+- API: `GET /api/tenant/current/production-calendar`, `POST .../bulk`.
+- UI: `/settings/production-calendar`, permission `tenant.workspace_config.*`.
+- В `getPlanSnapshot` exceptions tenant-default подмешиваются в `calendarExceptions`.
+- ICS import — Phase E.
+
+## D.2 Monthly resource matrix
+
+- Иерархия: **должность → пользователь** (без `department_label` в `positions`).
+- Горизонт: дни **месяца** (`useMonthlyResourceMatrix`, `MonthNavigation`).
+- Cross-project: `GET /api/tenant/current/scheduled-tasks` (`scheduledTasksRoutes.ts`, `projectWorkRepository.listScheduledTasks`).
+- UI: `features/planning/resources/*`, heatmap в `ResourcesPane`, production calendar как источник capacity/exceptions.
+
+## D.3 project.settings.update
+
+- `PlanningCommand` `project.settings.update` + reducer + `planningParsers`.
+- UI: `ProjectSettingsPane`, `CalendarPreviewSummary`.
+
+## D.4 Saved views + custom fields
+
+- `planning_saved_views`, `tasks.custom_fields jsonb`.
+- REST saved-views в `planningRoutes.ts`.
+- `task.update_custom_field` command.
+- UI: `savedViews/*`, `customFields/CustomFieldDefinitionsPane`, `wbsColumns` + `SavedViewsDropdown`.
+
+## D.6 Absences plane
+
+- Типы: `vacation`, `admin_leave`, `sick_leave`, `maternity_leave`, `truancy`.
+- Таблица `resource_absences`, repo `resourceAbsencesRepository.ts`.
+- Permissions: `tenant.absences.read`, `tenant.absences.manage`.
+- API: `GET/POST/DELETE /api/tenant/current/absences`.
+- Planning: absences → `PlanCalendarException` в `getPlanSnapshot` и в ответ production calendar (matrix окраска `is-holiday`).
+- UI: `/settings/absences`, `features/absences/*`, e2e `e2e/admin/absences.spec.ts`.
+- Approval workflow — Phase E.
+
+## Out of scope (Phase E)
+
+- ICS import production calendar.
+- Division/workshop hierarchy в matrix.
+- Drag-fill bulk, approval workflow для absences.
