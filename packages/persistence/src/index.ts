@@ -10,6 +10,7 @@ export * from "./projectWorkRepository";
 export * from "./tenantProductionCalendarConstants";
 export * from "./tenantProductionCalendarRepository";
 export * from "./resourceAbsencesRepository";
+export * from "./tenantOrgStructureRepository";
 export * from "./repositories";
 export * from "./seed";
 export * from "./schema";

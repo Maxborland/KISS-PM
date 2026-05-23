@@ -28,6 +28,7 @@ describe("workspace route model", () => {
       "settings",
       "production-calendar",
       "absences",
+      "org-structure",
       "project-types",
       "deal-stages",
       "task-statuses",
@@ -63,7 +64,7 @@ describe("workspace route model", () => {
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[17]]
+        routes: [workspaceRoutes[18]]
       }
     ]);
   });
@@ -91,7 +92,7 @@ describe("workspace route model", () => {
       {
         id: "settings",
         label: "Настройки",
-        routes: [workspaceRoutes[14], workspaceRoutes[15]]
+        routes: [workspaceRoutes[15], workspaceRoutes[16]]
       }
     ]);
   });

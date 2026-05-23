@@ -838,6 +838,76 @@ export const planningSavedViews = pgTable(
   ]
 );
 
+export const tenantOrgNodes = pgTable(
+  "tenant_org_nodes",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    track: text("track").notNull(),
+    nodeType: text("node_type").notNull(),
+    name: text("name").notNull(),
+    parentId: text("parent_id"),
+    sortOrder: integer("sort_order").notNull().default(0)
+  },
+  (table) => [
+    index("tenant_org_nodes_tenant_track_idx").on(table.tenantId, table.track, table.sortOrder),
+    check("tenant_org_nodes_track_chk", sql`${table.track} in ('functional', 'project')`),
+    check(
+      "tenant_org_nodes_type_chk",
+      sql`${table.nodeType} in ('direction', 'department', 'team')`
+    ),
+    check(
+      "tenant_org_nodes_direction_parent_chk",
+      sql`(${table.nodeType} = 'direction' and ${table.parentId} is null) or (${table.nodeType} in ('department', 'team') and ${table.parentId} is not null)`
+    ),
+    check(
+      "tenant_org_nodes_track_type_chk",
+      sql`(${table.track} = 'functional' and ${table.nodeType} in ('direction', 'department')) or (${table.track} = 'project' and ${table.nodeType} in ('direction', 'team'))`
+    )
+  ]
+);
+
+export const tenantUserOrgPlacements = pgTable(
+  "tenant_user_org_placements",
+  {
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    track: text("track").notNull(),
+    directionId: text("direction_id")
+      .notNull()
+      .references(() => tenantOrgNodes.id, { onDelete: "restrict" }),
+    departmentId: text("department_id").references(() => tenantOrgNodes.id, {
+      onDelete: "restrict"
+    }),
+    teamId: text("team_id").references(() => tenantOrgNodes.id, { onDelete: "restrict" }),
+    positionId: text("position_id").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tenant_user_org_placements_pkey",
+      columns: [table.tenantId, table.userId, table.track]
+    }),
+    foreignKey({
+      name: "tenant_user_org_placements_tenant_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "tenant_user_org_placements_position_fk",
+      columns: [table.tenantId, table.positionId],
+      foreignColumns: [positions.tenantId, positions.id]
+    }).onDelete("restrict"),
+    index("tenant_user_org_placements_tenant_track_idx").on(table.tenantId, table.track),
+    check("tenant_user_org_placements_track_chk", sql`${table.track} in ('functional', 'project')`),
+    check(
+      "tenant_user_org_placements_unit_chk",
+      sql`(${table.track} = 'functional' and ${table.departmentId} is not null and ${table.teamId} is null) or (${table.track} = 'project' and ${table.teamId} is not null and ${table.departmentId} is null)`
+    )
+  ]
+);
+
 export const resourceAbsences = pgTable(
   "resource_absences",
   {
@@ -1347,6 +1417,8 @@ export type PersistenceTableName =
   | "tenant_production_calendar_exceptions"
   | "planning_saved_views"
   | "resource_absences"
+  | "tenant_org_nodes"
+  | "tenant_user_org_placements"
   | "task_participants"
   | "task_activities"
   | "crm_activities"
@@ -1395,6 +1467,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "tenant_org_nodes",
+  "tenant_user_org_placements",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1436,6 +1510,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "tenant_org_nodes",
+  "tenant_user_org_placements",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -1775,6 +1851,24 @@ const tableColumns = {
     "approved_by",
     "created_at",
     "updated_at"
+  ],
+  tenant_org_nodes: [
+    "id",
+    "tenant_id",
+    "track",
+    "node_type",
+    "name",
+    "parent_id",
+    "sort_order"
+  ],
+  tenant_user_org_placements: [
+    "tenant_id",
+    "user_id",
+    "track",
+    "direction_id",
+    "department_id",
+    "team_id",
+    "position_id"
   ],
   task_participants: ["tenant_id", "task_id", "user_id", "role"],
   task_activities: [

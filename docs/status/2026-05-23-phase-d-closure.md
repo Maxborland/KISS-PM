@@ -1,25 +1,30 @@
 # Phase D closure — 2026-05-23
 
-## Delivered
+## Baseline (до правок матрицы)
 
-- **D.1** Tenant production calendar: `tenant_production_calendars`, `tenant_production_calendar_exceptions`, API `GET/POST /api/tenant/current/production-calendar`, UI `/settings/production-calendar`, RF 2026 preset.
-- **D.2** Monthly resource matrix: hierarchy position → user, `GET /api/tenant/current/scheduled-tasks`, hover tooltip + day drawer, heatmap in `ResourcesPane`.
-- **D.3** `project.settings.update` command + `ProjectSettingsPane` with calendar preview.
-- **D.4** `planning_saved_views`, `tasks.custom_fields`, saved views REST, `task.update_custom_field`, WBS saved views + custom field pane.
-- **D.6** Absences plane: `resource_absences`, `0025_phase_d_absences.sql`, API absences, planning/production-calendar merge, UI `/settings/absences`.
-- Migrations `0023`, `0024`, `0025`; e2e specs under `e2e/admin` and `e2e/planning`.
+- `pnpm test` — 291 passed
+- `pnpm typecheck` — OK
+- `pnpm build` — OK
 
-## Verification
+## Post verification (матрица + оргструктура)
 
-```bash
-pnpm test && pnpm typecheck && pnpm build
-# OK on 2026-05-23 (291 unit tests)
+- `pnpm test` — **299 passed** (55 files)
+- `pnpm typecheck` — OK
+- `pnpm build` — OK
+- `pnpm db:migrate` — миграция `0026_phase_d_org_structure.sql`
+- `pnpm test:db` — **99 passed** (14 files); TRUNCATE в db-тестах дополнен `tenant_org_nodes` / `tenant_user_org_placements`, audit — `auditEvents`
 
-pnpm db:up && pnpm db:migrate && pnpm test:db
-pnpm db:reset:dev && pnpm test:e2e:smoke
-# Требует локальный Postgres (docker compose). При недоступности Docker/registry — не прогонялось в closure-сессии.
-```
+## Семантика ячеек матрицы (Part A)
 
-## Out of scope (Phase E)
+| Класс | Условие |
+|-------|---------|
+| `is-absence` | Запись `resource_absences` на `userId` + `date` |
+| `is-free-day` | `workMinutes === 0`, capacity > 0, нет absence, не weekend/holiday |
+| `is-holiday` | Tenant exception `resourceId=null`, `workingMinutes=0` |
 
-- ICS import, division/workshop hierarchy, absences approval workflow.
+`getProductionCalendar` больше не подмешивает absences; `getPlanSnapshot` — по-прежнему учитывает для capacity.
+
+## Оргструктура (Part B)
+
+- Настройка: `/settings/org-structure`
+- Матрица: 4 уровня при наличии направлений в выбранном треке; иначе interim `position → user`

@@ -9,6 +9,7 @@ Canonical doc для реализованного среза Phase D (ветка
 | `0023_phase_d_tenant_production_calendar.sql` | `tenant_production_calendars`, `tenant_production_calendar_exceptions` |
 | `0024_phase_d_saved_views_custom_fields.sql` | `planning_saved_views`, `tasks.custom_fields` |
 | `0025_phase_d_absences.sql` | `resource_absences` |
+| `0026_phase_d_org_structure.sql` | `tenant_org_nodes`, `tenant_user_org_placements` |
 
 > `0022` занят `phase_5_6_planning_command_idempotency.sql`.
 
@@ -23,10 +24,15 @@ Canonical doc для реализованного среза Phase D (ветка
 
 ## D.2 Monthly resource matrix
 
-- Иерархия: **должность → пользователь** (без `department_label` в `positions`).
+- **Interim-иерархия** (если оргструктура не настроена): **должность → пользователь** (`positions` + `tenant_users.position_id`).
+- **Целевая иерархия** (при наличии узлов в D.7): **направление → отдел/команда → должность → сотрудник**, переключатель functional/project в `ResourcesPane`.
 - Горизонт: дни **месяца** (`useMonthlyResourceMatrix`, `MonthNavigation`).
-- Cross-project: `GET /api/tenant/current/scheduled-tasks` (`scheduledTasksRoutes.ts`, `projectWorkRepository.listScheduledTasks`).
-- UI: `features/planning/resources/*`, heatmap в `ResourcesPane`, production calendar как источник capacity/exceptions.
+- Семантика ячеек:
+  - `is-absence` — только при записи `resource_absences` на дату (не через `exceptionMinutes === 0`);
+  - `is-free-day` — рабочий день без назначенной работы и без отсутствия;
+  - `is-holiday` — tenant-wide non-working из production calendar.
+- Cross-project: `GET /api/tenant/current/scheduled-tasks`.
+- UI: `features/planning/resources/*`; absences для матрицы — отдельный `useAbsences`, не merge в `getProductionCalendar`.
 
 ## D.3 project.settings.update
 
@@ -46,12 +52,26 @@ Canonical doc для реализованного среза Phase D (ветка
 - Таблица `resource_absences`, repo `resourceAbsencesRepository.ts`.
 - Permissions: `tenant.absences.read`, `tenant.absences.manage`.
 - API: `GET/POST/DELETE /api/tenant/current/absences`.
-- Planning: absences → `PlanCalendarException` в `getPlanSnapshot` и в ответ production calendar (matrix окраска `is-holiday`).
+- Planning: absences → `PlanCalendarException` в `getPlanSnapshot` (capacity); для UI матрицы — прямой lookup `resource_absences`.
 - UI: `/settings/absences`, `features/absences/*`, e2e `e2e/admin/absences.spec.ts`.
 - Approval workflow — Phase E.
+
+## D.7 Org structure (tenant settings)
+
+- Два трека: **functional** (направление → отдел → должность → сотрудник) и **project** (направление → команда → должность → сотрудник).
+- Таблицы: `tenant_org_nodes`, `tenant_user_org_placements`.
+- Permissions: `tenant.org_structure.read`, `tenant.org_structure.manage`.
+- API: `GET/PUT /api/tenant/current/org-structure`.
+- UI: `/settings/org-structure`, `features/org-structure/*`; consumers: матрица ресурсов (4 уровня + toggle), фильтры Users по placements.
+
+## Phase E (planned) — Tenant resource load report
+
+- Агрегация загрузки **по всем проектам** tenant (не вкладка одного проекта).
+- Группировка по выбранному org track: направление → отдел/команда → должность → сотрудник.
+- Источники: assignments + `resourceLoad` / capacity, production calendar, absences.
+- Поверхность: отдельный маршрут или control surface (TBD в `docs/12_ФАЗОВЫЙ_ПЛАН.md`).
 
 ## Out of scope (Phase E)
 
 - ICS import production calendar.
-- Division/workshop hierarchy в matrix.
 - Drag-fill bulk, approval workflow для absences.

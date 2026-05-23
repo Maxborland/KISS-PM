@@ -12,6 +12,8 @@ export const permissions = [
   "tenant.workspace_config.manage",
   "tenant.absences.read",
   "tenant.absences.manage",
+  "tenant.org_structure.read",
+  "tenant.org_structure.manage",
   "tenant.clients.read",
   "tenant.clients.manage",
   "tenant.contacts.read",
@@ -179,6 +181,28 @@ export function canManageAbsences(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.absences.manage"
+  });
+}
+
+export function canReadOrgStructure(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.org_structure.read"
+  });
+}
+
+export function canManageOrgStructure(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.org_structure.manage"
   });
 }
 

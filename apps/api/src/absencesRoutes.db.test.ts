@@ -110,8 +110,8 @@ describe("absences routes (db)", () => {
       headers: { cookie }
     });
     expect(audit.status).toBe(200);
-    const events = (await audit.json()) as { events: Array<{ actionType: string }> };
-    const actionTypes = events.events.map((event) => event.actionType);
+    const body = (await audit.json()) as { auditEvents: Array<{ actionType: string }> };
+    const actionTypes = body.auditEvents.map((event) => event.actionType);
     expect(actionTypes).toContain("tenant.absence.created");
     expect(actionTypes).toContain("tenant.absence.deleted");
   });
