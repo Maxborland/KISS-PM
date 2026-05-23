@@ -5,7 +5,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { CrossProjectTaskTooltip } from "./CrossProjectTaskTooltip";
 import { MonthNavigation, currentMonthIso } from "./MonthNavigation";
 import { ResourceDayDrawer } from "./ResourceDayDrawer";
+import { ResourceMatrixOrgSection } from "./ResourceMatrixOrgSection";
 import { ResourceMatrixRowGroup } from "./ResourceMatrixRowGroup";
+import type { OrgMonthlyResourceMatrix } from "./computeOrgResourceMatrix";
 import { useCrossProjectTasks } from "./useCrossProjectTasks";
 import type {
   MonthlyResourceMatrix as MatrixModel,
@@ -16,7 +18,7 @@ const DAY_COLUMN_WIDTH = 28;
 const NAME_COLUMN_WIDTH = 220;
 
 export function MonthlyResourceMatrix(props: {
-  matrix: MatrixModel;
+  matrix: MatrixModel | OrgMonthlyResourceMatrix;
   monthIso: string;
   onMonthChange: (monthIso: string) => void;
 }) {
@@ -86,8 +88,23 @@ export function MonthlyResourceMatrix(props: {
     setDrawerKey(input);
   }, []);
 
+  const orgMatrix =
+    "hierarchyMode" in props.matrix && props.matrix.hierarchyMode === "org"
+      ? (props.matrix as OrgMonthlyResourceMatrix)
+      : null;
+
   const resourceNameByResourceId = useMemo(() => {
     const map = new Map<string, string>();
+    if (orgMatrix) {
+      for (const directionGroup of orgMatrix.orgGroups) {
+        for (const unitGroup of directionGroup.units) {
+          for (const positionGroup of unitGroup.positions) {
+            for (const row of positionGroup.rows) map.set(row.user.id, row.user.name);
+          }
+        }
+      }
+      return map;
+    }
     for (const group of props.matrix.groups) {
       for (const row of group.rows) map.set(row.user.id, row.user.name);
     }
@@ -95,7 +112,7 @@ export function MonthlyResourceMatrix(props: {
       map.set(row.user.id, row.user.name);
     }
     return map;
-  }, [props.matrix.groups, props.matrix.unassignedRows]);
+  }, [orgMatrix, props.matrix.groups, props.matrix.unassignedRows]);
 
   const gridTemplateColumns = `${NAME_COLUMN_WIDTH}px repeat(${props.matrix.days.length}, ${DAY_COLUMN_WIDTH}px)`;
 
@@ -124,15 +141,24 @@ export function MonthlyResourceMatrix(props: {
               </div>
             ))}
           </div>
-          {props.matrix.groups.map((group) => (
-            <ResourceMatrixRowGroup
-              key={group.position.id}
-              group={group}
+          {orgMatrix ? (
+            <ResourceMatrixOrgSection
+              orgGroups={orgMatrix.orgGroups}
+              gridTemplateColumns={gridTemplateColumns}
               onActivate={handleActivate}
               onHover={handleHover}
             />
-          ))}
-          {props.matrix.unassignedRows.length > 0 ? (
+          ) : (
+            props.matrix.groups.map((group) => (
+              <ResourceMatrixRowGroup
+                key={group.position.id}
+                group={group}
+                onActivate={handleActivate}
+                onHover={handleHover}
+              />
+            ))
+          )}
+          {!orgMatrix && props.matrix.unassignedRows.length > 0 ? (
             <ResourceMatrixRowGroup
               group={buildUnassignedGroup(props.matrix)}
               onActivate={handleActivate}
@@ -175,6 +201,7 @@ function buildUnassignedGroup(matrix: MatrixModel): ResourceMatrixGroup {
     let totalCapacity = 0;
     let overload = false;
     let exception = false;
+    let hasAbsence = false;
     for (const row of matrix.unassignedRows) {
       const cell = row.days[dayIndex];
       if (!cell) continue;
@@ -182,13 +209,22 @@ function buildUnassignedGroup(matrix: MatrixModel): ResourceMatrixGroup {
       totalCapacity += cell.capacityMinutes;
       if (cell.isOverload) overload = true;
       if (cell.isException) exception = true;
+      if (cell.hasAbsence) hasAbsence = true;
     }
+    const isFreeDay =
+      totalWork === 0 &&
+      !hasAbsence &&
+      totalCapacity > 0 &&
+      !day.isWeekend &&
+      !day.isHoliday;
     return {
       date: day.date,
       workMinutes: totalWork,
       capacityMinutes: totalCapacity,
       isWeekend: day.isWeekend,
       isHoliday: day.isHoliday,
+      hasAbsence,
+      isFreeDay,
       isException: exception,
       isOverload: overload,
       heat: 0 as 0 | 1 | 2 | 3

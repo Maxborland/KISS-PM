@@ -4,10 +4,6 @@ import type { TenantId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
 import {
-  createResourceAbsencesRepository,
-  expandAbsenceToCalendarExceptions
-} from "./resourceAbsencesRepository";
-import {
   DEFAULT_WORKING_MINUTES_PER_DAY,
   DEFAULT_WORKING_WEEKDAYS,
   TENANT_DEFAULT_CALENDAR_ID
@@ -68,29 +64,14 @@ export function createTenantProductionCalendarRepository(
         .from(tenantProductionCalendars)
         .where(eq(tenantProductionCalendars.tenantId, tenantId))
         .limit(1);
-      const range = yearDateRange(year);
       const exceptions = await this.listExceptionsForYear(tenantId, year);
-      const absences = await createResourceAbsencesRepository(db).listAbsences(
-        tenantId,
-        range.from,
-        range.to
-      );
-      const absenceExceptions = absences.flatMap((absence) =>
-        expandAbsenceToCalendarExceptions(absence).map((item) => ({
-          id: item.id,
-          date: item.date,
-          workingMinutes: item.workingMinutes,
-          reason: item.reason,
-          resourceId: item.resourceId
-        }))
-      );
       return {
         calendarId: calendar?.calendarId ?? TENANT_DEFAULT_CALENDAR_ID,
         year,
         workingWeekdays: calendar?.workingWeekdays ?? [...DEFAULT_WORKING_WEEKDAYS],
         workingMinutesPerDay:
           calendar?.workingMinutesPerDay ?? DEFAULT_WORKING_MINUTES_PER_DAY,
-        exceptions: [...exceptions, ...absenceExceptions]
+        exceptions
       };
     },
 

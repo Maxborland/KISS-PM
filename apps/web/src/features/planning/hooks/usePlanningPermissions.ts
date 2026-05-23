@@ -5,6 +5,8 @@ export type PlanningPermissions = {
   canManageProjectPlan: boolean;
   canManageProjectBaselines: boolean;
   canManageProjectResources: boolean;
+  canReadAbsences: boolean;
+  canReadOrgStructure: boolean;
   canReadAuditEvents: boolean;
 };
 
@@ -15,6 +17,8 @@ export function usePlanningPermissions(permissions: readonly string[]): Planning
       canManageProjectPlan: permissions.includes("tenant.project_plan.manage"),
       canManageProjectBaselines: permissions.includes("tenant.project_baselines.manage"),
       canManageProjectResources: permissions.includes("tenant.project_resources.manage"),
+      canReadAbsences: permissions.includes("tenant.absences.read"),
+      canReadOrgStructure: permissions.includes("tenant.org_structure.read"),
       canReadAuditEvents: permissions.includes("tenant.audit_events.read")
     }),
     [permissions]
@@ -31,6 +35,8 @@ export function planningPermissionTitle(
     canManageProjectPlan: "Нет права на изменение плана",
     canManageProjectBaselines: "Нет права на baseline",
     canManageProjectResources: "Нет права на ресурсы проекта",
+    canReadAbsences: "Нет права на чтение отсутствий",
+    canReadOrgStructure: "Нет права на чтение оргструктуры",
     canReadAuditEvents: "Нет права на чтение аудита"
   };
   return labels[required];

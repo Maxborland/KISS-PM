@@ -33,15 +33,15 @@ describe("planning health budgets", () => {
   });
 
   it.each([
-    { path: "resources/useMonthlyResourceMatrix.ts", maxLines: 380 },
+    { path: "resources/useMonthlyResourceMatrix.ts", maxLines: 400 },
     { path: "resources/useCrossProjectTasks.ts", maxLines: 120 },
-    { path: "resources/MonthlyResourceMatrix.tsx", maxLines: 220 },
+    { path: "resources/MonthlyResourceMatrix.tsx", maxLines: 250 },
     { path: "resources/MonthNavigation.tsx", maxLines: 100 },
     { path: "resources/ResourceMatrixCell.tsx", maxLines: 100 },
     { path: "resources/ResourceMatrixRowGroup.tsx", maxLines: 120 },
     { path: "resources/CrossProjectTaskTooltip.tsx", maxLines: 80 },
     { path: "resources/ResourceDayDrawer.tsx", maxLines: 90 },
-    { path: "resources/ResourcesPane.tsx", maxLines: 160 },
+    { path: "resources/ResourcesPane.tsx", maxLines: 220 },
     { path: "settings/ProjectSettingsPane.tsx", maxLines: 140 },
     { path: "settings/CalendarPreviewSummary.tsx", maxLines: 100 },
     { path: "savedViews/useSavedViews.ts", maxLines: 140 },

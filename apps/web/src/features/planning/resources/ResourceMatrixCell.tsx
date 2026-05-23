@@ -12,7 +12,10 @@ export function ResourceMatrixCell(props: {
   const titleParts: string[] = [];
   titleParts.push(formatMinutes(props.cell.workMinutes));
   titleParts.push(`/ ${formatMinutes(props.cell.capacityMinutes)}`);
+  if (props.cell.hasAbsence) titleParts.push("отсутствие");
+  else if (props.cell.isFreeDay) titleParts.push("свободно");
   if (props.cell.isHoliday) titleParts.push("праздник");
+  if (props.cell.isWeekend) titleParts.push("выходной");
   if (props.cell.isOverload) titleParts.push("перегруз");
 
   return (
@@ -47,11 +50,13 @@ export function ResourceMatrixCell(props: {
 function buildCellClassName(cell: ResourceMatrixDayLoad): string {
   const classes = ["planning-resource-matrix__cell"];
   if (cell.isOverload) classes.push("is-overload");
+  else if (cell.hasAbsence) classes.push("is-absence");
   else if (cell.heat === 1) classes.push("is-heat-1");
   else if (cell.heat === 2) classes.push("is-heat-2");
   else if (cell.heat === 3) classes.push("is-heat-3");
-  if (cell.isHoliday) classes.push("is-holiday");
+  else if (cell.isFreeDay) classes.push("is-free-day");
   else if (cell.isWeekend) classes.push("is-weekend");
+  else if (cell.isHoliday) classes.push("is-holiday");
   return classes.join(" ");
 }
 
