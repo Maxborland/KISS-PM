@@ -497,9 +497,132 @@
   background: color-mix(in srgb, #f87171 14%, transparent);
 }
 
+.planning-resource-matrix__cell.is-absence {
+  background: color-mix(in srgb, #f87171 14%, transparent);
+}
+
+.planning-resource-matrix__cell.is-free-day {
+  background: color-mix(in srgb, #4ade80 18%, transparent);
+}
+
 .planning-resource-matrix__row.is-position-group {
   background: color-mix(in srgb, var(--accent, #38bdf8) 4%, transparent);
   font-weight: 600;
+}
+
+.planning-resource-matrix__row.is-direction-group {
+  background: color-mix(in srgb, var(--accent, #38bdf8) 8%, transparent);
+  font-weight: 700;
+}
+
+.planning-resource-matrix__row.is-unit-group {
+  background: color-mix(in srgb, var(--accent, #38bdf8) 5%, transparent);
+  font-weight: 600;
+}
+
+.planning-resource-matrix__track-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.org-structure-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.org-structure-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.org-structure-page__track-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.org-structure-direction {
+  border: 1px solid var(--border, #1f2937);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-structure-direction__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.org-structure-input {
+  min-width: 220px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #1f2937);
+  background: transparent;
+  color: inherit;
+}
+
+.org-structure-units {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org-structure-unit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.org-structure-unit-reparent {
+  min-width: 160px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #1f2937);
+  background: transparent;
+  color: inherit;
+}
+
+.org-structure-placements {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-structure-placement-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(320px, 2fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.org-structure-placement-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.org-structure-placement-fields select {
+  min-width: 140px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #1f2937);
+  background: transparent;
+  color: inherit;
 }
 
 .planning-resource-tooltip {

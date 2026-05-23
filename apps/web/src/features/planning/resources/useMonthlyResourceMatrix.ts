@@ -3,6 +3,9 @@
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import { useMemo } from "react";
 
+import type { ResourceMatrixAbsenceInput } from "./resourceMatrixAbsences";
+import { buildAbsenceDateKeySet, hasAbsenceOnDate } from "./resourceMatrixAbsences";
+
 export type ResourceMatrixUser = {
   id: string;
   name: string;
@@ -22,6 +25,8 @@ export type ResourceMatrixDayLoad = {
   capacityMinutes: number;
   isWeekend: boolean;
   isHoliday: boolean;
+  hasAbsence: boolean;
+  isFreeDay: boolean;
   isException: boolean;
   isOverload: boolean;
   heat: 0 | 1 | 2 | 3;
@@ -62,15 +67,21 @@ export type ProductionCalendarShape = {
   }>;
 };
 
-export function useMonthlyResourceMatrix(input: {
+export type MonthlyResourceMatrixInput = {
   readModel: PlanningReadModel | undefined;
   workspaceUsers: ResourceMatrixUser[];
   workspacePositions: Array<{ id: string; name: string }>;
   monthIso: string;
   productionCalendar?: ProductionCalendarShape | undefined;
-}): MonthlyResourceMatrix {
-  return useMemo(() => {
+  absences?: ResourceMatrixAbsenceInput[];
+};
+
+export function computeMonthlyResourceMatrix(
+  input: MonthlyResourceMatrixInput
+): MonthlyResourceMatrix {
     const days = buildMonthDays(input.monthIso, input.productionCalendar);
+    const monthDateSet = new Set(days.map((day) => day.date));
+    const absenceKeys = buildAbsenceDateKeySet(input.absences ?? [], monthDateSet);
     const positionsMap = buildPositionsMap(input.workspaceUsers, input.workspacePositions);
     const loadByUserDate = buildLoadByUserDate(input.readModel, days);
     const exceptionsByResourceDate = buildExceptionsByResourceDate(
@@ -86,6 +97,7 @@ export function useMonthlyResourceMatrix(input: {
           days,
           loadByUserDate,
           exceptionsByResourceDate,
+          absenceKeys,
           productionCalendar: input.productionCalendar
         })
       );
@@ -110,20 +122,28 @@ export function useMonthlyResourceMatrix(input: {
           days,
           loadByUserDate,
           exceptionsByResourceDate,
+          absenceKeys,
           productionCalendar: input.productionCalendar
         })
       );
     }
 
-    groups.sort((left, right) => left.position.name.localeCompare(right.position.name, "ru"));
-    return { monthIso: input.monthIso, days, groups, unassignedRows };
-  }, [
-    input.monthIso,
-    input.productionCalendar,
-    input.readModel,
-    input.workspacePositions,
-    input.workspaceUsers
-  ]);
+  groups.sort((left, right) => left.position.name.localeCompare(right.position.name, "ru"));
+  return { monthIso: input.monthIso, days, groups, unassignedRows };
+}
+
+export function useMonthlyResourceMatrix(input: MonthlyResourceMatrixInput): MonthlyResourceMatrix {
+  return useMemo(
+    () => computeMonthlyResourceMatrix(input),
+    [
+      input.absences,
+      input.monthIso,
+      input.productionCalendar,
+      input.readModel,
+      input.workspacePositions,
+      input.workspaceUsers
+    ]
+  );
 }
 
 function buildMonthDays(
@@ -247,6 +267,7 @@ function buildRow(input: {
   days: ResourceMatrixDayInfo[];
   loadByUserDate: Map<string, Map<string, number>>;
   exceptionsByResourceDate: Map<string, Map<string, number>>;
+  absenceKeys: ReadonlySet<string>;
   productionCalendar?: ProductionCalendarShape | undefined;
 }): ResourceMatrixRow {
   const baseCapacity = input.productionCalendar?.workingMinutesPerDay ?? 480;
@@ -258,14 +279,18 @@ function buildRow(input: {
     const baseCapacityForDay = day.isWeekend || day.isHoliday ? 0 : baseCapacity;
     const capacityMinutes =
       exceptionMinutes !== undefined ? exceptionMinutes : baseCapacityForDay;
-    const isAbsenceDay = exceptionMinutes === 0;
+    const hasAbsence = hasAbsenceOnDate(input.absenceKeys, input.user.id, day.date);
+    const isFreeDay =
+      workMinutes === 0 && !hasAbsence && capacityMinutes > 0 && !day.isWeekend && !day.isHoliday;
     const isOverload = workMinutes > capacityMinutes && capacityMinutes >= 0;
     return {
       date: day.date,
       workMinutes,
       capacityMinutes,
       isWeekend: day.isWeekend,
-      isHoliday: day.isHoliday || isAbsenceDay,
+      isHoliday: day.isHoliday,
+      hasAbsence,
+      isFreeDay,
       isException: exceptionMinutes !== undefined,
       isOverload,
       heat: computeHeat(workMinutes, capacityMinutes)
@@ -283,6 +308,7 @@ function aggregateRows(
     let totalCapacity = 0;
     let overload = false;
     let exception = false;
+    let hasAbsence = false;
     for (const row of rows) {
       const cell = row.days[dayIndex];
       if (!cell) continue;
@@ -290,13 +316,22 @@ function aggregateRows(
       totalCapacity += cell.capacityMinutes;
       if (cell.isOverload) overload = true;
       if (cell.isException) exception = true;
+      if (cell.hasAbsence) hasAbsence = true;
     }
+    const isFreeDay =
+      totalWork === 0 &&
+      !hasAbsence &&
+      totalCapacity > 0 &&
+      !day.isWeekend &&
+      !day.isHoliday;
     return {
       date: day.date,
       workMinutes: totalWork,
       capacityMinutes: totalCapacity,
       isWeekend: day.isWeekend,
       isHoliday: day.isHoliday,
+      hasAbsence,
+      isFreeDay,
       isException: exception,
       isOverload: overload,
       heat: computeHeat(totalWork, totalCapacity)
