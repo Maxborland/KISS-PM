@@ -43,7 +43,7 @@ describe("orgStructureDraft", () => {
     expect(next.placements).toHaveLength(0);
   });
 
-  it("reparents unit and clears placement unit when direction changes", () => {
+  it("reparents unit and drops placements tied to the moved unit", () => {
     const withSecondDir = {
       ...baseSnapshot,
       nodes: [
@@ -61,7 +61,6 @@ describe("orgStructureDraft", () => {
     };
     const next = reparentOrgUnit(withSecondDir, "dept-1", "dir-2");
     expect(next.nodes.find((node) => node.id === "dept-1")?.parentId).toBe("dir-2");
-    expect(next.placements[0]?.directionId).toBe("dir-2");
-    expect(next.placements[0]?.departmentId).toBeNull();
+    expect(next.placements).toHaveLength(0);
   });
 });

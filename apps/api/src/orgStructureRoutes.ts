@@ -5,9 +5,8 @@ import {
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import {
-  createTenantOrgStructureRepository,
   ORG_NODE_TYPES,
-  validateOrgStructureReplace,
+  createTenantOrgStructureRepository,
   type OrgNodeType,
   type OrgStructureTrack,
   type OrgStructureTrackInput,
@@ -17,6 +16,10 @@ import type { Hono } from "hono";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
 import { readLimitedJsonBody } from "./jsonBody";
+import {
+  replaceTenantOrgStructureCommand,
+  tenantOrgStructureErrorMessage
+} from "./tenantOrgStructure/replaceTenantOrgStructureCommand";
 
 type OrgStructureRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -42,22 +45,7 @@ function parseTrackInput(
 ):
   | {
       ok: true;
-      value: {
-        nodes: Array<{
-          id: string;
-          nodeType: OrgNodeType;
-          name: string;
-          parentId: string | null;
-          sortOrder: number;
-        }>;
-        placements: Array<{
-          userId: string;
-          directionId: string;
-          departmentId?: string | null;
-          teamId?: string | null;
-          positionId: string;
-        }>;
-      };
+      value: OrgStructureTrackInput;
     }
   | { ok: false; error: string } {
   if (!value || typeof value !== "object") return { ok: false, error: "tenant_org_structure_invalid" };
@@ -177,25 +165,20 @@ export function registerOrgStructureRoutes(app: Hono, deps: OrgStructureRouteDep
     const parsed = parseReplaceBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const validationError = validateOrgStructureReplace(parsed.value);
-    if (validationError) return context.json({ error: validationError }, 400);
-
-    const repository = createTenantOrgStructureRepository(db);
-    const before = await repository.getOrgStructure(actor.tenantId);
-    const orgStructure = await repository.replaceOrgStructure(actor.tenantId, parsed.value);
-
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.org_structure.updated",
-      sourceWorkflow: "tenant.org_structure",
-      sourceEntity: { type: "tenant_org_structure", id: actor.tenantId },
-      commandInput: parsed.value,
-      beforeState: before,
-      afterState: orgStructure,
-      permissionResult: decision
-    });
-
-    return context.json({ orgStructure });
+    try {
+      const orgStructure = await replaceTenantOrgStructureCommand({
+        db,
+        tenantId: actor.tenantId,
+        actor,
+        body: parsed.value,
+        permissionResult: decision,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent
+      });
+      return context.json({ orgStructure });
+    } catch (error) {
+      const message = tenantOrgStructureErrorMessage(error);
+      if (message) return context.json({ error: message }, 400);
+      throw error;
+    }
   });
 }

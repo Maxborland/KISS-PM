@@ -9,8 +9,35 @@ test.describe("Planning grid Phase B", () => {
 
   test("opens schedule workspace with WBS and Gantt panes", async ({ page }) => {
     await openFirstProjectSchedule(page);
+    await expect(page.getByTestId("planning-schedule-pane")).toBeVisible();
     await expect(page.getByTestId("planning-wbs-grid")).toBeVisible();
     await expect(page.getByTestId("planning-gantt-pane")).toBeVisible();
+  });
+
+  test("gantt bar position responds to zoom scale", async ({ page }) => {
+    await openFirstProjectSchedule(page);
+    const bar = page.getByTestId("planning-gantt-bar").first();
+    await expect(bar).toBeVisible();
+    const leftDay = await bar.evaluate((element) => element.style.left);
+
+    await page.getByLabel("Масштаб диаграммы").click();
+    await page.getByRole("option", { name: "Неделя" }).click();
+
+    const leftWeek = await bar.evaluate((element) => element.style.left);
+    expect(leftDay).not.toBe(leftWeek);
+    expect(leftWeek).not.toBe("0px");
+  });
+
+  test("renders dependency connectors when plan has links", async ({ page }) => {
+    await openFirstProjectSchedule(page);
+    const depLines = page.getByTestId("planning-gantt-dep-line");
+    const count = await depLines.count();
+    if (count === 0) {
+      test.skip(true, "seed project has no FS dependencies to assert");
+    }
+    const firstPath = await depLines.first().getAttribute("d");
+    expect(firstPath).toBeTruthy();
+    expect(firstPath).not.toBe("M 20 18 L 80 18");
   });
 
   test("shows conflict banner after remote plan version bump", async ({ page, request }) => {

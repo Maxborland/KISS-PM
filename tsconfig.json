@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/tenant-org-structure" },
     { "path": "./packages/planning-client" },
     { "path": "./packages/access-control" },
     { "path": "./packages/persistence" },

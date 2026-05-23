@@ -33,7 +33,17 @@ describe("planning health budgets", () => {
   });
 
   it.each([
-    { path: "resources/useMonthlyResourceMatrix.ts", maxLines: 400 },
+    { path: "schedule/SchedulePane.tsx", maxLines: 130 },
+    { path: "schedule/ScheduleTimeline.tsx", maxLines: 200 },
+    { path: "schedule/ScheduleGanttBarRows.tsx", maxLines: 120 },
+    { path: "schedule/ganttTimelineScale.ts", maxLines: 180 },
+    { path: "schedule/ganttBarModel.ts", maxLines: 120 },
+    { path: "schedule/ganttDependencyPaths.ts", maxLines: 80 },
+    { path: "inspector/TaskInspectorTabs.tsx", maxLines: 120 },
+    { path: "inspector/TaskInspectorDependenciesPanel.tsx", maxLines: 150 },
+    { path: "inspector/TaskInspectorGeneralPanel.tsx", maxLines: 130 },
+    { path: "grid/wbsIndentOutdent.ts", maxLines: 60 },
+    { path: "resources/useWorkspaceCapacityTree.ts", maxLines: 80 },
     { path: "resources/useCrossProjectTasks.ts", maxLines: 120 },
     { path: "resources/MonthlyResourceMatrix.tsx", maxLines: 250 },
     { path: "resources/MonthNavigation.tsx", maxLines: 100 },
@@ -47,7 +57,8 @@ describe("planning health budgets", () => {
     { path: "savedViews/useSavedViews.ts", maxLines: 140 },
     { path: "savedViews/SavedViewsDropdown.tsx", maxLines: 80 },
     { path: "customFields/CustomFieldDefinitionsPane.tsx", maxLines: 180 },
-    { path: "grid/wbsColumns.tsx", maxLines: 120 }
+    { path: "grid/wbsColumns.tsx", maxLines: 120 },
+    { path: "resources/resourceMatrixTypes.ts", maxLines: 140 }
   ])("$path stays within line budget", (file) => {
     const fullPath = join(planningRoot, file.path);
     const lines = readFileSync(fullPath, "utf8").split("\n").length;

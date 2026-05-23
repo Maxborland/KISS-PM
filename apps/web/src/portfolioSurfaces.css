@@ -1,0 +1,70 @@
+.portfolio-timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.portfolio-timeline-list li {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.portfolio-timeline-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.portfolio-timeline-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 65%, #1e293b);
+}
+
+.free-capacity-heatmap__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.free-capacity-heatmap__cell {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.free-capacity-heatmap__cell.is-low {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+}
+
+.free-capacity-heatmap__cell.is-mid {
+  background: color-mix(in srgb, #eab308 18%, transparent);
+}
+
+.free-capacity-heatmap__cell.is-high {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+}
+
+.workspace-help-panel {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.workspace-help-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}

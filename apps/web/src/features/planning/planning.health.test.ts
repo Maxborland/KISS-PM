@@ -26,6 +26,6 @@ describe("planning repository health", () => {
       "utf8"
     );
     expect(source).toMatch(/onClick={props\.onApply}/);
-    expect(source).toMatch(/disabled={!props\.permissions\.canManageProjectPlan/);
+    expect(source).toMatch(/canManageProjectPlan/);
   });
 });

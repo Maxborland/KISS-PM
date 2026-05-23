@@ -1,4 +1,4 @@
-import { canReadProjectPlan, canReadProjectResources } from "@kiss-pm/access-control";
+import { canReadProjectPlan } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -22,13 +22,8 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
       profile,
       targetTenantId: actor.tenantId
     });
-    const resourceDecision = canReadProjectResources({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!planDecision.allowed || !resourceDecision.allowed) {
-      return context.json({ error: planDecision.allowed ? resourceDecision.reason : planDecision.reason }, 403);
+    if (!planDecision.allowed) {
+      return context.json({ error: planDecision.reason }, 403);
     }
 
     const projectId = context.req.param("projectId");

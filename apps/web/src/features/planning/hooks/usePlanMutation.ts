@@ -3,8 +3,9 @@
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { PlanningApiError } from "@kiss-pm/planning-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
+import { invalidateWorkspaceCapacityQueries } from "../capacity/invalidateWorkspaceCapacityQueries";
 import { planningApi } from "../planningApi";
 import {
   initialPlanMutationStore,
@@ -15,10 +16,14 @@ import {
 import { planKeys } from "./planKeys";
 import { useCompensatingUndo } from "./useCompensatingUndo";
 
+type PlanSnapshot = Awaited<ReturnType<typeof planningApi.getPlanReadModel>>;
+
 export function usePlanMutation(projectId: string) {
   const queryClient = useQueryClient();
   const [store, setStore] = useState<PlanMutationStore>(initialPlanMutationStore);
   const compensatingUndo = useCompensatingUndo();
+  const previewGenerationRef = useRef(0);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   const setApplyBarState = useCallback((applyBarState: ApplyBarState, errorMessage: string | null = null) => {
     setStore((current) => ({ ...current, applyBarState, errorMessage }));
@@ -30,32 +35,85 @@ export function usePlanMutation(projectId: string) {
 
   const handleConflict = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: planKeys.project(projectId) });
-    setStore({
+    invalidateWorkspaceCapacityQueries(queryClient);
+    setStore((current) => ({
       ...initialPlanMutationStore,
       applyBarState: "conflict",
-      errorMessage: "План обновлён другим пользователем. Данные перезагружены."
-    });
+      errorMessage: "План обновлён другим пользователем. Данные перезагружены.",
+      previewStale: current.pendingPreview !== null
+    }));
   }, [projectId, queryClient]);
 
-  const previewMutation = useMutation({
-    mutationFn: async (command: PlanningCommand) => {
-      const snapshot = queryClient.getQueryData<Awaited<ReturnType<typeof planningApi.getPlanReadModel>>>(
-        planKeys.project(projectId)
+  const markPreviewStale = useCallback(() => {
+    setStore((current) => {
+      if (!current.pendingPreview) return current;
+      return { ...current, previewStale: true };
+    });
+  }, []);
+
+  const readLoadedSnapshot = useCallback((): PlanSnapshot | undefined => {
+    return queryClient.getQueryData<PlanSnapshot>(planKeys.project(projectId));
+  }, [projectId, queryClient]);
+
+  const handleMutationError = useCallback(
+    async (error: unknown, fallbackMessage: string) => {
+      if (error instanceof PlanningApiError && error.code === "plan_version_conflict") {
+        await handleConflict();
+        return;
+      }
+      setApplyBarState(
+        "error",
+        error instanceof Error ? error.message : fallbackMessage
       );
+    },
+    [handleConflict, setApplyBarState]
+  );
+
+  const previewMutation = useMutation({
+    mutationFn: async (input: { command: PlanningCommand; generation: number }) => {
+      const snapshot = readLoadedSnapshot();
       if (!snapshot) throw new Error("plan_not_loaded");
-      return planningApi.previewCommand(projectId, {
-        command,
-        clientPlanVersion: snapshot.planVersion
-      });
+      previewAbortRef.current?.abort();
+      const controller = new AbortController();
+      previewAbortRef.current = controller;
+      try {
+        return await planningApi.previewCommand(
+          projectId,
+          {
+            command: input.command,
+            clientPlanVersion: snapshot.planVersion
+          },
+          controller.signal
+        );
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new Error("preview_aborted");
+        }
+        throw error;
+      } finally {
+        if (previewAbortRef.current === controller) {
+          previewAbortRef.current = null;
+        }
+      }
     },
-    onMutate: async () => {
-      setApplyBarState("preview-pending");
+    onMutate: async (input: { command: PlanningCommand; generation: number }) => {
+      void input;
+      setStore((current) => ({
+        ...current,
+        applyBarState: "preview-pending",
+        previewStale: false,
+        errorMessage: null
+      }));
     },
-    onSuccess: (preview, command) => {
+    onSuccess: (preview, input) => {
+      if (input.generation !== previewGenerationRef.current) return;
+      const command = input.command;
+      const snapshot = readLoadedSnapshot();
       const entry: PendingPreview = {
         command,
         preview,
-        overlayReadModel: preview.after
+        overlayReadModel: preview.after,
+        basePlanVersion: snapshot?.planVersion ?? preview.before.planVersion
       };
       setStore((current) => ({
         ...current,
@@ -66,24 +124,25 @@ export function usePlanMutation(projectId: string) {
         errorMessage: null
       }));
     },
-    onError: (error) => {
-      if (error instanceof PlanningApiError && error.code === "plan_version_conflict") {
-        void handleConflict();
-        return;
-      }
-      setApplyBarState(
-        "error",
-        error instanceof Error ? error.message : "Не удалось рассчитать превью"
-      );
+    onError: (error, input) => {
+      if (input.generation !== previewGenerationRef.current) return;
+      if (error instanceof Error && error.message === "preview_aborted") return;
+      void handleMutationError(error, "Не удалось рассчитать превью");
     }
   });
+
+  const preview = useCallback(
+    async (command: PlanningCommand) => {
+      const generation = ++previewGenerationRef.current;
+      return previewMutation.mutateAsync({ command, generation });
+    },
+    [previewMutation]
+  );
 
   const applyMutation = useMutation({
     mutationFn: async () => {
       const pending = store.pendingPreview;
-      const snapshot = queryClient.getQueryData<Awaited<ReturnType<typeof planningApi.getPlanReadModel>>>(
-        planKeys.project(projectId)
-      );
+      const snapshot = readLoadedSnapshot();
       if (!pending || !snapshot) throw new Error("nothing_to_apply");
       return planningApi.applyCommand(projectId, {
         command: pending.command,
@@ -103,25 +162,17 @@ export function usePlanMutation(projectId: string) {
         return { ...initialPlanMutationStore, applyBarState: "applied" };
       });
       queryClient.setQueryData(planKeys.project(projectId), result.readModel);
+      invalidateWorkspaceCapacityQueries(queryClient);
       window.setTimeout(() => setApplyBarState("idle"), 3000);
     },
-    onError: async (error) => {
-      if (error instanceof PlanningApiError && error.code === "plan_version_conflict") {
-        await handleConflict();
-        return;
-      }
-      setApplyBarState(
-        "error",
-        error instanceof Error ? error.message : "Не удалось применить изменения"
-      );
+    onError: (error) => {
+      void handleMutationError(error, "Не удалось применить изменения");
     }
   });
 
   const applyBatchMutation = useMutation({
     mutationFn: async (commands: PlanningCommand[]) => {
-      const snapshot = queryClient.getQueryData<Awaited<ReturnType<typeof planningApi.getPlanReadModel>>>(
-        planKeys.project(projectId)
-      );
+      const snapshot = readLoadedSnapshot();
       if (!snapshot) throw new Error("plan_not_loaded");
       return planningApi.applyCommandBatch(projectId, {
         commands,
@@ -131,9 +182,7 @@ export function usePlanMutation(projectId: string) {
     },
     onMutate: () => setApplyBarState("applying"),
     onSuccess: (result, commands) => {
-      const snapshot = queryClient.getQueryData<Awaited<ReturnType<typeof planningApi.getPlanReadModel>>>(
-        planKeys.project(projectId)
-      );
+      const snapshot = readLoadedSnapshot();
       if (snapshot && commands.length === 1) {
         compensatingUndo.pushApplied({
           command: commands[0]!,
@@ -141,19 +190,13 @@ export function usePlanMutation(projectId: string) {
         });
       }
       queryClient.setQueryData(planKeys.project(projectId), result.readModel);
+      invalidateWorkspaceCapacityQueries(queryClient);
       resetPending();
       setApplyBarState("applied");
       window.setTimeout(() => setApplyBarState("idle"), 3000);
     },
-    onError: async (error) => {
-      if (error instanceof PlanningApiError && error.code === "plan_version_conflict") {
-        await handleConflict();
-        return;
-      }
-      setApplyBarState(
-        "error",
-        error instanceof Error ? error.message : "Не удалось применить пакет изменений"
-      );
+    onError: (error) => {
+      void handleMutationError(error, "Не удалось применить пакет изменений");
     }
   });
 
@@ -175,11 +218,14 @@ export function usePlanMutation(projectId: string) {
     });
   }, []);
 
-  const displayReadModel =
-    store.pendingPreview?.overlayReadModel ??
-    queryClient.getQueryData<Awaited<ReturnType<typeof planningApi.getPlanReadModel>>>(
-      planKeys.project(projectId)
-    );
+  const loadedSnapshot = readLoadedSnapshot();
+  const displayReadModel = store.pendingPreview?.overlayReadModel ?? loadedSnapshot;
+
+  const previewStale =
+    store.previewStale ||
+    (store.pendingPreview !== null &&
+      loadedSnapshot !== undefined &&
+      loadedSnapshot.planVersion !== store.pendingPreview.basePlanVersion);
 
   const undoApplied = useCallback(async () => {
     const commands = compensatingUndo.popUndo();
@@ -195,8 +241,10 @@ export function usePlanMutation(projectId: string) {
 
   return {
     store,
+    previewStale,
     displayReadModel,
-    preview: previewMutation.mutateAsync,
+    preview,
+    markPreviewStale,
     apply: applyMutation.mutateAsync,
     applyBatch: applyBatchMutation.mutateAsync,
     cancelPreview: resetPending,

@@ -1,5 +1,7 @@
 "use client";
 
+import { currentMonthIso, shiftMonth } from "./monthIso";
+
 const MONTH_LABELS = [
   "Январь",
   "Февраль",
@@ -53,23 +55,4 @@ export function MonthNavigation(props: {
       </button>
     </div>
   );
-}
-
-function shiftMonth(monthIso: string, delta: number): string {
-  const [yearText, monthText] = monthIso.split("-");
-  const year = Number.parseInt(yearText ?? "2026", 10);
-  const monthIndex = Number.parseInt(monthText ?? "1", 10) - 1;
-  const date = new Date(Date.UTC(year, monthIndex + delta, 1));
-  return toMonthIso(date);
-}
-
-export function currentMonthIso(): string {
-  const now = new Date();
-  return toMonthIso(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
-}
-
-function toMonthIso(date: Date): string {
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  return `${yyyy}-${mm}`;
 }

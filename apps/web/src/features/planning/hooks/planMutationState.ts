@@ -14,6 +14,8 @@ export type PendingPreview = {
   command: PlanningCommand;
   preview: PlanningPreviewResponse;
   overlayReadModel: PlanningReadModel;
+  /** Версия плана на сервере в момент расчёта превью. */
+  basePlanVersion: number;
 };
 
 export type PlanMutationStore = {
@@ -22,6 +24,8 @@ export type PlanMutationStore = {
   undoStack: PendingPreview[];
   redoStack: PendingPreview[];
   errorMessage: string | null;
+  /** Серверная версия плана изменилась после расчёта превью. */
+  previewStale: boolean;
 };
 
 export const initialPlanMutationStore: PlanMutationStore = {
@@ -29,5 +33,6 @@ export const initialPlanMutationStore: PlanMutationStore = {
   pendingPreview: null,
   undoStack: [],
   redoStack: [],
-  errorMessage: null
+  errorMessage: null,
+  previewStale: false
 };

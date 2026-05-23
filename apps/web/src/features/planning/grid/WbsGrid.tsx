@@ -1,7 +1,6 @@
 "use client";
 
 import type { PlanningCommand } from "@kiss-pm/domain";
-import { parseDurationOrWork } from "@kiss-pm/planning-client";
 import {
   flexRender,
   getCoreRowModel,
@@ -19,10 +18,12 @@ import { useGridEdit } from "./useGridEdit";
 import { useGridKeyboard } from "./useGridKeyboard";
 import { useGridSelection } from "./useGridSelection";
 import { buildWbsColumns, type WbsCustomFieldColumn } from "./wbsColumns";
+import { buildPreviewCommandFromCell, getWbsCellTextValue } from "./wbsGridCellValue";
+import { buildIndentMoveCommand, buildOutdentMoveCommand } from "./wbsIndentOutdent";
 import { buildWbsRows } from "./wbsRows";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 
-const ROW_HEIGHT = 32;
+const ROW_HEIGHT = 36;
 
 export function WbsGrid(props: {
   readModel: PlanningReadModel | undefined;
@@ -73,6 +74,16 @@ export function WbsGrid(props: {
   const edit = useGridEdit();
   const canEdit =
     props.permissions.canManageProjectPlan && !props.previewPending;
+  const hierarchyTaskId =
+    props.selectedTaskId ??
+    (selection.activeCell !== null ? (rows[selection.activeCell.rowIndex]?.id ?? null) : null);
+  const canIndent = hierarchyTaskId
+    ? buildIndentMoveCommand(rows, hierarchyTaskId) !== null
+    : false;
+  const canOutdent = hierarchyTaskId
+    ? buildOutdentMoveCommand(rows, hierarchyTaskId) !== null
+    : false;
+
   const gridActions = useWbsGridActions({
     readModel: props.readModel,
     projectId: props.projectId,
@@ -93,47 +104,11 @@ export function WbsGrid(props: {
     const row = tableRows[selection.activeCell.rowIndex];
     if (!row) return;
     const columnId = selection.activeCell.columnId;
-    const value = edit.editingCell ? edit.editValue : getCellDisplayValue(row.original, columnId);
-    if (columnId === "title" && value !== row.original.title) {
-      await props.onPreviewCommand({
-        type: "task.update_identity",
-        payload: { taskId: row.original.id, title: value }
-      });
-    }
-    if (columnId === "finish") {
-      await props.onPreviewCommand({
-        type: "task.update_schedule",
-        payload: {
-          taskId: row.original.id,
-          plannedStart: (row.original.task.plannedStart as string | null) ?? null,
-          plannedFinish: value || null
-        }
-      });
-    }
-    if (columnId === "percentComplete") {
-      const percent = Number(value);
-      if (Number.isFinite(percent)) {
-        await props.onPreviewCommand({
-          type: "task.update_progress",
-          payload: { taskId: row.original.id, percentComplete: percent }
-        });
-      }
-    }
-    if (columnId === "durationLabel") {
-      const parsed = parseDurationOrWork(value, 8 * 60);
-      if (parsed.ok) {
-        await props.onPreviewCommand({
-          type: "task.update_work_model",
-          payload: {
-            taskId: row.original.id,
-            taskType: String(row.original.task.taskType ?? "fixed_duration") as "fixed_duration",
-            effortDriven: Boolean(row.original.task.effortDriven),
-            durationMinutes: parsed.minutes,
-            workMinutes: Number(row.original.task.workMinutes ?? parsed.minutes)
-          }
-        });
-      }
-    }
+    const value = edit.editingCell
+      ? edit.editValue
+      : getWbsCellTextValue(row.original, columnId);
+    const command = buildPreviewCommandFromCell(row.original, columnId, value);
+    if (command) await props.onPreviewCommand(command);
     edit.clearEdit();
   };
 
@@ -147,7 +122,7 @@ export function WbsGrid(props: {
       if (!row) return;
       edit.startEdit(
         selection.activeCell,
-        getCellDisplayValue(row.original, selection.activeCell.columnId)
+        getWbsCellTextValue(row.original, selection.activeCell.columnId)
       );
     },
     onCommitEdit: () => void commitActiveCell(),
@@ -160,6 +135,14 @@ export function WbsGrid(props: {
     ...(props.onRedoApplied ? { onRedoApplied: () => void props.onRedoApplied?.() } : {}),
     onSelectAll: () => selection.selectAllRows(rows.map((row) => row.id)),
     onInsertRow: () => void gridActions.createTaskBelow(props.selectedTaskId),
+    onIndentRow: () => {
+      if (!hierarchyTaskId) return;
+      void gridActions.applyWbsHierarchyMove(hierarchyTaskId, "indent");
+    },
+    onOutdentRow: () => {
+      if (!hierarchyTaskId) return;
+      void gridActions.applyWbsHierarchyMove(hierarchyTaskId, "outdent");
+    },
     enabled: true
   });
 
@@ -171,12 +154,13 @@ export function WbsGrid(props: {
       onInsertAbove={() => void gridActions.handleContextMenuAction("insert-above")}
       onInsertBelow={() => void gridActions.handleContextMenuAction("insert-below")}
       onInsertChild={() => void gridActions.handleContextMenuAction("insert-child")}
-      onIndent={() => {}}
-      onOutdent={() => {}}
       onCopy={() => void gridActions.handleContextMenuAction("copy")}
-      onCut={() => {}}
       onPaste={() => void gridActions.handleContextMenuAction("paste")}
       onFillDown={() => void gridActions.handleContextMenuAction("fill-down")}
+      onIndent={() => void gridActions.handleContextMenuAction("indent")}
+      onOutdent={() => void gridActions.handleContextMenuAction("outdent")}
+      canIndent={canIndent}
+      canOutdent={canOutdent}
       onDelete={() => void gridActions.handleContextMenuAction("delete")}
       trigger={
         <div className="planning-wbs-pane-wrapper">
@@ -287,7 +271,7 @@ export function WbsGrid(props: {
                         selection.setActiveCell({ rowIndex: virtualRow.index, columnId });
                         edit.startEdit(
                           { rowIndex: virtualRow.index, columnId },
-                          getCellDisplayValue(row.original, columnId)
+                          getWbsCellTextValue(row.original, columnId)
                         );
                       }}
                     >
@@ -341,13 +325,3 @@ export function WbsGrid(props: {
   );
 }
 
-function getCellDisplayValue(
-  row: ReturnType<typeof buildWbsRows>[number],
-  columnId: string
-): string {
-  if (columnId === "title") return row.title;
-  if (columnId === "durationLabel") return row.durationLabel;
-  if (columnId === "finish") return row.finish ?? "";
-  if (columnId === "percentComplete") return String(row.percentComplete);
-  return "";
-}

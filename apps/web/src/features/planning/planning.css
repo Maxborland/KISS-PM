@@ -43,6 +43,51 @@
   cursor: not-allowed;
 }
 
+.planning-schedule-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 420px;
+}
+
+.planning-schedule-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.planning-schedule-baseline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.planning-schedule-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, var(--planning-wbs-width, 520px)) minmax(280px, 1fr);
+  border: 1px solid var(--border, #334155);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.planning-schedule-wbs {
+  overflow: auto;
+  max-height: 520px;
+  border-right: 1px solid var(--border, #334155);
+  background: var(--panel, #0f172a);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.planning-schedule-gantt {
+  overflow: auto;
+  max-height: 520px;
+}
+
 .planning-schedule-layout {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) minmax(280px, 1.2fr);
@@ -96,14 +141,55 @@
 }
 
 .planning-gantt-pane {
-  overflow: auto;
-  max-height: 480px;
   position: relative;
+  min-width: 0;
+}
+
+.planning-gantt-scroll-x {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.planning-gantt-timeline-head {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--panel-strong, #1e293b);
+  border-bottom: 1px solid var(--border, #334155);
+  height: 36px;
+}
+
+.planning-gantt-head-cell {
+  flex: 0 0 var(--gantt-cell-width, 40px);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--muted-strong, #94a3b8);
+  border-right: 1px solid var(--border, #1f2937);
 }
 
 .planning-gantt-canvas {
   position: relative;
   min-height: 320px;
+}
+
+.planning-gantt-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.planning-gantt-marker--today {
+  border-left: 1px dashed var(--accent, #38bdf8);
+}
+
+.planning-gantt-marker--deadline {
+  border-left: 2px solid var(--warning, #f59e0b);
 }
 
 .planning-gantt-row {
@@ -112,20 +198,56 @@
   right: 0;
 }
 
+.planning-gantt-row.is-selected {
+  background: color-mix(in srgb, var(--accent, #38bdf8) 10%, transparent);
+}
+
+.planning-gantt-row.is-critical .planning-gantt-bar {
+  box-shadow: inset 3px 0 0 #f87171;
+}
+
 .planning-gantt-bar {
   position: absolute;
-  top: 8px;
-  height: 16px;
+  top: 9px;
+  height: 18px;
   border-radius: 4px;
+  background: color-mix(in srgb, var(--accent, #38bdf8) 70%, #1e293b);
+}
+
+.planning-gantt-bar.is-draggable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.planning-gantt-bar.is-draggable:active {
+  cursor: grabbing;
+  outline: 1px solid color-mix(in srgb, var(--accent, #38bdf8) 80%, #fff);
+}
+
+.planning-gantt-summary {
+  position: absolute;
+  top: 15px;
+  height: 6px;
+  border-radius: 2px;
+  background: #64748b;
+}
+
+.planning-gantt-milestone {
+  position: absolute;
+  top: 12px;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
   background: var(--accent, #38bdf8);
 }
 
 .planning-gantt-baseline {
   position: absolute;
-  top: 26px;
-  height: 2px;
+  top: 28px;
+  height: 4px;
   background: #94a3b8;
-  opacity: 0.7;
+  opacity: 0.6;
+  border-radius: 2px;
 }
 
 .planning-gantt-critical-stripe {
@@ -166,6 +288,31 @@
   border-color: #f87171;
 }
 
+.planning-apply-bar__stale {
+  display: block;
+  color: #fbbf24;
+  margin-bottom: 4px;
+}
+
+.planning-remote-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent, #38bdf8) 40%, var(--border, #334155));
+  background: color-mix(in srgb, var(--accent, #38bdf8) 12%, var(--card, #111827));
+}
+
+.planning-inspector__add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
 .planning-apply-bar__actions {
   display: flex;
   gap: 8px;
@@ -177,6 +324,62 @@
   padding: 12px;
   display: grid;
   gap: 8px;
+}
+
+.planning-inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.planning-inspector__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border, #334155);
+  padding-bottom: 4px;
+}
+
+.planning-inspector__tabs button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.planning-inspector__tabs button.is-active,
+.planning-inspector__tabs button[aria-selected="true"] {
+  background: var(--panel-subtle, #1e293b);
+  color: var(--text, #f8fafc);
+}
+
+.planning-inspector__tabs button:focus-visible {
+  outline: 2px solid var(--accent, #38bdf8);
+  outline-offset: 2px;
+}
+
+.planning-inspector__panel {
+  display: grid;
+  gap: 8px;
+}
+
+.planning-inspector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.planning-inspector-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .planning-field {

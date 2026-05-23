@@ -841,7 +841,7 @@ export const planningSavedViews = pgTable(
 export const tenantOrgNodes = pgTable(
   "tenant_org_nodes",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
@@ -852,6 +852,15 @@ export const tenantOrgNodes = pgTable(
     sortOrder: integer("sort_order").notNull().default(0)
   },
   (table) => [
+    primaryKey({
+      name: "tenant_org_nodes_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "tenant_org_nodes_parent_fk",
+      columns: [table.tenantId, table.parentId],
+      foreignColumns: [table.tenantId, table.id]
+    }).onDelete("cascade"),
     index("tenant_org_nodes_tenant_track_idx").on(table.tenantId, table.track, table.sortOrder),
     check("tenant_org_nodes_track_chk", sql`${table.track} in ('functional', 'project')`),
     check(
@@ -875,13 +884,9 @@ export const tenantUserOrgPlacements = pgTable(
     tenantId: text("tenant_id").notNull(),
     userId: text("user_id").notNull(),
     track: text("track").notNull(),
-    directionId: text("direction_id")
-      .notNull()
-      .references(() => tenantOrgNodes.id, { onDelete: "restrict" }),
-    departmentId: text("department_id").references(() => tenantOrgNodes.id, {
-      onDelete: "restrict"
-    }),
-    teamId: text("team_id").references(() => tenantOrgNodes.id, { onDelete: "restrict" }),
+    directionId: text("direction_id").notNull(),
+    departmentId: text("department_id"),
+    teamId: text("team_id"),
     positionId: text("position_id").notNull()
   },
   (table) => [
@@ -894,6 +899,21 @@ export const tenantUserOrgPlacements = pgTable(
       columns: [table.tenantId, table.userId],
       foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
     }).onDelete("cascade"),
+    foreignKey({
+      name: "tenant_user_org_placements_direction_fk",
+      columns: [table.tenantId, table.directionId],
+      foreignColumns: [tenantOrgNodes.tenantId, tenantOrgNodes.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tenant_user_org_placements_department_fk",
+      columns: [table.tenantId, table.departmentId],
+      foreignColumns: [tenantOrgNodes.tenantId, tenantOrgNodes.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tenant_user_org_placements_team_fk",
+      columns: [table.tenantId, table.teamId],
+      foreignColumns: [tenantOrgNodes.tenantId, tenantOrgNodes.id]
+    }).onDelete("restrict"),
     foreignKey({
       name: "tenant_user_org_placements_position_fk",
       columns: [table.tenantId, table.positionId],

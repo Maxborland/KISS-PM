@@ -42,6 +42,16 @@ const sourceFileBudgets = [
     path: "apps/web/src/styles.css",
     maxLines: 1800,
     reason: "style system should stay tokenized and sectioned"
+  },
+  {
+    path: "apps/web/src/features/org-structure/OrgStructurePage.tsx",
+    maxLines: 180,
+    reason: "org structure page must stay a shell over track editor"
+  },
+  {
+    path: "apps/web/src/features/org-structure/OrgStructureTrackEditor.tsx",
+    maxLines: 320,
+    reason: "org structure track editor owns track UI only"
   }
 ] as const;
 

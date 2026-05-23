@@ -1,75 +1,46 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import type { TenantId } from "@kiss-pm/domain";
+import {
+  ORG_NODE_TYPES,
+  ORG_STRUCTURE_TRACKS,
+  validateOrgStructureReplace,
+  type OrgNodeType,
+  type OrgStructureNodeInput,
+  type OrgStructurePlacementInput,
+  type OrgStructureReplaceInput,
+  type OrgStructureTrack,
+  type OrgStructureTrackInput,
+  type OrgStructureTrackSnapshot,
+  type OrgStructureNodeRecord,
+  type OrgStructurePlacementRecord,
+  type TenantOrgStructureSnapshot
+} from "@kiss-pm/tenant-org-structure";
 
 import type { KissPmDatabase } from "./connection";
-import { tenantOrgNodes, tenantUserOrgPlacements } from "./schema";
+import { positions, tenantOrgNodes, tenantUserOrgPlacements, tenantUsers } from "./schema";
 
-export const ORG_STRUCTURE_TRACKS = ["functional", "project"] as const;
-export type OrgStructureTrack = (typeof ORG_STRUCTURE_TRACKS)[number];
-
-export const ORG_NODE_TYPES = ["direction", "department", "team"] as const;
-export type OrgNodeType = (typeof ORG_NODE_TYPES)[number];
-
-export type TenantOrgNodeRecord = {
-  id: string;
-  tenantId: TenantId;
-  track: OrgStructureTrack;
-  nodeType: OrgNodeType;
-  name: string;
-  parentId: string | null;
-  sortOrder: number;
+export {
+  ORG_NODE_TYPES,
+  ORG_STRUCTURE_TRACKS,
+  validateOrgStructureReplace,
+  type OrgNodeType,
+  type OrgStructureNodeInput,
+  type OrgStructurePlacementInput,
+  type OrgStructureReplaceInput,
+  type OrgStructureTrack,
+  type OrgStructureTrackInput
 };
 
-export type TenantUserOrgPlacementRecord = {
-  tenantId: TenantId;
-  userId: string;
-  track: OrgStructureTrack;
-  directionId: string;
-  departmentId: string | null;
-  teamId: string | null;
-  positionId: string;
-};
-
-export type OrgStructureTrackSnapshot = {
-  nodes: TenantOrgNodeRecord[];
-  placements: TenantUserOrgPlacementRecord[];
-};
-
-export type TenantOrgStructureSnapshot = {
-  functional: OrgStructureTrackSnapshot;
-  project: OrgStructureTrackSnapshot;
-};
-
-export type OrgStructureNodeInput = {
-  id: string;
-  nodeType: OrgNodeType;
-  name: string;
-  parentId: string | null;
-  sortOrder: number;
-};
-
-export type OrgStructurePlacementInput = {
-  userId: string;
-  directionId: string;
-  departmentId?: string | null;
-  teamId?: string | null;
-  positionId: string;
-};
-
-export type OrgStructureTrackInput = {
-  nodes: OrgStructureNodeInput[];
-  placements: OrgStructurePlacementInput[];
-};
+export type TenantOrgNodeRecord = OrgStructureNodeRecord;
+export type TenantUserOrgPlacementRecord = OrgStructurePlacementRecord;
+export type { OrgStructureTrackSnapshot, TenantOrgStructureSnapshot };
 
 export type TenantOrgStructureRepository = {
   getOrgStructure(tenantId: TenantId): Promise<TenantOrgStructureSnapshot>;
   replaceOrgStructure(
     tenantId: TenantId,
-    input: {
-      functional: OrgStructureTrackInput;
-      project: OrgStructureTrackInput;
-    }
+    input: OrgStructureReplaceInput
   ): Promise<TenantOrgStructureSnapshot>;
 };
 
@@ -99,57 +70,29 @@ function mapPlacement(
   };
 }
 
-function isNodeType(value: string): value is OrgNodeType {
-  return (ORG_NODE_TYPES as readonly string[]).includes(value);
-}
+export async function validateOrgStructureReplaceForTenant(
+  db: KissPmDatabase,
+  tenantId: TenantId,
+  input: OrgStructureReplaceInput
+): Promise<string | null> {
+  const syncError = validateOrgStructureReplace(input);
+  if (syncError) return syncError;
 
-export function validateOrgStructureReplace(input: {
-  functional: OrgStructureTrackInput;
-  project: OrgStructureTrackInput;
-}): string | null {
-  try {
-    validateTrackInput("functional", input.functional);
-    validateTrackInput("project", input.project);
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message : "tenant_org_structure_invalid";
-  }
-}
+  const [positionRows, userRows] = await Promise.all([
+    db.select({ id: positions.id }).from(positions).where(eq(positions.tenantId, tenantId)),
+    db.select({ id: tenantUsers.id }).from(tenantUsers).where(eq(tenantUsers.tenantId, tenantId))
+  ]);
+  const positionIds = new Set(positionRows.map((row) => row.id));
+  const userIds = new Set(userRows.map((row) => row.id));
 
-function validateTrackInput(track: OrgStructureTrack, input: OrgStructureTrackInput): void {
-  const nodeIds = new Set(input.nodes.map((node) => node.id));
-  for (const node of input.nodes) {
-    if (!isNodeType(node.nodeType)) throw new Error("tenant_org_node_invalid_type");
-    if (track === "functional" && node.nodeType === "team") {
-      throw new Error("tenant_org_node_invalid_type");
-    }
-    if (track === "project" && node.nodeType === "department") {
-      throw new Error("tenant_org_node_invalid_type");
-    }
-    if (node.nodeType === "direction") {
-      if (node.parentId !== null) throw new Error("tenant_org_node_invalid_parent");
-      continue;
-    }
-    if (!node.parentId || !nodeIds.has(node.parentId)) {
-      throw new Error("tenant_org_node_invalid_parent");
+  for (const trackInput of [input.functional, input.project]) {
+    for (const placement of trackInput.placements) {
+      if (!userIds.has(placement.userId)) return "tenant_org_placement_invalid_user";
+      if (!positionIds.has(placement.positionId)) return "tenant_org_placement_invalid_position";
     }
   }
-  for (const placement of input.placements) {
-    if (!nodeIds.has(placement.directionId)) {
-      throw new Error("tenant_org_placement_invalid_direction");
-    }
-    if (track === "functional") {
-      if (!placement.departmentId || !nodeIds.has(placement.departmentId)) {
-        throw new Error("tenant_org_placement_invalid_department");
-      }
-      if (placement.teamId) throw new Error("tenant_org_placement_invalid_team");
-    } else {
-      if (!placement.teamId || !nodeIds.has(placement.teamId)) {
-        throw new Error("tenant_org_placement_invalid_team");
-      }
-      if (placement.departmentId) throw new Error("tenant_org_placement_invalid_department");
-    }
-  }
+
+  return null;
 }
 
 export function createTenantOrgStructureRepository(db: KissPmDatabase): TenantOrgStructureRepository {
@@ -184,8 +127,10 @@ export function createTenantOrgStructureRepository(db: KissPmDatabase): TenantOr
     },
 
     async replaceOrgStructure(tenantId, input) {
-      validateTrackInput("functional", input.functional);
-      validateTrackInput("project", input.project);
+      const validationError = await validateOrgStructureReplaceForTenant(db, tenantId, input);
+      if (validationError) {
+        throw new Error(validationError);
+      }
 
       await db.transaction(async (tx) => {
         await tx.delete(tenantUserOrgPlacements).where(eq(tenantUserOrgPlacements.tenantId, tenantId));

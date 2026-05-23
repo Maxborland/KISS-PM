@@ -6,6 +6,8 @@ import type { WorkspaceData } from "./workspaceData";
 import { filterProjectsForTable } from "./workspaceTables";
 import { formatDateOnly, formatHours, formatMoney } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
+import { ClosedProjectsRetrospective } from "./features/portfolio/ClosedProjectsRetrospective";
+import { PortfolioTimelineStrip } from "./features/portfolio/PortfolioTimelineStrip";
 import {
   CrudToolbar,
   Panel,
@@ -21,10 +23,16 @@ export function ProjectsView(props: {
   sectionState: SectionState;
 }) {
   const [tableSearch, setTableSearch] = useState("");
-  const filteredProjects = useMemo(
-    () => filterProjectsForTable(props.data.projects, tableSearch),
-    [props.data.projects, tableSearch]
-  );
+  const [statusFilter, setStatusFilter] = useState<"active" | "closed" | "all">("active");
+  const filteredProjects = useMemo(() => {
+    const byStatus =
+      statusFilter === "all"
+        ? props.data.projects
+        : props.data.projects.filter((project) =>
+            statusFilter === "closed" ? project.status === "closed" : project.status === "active"
+          );
+    return filterProjectsForTable(byStatus, tableSearch);
+  }, [props.data.projects, statusFilter, tableSearch]);
   const totalPlannedHours = props.data.projects.reduce(
     (sum, project) => sum + project.plannedHours,
     0
@@ -39,6 +47,10 @@ export function ProjectsView(props: {
       title="Проекты"
       subtitle="Активные проекты, созданные из проверенной возможности. Черновик не отдельная сущность: проект входит в рабочую зону через статус."
     >
+      <PortfolioTimelineStrip projects={props.data.projects} />
+      {statusFilter === "closed" ? (
+        <ClosedProjectsRetrospective projects={props.data.projects} />
+      ) : null}
       <div className="surface-summary-grid">
         <SummaryCard label="Активные проекты" value={props.data.projects.length} />
         <SummaryCard label="Плановые часы" value={formatHours(totalPlannedHours)} tone="success" />
@@ -60,6 +72,20 @@ export function ProjectsView(props: {
           <ClipboardList aria-hidden="true" size={14} />
           Потребность должностей
         </span>
+        <label className="toolbar-chip">
+          Статус
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "active" | "closed" | "all")
+            }
+            aria-label="Фильтр статуса проекта"
+          >
+            <option value="active">Активные</option>
+            <option value="closed">Закрытые</option>
+            <option value="all">Все</option>
+          </select>
+        </label>
       </CrudToolbar>
       <SectionFeedback state={props.sectionState} emptyLabel="Проекты недоступны." />
       {props.sectionState.canRead && !props.sectionState.error ? (

@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import {
-  currentMonthIso,
-  MonthNavigation
-} from "../planning/resources/MonthNavigation";
+import { MonthNavigation } from "../planning/resources/MonthNavigation";
+import { currentMonthIso } from "../planning/resources/monthIso";
 import "../planning/planning.css";
 import { AbsenceCreateDialog } from "./AbsenceCreateDialog";
 import { AbsencesTable, type AbsencesTableDay } from "./AbsencesTable";

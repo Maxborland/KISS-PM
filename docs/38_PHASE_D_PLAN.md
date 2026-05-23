@@ -10,6 +10,7 @@ Canonical doc для реализованного среза Phase D (ветка
 | `0024_phase_d_saved_views_custom_fields.sql` | `planning_saved_views`, `tasks.custom_fields` |
 | `0025_phase_d_absences.sql` | `resource_absences` |
 | `0026_phase_d_org_structure.sql` | `tenant_org_nodes`, `tenant_user_org_placements` |
+| `0027_tenant_org_nodes_composite_pk.sql` | PK `(tenant_id, id)`, composite FK для parent и placements |
 
 > `0022` занят `phase_5_6_planning_command_idempotency.sql`.
 
@@ -60,9 +61,13 @@ Canonical doc для реализованного среза Phase D (ветка
 
 - Два трека: **functional** (направление → отдел → должность → сотрудник) и **project** (направление → команда → должность → сотрудник).
 - Таблицы: `tenant_org_nodes`, `tenant_user_org_placements`.
+- PK узлов: **`(tenant_id, id)`** — id уникален в пределах tenant, не глобально (миграция `0027`).
+- Доменный контракт: пакет `@kiss-pm/tenant-org-structure` (типы, `validateOrgStructureReplace`, `isPlacementConsistentWithNodes`, graph helpers).
+- Application: `replaceTenantOrgStructureCommand` (audit + replace); persistence — только storage.
 - Permissions: `tenant.org_structure.read`, `tenant.org_structure.manage`.
-- API: `GET/PUT /api/tenant/current/org-structure`.
+- API: `GET/PUT /api/tenant/current/org-structure` (PUT = full replace snapshot).
 - UI: `/settings/org-structure`, `features/org-structure/*`; consumers: матрица ресурсов (4 уровня + toggle), фильтры Users по placements.
+- **Конкурентное редактирование:** last-write-wins; черновик UI защищён `isDraftDirty` от refetch. Optimistic lock / etag — Phase E+ (см. `docs/decisions/tenant-org-structure.md`).
 
 ## Phase E (planned) — Tenant resource load report
 

@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -255,8 +255,11 @@ describe("planning API routes", () => {
 
     expect(readModel.status).toBe(200);
     expect(readerReadModel.status).toBe(200);
-    expect(planOnlyReadModel.status).toBe(403);
-    await expect(planOnlyReadModel.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(planOnlyReadModel.status).toBe(200);
+    const planOnlyBody = await planOnlyReadModel.json();
+    expect(planOnlyBody.authored.tasks).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "task-plan-a" })])
+    );
     expect(initialBody).toMatchObject({
       authored: {
         tasks: expect.arrayContaining([
@@ -1600,6 +1603,64 @@ describe("planning API routes", () => {
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
+  });
+
+  it("lists and creates saved views with stable API keys", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const listEmpty = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(listEmpty.status).toBe(200);
+    await expect(listEmpty.json()).resolves.toEqual({ savedViews: [] });
+
+    const create = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      {
+        method: "POST",
+        headers: {
+          cookie: adminCookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          name: "Мой вид",
+          scope: "user",
+          payload: { visibleColumnIds: ["title", "start"] }
+        })
+      }
+    );
+    expect(create.status).toBe(201);
+    const createdBody = await create.json();
+    expect(createdBody.savedView).toMatchObject({
+      name: "Мой вид",
+      scope: "user",
+      payload: { visibleColumnIds: ["title", "start"] }
+    });
+
+    const listAfter = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      { headers: { cookie: adminCookie } }
+    );
+    const listBody = await listAfter.json();
+    expect(listAfter.status).toBe(200);
+    expect(listBody.savedViews).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Мой вид" })])
+    );
+  });
+
+  it("allows plan-only reader to load read-model and SSE without resource read", async () => {
+    const planOnlyCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: planOnlyCookie } }
+    );
+    expect(readModel.status).toBe(200);
+
+    const events = await app.request("/api/workspace/projects/project-alpha/planning/events", {
+      headers: { cookie: planOnlyCookie, Accept: "text/event-stream" }
+    });
+    expect(events.status).toBe(200);
   });
 
   it("applies project.settings.update with audit and plan recalc", async () => {

@@ -1,4 +1,9 @@
-import type { TenantOrgStructureSnapshot } from "./useOrgStructure";
+import type {
+  OrgStructureNodeInput,
+  OrgStructureReplaceInput,
+  OrgStructureTrack,
+  TenantOrgStructureSnapshot
+} from "./useOrgStructure";
 
 type TrackSnapshot = TenantOrgStructureSnapshot["functional"];
 
@@ -36,22 +41,39 @@ export function reparentOrgUnit(
     item.id === unitId ? { ...item, parentId: nextDirectionId || item.parentId } : item
   );
 
-  const placements = snapshot.placements.map((placement) => {
-    const unitField =
-      placement.departmentId === unitId
-        ? "departmentId"
-        : placement.teamId === unitId
-          ? "teamId"
-          : null;
-    if (!unitField) return placement;
-    if (placement.directionId === nextDirectionId) return placement;
-    return {
-      ...placement,
-      directionId: nextDirectionId,
-      departmentId: unitField === "departmentId" ? null : placement.departmentId,
-      teamId: unitField === "teamId" ? null : placement.teamId
-    };
+  const placements = snapshot.placements.filter((placement) => {
+    if (placement.departmentId === unitId || placement.teamId === unitId) {
+      return placement.directionId === nextDirectionId;
+    }
+    return true;
   });
 
   return { nodes, placements };
+}
+
+export function toOrgStructureReplaceInput(
+  snapshot: TenantOrgStructureSnapshot
+): OrgStructureReplaceInput {
+  const mapTrack = (track: OrgStructureTrack, data: TenantOrgStructureSnapshot["functional"]) => ({
+    nodes: data.nodes.map(
+      (node): OrgStructureNodeInput => ({
+        id: node.id,
+        nodeType: node.nodeType,
+        name: node.name,
+        parentId: node.parentId,
+        sortOrder: node.sortOrder
+      })
+    ),
+    placements: data.placements.map((placement) => ({
+      userId: placement.userId,
+      directionId: placement.directionId,
+      departmentId: placement.departmentId,
+      teamId: placement.teamId,
+      positionId: placement.positionId
+    }))
+  });
+  return {
+    functional: mapTrack("functional", snapshot.functional),
+    project: mapTrack("project", snapshot.project)
+  };
 }

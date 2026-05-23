@@ -3,8 +3,8 @@ export function NarrowFallback() {
     <section className="planning-narrow-fallback" data-testid="planning-narrow-fallback">
       <h2>Узкий экран</h2>
       <p>
-        На мобильном viewport доступны только Обзор и Аудит (read-only). Полный график, ресурсы и
-        сценарии откройте на десктопе.
+        На узком экране доступна только вкладка «Аудит» (только чтение). График, ресурсы, сценарии и
+        остальные вкладки планирования откройте на экране шире 1024&nbsp;px.
       </p>
     </section>
   );

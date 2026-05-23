@@ -1,12 +1,6 @@
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { parsePredecessorString } from "@kiss-pm/planning-client";
 
-export const PLANNING_CLIPBOARD_MIME = "application/vnd.kiss-pm.planning+json";
-
-export type PlanningClipboardPayload = {
-  tasks: Array<{ title: string; durationLabel?: string; finish?: string; predecessors?: string }>;
-};
-
 export function normalizeTsvInput(input: string): string {
   return input.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trim();
 }
@@ -60,16 +54,4 @@ export function buildCommandsFromTsvPaste(
     }
   });
   return commands;
-}
-
-export function detectPlanningClipboardPayload(
-  clipboardData: DataTransfer
-): PlanningClipboardPayload | null {
-  const raw = clipboardData.getData(PLANNING_CLIPBOARD_MIME);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as PlanningClipboardPayload;
-  } catch {
-    return null;
-  }
 }

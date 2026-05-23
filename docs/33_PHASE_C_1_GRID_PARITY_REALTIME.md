@@ -3,7 +3,7 @@
 ## Transport
 
 - **SSE** `GET /api/workspace/projects/:projectId/planning/events` (`text/event-stream`).
-- In-memory `planningEventBus` (PubSub по `projectId`).
+- In-memory `planningEventBus` / `PlanningEventPublisher` (PubSub по `projectId`). Ограничение multi-instance — [decisions/planning-realtime-sse.md](decisions/planning-realtime-sse.md).
 - События: `planVersionChanged`, `planSnapshotInvalidated`.
 - Heartbeat каждые 15 с.
 
