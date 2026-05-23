@@ -4,6 +4,7 @@ import type { PlanningCommand } from "@kiss-pm/domain";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 
 import type { PlanningPermissions } from "../hooks/usePlanningPermissions";
+import { readAssignmentRole, readAssignmentWorkMinutes } from "../planningReadModelAccess";
 
 export function AssignmentsMatrix(props: {
   readModel: PlanningReadModel | undefined;
@@ -46,9 +47,9 @@ export function AssignmentsMatrix(props: {
                         id: String(assignment.id),
                         taskId: String(assignment.taskId),
                         resourceId: String(assignment.resourceId),
-                        role: assignment.role as "executor",
+                        role: readAssignmentRole(assignment),
                         unitsPermille,
-                        workMinutes: (assignment.workMinutes as number | null) ?? null
+                        workMinutes: readAssignmentWorkMinutes(assignment)
                       }
                     });
                   }}

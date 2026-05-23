@@ -220,7 +220,7 @@ function OrgStructureTrackEditor(props: {
                     className="secondary-button"
                     data-testid={`org-delete-direction-${direction.id}`}
                     onClick={() =>
-                      props.onChange(removeOrgNode(props.snapshot, props.track, direction.id))
+                      props.onChange(removeOrgNode(props.snapshot, direction.id))
                     }
                   >
                     Удалить направление
@@ -267,7 +267,7 @@ function OrgStructureTrackEditor(props: {
                         className="secondary-button"
                         data-testid={`org-delete-unit-${unit.id}`}
                         onClick={() =>
-                          props.onChange(removeOrgNode(props.snapshot, props.track, unit.id))
+                          props.onChange(removeOrgNode(props.snapshot, unit.id))
                         }
                       >
                         Удалить

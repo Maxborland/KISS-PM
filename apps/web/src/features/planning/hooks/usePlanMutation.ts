@@ -97,9 +97,7 @@ export function usePlanMutation(projectId: string) {
         if (current.pendingPreview) {
           compensatingUndo.pushApplied({
             command: current.pendingPreview.command,
-            before: current.pendingPreview.preview.before as Awaited<
-              ReturnType<typeof planningApi.getPlanReadModel>
-            >
+            before: current.pendingPreview.preview.before
           });
         }
         return { ...initialPlanMutationStore, applyBarState: "applied" };
@@ -139,7 +137,7 @@ export function usePlanMutation(projectId: string) {
       if (snapshot && commands.length === 1) {
         compensatingUndo.pushApplied({
           command: commands[0]!,
-          before: snapshot as Awaited<ReturnType<typeof planningApi.getPlanReadModel>>
+          before: snapshot
         });
       }
       queryClient.setQueryData(planKeys.project(projectId), result.readModel);

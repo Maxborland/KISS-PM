@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../planningApi";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 import type { PlanningCommand } from "@kiss-pm/domain";
+import { readBaselineComparisonTasks } from "../planningReadModelAccess";
 
 export function BaselinePane(props: {
   projectId: string;
@@ -51,7 +52,7 @@ export function BaselinePane(props: {
             </tr>
           </thead>
           <tbody>
-            {(comparison.tasks as Array<{ taskId: string; finishDeltaDays: number | null }>).map((row) => (
+            {readBaselineComparisonTasks(props.readModel).map((row) => (
               <tr key={row.taskId}>
                 <td>{row.taskId}</td>
                 <td>{row.finishDeltaDays ?? "—"}</td>

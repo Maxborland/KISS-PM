@@ -12,6 +12,7 @@ import {
   computeOrgMonthlyResourceMatrix,
   type OrgMonthlyResourceMatrix
 } from "./computeOrgResourceMatrix";
+import { readResourceOverloads } from "../planningReadModelAccess";
 
 import { useAbsences } from "../../absences/useAbsences";
 import { useProductionCalendar } from "../../production-calendar/useProductionCalendar";
@@ -113,8 +114,7 @@ export function ResourcesPane(props: {
     return computeMonthlyResourceMatrix(matrixInput);
   }, [matrixInput, orgStructureQuery.orgStructure, orgTrack]);
 
-  const overloads = (props.readModel?.resourceLoad as { overloads?: Array<Record<string, unknown>> })
-    ?.overloads ?? [];
+  const overloads = readResourceOverloads(props.readModel);
   const orgGroups = isOrgMatrix(matrix) ? matrix.orgGroups : [];
   const hasMatrixContent =
     orgGroups.length > 0 || matrix.groups.length > 0 || matrix.unassignedRows.length > 0;

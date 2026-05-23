@@ -109,7 +109,8 @@ async function saveOrgStructure(input: OrgStructureReplaceInput): Promise<Tenant
     body: JSON.stringify(input)
   });
   if (!response.ok) {
-    throw new Error(`org_structure_save_failed_${response.status}`);
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `org_structure_save_failed_${response.status}`);
   }
   const body = (await response.json()) as { orgStructure: TenantOrgStructureSnapshot };
   return body.orgStructure;

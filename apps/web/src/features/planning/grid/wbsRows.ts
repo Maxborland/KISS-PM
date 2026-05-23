@@ -1,15 +1,19 @@
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 
+import { readCalculatedTasks } from "../planningReadModelAccess";
+
 export type WbsGridRow = {
   id: string;
   wbsIndex: number;
   wbsCode: string;
   title: string;
   durationLabel: string;
+  start: string | null;
   finish: string | null;
   percentComplete: number;
   assignmentsLabel: string;
   hasValidation: boolean;
+  isCritical: boolean;
   task: Record<string, unknown>;
 };
 
@@ -19,18 +23,17 @@ export function buildWbsRows(readModel: PlanningReadModel | undefined): WbsGridR
     String(left.wbsCode ?? "").localeCompare(String(right.wbsCode ?? ""), "ru")
   );
   const calculatedById = new Map(
-    (readModel.calculatedPlan.tasks as Array<Record<string, unknown>>).map((task) => [
-      String(task.id),
-      task
-    ])
+    readCalculatedTasks(readModel).map((task) => [String(task.id), task])
   );
   const workingMinutesPerDay = 8 * 60;
   return tasks.map((task, index) => {
     const calculated = calculatedById.get(String(task.id));
+    const start =
+      (typeof calculated?.calculatedStart === "string" ? calculated.calculatedStart : null) ??
+      (typeof task.plannedStart === "string" ? task.plannedStart : null);
     const finish =
-      (calculated?.calculatedFinish as string | null | undefined) ??
-      (task.plannedFinish as string | null | undefined) ??
-      null;
+      (typeof calculated?.calculatedFinish === "string" ? calculated.calculatedFinish : null) ??
+      (typeof task.plannedFinish === "string" ? task.plannedFinish : null);
     const durationMinutes = Number(task.durationMinutes ?? calculated?.durationMinutes ?? 0);
     const durationLabel =
       durationMinutes > 0
@@ -47,6 +50,7 @@ export function buildWbsRows(readModel: PlanningReadModel | undefined): WbsGridR
       wbsCode: String(task.wbsCode ?? index + 1),
       title: String(task.title ?? ""),
       durationLabel,
+      start,
       finish,
       percentComplete: Number(task.percentComplete ?? 0),
       assignmentsLabel: assignments.length > 0 ? String(assignments.length) : "",
@@ -54,6 +58,7 @@ export function buildWbsRows(readModel: PlanningReadModel | undefined): WbsGridR
         (issue) =>
           issue.entity?.type === "task" && issue.entity.id === String(task.id) && issue.severity === "error"
       ),
+      isCritical: Boolean(calculated?.isCritical),
       task
     };
   });
