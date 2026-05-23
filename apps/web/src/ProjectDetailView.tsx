@@ -27,10 +27,12 @@ export function ProjectDetailView(props: {
   data: WorkspaceData;
   projectId: string;
   onBack: () => void;
+  onOpenSchedule: (projectId: string) => void;
   onChanged: (message: string) => void;
   sectionState: SectionState;
 }) {
   const canManageProjects = hasPermission(props.data.permissions, "tenant.projects.manage");
+  const canReadPlan = hasPermission(props.data.permissions, "tenant.project_plan.read");
   const projectDetailQuery = useProjectDetailQuery(
     props.projectId,
     props.sectionState.canRead
@@ -80,6 +82,25 @@ export function ProjectDetailView(props: {
             <ArrowLeft aria-hidden="true" size={16} />
             К проектам
           </button>
+          {canReadPlan ? (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => props.onOpenSchedule(props.projectId)}
+            >
+              <CalendarDays aria-hidden="true" size={16} />
+              График
+            </button>
+          ) : (
+            <button
+              className="secondary-button"
+              disabled
+              title="Нужно право tenant.project_plan.read"
+              type="button"
+            >
+              График
+            </button>
+          )}
           {canManageProjects ? (
             <button
               className="primary-button"

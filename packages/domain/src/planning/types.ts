@@ -55,6 +55,7 @@ export type PlanTask = {
   workMinutes: number;
   percentComplete: number;
   calendarId: string | null;
+  customFields?: Record<string, unknown>;
   constraint: PlanConstraint | null;
 };
 

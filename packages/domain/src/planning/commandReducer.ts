@@ -63,6 +63,17 @@ export function reducePlanningCommand(
           task.id === command.payload.taskId ? { ...task, statusId: command.payload.statusId } : task
         )
       });
+    case "task.update_progress":
+      return withSnapshot(snapshot, command, {
+        tasks: snapshot.tasks.map((task) =>
+          task.id === command.payload.taskId
+            ? {
+                ...task,
+                percentComplete: clampPercentComplete(command.payload.percentComplete)
+              }
+            : task
+        )
+      });
     case "task.move_wbs":
       return withSnapshot(snapshot, command, {
         tasks: moveTask(snapshot.tasks, command.payload.taskId, command.payload.parentTaskId, command.payload.sortOrder)
@@ -117,6 +128,28 @@ export function reducePlanningCommand(
     case "project.deadline.move":
       return withSnapshot(snapshot, command, {
         project: { ...snapshot.project, deadline: command.payload.deadline }
+      });
+    case "project.settings.update":
+      return withSnapshot(snapshot, command, {
+        project: { ...snapshot.project, calendarId: command.payload.calendarId },
+        tasks: snapshot.tasks.map((task) => ({
+          ...task,
+          calendarId: command.payload.calendarId
+        }))
+      });
+    case "task.update_custom_field":
+      return withSnapshot(snapshot, command, {
+        tasks: snapshot.tasks.map((task) =>
+          task.id === command.payload.taskId
+            ? {
+                ...task,
+                customFields: {
+                  ...(task.customFields ?? {}),
+                  [command.payload.fieldKey]: command.payload.value
+                }
+              }
+            : task
+        )
       });
   }
 }
@@ -365,6 +398,20 @@ function validateCommandPreconditions(
     case "task.update_schedule":
     case "task.update_status":
       return requireTask(taskIds, command.payload.taskId);
+    case "task.update_progress": {
+      const issues = requireTask(taskIds, command.payload.taskId);
+      if (
+        !Number.isFinite(command.payload.percentComplete) ||
+        command.payload.percentComplete < 0 ||
+        command.payload.percentComplete > 100
+      ) {
+        return [
+          ...issues,
+          invalid("planning_command_invalid", "Прогресс задачи должен быть от 0 до 100")
+        ];
+      }
+      return issues;
+    }
     case "task.update_work_model":
       return [
         ...requireTask(taskIds, command.payload.taskId),
@@ -472,6 +519,19 @@ function validateCommandPreconditions(
         return [invalid("planning_command_invalid", "Перенос deadline требует причины")];
       }
       return [];
+    case "project.settings.update":
+      if (
+        command.payload.calendarId !== null &&
+        !calendarIds.has(command.payload.calendarId)
+      ) {
+        return [invalid("planning_command_invalid", "Календарь проекта не найден в плане")];
+      }
+      return [];
+    case "task.update_custom_field":
+      if (command.payload.fieldKey.trim().length === 0) {
+        return [invalid("planning_command_invalid", "Ключ пользовательского поля обязателен")];
+      }
+      return requireTask(taskIds, command.payload.taskId);
   }
 
   return [];
@@ -670,4 +730,9 @@ function dependencyIdsFor(command: PlanningCommand): string[] {
   if (command.type === "dependency.upsert") return [command.payload.id];
   if (command.type === "dependency.delete") return [command.payload.dependencyId];
   return [];
+}
+
+function clampPercentComplete(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
 }

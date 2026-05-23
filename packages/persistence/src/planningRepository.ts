@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 
 import type {
   DependencyType,
@@ -36,8 +36,15 @@ import {
   taskStatuses,
   taskParticipants,
   tasks,
+  tenantProductionCalendarExceptions,
+  tenantProductionCalendars,
   tenantUsers
 } from "./schema";
+import {
+  createResourceAbsencesRepository,
+  expandAbsenceToCalendarExceptions
+} from "./resourceAbsencesRepository";
+import { TENANT_DEFAULT_CALENDAR_ID } from "./tenantProductionCalendarConstants";
 
 export type PlanningDependencyInput = {
   id: string;
@@ -227,8 +234,73 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               )
             );
       const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
-      const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
+      const [tenantProductionCalendar] = await db
+        .select()
+        .from(tenantProductionCalendars)
+        .where(eq(tenantProductionCalendars.tenantId, tenantId))
+        .limit(1);
       const projectCalendarId = selectProjectCalendarId(project, projectCalendarRows);
+      const calendars = mapCalendars(
+        projectCalendarRows,
+        resourceCalendarRows,
+        project.id,
+        tenantProductionCalendar
+      );
+      const rangeStart = toPlanDate(project.plannedStart);
+      const rangeFinish = toPlanDate(project.plannedFinish);
+      const projectCalendarExceptions = exceptionRows.map((exception) => ({
+        id: exception.id,
+        calendarId: exception.calendarId,
+        resourceId: exception.resourceId,
+        date: exception.date,
+        workingMinutes: exception.workingMinutes,
+        reason: exception.reason
+      }));
+      const tenantCalendarExceptions =
+        projectCalendarId === TENANT_DEFAULT_CALENDAR_ID
+          ? await db
+              .select()
+              .from(tenantProductionCalendarExceptions)
+              .where(
+                and(
+                  eq(tenantProductionCalendarExceptions.tenantId, tenantId),
+                  gte(tenantProductionCalendarExceptions.date, rangeStart),
+                  lte(tenantProductionCalendarExceptions.date, rangeFinish)
+                )
+              )
+              .orderBy(
+                asc(tenantProductionCalendarExceptions.date),
+                asc(tenantProductionCalendarExceptions.id)
+              )
+          : [];
+      const absencesRepository = createResourceAbsencesRepository(db);
+      const approvedAbsences = await absencesRepository.listAbsences(
+        tenantId,
+        rangeStart,
+        rangeFinish
+      );
+      const absenceExceptions = approvedAbsences.flatMap((absence) =>
+        expandAbsenceToCalendarExceptions(absence).map((exception) => ({
+          id: exception.id,
+          calendarId: TENANT_DEFAULT_CALENDAR_ID,
+          resourceId: exception.resourceId,
+          date: exception.date,
+          workingMinutes: exception.workingMinutes,
+          reason: exception.reason
+        }))
+      );
+      const calendarExceptionsMerged = [
+        ...projectCalendarExceptions,
+        ...tenantCalendarExceptions.map((exception) => ({
+          id: `tenant-${exception.id}`,
+          calendarId: TENANT_DEFAULT_CALENDAR_ID,
+          resourceId: exception.resourceId,
+          date: exception.date,
+          workingMinutes: exception.workingMinutes,
+          reason: exception.reason
+        })),
+        ...absenceExceptions
+      ];
 
       return {
         tenantId,
@@ -265,14 +337,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           })),
         baselines: mapBaselines(baselineRows, baselineTaskRows),
         calendars,
-        calendarExceptions: exceptionRows.map((exception) => ({
-          id: exception.id,
-          calendarId: exception.calendarId,
-          resourceId: exception.resourceId,
-          date: exception.date,
-          workingMinutes: exception.workingMinutes,
-          reason: exception.reason
-        })),
+        calendarExceptions: calendarExceptionsMerged,
         resources: resourceRows.map<PlanResource>((resource) => ({
           id: resource.id,
           userId: resource.id,
@@ -871,6 +936,41 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             .set({ deadline: fromPlanDate(input.command.payload.deadline) })
             .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)));
           return;
+        case "project.settings.update":
+          await db
+            .update(projects)
+            .set({ calendarId: input.command.payload.calendarId })
+            .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)));
+          return;
+        case "task.update_custom_field": {
+          const [existing] = await db
+            .select({ customFields: tasks.customFields })
+            .from(tasks)
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            )
+            .limit(1);
+          if (!existing) throw new Error("task_not_found");
+          const nextCustomFields = {
+            ...(existing.customFields ?? {}),
+            [input.command.payload.fieldKey]: input.command.payload.value
+          };
+          await db
+            .update(tasks)
+            .set({ customFields: nextCustomFields, updatedAt: new Date() })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        }
       }
     },
 
@@ -1178,6 +1278,7 @@ function mapPlanTask(
     workMinutes: task.workMinutes ?? Math.max(0, task.plannedWork) * 60,
     percentComplete: task.progress,
     calendarId: projectCalendarId,
+    customFields: task.customFields ?? {},
     constraint
   };
 }
@@ -1331,7 +1432,8 @@ function assignmentFallbackKey(taskId: string, resourceId: string, role: string)
 function mapCalendars(
   projectCalendarRows: Array<typeof projectCalendars.$inferSelect>,
   resourceCalendarRows: Array<typeof resourceCalendars.$inferSelect>,
-  projectId: string
+  projectId: string,
+  tenantProductionCalendar?: typeof tenantProductionCalendars.$inferSelect
 ): PlanCalendar[] {
   const projectPlanCalendars = projectCalendarRows.length > 0
     ? projectCalendarRows.map<PlanCalendar>((calendar) => ({
@@ -1347,7 +1449,14 @@ function mapCalendars(
         }
       ];
 
-  const calendars = [
+  const calendars: PlanCalendar[] = [
+    {
+      id: TENANT_DEFAULT_CALENDAR_ID,
+      workingWeekdays:
+        tenantProductionCalendar?.workingWeekdays ?? defaultWorkingWeekdays,
+      workingMinutesPerDay:
+        tenantProductionCalendar?.workingMinutesPerDay ?? defaultWorkingMinutesPerDay
+    },
     ...projectPlanCalendars,
     ...resourceCalendarRows.map<PlanCalendar>((calendar) => ({
       id: calendar.id,
@@ -1356,7 +1465,8 @@ function mapCalendars(
     }))
   ];
 
-  return calendars;
+  const unique = new Map(calendars.map((calendar) => [calendar.id, calendar]));
+  return [...unique.values()];
 }
 
 function selectProjectCalendarId(

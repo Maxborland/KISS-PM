@@ -96,6 +96,22 @@ export const workspaceRoutes = [
     description: "Пользовательские поля и шаблоны проекта"
   },
   {
+    id: "production-calendar",
+    label: "Производственный календарь",
+    group: "settings",
+    path: "/settings/production-calendar",
+    permission: "tenant.workspace_config.read",
+    description: "Tenant-уровень: рабочие/нерабочие дни и пресет РФ"
+  },
+  {
+    id: "absences",
+    label: "Отсутствия",
+    group: "settings",
+    path: "/settings/absences",
+    permission: "tenant.absences.read",
+    description: "Отпуска, больничные и прочие отсутствия сотрудников"
+  },
+  {
     id: "project-types",
     label: "Типы проектов",
     group: "settings",

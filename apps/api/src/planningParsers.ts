@@ -15,8 +15,18 @@ export type PlanningCommandEnvelope = {
   idempotencyKey?: string;
 };
 
+export type PlanningCommandBatchEnvelope = {
+  commands: PlanningCommand[];
+  clientPlanVersion: number;
+  idempotencyKey?: string;
+};
+
 export type PlanningCommandEnvelopeParseResult =
   | { ok: true; value: PlanningCommandEnvelope }
+  | { ok: false; error: string };
+
+export type PlanningCommandBatchEnvelopeParseResult =
+  | { ok: true; value: PlanningCommandBatchEnvelope }
   | { ok: false; error: string };
 
 export type ScenarioPreviewEnvelope = {
@@ -54,6 +64,30 @@ export function parsePlanningCommandEnvelope(input: unknown): PlanningCommandEnv
     ok: true,
     value
   };
+}
+
+export function parsePlanningCommandBatchEnvelope(
+  input: unknown
+): PlanningCommandBatchEnvelopeParseResult {
+  if (!isObject(input)) return { ok: false, error: "planning_command_invalid" };
+  if (!Array.isArray(input.commands) || input.commands.length === 0) {
+    return { ok: false, error: "planning_command_invalid" };
+  }
+  const commands: PlanningCommand[] = [];
+  for (const commandInput of input.commands) {
+    const commandResult = parsePlanningCommand(commandInput);
+    if (!commandResult.ok) return commandResult;
+    commands.push(commandResult.value);
+  }
+  const clientPlanVersion = getInteger(input, "clientPlanVersion");
+  if (clientPlanVersion === null || clientPlanVersion < 1) {
+    return { ok: false, error: "plan_version_conflict" };
+  }
+  const idempotencyKey = parseIdempotencyKey(input);
+  if (idempotencyKey === false) return { ok: false, error: "planning_command_invalid" };
+  const value: PlanningCommandBatchEnvelope = { commands, clientPlanVersion };
+  if (idempotencyKey !== undefined) value.idempotencyKey = idempotencyKey;
+  return { ok: true, value };
 }
 
 export function parseScenarioPreviewEnvelope(input: unknown):
@@ -159,6 +193,19 @@ export function parsePlanningCommand(input: unknown):
       if (!taskId || !statusId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { taskId, statusId } } };
     }
+    case "task.update_progress": {
+      const taskId = getString(payload, "taskId");
+      const percentComplete = getInteger(payload, "percentComplete");
+      if (
+        !taskId ||
+        percentComplete === null ||
+        percentComplete < 0 ||
+        percentComplete > 100
+      ) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
+      return { ok: true, value: { type, payload: { taskId, percentComplete } } };
+    }
     case "task.move_wbs": {
       const taskId = getString(payload, "taskId");
       const parentTaskId = getOptionalString(payload, "parentTaskId");
@@ -254,6 +301,19 @@ export function parsePlanningCommand(input: unknown):
       const reason = getString(payload, "reason");
       if (!deadline || !reason) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { deadline, reason } } };
+    }
+    case "project.settings.update": {
+      const calendarId = getOptionalString(payload, "calendarId");
+      return { ok: true, value: { type, payload: { calendarId } } };
+    }
+    case "task.update_custom_field": {
+      const taskId = getString(payload, "taskId");
+      const fieldKey = getString(payload, "fieldKey");
+      if (!taskId || !fieldKey) return { ok: false, error: "planning_command_invalid" };
+      return {
+        ok: true,
+        value: { type, payload: { taskId, fieldKey, value: payload.value } }
+      };
     }
     default:
       return { ok: false, error: "planning_command_invalid" };
