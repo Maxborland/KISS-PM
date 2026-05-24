@@ -44,7 +44,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "border-t bg-slate-100/50 font-medium [&>tr]:last:border-b-0 dark:bg-slate-800/50",
+        "border-t border-[var(--border-subtle)] bg-[var(--panel-strong)] font-medium [&>tr]:last:border-b-0",
         className
       )}
       {...props}
@@ -57,7 +57,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-slate-100/50 has-aria-expanded:bg-slate-100/50 data-[state=selected]:bg-slate-100 dark:hover:bg-slate-800/50 dark:has-aria-expanded:bg-slate-800/50 dark:data-[state=selected]:bg-slate-800",
+        "border-b border-[var(--border-subtle)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--panel-strong)] has-aria-expanded:bg-[var(--panel-strong)] data-[state=selected]:bg-[var(--accent-soft)]",
         className
       )}
       {...props}
@@ -70,7 +70,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-slate-950 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] dark:text-slate-50",
+        "h-10 px-[var(--space-2)] text-left align-middle text-[var(--text-xs)] font-semibold uppercase tracking-[0.04em] whitespace-nowrap text-[var(--muted-strong)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}
@@ -98,7 +98,7 @@ function TableCaption({
   return (
     <caption
       data-slot="table-caption"
-      className={cn("mt-4 text-sm text-slate-500 dark:text-slate-400", className)}
+      className={cn("mt-4 text-[var(--text-sm)] text-[var(--muted)]", className)}
       {...props}
     />
   )

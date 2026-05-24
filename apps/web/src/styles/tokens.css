@@ -73,29 +73,37 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Typography */
-  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* Typography — pair: Plus Jakarta Sans (display) + Inter (body) + JetBrains Mono (code).
+     next/font подставляет --next-font-*; fallback в var() обеспечивает корректный стек в Storybook. */
+  --font-ui: var(--next-font-ui, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--next-font-display, "Plus Jakarta Sans"), "Inter", system-ui, sans-serif;
+  --font-mono: var(--next-font-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
 
+  /* Type scale: body 14 · h3 18 · h2 24 · h1 32 */
   --text-xs: 11px;
   --text-sm: 12px;
-  --text-base: 13px;
+  --text-base: 14px;
   --text-md: 14px;
   --text-lg: 16px;
-  --text-xl: 20px;
-  --text-2xl: 26px;
-  --text-3xl: 32px;
+  --text-h3: 18px;
+  --text-h2: 24px;
+  --text-h1: 32px;
+  --text-xl: var(--text-h3);
+  --text-2xl: var(--text-h2);
+  --text-3xl: var(--text-h1);
   --text-4xl: 40px;
 
   --lh-xs: 16px;
   --lh-sm: 18px;
-  --lh-base: 20px;
+  --lh-base: 22px;
   --lh-md: 22px;
   --lh-lg: 24px;
-  --lh-xl: 28px;
-  --lh-2xl: 32px;
-  --lh-3xl: 38px;
+  --lh-h3: 24px;
+  --lh-h2: 32px;
+  --lh-h1: 38px;
+  --lh-xl: var(--lh-h3);
+  --lh-2xl: var(--lh-h2);
+  --lh-3xl: var(--lh-h1);
   --lh-4xl: 44px;
 
   /* Radii */
@@ -122,8 +130,8 @@
   --sidebar-width: 232px;
   --topbar-height: 60px;
   --page-header-height: 64px;
-  --row-h: 36px;
-  --toolbar-h: 40px;
+  --row-h: 30px;
+  --toolbar-h: 36px;
   --content-max: 1480px;
   --canvas-pad: 16px;
   --canvas-radius: var(--radius-2xl);
