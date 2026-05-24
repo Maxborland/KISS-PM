@@ -362,6 +362,55 @@ describe("attachment and unified search API", () => {
     });
   });
 
+  it("respects file and external reference type filters in unified search", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "client-alpha",
+        title: "Единый фильтр поиска",
+        url: "https://example.test/type-filter.pdf"
+      })
+    });
+    const form = new FormData();
+    form.set("entityType", "client");
+    form.set("entityId", "client-alpha");
+    form.set("file", new Blob(["hello"], { type: "text/plain" }), "Единый фильтр поиска.txt");
+    await app.request("/api/workspace/attachments/files", {
+      method: "POST",
+      headers: actionHeaders(adminCookie),
+      body: form
+    });
+
+    const fileSearch = await app.request(
+      "/api/workspace/search?q=единый&types=file",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(fileSearch.status).toBe(200);
+    const filePayload = await fileSearch.json() as { results: Array<{ type: string; title: string }> };
+    expect(filePayload.results).toEqual([
+      expect.objectContaining({ type: "file", title: "Единый фильтр поиска.txt" })
+    ]);
+    expect(filePayload.results).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "external_reference" })])
+    );
+
+    const referenceSearch = await app.request(
+      "/api/workspace/search?q=единый&types=external_reference",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(referenceSearch.status).toBe(200);
+    const referencePayload = await referenceSearch.json() as { results: Array<{ type: string; title: string }> };
+    expect(referencePayload.results).toEqual([
+      expect.objectContaining({ type: "external_reference", title: "Единый фильтр поиска" })
+    ]);
+    expect(referencePayload.results).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "file" })])
+    );
+  });
+
   async function loginAs(email: string, password: string) {
     const response = await app.request("/api/auth/login", {
       method: "POST",

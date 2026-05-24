@@ -207,7 +207,9 @@ async function searchAttachments(input: WorkspaceSearchInput, limit: number): Pr
         entityType: attachment.entityType as AttachmentEntityType,
         profile: input.profile
       });
-      if (entity.ok && entity.value.readDecision.allowed) visible.push(attachment);
+      if (entity.ok && entity.value.readDecision.allowed && matchesRequestedAttachmentKind(input, attachment)) {
+        visible.push(attachment);
+      }
     }
     offset += attachments.length;
     if (attachments.length < pageLimit) break;
@@ -231,4 +233,13 @@ async function searchAttachments(input: WorkspaceSearchInput, limit: number): Pr
       source: "attachments"
     };
   }), limit);
+}
+
+function matchesRequestedAttachmentKind(
+  input: WorkspaceSearchInput,
+  attachment: AttachmentReadModel
+): boolean {
+  if (!input.requestedTypes) return true;
+  const kind = attachment.fileAsset ? "file" : "external_reference";
+  return input.requestedTypes.has(kind);
 }
