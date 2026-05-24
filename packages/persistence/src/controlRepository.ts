@@ -157,6 +157,7 @@ export function createControlRepository(db: KissPmDatabase): ControlRepository {
         .onConflictDoUpdate({
           target: [controlSignals.tenantId, controlSignals.projectId, controlSignals.id],
           set: {
+            evaluationId: input.evaluationId,
             severity: input.severity,
             explanation: input.explanation,
             ownerUserId: input.ownerUserId,

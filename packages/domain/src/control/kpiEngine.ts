@@ -126,7 +126,7 @@ export function createControlSignalsFromEvaluations(input: {
       const definition = definitionsById.get(evaluation.definitionId);
       const metric = metricKeyForDefinition(definition);
       return {
-        id: `signal-${evaluation.id}`,
+        id: `signal-${evaluation.projectId}-${evaluation.definitionId}`,
         tenantId: evaluation.tenantId,
         projectId: evaluation.projectId,
         sourceEntity: { type: "Project", id: evaluation.projectId },

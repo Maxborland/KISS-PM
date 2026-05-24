@@ -770,8 +770,135 @@ describe("KISS PM API Phase 1 shell", () => {
       expect(response.status).toBe(200);
     }
 
-    expect(signalIdsByRun[0]).toEqual(["signal-project-control-deadline_delta_days"]);
+    expect(signalIdsByRun[0]).toEqual(["signal-project-control-kpi-project-deadline-delta"]);
     expect(signalIdsByRun[1]).toEqual(signalIdsByRun[0]);
+  });
+
+  it("keeps control signal ids unique for KPI definitions sharing one metric", async () => {
+    const definitions: KpiDefinition[] = [
+      {
+        id: "kpi-deadline-warning",
+        tenantId: "tenant-control",
+        entityType: "project",
+        code: "project.deadline.warning",
+        label: "Сдвиг срока: предупреждение",
+        formula: { type: "builtin", key: "deadline_delta_days" },
+        unit: "days",
+        period: "snapshot",
+        thresholdRules: [{ severity: "warning", operator: "gt", value: 0 }],
+        ownerRole: "project_manager",
+        allowedActions: ["create_corrective_action"],
+        version: 1,
+        status: "active"
+      },
+      {
+        id: "kpi-deadline-critical",
+        tenantId: "tenant-control",
+        entityType: "project",
+        code: "project.deadline.critical",
+        label: "Сдвиг срока: критично",
+        formula: { type: "builtin", key: "deadline_delta_days" },
+        unit: "days",
+        period: "snapshot",
+        thresholdRules: [{ severity: "critical", operator: "gt", value: 0 }],
+        ownerRole: "project_manager",
+        allowedActions: ["apply_planning_delta"],
+        version: 1,
+        status: "active"
+      }
+    ];
+    const evaluationsById = new Map<string, string>();
+    const persistedSignals: ControlSignal[] = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: [
+            "tenant.project_plan.read",
+            "tenant.control_signals.read",
+            "tenant.control_signals.manage"
+          ]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async listKpiDefinitions() {
+        return definitions;
+      },
+      async upsertKpiDefinition(input) {
+        return input;
+      },
+      async getPlanSnapshot() {
+        const snapshot = createControlActionSnapshot();
+        return {
+          ...snapshot,
+          project: {
+            ...snapshot.project,
+            deadline: "2026-05-23"
+          }
+        };
+      },
+      async createKpiEvaluation(input) {
+        evaluationsById.set(input.id, input.definitionId);
+        return input;
+      },
+      async upsertControlSignal(input) {
+        persistedSignals.push(input);
+        return input;
+      },
+      async appendAuditEvent() {
+        return;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/projects/project-control/control/evaluate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: "kiss_pm_session=control-token"
+      },
+      body: JSON.stringify({})
+    });
+
+    expect(response.status).toBe(200);
+    expect(persistedSignals.map((signal) => signal.id)).toEqual([
+      "signal-project-control-kpi-deadline-warning",
+      "signal-project-control-kpi-deadline-critical"
+    ]);
+    expect(new Set(persistedSignals.map((signal) => signal.id)).size).toBe(2);
+    expect(persistedSignals.every((signal) => signal.evaluationId !== null)).toBe(true);
+    expect(persistedSignals.map((signal) => evaluationsById.get(signal.evaluationId ?? ""))).toEqual([
+      "kpi-deadline-warning",
+      "kpi-deadline-critical"
+    ]);
   });
 
   it("requires control-signal manage permission before persisting KPI evaluations", async () => {
