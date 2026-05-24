@@ -47,6 +47,28 @@ const dataset: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Оператор сценариев без чтения",
       permissions: ["tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply"]
+    },
+    {
+      id: "access-profile-plan-manager-no-resource-manage",
+      tenantId: "tenant-alpha",
+      name: "Менеджер плана без управления ресурсами",
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.project_plan.manage"
+      ]
+    },
+    {
+      id: "access-profile-resource-manager-no-plan-manage",
+      tenantId: "tenant-alpha",
+      name: "Ресурсный менеджер без управления планом",
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.project_resources.manage"
+      ]
     }
   ],
   positions: [
@@ -102,6 +124,24 @@ const dataset: SeedTenantDataset = {
       accessProfileId: "access-profile-scenario-operator-no-read",
       positionId: "position-manager",
       password: "scenario12345"
+    },
+    {
+      id: "user-alpha-plan-manager-no-resource-manage",
+      tenantId: "tenant-alpha",
+      email: "plan-manager-no-resource-manage@kiss-pm.local",
+      name: "Павел Без Ресурсов",
+      accessProfileId: "access-profile-plan-manager-no-resource-manage",
+      positionId: "position-manager",
+      password: "local-plan-manager-password"
+    },
+    {
+      id: "user-alpha-resource-manager-no-plan",
+      tenantId: "tenant-alpha",
+      email: "resource-manager-no-plan@kiss-pm.local",
+      name: "Роман Без Плана",
+      accessProfileId: "access-profile-resource-manager-no-plan-manage",
+      positionId: "position-manager",
+      password: "resourcelocal-manager-password"
     }
   ]
 };
@@ -851,6 +891,138 @@ describe("planning API routes", () => {
         })
       ])
     });
+  });
+
+  it("requires resource management permission when task creation includes assignments", async () => {
+    const limitedManagerCookie = await loginAs(
+      "plan-manager-no-resource-manage@kiss-pm.local",
+      "local-plan-manager-password"
+    );
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: limitedManagerCookie } }
+    );
+    const readModelBody = await readModel.json();
+    expect(readModel.status).toBe(200);
+
+    const command = {
+      type: "task.create",
+      payload: {
+        id: "task-create-with-assignment",
+        projectId: "project-alpha",
+        title: "Создать задачу с назначением",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-10",
+        plannedFinish: "2026-06-11",
+        durationMinutes: 960,
+        workMinutes: 960,
+        assignments: [
+          {
+            id: "assignment-created-with-task",
+            resourceId: "user-alpha-executor",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 960
+          }
+        ]
+      }
+    };
+
+    const deniedPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/preview-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: limitedManagerCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    expect(deniedPreview.status).toBe(403);
+    await expect(deniedPreview.json()).resolves.toMatchObject({ error: "permission_missing" });
+
+    const deniedApply = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: limitedManagerCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    expect(deniedApply.status).toBe(403);
+    await expect(deniedApply.json()).resolves.toEqual({ error: "permission_missing" });
+  });
+
+  it("requires plan management permission when assigned task creation also allocates resources", async () => {
+    const resourceManagerCookie = await loginAs(
+      "resource-manager-no-plan@kiss-pm.local",
+      "resourcelocal-manager-password"
+    );
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: resourceManagerCookie } }
+    );
+    const readModelBody = await readModel.json();
+    expect(readModel.status).toBe(200);
+
+    const command = {
+      type: "task.create",
+      payload: {
+        id: "task-create-resource-manager-only",
+        projectId: "project-alpha",
+        title: "Нельзя создать задачу без права управления планом",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-12",
+        plannedFinish: "2026-06-13",
+        durationMinutes: 960,
+        workMinutes: 960,
+        assignments: [
+          {
+            id: "assignment-created-resource-manager-only",
+            resourceId: "user-alpha-executor",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 960
+          }
+        ]
+      }
+    };
+
+    const deniedPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/preview-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: resourceManagerCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    expect(deniedPreview.status).toBe(403);
+    await expect(deniedPreview.json()).resolves.toMatchObject({ error: "permission_missing" });
+
+    const deniedApply = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: resourceManagerCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    expect(deniedApply.status).toBe(403);
+    await expect(deniedApply.json()).resolves.toEqual({ error: "permission_missing" });
   });
 
   it("returns baseline comparison in the planning read-model", async () => {

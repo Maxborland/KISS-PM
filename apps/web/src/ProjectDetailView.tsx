@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { Task } from "./api";
 import { TaskFormDialog } from "./TaskFormDialog";
+import { PlanningWorkspaceRoute } from "./planning/PlanningWorkspaceRoute";
 import type { WorkspaceData } from "./workspaceData";
 import { formatDateOnly } from "./workspaceViewHelpers";
 import type { SectionState } from "./workspaceShellState";
@@ -158,6 +159,13 @@ export function ProjectDetailView(props: {
               <StatusPill label="Активен" tone="success" />
             </section>
           </div>
+          <PlanningWorkspaceRoute
+            projectId={project.id}
+            permissions={props.data.permissions}
+            taskStatuses={props.data.taskStatuses}
+            sectionState={props.sectionState}
+            onChanged={props.onChanged}
+          />
           <div className="table-wrap">
             {transitionError ? <p className="error">{transitionError}</p> : null}
             <table className="data-table" aria-label="Задачи проекта">

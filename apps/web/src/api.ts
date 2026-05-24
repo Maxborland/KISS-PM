@@ -1038,7 +1038,7 @@ export async function createTaskComment(
   });
 }
 
-async function requestJson<T>(
+export async function requestJson<T>(
   path: string,
   options: {
     method?: string;
