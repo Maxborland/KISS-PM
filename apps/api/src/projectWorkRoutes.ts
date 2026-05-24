@@ -37,6 +37,7 @@ import {
   parseUpdateTaskBody,
   parseUpdateTaskStatusBody
 } from "./projectWorkParsers";
+import { serializeAttachment } from "./attachmentSerialization";
 
 type ProjectWorkRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -311,9 +312,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const task = await dataSource.findTaskById(actor.tenantId, context.req.param("taskId"));
     if (!task) return context.json({ error: "task_not_found" }, 404);
 
+    const attachmentItems = (await dataSource.listAttachmentActivityItems?.({
+      tenantId: actor.tenantId,
+      entityType: "task",
+      entityId: task.id
+    })) ?? [];
+
     return context.json({
       task,
-      activities: await dataSource.listTaskActivities(actor.tenantId, task.id)
+      activities: await dataSource.listTaskActivities(actor.tenantId, task.id),
+      attachmentItems: attachmentItems.map(serializeAttachment)
     });
   });
 
@@ -1148,8 +1156,15 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const task = await dataSource.findTaskById(actor.tenantId, context.req.param("taskId"));
     if (!task) return context.json({ error: "task_not_found" }, 404);
 
+    const attachmentItems = (await dataSource.listAttachmentActivityItems?.({
+      tenantId: actor.tenantId,
+      entityType: "task",
+      entityId: task.id
+    })) ?? [];
+
     return context.json({
-      activities: await dataSource.listTaskActivities(actor.tenantId, task.id)
+      activities: await dataSource.listTaskActivities(actor.tenantId, task.id),
+      attachmentItems: attachmentItems.map(serializeAttachment)
     });
   });
 

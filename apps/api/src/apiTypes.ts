@@ -23,6 +23,13 @@ import type {
   PlanningScenarioRunRecord,
   PlanningSolverRunInput,
   PlanningSolverRunRecord,
+  AttachmentEntityType,
+  AttachmentReadModel,
+  EntityAttachmentInput,
+  ExternalReferenceInput,
+  ExternalReferenceRecord,
+  FileAssetInput,
+  FileAssetRecord,
   ActionExecutionInput,
   ActionExecutionRecord,
   TaskActivityInput,
@@ -33,6 +40,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { StorageProvider } from "./storageProvider";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -461,6 +469,42 @@ export type ApiTenantDataSource = {
   updateTaskMetadata?(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
   listTaskActivities?(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
   createTaskActivity?(input: TaskActivityInput): Promise<TaskActivityRecord>;
+  createPendingFileAsset?(input: FileAssetInput): Promise<FileAssetRecord>;
+  markFileAssetReady?(input: {
+    tenantId: TenantId;
+    assetId: string;
+    sizeBytes: number;
+    checksumSha256: string;
+  }): Promise<FileAssetRecord | undefined>;
+  markFileAssetFailed?(input: {
+    tenantId: TenantId;
+    assetId: string;
+  }): Promise<FileAssetRecord | undefined>;
+  createExternalReference?(input: ExternalReferenceInput): Promise<ExternalReferenceRecord>;
+  createEntityAttachment?(input: EntityAttachmentInput): Promise<AttachmentReadModel>;
+  listEntityAttachments?(input: {
+    tenantId: TenantId;
+    entityType: AttachmentEntityType;
+    entityId: string;
+  }): Promise<AttachmentReadModel[]>;
+  listAttachmentActivityItems?(input: {
+    tenantId: TenantId;
+    entityType: AttachmentEntityType;
+    entityId: string;
+  }): Promise<AttachmentReadModel[]>;
+  findAttachmentById?(
+    tenantId: TenantId,
+    attachmentId: string
+  ): Promise<AttachmentReadModel | undefined>;
+  archiveAttachment?(input: {
+    tenantId: TenantId;
+    attachmentId: string;
+  }): Promise<AttachmentReadModel | undefined>;
+  searchAttachments?(input: {
+    tenantId: TenantId;
+    query: string;
+    limit: number;
+  }): Promise<AttachmentReadModel[]>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;
@@ -596,6 +640,7 @@ export type ApiTenantDataSource = {
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
+  storageProvider?: StorageProvider;
   authRateLimiter?: AuthRateLimiter;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];

@@ -21,6 +21,7 @@ import type {
 } from "./apiTypes";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
+import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
@@ -37,6 +38,8 @@ import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
 import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
+import { registerSearchRoutes } from "./searchRoutes";
+import { createStorageProviderFromEnv } from "./storageProvider";
 import {
   isTrustedBrowserMutationRequest,
   setApiSecurityHeaders,
@@ -56,6 +59,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
   const trustedMutationOrigins =
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
+  const storageProvider = options.storageProvider ?? createStorageProviderFromEnv();
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
@@ -198,6 +202,7 @@ export function createApp(options: CreateAppOptions = {}) {
     isWorkspaceUserActive,
     runDataSourceTransaction,
     secureCookies,
+    storageProvider,
     trustForwardedAuthHeaders
   };
 
@@ -220,6 +225,8 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
+  registerAttachmentRoutes(app, routeDeps);
+  registerSearchRoutes(app, routeDeps);
   registerPlanningRoutes(app, routeDeps);
   registerCapacityRoutes(app, routeDeps);
   registerProductionCalendarRoutes(app, routeDeps);
