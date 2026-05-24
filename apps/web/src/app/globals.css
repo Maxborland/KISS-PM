@@ -1,0 +1,47 @@
+@layer reset, tokens, base, components, utilities;
+
+@import "tailwindcss";
+@import "../styles/tokens.css" layer(tokens);
+@import "../styles/tokens.planning.css" layer(tokens);
+@import "../styles/bem.css" layer(components);
+
+@theme inline {
+  --color-background: var(--canvas);
+  --color-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #fff;
+  --color-muted: var(--panel-strong);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent-soft);
+  --color-destructive: var(--danger);
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--accent-ring);
+  --color-card: var(--panel);
+  --color-popover: var(--panel-elevated);
+  --radius: var(--radius-md);
+  --animate-duration: var(--duration-base);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: var(--lh-base);
+    color: var(--text);
+    background: var(--canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+}
