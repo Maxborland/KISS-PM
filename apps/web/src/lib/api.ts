@@ -40,37 +40,49 @@ function mapStatusToCode(status: number, body: Record<string, unknown>): ApiErro
   return "unknown";
 }
 
+function buildRequestHeaders(json: unknown, headers: HeadersInit | undefined): Headers {
+  const requestHeaders = new Headers();
+  if (json !== undefined) {
+    requestHeaders.set("content-type", "application/json");
+  }
+  requestHeaders.set("x-kiss-pm-action", "same-origin");
+  new Headers(headers).forEach((value, key) => requestHeaders.set(key, value));
+  return requestHeaders;
+}
+
+function toErrorBody(payload: unknown): Record<string, unknown> {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return payload as Record<string, unknown>;
+  }
+  return { payload };
+}
+
 export type ApiFetchOptions = RequestInit & {
   json?: unknown;
 };
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { json, headers, ...init } = options;
+  const requestHeaders = buildRequestHeaders(json, headers);
   const response = await fetch(path, {
     ...init,
     credentials: "same-origin",
-    headers: {
-      ...(json !== undefined ? { "content-type": "application/json" } : {}),
-      "x-kiss-pm-action": "same-origin",
-      ...(headers ?? {})
-    },
+    headers: requestHeaders,
     ...(json !== undefined ? { body: JSON.stringify(json) } : {})
   });
 
   const rawText = await response.text();
-  let body: Record<string, unknown> = {};
+  let payload: unknown = {};
   if (rawText.length > 0) {
     try {
-      const parsed: unknown = JSON.parse(rawText);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        body = parsed as Record<string, unknown>;
-      }
+      payload = JSON.parse(rawText) as unknown;
     } catch {
-      body = { error: "invalid_json_response" };
+      payload = { error: "invalid_json_response" };
     }
   }
 
   if (!response.ok) {
+    const body = toErrorBody(payload);
     const code = mapStatusToCode(response.status, body);
     const message =
       typeof body.message === "string"
@@ -81,5 +93,5 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     throw new ApiError(response.status, code, message, body);
   }
 
-  return body as T;
+  return payload as T;
 }
