@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, type FormEvent, type ReactNode } from "react";
 
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { FormErrors } from "../workspaceForms";
 import { getFieldErrorId, getNextFocusTrapIndex } from "../workspaceForms";
 import type { SectionState } from "../workspaceShellState";
@@ -191,98 +192,70 @@ export function Modal(props: {
   size?: "default" | "wide";
   onClose: () => void;
 }) {
-  const panelRef = useRef<HTMLElement | null>(null);
-  const isDismissDisabledRef = useRef(props.isDismissDisabled);
-  const onCloseRef = useRef(props.onClose);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const firstFocusable =
+      panelRef.current?.querySelector<HTMLElement>("[data-autofocus]") ??
+      panelRef.current?.querySelector<HTMLElement>(
+        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+      );
+    firstFocusable?.focus();
+  }, []);
+
+  function handleOpenChange(open: boolean) {
+    if (!open && !props.isDismissDisabled) props.onClose();
+  }
+
   const titleId = useMemo(() => `dialog-title-${props.title.replace(/\W+/g, "-")}`, [props.title]);
   const descriptionId = props.description ? `${titleId}-description` : undefined;
 
-  useEffect(() => {
-    isDismissDisabledRef.current = props.isDismissDisabled;
-    onCloseRef.current = props.onClose;
-  }, [props.isDismissDisabled, props.onClose]);
-
-  useEffect(() => {
-    const previousActiveElement = document.activeElement;
-    const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
-      "[data-autofocus]"
-    ) ?? panelRef.current?.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
-    );
-
-    firstFocusable?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        if (isDismissDisabledRef.current) return;
-        onCloseRef.current();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previousActiveElement instanceof HTMLElement) {
-        previousActiveElement.focus();
-      }
-    };
-  }, []);
-
-  function handlePanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
-    if (event.key !== "Tab") return;
-    const focusable = getFocusableElements(panelRef.current);
-    const activeIndex = focusable.findIndex((element) => element === document.activeElement);
-    const nextIndex = getNextFocusTrapIndex(activeIndex, focusable.length, event.shiftKey);
-
-    if (nextIndex === null) return;
-
-    event.preventDefault();
-    focusable[nextIndex]?.focus();
-  }
-
   return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={() => {
-        if (!props.isDismissDisabled) props.onClose();
-      }}
-    >
-      <section
-        ref={panelRef}
-        aria-describedby={descriptionId}
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className={["modal-panel", props.size === "wide" ? "wide" : ""]
-          .filter(Boolean)
-          .join(" ")}
-        role="dialog"
-        tabIndex={-1}
-        onKeyDown={handlePanelKeyDown}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="modal-header">
-          <div>
-            <h2 id={titleId}>{props.title}</h2>
-            {props.description ? (
-              <p id={descriptionId} className="modal-description">
-                {props.description}
-              </p>
-            ) : null}
-          </div>
-          <button
-            aria-label="Закрыть"
-            className="icon-button"
-            disabled={props.isDismissDisabled}
-            type="button"
-            onClick={props.onClose}
-          >
-            ×
-          </button>
-        </header>
-        {props.children}
-      </section>
-    </div>
+    <DialogPrimitive.Root open onOpenChange={handleOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="modal-backdrop" />
+        <DialogPrimitive.Content
+          ref={panelRef}
+          aria-describedby={descriptionId}
+          aria-labelledby={titleId}
+          className={["modal-panel", props.size === "wide" ? "wide" : ""].filter(Boolean).join(" ")}
+          onEscapeKeyDown={(event) => {
+            if (props.isDismissDisabled) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (props.isDismissDisabled) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (props.isDismissDisabled) event.preventDefault();
+          }}
+        >
+          <header className="modal-header">
+            <div>
+              <DialogPrimitive.Title asChild>
+                <h2 id={titleId}>{props.title}</h2>
+              </DialogPrimitive.Title>
+              {props.description ? (
+                <DialogPrimitive.Description asChild>
+                  <p id={descriptionId} className="modal-description">
+                    {props.description}
+                  </p>
+                </DialogPrimitive.Description>
+              ) : null}
+            </div>
+            <button
+              aria-label="Закрыть"
+              className="icon-button"
+              disabled={props.isDismissDisabled}
+              type="button"
+              onClick={props.onClose}
+            >
+              ×
+            </button>
+          </header>
+          {props.children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

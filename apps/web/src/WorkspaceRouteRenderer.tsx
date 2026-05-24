@@ -1,3 +1,6 @@
+import { AbsencesPage } from "./features/absences/AbsencesPage";
+import { OrgStructurePage } from "./features/org-structure/OrgStructurePage";
+import { ProductionCalendarPage } from "./features/production-calendar/ProductionCalendarPage";
 import { ProfileView, ThemeView } from "./AccountViews";
 import { AuditView } from "./AuditView";
 import { ClientsView, ContactsView, ProductsView } from "./CrmEntityViews";
@@ -5,6 +8,7 @@ import { DashboardView } from "./DashboardView";
 import { OpportunityDetailView } from "./OpportunityDetailView";
 import { OpportunitiesView } from "./OpportunitiesView";
 import { PositionsView } from "./PositionsView";
+import { PlanningWorkspace } from "./features/planning/shell/PlanningWorkspace";
 import { ProjectDetailView } from "./ProjectDetailView";
 import { MyWorkView } from "./MyWorkView";
 import { ProjectsView } from "./ProjectsView";
@@ -13,6 +17,7 @@ import { DealStagesView, ProjectTypesView, TaskStatusesView } from "./SettingsRe
 import { TaskDetailView } from "./TaskDetailView";
 import { UsersView } from "./UsersView";
 import { WorkspaceSettingsView } from "./WorkspaceSettingsView";
+import { type PlanningProjectTab } from "./workspacePathIds";
 import { type WorkspaceRouteId } from "./routes";
 import { type WorkspaceData } from "./workspaceData";
 import { type SectionState } from "./workspaceShellState";
@@ -24,8 +29,11 @@ export function WorkspaceRouteRenderer(props: {
   activeContactId: string | null;
   activeProductId: string | null;
   activeProjectId: string | null;
+  planningTab: PlanningProjectTab;
+  isProjectPlanning: boolean;
   activeTaskId: string | null;
   data: WorkspaceData;
+  permissions: readonly string[];
   openCreateRequested: boolean;
   onChanged: (message: string) => void;
   onBackToOpportunities: () => void;
@@ -38,6 +46,8 @@ export function WorkspaceRouteRenderer(props: {
   onOpenProduct: (productId: string) => void;
   onBackToProjects: () => void;
   onOpenProject: (projectId: string) => void;
+  onOpenProjectSchedule: (projectId: string) => void;
+  onNavigatePlanningTab: (projectId: string, tab: PlanningProjectTab) => void;
   onBackToMyWork: () => void;
   onOpenTask: (taskId: string) => void;
   onQuickCreateConsumed: () => void;
@@ -173,12 +183,45 @@ export function WorkspaceRouteRenderer(props: {
   }
 
   if (props.activeRouteId === "projects") {
+    if (props.activeProjectId && props.isProjectPlanning) {
+      const project =
+        props.data.projects.find((candidate) => candidate.id === props.activeProjectId) ??
+        null;
+      const defaultStatusId =
+        props.data.taskStatuses.find((status) => status.status === "active")?.id ?? "";
+      const workspaceUsers = props.data.users.map((user) => ({
+        id: user.id,
+        name: user.name,
+        positionId: user.positionId,
+        positionName: user.positionName
+      }));
+      const workspacePositions = props.data.positions.map((position) => ({
+        id: position.id,
+        name: position.name
+      }));
+      return (
+        <PlanningWorkspace
+          projectId={props.activeProjectId}
+          projectTitle={project?.title ?? "Проект"}
+          activeTab={props.planningTab}
+          permissions={props.permissions}
+          canRead={props.sectionStates.projects.canRead}
+          defaultStatusId={defaultStatusId}
+          workspaceUsers={workspaceUsers}
+          workspacePositions={workspacePositions}
+          onBack={props.onBackToProjects}
+          onNavigateTab={(tab) => props.onNavigatePlanningTab(props.activeProjectId!, tab)}
+        />
+      );
+    }
+
     if (props.activeProjectId) {
       return (
         <ProjectDetailView
           data={props.data}
           projectId={props.activeProjectId}
           onBack={props.onBackToProjects}
+          onOpenSchedule={props.onOpenProjectSchedule}
           onChanged={props.onChanged}
           sectionState={props.sectionStates.projects}
         />
@@ -229,6 +272,46 @@ export function WorkspaceRouteRenderer(props: {
         data={props.data}
         sectionState={props.sectionStates.workspaceConfig}
         onChanged={props.onChanged}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "production-calendar") {
+    return (
+      <ProductionCalendarPage
+        canRead={props.permissions.includes("tenant.workspace_config.read")}
+        canManage={props.permissions.includes("tenant.workspace_config.manage")}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "absences") {
+    return (
+      <AbsencesPage
+        canRead={props.permissions.includes("tenant.absences.read")}
+        canManage={props.permissions.includes("tenant.absences.manage")}
+        users={props.data.users.map((user) => ({
+          id: user.id,
+          name: user.name
+        }))}
+      />
+    );
+  }
+
+  if (props.activeRouteId === "org-structure") {
+    return (
+      <OrgStructurePage
+        canRead={props.permissions.includes("tenant.org_structure.read")}
+        canManage={props.permissions.includes("tenant.org_structure.manage")}
+        users={props.data.users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          positionId: user.positionId
+        }))}
+        positions={props.data.positions.map((position) => ({
+          id: position.id,
+          name: position.name
+        }))}
       />
     );
   }

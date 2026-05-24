@@ -55,6 +55,7 @@ export type PlanTask = {
   workMinutes: number;
   percentComplete: number;
   calendarId: string | null;
+  customFields?: Record<string, unknown>;
   constraint: PlanConstraint | null;
 };
 
@@ -73,6 +74,14 @@ export type PlanAssignment = {
   unitsPermille: number;
   workMinutes: number | null;
   calendarId: string | null;
+};
+
+export type PlanAssignmentAllocation = {
+  assignmentId: string;
+  taskId: string;
+  resourceId: string;
+  date: PlanDate;
+  workMinutes: number;
 };
 
 export type PlanDependency = {
@@ -135,6 +144,7 @@ export type PlanSnapshot = {
   project: PlanProject;
   tasks: PlanTask[];
   assignments: PlanAssignment[];
+  assignmentAllocations?: PlanAssignmentAllocation[] | undefined;
   dependencies: PlanDependency[];
   baselines: PlanBaseline[];
   calendars: PlanCalendar[];

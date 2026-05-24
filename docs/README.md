@@ -34,6 +34,10 @@
 28. `27_UX_UI_DESIGN_SYSTEM.md` — визуальная дизайн-система: токены, shell/layout, controls, kanban cards, таблицы, detail/activity, responsive, accessibility и visual QA snapshots.
 29. `28_PHASE_4_2_TASK_WORKSPACE.md` — полноценный task workspace: список/канбан, CRUD задач, карточка задачи, статусы задач, права редактирования, bulk и activity.
 
+## Планы исправлений
+
+- [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
+
 ## Референсы
 
 `references/` содержит обязательные материалы для продуктовой проверки: BR2-скриншоты, русское описание паттернов, русские выжимки по MS Project scheduling и визуальные boards дизайн-системы. Референсы нельзя копировать буквально. Из них извлекаются возможности, плотность интерфейса, управленческие сценарии, доменные требования и стабильные UI-паттерны KISS PM.

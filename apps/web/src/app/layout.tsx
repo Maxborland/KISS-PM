@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "../styles.css";
+import "../portfolioSurfaces.css";
 import "../crm.css";
 import "../task.css";
 import { AppQueryProvider } from "../queryClient";

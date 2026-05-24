@@ -1,6 +1,10 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  ControlSignal,
+  CorrectiveAction,
+  KpiDefinition,
+  KpiEvaluation,
   PlanSnapshot,
   Tenant,
   TenantId,
@@ -17,6 +21,10 @@ import type {
   PlanningCommandIdempotencyRecord,
   PlanningScenarioRunInput,
   PlanningScenarioRunRecord,
+  PlanningSolverRunInput,
+  PlanningSolverRunRecord,
+  ActionExecutionInput,
+  ActionExecutionRecord,
   TaskActivityInput,
   TaskActivityRecord,
   TaskMetadataInput,
@@ -421,6 +429,25 @@ export type ApiTenantDataSource = {
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  listScheduledTasks?(input: {
+    tenantId: TenantId;
+    assigneeUserId: UserId;
+    fromDate: string;
+    toDate: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      title: string;
+      projectId: string;
+      projectTitle: string;
+      plannedStart: Date;
+      plannedFinish: Date;
+      workMinutes: number;
+      createdAt: Date;
+      statusId: string;
+    }>
+  >;
   findTaskById?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   listTaskStatuses?(tenantId: TenantId): Promise<TaskStatusRecord[]>;
   createTaskStatus?(input: TaskStatusInput): Promise<TaskStatusRecord>;
@@ -452,6 +479,53 @@ export type ApiTenantDataSource = {
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning?(tenantId: TenantId): Promise<void>;
+  listSavedViews?(
+    tenantId: TenantId,
+    projectId: string,
+    actorUserId: UserId
+  ): Promise<
+    Array<{
+      id: string;
+      tenantId: TenantId;
+      projectId: string;
+      ownerUserId: UserId;
+      scope: "user" | "project";
+      name: string;
+      payload: Record<string, unknown>;
+      createdAt: Date;
+    }>
+  >;
+  createSavedView?(input: {
+    id: string;
+    tenantId: TenantId;
+    projectId: string;
+    ownerUserId: UserId;
+    scope: "user" | "project";
+    name: string;
+    payload: Record<string, unknown>;
+  }): Promise<{
+    id: string;
+    name: string;
+    scope: "user" | "project";
+    payload: Record<string, unknown>;
+  }>;
+  deleteSavedView?(
+    tenantId: TenantId,
+    projectId: string,
+    viewId: string,
+    actorUserId: UserId
+  ): Promise<boolean>;
+  listKpiDefinitions?(tenantId: TenantId): Promise<KpiDefinition[]>;
+  upsertKpiDefinition?(input: KpiDefinition): Promise<KpiDefinition>;
+  createKpiEvaluation?(input: KpiEvaluation): Promise<KpiEvaluation>;
+  listKpiEvaluations?(tenantId: TenantId, projectId: string): Promise<KpiEvaluation[]>;
+  upsertControlSignal?(input: ControlSignal): Promise<ControlSignal>;
+  listControlSignals?(tenantId: TenantId, projectId: string): Promise<ControlSignal[]>;
+  createCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
+  updateCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
+  listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
+  createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
+  listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
   getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
   ensurePlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
   incrementPlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
@@ -467,6 +541,21 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     projectId: string;
     scenarioRunId: string;
+    appliedAt: Date;
+  }): Promise<void>;
+  createPlanningSolverRun?(
+    input: PlanningSolverRunInput
+  ): Promise<PlanningSolverRunRecord>;
+  findPlanningSolverRun?(
+    tenantId: TenantId,
+    projectId: string,
+    runId: string
+  ): Promise<PlanningSolverRunRecord | undefined>;
+  markPlanningSolverRunApplied?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    runId: string;
+    proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
   findPlanningCommandIdempotency?(

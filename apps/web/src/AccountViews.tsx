@@ -79,6 +79,14 @@ export function ProfileView(props: {
               <dd>{props.data.permissions.length}</dd>
             </div>
           </dl>
+          <section className="workspace-help-panel" data-testid="workspace-help-panel">
+            <h3>Справка и уведомления</h3>
+            <p className="muted">
+              Документация продукта — в разделе «Настройки workspace». Критичные сигналы планирования
+              отображаются на графике проекта и в матрице ресурсов.
+            </p>
+            <p className="muted">Push-уведомления: в следующих фазах (интеграция email/Slack).</p>
+          </section>
         </aside>
       </div>
     </Panel>

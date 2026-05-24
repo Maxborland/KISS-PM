@@ -1,13 +1,20 @@
+"use client";
+
 import {
   Activity,
   ClipboardList,
   PanelsTopLeft,
   Users
 } from "lucide-react";
+import { useMemo } from "react";
 
 import { buildAuditPreviewRows } from "./workspaceDashboard";
 import { type WorkspaceData } from "./workspaceData";
 import { getMetricHint, type SectionState } from "./workspaceShellState";
+import { RoleDashboardPanel } from "./features/dashboard/RoleDashboardPanel";
+import { useCapacitySummary } from "./features/dashboard/useCapacitySummary";
+import { FreeCapacityHeatmap } from "./features/resources/FreeCapacityHeatmap";
+import { currentMonthIso } from "./features/planning/resources/monthIso";
 import {
   Metric,
   SectionFeedback,
@@ -30,8 +37,23 @@ export function DashboardView(props: {
   const dashboardUsers = props.data.users.slice(0, 7);
   const auditRows = buildAuditPreviewRows(props.data.auditEvents, props.data.users);
 
+  const activeProjects = props.data.projects.filter((project) => project.status === "active");
+  const monthIso = currentMonthIso();
+  const canCapacity = props.data.permissions.includes("tenant.project_resources.read");
+  const summaryQuery = useCapacitySummary(monthIso, canCapacity);
+  const overloadProjectIds = useMemo(
+    () => new Set(summaryQuery.data?.overloadProjectIds ?? []),
+    [summaryQuery.data?.overloadProjectIds]
+  );
+
   return (
     <section className="dashboard-grid">
+      {canCapacity ? (
+        <>
+          <RoleDashboardPanel projects={activeProjects} overloadProjectIds={overloadProjectIds} />
+          <FreeCapacityHeatmap summary={summaryQuery.data} isLoading={summaryQuery.isLoading} />
+        </>
+      ) : null}
       <Metric
         icon={ClipboardList}
         hint={getMetricHint(props.sectionStates.opportunities)}

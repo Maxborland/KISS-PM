@@ -15,7 +15,12 @@ import {
   hasFormErrors,
   validateUserForm
 } from "./workspaceForms";
+import { useOrgStructure, type OrgStructureTrack } from "./features/org-structure/useOrgStructure";
 import { filterUsersForTable } from "./workspaceTables";
+import {
+  filterUsersByOrgPlacement,
+  listOrgFilterOptions
+} from "./workspaceOrgFilters";
 import {
   getErrorMessage,
   hasPermission,
@@ -53,6 +58,12 @@ export function UsersView(props: {
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
+  const canReadOrgStructure = hasPermission(props.data.permissions, "tenant.org_structure.read");
+  const orgStructureQuery = useOrgStructure(canReadOrgStructure);
+  const [orgTrack, setOrgTrack] = useState<OrgStructureTrack>("functional");
+  const [orgDirectionId, setOrgDirectionId] = useState("");
+  const [orgUnitId, setOrgUnitId] = useState("");
+  const [unplacedOnly, setUnplacedOnly] = useState(false);
   const editingUser =
     modal?.type === "edit"
       ? props.data.users.find((user) => user.id === modal.userId)
@@ -68,10 +79,31 @@ export function UsersView(props: {
     userMutations.createUser.isPending ||
     userMutations.updateUser.isPending ||
     userMutations.deleteUser.isPending;
-  const filteredUsers = useMemo(
-    () => filterUsersForTable(props.data.users, props.data.accessRoles, tableSearch),
-    [props.data.accessRoles, props.data.users, tableSearch]
+  const orgFilterOptions = useMemo(
+    () => listOrgFilterOptions(orgStructureQuery.orgStructure, orgTrack),
+    [orgStructureQuery.orgStructure, orgTrack]
   );
+
+  const filteredUsers = useMemo(() => {
+    const bySearch = filterUsersForTable(props.data.users, props.data.accessRoles, tableSearch);
+    if (!canReadOrgStructure) return bySearch;
+    return filterUsersByOrgPlacement(bySearch, orgStructureQuery.orgStructure, {
+      track: orgTrack,
+      directionId: orgDirectionId,
+      unitId: orgUnitId,
+      unplacedOnly
+    });
+  }, [
+    canReadOrgStructure,
+    orgDirectionId,
+    orgStructureQuery.orgStructure,
+    orgTrack,
+    orgUnitId,
+    props.data.accessRoles,
+    props.data.users,
+    tableSearch,
+    unplacedOnly
+  ]);
   const activeUsers = props.data.users.filter((user) => user.status === "active").length;
   const inactiveUsers = props.data.users.length - activeUsers;
 
@@ -196,6 +228,68 @@ export function UsersView(props: {
             <BriefcaseBusiness aria-hidden="true" size={14} />
             Должности
           </span>
+          {canReadOrgStructure ? (
+            <>
+              <label className="toolbar-filter">
+                <span className="toolbar-filter__label">Структура</span>
+                <select
+                  value={orgTrack}
+                  onChange={(event) => {
+                    setOrgTrack(event.target.value as OrgStructureTrack);
+                    setOrgDirectionId("");
+                    setOrgUnitId("");
+                  }}
+                >
+                  <option value="functional">Функциональная</option>
+                  <option value="project">Проектная</option>
+                </select>
+              </label>
+              <label className="toolbar-filter">
+                <span className="toolbar-filter__label">Направление</span>
+                <select
+                  value={orgDirectionId}
+                  onChange={(event) => {
+                    setOrgDirectionId(event.target.value);
+                    setOrgUnitId("");
+                  }}
+                >
+                  <option value="">Все</option>
+                  {orgFilterOptions.directions.map((direction) => (
+                    <option key={direction.id} value={direction.id}>
+                      {direction.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="toolbar-filter">
+                <span className="toolbar-filter__label">
+                  {orgTrack === "functional" ? "Отдел" : "Команда"}
+                </span>
+                <select
+                  value={orgUnitId}
+                  disabled={!orgDirectionId}
+                  onChange={(event) => setOrgUnitId(event.target.value)}
+                >
+                  <option value="">Все</option>
+                  {orgFilterOptions.units
+                    .filter((unit) => !orgDirectionId || unit.directionId === orgDirectionId)
+                    .map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="toolbar-filter toolbar-filter--checkbox">
+                <input
+                  type="checkbox"
+                  checked={unplacedOnly}
+                  onChange={(event) => setUnplacedOnly(event.target.checked)}
+                />
+                Без оргструктуры
+              </label>
+            </>
+          ) : null}
         </CrudToolbar>
         <SectionFeedback state={props.sectionState} emptyLabel="Раздел недоступен." />
         {props.sectionState.canRead && !props.sectionState.error ? (

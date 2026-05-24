@@ -957,6 +957,32 @@ h2 {
   font-weight: 750;
 }
 
+.toolbar-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.toolbar-filter__label {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.toolbar-filter select {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.toolbar-filter--checkbox {
+  gap: 4px;
+}
+
 .table-search {
   min-width: min(320px, 100%);
   min-height: 34px;

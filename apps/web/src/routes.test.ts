@@ -26,6 +26,9 @@ describe("workspace route model", () => {
       "positions",
       "audit",
       "settings",
+      "production-calendar",
+      "absences",
+      "org-structure",
       "project-types",
       "deal-stages",
       "task-statuses",
@@ -61,7 +64,7 @@ describe("workspace route model", () => {
       {
         id: "personal",
         label: "Личное",
-        routes: [workspaceRoutes[15]]
+        routes: [workspaceRoutes[18]]
       }
     ]);
   });
@@ -89,7 +92,7 @@ describe("workspace route model", () => {
       {
         id: "settings",
         label: "Настройки",
-        routes: [workspaceRoutes[12], workspaceRoutes[13]]
+        routes: [workspaceRoutes[15], workspaceRoutes[16]]
       }
     ]);
   });
@@ -126,6 +129,8 @@ describe("workspace route model", () => {
     expect(getRouteIdFromPathname("/my-work")).toBe("my-work");
     expect(getRouteIdFromPathname("/audit")).toBe("audit");
     expect(getRouteIdFromPathname("/settings")).toBe("settings");
+    expect(getRouteIdFromPathname("/settings/production-calendar")).toBe("production-calendar");
+    expect(getRouteIdFromPathname("/settings/absences")).toBe("absences");
     expect(getRouteIdFromPathname("/settings/project-types")).toBe("project-types");
     expect(getRouteIdFromPathname("/settings/deal-stages")).toBe("deal-stages");
     expect(getRouteIdFromPathname("/unknown")).toBe("dashboard");
@@ -141,6 +146,8 @@ describe("workspace route model", () => {
     expect(getRoutePath("products")).toBe("/products");
     expect(getRoutePath("users")).toBe("/users");
     expect(getRoutePath("settings")).toBe("/settings");
+    expect(getRoutePath("production-calendar")).toBe("/settings/production-calendar");
+    expect(getRoutePath("absences")).toBe("/settings/absences");
     expect(getRoutePath("project-types")).toBe("/settings/project-types");
     expect(getRoutePath("deal-stages")).toBe("/settings/deal-stages");
   });

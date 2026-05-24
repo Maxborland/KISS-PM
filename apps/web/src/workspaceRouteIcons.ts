@@ -2,6 +2,7 @@ import {
   Activity,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   ClipboardList,
   Columns3,
   ContactRound,
@@ -14,6 +15,7 @@ import {
   Settings,
   ShieldCheck,
   UserCircle,
+  UserMinus,
   Users,
   type LucideIcon
 } from "lucide-react";
@@ -33,6 +35,9 @@ export const workspaceRouteIcons = {
   positions: BriefcaseBusiness,
   audit: Activity,
   settings: Settings,
+  "production-calendar": CalendarDays,
+  absences: UserMinus,
+  "org-structure": Users,
   "project-types": FolderKanban,
   "deal-stages": ClipboardList,
   "task-statuses": Columns3,

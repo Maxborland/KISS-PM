@@ -201,7 +201,7 @@ describe("planning API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -211,7 +211,7 @@ describe("planning API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -255,8 +255,11 @@ describe("planning API routes", () => {
 
     expect(readModel.status).toBe(200);
     expect(readerReadModel.status).toBe(200);
-    expect(planOnlyReadModel.status).toBe(403);
-    await expect(planOnlyReadModel.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(planOnlyReadModel.status).toBe(200);
+    const planOnlyBody = await planOnlyReadModel.json();
+    expect(planOnlyBody.authored.tasks).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "task-plan-a" })])
+    );
     expect(initialBody).toMatchObject({
       authored: {
         tasks: expect.arrayContaining([
@@ -1416,6 +1419,277 @@ describe("planning API routes", () => {
           event.sourceWorkflow === "planning"
       )
     ).toBe(false);
+  });
+
+  it("applies command batch atomically with idempotency and version conflict", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-plan-a",
+      title: "Подготовить план",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-plan-b",
+      title: "Согласовать план",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-a", title: "Batch rename A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-b", title: "Batch rename B" }
+      }
+    ];
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-test-1"
+        })
+      }
+    );
+    const appliedBody = await applied.json();
+    expect(applied.status).toBe(200);
+    expect(appliedBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+    expect(appliedBody.readModel.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-plan-a", title: "Batch rename A" }),
+        expect.objectContaining({ id: "task-plan-b", title: "Batch rename B" })
+      ])
+    );
+
+    const retried = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-test-1"
+        })
+      }
+    );
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toEqual(appliedBody);
+
+    const stale = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands: [
+            {
+              type: "task.update_identity",
+              payload: { taskId: "task-plan-a", title: "Stale batch" }
+            }
+          ],
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({
+      error: "plan_version_conflict",
+      currentPlanVersion: appliedBody.newPlanVersion
+    });
+  });
+
+  it("rejects batch when a middle command has blocking validation", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-plan-a",
+      title: "Подготовить план",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands: [
+            {
+              type: "task.update_identity",
+              payload: { taskId: "task-plan-a", title: "Still valid" }
+            },
+            {
+              type: "dependency.upsert",
+              payload: {
+                id: "dep-invalid-self",
+                predecessorTaskId: "task-plan-a",
+                successorTaskId: "task-plan-a",
+                dependencyType: "FS",
+                lagMinutes: 0
+              }
+            }
+          ],
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("planning_precondition_failed");
+    expect(body.validationIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ severity: "error" })
+      ])
+    );
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(afterBody.planVersion).toBe(initialBody.planVersion);
+    expect(
+      afterBody.authored.tasks.find((task: { id: string }) => task.id === "task-plan-a")?.title
+    ).not.toBe("Still valid");
+  });
+
+  it("lists planning baselines for a project", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const response = await app.request("/api/workspace/projects/project-alpha/planning/baselines", {
+      headers: { cookie: adminCookie }
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.baselines).toEqual(expect.any(Array));
+  });
+
+  it("opens planning events SSE stream for authorized reader", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const response = await app.request("/api/workspace/projects/project-alpha/planning/events", {
+      headers: { cookie: adminCookie, Accept: "text/event-stream" }
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+  });
+
+  it("lists and creates saved views with stable API keys", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const listEmpty = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(listEmpty.status).toBe(200);
+    await expect(listEmpty.json()).resolves.toEqual({ savedViews: [] });
+
+    const create = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      {
+        method: "POST",
+        headers: {
+          cookie: adminCookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          name: "Мой вид",
+          scope: "user",
+          payload: { visibleColumnIds: ["title", "start"] }
+        })
+      }
+    );
+    expect(create.status).toBe(201);
+    const createdBody = await create.json();
+    expect(createdBody.savedView).toMatchObject({
+      name: "Мой вид",
+      scope: "user",
+      payload: { visibleColumnIds: ["title", "start"] }
+    });
+
+    const listAfter = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      { headers: { cookie: adminCookie } }
+    );
+    const listBody = await listAfter.json();
+    expect(listAfter.status).toBe(200);
+    expect(listBody.savedViews).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Мой вид" })])
+    );
+  });
+
+  it("allows plan-only reader to load read-model and SSE without resource read", async () => {
+    const planOnlyCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: planOnlyCookie } }
+    );
+    expect(readModel.status).toBe(200);
+
+    const events = await app.request("/api/workspace/projects/project-alpha/planning/events", {
+      headers: { cookie: planOnlyCookie, Accept: "text/event-stream" }
+    });
+    expect(events.status).toBe(200);
+  });
+
+  it("applies project.settings.update with audit and plan recalc", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          command: {
+            type: "project.settings.update",
+            payload: { calendarId: "tenant-default" }
+          },
+          clientPlanVersion: 1
+        })
+      }
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      readModel: { project: { calendarId?: string | null } };
+      auditEventId: string;
+    };
+    expect(body.readModel.project.calendarId).toBe("tenant-default");
+    expect(body.auditEventId).toMatch(/^audit-/);
   });
 });
 

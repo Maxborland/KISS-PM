@@ -20,7 +20,9 @@ import type {
   CalculatedPlan,
   CalculatedTask,
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanCalendar,
+  PlanCalendarException,
   PlanSnapshot,
   PlanTask,
   ScheduleTraceEntry,
@@ -82,7 +84,14 @@ export function calculatePlan(
     try {
       const taskCalendar = selectTaskCalendar(snapshot, task);
       const taskCalendarExceptions = selectTaskCalendarExceptions(snapshot, taskCalendar);
-      const durationMinutes = resolveDurationMinutes(task, snapshot.assignments, validationIssues);
+      const durationMinutes = resolveDurationMinutes(
+        task,
+        snapshot.assignments,
+        snapshot.assignmentAllocations ?? [],
+        taskCalendar,
+        taskCalendarExceptions,
+        validationIssues
+      );
       const authoredStart = resolveAuthoredStart(task, snapshot, taskCalendar, taskCalendarExceptions);
       const dependencyStart = resolveDependencyStart(
         task,
@@ -209,6 +218,9 @@ export function calculatePlan(
 function resolveDurationMinutes(
   task: PlanTask,
   assignments: PlanAssignment[],
+  assignmentAllocations: PlanAssignmentAllocation[],
+  calendar: PlanCalendar,
+  exceptions: PlanCalendarException[],
   validationIssues: ValidationIssue[]
 ): number {
   const workAssignments = assignments.filter(
@@ -229,6 +241,15 @@ function resolveDurationMinutes(
       entity: { type: "Task", id: task.id }
     });
   }
+
+  const explicitAllocationDuration = resolveExplicitAllocationDuration(
+    task,
+    workAssignments,
+    assignmentAllocations,
+    calendar,
+    exceptions
+  );
+  if (explicitAllocationDuration !== null) return explicitAllocationDuration;
 
   if (task.workMinutes < 0 || (task.durationMinutes !== null && task.durationMinutes <= 0) || unitsPermille < 0) {
     validationIssues.push({
@@ -260,6 +281,38 @@ function resolveDurationMinutes(
   }
 
   return Math.max(1, task.durationMinutes ?? task.workMinutes);
+}
+
+function resolveExplicitAllocationDuration(
+  task: PlanTask,
+  workAssignments: PlanAssignment[],
+  assignmentAllocations: PlanAssignmentAllocation[],
+  calendar: PlanCalendar,
+  exceptions: PlanCalendarException[]
+): number | null {
+  const workAssignmentIds = new Set(workAssignments.map((assignment) => assignment.id));
+  const taskAllocationDates = assignmentAllocations
+    .filter(
+      (allocation) =>
+        allocation.taskId === task.id &&
+        workAssignmentIds.has(allocation.assignmentId) &&
+        allocation.workMinutes > 0
+    )
+    .map((allocation) => allocation.date)
+    .sort(comparePlanDates);
+  const firstAllocationDate = taskAllocationDates[0];
+  const lastAllocationDate = taskAllocationDates.at(-1);
+  if (!firstAllocationDate || !lastAllocationDate) return null;
+
+  return Math.max(
+    1,
+    diffWorkingMinutes(
+      startOfWorkingDate(firstAllocationDate, calendar, exceptions),
+      endOfWorkingDate(lastAllocationDate, calendar, exceptions),
+      calendar,
+      exceptions
+    )
+  );
 }
 
 function resolveAuthoredStart(

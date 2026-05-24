@@ -20,11 +20,24 @@ import {
 } from "./schema";
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
 import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
+import {
+  createPlanningSavedViewsRepository,
+  type PlanningSavedViewsRepository
+} from "./planningSavedViewsRepository";
 import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
+import {
+  createResourceAbsencesRepository,
+  type ResourceAbsencesRepository
+} from "./resourceAbsencesRepository";
+import {
+  createTenantProductionCalendarRepository,
+  type TenantProductionCalendarRepository
+} from "./tenantProductionCalendarRepository";
 import {
   createCrmActivityRepository,
   type CrmActivityRepository
 } from "./crmActivityRepository";
+import { createControlRepository, type ControlRepository } from "./controlRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -109,7 +122,15 @@ export type UserSessionRecord = {
   tokenHash: string;
   expiresAt: Date;
 };
-export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & PlanningRepository & ProjectWorkRepository & CrmActivityRepository & {
+export type PostgresTenantDataSource = CrmRepository &
+  ProjectIntakeRepository &
+  PlanningRepository &
+  PlanningSavedViewsRepository &
+  ProjectWorkRepository &
+  TenantProductionCalendarRepository &
+  ResourceAbsencesRepository &
+  ControlRepository &
+  CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -163,9 +184,13 @@ export function createPostgresTenantDataSource(
   return {
     db,
     ...createCrmRepository(db),
+    ...createControlRepository(db),
     ...createProjectIntakeRepository(db),
     ...createPlanningRepository(db),
+    ...createPlanningSavedViewsRepository(db),
     ...createProjectWorkRepository(db),
+    ...createTenantProductionCalendarRepository(db),
+    ...createResourceAbsencesRepository(db),
     ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
