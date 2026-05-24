@@ -23,6 +23,7 @@ import type {
   ManagementAuditEventInput,
   ProjectRecord
 } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   buildArchiveTaskPlanningCommand,
@@ -484,6 +485,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: createResult.error }, 404);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({
       task: createResult.task,
       project: createResult.project,
@@ -682,6 +684,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: createResult.error }, 404);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: createResult.task }, 201);
   });
 
@@ -856,6 +859,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     }
     const updated = updateResult.updated;
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: updated });
   });
 
@@ -931,6 +935,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: archiveResult.error }, 404);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: archiveResult.archived });
   });
 
@@ -1131,6 +1136,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         if (transition.status === 404) return context.json({ error: transition.error }, 404);
         return context.json({ error: transition.error }, 409);
       }
+      invalidateCapacityCacheForTenant(actor.tenantId);
       return context.json({ task: transition.task });
     }
   );

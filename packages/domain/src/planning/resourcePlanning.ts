@@ -33,6 +33,15 @@ export type ResourceLoadBucket = {
   freeMinutes: number;
   taskIds: string[];
   assignmentIds: string[];
+  assignmentContributions: Array<{
+    taskId: string;
+    assignmentId: string;
+    workMinutes: number;
+  }>;
+  reservationContributions: Array<{
+    reservationId: string;
+    workMinutes: number;
+  }>;
   reservationIds: string[];
   calendarExceptionIds: string[];
 };
@@ -151,6 +160,8 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         freeMinutes: Math.max(0, capacityMinutes - committedMinutes),
         taskIds: taskLoad.taskIds,
         assignmentIds: taskLoad.assignmentIds,
+        assignmentContributions: taskLoad.assignmentContributions,
+        reservationContributions: reservationLoad.reservationContributions,
         reservationIds: reservationLoad.reservationIds,
         calendarExceptionIds
       });
@@ -166,10 +177,20 @@ function calculateTaskLoadForDate(
   date: PlanDate,
   calendar: PlanCalendar,
   calendarExceptions: PlanCalendarException[]
-): { assignedMinutes: number; taskIds: string[]; assignmentIds: string[] } {
+): {
+  assignedMinutes: number;
+  taskIds: string[];
+  assignmentIds: string[];
+  assignmentContributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>;
+} {
   let assignedMinutes = 0;
   const taskIds: string[] = [];
   const assignmentIds: string[] = [];
+  const assignmentContributions: Array<{
+    taskId: string;
+    assignmentId: string;
+    workMinutes: number;
+  }> = [];
 
   for (const assignment of input.assignments.filter((item) => item.resourceId === resourceId)) {
     if (assignment.role !== "executor" && assignment.role !== "co_executor") continue;
@@ -184,6 +205,11 @@ function calculateTaskLoadForDate(
         assignedMinutes += allocatedMinutes;
         taskIds.push(assignment.taskId);
         assignmentIds.push(assignment.id);
+        assignmentContributions.push({
+          taskId: assignment.taskId,
+          assignmentId: assignment.id,
+          workMinutes: allocatedMinutes
+        });
       }
       continue;
     }
@@ -206,6 +232,11 @@ function calculateTaskLoadForDate(
         assignedMinutes += assignmentWork;
         taskIds.push(task.id);
         assignmentIds.push(assignment.id);
+        assignmentContributions.push({
+          taskId: task.id,
+          assignmentId: assignment.id,
+          workMinutes: assignmentWork
+        });
       }
       continue;
     }
@@ -213,16 +244,43 @@ function calculateTaskLoadForDate(
     const currentCapacity = capacities.find((item) => item.date === date)?.capacityMinutes ?? 0;
     if (currentCapacity <= 0) continue;
 
-    assignedMinutes += Math.round((assignmentWork * currentCapacity) / totalCapacity);
+    const workMinutes = Math.round((assignmentWork * currentCapacity) / totalCapacity);
+    assignedMinutes += workMinutes;
     taskIds.push(task.id);
     assignmentIds.push(assignment.id);
+    assignmentContributions.push({
+      taskId: task.id,
+      assignmentId: assignment.id,
+      workMinutes
+    });
   }
 
   return {
     assignedMinutes,
     taskIds: [...new Set(taskIds)].sort(),
-    assignmentIds: [...new Set(assignmentIds)].sort()
+    assignmentIds: [...new Set(assignmentIds)].sort(),
+    assignmentContributions: aggregateAssignmentContributions(assignmentContributions)
   };
+}
+
+function aggregateAssignmentContributions(
+  contributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>
+): Array<{ taskId: string; assignmentId: string; workMinutes: number }> {
+  const grouped = new Map<string, { taskId: string; assignmentId: string; workMinutes: number }>();
+  for (const contribution of contributions) {
+    const key = `${contribution.taskId}:${contribution.assignmentId}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.workMinutes += contribution.workMinutes;
+      continue;
+    }
+    grouped.set(key, { ...contribution });
+  }
+  return [...grouped.values()].sort(
+    (left, right) =>
+      left.taskId.localeCompare(right.taskId) ||
+      left.assignmentId.localeCompare(right.assignmentId)
+  );
 }
 
 function taskWorkingOverlapForDate(
@@ -283,9 +341,14 @@ function calculateReservationLoadForDate(
   date: PlanDate,
   calendar: PlanCalendar,
   calendarExceptions: PlanCalendarException[]
-): { reservedMinutes: number; reservationIds: string[] } {
+): {
+  reservedMinutes: number;
+  reservationIds: string[];
+  reservationContributions: Array<{ reservationId: string; workMinutes: number }>;
+} {
   let reservedMinutes = 0;
   const reservationIds: string[] = [];
+  const reservationContributions: Array<{ reservationId: string; workMinutes: number }> = [];
 
   for (const reservation of input.reservations.filter((item) => item.resourceId === resourceId)) {
     if (comparePlanDates(date, reservation.start) < 0 || comparePlanDates(date, reservation.finish) > 0) {
@@ -299,13 +362,16 @@ function calculateReservationLoadForDate(
     const currentCapacity = workingMinutesForDate(date, calendar, calendarExceptions);
     if (totalCapacity <= 0 || currentCapacity <= 0) continue;
 
-    reservedMinutes += Math.round((reservation.workMinutes * currentCapacity) / totalCapacity);
+    const workMinutes = Math.round((reservation.workMinutes * currentCapacity) / totalCapacity);
+    reservedMinutes += workMinutes;
     reservationIds.push(reservation.id);
+    reservationContributions.push({ reservationId: reservation.id, workMinutes });
   }
 
   return {
     reservedMinutes,
-    reservationIds: [...new Set(reservationIds)].sort()
+    reservationIds: [...new Set(reservationIds)].sort(),
+    reservationContributions: aggregateReservationContributions(reservationContributions)
   };
 }
 
@@ -333,6 +399,8 @@ function aggregateBuckets(
         granularity,
         taskIds: [...bucket.taskIds],
         assignmentIds: [...bucket.assignmentIds],
+        assignmentContributions: [...bucket.assignmentContributions],
+        reservationContributions: [...bucket.reservationContributions],
         reservationIds: [...bucket.reservationIds],
         calendarExceptionIds: [...bucket.calendarExceptionIds]
       });
@@ -348,6 +416,14 @@ function aggregateBuckets(
     );
     current.taskIds = [...new Set([...current.taskIds, ...bucket.taskIds])].sort();
     current.assignmentIds = [...new Set([...current.assignmentIds, ...bucket.assignmentIds])].sort();
+    current.assignmentContributions = aggregateAssignmentContributions([
+      ...current.assignmentContributions,
+      ...bucket.assignmentContributions
+    ]);
+    current.reservationContributions = aggregateReservationContributions([
+      ...current.reservationContributions,
+      ...bucket.reservationContributions
+    ]);
     current.reservationIds = [...new Set([...current.reservationIds, ...bucket.reservationIds])].sort();
     current.calendarExceptionIds = [
       ...new Set([...current.calendarExceptionIds, ...bucket.calendarExceptionIds])
@@ -355,6 +431,23 @@ function aggregateBuckets(
   }
 
   return [...grouped.values()];
+}
+
+function aggregateReservationContributions(
+  contributions: Array<{ reservationId: string; workMinutes: number }>
+): Array<{ reservationId: string; workMinutes: number }> {
+  const grouped = new Map<string, { reservationId: string; workMinutes: number }>();
+  for (const contribution of contributions) {
+    const existing = grouped.get(contribution.reservationId);
+    if (existing) {
+      existing.workMinutes += contribution.workMinutes;
+      continue;
+    }
+    grouped.set(contribution.reservationId, { ...contribution });
+  }
+  return [...grouped.values()].sort((left, right) =>
+    left.reservationId.localeCompare(right.reservationId)
+  );
 }
 
 function selectCalendar(calendarId: string | null, calendars: PlanCalendar[]): PlanCalendar {

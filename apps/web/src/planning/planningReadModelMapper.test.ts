@@ -313,6 +313,12 @@ function createReadModel(): PlanningReadModel {
           freeMinutes: 0,
           taskIds: ["task-a"],
           assignmentIds: ["assignment-a"],
+          assignmentContributions: [
+            { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 600 }
+          ],
+          reservationContributions: [
+            { reservationId: "reservation-a", workMinutes: 60 }
+          ],
           reservationIds: ["reservation-a"],
           calendarExceptionIds: []
         }
@@ -332,6 +338,12 @@ function createReadModel(): PlanningReadModel {
           overloadMinutes: 180,
           taskIds: ["task-a"],
           assignmentIds: ["assignment-a"],
+          assignmentContributions: [
+            { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 600 }
+          ],
+          reservationContributions: [
+            { reservationId: "reservation-a", workMinutes: 60 }
+          ],
           reservationIds: ["reservation-a"],
           calendarExceptionIds: [],
           reasons: [{ type: "task", id: "task-a" }]

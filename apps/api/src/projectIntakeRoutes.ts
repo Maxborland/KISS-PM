@@ -9,6 +9,7 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { parseDealStageChangeBody } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
@@ -223,6 +224,7 @@ export function registerProjectIntakeRoutes(
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ project: result.project }, result.status);
   });
 

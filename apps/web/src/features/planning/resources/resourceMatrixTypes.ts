@@ -4,6 +4,8 @@ export type ResourceMatrixDayLoad = {
   date: string;
   workMinutes: number;
   capacityMinutes: number;
+  freeMinutes: number;
+  overloadMinutes: number;
   isWeekend: boolean;
   isHoliday: boolean;
   hasAbsence: boolean;
@@ -77,25 +79,26 @@ export function aggregateResourceMatrixRowDays(
     let overload = false;
     let exception = false;
     let hasAbsence = false;
+    let freeMinutes = 0;
+    let overloadMinutes = 0;
     for (const row of rows) {
       const cell = row.days[dayIndex];
       if (!cell) continue;
       totalWork += cell.workMinutes;
       totalCapacity += cell.capacityMinutes;
+      freeMinutes += cell.freeMinutes;
+      overloadMinutes += cell.overloadMinutes;
       if (cell.isOverload) overload = true;
       if (cell.isException) exception = true;
       if (cell.hasAbsence) hasAbsence = true;
     }
-    const isFreeDay =
-      totalWork === 0 &&
-      !hasAbsence &&
-      totalCapacity > 0 &&
-      !day.isWeekend &&
-      !day.isHoliday;
+    const isFreeDay = totalWork === 0 && !hasAbsence && totalCapacity > 0 && !day.isWeekend && !day.isHoliday;
     return {
       date: day.date,
       workMinutes: totalWork,
       capacityMinutes: totalCapacity,
+      freeMinutes,
+      overloadMinutes,
       isWeekend: day.isWeekend,
       isHoliday: day.isHoliday,
       hasAbsence,

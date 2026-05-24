@@ -102,6 +102,12 @@ describe("PlanningResourcePanel", () => {
             freeMinutes: 1140,
             taskIds: ["task-a"],
             assignmentIds: ["assignment-a"],
+            assignmentContributions: [
+              { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 1200 }
+            ],
+            reservationContributions: [
+              { reservationId: "reservation-a", workMinutes: 60 }
+            ],
             reservationIds: ["reservation-a"],
             calendarExceptionIds: []
           },
@@ -118,6 +124,12 @@ describe("PlanningResourcePanel", () => {
             freeMinutes: 7140,
             taskIds: ["task-a"],
             assignmentIds: ["assignment-a"],
+            assignmentContributions: [
+              { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 2400 }
+            ],
+            reservationContributions: [
+              { reservationId: "reservation-a", workMinutes: 60 }
+            ],
             reservationIds: ["reservation-a"],
             calendarExceptionIds: []
           }
