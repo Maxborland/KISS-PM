@@ -32,6 +32,7 @@ import {
   parseCrmActivityEntityType,
   parseUpdateCrmTaskBody
 } from "./crmActivityParsers";
+import { serializeAttachment } from "./attachmentSerialization";
 import { isFinalOpportunityStatus } from "./projectIntakeService/opportunityStatus";
 
 type CrmActivityRouteDeps = {
@@ -106,8 +107,15 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       targetTenantId: actor.tenantId
     });
 
+    const attachmentItems = (await deps.dataSource.listAttachmentActivityItems?.({
+      tenantId: actor.tenantId,
+      entityType: entity.entityType,
+      entityId: entity.entityId
+    })) ?? [];
+
     return context.json({
       activities: activities.map(serializeCrmActivity),
+      attachmentItems: attachmentItems.map(serializeAttachment),
       systemEvents: visibleSystemEvents.map(redactCrmSystemEvent),
       canReadRawAudit: auditDecision.allowed,
       auditEvents: auditDecision.allowed
