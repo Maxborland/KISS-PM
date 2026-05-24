@@ -13,6 +13,9 @@ import { matches, rankAndLimit, score } from "./searchScoring";
 import { routeForEntity } from "./searchRouting";
 import type { SearchResult, WorkspaceSearchInput, WorkspaceSearchSource } from "./searchTypes";
 
+const ATTACHMENT_ACL_SCAN_MULTIPLIER = 10;
+const MAX_ATTACHMENT_ACL_SCAN_CANDIDATES = 200;
+
 export const workspaceSearchSources: WorkspaceSearchSource[] = [
   {
     sourceTypes: ["project"],
@@ -180,21 +183,34 @@ async function searchProducts(input: WorkspaceSearchInput, limit: number): Promi
 
 async function searchAttachments(input: WorkspaceSearchInput, limit: number): Promise<SearchResult[]> {
   if (!input.dataSource.searchAttachments) return [];
-  const attachments = await input.dataSource.searchAttachments({
-    tenantId: input.actor.tenantId,
-    query: input.query,
-    limit
-  });
   const visible: AttachmentReadModel[] = [];
-  for (const attachment of attachments) {
-    const entity = await resolveAttachmentEntityContext({
-      actor: input.actor,
-      dataSource: input.dataSource,
-      entityId: attachment.entityId,
-      entityType: attachment.entityType as AttachmentEntityType,
-      profile: input.profile
+
+  const maxCandidates = Math.min(
+    Math.max(limit, limit * ATTACHMENT_ACL_SCAN_MULTIPLIER),
+    MAX_ATTACHMENT_ACL_SCAN_CANDIDATES
+  );
+  let offset = 0;
+  while (visible.length < limit && offset < maxCandidates) {
+    const pageLimit = Math.min(limit, maxCandidates - offset);
+    const attachments = await input.dataSource.searchAttachments({
+      tenantId: input.actor.tenantId,
+      query: input.query,
+      limit: pageLimit,
+      offset
     });
-    if (entity.ok && entity.value.readDecision.allowed) visible.push(attachment);
+    if (attachments.length === 0) break;
+    for (const attachment of attachments) {
+      const entity = await resolveAttachmentEntityContext({
+        actor: input.actor,
+        dataSource: input.dataSource,
+        entityId: attachment.entityId,
+        entityType: attachment.entityType as AttachmentEntityType,
+        profile: input.profile
+      });
+      if (entity.ok && entity.value.readDecision.allowed) visible.push(attachment);
+    }
+    offset += attachments.length;
+    if (attachments.length < pageLimit) break;
   }
 
   return rankAndLimit(visible.map((attachment) => {

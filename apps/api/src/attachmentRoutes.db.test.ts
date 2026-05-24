@@ -32,6 +32,8 @@ const dataset: SeedTenantDataset = {
       permissions: [
         "tenant.clients.read",
         "tenant.clients.manage",
+        "tenant.contacts.read",
+        "tenant.contacts.manage",
         "tenant.projects.read",
         "tenant.projects.manage",
         "tenant.tasks.create",
@@ -65,6 +67,18 @@ const dataset: SeedTenantDataset = {
   clients: [
     { id: "client-alpha", tenantId: "tenant-alpha", name: "ООО Альфа" },
     { id: "client-beta", tenantId: "tenant-beta", name: "ООО Бета" }
+  ],
+  contacts: [
+    {
+      id: "contact-alpha",
+      tenantId: "tenant-alpha",
+      clientId: "client-alpha",
+      name: "Вера Контакт",
+      email: "vera@alpha.test",
+      phone: null,
+      telegram: null,
+      role: "Заказчик"
+    }
   ],
   users: [
     {
@@ -305,6 +319,47 @@ describe("attachment and unified search API", () => {
     });
     expect(search.status).toBe(200);
     await expect(search.json()).resolves.toEqual({ results: [] });
+  });
+
+  it("keeps scanning attachment matches after unreadable candidates are filtered", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "client-alpha",
+        title: "Общий ресурсный бриф",
+        url: "https://example.test/shared-visible.pdf"
+      })
+    });
+    for (let index = 0; index < 3; index += 1) {
+      await app.request("/api/workspace/attachments/external-references", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          entityType: "contact",
+          entityId: "contact-alpha",
+          title: `Общий ресурсный бриф скрытый ${index}`,
+          url: `https://example.test/shared-hidden-${index}.pdf`
+        })
+      });
+    }
+
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const search = await app.request(
+      "/api/workspace/search?q=общий&limit=1&types=external_reference",
+      { headers: { cookie: readerCookie } }
+    );
+    expect(search.status).toBe(200);
+    await expect(search.json()).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          title: "Общий ресурсный бриф",
+          route: "/clients/client-alpha"
+        })
+      ]
+    });
   });
 
   async function loginAs(email: string, password: string) {
