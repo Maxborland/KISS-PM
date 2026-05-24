@@ -361,6 +361,12 @@ describe("capacity API routes", () => {
       title: "Черновой проект",
       status: "draft"
     });
+    await createProject({
+      projectId: "project-draft-empty",
+      opportunityId: "opportunity-draft-empty",
+      title: "Пустой черновик",
+      status: "draft"
+    });
     await createPlanningTask(adminCookie, {
       projectId: "project-active",
       taskId: "task-active",
@@ -393,6 +399,7 @@ describe("capacity API routes", () => {
         { projectId: "project-draft", workMinutes: 240 }
       ])
     );
+    expect(JSON.stringify(row?.projectsMixByDate ?? {})).not.toContain("project-draft-empty");
 
     const projectFiltered = await app.request(
       "/api/workspace/capacity/tree?monthIso=2026-06&projectId=project-active",
