@@ -97,7 +97,7 @@ function FormLabel({
     <Label
       data-slot="form-label"
       data-error={!!error}
-      className={cn("data-[error=true]:text-red-500 dark:data-[error=true]:text-red-900", className)}
+      className={cn("data-[error=true]:text-[var(--danger)]", className)}
       htmlFor={formItemId}
       {...props}
     />
@@ -129,7 +129,7 @@ function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="form-description"
       id={formDescriptionId}
-      className={cn("text-sm text-slate-500 dark:text-slate-400", className)}
+      className={cn("text-[var(--text-xs)] text-[var(--muted)]", className)}
       {...props}
     />
   )
@@ -147,7 +147,7 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="form-message"
       id={formMessageId}
-      className={cn("text-sm text-red-500 dark:text-red-900", className)}
+      className={cn("text-[var(--text-xs)] text-[var(--danger-text)]", className)}
       {...props}
     >
       {body}

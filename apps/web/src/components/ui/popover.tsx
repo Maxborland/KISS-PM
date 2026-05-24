@@ -72,7 +72,7 @@ function PopoverDescription({
   return (
     <p
       data-slot="popover-description"
-      className={cn("text-slate-500 dark:text-slate-400", className)}
+      className={cn("text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--muted-strong)]", className)}
       {...props}
     />
   )

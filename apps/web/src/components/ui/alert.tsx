@@ -32,7 +32,10 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-title"
-      className={cn("mb-1 font-medium leading-none tracking-tight", className)}
+      className={cn(
+        "mb-1 font-[family-name:var(--font-display)] text-[length:var(--text-h3)] font-semibold leading-[var(--lh-h3)] text-[var(--text-strong)]",
+        className
+      )}
       {...props}
     />
   );
@@ -42,7 +45,10 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   return (
     <div
       data-slot="alert-description"
-      className={cn("text-[var(--text-sm)] [&_p]:leading-relaxed opacity-90", className)}
+      className={cn(
+        "text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--muted-strong)] [&_p]:leading-[var(--lh-md)]",
+        className
+      )}
       {...props}
     />
   );

@@ -3,8 +3,11 @@
 @import "tailwindcss";
 @import "../styles/tokens.css" layer(tokens);
 @import "../styles/tokens.planning.css" layer(tokens);
+@import "react-day-picker/dist/style.css" layer(components);
 @import "../styles/bem.css" layer(components);
 @import "../styles/bem-supplement.css" layer(components);
+@import "../styles/widgets/resource-matrix.css" layer(components);
+@import "../styles/widgets/gantt.css" layer(components);
 
 @theme inline {
   --color-background: var(--canvas);
@@ -22,6 +25,11 @@
   --color-popover: var(--panel-elevated);
   --radius: var(--radius-md);
   --animate-duration: var(--duration-base);
+
+  /* Tailwind font utilities → дизайн-токены */
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 @layer base {
@@ -44,5 +52,18 @@
     color: var(--text);
     background: var(--canvas);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  .mono, code, kbd, samp, pre {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum", "zero";
   }
 }

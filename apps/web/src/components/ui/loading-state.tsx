@@ -8,7 +8,7 @@ export type LoadingStateProps = {
 export function LoadingState({ label = "Загрузка…", className }: LoadingStateProps) {
   return (
     <div className={cn("skeleton-page", className)} aria-busy="true" aria-live="polite">
-      <p className="u-text-sm u-text-muted u-mb-4">{label}</p>
+      <p className="u-text-body u-text-muted u-mb-4">{label}</p>
       <div className="skeleton skeleton--bar" />
       <div className="skeleton skeleton--text skeleton--w-md" />
       <div className="skeleton skeleton--text skeleton--w-lg" />
