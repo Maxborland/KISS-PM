@@ -8,7 +8,8 @@ import {
 import {
   createDefaultControlSurfacePresets,
   validateControlSurfaceDefinition,
-  type ControlSurfaceDefinition
+  type ControlSurfaceDefinition,
+  type ControlSurfaceRecord
 } from "@kiss-pm/domain";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
@@ -24,11 +25,14 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
     const includeArchived = context.req.query("includeArchived") === "true";
-    const surfaces = (await deps.dataSource.listControlSurfaces(actor.tenantId)).filter(
-      (surface) => includeArchived || surface.status !== "archived"
-    );
+    const surfaces = (await deps.dataSource.listControlSurfaces(actor.tenantId))
+      .filter((surface) => includeArchived || surface.status !== "archived")
+      .filter((surface) => canReadBuilderState || surface.status === "published")
+      .map((surface) => canReadBuilderState ? surface : toPublishedSurfaceReadModel(surface))
+      .filter((surface): surface is ControlSurfaceRecord | PublishedControlSurfaceReadModel => Boolean(surface));
     return context.json({ surfaces });
   });
 
@@ -56,9 +60,15 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
     const surface = await deps.dataSource.findControlSurface(actor.tenantId, context.req.param("surfaceId"));
     if (!surface) return context.json({ error: "control_surface_not_found" }, 404);
+    if (!canReadBuilderState) {
+      const publishedSurface = toPublishedSurfaceReadModel(surface);
+      if (!publishedSurface) return context.json({ error: "control_surface_not_found" }, 404);
+      return context.json({ surface: publishedSurface });
+    }
     const versions = await deps.dataSource.listControlSurfaceVersions(actor.tenantId, surface.id);
     return context.json({ surface, versions });
   });
@@ -445,6 +455,57 @@ function nullableStringField(input: Record<string, unknown>, field: string): str
   const value = input[field];
   if (value === null || value === undefined) return null;
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+type PublishedControlSurfaceReadModel = Pick<
+  ControlSurfaceRecord,
+  | "id"
+  | "tenantId"
+  | "code"
+  | "name"
+  | "description"
+  | "ownerUserId"
+  | "status"
+  | "currentVersion"
+  | "publishedDefinition"
+  | "createdAt"
+  | "updatedAt"
+  | "publishedAt"
+>;
+
+function canReadControlSurfaceBuilderState(input: {
+  actor: Parameters<typeof canManageControlSurfaces>[0]["actor"];
+  profile: Parameters<typeof canManageControlSurfaces>[0]["profile"];
+}): boolean {
+  const policyInput = {
+    actor: input.actor,
+    profile: input.profile,
+    targetTenantId: input.actor.tenantId
+  };
+  return (
+    canManageControlSurfaces(policyInput).allowed ||
+    canPublishControlSurfaces(policyInput).allowed
+  );
+}
+
+function toPublishedSurfaceReadModel(
+  surface: ControlSurfaceRecord
+): PublishedControlSurfaceReadModel | null {
+  if (surface.status !== "published" || !surface.publishedDefinition) return null;
+  return {
+    id: surface.id,
+    tenantId: surface.tenantId,
+    code: surface.code,
+    name: surface.name,
+    description: surface.description,
+    ownerUserId: surface.ownerUserId,
+    status: "published",
+    currentVersion: surface.currentVersion,
+    publishedDefinition: surface.publishedDefinition,
+    createdAt: surface.createdAt,
+    updatedAt: surface.updatedAt,
+    publishedAt: surface.publishedAt
+  };
 }
 
 async function appendDeniedAuditIfConfigured(
