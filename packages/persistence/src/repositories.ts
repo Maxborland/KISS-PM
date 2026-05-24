@@ -18,26 +18,15 @@ import {
   userCredentials,
   userSessions
 } from "./schema";
-import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
-import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
-import {
-  createPlanningSavedViewsRepository,
-  type PlanningSavedViewsRepository
-} from "./planningSavedViewsRepository";
-import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
-import {
-  createResourceAbsencesRepository,
-  type ResourceAbsencesRepository
-} from "./resourceAbsencesRepository";
-import {
-  createTenantProductionCalendarRepository,
-  type TenantProductionCalendarRepository
-} from "./tenantProductionCalendarRepository";
-import {
-  createCrmActivityRepository,
-  type CrmActivityRepository
-} from "./crmActivityRepository";
+import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
+import { createCrmActivityRepository, type CrmActivityRepository } from "./crmActivityRepository";
 import { createControlRepository, type ControlRepository } from "./controlRepository";
+import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
+import { createPlanningSavedViewsRepository, type PlanningSavedViewsRepository } from "./planningSavedViewsRepository";
+import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
+import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
+import { createResourceAbsencesRepository, type ResourceAbsencesRepository } from "./resourceAbsencesRepository";
+import { createTenantProductionCalendarRepository, type TenantProductionCalendarRepository } from "./tenantProductionCalendarRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -130,6 +119,7 @@ export type PostgresTenantDataSource = CrmRepository &
   TenantProductionCalendarRepository &
   ResourceAbsencesRepository &
   ControlRepository &
+  AttachmentRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
@@ -191,6 +181,7 @@ export function createPostgresTenantDataSource(
     ...createProjectWorkRepository(db),
     ...createTenantProductionCalendarRepository(db),
     ...createResourceAbsencesRepository(db),
+    ...createAttachmentRepository(db),
     ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {

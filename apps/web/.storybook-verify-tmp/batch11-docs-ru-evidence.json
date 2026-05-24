@@ -1,0 +1,20 @@
+{
+  "batch": 11,
+  "date": "2026-05-24",
+  "scope": "RU cross-ref in UI/* Docs stories; design-v3 JSDoc on Витрина; catalog lead RU",
+  "grep": {
+    "Catalog/All Components in userFacingDocs": 0,
+    "Catalog/All Components in titleOnly": "stories/catalog/ComponentCatalog.stories.tsx (CSF title, id preserved)",
+    "Design v2 in ui stories": 0
+  },
+  "files": {
+    "shared": "apps/web/src/stories/story-docs-copy.tsx",
+    "docsStoriesUpdated": 11,
+    "showcaseJSDocUpdated": 31,
+    "catalogLead": "apps/web/src/stories/catalog/ComponentCatalog.stories.tsx"
+  },
+  "verification": {
+    "typecheck": "exit 0",
+    "buildStorybook": "exit 0"
+  }
+}
