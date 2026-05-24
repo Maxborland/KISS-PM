@@ -421,6 +421,12 @@ function validateCommandPreconditions(
       ) {
         return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
       }
+      {
+        const plannedStart = command.payload.plannedStart ?? snapshot.project.plannedStart;
+        const plannedFinish = command.payload.plannedFinish ?? plannedStart;
+        const dateOrderIssues = validateTaskDateOrder(plannedStart, plannedFinish);
+        if (dateOrderIssues.length > 0) return dateOrderIssues;
+      }
       if (
         command.payload.assignments.some(
           (assignment) =>
@@ -437,13 +443,9 @@ function validateCommandPreconditions(
     case "task.update_identity":
       return requireTask(taskIds, command.payload.taskId);
     case "task.update_schedule": {
-      const task = snapshot.tasks.find((candidate) => candidate.id === command.payload.taskId);
       return [
         ...requireTask(taskIds, command.payload.taskId),
-        ...validateSchedulePayload(
-          command.payload.plannedStart ?? task?.plannedStart ?? null,
-          command.payload.plannedFinish ?? task?.plannedFinish ?? null
-        )
+        ...validateTaskScheduleUpdate(snapshot.tasks, command.payload)
       ];
     }
     case "task.update_status":
@@ -641,12 +643,24 @@ function validateWorkModelPayload(
   return [];
 }
 
-function validateSchedulePayload(
-  plannedStart: string | null,
-  plannedFinish: string | null
+function validateTaskScheduleUpdate(
+  tasks: PlanTask[],
+  payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
+): ValidationIssue[] {
+  const task = tasks.find((candidate) => candidate.id === payload.taskId);
+  if (!task) return [];
+  return validateTaskDateOrder(
+    payload.plannedStart ?? task.plannedStart,
+    payload.plannedFinish ?? task.plannedFinish
+  );
+}
+
+function validateTaskDateOrder(
+  plannedStart: PlanTask["plannedStart"],
+  plannedFinish: PlanTask["plannedFinish"]
 ): ValidationIssue[] {
   if (plannedStart !== null && plannedFinish !== null && comparePlanDates(plannedStart, plannedFinish) > 0) {
-    return [invalid("planning_command_invalid", "Дата начала задачи не может быть позже даты завершения")];
+    return [invalid("planning_command_invalid", "Дата начала задачи не может быть позже завершения")];
   }
   return [];
 }

@@ -100,6 +100,9 @@ importers:
       '@kiss-pm/planning-client':
         specifier: workspace:*
         version: link:../../packages/planning-client
+      '@kiss-pm/planning-gantt-ui':
+        specifier: workspace:*
+        version: link:../../packages/planning-gantt-ui
       '@kiss-pm/tenant-org-structure':
         specifier: workspace:*
         version: link:../../packages/tenant-org-structure
@@ -212,6 +215,34 @@ importers:
       vitest:
         specifier: ^3.1.4
         version: 3.2.4(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(tsx@4.22.1)
+
+  packages/planning-gantt-ui:
+    dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tanstack/react-table':
+        specifier: ^8.21.3
+        version: 8.21.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tanstack/react-virtual':
+        specifier: ^3.13.12
+        version: 3.13.25(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      date-fns:
+        specifier: ^4.2.1
+        version: 4.2.1
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.5
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.1.5
+        version: 19.2.3(@types/react@19.2.14)
 
   packages/tenant-org-structure: {}
 

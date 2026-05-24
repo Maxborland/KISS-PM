@@ -86,6 +86,17 @@ Resource planning должен показывать загрузку людей,
 
 Матрица загрузки — обязательное наследие BR2 как capability. Она должна быть плотной, интерактивной и управленческой: пользователь видит перегруз, открывает причину, выбирает действие, получает audit и пересчет.
 
+## Planning workspace UI contract
+
+Phase 7 UI contract закреплен в `31_PHASE_7_PLANNING_WORKSPACE_UI_CONTRACT.md`.
+Этот документ описывает, как Phase 5/6 backend должен быть отражен в интерфейсе:
+Gantt/WBS, resource sheet, resource usage/load matrix, scenario proposals,
+baseline comparison, validation panel, permissions, audit и browser acceptance.
+
+Главное правило: Gantt, resource matrix и task CRUD используют один planning
+read model и один command layer. Frontend не должен иметь отдельный hidden
+scheduling/resource engine, который расходится с `PlanSnapshot`.
+
 ## Scenario Planning Engine
 
 Scenario Planning Engine — future capability над Gantt scheduling и resource matrix. Он не заменяет MS Project-class scheduling engine, а использует его для оценки последствий сценариев.
