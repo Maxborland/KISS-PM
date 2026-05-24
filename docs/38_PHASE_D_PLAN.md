@@ -74,6 +74,11 @@ Canonical doc для реализованного среза Phase D (ветка
 - Агрегация загрузки **по всем проектам** tenant (не вкладка одного проекта).
 - Группировка по выбранному org track: направление → отдел/команда → должность → сотрудник.
 - Источники: assignments + `resourceLoad` / capacity, production calendar, absences.
+- Phase E уточняет старое Phase 3 правило по draft: tenant capacity считает только
+  capacity-committed planning containers (`active`, `paused`, а также `draft` с
+  реальными assignments/reservations). Draft по-прежнему не попадает в active
+  projects workspace API, но его явная плановая занятость видна resource manager'у
+  в tenant-wide capacity.
 - Поверхность: отдельный маршрут или control surface (TBD в `docs/12_ФАЗОВЫЙ_ПЛАН.md`).
 
 ## Out of scope (Phase E)

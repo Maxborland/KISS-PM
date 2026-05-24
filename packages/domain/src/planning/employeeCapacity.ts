@@ -8,6 +8,8 @@ export type CapacityDayLoad = {
   date: string;
   workMinutes: number;
   capacityMinutes: number;
+  freeMinutes: number;
+  overloadMinutes: number;
   isWeekend: boolean;
   isHoliday: boolean;
   hasAbsence: boolean;
@@ -179,9 +181,10 @@ export function mergeWorkspaceDayBuckets(input: {
         projectsMix: new Map<string, number>()
       };
 
-      existing.workMinutes += bucket.assignedMinutes;
+      const committedMinutes = bucket.assignedMinutes + bucket.reservedMinutes;
+      existing.workMinutes += committedMinutes;
       existing.capacityMinutes = Math.max(existing.capacityMinutes, bucket.capacityMinutes);
-      const mixMinutes = (existing.projectsMix.get(displayProjectId) ?? 0) + bucket.assignedMinutes;
+      const mixMinutes = (existing.projectsMix.get(displayProjectId) ?? 0) + committedMinutes;
       existing.projectsMix.set(displayProjectId, mixMinutes);
       userMap.set(bucket.date, existing);
     }
@@ -229,27 +232,35 @@ function buildDayLoad(input: {
   day: CapacityMatrixDayInfo;
   workMinutes: number;
   capacityMinutes: number;
+  availabilityWorkMinutes?: number;
   hasAbsence: boolean;
   isException: boolean;
   isOverload: boolean;
+  isFreeDay?: boolean;
+  freeMinutes?: number;
+  overloadMinutes?: number;
 }): CapacityDayLoad {
+  const availabilityWorkMinutes = input.availabilityWorkMinutes ?? input.workMinutes;
   const isFreeDay =
-    input.workMinutes === 0 &&
-    !input.hasAbsence &&
-    input.capacityMinutes > 0 &&
-    !input.day.isWeekend &&
-    !input.day.isHoliday;
+    input.isFreeDay ??
+    (availabilityWorkMinutes === 0 &&
+      !input.hasAbsence &&
+      input.capacityMinutes > 0 &&
+      !input.day.isWeekend &&
+      !input.day.isHoliday);
   return {
     date: input.day.date,
     workMinutes: input.workMinutes,
     capacityMinutes: input.capacityMinutes,
+    freeMinutes: input.freeMinutes ?? Math.max(0, input.capacityMinutes - input.workMinutes),
+    overloadMinutes: input.overloadMinutes ?? Math.max(0, input.workMinutes - input.capacityMinutes),
     isWeekend: input.day.isWeekend,
     isHoliday: input.day.isHoliday,
     hasAbsence: input.hasAbsence,
     isFreeDay,
     isException: input.isException,
     isOverload: input.isOverload,
-    heat: computeHeat(input.workMinutes, input.capacityMinutes)
+    heat: computeHeat(availabilityWorkMinutes, input.capacityMinutes)
   };
 }
 
@@ -275,14 +286,14 @@ export function buildEmployeeRows(input: {
     const dayLoads = days.map((day) => {
       const merged = userMerged?.get(day.date);
       const totalWork = merged?.workMinutes ?? 0;
-      const capacityMinutes =
-        merged?.capacityMinutes ??
-        (day.isWeekend || day.isHoliday
-          ? 0
-          : (userExceptions?.get(day.date) ?? baseCapacity));
       const exceptionMinutes = userExceptions?.get(day.date);
       const hasAbsence = absenceKeys.has(`${user.id}:${day.date}`);
+      const baseDayCapacity =
+        day.isWeekend || day.isHoliday ? 0 : (exceptionMinutes ?? baseCapacity);
+      const capacityMinutes = hasAbsence ? 0 : (merged?.capacityMinutes ?? baseDayCapacity);
       const isOverload = totalWork > capacityMinutes && capacityMinutes >= 0;
+      const freeMinutes = Math.max(0, capacityMinutes - totalWork);
+      const overloadMinutes = Math.max(0, totalWork - capacityMinutes);
 
       let displayWork = totalWork;
       if (input.projectFilterId && merged) {
@@ -305,9 +316,12 @@ export function buildEmployeeRows(input: {
         day,
         workMinutes: displayWork,
         capacityMinutes,
+        availabilityWorkMinutes: totalWork,
         hasAbsence,
         isException: exceptionMinutes !== undefined,
-        isOverload
+        isOverload,
+        freeMinutes,
+        overloadMinutes
       });
     });
 
@@ -331,22 +345,33 @@ export function aggregateCapacityRowDays(
     let overload = false;
     let exception = false;
     let hasAbsence = false;
+    let freeMinutes = 0;
+    let overloadMinutes = 0;
+    let allRowsFreeDay = rows.length > 0;
     for (const row of rows) {
       const cell = row.days[dayIndex];
       if (!cell) continue;
       totalWork += cell.workMinutes;
       totalCapacity += cell.capacityMinutes;
+      freeMinutes += cell.freeMinutes;
+      overloadMinutes += cell.overloadMinutes;
       if (cell.isOverload) overload = true;
       if (cell.isException) exception = true;
       if (cell.hasAbsence) hasAbsence = true;
+      if (!cell.isFreeDay) allRowsFreeDay = false;
     }
+    const availabilityWorkMinutes = Math.max(0, totalCapacity - freeMinutes) + overloadMinutes;
     return buildDayLoad({
       day,
       workMinutes: totalWork,
       capacityMinutes: totalCapacity,
+      availabilityWorkMinutes,
       hasAbsence,
       isException: exception,
-      isOverload: overload
+      isOverload: overload,
+      isFreeDay: allRowsFreeDay,
+      freeMinutes,
+      overloadMinutes
     });
   });
 }
@@ -528,4 +553,51 @@ export function collectProjectsWithOverloadedEmployees(
     }
   }
   return ids;
+}
+
+export function maskOrgCapacityTreeProjects(
+  tree: OrgCapacityTree,
+  readableProjectIds: ReadonlySet<string>
+): OrgCapacityTree {
+  return {
+    ...tree,
+    groups: tree.groups.map(maskGroup),
+    unassignedRows: tree.unassignedRows.map((row) => maskCapacityRowProjects(row, readableProjectIds)),
+    orgGroups: tree.orgGroups.map((direction) => ({
+      ...direction,
+      units: direction.units.map((unit) => ({
+        ...unit,
+        positions: unit.positions.map(maskGroup)
+      }))
+    }))
+  };
+
+  function maskGroup(group: CapacityMatrixGroup): CapacityMatrixGroup {
+    return {
+      ...group,
+      rows: group.rows.map((row) => maskCapacityRowProjects(row, readableProjectIds))
+    };
+  }
+}
+
+export function maskCapacityRowProjects(
+  row: CapacityMatrixRow,
+  readableProjectIds: ReadonlySet<string>
+): CapacityMatrixRow {
+  if (!row.projectsMixByDate) return row;
+  const projectsMixByDate: CapacityMatrixRow["projectsMixByDate"] = {};
+  for (const [date, mix] of Object.entries(row.projectsMixByDate)) {
+    const masked = new Map<string, number>();
+    for (const entry of mix) {
+      const projectId = readableProjectIds.has(entry.projectId)
+        ? entry.projectId
+        : HIDDEN_PROJECT_ID;
+      masked.set(projectId, (masked.get(projectId) ?? 0) + entry.workMinutes);
+    }
+    projectsMixByDate[date] = [...masked.entries()].map(([projectId, workMinutes]) => ({
+      projectId,
+      workMinutes
+    }));
+  }
+  return { ...row, projectsMixByDate };
 }

@@ -15,6 +15,7 @@ function dayBucket(input: {
   projectId: string;
   date: string;
   assignedMinutes: number;
+  reservedMinutes?: number;
   capacityMinutes?: number;
 }): ResourceLoadBucket {
   return {
@@ -25,11 +26,16 @@ function dayBucket(input: {
     date: input.date,
     granularity: "day",
     assignedMinutes: input.assignedMinutes,
-    reservedMinutes: 0,
+    reservedMinutes: input.reservedMinutes ?? 0,
     capacityMinutes: input.capacityMinutes ?? 480,
     freeMinutes: 0,
     taskIds: [],
     assignmentIds: [],
+    assignmentContributions: [],
+    reservationContributions:
+      input.reservedMinutes && input.reservedMinutes > 0
+        ? [{ reservationId: `reservation-${input.projectId}`, workMinutes: input.reservedMinutes }]
+        : [],
     reservationIds: [],
     calendarExceptionIds: []
   };
@@ -65,6 +71,8 @@ describe("employeeCapacity", () => {
 
     const cell = rows[0]?.days.find((day) => day.date === date);
     expect(cell?.workMinutes).toBe(528);
+    expect(cell?.freeMinutes).toBe(0);
+    expect(cell?.overloadMinutes).toBe(48);
     expect(cell?.isOverload).toBe(true);
   });
 
@@ -129,6 +137,94 @@ describe("employeeCapacity", () => {
     const cell = rows[0]?.days.find((day) => day.date === date);
     expect(cell?.workMinutes).toBe(240);
     expect(cell?.isOverload).toBe(true);
+  });
+
+  it("project filter keeps tenant-wide availability flags when selected project has no work", () => {
+    const monthIso = "2026-06-01".slice(0, 7);
+    const monthDates = monthDateSet(monthIso);
+    const date = "2026-06-02";
+    const merged = mergeWorkspaceDayBuckets({
+      monthDates,
+      readableProjectIds: new Set(["p-a", "p-b"]),
+      projects: [
+        {
+          projectId: "p-b",
+          buckets: [dayBucket({ resourceId: "u1", projectId: "p-b", date, assignedMinutes: 240 })]
+        }
+      ]
+    });
+
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [
+        { id: "u1", name: "User", positionId: null, positionName: null }
+      ],
+      mergedByUserDate: merged,
+      projectFilterId: "p-a"
+    });
+
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.workMinutes).toBe(0);
+    expect(cell?.freeMinutes).toBe(240);
+    expect(cell?.isFreeDay).toBe(false);
+    expect(cell?.heat).toBe(2);
+  });
+
+  it("counts reservations as committed capacity load", () => {
+    const monthIso = "2026-06-01".slice(0, 7);
+    const monthDates = monthDateSet(monthIso);
+    const date = "2026-06-02";
+    const merged = mergeWorkspaceDayBuckets({
+      monthDates,
+      readableProjectIds: new Set(["p-a"]),
+      projects: [
+        {
+          projectId: "p-a",
+          buckets: [
+            dayBucket({
+              resourceId: "u1",
+              projectId: "p-a",
+              date,
+              assignedMinutes: 0,
+              reservedMinutes: 240
+            })
+          ]
+        }
+      ]
+    });
+
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [
+        { id: "u1", name: "User", positionId: null, positionName: null }
+      ],
+      mergedByUserDate: merged
+    });
+
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.workMinutes).toBe(240);
+    expect(cell?.freeMinutes).toBe(240);
+    expect(rows[0]?.projectsMixByDate?.[date]).toEqual([{ projectId: "p-a", workMinutes: 240 }]);
+  });
+
+  it("removes capacity for absence days even when employee has no project load", () => {
+    const monthIso = "2026-06-01".slice(0, 7);
+    const date = "2026-06-02";
+
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [
+        { id: "u1", name: "User", positionId: null, positionName: null }
+      ],
+      mergedByUserDate: new Map(),
+      absences: [{ userId: "u1", dateFrom: date, dateTo: date }]
+    });
+
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.capacityMinutes).toBe(0);
+    expect(cell?.freeMinutes).toBe(0);
+    expect(cell?.hasAbsence).toBe(true);
+    expect(cell?.isFreeDay).toBe(false);
   });
 
   it("hides unreadable project ids in mix", () => {
