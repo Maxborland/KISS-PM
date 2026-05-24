@@ -15,9 +15,13 @@ import {
   canManageProjectTypes,
   canManageProjects,
   canManageTaskStatuses,
+  canManageControlSignals,
+  canManageCorrectiveActions,
+  canManageKpiDefinitions,
   canCreateTasks,
   canDeleteTasks,
   canEditTasks,
+  canExecuteManagementActions,
   canManageTenantUsers,
   canManageWorkspaceConfig,
   canManageWorkspaceTheme,
@@ -32,6 +36,8 @@ import {
   canReadProjects,
   canReadProjectTypes,
   canReadResourceFeasibility,
+  canReadControlSignals,
+  canReadKpiDefinitions,
   canReadTenantUsers,
   canReadWorkspaceConfig,
   canPreviewPlanningScenarios,
@@ -74,6 +80,12 @@ describe("access-control tenant policy", () => {
       "tenant.project_resources.manage",
       "tenant.planning_scenarios.preview",
       "tenant.planning_scenarios.apply",
+      "tenant.kpi_definitions.read",
+      "tenant.kpi_definitions.manage",
+      "tenant.control_signals.read",
+      "tenant.control_signals.manage",
+      "tenant.management_actions.execute",
+      "tenant.corrective_actions.manage",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -584,6 +596,98 @@ describe("access-control tenant policy", () => {
     ).toBe(true);
     expect(
       canApplyPlanningScenarios({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 7 KPI, signal and action engine access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const controlReader = createAccessProfile({
+      id: "control-reader",
+      permissions: ["tenant.kpi_definitions.read", "tenant.control_signals.read"]
+    });
+
+    expect(
+      canReadKpiDefinitions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadControlSignals({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageKpiDefinitions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canExecuteManagementActions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageKpiDefinitions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageControlSignals({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canExecuteManagementActions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageCorrectiveActions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadControlSignals({
         actor,
         profile: adminProfile,
         targetTenantId: "tenant-beta"

@@ -29,6 +29,7 @@ export function permissionForCommand(
   if (
     command.type === "assignment.upsert" ||
     command.type === "assignment.delete" ||
+    command.type === "assignment.allocations.replace" ||
     command.type === "resource.reserve"
   ) {
     return canManageProjectResources(input);

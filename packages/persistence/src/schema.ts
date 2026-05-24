@@ -1,5 +1,6 @@
 import {
   boolean,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -1010,6 +1011,55 @@ export const taskAssignments = pgTable(
   ]
 );
 
+export const taskAssignmentAllocations = pgTable(
+  "task_assignment_allocations",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    assignmentId: text("assignment_id").notNull(),
+    taskId: text("task_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    date: text("date").notNull(),
+    workMinutes: integer("work_minutes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_assignment_allocations_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "task_assignment_allocations_assignment_fk",
+      columns: [table.tenantId, table.projectId, table.assignmentId],
+      foreignColumns: [taskAssignments.tenantId, taskAssignments.projectId, taskAssignments.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_assignment_allocations_task_fk",
+      columns: [table.tenantId, table.projectId, table.taskId],
+      foreignColumns: [tasks.tenantId, tasks.projectId, tasks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "task_assignment_allocations_resource_fk",
+      columns: [table.tenantId, table.resourceId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    uniqueIndex("task_assignment_allocations_assignment_date_uidx").on(
+      table.tenantId,
+      table.projectId,
+      table.assignmentId,
+      table.date
+    ),
+    index("task_assignment_allocations_resource_date_idx").on(
+      table.tenantId,
+      table.resourceId,
+      table.date
+    ),
+    check("task_assignment_allocations_work_chk", sql`${table.workMinutes} >= 0`)
+  ]
+);
+
 export const taskDependencies = pgTable(
   "task_dependencies",
   {
@@ -1197,6 +1247,50 @@ export const planningScenarioRuns = pgTable(
   ]
 );
 
+export const planningSolverRuns = pgTable(
+  "planning_solver_runs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    mode: text("mode").notNull(),
+    clientPlanVersion: integer("client_plan_version").notNull(),
+    engineVersion: text("engine_version").notNull(),
+    inputSnapshotMetadata: jsonb("input_snapshot_metadata").$type<Record<string, unknown>>().notNull(),
+    targetDeadline: text("target_deadline"),
+    proposals: jsonb("proposals").$type<Record<string, unknown>[]>().notNull(),
+    proposalPayloadHash: text("proposal_payload_hash").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    appliedProposalId: text("applied_proposal_id"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_solver_runs_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "planning_solver_runs_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "planning_solver_runs_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("planning_solver_runs_tenant_project_expires_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.expiresAt
+    ),
+    check("planning_solver_runs_mode_chk", sql`${table.mode} in ('schedule', 'repair')`),
+    check("planning_solver_runs_client_plan_version_chk", sql`${table.clientPlanVersion} > 0`)
+  ]
+);
+
 export const planningCommandIdempotencyKeys = pgTable(
   "planning_command_idempotency_keys",
   {
@@ -1228,6 +1322,208 @@ export const planningCommandIdempotencyKeys = pgTable(
       table.projectId,
       table.createdAt
     )
+  ]
+);
+
+export const kpiDefinitions = pgTable(
+  "kpi_definitions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    formula: jsonb("formula").$type<Record<string, unknown>>().notNull(),
+    unit: text("unit").notNull(),
+    period: text("period").notNull(),
+    thresholdRules: jsonb("threshold_rules").$type<Record<string, unknown>[]>().notNull(),
+    ownerRole: text("owner_role"),
+    allowedActions: jsonb("allowed_actions").$type<string[]>().notNull(),
+    version: integer("version").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "kpi_definitions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    uniqueIndex("kpi_definitions_tenant_code_uidx").on(table.tenantId, table.code),
+    index("kpi_definitions_tenant_status_idx").on(table.tenantId, table.status),
+    check("kpi_definitions_entity_type_chk", sql`${table.entityType} in ('project')`),
+    check("kpi_definitions_version_chk", sql`${table.version} > 0`),
+    check("kpi_definitions_status_chk", sql`${table.status} in ('active', 'archived')`)
+  ]
+);
+
+export const kpiEvaluations = pgTable(
+  "kpi_evaluations",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    definitionId: text("definition_id").notNull(),
+    definitionVersion: integer("definition_version").notNull(),
+    formulaVersion: integer("formula_version").notNull(),
+    sourceData: jsonb("source_data").$type<Record<string, unknown>>().notNull(),
+    periodStart: text("period_start"),
+    periodEnd: text("period_end"),
+    threshold: jsonb("threshold").$type<Record<string, unknown> | null>(),
+    calculatedValue: doublePrecision("calculated_value").notNull(),
+    severity: text("severity").notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "kpi_evaluations_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "kpi_evaluations_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "kpi_evaluations_definition_fk",
+      columns: [table.tenantId, table.definitionId],
+      foreignColumns: [kpiDefinitions.tenantId, kpiDefinitions.id]
+    }).onDelete("restrict"),
+    index("kpi_evaluations_tenant_project_evaluated_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.evaluatedAt
+    ),
+    check("kpi_evaluations_severity_chk", sql`${table.severity} in ('ok', 'warning', 'critical')`)
+  ]
+);
+
+export const controlSignals = pgTable(
+  "control_signals",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    evaluationId: text("evaluation_id"),
+    sourceEntity: jsonb("source_entity").$type<AuditSourceEntity>().notNull(),
+    sourceMetric: text("source_metric").notNull(),
+    severity: text("severity").notNull(),
+    explanation: text("explanation").notNull(),
+    ownerUserId: text("owner_user_id"),
+    allowedActions: jsonb("allowed_actions").$type<string[]>().notNull(),
+    scenarioProposals: jsonb("scenario_proposals").$type<Record<string, unknown>[]>().notNull(),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "control_signals_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "control_signals_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "control_signals_owner_user_fk",
+      columns: [table.tenantId, table.ownerUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("control_signals_tenant_project_status_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.status
+    ),
+    check("control_signals_severity_chk", sql`${table.severity} in ('warning', 'critical')`),
+    check(
+      "control_signals_status_chk",
+      sql`${table.status} in ('open', 'acknowledged', 'resolved', 'accepted_risk')`
+    )
+  ]
+);
+
+export const correctiveActions = pgTable(
+  "corrective_actions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    controlSignalId: text("control_signal_id").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    responsibleUserId: text("responsible_user_id"),
+    dueDate: text("due_date"),
+    status: text("status").notNull().default("open"),
+    result: text("result"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "corrective_actions_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "corrective_actions_signal_fk",
+      columns: [table.tenantId, table.projectId, table.controlSignalId],
+      foreignColumns: [controlSignals.tenantId, controlSignals.projectId, controlSignals.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "corrective_actions_responsible_user_fk",
+      columns: [table.tenantId, table.responsibleUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("corrective_actions_tenant_project_status_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.status
+    ),
+    check("corrective_actions_status_chk", sql`${table.status} in ('open', 'in_progress', 'done', 'cancelled')`)
+  ]
+);
+
+export const actionExecutions = pgTable(
+  "action_executions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    actionType: text("action_type").notNull(),
+    targetEntity: jsonb("target_entity").$type<AuditSourceEntity>().notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    previewPayload: jsonb("preview_payload").$type<Record<string, unknown> | null>(),
+    resultPayload: jsonb("result_payload").$type<Record<string, unknown> | null>(),
+    status: text("status").notNull(),
+    auditEventId: text("audit_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "action_executions_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "action_executions_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "action_executions_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("action_executions_tenant_project_created_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.createdAt
+    ),
+    check("action_executions_status_chk", sql`${table.status} in ('previewed', 'succeeded', 'failed', 'denied')`)
   ]
 );
 
@@ -1426,13 +1722,20 @@ export type PersistenceTableName =
   | "resource_calendars"
   | "calendar_exceptions"
   | "task_assignments"
+  | "task_assignment_allocations"
   | "task_dependencies"
   | "project_baselines"
   | "project_baseline_tasks"
   | "project_baseline_assignments"
   | "resource_reservations"
   | "planning_scenario_runs"
+  | "planning_solver_runs"
   | "planning_command_idempotency_keys"
+  | "kpi_definitions"
+  | "kpi_evaluations"
+  | "control_signals"
+  | "corrective_actions"
+  | "action_executions"
   | "tenant_production_calendars"
   | "tenant_production_calendar_exceptions"
   | "planning_saved_views"
@@ -1476,13 +1779,20 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "resource_calendars",
   "calendar_exceptions",
   "task_assignments",
+  "task_assignment_allocations",
   "task_dependencies",
   "project_baselines",
   "project_baseline_tasks",
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_solver_runs",
   "planning_command_idempotency_keys",
+  "kpi_definitions",
+  "kpi_evaluations",
+  "control_signals",
+  "corrective_actions",
+  "action_executions",
   "tenant_production_calendars",
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
@@ -1519,13 +1829,20 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "resource_calendars",
   "calendar_exceptions",
   "task_assignments",
+  "task_assignment_allocations",
   "task_dependencies",
   "project_baselines",
   "project_baseline_tasks",
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_solver_runs",
   "planning_command_idempotency_keys",
+  "kpi_definitions",
+  "kpi_evaluations",
+  "control_signals",
+  "corrective_actions",
+  "action_executions",
   "tenant_production_calendars",
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
@@ -1769,6 +2086,18 @@ const tableColumns = {
     "work_minutes",
     "calendar_id"
   ],
+  task_assignment_allocations: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "assignment_id",
+    "task_id",
+    "resource_id",
+    "date",
+    "work_minutes",
+    "created_at",
+    "updated_at"
+  ],
   task_dependencies: [
     "id",
     "tenant_id",
@@ -1821,6 +2150,23 @@ const tableColumns = {
     "applied_at",
     "created_at"
   ],
+  planning_solver_runs: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "mode",
+    "client_plan_version",
+    "engine_version",
+    "input_snapshot_metadata",
+    "target_deadline",
+    "proposals",
+    "proposal_payload_hash",
+    "actor_user_id",
+    "expires_at",
+    "applied_proposal_id",
+    "applied_at",
+    "created_at"
+  ],
   planning_command_idempotency_keys: [
     "tenant_id",
     "project_id",
@@ -1828,6 +2174,83 @@ const tableColumns = {
     "request_hash",
     "response_payload",
     "actor_user_id",
+    "created_at"
+  ],
+  kpi_definitions: [
+    "id",
+    "tenant_id",
+    "entity_type",
+    "code",
+    "label",
+    "formula",
+    "unit",
+    "period",
+    "threshold_rules",
+    "owner_role",
+    "allowed_actions",
+    "version",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  kpi_evaluations: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "definition_id",
+    "definition_version",
+    "formula_version",
+    "source_data",
+    "period_start",
+    "period_end",
+    "threshold",
+    "calculated_value",
+    "severity",
+    "evaluated_at"
+  ],
+  control_signals: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "evaluation_id",
+    "source_entity",
+    "source_metric",
+    "severity",
+    "explanation",
+    "owner_user_id",
+    "allowed_actions",
+    "scenario_proposals",
+    "status",
+    "created_at",
+    "updated_at",
+    "resolved_at"
+  ],
+  corrective_actions: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "control_signal_id",
+    "title",
+    "description",
+    "responsible_user_id",
+    "due_date",
+    "status",
+    "result",
+    "created_at",
+    "updated_at"
+  ],
+  action_executions: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "action_type",
+    "target_entity",
+    "actor_user_id",
+    "input",
+    "preview_payload",
+    "result_payload",
+    "status",
+    "audit_event_id",
     "created_at"
   ],
   tenant_production_calendars: [

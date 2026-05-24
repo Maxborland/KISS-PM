@@ -15,6 +15,7 @@ import { readLimitedJsonBody } from "../jsonBody";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
+import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
 import {
   parsePlanningCommandEnvelope,
   parsePlanningCommandBatchEnvelope,
@@ -61,6 +62,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
     getActorProfile: deps.getActorProfile
   });
+  registerPlanningAutoSolverRoutes(app, deps);
 
   app.get("/api/workspace/projects/:projectId/planning/read-model", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);

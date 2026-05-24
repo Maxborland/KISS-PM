@@ -80,6 +80,7 @@ export function auditActionForCommand(command: PlanningCommand): string {
     "dependency.delete": "planning.dependency.deleted",
     "assignment.upsert": "planning.assignment.upserted",
     "assignment.delete": "planning.assignment.deleted",
+    "assignment.allocations.replace": "planning.assignment_allocations.replaced",
     "baseline.capture": "planning.baseline.captured",
     "calendar.exception.upsert": "planning.calendar_exception.upserted",
     "constraint.update": "planning.constraint.updated",

@@ -2,6 +2,7 @@ import { createEmptyPlanDelta, type PlanDelta, type PlanningCommand } from "./pl
 import { comparePlanDates } from "./calendar";
 import type {
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanBaseline,
   PlanConstraint,
   PlanSnapshot,
@@ -90,10 +91,15 @@ export function reducePlanningCommand(
       });
     case "assignment.upsert":
       return reduceAssignmentUpsert(snapshot, command);
+    case "assignment.allocations.replace":
+      return reduceAssignmentAllocationsReplace(snapshot, command);
     case "assignment.delete":
       return withSnapshot(snapshot, command, {
         assignments: snapshot.assignments.filter(
           (assignment) => assignment.id !== command.payload.assignmentId
+        ),
+        assignmentAllocations: snapshot.assignmentAllocations?.filter(
+          (allocation) => allocation.assignmentId !== command.payload.assignmentId
         )
       });
     case "baseline.capture":
@@ -224,6 +230,9 @@ function reduceTaskDeleteOrArchive(
       assignments: snapshot.assignments.filter(
         (assignment) => assignment.taskId !== command.payload.taskId
       ),
+      assignmentAllocations: snapshot.assignmentAllocations?.filter(
+        (allocation) => allocation.taskId !== command.payload.taskId
+      ),
       dependencies: snapshot.dependencies.filter(
         (dependency) =>
           dependency.predecessorTaskId !== command.payload.taskId &&
@@ -276,9 +285,40 @@ function reduceAssignmentUpsert(
         unitsPermille: command.payload.unitsPermille,
         workMinutes: command.payload.workMinutes,
         calendarId: null
-      })
+      }),
+      assignmentAllocations: snapshot.assignmentAllocations?.filter(
+        (allocation) => allocation.assignmentId !== command.payload.id
+      )
     },
     { changedAssignmentIds: [command.payload.id] }
+  );
+}
+
+function reduceAssignmentAllocationsReplace(
+  snapshot: PlanSnapshot,
+  command: Extract<PlanningCommand, { type: "assignment.allocations.replace" }>
+): CommandReductionResult {
+  const assignment = snapshot.assignments.find((candidate) => candidate.id === command.payload.assignmentId);
+  if (!assignment) return withSnapshot(snapshot, command, {});
+  const allocations = command.payload.allocations.map<PlanAssignmentAllocation>((allocation) => ({
+    assignmentId: assignment.id,
+    taskId: assignment.taskId,
+    resourceId: assignment.resourceId,
+    date: allocation.date,
+    workMinutes: allocation.workMinutes
+  }));
+  return withSnapshot(
+    snapshot,
+    command,
+    {
+      assignmentAllocations: [
+        ...(snapshot.assignmentAllocations ?? []).filter(
+          (allocation) => allocation.assignmentId !== command.payload.assignmentId
+        ),
+        ...allocations
+      ].sort((left, right) => left.assignmentId.localeCompare(right.assignmentId) || left.date.localeCompare(right.date))
+    },
+    { changedAssignmentIds: [command.payload.assignmentId] }
   );
 }
 
@@ -395,7 +435,17 @@ function validateCommandPreconditions(
       }
       return [];
     case "task.update_identity":
-    case "task.update_schedule":
+      return requireTask(taskIds, command.payload.taskId);
+    case "task.update_schedule": {
+      const task = snapshot.tasks.find((candidate) => candidate.id === command.payload.taskId);
+      return [
+        ...requireTask(taskIds, command.payload.taskId),
+        ...validateSchedulePayload(
+          command.payload.plannedStart ?? task?.plannedStart ?? null,
+          command.payload.plannedFinish ?? task?.plannedFinish ?? null
+        )
+      ];
+    }
     case "task.update_status":
       return requireTask(taskIds, command.payload.taskId);
     case "task.update_progress": {
@@ -472,6 +522,42 @@ function validateCommandPreconditions(
         return [invalid("planning_command_invalid", "Трудоемкость назначения не может быть отрицательной")];
       }
       return [];
+    case "assignment.allocations.replace": {
+      const assignment = snapshot.assignments.find((candidate) => candidate.id === command.payload.assignmentId);
+      if (!assignment) {
+        return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
+      }
+      const duplicateDates = new Set<string>();
+      const seenDates = new Set<string>();
+      for (const allocation of command.payload.allocations) {
+        if (seenDates.has(allocation.date)) duplicateDates.add(allocation.date);
+        seenDates.add(allocation.date);
+      }
+      if (
+        duplicateDates.size > 0 ||
+        command.payload.allocations.some(
+          (allocation) => allocation.workMinutes <= 0 || !Number.isFinite(allocation.workMinutes)
+        )
+      ) {
+        return [invalid("planning_command_invalid", "Allocation назначения содержит некорректные даты или минуты")];
+      }
+      if (command.payload.allocations.length > 0) {
+        const allocatedWork = command.payload.allocations.reduce(
+          (total, allocation) => total + allocation.workMinutes,
+          0
+        );
+        const expectedWork = resolveAssignmentWork(snapshot, assignment);
+        if (allocatedWork !== expectedWork) {
+          return [
+            invalid(
+              "planning_command_invalid",
+              "Сумма allocation назначения должна совпадать с трудоемкостью назначения"
+            )
+          ];
+        }
+      }
+      return [];
+    }
     case "assignment.delete":
       if (!assignmentIds.has(command.payload.assignmentId)) {
         return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
@@ -555,6 +641,35 @@ function validateWorkModelPayload(
   return [];
 }
 
+function validateSchedulePayload(
+  plannedStart: string | null,
+  plannedFinish: string | null
+): ValidationIssue[] {
+  if (plannedStart !== null && plannedFinish !== null && comparePlanDates(plannedStart, plannedFinish) > 0) {
+    return [invalid("planning_command_invalid", "Дата начала задачи не может быть позже даты завершения")];
+  }
+  return [];
+}
+
+function resolveAssignmentWork(snapshot: PlanSnapshot, assignment: PlanAssignment): number {
+  if (assignment.workMinutes !== null) return assignment.workMinutes;
+  const task = snapshot.tasks.find((candidate) => candidate.id === assignment.taskId);
+  if (!task) return 0;
+  const taskWorkAssignments = snapshot.assignments.filter(
+    (candidate) =>
+      candidate.taskId === assignment.taskId &&
+      (candidate.role === "executor" || candidate.role === "co_executor")
+  );
+  const explicitWork = taskWorkAssignments.reduce(
+    (total, candidate) => total + (candidate.workMinutes ?? 0),
+    0
+  );
+  const implicitAssignments = taskWorkAssignments.filter((candidate) => candidate.workMinutes === null);
+  const implicitUnits = implicitAssignments.reduce((total, candidate) => total + candidate.unitsPermille, 0);
+  if (implicitUnits <= 0) return 0;
+  return Math.round((Math.max(0, task.workMinutes - explicitWork) * assignment.unitsPermille) / implicitUnits);
+}
+
 function isDescendantTask(tasks: PlanTask[], ancestorTaskId: string, candidateTaskId: string): boolean {
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
   const visitedTaskIds = new Set<string>();
@@ -584,16 +699,22 @@ function updateTaskSchedule(
   payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
 ): PlanTask {
   const plannedStart = payload.plannedStart ?? task.plannedStart;
+  const plannedFinish = payload.plannedFinish ?? task.plannedFinish;
   const plannedStartInstant =
     payload.plannedStart !== null && task.plannedStartInstant
       ? { ...task.plannedStartInstant, date: payload.plannedStart }
       : task.plannedStartInstant;
+  const plannedFinishInstant =
+    payload.plannedFinish !== null && task.plannedFinishInstant
+      ? { ...task.plannedFinishInstant, date: payload.plannedFinish }
+      : task.plannedFinishInstant;
 
   return {
     ...task,
     plannedStart,
-    plannedFinish: payload.plannedFinish ?? task.plannedFinish,
-    ...(plannedStartInstant !== undefined ? { plannedStartInstant } : {})
+    plannedFinish,
+    ...(plannedStartInstant !== undefined ? { plannedStartInstant } : {}),
+    ...(plannedFinishInstant !== undefined ? { plannedFinishInstant } : {})
   };
 }
 
@@ -722,6 +843,7 @@ function taskIdsFor(command: PlanningCommand): string[] {
 
 function assignmentIdsFor(command: PlanningCommand): string[] {
   if (command.type === "assignment.upsert") return [command.payload.id];
+  if (command.type === "assignment.allocations.replace") return [command.payload.assignmentId];
   if (command.type === "assignment.delete") return [command.payload.assignmentId];
   return [];
 }

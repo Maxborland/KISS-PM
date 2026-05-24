@@ -37,6 +37,7 @@ import {
   createCrmActivityRepository,
   type CrmActivityRepository
 } from "./crmActivityRepository";
+import { createControlRepository, type ControlRepository } from "./controlRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -128,6 +129,7 @@ export type PostgresTenantDataSource = CrmRepository &
   ProjectWorkRepository &
   TenantProductionCalendarRepository &
   ResourceAbsencesRepository &
+  ControlRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
@@ -182,6 +184,7 @@ export function createPostgresTenantDataSource(
   return {
     db,
     ...createCrmRepository(db),
+    ...createControlRepository(db),
     ...createProjectIntakeRepository(db),
     ...createPlanningRepository(db),
     ...createPlanningSavedViewsRepository(db),

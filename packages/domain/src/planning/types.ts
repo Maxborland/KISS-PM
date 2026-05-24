@@ -76,6 +76,14 @@ export type PlanAssignment = {
   calendarId: string | null;
 };
 
+export type PlanAssignmentAllocation = {
+  assignmentId: string;
+  taskId: string;
+  resourceId: string;
+  date: PlanDate;
+  workMinutes: number;
+};
+
 export type PlanDependency = {
   id: string;
   predecessorTaskId: string;
@@ -136,6 +144,7 @@ export type PlanSnapshot = {
   project: PlanProject;
   tasks: PlanTask[];
   assignments: PlanAssignment[];
+  assignmentAllocations?: PlanAssignmentAllocation[] | undefined;
   dependencies: PlanDependency[];
   baselines: PlanBaseline[];
   calendars: PlanCalendar[];
