@@ -6,6 +6,7 @@ export type ApiErrorCode =
   | "conflict"
   | "server_error"
   | "network_error"
+  | "invalid_response"
   | "unknown";
 
 export class ApiError extends Error {
@@ -77,7 +78,11 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     try {
       payload = JSON.parse(rawText) as unknown;
     } catch {
-      payload = { error: "invalid_json_response" };
+      const body = { error: "invalid_json_response" };
+      if (response.ok) {
+        throw new ApiError(response.status, "invalid_response", "invalid_json_response", body);
+      }
+      payload = body;
     }
   }
 

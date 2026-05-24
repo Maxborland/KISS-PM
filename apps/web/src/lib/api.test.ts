@@ -42,4 +42,15 @@ describe("apiFetch", () => {
       body: { error: "forbidden", message: "Нет доступа" }
     });
   });
+
+  it("throws when a successful response contains invalid JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("<html>login</html>", { status: 200 }));
+
+    await expect(apiFetch("/api/tasks")).rejects.toMatchObject({
+      status: 200,
+      code: "invalid_response",
+      message: "invalid_json_response",
+      body: { error: "invalid_json_response" }
+    });
+  });
 });
