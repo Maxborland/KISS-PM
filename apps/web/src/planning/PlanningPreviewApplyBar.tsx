@@ -80,18 +80,22 @@ export function commandLabel(commandType: PlanningCommand["type"]): string {
     "task.update_schedule": "Изменение дат задачи",
     "task.update_work_model": "Изменение трудоемкости",
     "task.update_status": "Изменение статуса",
+    "task.update_progress": "Изменение прогресса",
     "task.move_wbs": "Изменение WBS",
     "task.delete_or_archive": "Удаление или архивирование задачи",
     "dependency.upsert": "Изменение зависимости",
     "dependency.delete": "Удаление зависимости",
     "assignment.upsert": "Назначение ресурса",
+    "assignment.allocations.replace": "Изменение распределения работ",
     "assignment.delete": "Снятие назначения",
     "baseline.capture": "Фиксация baseline",
     "calendar.exception.upsert": "Исключение календаря",
     "constraint.update": "Изменение constraint",
     "resource.reserve": "Резерв ресурса",
     "risk.accept_overload": "Принятие перегруза",
-    "project.deadline.move": "Перенос deadline"
+    "project.deadline.move": "Перенос deadline",
+    "project.settings.update": "Изменение настроек проекта",
+    "task.update_custom_field": "Изменение пользовательского поля"
   };
   return labels[commandType];
 }
