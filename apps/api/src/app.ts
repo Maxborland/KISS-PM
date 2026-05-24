@@ -26,6 +26,7 @@ import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerControlRoutes } from "./controlRoutes";
+import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
@@ -171,7 +172,7 @@ export function createApp(options: CreateAppOptions = {}) {
       throw new Error("audit_not_configured");
     }
 
-    const auditEventId = `audit-${randomUUID()}`;
+    const auditEventId = input.auditEventId ?? `audit-${randomUUID()}`;
     await auditDataSource.appendAuditEvent({
       id: auditEventId,
       tenantId: input.tenantId,
@@ -222,6 +223,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
   registerControlRoutes(app, routeDeps);
+  registerControlSurfaceRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);

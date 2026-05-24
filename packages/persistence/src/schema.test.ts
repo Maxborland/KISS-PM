@@ -44,6 +44,8 @@ describe("PostgreSQL persistence schema", () => {
       "control_signals",
       "corrective_actions",
       "action_executions",
+      "control_surface_definitions",
+      "control_surface_versions",
       "tenant_production_calendars",
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
@@ -99,6 +101,8 @@ describe("PostgreSQL persistence schema", () => {
       "control_signals",
       "corrective_actions",
       "action_executions",
+      "control_surface_definitions",
+      "control_surface_versions",
       "tenant_production_calendars",
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
@@ -158,6 +162,33 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("action_executions")).toEqual(
       expect.arrayContaining(["action_type", "target_entity", "preview_payload", "result_payload"])
+    );
+  });
+
+  it("stores Phase 8 control surface definitions and immutable versions", () => {
+    expect(getPersistenceTableColumns("control_surface_definitions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "code",
+        "status",
+        "current_version",
+        "draft_version",
+        "draft_definition",
+        "published_definition",
+        "published_at",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("control_surface_versions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "surface_id",
+        "version",
+        "definition",
+        "published_by_user_id",
+        "audit_event_id",
+        "created_at"
+      ])
     );
   });
 

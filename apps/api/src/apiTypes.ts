@@ -23,6 +23,12 @@ import type {
   PlanningScenarioRunRecord,
   PlanningSolverRunInput,
   PlanningSolverRunRecord,
+  ControlSurfaceArchiveInput,
+  ControlSurfaceDraftInput,
+  ControlSurfacePublishInput,
+  ControlSurfaceRecord,
+  ControlSurfaceRollbackInput,
+  ControlSurfaceVersionRecord,
   AttachmentEntityType,
   AttachmentReadModel,
   EntityAttachmentInput,
@@ -297,6 +303,7 @@ export type UserSessionRecord = {
 };
 
 export type ManagementAuditEventInput = {
+  auditEventId?: string;
   tenantId: TenantId;
   actorUserId: UserId;
   actionType: string;
@@ -571,6 +578,25 @@ export type ApiTenantDataSource = {
   listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
   createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
   listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
+  listControlSurfaces?(tenantId: TenantId): Promise<ControlSurfaceRecord[]>;
+  findControlSurface?(tenantId: TenantId, surfaceId: string): Promise<ControlSurfaceRecord | undefined>;
+  upsertControlSurfaceDraft?(input: ControlSurfaceDraftInput): Promise<ControlSurfaceRecord>;
+  publishControlSurface?(input: ControlSurfacePublishInput): Promise<{
+    surface: ControlSurfaceRecord;
+    version: ControlSurfaceVersionRecord;
+  }>;
+  archiveControlSurface?(input: ControlSurfaceArchiveInput): Promise<ControlSurfaceRecord | undefined>;
+  listControlSurfaceVersions?(
+    tenantId: TenantId,
+    surfaceId: string
+  ): Promise<ControlSurfaceVersionRecord[]>;
+  rollbackControlSurfaceToVersion?(input: ControlSurfaceRollbackInput): Promise<
+    | {
+        surface: ControlSurfaceRecord;
+        version: ControlSurfaceVersionRecord;
+      }
+    | undefined
+  >;
   getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
   ensurePlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
   incrementPlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
