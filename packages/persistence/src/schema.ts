@@ -1527,6 +1527,92 @@ export const actionExecutions = pgTable(
   ]
 );
 
+export const controlSurfaceDefinitions = pgTable(
+  "control_surface_definitions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    ownerUserId: text("owner_user_id"),
+    status: text("status").notNull().default("draft"),
+    currentVersion: integer("current_version").notNull().default(0),
+    draftVersion: integer("draft_version").notNull().default(1),
+    draftDefinition: jsonb("draft_definition").$type<Record<string, unknown>>().notNull(),
+    publishedDefinition: jsonb("published_definition").$type<Record<string, unknown> | null>(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    updatedByUserId: text("updated_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "control_surface_definitions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    uniqueIndex("control_surface_definitions_tenant_code_uidx").on(table.tenantId, table.code),
+    foreignKey({
+      name: "control_surface_definitions_owner_user_fk",
+      columns: [table.tenantId, table.ownerUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "control_surface_definitions_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "control_surface_definitions_updated_by_fk",
+      columns: [table.tenantId, table.updatedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("control_surface_definitions_tenant_status_idx").on(table.tenantId, table.status),
+    check("control_surface_definitions_status_chk", sql`${table.status} in ('draft', 'published', 'archived')`),
+    check("control_surface_definitions_current_version_chk", sql`${table.currentVersion} >= 0`),
+    check("control_surface_definitions_draft_version_chk", sql`${table.draftVersion} > 0`)
+  ]
+);
+
+export const controlSurfaceVersions = pgTable(
+  "control_surface_versions",
+  {
+    tenantId: text("tenant_id").notNull(),
+    surfaceId: text("surface_id").notNull(),
+    version: integer("version").notNull(),
+    definition: jsonb("definition").$type<Record<string, unknown>>().notNull(),
+    publishedByUserId: text("published_by_user_id").notNull(),
+    auditEventId: text("audit_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "control_surface_versions_pkey",
+      columns: [table.tenantId, table.surfaceId, table.version]
+    }),
+    foreignKey({
+      name: "control_surface_versions_surface_fk",
+      columns: [table.tenantId, table.surfaceId],
+      foreignColumns: [controlSurfaceDefinitions.tenantId, controlSurfaceDefinitions.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "control_surface_versions_published_by_fk",
+      columns: [table.tenantId, table.publishedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("control_surface_versions_tenant_surface_created_idx").on(
+      table.tenantId,
+      table.surfaceId,
+      table.createdAt
+    ),
+    check("control_surface_versions_version_chk", sql`${table.version} > 0`)
+  ]
+);
+
 export const taskParticipants = pgTable(
   "task_participants",
   {
@@ -1883,6 +1969,8 @@ export type PersistenceTableName =
   | "control_signals"
   | "corrective_actions"
   | "action_executions"
+  | "control_surface_definitions"
+  | "control_surface_versions"
   | "tenant_production_calendars"
   | "tenant_production_calendar_exceptions"
   | "planning_saved_views"
@@ -1943,6 +2031,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "control_signals",
   "corrective_actions",
   "action_executions",
+  "control_surface_definitions",
+  "control_surface_versions",
   "tenant_production_calendars",
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
@@ -1996,6 +2086,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "control_signals",
   "corrective_actions",
   "action_executions",
+  "control_surface_definitions",
+  "control_surface_versions",
   "tenant_production_calendars",
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
@@ -2406,6 +2498,34 @@ const tableColumns = {
     "preview_payload",
     "result_payload",
     "status",
+    "audit_event_id",
+    "created_at"
+  ],
+  control_surface_definitions: [
+    "id",
+    "tenant_id",
+    "code",
+    "name",
+    "description",
+    "owner_user_id",
+    "status",
+    "current_version",
+    "draft_version",
+    "draft_definition",
+    "published_definition",
+    "created_by_user_id",
+    "updated_by_user_id",
+    "created_at",
+    "updated_at",
+    "published_at",
+    "archived_at"
+  ],
+  control_surface_versions: [
+    "tenant_id",
+    "surface_id",
+    "version",
+    "definition",
+    "published_by_user_id",
     "audit_event_id",
     "created_at"
   ],

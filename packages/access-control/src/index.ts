@@ -41,6 +41,9 @@ export const permissions = [
   "tenant.control_signals.manage",
   "tenant.management_actions.execute",
   "tenant.corrective_actions.manage",
+  "tenant.control_surfaces.read",
+  "tenant.control_surfaces.manage",
+  "tenant.control_surfaces.publish",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -506,6 +509,39 @@ export function canManageCorrectiveActions(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.corrective_actions.manage"
+  });
+}
+
+export function canReadControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.read"
+  });
+}
+
+export function canManageControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.manage"
+  });
+}
+
+export function canPublishControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.publish"
   });
 }
 

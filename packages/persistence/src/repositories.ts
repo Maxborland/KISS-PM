@@ -21,6 +21,7 @@ import {
 import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
 import { createCrmActivityRepository, type CrmActivityRepository } from "./crmActivityRepository";
 import { createControlRepository, type ControlRepository } from "./controlRepository";
+import { createControlSurfaceRepository, type ControlSurfaceRepository } from "./controlSurfaceRepository";
 import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
 import { createPlanningSavedViewsRepository, type PlanningSavedViewsRepository } from "./planningSavedViewsRepository";
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
@@ -119,6 +120,7 @@ export type PostgresTenantDataSource = CrmRepository &
   TenantProductionCalendarRepository &
   ResourceAbsencesRepository &
   ControlRepository &
+  ControlSurfaceRepository &
   AttachmentRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
@@ -175,6 +177,7 @@ export function createPostgresTenantDataSource(
     db,
     ...createCrmRepository(db),
     ...createControlRepository(db),
+    ...createControlSurfaceRepository(db),
     ...createProjectIntakeRepository(db),
     ...createPlanningRepository(db),
     ...createPlanningSavedViewsRepository(db),
