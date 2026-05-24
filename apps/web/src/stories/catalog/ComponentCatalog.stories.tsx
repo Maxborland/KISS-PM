@@ -7,12 +7,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BannerInline } from "@/components/ui/banner-inline";
+import { CardPanel } from "@/components/domain/card-panel";
+import { DataTable } from "@/components/domain/data-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Chip } from "@/components/ui/chip";
 import { Combobox } from "@/components/ui/combobox";
-import { DateInput } from "@/components/ui/date-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -37,7 +38,6 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
@@ -45,9 +45,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--panel)] p-[var(--space-5)]">
-      <h2 className="text-[var(--text-lg)] font-semibold text-[var(--text)]">{title}</h2>
-      {children}
+    <section className="catalog-section">
+      <h2 className="type-section-title">{title}</h2>
+      <div className="catalog-section__body">{children}</div>
     </section>
   );
 }
@@ -57,21 +57,21 @@ function CatalogPage() {
   const [combo, setCombo] = useState("pm");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto flex max-w-5xl flex-col gap-[var(--space-6)] pb-[var(--space-8)]">
       <PageIntro
         title="Design v3 — каталог компонентов"
-        lead="Согласование CVA overrides, BEM-токенов и custom primitives перед экранами. PR #21."
+        lead="React-примитивы (CVA). Эталонные макеты v2 — экраны, паттерны и компоненты."
       />
 
       <Section title="Кнопки и ввод">
-        <div className="flex flex-wrap gap-2">
-          <Button>Primary</Button>
-          <Button variant="secondary">Secondary</Button>
-          <Button variant="outline">Outline</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button variant="destructive">Destructive</Button>
-          <Button size="sm">Small</Button>
-          <Button size="lg">Large</Button>
+        <div className="flex flex-wrap gap-[var(--space-2)]">
+          <Button variant="primary">Основная</Button>
+          <Button variant="secondary">Вторичная</Button>
+          <Button variant="outline">Контур</Button>
+          <Button variant="ghost">Прозрачная</Button>
+          <Button variant="destructive">Опасная</Button>
+          <Button size="sm">Малая</Button>
+          <Button size="lg">Большая</Button>
           <IconButton label="Уведомления">
             <Bell className="size-4" />
           </IconButton>
@@ -79,7 +79,7 @@ function CatalogPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Input placeholder="Название проекта" />
           <Textarea placeholder="Описание" rows={2} />
-          <DateInput />
+          <DatePicker placeholder="Выберите дату" />
           <SearchPill placeholder="Поиск задач…" />
         </div>
         <Segmented
@@ -93,12 +93,12 @@ function CatalogPage() {
         />
       </Section>
 
-      <Section title="Chips, badges, kbd">
+      <Section title="Чипы, бейджи, клавиши">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge>Default</Badge>
-          <Badge variant="success">Success</Badge>
-          <Badge variant="warning">Warning</Badge>
-          <Badge variant="danger">Danger</Badge>
+          <Badge>По умолчанию</Badge>
+          <Badge variant="success">Успех</Badge>
+          <Badge variant="warning">Предупреждение</Badge>
+          <Badge variant="danger">Опасность</Badge>
           <Chip variant="violet">В работе</Chip>
           <Chip variant="info">Черновик</Chip>
           <Kbd>⌘</Kbd>
@@ -116,7 +116,7 @@ function CatalogPage() {
           <EmptyState title="Нет проектов" description="Создайте первый проект из CRM." action={<Button size="sm"><Plus className="size-4" /> Создать</Button>} />
           <LoadingState label="Загрузка портфеля…" />
           <ErrorState title="Ошибка загрузки" description="Повторите позже." />
-          <ForbiddenState title="Нет доступа" description="Обратитесь к администратору workspace." />
+          <ForbiddenState title="Нет доступа" description="Обратитесь к администратору рабочей области." />
         </div>
         <IlluState title="Портфель пуст" description="Подключите CRM или импортируйте шаблон." />
         <div className="space-y-2">
@@ -140,7 +140,7 @@ function CatalogPage() {
         <div className="flex flex-wrap gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">Dialog</Button>
+              <Button variant="outline">Модалка</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -151,7 +151,7 @@ function CatalogPage() {
           </Dialog>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline">Sheet</Button>
+              <Button variant="outline">Панель</Button>
             </SheetTrigger>
             <SheetContent>
               <SheetHeader>
@@ -162,13 +162,13 @@ function CatalogPage() {
           </Sheet>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline">Popover</Button>
+              <Button variant="outline">Всплывающее</Button>
             </PopoverTrigger>
             <PopoverContent>Быстрые фильтры</PopoverContent>
           </Popover>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">Menu</Button>
+              <Button variant="outline">Меню</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem>Редактировать</DropdownMenuItem>
@@ -184,21 +184,21 @@ function CatalogPage() {
             <TooltipContent>Подсказка</TooltipContent>
           </Tooltip>
           <Button variant="secondary" onClick={() => toast.success("Сохранено")}>
-            Toast
+            Тост
           </Button>
         </div>
         <Combobox
           className="max-w-xs"
           options={[
-            { value: "pm", label: "Project Manager" },
-            { value: "dev", label: "Developer" }
+            { value: "pm", label: "Менеджер проекта" },
+            { value: "dev", label: "Разработчик" }
           ]}
           value={combo}
           onValueChange={setCombo}
         />
       </Section>
 
-      <Section title="Формы и таблица">
+      <Section title="Формы, CardPanel и DataTable">
         <div className="flex items-center gap-3">
           <Checkbox id="c1" defaultChecked />
           <Label htmlFor="c1">Согласен с политикой</Label>
@@ -206,40 +206,40 @@ function CatalogPage() {
           <Label htmlFor="s1">Уведомления</Label>
         </div>
         <Separator />
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Карточка KPI</CardTitle>
-            <CardDescription>Метрика за период</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-[var(--accent)]">87%</p>
-          </CardContent>
-          <CardFooter>
-            <Button size="sm">Детали</Button>
-          </CardFooter>
-        </Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Проект</TableHead>
-              <TableHead>Статус</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>Альфа</TableCell>
-              <TableCell>
+        <CardPanel
+          className="max-w-md"
+          title="Карточка KPI"
+          subtitle="Метрика за период"
+          actions={
+            <Button size="sm" variant="ghost">
+              Детали
+            </Button>
+          }
+        >
+          <p className="text-2xl font-semibold text-[var(--accent)]">87%</p>
+        </CardPanel>
+        <DataTable>
+          <thead>
+            <tr>
+              <th>Проект</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Альфа</td>
+              <td>
                 <Badge variant="success">В срок</Badge>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Бета</TableCell>
-              <TableCell>
+              </td>
+            </tr>
+            <tr>
+              <td>Бета</td>
+              <td>
                 <Badge variant="warning">Риск</Badge>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+              </td>
+            </tr>
+          </tbody>
+        </DataTable>
         <div className="flex items-center gap-2">
           <Avatar>
             <AvatarFallback>ИП</AvatarFallback>
@@ -269,5 +269,6 @@ export default meta;
 type Story = StoryObj;
 
 export const ForApproval: Story = {
+  name: "Для согласования",
   render: () => <CatalogPage />
 };

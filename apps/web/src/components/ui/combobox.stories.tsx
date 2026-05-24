@@ -1,8 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/react";
+﻿import type { Meta, StoryObj } from "@storybook/react";
 
 import { Combobox } from "./combobox";
+import { ComboboxShowcase } from "@/stories/showcases/demos";
 
-const meta: Meta<typeof Combobox> = {
+import { createVariantsStory } from "@/stories/createVariantsStory";
+
+const meta: Meta = {
   title: "UI/Combobox",
   component: Combobox,
   tags: ["autodocs"],
@@ -12,10 +15,11 @@ const meta: Meta<typeof Combobox> = {
 export default meta;
 type Story = StoryObj<typeof Combobox>;
 
-export const Docs: Story = {
-  render: () => (
-    <p className="text-[var(--text-sm)] text-[var(--muted)] max-w-md text-center">
-      См. также <strong>Catalog/All Components</strong> для согласования в контексте.
-    </p>
-  )
+/** Витрина design-v3 (React + CVA, токены) */
+export const DesignV2: Story = {
+  name: "Витрина",
+  parameters: { layout: "fullscreen" },
+  render: () => <ComboboxShowcase />
 };
+
+export const Variants: Story = createVariantsStory("combobox");

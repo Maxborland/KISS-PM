@@ -1,8 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/react";
+﻿import type { Meta, StoryObj } from "@storybook/react";
 
 import { Table } from "./table";
+import { TableShowcase } from "@/stories/showcases/demos";
 
-const meta: Meta<typeof Table> = {
+import { createVariantsStory } from "@/stories/createVariantsStory";
+
+const meta: Meta = {
   title: "UI/Table",
   component: Table,
   tags: ["autodocs"],
@@ -12,10 +15,11 @@ const meta: Meta<typeof Table> = {
 export default meta;
 type Story = StoryObj<typeof Table>;
 
-export const Docs: Story = {
-  render: () => (
-    <p className="text-[var(--text-sm)] text-[var(--muted)] max-w-md text-center">
-      См. также <strong>Catalog/All Components</strong> для согласования в контексте.
-    </p>
-  )
+/** Витрина design-v3 (React + CVA, токены) */
+export const DesignV2: Story = {
+  name: "Витрина",
+  parameters: { layout: "fullscreen" },
+  render: () => <TableShowcase />
 };
+
+export const Variants: Story = createVariantsStory("table");
