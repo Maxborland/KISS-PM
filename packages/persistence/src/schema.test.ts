@@ -50,6 +50,9 @@ describe("PostgreSQL persistence schema", () => {
       "resource_absences",
       "tenant_org_nodes",
       "tenant_user_org_placements",
+      "file_assets",
+      "external_references",
+      "entity_attachments",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -102,6 +105,9 @@ describe("PostgreSQL persistence schema", () => {
       "resource_absences",
       "tenant_org_nodes",
       "tenant_user_org_placements",
+      "file_assets",
+      "external_references",
+      "entity_attachments",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -191,6 +197,41 @@ describe("PostgreSQL persistence schema", () => {
         "file_url",
         "file_size_bytes",
         "mime_type"
+      ])
+    );
+  });
+
+  it("stores the Phase F storage and connector reference contract", () => {
+    expect(getPersistenceTableColumns("file_assets")).toEqual(
+      expect.arrayContaining([
+        "provider",
+        "storage_key",
+        "safe_display_name",
+        "checksum_sha256",
+        "status",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("external_references")).toEqual(
+      expect.arrayContaining([
+        "connector_type",
+        "external_id",
+        "url",
+        "title",
+        "metadata",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("entity_attachments")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "asset_id",
+        "external_reference_id",
+        "relation_type",
+        "source_activity_type",
+        "source_activity_id",
+        "archived_at"
       ])
     );
   });

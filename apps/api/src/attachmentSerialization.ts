@@ -1,0 +1,39 @@
+import type { AttachmentReadModel } from "@kiss-pm/persistence";
+
+export function serializeAttachment(attachment: AttachmentReadModel) {
+  return {
+    id: attachment.id,
+    entityType: attachment.entityType,
+    entityId: attachment.entityId,
+    relationType: attachment.relationType,
+    kind: attachment.fileAsset ? "file" : "external_reference",
+    fileAsset: attachment.fileAsset
+      ? {
+          id: attachment.fileAsset.id,
+          originalName: attachment.fileAsset.originalName,
+          safeDisplayName: attachment.fileAsset.safeDisplayName,
+          mimeType: attachment.fileAsset.mimeType,
+          sizeBytes: attachment.fileAsset.sizeBytes,
+          checksumSha256: attachment.fileAsset.checksumSha256,
+          status: attachment.fileAsset.status,
+          createdAt: attachment.fileAsset.createdAt.toISOString()
+        }
+      : null,
+    externalReference: attachment.externalReference
+      ? {
+          id: attachment.externalReference.id,
+          connectorType: attachment.externalReference.connectorType,
+          externalId: attachment.externalReference.externalId,
+          url: attachment.externalReference.url,
+          title: attachment.externalReference.title,
+          metadata: attachment.externalReference.metadata,
+          createdAt: attachment.externalReference.createdAt.toISOString()
+        }
+      : null,
+    sourceActivityType: attachment.sourceActivityType,
+    sourceActivityId: attachment.sourceActivityId,
+    createdByUserId: attachment.createdByUserId,
+    createdAt: attachment.createdAt.toISOString(),
+    archivedAt: attachment.archivedAt?.toISOString() ?? null
+  };
+}
