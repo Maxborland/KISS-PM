@@ -12,6 +12,7 @@ import type {
   BucketGranularity,
   CalculatedPlan,
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanCalendar,
   PlanCalendarException,
   PlanDate,
@@ -58,6 +59,7 @@ export type BuildResourceLoadMatrixInput = {
   plan: CalculatedPlan;
   resources: PlanResource[];
   assignments: PlanAssignment[];
+  assignmentAllocations?: PlanAssignmentAllocation[] | undefined;
   calendars: PlanCalendar[];
   calendarExceptions: PlanCalendarException[];
   reservations: PlanReservation[];
@@ -171,6 +173,21 @@ function calculateTaskLoadForDate(
 
   for (const assignment of input.assignments.filter((item) => item.resourceId === resourceId)) {
     if (assignment.role !== "executor" && assignment.role !== "co_executor") continue;
+    const explicitAllocations = (input.assignmentAllocations ?? []).filter(
+      (allocation) => allocation.assignmentId === assignment.id
+    );
+    if (explicitAllocations.length > 0) {
+      const allocatedMinutes = explicitAllocations
+        .filter((allocation) => allocation.date === date)
+        .reduce((total, allocation) => total + allocation.workMinutes, 0);
+      if (allocatedMinutes > 0) {
+        assignedMinutes += allocatedMinutes;
+        taskIds.push(assignment.taskId);
+        assignmentIds.push(assignment.id);
+      }
+      continue;
+    }
+
     const task = input.plan.tasks.find((candidate) => candidate.id === assignment.taskId);
     if (!task?.calculatedStart || !task.calculatedFinish) continue;
     if (comparePlanDates(date, task.calculatedStart) < 0 || comparePlanDates(date, task.calculatedFinish) > 0) {

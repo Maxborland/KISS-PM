@@ -248,6 +248,12 @@ export function parsePlanningCommand(input: unknown):
       if (!assignmentId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { assignmentId } } };
     }
+    case "assignment.allocations.replace": {
+      const assignmentId = getString(payload, "assignmentId");
+      const allocations = parseAssignmentAllocations(payload.allocations);
+      if (!assignmentId || !allocations.ok) return { ok: false, error: "planning_command_invalid" };
+      return { ok: true, value: { type, payload: { assignmentId, allocations: allocations.value } } };
+    }
     case "baseline.capture": {
       const baselineId = getString(payload, "baselineId");
       const label = getString(payload, "label");
@@ -341,6 +347,25 @@ function parseCreateAssignments(input: unknown):
     assignments.push(assignment);
   }
   return { ok: true, value: assignments };
+}
+
+function parseAssignmentAllocations(input: unknown):
+  | { ok: true; value: Array<{ date: string; workMinutes: number }> }
+  | { ok: false; error: string } {
+  if (!Array.isArray(input)) return { ok: false, error: "planning_command_invalid" };
+  const allocations = [];
+  const seenDates = new Set<string>();
+  for (const item of input) {
+    if (!isObject(item)) return { ok: false, error: "planning_command_invalid" };
+    const date = getDate(item, "date");
+    const workMinutes = getInteger(item, "workMinutes");
+    if (!date || workMinutes === null || workMinutes <= 0 || seenDates.has(date)) {
+      return { ok: false, error: "planning_command_invalid" };
+    }
+    seenDates.add(date);
+    allocations.push({ date, workMinutes });
+  }
+  return { ok: true, value: allocations };
 }
 
 function parseScenarioTarget(input: Record<string, unknown>):

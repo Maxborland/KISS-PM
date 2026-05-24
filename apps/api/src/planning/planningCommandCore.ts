@@ -27,6 +27,7 @@ export async function previewPlanningCommands(
   const changedTaskIds = new Set<string>();
   const changedAssignmentIds = new Set<string>();
   const changedDependencyIds = new Set<string>();
+  const acceptedRiskIds = new Set<string>();
 
   for (const command of commands) {
     const preview = previewPlanningCommand(nextSnapshot, command);
@@ -39,6 +40,7 @@ export async function previewPlanningCommands(
     preview.planDelta.changedTaskIds.forEach((id) => changedTaskIds.add(id));
     preview.planDelta.changedAssignmentIds.forEach((id) => changedAssignmentIds.add(id));
     preview.planDelta.changedDependencyIds.forEach((id) => changedDependencyIds.add(id));
+    preview.planDelta.acceptedRiskIds.forEach((id) => acceptedRiskIds.add(id));
   }
 
   const calculated = calculatePlan(nextSnapshot, {
@@ -55,7 +57,7 @@ export async function previewPlanningCommands(
       changedTaskIds: [...changedTaskIds],
       changedAssignmentIds: [...changedAssignmentIds],
       changedDependencyIds: [...changedDependencyIds],
-      acceptedRiskIds: []
+      acceptedRiskIds: [...acceptedRiskIds]
     }
   };
 }

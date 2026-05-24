@@ -50,3 +50,5 @@ export * from "./planning/schedulingEngine";
 export * from "./planning/resourcePlanning";
 export * from "./planning/employeeCapacity";
 export * from "./planning/scenarioPlanning";
+export * from "./planning/autoSolver";
+export * from "./control";

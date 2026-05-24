@@ -80,6 +80,16 @@ export type PlanningCommand =
         workMinutes: number | null;
       };
     }
+  | {
+      type: "assignment.allocations.replace";
+      payload: {
+        assignmentId: string;
+        allocations: Array<{
+          date: PlanDate;
+          workMinutes: number;
+        }>;
+      };
+    }
   | { type: "assignment.delete"; payload: { assignmentId: string } }
   | { type: "baseline.capture"; payload: { baselineId: string; label: string } }
   | {

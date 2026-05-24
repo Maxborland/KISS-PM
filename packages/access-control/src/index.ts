@@ -35,6 +35,12 @@ export const permissions = [
   "tenant.project_resources.manage",
   "tenant.planning_scenarios.preview",
   "tenant.planning_scenarios.apply",
+  "tenant.kpi_definitions.read",
+  "tenant.kpi_definitions.manage",
+  "tenant.control_signals.read",
+  "tenant.control_signals.manage",
+  "tenant.management_actions.execute",
+  "tenant.corrective_actions.manage",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -434,6 +440,72 @@ export function canApplyPlanningScenarios(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.planning_scenarios.apply"
+  });
+}
+
+export function canReadKpiDefinitions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.kpi_definitions.read"
+  });
+}
+
+export function canManageKpiDefinitions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.kpi_definitions.manage"
+  });
+}
+
+export function canReadControlSignals(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_signals.read"
+  });
+}
+
+export function canManageControlSignals(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_signals.manage"
+  });
+}
+
+export function canExecuteManagementActions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.management_actions.execute"
+  });
+}
+
+export function canManageCorrectiveActions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.corrective_actions.manage"
   });
 }
 
