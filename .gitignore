@@ -1,5 +1,6 @@
 node_modules/
 .next/
+storybook-static/
 dist/
 build/
 coverage/
@@ -16,3 +17,4 @@ Thumbs.db
 .tmp/
 tmp/
 .worktrees/
+apps/web/.storybook-verify-tmp/*.png

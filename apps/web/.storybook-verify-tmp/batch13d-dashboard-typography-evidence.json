@@ -1,0 +1,11 @@
+{
+  "batch": "13d",
+  "date": "2026-05-24",
+  "storyId": "views-screens--dashboard",
+  "welcomeHeroTitle": 0,
+  "pageIntroTitle": 1,
+  "h1TypeH1": 0,
+  "pageIntroTitleFontSizePx": "32px",
+  "pass": true,
+  "evidencePng": ".storybook-verify-tmp/batch13d-dashboard-page-intro.png"
+}

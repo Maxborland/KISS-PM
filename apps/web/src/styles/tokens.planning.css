@@ -1,0 +1,20 @@
+/* Planning geometry — design-v3 (from planning-ui-approved, see docs/design-v3/TOKENS.md) */
+:root {
+  --row-h-summary: 36px;
+  --gantt-bar-h: 18px;
+  --wbs-width: 720px;
+  --inspector-width: 380px;
+  --tabs-height: 44px;
+  --bottom-bar-height: 56px;
+  --cell-day: 40px;
+  --cell-week: 140px;
+  --cell-month: 220px;
+  --critical-stripe: #c0331e;
+  --z-arrow: 3;
+  --z-bar: 4;
+  --z-sticky-col: 6;
+  --z-sticky-header: 7;
+  --z-sticky-corner: 8;
+  --z-bottom-bar: 20;
+  --z-drawer: 30;
+}

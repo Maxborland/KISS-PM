@@ -1,0 +1,68 @@
+name: design-v3 Storybook contract
+
+on:
+  push:
+    paths:
+      - "apps/web/**"
+      - "packages/domain/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/design-v3-storybook-contract.yml"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/domain/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/design-v3-storybook-contract.yml"
+
+concurrency:
+  group: design-v3-storybook-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  storybook-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ${{ github.workspace }}
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Typecheck web
+        run: pnpm typecheck
+
+      - name: Storybook contract gate (build + copy scan 106)
+        run: pnpm verify:storybook-contract
+        env:
+          STORYBOOK_CONTRACT_PORT: "6006"
+
+      - name: Contract health tests
+        run: pnpm test
+
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-contract-evidence
+          path: |
+            apps/web/.storybook-verify-tmp/batch16-ci-evidence.json
+            apps/web/.storybook-verify-tmp/batch15c-copy-scan-evidence.json
+            apps/web/.storybook-verify-tmp/batch15-build-evidence.json
+          if-no-files-found: warn

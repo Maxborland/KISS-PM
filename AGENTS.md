@@ -199,3 +199,35 @@ CodeGraph: (sync до / sync после; status: nodes/edges; использов
 Decisions / assumptions:
 Risks / follow-up:
 ```
+
+## 10. Design-v3 lockdown
+
+После миграции UI единственный путь визуала:
+
+```txt
+docs/design-v3/TOKENS.md → apps/web/src/styles/{tokens,tokens.planning,bem}.css
+  → apps/web/src/components/{ui,domain}/* + widgets/* + shell/*
+  → apps/web/src/{app,features}/**
+```
+
+Обязательные правила:
+
+1. `apps/web/src/{app,features}/**` импортируют UI **только** из:
+   - `apps/web/src/components/ui/*` (shadcn primitives)
+   - `apps/web/src/components/domain/*` (composite)
+   - `apps/web/src/widgets/*` (lazy-loaded)
+   - `apps/web/src/shell/*` (AppShell / Topbar / Sidebar / ...)
+2. Запрещено:
+   - inline `style={{ ... }}` (исключение: SVG-атрибуты в Gantt с комментарием)
+   - hex `#xxxxxx` / `rgba(...)` в TSX
+   - прямой импорт `lucide-react@1.x` (правильно `^0.460`)
+   - любой импорт из legacy `apps/web/src/features/dv2/*` или `apps/web/src/design-v2/*`
+3. Запрещено создавать `*.css` в `features/**` или `components/**` — все стили в `apps/web/src/styles/{bem.css, widgets/*.css}` и `app/globals.css`.
+4. Новые BEM-классы добавляются в `apps/web/src/styles/bem.css` (общие) или `apps/web/src/styles/widgets/<name>.css` (widget-specific).
+5. shadcn primitives генерируются с `cssVariables: false`. Variants под BEM-визуал — `docs/design-v3/SHADCN-OVERRIDE.md`.
+6. Перед PR: `pnpm --filter @kiss-pm/web typecheck && pnpm --filter @kiss-pm/web test && pnpm --filter @kiss-pm/web build`.
+7. Каталог компонентов: Storybook (`pnpm --filter @kiss-pm/web storybook`).
+
+Референсы планирования: `docs/references/planning-ui-approved/` (один каталог `references`, без дублирования).
+
+Health-tests design-v3 (line-budgets, ban-list, bundle-budget) — Phase 16 в `apps/web/src/__health__/design-v3-enforcement.health.test.ts`.
