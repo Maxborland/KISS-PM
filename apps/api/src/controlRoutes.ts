@@ -169,10 +169,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       evaluations,
       snapshot,
       now
-    }).map((signal) => ({
-      ...signal,
-      id: `signal-${signal.projectId}-${signal.sourceMetric}`
-    }));
+    });
     const proposals = proposeManagementActions({
       snapshot,
       calculatedPlan,

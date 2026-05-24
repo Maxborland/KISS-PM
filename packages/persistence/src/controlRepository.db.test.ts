@@ -146,6 +146,30 @@ describe("control repository", () => {
     expect(await repository.listCorrectiveActions("tenant-alpha", "project-alpha")).toEqual([completedAction]);
     expect(await repository.listActionExecutions("tenant-alpha", "project-alpha")).toEqual([execution]);
   });
+
+  it("refreshes a stable control signal with the latest KPI evaluation", async () => {
+    const repository = createControlRepository(createDatabase(client));
+    const definition = await repository.upsertKpiDefinition(createDefinition("tenant-alpha"));
+    const firstEvaluation = await repository.createKpiEvaluation(createEvaluation(definition));
+    const initialSignal = await repository.upsertControlSignal(createSignal(firstEvaluation));
+    const secondEvaluation = await repository.createKpiEvaluation({
+      ...createEvaluation(definition),
+      id: "eval-alpha-next",
+      calculatedValue: 4,
+      evaluatedAt: "2026-05-24T10:00:00.000Z"
+    });
+
+    const refreshedSignal = await repository.upsertControlSignal({
+      ...initialSignal,
+      evaluationId: secondEvaluation.id,
+      severity: "critical",
+      explanation: "Срок проекта сдвинут повторно",
+      updatedAt: "2026-05-24T10:05:00.000Z"
+    });
+
+    expect(refreshedSignal.evaluationId).toBe(secondEvaluation.id);
+    expect(await repository.listControlSignals("tenant-alpha", "project-alpha")).toEqual([refreshedSignal]);
+  });
 });
 
 async function truncateControlDb(client: PostgresClient) {
