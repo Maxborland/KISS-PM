@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 const chipVariants = cva("chip", {
   variants: {
     variant: {
-      success: "chip--success",
       info: "chip--info",
+      success: "chip--success",
       warning: "chip--warning",
       danger: "chip--danger",
       violet: "chip--violet"

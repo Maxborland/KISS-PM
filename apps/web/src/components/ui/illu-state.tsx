@@ -9,7 +9,6 @@ export type IlluStateProps = {
   className?: string;
 };
 
-/** First-time / onboarding — state-illu with optional art slot */
 export function IlluState({ title, description, action, className }: IlluStateProps) {
   return (
     <div className={cn("state-illu", className)}>

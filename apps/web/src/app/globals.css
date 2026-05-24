@@ -4,6 +4,7 @@
 @import "../styles/tokens.css" layer(tokens);
 @import "../styles/tokens.planning.css" layer(tokens);
 @import "../styles/bem.css" layer(components);
+@import "../styles/bem-supplement.css" layer(components);
 
 @theme inline {
   --color-background: var(--canvas);
