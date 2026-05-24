@@ -218,6 +218,66 @@ describe("control surface routes", () => {
     );
   });
 
+  it("hides draft definitions and version history from read-only users", async () => {
+    const state = createSurfaceDataSource({ permissions: ["tenant.control_surfaces.read"] });
+    const app = createApp({ dataSource: state.dataSource });
+    const publishedDefinition = createDefinition();
+    await state.dataSource.upsertControlSurfaceDraft?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: publishedDefinition
+    });
+    await state.dataSource.publishControlSurface?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      surfaceId: publishedDefinition.id,
+      auditEventId: "audit-published"
+    });
+    await state.dataSource.upsertControlSurfaceDraft?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: { ...publishedDefinition, name: "Unpublished draft name" }
+    });
+    await state.dataSource.upsertControlSurfaceDraft?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: { ...createDefinition(), id: "surface-draft-only", code: "draft-only" }
+    });
+
+    const listResponse = await app.request("/api/tenant/current/control-surfaces", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    expect(listResponse.status).toBe(200);
+    const listBody = (await listResponse.json()) as { surfaces: Array<Record<string, unknown>> };
+    expect(listBody.surfaces).toHaveLength(1);
+    expect(listBody.surfaces[0]).toMatchObject({
+      id: publishedDefinition.id,
+      status: "published",
+      publishedDefinition: expect.objectContaining({ name: "Project Delivery" })
+    });
+    expect(listBody.surfaces[0]).not.toHaveProperty("draftDefinition");
+
+    const detailResponse = await app.request(
+      `/api/tenant/current/control-surfaces/${publishedDefinition.id}`,
+      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+    );
+    expect(detailResponse.status).toBe(200);
+    const detailBody = (await detailResponse.json()) as {
+      surface: Record<string, unknown>;
+      versions?: unknown;
+    };
+    expect(detailBody).not.toHaveProperty("versions");
+    expect(detailBody.surface).not.toHaveProperty("draftDefinition");
+    expect(detailBody.surface.publishedDefinition).toMatchObject({ name: "Project Delivery" });
+
+    const draftDetailResponse = await app.request(
+      "/api/tenant/current/control-surfaces/surface-draft-only",
+      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+    );
+    expect(draftDetailResponse.status).toBe(404);
+    await expect(draftDetailResponse.json()).resolves.toEqual({ error: "control_surface_not_found" });
+  });
+
   it("does not crash on malformed action bindings and returns validation issues", async () => {
     const state = createSurfaceDataSource();
     const app = createApp({ dataSource: state.dataSource });
