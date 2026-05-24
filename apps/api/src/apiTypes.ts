@@ -504,6 +504,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     query: string;
     limit: number;
+    offset?: number;
   }): Promise<AttachmentReadModel[]>;
   findCredentialByEmail?(
     email: string

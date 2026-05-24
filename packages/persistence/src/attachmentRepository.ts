@@ -134,6 +134,7 @@ export type AttachmentRepository = {
     tenantId: TenantId;
     query: string;
     limit: number;
+    offset?: number;
   }): Promise<AttachmentReadModel[]>;
 };
 
@@ -413,7 +414,8 @@ export function createAttachmentRepository(db: KissPmDatabase): AttachmentReposi
           )
         )
         .orderBy(desc(entityAttachments.createdAt), desc(entityAttachments.id))
-        .limit(input.limit);
+        .limit(input.limit)
+        .offset(input.offset ?? 0);
 
       return hydrateAttachmentRows(rows);
     }
