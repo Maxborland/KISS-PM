@@ -9,7 +9,7 @@ const repoRoot = resolve(webDir, "../..");
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   devIndicators: false,
-  transpilePackages: ["@kiss-pm/planning-gantt-ui"],
+  transpilePackages: ["@kiss-pm/planning-client", "@kiss-pm/domain"],
   turbopack: {
     root: repoRoot
   },
