@@ -1,24 +1,18 @@
 import {
-  canReadProjects,
-  canReadProjectResources,
-  type AccessProfile
-} from "@kiss-pm/access-control";
-import type { ResourceLoadBucket, TenantId, TenantUser } from "@kiss-pm/domain";
-import {
-  buildCapacitySummary,
+  HIDDEN_PROJECT_ID,
   buildEmployeeRows,
-  collectProjectsWithOverloadedEmployees,
   listOrgCapacityRows,
   mergeWorkspaceDayBuckets,
   monthDateSet,
   rollupOrgCapacityTree,
+  type CapacityDayLoad,
   type CapacityMatrixUser,
-  type CapacitySummary,
   type OrgCapacityTree,
-  type ProductionCalendarShape
+  type ProductionCalendarShape,
+  type ResourceLoadBucket,
+  type TenantId
 } from "@kiss-pm/domain";
 import {
-  createPlanningRepository,
   createResourceAbsencesRepository,
   createTenantOrgStructureRepository,
   createTenantProductionCalendarRepository,
@@ -31,15 +25,47 @@ import {
   sortedDirectionNodes
 } from "@kiss-pm/tenant-org-structure";
 
-import type { ApiTenantDataSource } from "../apiTypes";
+import type { ApiTenantDataSource, ProjectRecord } from "../apiTypes";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 
-export type BuildCapacityInput = {
+export type BuildCapacityAggregationInput = {
   tenantId: TenantId;
   monthIso: string;
-  projectId?: string | null;
-  actor: TenantUser;
-  profile: AccessProfile;
+  projectFilterId?: string | null;
+};
+
+export type CapacityContribution = {
+  resourceId: string;
+  date: string;
+  projectId: string;
+  projectTitle: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  assignmentId: string | null;
+  reservationId: string | null;
+  workMinutes: number;
+};
+
+export type WorkspaceCapacityAggregation = {
+  monthIso: string;
+  tree: OrgCapacityTree;
+  contributions: CapacityContribution[];
+};
+
+export type CapacityDrilldown = {
+  monthIso: string;
+  resourceId: string;
+  date: string;
+  totals: CapacityDayLoad;
+  contributions: Array<{
+    projectId: string;
+    projectTitle: string;
+    taskId: string | null;
+    taskTitle: string | null;
+    assignmentId: string | null;
+    reservationId: string | null;
+    workMinutes: number;
+  }>;
 };
 
 function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
@@ -49,12 +75,24 @@ function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
   return null;
 }
 
-function parseMonthIso(value: string): string | null {
-  if (!/^\d{4}-\d{2}$/.test(value.trim())) return null;
-  return value.trim();
+export function parseMonthIso(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}$/.test(trimmed)) return null;
+  const month = Number.parseInt(trimmed.slice(5, 7), 10);
+  if (month < 1 || month > 12) return null;
+  return trimmed;
 }
 
-function monthRangeIso(monthIso: string): { fromDate: string; toDate: string } {
+export function parseCapacityDate(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const parsed = new Date(`${trimmed}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  if (parsed.toISOString().slice(0, 10) !== trimmed) return null;
+  return trimmed;
+}
+
+export function monthRangeIso(monthIso: string): { fromDate: string; toDate: string } {
   const [yearText, monthText] = monthIso.split("-");
   const year = Number.parseInt(yearText ?? "0", 10);
   const monthIndex = Number.parseInt(monthText ?? "1", 10) - 1;
@@ -64,10 +102,18 @@ function monthRangeIso(monthIso: string): { fromDate: string; toDate: string } {
   return { fromDate, toDate };
 }
 
-export async function buildWorkspaceCapacityTree(
+export function isCapacityCommittedProject(project: ProjectRecord): boolean {
+  return project.status === "draft" || project.status === "active" || project.status === "paused";
+}
+
+function hasCommittedLoad(bucket: ResourceLoadBucket): boolean {
+  return bucket.assignedMinutes + bucket.reservedMinutes > 0;
+}
+
+export async function buildWorkspaceCapacityAggregation(
   dataSource: ApiTenantDataSource,
-  input: BuildCapacityInput
-): Promise<OrgCapacityTree | null> {
+  input: BuildCapacityAggregationInput
+): Promise<WorkspaceCapacityAggregation | null> {
   const monthIso = parseMonthIso(input.monthIso);
   if (!monthIso) return null;
 
@@ -76,45 +122,71 @@ export async function buildWorkspaceCapacityTree(
     return null;
   }
 
-  const resourcesDecision = canReadProjectResources({
-    actor: input.actor,
-    profile: input.profile,
-    targetTenantId: input.tenantId
-  });
-  if (!resourcesDecision.allowed) return null;
-
-  const projectsDecision = canReadProjects({
-    actor: input.actor,
-    profile: input.profile,
-    targetTenantId: input.tenantId
-  });
-  const readableProjectIds = projectsDecision.allowed
-    ? new Set((await dataSource.listProjects(input.tenantId)).map((project) => project.id))
-    : new Set<string>();
-
   const monthDates = monthDateSet(monthIso);
   const { fromDate, toDate } = monthRangeIso(monthIso);
-
-  const planningRepo = createPlanningRepository(db);
-  const projects = (await dataSource.listProjects(input.tenantId)).filter(
-    (project) => project.status === "active"
-  );
+  const projects = (await dataSource.listProjects(input.tenantId)).filter(isCapacityCommittedProject);
 
   const projectLoads: Array<{ projectId: string; buckets: ResourceLoadBucket[] }> = [];
+  const contributions: CapacityContribution[] = [];
+  const assignedResourceIds = new Set<string>();
+
   for (const project of projects) {
     const snapshot = await dataSource.getPlanSnapshot(input.tenantId, project.id);
     if (!snapshot) continue;
     const readModel = createPlanningReadModel(snapshot);
+    const tasksById = new Map(snapshot.tasks.map((task) => [task.id, task]));
     const dayBuckets = readModel.resourceLoad.buckets.filter(
       (bucket) => bucket.granularity === "day" && monthDates.has(bucket.date)
     );
-    projectLoads.push({ projectId: project.id, buckets: dayBuckets });
+    const loadBuckets = dayBuckets.filter(hasCommittedLoad);
+    if (project.status === "draft" && loadBuckets.length === 0) {
+      continue;
+    }
+    projectLoads.push({ projectId: project.id, buckets: loadBuckets });
+
+    for (const assignment of snapshot.assignments) {
+      assignedResourceIds.add(assignment.resourceId);
+    }
+    for (const reservation of snapshot.reservations) {
+      assignedResourceIds.add(reservation.resourceId);
+    }
+    for (const bucket of loadBuckets) {
+      for (const contribution of bucket.assignmentContributions) {
+        if (contribution.workMinutes <= 0) continue;
+        const task = tasksById.get(contribution.taskId);
+        contributions.push({
+          resourceId: bucket.resourceId,
+          date: bucket.date,
+          projectId: project.id,
+          projectTitle: project.title,
+          taskId: contribution.taskId,
+          taskTitle: task?.title ?? contribution.taskId,
+          assignmentId: contribution.assignmentId,
+          reservationId: null,
+          workMinutes: contribution.workMinutes
+        });
+      }
+      for (const contribution of bucket.reservationContributions) {
+        if (contribution.workMinutes <= 0) continue;
+        contributions.push({
+          resourceId: bucket.resourceId,
+          date: bucket.date,
+          projectId: project.id,
+          projectTitle: project.title,
+          taskId: null,
+          taskTitle: null,
+          assignmentId: null,
+          reservationId: contribution.reservationId,
+          workMinutes: contribution.workMinutes
+        });
+      }
+    }
   }
 
   const merged = mergeWorkspaceDayBuckets({
     monthDates,
     projects: projectLoads,
-    readableProjectIds
+    readableProjectIds: null
   });
 
   const workspaceUsers: CapacityMatrixUser[] = (await dataSource.listWorkspaceUsers(input.tenantId))
@@ -156,17 +228,8 @@ export async function buildWorkspaceCapacityTree(
       dateFrom: absence.dateFrom,
       dateTo: absence.dateTo
     })),
-    projectFilterId: input.projectId ?? null
+    projectFilterId: input.projectFilterId ?? null
   });
-
-  const assignedResourceIds = new Set<string>();
-  for (const project of projects) {
-    const snapshot = await planningRepo.getPlanSnapshot(input.tenantId, project.id);
-    if (!snapshot) continue;
-    for (const assignment of snapshot.assignments) {
-      assignedResourceIds.add(assignment.resourceId);
-    }
-  }
 
   const unassignedRows = rows.filter((row) => {
     const hasLoad = row.days.some((day) => day.workMinutes > 0 || day.isOverload);
@@ -193,35 +256,90 @@ export async function buildWorkspaceCapacityTree(
     unitId: placementUnitId(placement, "functional")
   }));
 
-  return rollupOrgCapacityTree({
+  return {
     monthIso,
-    rows: primaryRows,
-    unassignedRows,
-    days,
-    workspacePositions: (positions ?? []).map((position) => ({
-      id: position.id,
-      name: position.name
-    })),
-    directions,
-    units,
-    placements
-  });
+    tree: rollupOrgCapacityTree({
+      monthIso,
+      rows: primaryRows,
+      unassignedRows,
+      days,
+      workspacePositions: (positions ?? []).map((position) => ({
+        id: position.id,
+        name: position.name
+      })),
+      directions,
+      units,
+      placements
+    }),
+    contributions
+  };
 }
 
-export async function buildWorkspaceCapacitySummary(
-  dataSource: ApiTenantDataSource,
-  input: BuildCapacityInput
-): Promise<CapacitySummary | null> {
-  const monthIso = parseMonthIso(input.monthIso);
-  if (!monthIso) return null;
+export function buildCapacityDrilldown(input: {
+  aggregation: WorkspaceCapacityAggregation;
+  resourceId: string;
+  date: string;
+  readableProjectIds: ReadonlySet<string>;
+}): CapacityDrilldown | null {
+  const monthIso = parseMonthIso(input.aggregation.monthIso);
+  const date = parseCapacityDate(input.date);
+  if (!monthIso || !date || !monthDateSet(monthIso).has(date)) return null;
 
-  const tree = await buildWorkspaceCapacityTree(dataSource, input);
-  if (!tree) return null;
+  const row = listOrgCapacityRows(input.aggregation.tree).find(
+    (candidate) => candidate.user.id === input.resourceId
+  );
+  const totals = row?.days.find((day) => day.date === date);
+  if (!row || !totals) return null;
 
-  const overloadProjectIds = collectProjectsWithOverloadedEmployees(listOrgCapacityRows(tree));
-  return buildCapacitySummary({
+  const visibleContributions: CapacityDrilldown["contributions"] = [];
+  let hiddenWorkMinutes = 0;
+  for (const contribution of input.aggregation.contributions) {
+    if (contribution.resourceId !== input.resourceId || contribution.date !== date) continue;
+    if (!input.readableProjectIds.has(contribution.projectId)) {
+      hiddenWorkMinutes += contribution.workMinutes;
+      continue;
+    }
+    visibleContributions.push({
+      projectId: contribution.projectId,
+      projectTitle: contribution.projectTitle,
+      taskId: contribution.taskId,
+      taskTitle: contribution.taskTitle,
+      assignmentId: contribution.assignmentId,
+      reservationId: contribution.reservationId,
+      workMinutes: contribution.workMinutes
+    });
+  }
+  if (hiddenWorkMinutes > 0) {
+    visibleContributions.push({
+      projectId: HIDDEN_PROJECT_ID,
+      projectTitle: "Недоступный проект",
+      taskId: null,
+      taskTitle: null,
+      assignmentId: null,
+      reservationId: null,
+      workMinutes: hiddenWorkMinutes
+    });
+  }
+
+  return {
     monthIso,
-    tree,
-    overloadProjectIdsFromMix: overloadProjectIds
-  });
+    resourceId: input.resourceId,
+    date,
+    totals,
+    contributions: visibleContributions.sort(compareDrilldownRows)
+  };
+}
+
+function compareDrilldownRows(
+  left: CapacityDrilldown["contributions"][number],
+  right: CapacityDrilldown["contributions"][number]
+): number {
+  if (left.projectId === HIDDEN_PROJECT_ID && right.projectId !== HIDDEN_PROJECT_ID) return 1;
+  if (right.projectId === HIDDEN_PROJECT_ID && left.projectId !== HIDDEN_PROJECT_ID) return -1;
+  return (
+    left.projectTitle.localeCompare(right.projectTitle, "ru") ||
+    (left.taskTitle ?? "").localeCompare(right.taskTitle ?? "", "ru") ||
+    (left.assignmentId ?? "").localeCompare(right.assignmentId ?? "") ||
+    (left.reservationId ?? "").localeCompare(right.reservationId ?? "")
+  );
 }

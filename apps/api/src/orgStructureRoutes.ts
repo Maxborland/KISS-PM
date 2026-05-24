@@ -15,6 +15,7 @@ import {
 import type { Hono } from "hono";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   replaceTenantOrgStructureCommand,
@@ -174,6 +175,7 @@ export function registerOrgStructureRoutes(app: Hono, deps: OrgStructureRouteDep
         permissionResult: decision,
         appendManagementAuditEvent: deps.appendManagementAuditEvent
       });
+      invalidateCapacityCacheForTenant(actor.tenantId);
       return context.json({ orgStructure });
     } catch (error) {
       const message = tenantOrgStructureErrorMessage(error);

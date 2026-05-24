@@ -4,6 +4,7 @@ import {
 } from "@kiss-pm/access-control";
 import type { UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
@@ -139,6 +140,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return createdUser;
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user }, 201);
   });
 
@@ -252,6 +254,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return updatedUser;
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user });
   });
 
@@ -299,6 +302,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ status: "deleted" });
   });
 }

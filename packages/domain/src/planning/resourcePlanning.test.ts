@@ -36,6 +36,12 @@ describe("resource planning", () => {
           capacityMinutes: 480,
           taskIds: ["task-a"],
           assignmentIds: ["assignment-a"],
+          assignmentContributions: [
+            { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 960 }
+          ],
+          reservationContributions: [
+            { reservationId: "reservation-a", workMinutes: 120 }
+          ],
           reservationIds: ["reservation-a"]
         }),
         expect.objectContaining({

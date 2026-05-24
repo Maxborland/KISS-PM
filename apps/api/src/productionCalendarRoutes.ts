@@ -13,6 +13,7 @@ import type { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 
 type ProductionCalendarRouteDeps = {
@@ -128,6 +129,7 @@ export function registerProductionCalendarRoutes(
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     const year = new Date().getUTCFullYear();
     return context.json(await repository.getProductionCalendar(actor.tenantId, year));
   });

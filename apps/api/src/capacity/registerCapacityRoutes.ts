@@ -1,22 +1,32 @@
-import { canReadProjectResources, type AccessProfile } from "@kiss-pm/access-control";
+import {
+  canReadProjects,
+  canReadProjectResources,
+  type AccessProfile
+} from "@kiss-pm/access-control";
+import {
+  buildCapacitySummary,
+  collectProjectsWithOverloadedEmployees,
+  listOrgCapacityRows,
+  maskOrgCapacityTreeProjects
+} from "@kiss-pm/domain";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 
 import type { ApiRouteDeps } from "../routeTypes";
 import { createCapacityCache } from "./capacityCache";
 import {
-  buildWorkspaceCapacitySummary,
-  buildWorkspaceCapacityTree
+  buildCapacityDrilldown,
+  buildWorkspaceCapacityAggregation,
+  isCapacityCommittedProject,
+  parseCapacityDate,
+  parseMonthIso,
+  type WorkspaceCapacityAggregation
 } from "./capacityService";
 
-const treeCache = createCapacityCache<Awaited<ReturnType<typeof buildWorkspaceCapacityTree>>>(60_000);
-const summaryCache = createCapacityCache<Awaited<ReturnType<typeof buildWorkspaceCapacitySummary>>>(
-  60_000
-);
+const aggregationCache = createCapacityCache<WorkspaceCapacityAggregation>(60_000);
 
 export function invalidateCapacityCacheForTenant(tenantId: string) {
-  treeCache.invalidateTenant(tenantId);
-  summaryCache.invalidateTenant(tenantId);
+  aggregationCache.invalidateTenant(tenantId);
 }
 
 export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
@@ -24,63 +34,144 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
-    const monthIso = context.req.query("monthIso") ?? "";
-    const projectId = context.req.query("projectId") ?? null;
+    const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
+    if (!monthIso) return context.json({ error: "capacity_invalid_query" }, 400);
+
     const profile = await deps.getActorProfile(actor);
-    const decision = canReadProjectResources({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const access = await resolveCapacityAccess(deps, actor, profile);
+    if (!access.ok) return context.json({ error: access.error }, access.status);
 
-    const cacheKey = `${actor.tenantId}:tree:${monthIso}:${projectId ?? ""}`;
-    const cached = treeCache.get(cacheKey);
-    if (cached !== undefined) {
-      return context.json(cached);
+    const requestedProjectId = context.req.query("projectId")?.trim() || null;
+    if (requestedProjectId && !access.canReadProjects) {
+      return context.json({ error: access.projectReadReason }, 403);
     }
+    if (requestedProjectId && !access.readableProjectIds.has(requestedProjectId)) {
+      return context.json({ error: "capacity_invalid_query" }, 400);
+    }
+    const effectiveProjectFilterId = requestedProjectId;
+    const aggregation = await getRawAggregation(deps, actor.tenantId, monthIso, effectiveProjectFilterId);
+    if (!aggregation) return context.json({ error: "capacity_invalid_query" }, 400);
 
-    const tree = await buildWorkspaceCapacityTree(deps.dataSource, {
-      tenantId: actor.tenantId,
-      monthIso,
-      projectId,
-      actor,
-      profile
-    });
-    if (!tree) return context.json({ error: "capacity_invalid_month" }, 400);
-
-    treeCache.set(cacheKey, tree);
-    return context.json(tree);
+    return context.json(maskOrgCapacityTreeProjects(aggregation.tree, access.readableProjectIds));
   });
 
   app.get("/api/workspace/capacity/summary", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
-    const monthIso = context.req.query("monthIso") ?? "";
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadProjectResources({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
+    if (!monthIso) return context.json({ error: "capacity_invalid_query" }, 400);
 
-    const cacheKey = `${actor.tenantId}:summary:${monthIso}`;
-    const cached = summaryCache.get(cacheKey);
-    if (cached !== undefined) {
-      return context.json(cached);
+    const profile = await deps.getActorProfile(actor);
+    const access = await resolveCapacityAccess(deps, actor, profile);
+    if (!access.ok) return context.json({ error: access.error }, access.status);
+
+    const aggregation = await getRawAggregation(deps, actor.tenantId, monthIso, null);
+    if (!aggregation) return context.json({ error: "capacity_invalid_query" }, 400);
+    const tree = maskOrgCapacityTreeProjects(aggregation.tree, access.readableProjectIds);
+    const overloadProjectIds = collectProjectsWithOverloadedEmployees(listOrgCapacityRows(tree));
+    return context.json(
+      buildCapacitySummary({
+        monthIso,
+        tree,
+        overloadProjectIdsFromMix: overloadProjectIds
+      })
+    );
+  });
+
+  app.get("/api/workspace/capacity/drilldown", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+
+    const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
+    const resourceId = context.req.query("resourceId")?.trim() || "";
+    const date = parseCapacityDate(context.req.query("date") ?? "");
+    if (!monthIso || !resourceId || !date || !date.startsWith(`${monthIso}-`)) {
+      return context.json({ error: "capacity_invalid_query" }, 400);
     }
 
-    const summary = await buildWorkspaceCapacitySummary(deps.dataSource, {
-      tenantId: actor.tenantId,
-      monthIso,
-      actor,
-      profile
-    });
-    if (!summary) return context.json({ error: "capacity_invalid_month" }, 400);
+    const profile = await deps.getActorProfile(actor);
+    const access = await resolveCapacityAccess(deps, actor, profile);
+    if (!access.ok) return context.json({ error: access.error }, access.status);
 
-    summaryCache.set(cacheKey, summary);
-    return context.json(summary);
+    const aggregation = await getRawAggregation(deps, actor.tenantId, monthIso, null);
+    if (!aggregation) return context.json({ error: "capacity_invalid_query" }, 400);
+
+    const drilldown = buildCapacityDrilldown({
+      aggregation,
+      resourceId,
+      date,
+      readableProjectIds: access.readableProjectIds
+    });
+    if (!drilldown) return context.json({ error: "capacity_invalid_query" }, 400);
+
+    return context.json(drilldown);
   });
+}
+
+async function getRawAggregation(
+  deps: ApiRouteDeps,
+  tenantId: string,
+  monthIso: string,
+  projectFilterId: string | null
+): Promise<WorkspaceCapacityAggregation | null> {
+  const cacheKey = `${tenantId}:raw:${monthIso}:${projectFilterId ?? ""}`;
+  const cached = aggregationCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const aggregation = await buildWorkspaceCapacityAggregation(deps.dataSource, {
+    tenantId,
+    monthIso,
+    projectFilterId
+  });
+  if (aggregation) aggregationCache.set(cacheKey, aggregation);
+  return aggregation;
+}
+
+async function resolveCapacityAccess(
+  deps: ApiRouteDeps,
+  actor: TenantUser,
+  profile: AccessProfile
+): Promise<
+  | {
+      ok: true;
+      readableProjectIds: ReadonlySet<string>;
+      canReadProjects: boolean;
+      projectReadReason: string;
+    }
+  | { ok: false; status: 403 | 501; error: string }
+> {
+  const resourcesDecision = canReadProjectResources({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!resourcesDecision.allowed) {
+    return { ok: false, status: 403, error: resourcesDecision.reason };
+  }
+  if (!deps.dataSource.listProjects) {
+    return { ok: false, status: 501, error: "persistence_not_configured" };
+  }
+
+  const projectsDecision = canReadProjects({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!projectsDecision.allowed) {
+    return {
+      ok: true,
+      readableProjectIds: new Set(),
+      canReadProjects: false,
+      projectReadReason: projectsDecision.reason
+    };
+  }
+
+  const projects = await deps.dataSource.listProjects(actor.tenantId);
+  return {
+    ok: true,
+    readableProjectIds: new Set(projects.filter(isCapacityCommittedProject).map((project) => project.id)),
+    canReadProjects: true,
+    projectReadReason: projectsDecision.reason
+  };
 }
