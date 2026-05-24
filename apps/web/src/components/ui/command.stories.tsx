@@ -1,6 +1,10 @@
-import type { Meta, StoryObj } from "@storybook/react";
+﻿import type { Meta, StoryObj } from "@storybook/react";
+
+import { CatalogCrossRefParagraph } from "@/stories/story-docs-copy";
 
 import { Command } from "./command";
+
+import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Command> = {
   title: "UI/Command",
@@ -13,9 +17,7 @@ export default meta;
 type Story = StoryObj<typeof Command>;
 
 export const Docs: Story = {
-  render: () => (
-    <p className="text-[var(--text-sm)] text-[var(--muted)] max-w-md text-center">
-      См. также <strong>Catalog/All Components</strong> для согласования в контексте.
-    </p>
-  )
+  render: () => <CatalogCrossRefParagraph />
 };
+
+export const Variants: Story = createVariantsStory("command");

@@ -1,0 +1,8 @@
+{
+  "batch": "14m",
+  "date": "2026-05-24",
+  "storyId": "views-screens--deals",
+  "dealCardTitleFontSizePx": "18px",
+  "cssToken": "var(--text-h3) → 18px",
+  "pass": true
+}

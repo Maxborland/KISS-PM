@@ -1,30 +1,25 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { toast } from "sonner";
+﻿import type { Meta, StoryObj } from "@storybook/react";
 
-import { Button } from "./button";
 import { Toaster } from "./sonner";
+import { ToastShowcase } from "@/stories/showcases/demos";
+
+import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
   title: "UI/Sonner",
+  component: Toaster,
+  tags: ["autodocs"],
   parameters: { layout: "centered" }
 };
 
 export default meta;
-type Story = StoryObj;
+type Story = StoryObj<typeof Toaster>;
 
-export const ToastDemo: Story = {
-  render: () => (
-    <>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => toast.success("Сохранено")}>Success</Button>
-        <Button variant="outline" onClick={() => toast.error("Ошибка")}>
-          Error
-        </Button>
-        <Button variant="secondary" onClick={() => toast.info("Информация")}>
-          Info
-        </Button>
-      </div>
-      <Toaster richColors closeButton />
-    </>
-  )
+/** Витрина design-v3 (React + CVA, токены) */
+export const DesignV2: Story = {
+  name: "Витрина",
+  parameters: { layout: "fullscreen" },
+  render: () => <ToastShowcase />
 };
+
+export const Variants: Story = createVariantsStory("sonner");

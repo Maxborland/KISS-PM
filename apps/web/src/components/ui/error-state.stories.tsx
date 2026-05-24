@@ -1,8 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/react";
+﻿import type { Meta, StoryObj } from "@storybook/react";
 
 import { ErrorState } from "./error-state";
+import { ErrorStateShowcase } from "@/stories/showcases/demos";
 
-const meta: Meta<typeof ErrorState> = {
+import { createVariantsStory } from "@/stories/createVariantsStory";
+
+const meta: Meta = {
   title: "UI/ErrorState",
   component: ErrorState,
   tags: ["autodocs"],
@@ -12,10 +15,11 @@ const meta: Meta<typeof ErrorState> = {
 export default meta;
 type Story = StoryObj<typeof ErrorState>;
 
-export const Docs: Story = {
-  render: () => (
-    <p className="text-[var(--text-sm)] text-[var(--muted)] max-w-md text-center">
-      См. также <strong>Catalog/All Components</strong> для согласования в контексте.
-    </p>
-  )
+/** Витрина design-v3 (React + CVA, токены) */
+export const DesignV2: Story = {
+  name: "Витрина",
+  parameters: { layout: "fullscreen" },
+  render: () => <ErrorStateShowcase />
 };
+
+export const Variants: Story = createVariantsStory("error-state");

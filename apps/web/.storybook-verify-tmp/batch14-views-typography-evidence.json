@@ -1,0 +1,282 @@
+{
+  "batch": "14",
+  "date": "2026-05-24",
+  "fix": "Views/Screens: PageIntro h1 32px on all workspace stories; login uses login-card__title; no welcome-hero",
+  "storiesChecked": 27,
+  "staticViolations": [],
+  "storyResults": [
+    {
+      "id": "views-screens--admin",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--avatar-menu",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--create-task-modal",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--dashboard",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--deal-card",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--deals",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--entities-clients",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--entities-contacts",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--entities-products",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--login",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 0,
+      "loginTitle": 1,
+      "h1FontSizePx": "24px",
+      "buttonFontSizePx": null,
+      "reason": null
+    },
+    {
+      "id": "views-screens--my-work",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-audit",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-baseline",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-calendars",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-detail",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-gantt",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-kpi",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-resources",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--project-scenarios",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--projects-list",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--settings",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--space-discipline",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--state-empty",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--state-error",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--state-forbidden",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--state-loading",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    },
+    {
+      "id": "views-screens--task-card",
+      "pass": true,
+      "welcomeHero": 0,
+      "pageIntro": 1,
+      "loginTitle": 0,
+      "h1FontSizePx": "32px",
+      "buttonFontSizePx": "12px",
+      "reason": null
+    }
+  ],
+  "staticPass": true,
+  "playwrightPass": true,
+  "pass": true
+}
