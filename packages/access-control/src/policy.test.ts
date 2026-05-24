@@ -17,7 +17,9 @@ import {
   canManageTaskStatuses,
   canManageControlSignals,
   canManageCorrectiveActions,
+  canManageControlSurfaces,
   canManageKpiDefinitions,
+  canPublishControlSurfaces,
   canCreateTasks,
   canDeleteTasks,
   canEditTasks,
@@ -37,6 +39,7 @@ import {
   canReadProjectTypes,
   canReadResourceFeasibility,
   canReadControlSignals,
+  canReadControlSurfaces,
   canReadKpiDefinitions,
   canReadTenantUsers,
   canReadWorkspaceConfig,
@@ -86,6 +89,9 @@ describe("access-control tenant policy", () => {
       "tenant.control_signals.manage",
       "tenant.management_actions.execute",
       "tenant.corrective_actions.manage",
+      "tenant.control_surfaces.read",
+      "tenant.control_surfaces.manage",
+      "tenant.control_surfaces.publish",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -690,6 +696,68 @@ describe("access-control tenant policy", () => {
       canReadControlSignals({
         actor,
         profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 8 control surface access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const surfaceReader = createAccessProfile({
+      id: "surface-reader",
+      permissions: ["tenant.control_surfaces.read"]
+    });
+    const surfacePublisher = createAccessProfile({
+      id: "surface-publisher",
+      permissions: [
+        "tenant.control_surfaces.read",
+        "tenant.control_surfaces.manage",
+        "tenant.control_surfaces.publish"
+      ]
+    });
+
+    expect(
+      canReadControlSurfaces({
+        actor,
+        profile: surfaceReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageControlSurfaces({
+        actor,
+        profile: surfaceReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canPublishControlSurfaces({
+        actor,
+        profile: surfacePublisher,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadControlSurfaces({
+        actor,
+        profile: surfacePublisher,
         targetTenantId: "tenant-beta"
       })
     ).toEqual({

@@ -52,3 +52,4 @@ export * from "./planning/employeeCapacity";
 export * from "./planning/scenarioPlanning";
 export * from "./planning/autoSolver";
 export * from "./control";
+export * from "./controlSurfaces";

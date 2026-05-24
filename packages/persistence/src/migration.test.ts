@@ -147,6 +147,10 @@ const phase78AutoSolverAllocationsMigration = readFileSync(
   ),
   "utf8"
 );
+const phase8ControlSurfacesMigration = readFileSync(
+  new URL("../migrations/0032_phase_8_control_surfaces.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -207,6 +211,29 @@ describe("Phase 7 SQL migration", () => {
     );
     expect(phase78AutoSolverAllocationsMigration).toContain(
       "CONSTRAINT planning_solver_runs_mode_chk CHECK (mode IN ('schedule', 'repair'))"
+    );
+  });
+});
+
+describe("Phase 8 SQL migration", () => {
+  it("creates versioned tenant-scoped control surface tables", () => {
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS control_surface_definitions"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS control_surface_versions"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_definitions_pkey PRIMARY KEY (tenant_id, id)"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS control_surface_definitions_tenant_code_uidx"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_versions_pkey PRIMARY KEY (tenant_id, surface_id, version)"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_versions_surface_fk"
     );
   });
 });
