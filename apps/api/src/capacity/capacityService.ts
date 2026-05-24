@@ -106,6 +106,10 @@ export function isCapacityCommittedProject(project: ProjectRecord): boolean {
   return project.status === "draft" || project.status === "active" || project.status === "paused";
 }
 
+function hasCommittedLoad(bucket: ResourceLoadBucket): boolean {
+  return bucket.assignedMinutes + bucket.reservedMinutes > 0;
+}
+
 export async function buildWorkspaceCapacityAggregation(
   dataSource: ApiTenantDataSource,
   input: BuildCapacityAggregationInput
@@ -134,7 +138,11 @@ export async function buildWorkspaceCapacityAggregation(
     const dayBuckets = readModel.resourceLoad.buckets.filter(
       (bucket) => bucket.granularity === "day" && monthDates.has(bucket.date)
     );
-    projectLoads.push({ projectId: project.id, buckets: dayBuckets });
+    const loadBuckets = dayBuckets.filter(hasCommittedLoad);
+    if (project.status === "draft" && loadBuckets.length === 0) {
+      continue;
+    }
+    projectLoads.push({ projectId: project.id, buckets: loadBuckets });
 
     for (const assignment of snapshot.assignments) {
       assignedResourceIds.add(assignment.resourceId);
@@ -142,7 +150,7 @@ export async function buildWorkspaceCapacityAggregation(
     for (const reservation of snapshot.reservations) {
       assignedResourceIds.add(reservation.resourceId);
     }
-    for (const bucket of dayBuckets) {
+    for (const bucket of loadBuckets) {
       for (const contribution of bucket.assignmentContributions) {
         if (contribution.workMinutes <= 0) continue;
         const task = tasksById.get(contribution.taskId);

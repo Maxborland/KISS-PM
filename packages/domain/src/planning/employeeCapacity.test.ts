@@ -207,6 +207,30 @@ describe("employeeCapacity", () => {
     expect(rows[0]?.projectsMixByDate?.[date]).toEqual([{ projectId: "p-a", workMinutes: 240 }]);
   });
 
+  it("omits zero-minute buckets from workload and project mix", () => {
+    const monthIso = "2026-06-01".slice(0, 7);
+    const monthDates = monthDateSet(monthIso);
+    const date = "2026-06-02";
+    const merged = mergeWorkspaceDayBuckets({
+      monthDates,
+      readableProjectIds: new Set(["p-a", "p-zero"]),
+      projects: [
+        {
+          projectId: "p-a",
+          buckets: [dayBucket({ resourceId: "u1", projectId: "p-a", date, assignedMinutes: 180 })]
+        },
+        {
+          projectId: "p-zero",
+          buckets: [dayBucket({ resourceId: "u1", projectId: "p-zero", date, assignedMinutes: 0 })]
+        }
+      ]
+    });
+
+    const day = merged.get("u1")?.get(date);
+    expect(day?.workMinutes).toBe(180);
+    expect(day?.projectsMix.has("p-zero")).toBe(false);
+  });
+
   it("removes capacity for absence days even when employee has no project load", () => {
     const monthIso = "2026-06-01".slice(0, 7);
     const date = "2026-06-02";
