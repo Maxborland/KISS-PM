@@ -14,6 +14,7 @@ import type { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 
 type AbsencesRouteDeps = {
@@ -147,6 +148,7 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ absence }, 201);
   });
 
@@ -186,6 +188,7 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ ok: true });
   });
 }

@@ -6,6 +6,7 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseCreateTaskBody,
@@ -203,6 +204,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: createResult.error }, createResult.status);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({
       task: createResult.task,
       project: createResult.project,
@@ -237,6 +239,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: createResult.error }, createResult.status);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: createResult.task }, 201);
   });
 
@@ -267,6 +270,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: updateResult.error }, updateResult.status);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: updateResult.task });
   });
 
@@ -283,6 +287,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: archiveResult.error }, archiveResult.status);
     }
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ task: archiveResult.task });
   });
 
@@ -316,6 +321,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       if (!transition.ok) {
         return context.json({ error: transition.error }, transition.status);
       }
+      invalidateCapacityCacheForTenant(actor.tenantId);
       return context.json({ task: transition.task });
     }
   );

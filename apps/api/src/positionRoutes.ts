@@ -2,6 +2,7 @@ import {
   canManagePositions,
   canReadPositions
 } from "@kiss-pm/access-control";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import { parsePositionBody } from "./workspaceParsers";
@@ -77,6 +78,7 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ position }, 201);
   });
 
@@ -136,6 +138,7 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ position });
   });
 
@@ -189,6 +192,7 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
       permissionResult: decision
     });
 
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ status: "deleted" });
   });
 }
