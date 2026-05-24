@@ -12,10 +12,11 @@ KISS PM перезапущен как **docs-first проект с новой ч
 
 1. Прочитать этот `AGENTS.md`.
 2. Выполнить `git status --short` и увидеть существующие изменения.
-3. Прочитать ближайшие документы из `docs/`.
-4. Определить, является ли задача продуктовой, архитектурной, UI/UX, кодовой, документационной, ревью или только read-only вопросом.
-5. Для любой задачи, которая меняет файлы, код, документы, архитектуру, UX, тесты, планы, git-состояние или продуктовый контракт, сначала пройти workflow из раздела 6.
-6. Не делать разрушительные действия без явного подтверждения границ.
+3. **CodeGraph (обязательно для кодовых задач):** см. раздел 8 — обновить индекс до начала работы; при отсутствии `.codegraph/` выполнить `codegraph init -i`.
+4. Прочитать ближайшие документы из `docs/`.
+5. Определить, является ли задача продуктовой, архитектурной, UI/UX, кодовой, документационной, ревью или только read-only вопросом.
+6. Для любой задачи, которая меняет файлы, код, документы, архитектуру, UX, тесты, планы, git-состояние или продуктовый контракт, сначала пройти workflow из раздела 6.
+7. Не делать разрушительные действия без явного подтверждения границ.
 
 ## 2. Язык
 
@@ -104,13 +105,14 @@ Tenant-настройки
 `task-workflow-orchestrator` является единственным источником истины по порядку:
 
 ```txt
-brainstorming -> specification -> lead-architect-review
+codegraph sync (или init) -> brainstorming -> specification -> lead-architect-review
   -> ui-ux-pro-max для UI/UX задач
   -> writing-plans
-  -> executing-plans или subagent-driven-development
+  -> executing-plans или subagent-driven-development  [активно: codegraph_* во время работы]
   -> review loop
   -> receiving-code-review
   -> verification-before-completion
+  -> codegraph sync
   -> finishing-a-development-branch
 ```
 
@@ -138,13 +140,62 @@ brainstorming -> specification -> lead-architect-review
 9. Любой refactor должен быть behavior-preserving, маленький и проверяемый. Если меняется поведение, сначала нужна compact spec и тест/acceptance сценарий.
 10. Для предотвращения повторного bloat допускаются repository health tests: line budgets, ban-list для fake classes/selectors, smoke assertions на ключевые interaction states.
 
-## 8. Формат финального отчета
+## 8. CodeGraph — обязательное использование
+
+В проекте включён MCP **CodeGraph** (`@colbymchenry/codegraph`) — локальный граф символов и связей (tree-sitter + SQLite), без внешних API.
+
+**CodeGraph обязателен** для любой задачи, где агент читает, меняет или ревьюит исходный код, маршруты, API, тесты или архитектуру модулей. Исключение: чисто read-only вопросы без анализа кода (документация, продукт, git-статус).
+
+### Конфигурация
+
+- MCP (глобально и/или в проекте): сервер `codegraph` (`codegraph serve --mcp --path ${workspaceFolder}`).
+- Правила агента: этот `AGENTS.md`.
+- Индекс: `.codegraph/` (в git не коммитится).
+
+### Обязательный цикл на каждую задачу
+
+| Фаза | Когда | Действие агента |
+|------|--------|-----------------|
+| **До работы** | Сразу после `git status`, до spec/плана/правок | `codegraph status`; если нет `.codegraph/` — `codegraph init -i`; иначе **`codegraph sync`** (при большом расхождении с веткой — `codegraph index --force`) |
+| **Во время работы** | Исследование, проектирование, рефакторинг, правки | **Активно** вызывать MCP `codegraph_*` (см. ниже); не обходить граф массовым grep/read для структурных вопросов |
+| **После задачи** | Перед финальным отчётом и claim «готово» | **`codegraph sync`**; при необходимости `codegraph status` и зафиксировать в отчёте |
+
+Команды (из корня репозитория / worktree):
+
+```bash
+codegraph status          # проверка индекса (до и после)
+codegraph sync            # обязательно: до начала и после завершения задачи
+codegraph index --force   # полная переиндексация (после крупных merge/rename)
+codegraph init -i         # первичная инициализация (если нет .codegraph/)
+```
+
+### Активное использование во время работы
+
+Перед изменением кода агент обязан понять контекст через CodeGraph:
+
+1. **Поиск и вход в область:** `codegraph_search`, `codegraph_context`.
+2. **Понимание потока и зависимостей:** `codegraph_explore`, `codegraph_callers`, `codegraph_callees`.
+3. **Перед правками:** `codegraph_impact` для затрагиваемых символов.
+4. **Детали символа:** `codegraph_node` (точечно, не десятками вызовов подряд).
+
+**Запрещено** для структурных вопросов («где определено», «кто вызывает», «что сломается», «как устроен модуль») начинать с широкого grep/glob/read по всему репозиторию, если доступны инструменты `codegraph_*`.
+
+**Допустимо** grep/read только для: литеральных строк, комментариев, логов, конфигов вне графа, или когда `codegraph_*` вернул пустой результат и это зафиксировано в отчёте.
+
+### Инструменты MCP
+
+`codegraph_search`, `codegraph_context`, `codegraph_explore`, `codegraph_callers`, `codegraph_callees`, `codegraph_impact`, `codegraph_node`, `codegraph_files`, `codegraph_status`.
+
+Если MCP недоступен — сообщить пользователю (перезапуск Cursor, проверка `mcp.json`), выполнить `codegraph sync` в терминале и не считать исследование кода завершённым без явного fallback в отчёте.
+
+## 9. Формат финального отчета
 
 ```txt
 Status:
 Changed:
 Files:
 Tests / verification:
+CodeGraph: (sync до / sync после; status: nodes/edges; использованные codegraph_*)
 Decisions / assumptions:
 Risks / follow-up:
 ```
