@@ -25,6 +25,7 @@ import {
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput, ProjectRecord } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
@@ -237,6 +238,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (result.status === 409) return context.json({ error: result.error }, 409);
       return context.json({ error: result.error }, 400);
     }
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json(result.body);
   });
 

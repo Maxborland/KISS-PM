@@ -20,6 +20,7 @@
 | Closure denied audit | Lesson creation and template improvement apply returned 403 without denied audit | Retrospective lesson and template improvement denied paths write closure audit events | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 | Release-like smoke | Не было DB smoke, который проходит полный backend management loop | Добавлен сквозной DB smoke: auth → planning apply → control evaluate → closure close → audit read | `pnpm vitest run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts`, `pnpm typecheck` |
 | Planning auto-solver permissions | Solver run proposals could expose assignment/allocation deltas to plan managers without resource-manage permission | Auto-solver run create/read now require resource management permission before persisted proposal data is returned | `pnpm vitest run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts`, `pnpm typecheck` |
+| Capacity invalidation | Closing a project changed capacity-committed status but left tenant capacity cache warm until TTL | Project closure now invalidates tenant capacity cache so closed project load disappears immediately | `pnpm vitest run --config vitest.db.config.ts apps/api/src/capacityRoutes.db.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -33,7 +34,7 @@
 | Area | Next check |
 |------|------------|
 | Planning / solver apply | Continue focused review for persisted proposal apply conflict semantics and audit trace after resource permission hardening |
-| Capacity | Re-run focused review for project filter semantics, hidden contribution masking and cache invalidation after all mutating paths |
+| Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for denied-path audit completeness and read-model exposure |
 | Control surfaces | Continue focused review for action binding safety and published read-model shape |
 | Closure / retrospectives | Continue focused review for immutable snapshot consistency and retry/conflict semantics |
