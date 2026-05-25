@@ -114,6 +114,36 @@ describe("retrospective routes", () => {
     ]);
   });
 
+  it("denies closure without project plan read permission before building a snapshot", async () => {
+    const state = createRetrospectiveDataSource({
+      permissions: [
+        "tenant.projects.manage",
+        "tenant.management_actions.execute",
+        "tenant.retrospectives.manage"
+      ]
+    });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Готово" })
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(state.projects[0]?.status).toBe("active");
+    expect(state.auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "project.close_denied",
+        executionResult: { status: "denied" }
+      })
+    ]);
+  });
+
   it("denies retrospective lesson creation without manage permission and writes denied audit", async () => {
     const state = createRetrospectiveDataSource({
       permissions: [

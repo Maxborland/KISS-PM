@@ -23,6 +23,7 @@
 | Capacity invalidation | Closing a project changed capacity-committed status but left tenant capacity cache warm until TTL | Project closure now invalidates tenant capacity cache so closed project load disappears immediately | `pnpm vitest run --config vitest.db.config.ts apps/api/src/capacityRoutes.db.test.ts`, `pnpm typecheck` |
 | Control action preview permissions | Management action preview returned persisted `planDelta` with only execute/control-read permissions, before action-specific permission checks | Preview now runs the same action-specific permission gate as apply, writes denied audit/execution on refusal, and control read-model requires project plan read | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Control surface action binding safety | Action permission arrays accepted non-string/blank entries as long as the mandatory permissions were present | Control surface validation now rejects malformed permission array entries before publish | `pnpm vitest run packages/domain/src/controlSurfaces/validation.test.ts apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
+| Closure snapshot read boundary | Project close built and returned a plan-derived closure snapshot without requiring project plan read permission | Close permission composition now requires `tenant.project_plan.read` before snapshot construction, and denied close remains audited | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -39,5 +40,5 @@
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for KPI definition mutation audit/read exposure beyond control action preview |
 | Control surfaces | Continue focused review for published read-model shape after action binding validation hardening |
-| Closure / retrospectives | Continue focused review for immutable snapshot consistency and retry/conflict semantics |
+| Closure / retrospectives | Continue focused review for immutable snapshot retry/conflict semantics after read-boundary hardening |
 | Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |

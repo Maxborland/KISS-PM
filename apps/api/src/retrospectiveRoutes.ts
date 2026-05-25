@@ -454,6 +454,12 @@ function closeDecision(actor: TenantUser, profile: AccessProfile): PolicyDecisio
     targetTenantId: actor.tenantId
   });
   if (!manageProjectDecision.allowed) return manageProjectDecision;
+  const readPlanDecision = canReadProjectPlan({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!readPlanDecision.allowed) return readPlanDecision;
   const executeDecision = canExecuteManagementActions({
     actor,
     profile,
