@@ -144,6 +144,28 @@ describe("retrospective routes", () => {
     ]);
   });
 
+  it("audits denied closure read and preview requests", async () => {
+    const state = createRetrospectiveDataSource({ permissions: [] });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    const previewResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/preview",
+      { method: "POST", headers: mutationHeaders(), body: JSON.stringify({}) }
+    );
+
+    expect(readResponse.status).toBe(403);
+    expect(previewResponse.status).toBe(403);
+    await expect(readResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(previewResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(state.auditEvents.map((event) => event.actionType)).toEqual([
+      "closure.preview_denied",
+      "closure.read_denied"
+    ]);
+  });
+
   it("denies retrospective lesson creation without manage permission and writes denied audit", async () => {
     const state = createRetrospectiveDataSource({
       permissions: [
