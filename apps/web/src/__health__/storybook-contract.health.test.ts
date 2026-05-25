@@ -129,4 +129,21 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(evidence.pass).toBe(true);
     expect(evidence.steps.find((s) => s.name === "copy-scan-106")?.pass).toBe(true);
   });
+
+  it("Gantt production-grade evidence is green", () => {
+    const evidence = JSON.parse(
+      readFileSync(join(webRoot, ".storybook-verify-tmp/gantt-production-grade-evidence.json"), "utf8")
+    ) as { pass: boolean; phases: string[] };
+    expect(evidence.pass).toBe(true);
+    expect(evidence.phases).toEqual(
+      expect.arrayContaining([
+        "arrows-routing",
+        "layering",
+        "bar-semantic",
+        "drawer",
+        "toolbar",
+        "playwright"
+      ])
+    );
+  });
 });

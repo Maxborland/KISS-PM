@@ -1,0 +1,20 @@
+{
+  "pass": true,
+  "exitCode": 0,
+  "timestamp": "2026-05-25T17:50:00.000Z",
+  "phases": [
+    "arrows-routing",
+    "layering",
+    "bar-semantic",
+    "drawer",
+    "toolbar",
+    "playwright"
+  ],
+  "specs": [
+    "stable screenshot: widgets-gantt--baseline-and-critical-path",
+    "stable screenshot: widgets-gantt--dependency-selected",
+    "stable screenshot: widgets-gantt--dependency-create",
+    "deps render under bars, selected dep above (DOM order check)",
+    "ArrowHead direction follows entryDir (FF entry from right)"
+  ]
+}
