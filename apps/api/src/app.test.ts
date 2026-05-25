@@ -651,6 +651,87 @@ describe("KISS PM API Phase 1 shell", () => {
     );
   });
 
+  it("writes denied audit when KPI definition upsert lacks manage permission", async () => {
+    let upsertCalled = false;
+    const auditEvents: Array<{
+      actionType: string;
+      input: unknown;
+      permissionResult: unknown;
+      executionResult: unknown;
+    }> = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.kpi_definitions.read"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async upsertKpiDefinition(input) {
+        upsertCalled = true;
+        return input;
+      },
+      async appendAuditEvent(input) {
+        auditEvents.push(input);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/tenant/current/kpi-definitions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: "kiss_pm_session=control-token"
+      },
+      body: JSON.stringify({
+        code: "project.custom",
+        label: "Custom",
+        formula: { type: "builtin", key: "deadline_delta_days" },
+        thresholdRules: [{ severity: "critical", operator: "gt", value: 0 }]
+      })
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(upsertCalled).toBe(false);
+    expect(auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "kpi.definition.upsert_denied",
+        input: { route: "/api/tenant/current/kpi-definitions" },
+        permissionResult: { allowed: false, reason: "permission_missing" },
+        executionResult: { status: "denied" }
+      })
+    ]);
+  });
+
   it("materializes default KPI definitions before persisting evaluations", async () => {
     const upsertedDefinitionIds = new Set<string>();
     const evaluationDefinitionIds: string[] = [];
