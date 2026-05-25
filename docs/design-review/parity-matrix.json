@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-25T02:20:36Z",
+  "worktree": "design-v3-rebuild",
+  "notes": "Design-v3 Storybook visual batches V-1…V-G. PNG в evidence/ коммитятся; tmp в apps/web/.storybook-verify-tmp — gitignore.",
+  "rows": [
+    {
+      "id": "dv3-v1-deals-kanban",
+      "referenceId": "ds-05-kanban",
+      "storyId": "views-screens--deals",
+      "component": "apps/web/src/views/blocks/deals-block.tsx",
+      "status": "yellow",
+      "severity": "medium",
+      "gaps": ["Канбан и список не показываются одновременно при Segmented «Канбан»"],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-deals.png"
+      }
+    },
+    {
+      "id": "dv3-vc-dashboard-kpi",
+      "referenceId": "ds-03-dashboard",
+      "storyId": "views-screens--dashboard",
+      "component": "apps/web/src/views/blocks/dashboard-bento.tsx",
+      "status": "yellow",
+      "severity": "low",
+      "gaps": ["KPI tile использует --text-h2 (24px), не display 40px"],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-dashboard.png"
+      }
+    },
+    {
+      "id": "dv3-ve-entity-stage-bar",
+      "referenceId": "ds-07-entity-detail",
+      "storyId": "views-screens--task-card",
+      "component": "apps/web/src/views/blocks/entity-detail-block.tsx",
+      "status": "green",
+      "severity": "low",
+      "gaps": [],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-task-card.png"
+      }
+    },
+    {
+      "id": "dv3-vf-gantt-zoom",
+      "referenceId": "plan-02-schedule-wbs-gantt",
+      "storyId": "views-screens--project-gantt",
+      "component": "apps/web/src/widgets/gantt/gantt.tsx",
+      "status": "yellow",
+      "severity": "medium",
+      "gaps": [
+        "Zoom wired: dev evidence day --gantt-day-w 28px, month 12px (см. capture-manifest.json)",
+        "Нет агрегации колонок недель/месяцев как в planning-ui-approved HTML"
+      ],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-gantt-chart.png",
+        "screenshotTable": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-gantt-table.png",
+        "screenshotZoomMonth": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-gantt-chart-zoom-month.png",
+        "screenshotFullPageAlias": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-gantt.png",
+        "manifest": "docs/design-review/evidence/visual-v-g-2026-05-24/capture-manifest.json"
+      }
+    },
+    {
+      "id": "dv3-vh-resources-matrix",
+      "referenceId": "plan-04-resources",
+      "storyId": "views-screens--project-resources",
+      "component": "apps/web/src/views/blocks/project-resources-block.tsx",
+      "status": "red",
+      "severity": "high",
+      "gaps": [
+        "См. docs/design-v3/V-H-PLANNING-PARITY-GAPS.md — WBS+inspector, dependency arrows, matrix density"
+      ],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-resources.png"
+      }
+    },
+    {
+      "id": "dv3-vi-entity-cta",
+      "referenceId": "DESIGN_CONTRACT §9",
+      "storyId": "views-screens--task-card",
+      "component": "apps/web/src/views/blocks/entity-detail-block.tsx",
+      "status": "green",
+      "severity": "low",
+      "gaps": ["Один visible primary в PageIntro; «Запланировать» в меню «Действия»"],
+      "evidence": {
+        "screenshotCurrent": "docs/design-review/evidence/visual-v-g-2026-05-24/audit-views-screens-task-card.png"
+      }
+    }
+  ]
+}
