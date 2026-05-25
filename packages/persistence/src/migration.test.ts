@@ -158,6 +158,13 @@ const phase9ClosureRetrospectivesMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseGCollaborationMigration = readFileSync(
+  new URL(
+    "../migrations/0034_phase_g_collaboration_communications.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -264,6 +271,32 @@ describe("Phase 9 SQL migration", () => {
     );
     expect(phase9ClosureRetrospectivesMigration).toContain(
       "ALTER TABLE projects"
+    );
+  });
+});
+
+describe("Phase G / 11 SQL migration", () => {
+  it("creates tenant-scoped collaboration and meeting tables", () => {
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS conversations"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS discussion_messages"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS user_notifications"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meetings"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meeting_external_links"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "conversations_tenant_entity_type_uidx"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CONSTRAINT meeting_external_links_provider_chk"
     );
   });
 });

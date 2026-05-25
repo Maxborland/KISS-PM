@@ -1,5 +1,6 @@
 export * from "./auditEvent";
 export * from "./attachmentRepository";
+export * from "./collaborationRepository";
 export * from "./auth";
 export * from "./connection";
 export * from "./crmRepository";

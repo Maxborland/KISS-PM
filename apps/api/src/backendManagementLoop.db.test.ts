@@ -76,6 +76,17 @@ describe("backend management loop DB smoke", () => {
     await client`
       TRUNCATE
         audit_events,
+        meeting_action_items,
+        meeting_notes,
+        meeting_external_links,
+        meeting_participants,
+        meetings,
+        notification_preferences,
+        user_notifications,
+        conversation_read_states,
+        message_mentions,
+        discussion_messages,
+        conversations,
         crm_activities,
         task_activities,
         entity_attachments,
