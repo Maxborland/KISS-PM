@@ -306,6 +306,16 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const before = await transactionDataSource.findControlSurface(actor.tenantId, surfaceId);
       if (!before) return { ok: false as const, status: 404, error: "control_surface_version_not_found" };
       if (before.status === "archived") {
+        await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.rollback_conflict",
+          surfaceId,
+          commandInput: { surfaceId, version },
+          beforeState: { surface: before },
+          permissionResult: decision,
+          reason: "control_surface_archived"
+        });
         return { ok: false as const, status: 409, error: "control_surface_archived" };
       }
       const auditEventId = `audit-${randomUUID()}`;
@@ -317,6 +327,16 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         auditEventId
       });
       if (!rollback) {
+        await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.rollback_failed",
+          surfaceId,
+          commandInput: { surfaceId, version },
+          beforeState: { surface: before },
+          permissionResult: decision,
+          reason: "control_surface_version_not_found"
+        });
         return { ok: false as const, status: 404, error: "control_surface_version_not_found" };
       }
       await deps.appendManagementAuditEvent(
@@ -376,7 +396,19 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         surfaceId,
         actorUserId: actor.id
       });
-      if (!before || !surface) return { ok: false as const, status: 404, error: "control_surface_not_found" };
+      if (!before || !surface) {
+        await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.archive_failed",
+          surfaceId,
+          commandInput: { surfaceId },
+          beforeState: before ? { surface: before } : null,
+          permissionResult: decision,
+          reason: "control_surface_not_found"
+        });
+        return { ok: false as const, status: 404, error: "control_surface_not_found" };
+      }
       const auditEventId = await deps.appendManagementAuditEvent(
         {
           tenantId: actor.tenantId,
