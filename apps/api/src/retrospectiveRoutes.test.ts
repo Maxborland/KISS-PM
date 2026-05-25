@@ -197,6 +197,82 @@ describe("retrospective routes", () => {
       expect.arrayContaining(["project.closed", "template_improvement.applied"])
     );
   });
+
+  it("returns conflict when applying an already applied template improvement action", async () => {
+    const state = createRetrospectiveDataSource();
+    const app = createApp({ dataSource: state.dataSource });
+
+    const closeResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Работы приняты" })
+      }
+    );
+    expect(closeResponse.status).toBe(200);
+    const closeBody = (await closeResponse.json()) as RetrospectiveReadModel;
+    const actionId = closeBody.templateImprovementActions[0]?.id;
+    expect(actionId).toBeTruthy();
+
+    const firstApplyResponse = await app.request(
+      `/api/workspace/projects/project-alpha/closure/template-improvement-actions/${actionId}/apply`,
+      { method: "POST", headers: mutationHeaders(), body: JSON.stringify({}) }
+    );
+    expect(firstApplyResponse.status).toBe(200);
+
+    const retryResponse = await app.request(
+      `/api/workspace/projects/project-alpha/closure/template-improvement-actions/${actionId}/apply`,
+      { method: "POST", headers: mutationHeaders(), body: JSON.stringify({}) }
+    );
+
+    expect(retryResponse.status).toBe(409);
+    await expect(retryResponse.json()).resolves.toEqual({
+      error: "template_improvement_action_already_applied"
+    });
+    expect(
+      state.auditEvents.filter((event) => event.actionType === "template_improvement.applied")
+    ).toHaveLength(1);
+  });
+
+  it("rolls back lesson creation when lesson audit write fails", async () => {
+    const state = createRetrospectiveDataSource();
+    const app = createApp({ dataSource: state.dataSource });
+
+    const closeResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Работы приняты" })
+      }
+    );
+    expect(closeResponse.status).toBe(200);
+    state.failAuditActionTypes.add("retrospective.lesson.created");
+
+    const lessonResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/lessons",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({
+          category: "process",
+          title: "Согласовать чеклист",
+          body: "Нужен единый чеклист закрытия.",
+          impact: "positive"
+        })
+      }
+    );
+
+    expect(lessonResponse.status).toBe(500);
+    state.failAuditActionTypes.clear();
+    const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    expect(readResponse.status).toBe(200);
+    const readBody = (await readResponse.json()) as RetrospectiveReadModel;
+    expect(readBody.lessons).toEqual([]);
+  });
 });
 
 function createRetrospectiveDataSource(
@@ -231,6 +307,7 @@ function createRetrospectiveDataSource(
     templateImprovementActions: []
   };
   const auditEvents: AuditEventListItem[] = [];
+  const failAuditActionTypes = new Set<string>();
 
   const dataSource: ApiTenantDataSource = {
     async listDevUsers() {
@@ -258,7 +335,17 @@ function createRetrospectiveDataSource(
       };
     },
     async withTransaction(operation) {
-      return operation(dataSource);
+      const projectSnapshot = projects.map((project) => ({ ...project }));
+      const readModelSnapshot = readModel;
+      const auditEventsSnapshot = [...auditEvents];
+      try {
+        return await operation(dataSource);
+      } catch (error) {
+        projects.splice(0, projects.length, ...projectSnapshot);
+        readModel = readModelSnapshot;
+        auditEvents.splice(0, auditEvents.length, ...auditEventsSnapshot);
+        throw error;
+      }
     },
     async listProjects(tenantId) {
       return projects.filter((project) => project.tenantId === tenantId);
@@ -340,6 +427,9 @@ function createRetrospectiveDataSource(
       );
     },
     async appendAuditEvent(input) {
+      if (failAuditActionTypes.has(input.actionType)) {
+        throw new Error("audit_insert_failed");
+      }
       auditEvents.unshift({
         ...input,
         sourceSurfaceId: input.sourceSurfaceId ?? null,
@@ -348,7 +438,7 @@ function createRetrospectiveDataSource(
     }
   };
 
-  return { dataSource, projects, auditEvents };
+  return { dataSource, projects, auditEvents, failAuditActionTypes };
 }
 
 function mutationHeaders() {
