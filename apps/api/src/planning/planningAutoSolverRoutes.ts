@@ -226,11 +226,59 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
         const run = await transactionDataSource.findPlanningSolverRun(actor.tenantId, projectId, runId);
         if (!run) return { ok: false as const, status: 404, error: "planning_solver_run_not_found" };
-        if (run.appliedAt) return { ok: false as const, status: 409, error: "planning_solver_run_already_applied" };
+        if (run.appliedAt) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_already_applied",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: {
+              planVersion: snapshot.planVersion,
+              appliedProposalId: run.appliedProposalId,
+              appliedAt: run.appliedAt.toISOString()
+            },
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "rejected", reason: "planning_solver_run_already_applied" }
+          }, transactionDataSource);
+          return { ok: false as const, status: 409, error: "planning_solver_run_already_applied" };
+        }
         if (run.expiresAt.getTime() <= Date.now()) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_expired",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: {
+              planVersion: snapshot.planVersion,
+              expiresAt: run.expiresAt.toISOString()
+            },
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "rejected", reason: "planning_solver_run_expired" }
+          }, transactionDataSource);
           return { ok: false as const, status: 409, error: "planning_solver_run_expired" };
         }
         if (hashJson(run.proposals) !== run.proposalPayloadHash) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_payload_hash_mismatch",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: {
+              planVersion: snapshot.planVersion,
+              proposalPayloadHash: run.proposalPayloadHash
+            },
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "rejected", reason: "planning_solver_payload_hash_mismatch" }
+          }, transactionDataSource);
           return { ok: false as const, status: 409, error: "planning_solver_payload_hash_mismatch" };
         }
         if (
