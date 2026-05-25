@@ -316,8 +316,37 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         const proposal = parseAutoSolverProposal(
           run.proposals.find((candidate) => candidate.id === proposalId)
         );
-        if (!proposal) return { ok: false as const, status: 404, error: "planning_solver_proposal_not_found" };
+        if (!proposal) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_proposal_not_found",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: {
+              planVersion: snapshot.planVersion,
+              proposalCount: run.proposals.length
+            },
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "rejected", reason: "planning_solver_proposal_not_found" }
+          }, transactionDataSource);
+          return { ok: false as const, status: 404, error: "planning_solver_proposal_not_found" };
+        }
         if (requiresAcceptedRiskReason(proposal.planDelta.commands) && !parsedApply.value.acceptedRiskReason) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_precondition_failed",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: summarizeSnapshot(snapshot),
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "precondition_failed", reason: "accepted_risk_reason_required" }
+          }, transactionDataSource);
           return { ok: false as const, status: 409, error: "accepted_risk_reason_required" };
         }
         const commands = withAcceptedRiskReason(
