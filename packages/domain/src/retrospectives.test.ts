@@ -48,9 +48,69 @@ describe("retrospectives domain", () => {
       sourceMetric: "closure_plan_fact"
     });
   });
+
+  it("keeps actual start and finish empty before any task execution", () => {
+    const summary = buildClosurePlanFactSummary({
+      snapshot: createSnapshot({
+        tasks: createSnapshot().tasks.map((task) => ({ ...task, percentComplete: 0 }))
+      }),
+      factTasks: [
+        {
+          id: "task-1",
+          actualWorkMinutes: 0,
+          progress: 0,
+          statusCategory: "todo"
+        },
+        {
+          id: "task-2",
+          actualWorkMinutes: 0,
+          progress: 0,
+          statusCategory: "todo"
+        }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      actualStart: null,
+      actualFinish: null,
+      scheduleVarianceDays: 0,
+      completedTaskCount: 0,
+      openTaskCount: 2
+    });
+  });
+
+  it("sets actual start from started tasks but keeps actual finish empty until completion", () => {
+    const summary = buildClosurePlanFactSummary({
+      snapshot: createSnapshot({
+        tasks: createSnapshot().tasks.map((task) => ({ ...task, percentComplete: 0 }))
+      }),
+      factTasks: [
+        {
+          id: "task-1",
+          actualWorkMinutes: 120,
+          progress: 25,
+          statusCategory: "in_progress"
+        },
+        {
+          id: "task-2",
+          actualWorkMinutes: 0,
+          progress: 0,
+          statusCategory: "todo"
+        }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      actualStart: "2026-05-01",
+      actualFinish: null,
+      scheduleVarianceDays: 0,
+      completedTaskCount: 0,
+      openTaskCount: 2
+    });
+  });
 });
 
-function createSnapshot(): PlanSnapshot {
+function createSnapshot(input: Partial<PlanSnapshot> = {}): PlanSnapshot {
   return {
     tenantId: "tenant-alpha",
     projectId: "project-alpha",
@@ -115,6 +175,7 @@ function createSnapshot(): PlanSnapshot {
     resources: [],
     reservations: [],
     constraints: [],
-    capturedAt: "2026-05-11T10:00:00.000Z"
+    capturedAt: "2026-05-11T10:00:00.000Z",
+    ...input
   };
 }
