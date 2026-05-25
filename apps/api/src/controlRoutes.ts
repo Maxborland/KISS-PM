@@ -88,6 +88,8 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await deps.getActorProfile(actor);
+    const readPlanDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+    if (!readPlanDecision.allowed) return context.json({ error: readPlanDecision.reason }, 403);
     const controlDecision = canReadControlSignals({ actor, profile, targetTenantId: actor.tenantId });
     if (!controlDecision.allowed) return context.json({ error: controlDecision.reason }, 403);
     if (!deps.dataSource.listKpiEvaluations || !deps.dataSource.listControlSignals) {
@@ -254,6 +256,36 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         const action = signal?.scenarioProposals.find((candidate) => candidate.id === actionId);
         if (!signal || !action) return { ok: false as const, status: 404, error: "action_candidate_not_found" };
 
+        const requiredDecision = decisionForActionPermissions(action, actor, profile);
+        if (!requiredDecision.allowed) {
+          const auditEventId = await appendControlAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "management_action.denied",
+            sourceWorkflow: "control",
+            sourceEntity: { type: "ControlSignal", id: signalId },
+            commandInput: { actionId, requiredPermissions: action.requiredPermissions },
+            beforeState: { signal },
+            afterState: null,
+            permissionResult: requiredDecision,
+            executionResult: { status: "denied", stage: "preview" }
+          }, transactionDataSource);
+          await transactionDataSource.createActionExecution({
+            id: `action-exec-${randomUUID()}`,
+            tenantId: actor.tenantId,
+            projectId,
+            actionType: action.type,
+            targetEntity: action.targetEntity,
+            actorUserId: actor.id,
+            input: action.input,
+            previewPayload: null,
+            resultPayload: { error: requiredDecision.reason },
+            status: "denied",
+            auditEventId
+          });
+          return { ok: false as const, status: 403, error: requiredDecision.reason };
+        }
+
         const executionId = `action-exec-${randomUUID()}`;
         const auditEventId = await appendControlAuditIfConfigured(deps, {
           tenantId: actor.tenantId,
@@ -285,6 +317,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
       if (!result.ok) {
         if (result.status === 501) return context.json({ error: result.error }, 501);
+        if (result.status === 403) return context.json({ error: result.error }, 403);
         return context.json({ error: result.error }, 404);
       }
       return context.json(result.body);
