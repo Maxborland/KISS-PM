@@ -38,26 +38,64 @@ async function readPreviewText(frame) {
     await frame.locator(".sb-preparing-story").waitFor({ state: "hidden", timeout: 120000 }).catch(() => undefined);
     return frame.locator("body").innerText();
   }
-  for (let i = 0; i < 40; i += 1) {
+  await frame.locator("body").waitFor({ state: "attached", timeout: 120000 }).catch(() => undefined);
+  for (let i = 0; i < 80; i += 1) {
     await frame.locator(".sb-preparing-story").waitFor({ state: "hidden", timeout: 3000 }).catch(() => undefined);
-    const text = await frame.locator("body").innerText();
+    const text = await frame.locator("body").innerText().catch(() => "");
     if (text.length > 5 && !text.includes("No Preview")) return text;
     await new Promise((r) => setTimeout(r, 500));
   }
-  return frame.locator("body").innerText();
+  return frame.locator("body").innerText().catch(() => "");
 }
 
 const storyResults = [];
 
 for (const id of storyIds) {
-  await page.goto(`http://127.0.0.1:${port}/?path=/story/${id}&viewMode=story`, {
-    waitUntil: isStatic ? "load" : "networkidle",
-    timeout: 120000
-  });
-  const frame = page.frameLocator("#storybook-preview-iframe");
-  await frame.locator("body").waitFor({ timeout: 60000 });
+  const storyUrl = `http://127.0.0.1:${port}/?path=/story/${id}&viewMode=story`;
+  let navigated = false;
+  for (let attempt = 0; attempt < 3 && !navigated; attempt += 1) {
+    try {
+      await page.goto(storyUrl, {
+        waitUntil: isStatic ? "load" : "networkidle",
+        timeout: 120000
+      });
+      navigated = true;
+    } catch (err) {
+      if (attempt === 2) {
+        storyResults.push({
+          id,
+          hasNoPreview: true,
+          hasEnDev: false,
+          hasCyrillic: false,
+          hasScreenError: true,
+          screenErrorMarkers: [String(err instanceof Error ? err.message : err)],
+          pass: false
+        });
+      } else {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+  if (!navigated) continue;
 
-  const text = await readPreviewText(frame);
+  await page.locator("#storybook-preview-iframe").waitFor({ state: "attached", timeout: 120000 });
+  const frame = page.frameLocator("#storybook-preview-iframe");
+
+  let text = "";
+  try {
+    text = await readPreviewText(frame);
+  } catch (err) {
+    storyResults.push({
+      id,
+      hasNoPreview: true,
+      hasEnDev: false,
+      hasCyrillic: false,
+      hasScreenError: true,
+      screenErrorMarkers: [String(err instanceof Error ? err.message : err)],
+      pass: false
+    });
+    continue;
+  }
   const hasNoPreview = text.includes("No Preview");
   const hasEnDev = EN_DEV.test(text);
   const hasCyrillic = CYRILLIC.test(text);

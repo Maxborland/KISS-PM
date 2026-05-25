@@ -4,7 +4,7 @@ import {
   formatPredecessorText,
   parsePredecessorText,
   parsePredecessorTextError
-} from "./gantt-predecessor-text";
+} from "./predecessor-text";
 
 describe("parsePredecessorText", () => {
   it("parses FS with lag", () => {
