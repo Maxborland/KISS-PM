@@ -1,4 +1,4 @@
-import { canManageProjectPlan } from "@kiss-pm/access-control";
+import { canManageProjectPlan, canManageProjectResources } from "@kiss-pm/access-control";
 import {
   isBlockingValidationIssue,
   proposeAutoPlanningSolutions,
@@ -59,6 +59,14 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       targetTenantId: actor.tenantId
     });
     if (!manageDecision.allowed) return context.json({ error: manageDecision.reason }, 403);
+    const resourceManageDecision = canManageProjectResources({
+      actor,
+      profile,
+      targetTenantId: actor.tenantId
+    });
+    if (!resourceManageDecision.allowed) {
+      return context.json({ error: resourceManageDecision.reason }, 403);
+    }
 
     const projectId = getRequiredRouteParam(context, "projectId");
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -149,6 +157,14 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
     const profile = await deps.getActorProfile(actor);
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    const resourceManageDecision = canManageProjectResources({
+      actor,
+      profile,
+      targetTenantId: actor.tenantId
+    });
+    if (!resourceManageDecision.allowed) {
+      return context.json({ error: resourceManageDecision.reason }, 403);
+    }
 
     const projectId = getRequiredRouteParam(context, "projectId");
     const run = await deps.dataSource.findPlanningSolverRun(
