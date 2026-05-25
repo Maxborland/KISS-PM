@@ -2,7 +2,9 @@
 
 ## Статус
 
-Phase 8 добавляет backend-only основу конструктора управленческих поверхностей. UI builder, визуальные редакторы и frontend-роутинг публикуемых surfaces идут отдельным UI slice. Backend обязан уже сейчас зафиксировать контракт так, чтобы будущий UI не придумывал собственные права, action binding, preview/publish и versioning.
+Backend-scope Phase 8 реализован (PR #25, hotfix PR #26). Этот документ остается canonical contract для конструктора управленческих поверхностей; Phase 10 проверяет его как production hardening surface.
+
+UI builder, визуальные редакторы и frontend-роутинг публикуемых surfaces идут отдельным UI slice. Backend обязан фиксировать контракт так, чтобы будущий UI не придумывал собственные права, action binding, preview/publish и versioning.
 
 ## Product intent
 
