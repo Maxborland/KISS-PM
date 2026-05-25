@@ -38,6 +38,7 @@
 | Closure read/preview denied audit | Closure read and preview denied paths returned 403 without audit | Closure read/preview now write best-effort denied audit before returning 403 | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 | Control surface publish failure audit | Publish blocked/archived conflicts returned 409 without mutation audit | Publish conflicts now write control surface failure audit with validation/reason metadata | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | Control surface rollback/archive failure audit | Rollback/archive not-found or archived conflicts returned errors without mutation audit | Rollback/archive failure paths now write control surface failure audit with reason metadata | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
+| Control surface read denied audit | Control surface list/detail/preset denied paths returned 403 without audit | Control surface read/preset denials now write best-effort denied audit | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -53,6 +54,6 @@
 | Planning / solver apply | Continue focused review for low-level persistence failure mapping after route-level denied audit symmetry |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
-| Control surfaces | Continue focused review for read/preset denied audit symmetry after mutation failure audit |
+| Control surfaces | Continue focused review for low-level persistence failure mapping after read denied audit symmetry |
 | Closure / retrospectives | Continue focused review for persistence failure mapping in closure auxiliary commands |
 | Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |
