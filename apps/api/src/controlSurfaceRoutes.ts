@@ -513,6 +513,10 @@ function toPublishedSurfaceReadModel(
 ): PublishedControlSurfaceReadModel | null {
   if (surface.status !== "published" || !surface.publishedDefinition) return null;
   const grantedPermissions = new Set<string>(profile.permissions);
+  const canReadSurface = surface.publishedDefinition.requiredPermissions.every((permission) =>
+    grantedPermissions.has(permission)
+  );
+  if (!canReadSurface) return null;
   return {
     id: surface.id,
     tenantId: surface.tenantId,

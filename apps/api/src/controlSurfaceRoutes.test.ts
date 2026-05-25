@@ -272,8 +272,40 @@ describe("control surface routes", () => {
     );
   });
 
-  it("hides draft definitions and version history from read-only users", async () => {
+  it("hides published surfaces when read-only users lack surface required permissions", async () => {
     const state = createSurfaceDataSource({ permissions: ["tenant.control_surfaces.read"] });
+    const app = createApp({ dataSource: state.dataSource });
+    const publishedDefinition = createDefinition();
+    await state.dataSource.upsertControlSurfaceDraft?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: publishedDefinition
+    });
+    await state.dataSource.publishControlSurface?.({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      surfaceId: publishedDefinition.id,
+      auditEventId: "audit-published"
+    });
+
+    const listResponse = await app.request("/api/tenant/current/control-surfaces", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toEqual({ surfaces: [] });
+
+    const detailResponse = await app.request(
+      `/api/tenant/current/control-surfaces/${publishedDefinition.id}`,
+      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+    );
+    expect(detailResponse.status).toBe(404);
+    await expect(detailResponse.json()).resolves.toEqual({ error: "control_surface_not_found" });
+  });
+
+  it("hides draft definitions and version history from read-only users", async () => {
+    const state = createSurfaceDataSource({
+      permissions: ["tenant.control_surfaces.read", "tenant.projects.read"]
+    });
     const app = createApp({ dataSource: state.dataSource });
     const publishedDefinition = createDefinition();
     await state.dataSource.upsertControlSurfaceDraft?.({
