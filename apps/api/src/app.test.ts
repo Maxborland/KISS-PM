@@ -1107,6 +1107,194 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(upsertCalled).toBe(false);
   });
 
+  it("requires project plan read permission for the control read model", async () => {
+    let readModelLoaded = false;
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.control_signals.read"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async listKpiDefinitions() {
+        readModelLoaded = true;
+        return [];
+      },
+      async listKpiEvaluations() {
+        readModelLoaded = true;
+        return [];
+      },
+      async listControlSignals() {
+        readModelLoaded = true;
+        return [];
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/projects/project-control/control/read-model", {
+      headers: {
+        cookie: "kiss_pm_session=control-token"
+      }
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(readModelLoaded).toBe(false);
+  });
+
+  it("rejects control action preview when action-specific permissions are missing", async () => {
+    let createdExecutionStatus: string | null = null;
+    let auditActionType: string | null = null;
+    const actionCommand: PlanningCommand = {
+      type: "task.update_work_model",
+      payload: {
+        taskId: "task-control-1",
+        taskType: "fixed_units",
+        effortDriven: false,
+        durationMinutes: 420,
+        workMinutes: 420
+      }
+    };
+    const signal: ControlSignal = {
+      id: "signal-control-1",
+      tenantId: "tenant-control",
+      projectId: "project-control",
+      sourceEntity: { type: "Project", id: "project-control" },
+      sourceMetric: "deadline_delta_days",
+      evaluationId: "eval-control-1",
+      severity: "critical",
+      explanation: "Project finish is after deadline",
+      ownerUserId: null,
+      allowedActions: ["apply_planning_delta"],
+      scenarioProposals: [
+        {
+          id: "action-control-1",
+          type: "apply_planning_delta",
+          label: "Compress critical task",
+          targetEntity: { type: "ControlSignal", id: "signal-control-1" },
+          requiredPermissions: ["tenant.project_plan.manage"],
+          planDelta: {
+            commands: [actionCommand],
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            changedDependencyIds: [],
+            acceptedRiskIds: []
+          },
+          input: { taskId: "task-control-1" },
+          explainability: {
+            reason: "Deadline-first correction",
+            deadlineDeltaDays: 0,
+            overloadMinutes: 0,
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            riskScore: 20,
+            cost: 120
+          }
+        }
+      ],
+      status: "open",
+      createdAt: "2026-05-24T00:00:00.000Z",
+      updatedAt: "2026-05-24T00:00:00.000Z"
+    };
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.control_signals.read", "tenant.management_actions.execute"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async listControlSignals() {
+        return [signal];
+      },
+      async createActionExecution(input) {
+        createdExecutionStatus = input.status;
+        return {
+          ...input,
+          createdAt: new Date("2026-05-24T00:00:00.000Z")
+        };
+      },
+      async appendAuditEvent(input) {
+        auditActionType = input.actionType;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/preview",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=control-token"
+        }
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(createdExecutionStatus).toBe("denied");
+    expect(auditActionType).toBe("management_action.denied");
+  });
+
   it("applies Phase 7 action candidates through the governed planning command path", async () => {
     let snapshot = createControlActionSnapshot();
     let appliedCommand: PlanningCommand | null = null;
