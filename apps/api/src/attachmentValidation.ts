@@ -156,7 +156,9 @@ function isBlockedHost(hostname: string): boolean {
   if (mappedIpv4Parts) return isBlockedIpv4Parts(mappedIpv4Parts);
   if (
     normalized === "localhost" ||
+    normalized === "::" ||
     normalized === "::1" ||
+    normalized === "0:0:0:0:0:0:0:0" ||
     normalized === "0:0:0:0:0:0:0:1"
   ) {
     return true;
