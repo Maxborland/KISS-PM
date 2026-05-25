@@ -203,10 +203,31 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const before = await transactionDataSource.findControlSurface(actor.tenantId, surfaceId);
       if (!before) return { ok: false as const, status: 404, error: "control_surface_not_found" };
       if (before.status === "archived") {
+        await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.publish_conflict",
+          surfaceId,
+          commandInput: { surfaceId },
+          beforeState: { surface: before },
+          permissionResult: decision,
+          reason: "control_surface_archived"
+        });
         return { ok: false as const, status: 409, error: "control_surface_archived" };
       }
       const validation = validateControlSurfaceDefinition(before.draftDefinition);
       if (!validation.canPublish) {
+        await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.publish_blocked",
+          surfaceId,
+          commandInput: { surfaceId, draftVersion: before.draftVersion },
+          beforeState: { surface: before },
+          permissionResult: decision,
+          reason: "control_surface_publish_blocked",
+          validation
+        });
         return {
           ok: false as const,
           status: 409,
@@ -561,4 +582,41 @@ async function appendDeniedAuditIfConfigured(
     permissionResult: input.permissionResult,
     executionResult: { status: "denied" }
   });
+}
+
+async function appendControlSurfaceFailureAuditIfConfigured(
+  deps: ApiRouteDeps,
+  auditDataSource: ApiRouteDeps["dataSource"],
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    actionType: string;
+    surfaceId: string;
+    commandInput: Record<string, unknown>;
+    beforeState: Record<string, unknown> | null;
+    permissionResult: Record<string, unknown>;
+    reason: string;
+    validation?: Record<string, unknown>;
+  }
+) {
+  if (!auditDataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent(
+    {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      actionType: input.actionType,
+      sourceWorkflow: "control_surfaces",
+      sourceEntity: { type: "ControlSurface", id: input.surfaceId },
+      commandInput: input.commandInput,
+      beforeState: input.beforeState,
+      afterState: null,
+      permissionResult: input.permissionResult,
+      executionResult: {
+        status: "failed",
+        reason: input.reason,
+        ...(input.validation ? { validation: input.validation } : {})
+      }
+    },
+    auditDataSource
+  );
 }
