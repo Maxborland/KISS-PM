@@ -29,6 +29,7 @@ import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
+import { registerHealthRoutes } from "./healthRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
@@ -208,8 +209,9 @@ export function createApp(options: CreateAppOptions = {}) {
     trustForwardedAuthHeaders
   };
 
-  app.get("/health", (context) => {
-    return context.json({ status: "ok", product: "KISS PM" });
+  registerHealthRoutes(app, {
+    readinessChecks: options.readinessChecks,
+    storageProvider
   });
 
   app.get("/api/health/realtime", async (context) => {
