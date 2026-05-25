@@ -30,6 +30,7 @@ describe("attachment route request bounds", () => {
   it("rejects malformed upload content-length values before body reads", () => {
     expect(parseContentLength(undefined)).toEqual({ ok: true, value: null });
     expect(parseContentLength("0")).toEqual({ ok: true, value: 0 });
+    expect(parseContentLength("00042")).toEqual({ ok: true, value: 42 });
     expect(parseContentLength("42")).toEqual({ ok: true, value: 42 });
     expect(parseContentLength("10.5")).toEqual({ ok: false, error: "content_length_invalid" });
     expect(parseContentLength("-1")).toEqual({ ok: false, error: "content_length_invalid" });

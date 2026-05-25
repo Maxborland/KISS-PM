@@ -3,7 +3,7 @@ export function parseContentLength(value: string | undefined):
   | { ok: false; error: "content_length_invalid" } {
   if (!value) return { ok: true, value: null };
   const normalized = value.trim();
-  if (!/^(0|[1-9]\d*)$/.test(normalized)) {
+  if (!/^\d+$/.test(normalized)) {
     return { ok: false, error: "content_length_invalid" };
   }
   const parsed = Number(normalized);
