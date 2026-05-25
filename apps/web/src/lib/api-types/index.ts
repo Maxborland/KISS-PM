@@ -1,0 +1,10 @@
+export type * from "./capacity";
+export type * from "./common";
+export type * from "./control";
+export type * from "./crm";
+export type * from "./deals";
+export type * from "./planning";
+export type * from "./projects";
+export type * from "./tasks";
+export type * from "./users";
+export type * from "./workspace-config";
