@@ -31,6 +31,7 @@
 | KPI definition mutation denied audit | KPI definition upsert denied by missing manage permission returned 403 without an audit trail | Denied KPI definition upserts now write safe metadata-only control audit events before returning 403 | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Management action route-level denied audit | Management action preview/apply route-level permission failures returned 403 before loading candidates without audit | Preview/apply now audit safe route metadata for execute/read permission denials before loading action candidates | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Planning auto-solver apply rejection audit | Expired, already-applied, and payload-hash-mismatch solver apply rejections returned 409 without audit | Solver apply now writes rejection-specific audit events before returning governed 409 outcomes | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
+| Planning auto-solver proposal rejection audit | Missing proposal ids and accepted-overload proposals without risk reason returned errors without audit | Solver apply now audits missing proposal and accepted-risk-reason precondition failures before returning 404/409 | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -43,7 +44,7 @@
 
 | Area | Next check |
 |------|------------|
-| Planning / solver apply | Continue focused review for accepted-risk reason and missing proposal rejection audit after persisted-run rejection coverage |
+| Planning / solver apply | Continue focused review for create/read permission denied audit symmetry after apply rejection coverage |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
 | Control surfaces | Continue focused review for saved-view/audit mutation boundaries after published permission gates |

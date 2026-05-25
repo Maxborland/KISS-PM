@@ -5,6 +5,7 @@ import { reducePlanningCommand, type PlanSnapshot } from "@kiss-pm/domain";
 import type { PlanningSolverRunRecord } from "@kiss-pm/persistence";
 import type { ApiTenantDataSource } from "./apiTypes";
 import { createApp } from "./app";
+import { hashJson } from "./planning/planningRouteHelpers";
 
 describe("planning auto-solver API", () => {
   it("persists a solver run and applies the stored proposal through planning commands", async () => {
@@ -156,6 +157,74 @@ describe("planning auto-solver API", () => {
     expect(harness.auditActionTypes).toEqual([
       "planning.auto_solver.run_created",
       "planning.auto_solver.apply_payload_hash_mismatch"
+    ]);
+  });
+
+  it("audits missing persisted proposal ids before returning not found", async () => {
+    const harness = createApiHarness();
+    const createBody = await createSolverRun(harness);
+
+    const response = await harness.app.request(
+      `/api/workspace/projects/project-solver/planning/auto-solver-runs/${createBody.runId}/proposals/proposal-missing/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=solver-token"
+        },
+        body: JSON.stringify({ clientPlanVersion: 3 })
+      }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("planning_solver_proposal_not_found");
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_proposal_not_found"
+    ]);
+  });
+
+  it("audits accepted-overload proposals that are missing a risk reason", async () => {
+    const harness = createApiHarness();
+    const createBody = await createSolverRun(harness);
+    const storedRun = harness.storedRunBox.value;
+    if (!storedRun) throw new Error("missing_stored_run");
+    const proposals = storedRun.proposals.map((proposal, index) =>
+      index === 0
+        ? {
+            ...proposal,
+            planDelta: {
+              commands: [
+                {
+                  type: "risk.accept_overload",
+                  payload: {
+                    overloadId: "overload-alpha",
+                    acceptedRiskReason: "placeholder"
+                  }
+                }
+              ]
+            }
+          }
+        : proposal
+    );
+    harness.storedRunBox.value = {
+      ...storedRun,
+      proposals,
+      proposalPayloadHash: hashJson(proposals)
+    };
+
+    const response = await applyProposal(harness, createBody);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("accepted_risk_reason_required");
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_precondition_failed"
     ]);
   });
 
