@@ -44,6 +44,9 @@ describe("PostgreSQL persistence schema", () => {
       "control_signals",
       "corrective_actions",
       "action_executions",
+      "project_closure_snapshots",
+      "retrospective_lessons",
+      "template_improvement_actions",
       "control_surface_definitions",
       "control_surface_versions",
       "tenant_production_calendars",
@@ -101,6 +104,9 @@ describe("PostgreSQL persistence schema", () => {
       "control_signals",
       "corrective_actions",
       "action_executions",
+      "project_closure_snapshots",
+      "retrospective_lessons",
+      "template_improvement_actions",
       "control_surface_definitions",
       "control_surface_versions",
       "tenant_production_calendars",
@@ -188,6 +194,52 @@ describe("PostgreSQL persistence schema", () => {
         "published_by_user_id",
         "audit_event_id",
         "created_at"
+      ])
+    );
+  });
+
+  it("stores Phase 9 closure snapshots, retrospectives and template improvement actions", () => {
+    expect(getPersistenceTableColumns("projects")).toEqual(
+      expect.arrayContaining(["closed_at"])
+    );
+    expect(getPersistenceTableColumns("project_closure_snapshots")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "project_status_before",
+        "plan_version",
+        "snapshot_payload",
+        "plan_fact_summary",
+        "closed_by_user_id",
+        "closed_at",
+        "close_reason",
+        "audit_event_id"
+      ])
+    );
+    expect(getPersistenceTableColumns("retrospective_lessons")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "snapshot_id",
+        "category",
+        "title",
+        "body",
+        "impact",
+        "created_by_user_id",
+        "created_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("template_improvement_actions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "snapshot_id",
+        "template_id",
+        "status",
+        "impact",
+        "applied_by_user_id",
+        "applied_at",
+        "audit_event_id"
       ])
     );
   });

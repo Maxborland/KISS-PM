@@ -18,8 +18,10 @@ import {
   canManageControlSignals,
   canManageCorrectiveActions,
   canManageControlSurfaces,
+  canManageRetrospectives,
   canManageKpiDefinitions,
   canPublishControlSurfaces,
+  canApplyTemplateImprovements,
   canCreateTasks,
   canDeleteTasks,
   canEditTasks,
@@ -40,6 +42,7 @@ import {
   canReadResourceFeasibility,
   canReadControlSignals,
   canReadControlSurfaces,
+  canReadRetrospectives,
   canReadKpiDefinitions,
   canReadTenantUsers,
   canReadWorkspaceConfig,
@@ -92,6 +95,9 @@ describe("access-control tenant policy", () => {
       "tenant.control_surfaces.read",
       "tenant.control_surfaces.manage",
       "tenant.control_surfaces.publish",
+      "tenant.retrospectives.read",
+      "tenant.retrospectives.manage",
+      "tenant.template_improvements.apply",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -758,6 +764,88 @@ describe("access-control tenant policy", () => {
       canReadControlSurfaces({
         actor,
         profile: surfacePublisher,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 9 retrospective and template improvement access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const retrospectiveReader = createAccessProfile({
+      id: "retrospective-reader",
+      permissions: ["tenant.retrospectives.read"]
+    });
+    const retrospectiveManager = createAccessProfile({
+      id: "retrospective-manager",
+      permissions: [
+        "tenant.retrospectives.read",
+        "tenant.retrospectives.manage",
+        "tenant.template_improvements.apply"
+      ]
+    });
+
+    expect(
+      canReadRetrospectives({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageRetrospectives({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canApplyTemplateImprovements({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageRetrospectives({
+        actor,
+        profile: retrospectiveManager,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canApplyTemplateImprovements({
+        actor,
+        profile: retrospectiveManager,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadRetrospectives({
+        actor,
+        profile: retrospectiveManager,
         targetTenantId: "tenant-beta"
       })
     ).toEqual({
