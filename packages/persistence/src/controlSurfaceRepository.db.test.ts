@@ -152,6 +152,21 @@ describe("control surface repository", () => {
     expect(archived?.status).toBe("archived");
     expect(archived?.archivedAt).not.toBeNull();
     expect(await repository.listControlSurfaceVersions("tenant-alpha", draft.id)).toHaveLength(1);
+
+    await expect(
+      repository.upsertControlSurfaceDraft({
+        tenantId: "tenant-alpha",
+        actorUserId: "user-alpha-admin",
+        definition: {
+          ...createDefinition("tenant-alpha", "surface-alpha", "delivery"),
+          name: "Implicit unarchive attempt"
+        }
+      })
+    ).rejects.toThrow("control_surface_archived");
+
+    const afterRejectedDraftSave = await repository.findControlSurface("tenant-alpha", draft.id);
+    expect(afterRejectedDraftSave?.status).toBe("archived");
+    expect(afterRejectedDraftSave?.archivedAt).not.toBeNull();
   });
 });
 

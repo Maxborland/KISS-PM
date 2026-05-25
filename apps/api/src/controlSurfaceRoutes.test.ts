@@ -112,6 +112,16 @@ describe("control surface routes", () => {
     });
     expect(archiveResponse.status).toBe(200);
 
+    const draftSaveResponse = await app.request("/api/tenant/current/control-surfaces", {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({
+        definition: { ...definition, name: "Implicit unarchive attempt" }
+      })
+    });
+    expect(draftSaveResponse.status).toBe(409);
+    await expect(draftSaveResponse.json()).resolves.toEqual({ error: "control_surface_archived" });
+
     const listResponse = await app.request("/api/tenant/current/control-surfaces", {
       headers: { cookie: "kiss_pm_session=session-alpha" }
     });
@@ -377,6 +387,9 @@ function createSurfaceDataSource(input: { permissions?: AccessProfile["permissio
       );
       const now = new Date("2026-05-25T10:00:00.000Z").toISOString();
       if (existing) {
+        if (existing.status === "archived") {
+          throw new Error("control_surface_archived");
+        }
         existing.name = definition.name;
         existing.description = definition.description;
         existing.ownerUserId = ownerUserId ?? existing.ownerUserId;
