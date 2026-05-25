@@ -52,8 +52,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const projectId = context.req.param("projectId");
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "closure.read_denied", { projectId }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
     const project = await findProject(deps.dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
 
@@ -76,8 +79,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const projectId = context.req.param("projectId");
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "closure.preview_denied", { projectId }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
     const project = await findProject(deps.dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
