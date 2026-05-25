@@ -1,10 +1,12 @@
 import { chromium } from "@playwright/test";
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
 import { join } from "path";
 
 const root = process.cwd();
 const outDir = join(root, ".storybook-verify-tmp");
+const evidenceDir = join(root, "../../docs/design-review/evidence/visual-v-g-2026-05-24");
 mkdirSync(outDir, { recursive: true });
+mkdirSync(evidenceDir, { recursive: true });
 
 const index = JSON.parse(readFileSync(join(root, "storybook-static/index.json"), "utf8"));
 
@@ -12,6 +14,7 @@ const REFERENCE_STORIES = [
   { id: "foundations-colors--palette", ref: "foundations-colors" },
   { id: "foundations-typography--type-scale", ref: "foundations-typography" },
   { id: "views-screens--dashboard", ref: "views-screens-dashboard" },
+  { id: "views-screens--deals", ref: "views-screens-deals" },
   { id: "views-screens--task-card", ref: "views-screens-task-card" },
   { id: "views-screens--project-gantt", ref: "views-screens-gantt" },
   { id: "views-screens--project-resources", ref: "views-screens-resources" },
@@ -34,6 +37,7 @@ for (const { id, ref } of REFERENCE_STORIES) {
   });
   const frame = page.frameLocator("#storybook-preview-iframe");
   await frame.locator("body").waitFor({ timeout: 60000 });
+  await frame.locator(".sb-preparing-story").waitFor({ state: "hidden", timeout: 30000 }).catch(() => undefined);
   const text = await frame.locator("body").innerText();
   const hasNoPreview = text.includes("No Preview");
   const hasEnDev = EN_DEV.test(text);
@@ -42,7 +46,10 @@ for (const { id, ref } of REFERENCE_STORIES) {
   const typeH1 = (await frame.locator("h1.type-h1").count()) > 0;
   const pageIntro = (await frame.locator(".page-intro__title").count()) > 0;
 
-  await frame.locator("body").screenshot({ path: join(outDir, `audit-${ref}.png`) });
+  const pngName = `audit-${ref}.png`;
+  const pngTmp = join(outDir, pngName);
+  await frame.locator("body").screenshot({ path: pngTmp });
+  copyFileSync(pngTmp, join(evidenceDir, pngName));
 
   storyResults.push({
     id,
@@ -65,8 +72,9 @@ const uiStories = Object.values(index.entries).filter((e) => (e.title || "").sta
 const uiWithOnlyShowcase = uiStories.filter((e) => e.name === "Витрина").length;
 
 const audit = {
-  batch: 10,
+  batch: "visual-v-g",
   date: "2026-05-24",
+  evidenceDir: "docs/design-review/evidence/visual-v-g-2026-05-24",
   storybookEntries: Object.keys(index.entries).length,
   designV2Entries: dv2.length,
   referenceStories: storyResults,
