@@ -12,6 +12,8 @@ describe("KISS PM API Phase 1 shell", () => {
     const response = await app.request("/health");
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store, private");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     await expect(response.json()).resolves.toEqual({ status: "ok", product: "KISS PM" });
   });
 
