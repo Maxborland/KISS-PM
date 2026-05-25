@@ -251,7 +251,27 @@ describe("planning auto-solver API", () => {
     expect(body.error).toBe("permission_missing");
     expect(harness.appliedCommandTypes).toEqual([]);
     expect(harness.storedRunBox.value).toBeNull();
-    expect(harness.auditActionTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual(["planning.auto_solver.create_denied"]);
+  });
+
+  it("audits denied solver run reads before returning persisted proposals", async () => {
+    const harness = createApiHarness({
+      permissions: ["tenant.project_plan.read"]
+    });
+
+    const response = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs/planning-auto-solver-1",
+      {
+        headers: {
+          cookie: "kiss_pm_session=solver-token"
+        }
+      }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("permission_missing");
+    expect(harness.auditActionTypes).toEqual(["planning.auto_solver.read_denied"]);
   });
 });
 

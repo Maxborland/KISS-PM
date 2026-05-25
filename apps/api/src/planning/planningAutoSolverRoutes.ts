@@ -51,24 +51,46 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
+    const projectId = getRequiredRouteParam(context, "projectId");
     const readDecision = canReadPlanningReadModel({ actor, profile });
-    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    if (!readDecision.allowed) {
+      await appendAutoSolverDeniedAuditIfConfigured(deps, {
+        actor,
+        projectId,
+        operation: "create",
+        permissionResult: readDecision
+      });
+      return context.json({ error: readDecision.reason }, 403);
+    }
     const manageDecision = canManageProjectPlan({
       actor,
       profile,
       targetTenantId: actor.tenantId
     });
-    if (!manageDecision.allowed) return context.json({ error: manageDecision.reason }, 403);
+    if (!manageDecision.allowed) {
+      await appendAutoSolverDeniedAuditIfConfigured(deps, {
+        actor,
+        projectId,
+        operation: "create",
+        permissionResult: manageDecision
+      });
+      return context.json({ error: manageDecision.reason }, 403);
+    }
     const resourceManageDecision = canManageProjectResources({
       actor,
       profile,
       targetTenantId: actor.tenantId
     });
     if (!resourceManageDecision.allowed) {
+      await appendAutoSolverDeniedAuditIfConfigured(deps, {
+        actor,
+        projectId,
+        operation: "create",
+        permissionResult: resourceManageDecision
+      });
       return context.json({ error: resourceManageDecision.reason }, 403);
     }
 
-    const projectId = getRequiredRouteParam(context, "projectId");
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -155,22 +177,39 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
     }
 
     const profile = await deps.getActorProfile(actor);
+    const projectId = getRequiredRouteParam(context, "projectId");
+    const runId = getRequiredRouteParam(context, "runId");
     const readDecision = canReadPlanningReadModel({ actor, profile });
-    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    if (!readDecision.allowed) {
+      await appendAutoSolverDeniedAuditIfConfigured(deps, {
+        actor,
+        projectId,
+        runId,
+        operation: "read",
+        permissionResult: readDecision
+      });
+      return context.json({ error: readDecision.reason }, 403);
+    }
     const resourceManageDecision = canManageProjectResources({
       actor,
       profile,
       targetTenantId: actor.tenantId
     });
     if (!resourceManageDecision.allowed) {
+      await appendAutoSolverDeniedAuditIfConfigured(deps, {
+        actor,
+        projectId,
+        runId,
+        operation: "read",
+        permissionResult: resourceManageDecision
+      });
       return context.json({ error: resourceManageDecision.reason }, 403);
     }
 
-    const projectId = getRequiredRouteParam(context, "projectId");
     const run = await deps.dataSource.findPlanningSolverRun(
       actor.tenantId,
       projectId,
-      getRequiredRouteParam(context, "runId")
+      runId
     );
     if (!run) return context.json({ error: "planning_solver_run_not_found" }, 404);
     return context.json({
@@ -203,12 +242,22 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       if (!parsedApply.ok) return context.json({ error: "planning_solver_invalid" }, 400);
 
       const profile = await deps.getActorProfile(actor);
-      const readDecision = canReadPlanningReadModel({ actor, profile });
-      if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
-
       const projectId = getRequiredRouteParam(context, "projectId");
       const runId = getRequiredRouteParam(context, "runId");
       const proposalId = getRequiredRouteParam(context, "proposalId");
+      const readDecision = canReadPlanningReadModel({ actor, profile });
+      if (!readDecision.allowed) {
+        await appendAutoSolverDeniedAuditIfConfigured(deps, {
+          actor,
+          projectId,
+          runId,
+          proposalId,
+          operation: "apply",
+          permissionResult: readDecision
+        });
+        return context.json({ error: readDecision.reason }, 403);
+      }
+
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
           !transactionDataSource.getPlanSnapshot ||
@@ -504,6 +553,36 @@ function parseAutoSolverProposal(input: unknown): { planDelta: { commands: Plann
 
 function requiresAcceptedRiskReason(commands: PlanningCommand[]): boolean {
   return commands.some((command) => command.type === "risk.accept_overload");
+}
+
+async function appendAutoSolverDeniedAuditIfConfigured(
+  deps: PlanningRouteDeps,
+  input: {
+    actor: { tenantId: string; id: string };
+    projectId: string;
+    runId?: string;
+    proposalId?: string;
+    operation: "create" | "read" | "apply";
+    permissionResult: Record<string, unknown>;
+  }
+): Promise<void> {
+  if (!deps.dataSource.appendAuditEvent) return;
+  await appendPlanningAuditIfConfigured(deps, {
+    tenantId: input.actor.tenantId,
+    actorUserId: input.actor.id,
+    actionType: `planning.auto_solver.${input.operation}_denied`,
+    sourceWorkflow: "planning",
+    sourceEntity: { type: "Project", id: input.projectId },
+    commandInput: {
+      projectId: input.projectId,
+      runId: input.runId ?? null,
+      proposalId: input.proposalId ?? null
+    },
+    beforeState: null,
+    afterState: null,
+    permissionResult: input.permissionResult,
+    executionResult: { status: "denied", operation: input.operation }
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
