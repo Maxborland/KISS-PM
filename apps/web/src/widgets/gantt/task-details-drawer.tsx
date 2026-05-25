@@ -142,6 +142,17 @@ export function TaskDetailsDrawer({
           </div>
 
           <div className="gantt2__drawer-grid-2">
+            <div className="gantt2__drawer-field gantt2__drawer-field--readonly">
+              <span className="gantt2__drawer-label">Backend status</span>
+              <span className="gantt2__drawer-value">{row.statusName ?? row.statusId ?? "—"}</span>
+            </div>
+            <div className="gantt2__drawer-field gantt2__drawer-field--readonly">
+              <span className="gantt2__drawer-label">Project / owner</span>
+              <span className="gantt2__drawer-value">{row.projectId ?? "—"} · {row.ownerUserId ?? "—"}</span>
+            </div>
+          </div>
+
+          <div className="gantt2__drawer-grid-2">
             <label className="gantt2__drawer-field">
               <span className="gantt2__drawer-label">Начало</span>
               <GanttDateField
@@ -204,6 +215,9 @@ export function TaskDetailsDrawer({
             {row.kind === "task" ? (
               <span className="gantt2__drawer-hint">
                 {row.hoursPerDay ?? 8} ч/день · режим {row.effortMode === "custom" ? "ручной" : "авто"}
+                {row.plannedWork != null || row.actualWork != null
+                  ? ` · API план/факт ${row.plannedWork ?? 0}/${row.actualWork ?? 0} мин`
+                  : ""}
               </span>
             ) : null}
           </label>

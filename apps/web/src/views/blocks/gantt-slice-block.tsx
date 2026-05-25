@@ -167,10 +167,9 @@ function GanttToolbar({
             className="gantt-toolbar__filter-soon"
             aria-label="Фильтр (скоро)"
             disabled
-            title="Фильтр (скоро) — в следующем этапе"
+            title="Фильтр (скоро) — будет в следующем этапе"
           >
             <Filter className="size-4" aria-hidden />
-            <span className="gantt-toolbar__soon-suffix">скоро</span>
           </Button>
         </ToolbarSection>
 
@@ -188,12 +187,6 @@ function GanttToolbar({
         </ToolbarSection>
 
         <span className="gantt-toolbar__sep" aria-hidden />
-
-        {api.canUndo ? (
-          <span className="gantt-toolbar__hint" role="status">
-            Локальные изменения · отмена Ctrl+Z
-          </span>
-        ) : null}
 
         <ToolbarSection label="История">
           <Button

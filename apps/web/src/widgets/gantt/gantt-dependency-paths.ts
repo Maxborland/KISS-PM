@@ -56,7 +56,7 @@ function depEndpoints(type: GanttDependencyType | undefined): {
   }
 }
 
-const GUTTER_PX = 8;
+const GUTTER_PX = 4;
 
 function buildOrthogonalDependencyPath(input: {
   x1: number;
@@ -68,34 +68,29 @@ function buildOrthogonalDependencyPath(input: {
   yChannel: number;
 }): { d: string; arrowDir: EndpointDir } {
   const { x1, y1, exitDir, x2, y2, entryDir, yChannel } = input;
+  const arrowDir: EndpointDir = entryDir === "left" ? "right" : "left";
+
   const xa = exitDir === "right" ? x1 + GUTTER_PX : x1 - GUTTER_PX;
   const xb = entryDir === "left" ? x2 - GUTTER_PX : x2 + GUTTER_PX;
 
-  const direct =
-    (exitDir === "right" && entryDir === "left" && xa <= xb) ||
-    (exitDir === "left" && entryDir === "right" && xa >= xb);
-
-  if (direct) {
-    return { d: `M ${x1} ${y1} H ${xa} V ${y2} H ${x2}`, arrowDir: arrowDirFor(exitDir, entryDir) };
-  }
-
+  // Always route through the row-gap channel adjacent to TARGET row.
+  // Horizontal travel happens at row-border (between bar bodies) → bars cover
+  // any vertical crossings via z-index, while horizontal segment stays in the gap.
   return {
     d: `M ${x1} ${y1} H ${xa} V ${yChannel} H ${xb} V ${y2} H ${x2}`,
-    arrowDir: arrowDirFor(exitDir, entryDir)
+    arrowDir
   };
 }
 
-/** Tip direction at target endpoint (into the bar). */
-function arrowDirFor(exitDir: EndpointDir, entryDir: EndpointDir): EndpointDir {
-  if (exitDir === entryDir) return entryDir;
-  return entryDir === "left" ? "right" : "left";
-}
-
+/** Channel y placed at row-border adjacent to TARGET row. */
 function rowGapChannelY(fromIndex: number, toIndex: number): number {
-  if (Math.abs(fromIndex - toIndex) === 1) {
-    return GANTT_CHART_HEADER_PX + Math.max(fromIndex, toIndex) * GANTT_ROW_PX;
+  if (toIndex > fromIndex) {
+    return GANTT_CHART_HEADER_PX + toIndex * GANTT_ROW_PX;
   }
-  return GANTT_CHART_HEADER_PX + (Math.min(fromIndex, toIndex) + 1) * GANTT_ROW_PX - 1;
+  if (toIndex < fromIndex) {
+    return GANTT_CHART_HEADER_PX + (toIndex + 1) * GANTT_ROW_PX;
+  }
+  return GANTT_CHART_HEADER_PX + (toIndex + 1) * GANTT_ROW_PX;
 }
 
 export type DependencyPath = {

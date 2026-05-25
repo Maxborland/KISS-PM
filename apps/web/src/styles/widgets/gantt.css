@@ -106,7 +106,8 @@
 
 .gantt2__deps {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   z-index: 2;
   pointer-events: none;
   overflow: visible;
@@ -207,7 +208,7 @@
   position: relative;
   padding: 0;
   display: grid;
-  grid-auto-rows: 28px;
+  grid-auto-rows: 27px;
   background-color: var(--panel);
   background-image:
     repeating-linear-gradient(
@@ -382,29 +383,13 @@
   box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent);
 }
 .gbar--critical {
-  background: var(--success);
-  border-left: 3px solid var(--danger);
-  box-sizing: border-box;
+  background: color-mix(in srgb, var(--danger) 14%, var(--success));
 }
 .gbar--at-risk {
-  background: var(--success);
-  border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
-  border-top: 3px solid var(--warning);
-  color: var(--success-text);
-  box-sizing: border-box;
+  background: color-mix(in srgb, var(--danger) 18%, var(--success));
 }
 .gbar--overdue {
-  background: var(--success);
-  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
-  border-top: 3px solid var(--danger);
-  color: var(--success-text);
-  box-sizing: border-box;
-}
-
-.gbar--overdue.gbar--critical {
-  border-top: 3px solid var(--danger);
-  border-left: 3px solid var(--danger);
-  border-top-left-radius: 0;
+  background: color-mix(in srgb, var(--danger) 26%, var(--success));
 }
 .gbar--selected {
   box-shadow:
@@ -531,14 +516,14 @@
 
 .gdep__line {
   fill: none;
-  stroke: color-mix(in srgb, var(--muted-strong) 88%, var(--text));
-  stroke-width: 1.25;
+  stroke: color-mix(in srgb, var(--muted) 70%, transparent);
+  stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .gdep__arrow {
-  fill: color-mix(in srgb, var(--muted-strong) 88%, var(--text));
+  fill: color-mix(in srgb, var(--muted) 70%, transparent);
   stroke: none;
 }
 
@@ -607,7 +592,7 @@
   max-height: none;
 }
 
-.gantt2--interactive .gantt2__row {
+.gantt2--interactive .gantt2__row:not(.gantt2__row--head1):not(.gantt2__row--head2) {
   min-height: 28px;
 }
 
@@ -1165,26 +1150,9 @@
   margin: 0 4px;
 }
 
-.gantt-toolbar__hint {
-  align-self: center;
-  font-size: 10px;
-  color: var(--muted);
-  padding: 0 4px;
-  white-space: nowrap;
-}
-
 .gantt-toolbar__filter-soon {
-  gap: 4px;
   border: 1px dashed var(--border-subtle);
-  opacity: 0.65;
-}
-
-.gantt-toolbar__soon-suffix {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--muted);
+  opacity: 0.6;
 }
 
 .gantt-toolbar__spacer {
@@ -1321,78 +1289,39 @@
   cursor: grabbing;
 }
 
-.gantt2__cell--issue-info {
-  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.gantt2__cell--issue-warning {
-  background: color-mix(in srgb, var(--warning) 6%, var(--panel));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--warning) 45%, transparent);
-}
-
+.gantt2__cell--issue-info,
+.gantt2__cell--issue-warning,
 .gantt2__cell--issue-danger {
   background: color-mix(in srgb, var(--danger) 5%, var(--panel));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
-.gantt2__row--planning-issue-info .gantt2__cell--num {
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-.gantt2__row--planning-issue-warning .gantt2__cell--num {
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--warning) 40%, transparent);
-}
-
+.gantt2__row--planning-issue-info .gantt2__cell--num,
+.gantt2__row--planning-issue-warning .gantt2__cell--num,
 .gantt2__row--planning-issue-danger .gantt2__cell--num {
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 38%, transparent);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
-.gbar--issue-warning::after,
-.gbar--issue-danger::after,
-.gbar--issue-info::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  border-radius: 0 0 3px 3px;
-  pointer-events: none;
+.gbar--issue-warning,
+.gbar--issue-danger {
+  background: color-mix(in srgb, var(--danger) 18%, var(--success));
 }
 
-.gbar--issue-warning::after {
-  background: color-mix(in srgb, var(--warning) 55%, transparent);
-}
-
-.gbar--issue-danger::after {
-  background: color-mix(in srgb, var(--danger) 45%, transparent);
-}
-
-.gbar--issue-info::after {
-  background: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.gbar--selected.gbar--issue-warning,
-.gbar--selected.gbar--issue-danger,
-.gbar--selected.gbar--issue-info {
-  box-shadow:
-    0 0 0 2px var(--accent-ring),
-    0 0 0 1px var(--accent);
+.gbar--issue-info {
+  background: color-mix(in srgb, var(--danger) 10%, var(--success));
 }
 
 .gantt2__issue-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 4px;
-  padding: 0 5px;
-  border-radius: var(--radius-sm);
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--warning-text);
-  background: color-mix(in srgb, var(--warning) 12%, var(--panel));
-  vertical-align: middle;
+  display: none;
+}
+
+.gantt2__issue-marker {
+  display: inline-block;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) 55%, transparent);
 }
 
 .gantt2__drawer-issues {

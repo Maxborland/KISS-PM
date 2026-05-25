@@ -1,14 +1,15 @@
 {
   "pass": true,
   "exitCode": 0,
-  "timestamp": "2026-05-25T17:50:00.000Z",
+  "timestamp": "2026-05-25T18:12:30.000Z",
   "phases": [
     "arrows-routing",
     "layering",
     "bar-semantic",
     "drawer",
     "toolbar",
-    "playwright"
+    "playwright",
+    "row-alignment-fix"
   ],
   "specs": [
     "stable screenshot: widgets-gantt--baseline-and-critical-path",

@@ -13,32 +13,33 @@ const row = (id: string, startDay: number, durationDays: number, kind: GanttRow[
 });
 
 describe("buildDependencyPaths", () => {
-  it("FS direct: 3-segment, exit right → entry left", () => {
+  it("FS no overlap: 5-segment via target-adjacent channel, arrow right", () => {
     const rows = [row("a", 0, 3), row("b", 5, 2)];
     const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "FS" }], 28);
-    expect(p?.d).toMatch(/^M \d+ \d+ H \d+ V \d+ H \d+$/);
+    expect(p?.d).toMatch(/^M \d+ \d+ H \d+ V \d+ H \d+ V \d+ H \d+$/);
     expect(p?.arrowDir).toBe("right");
   });
 
-  it("FS overlap: 5-segment через row-gap, exit right → entry left", () => {
+  it("FS overlap: 5-segment via row-gap channel", () => {
     const rows = [row("a", 0, 5), row("b", 2, 3)];
     const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "FS" }], 28);
     expect(p?.d).toMatch(/^M \d+ \d+ H \d+ V \d+ H \d+ V \d+ H \d+$/);
-  });
-
-  it("SS: exit left → entry left", () => {
-    const rows = [row("a", 5, 3), row("b", 5, 3)];
-    const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "SS" }], 28);
-    expect(p?.arrowDir).toBe("left");
-  });
-
-  it("FF: exit right → entry right", () => {
-    const rows = [row("a", 0, 3), row("b", 0, 3)];
-    const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "FF" }], 28);
     expect(p?.arrowDir).toBe("right");
   });
 
-  it("SF: exit left → entry right", () => {
+  it("SS: arrow points right (into target.start from left)", () => {
+    const rows = [row("a", 5, 3), row("b", 5, 3)];
+    const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "SS" }], 28);
+    expect(p?.arrowDir).toBe("right");
+  });
+
+  it("FF: arrow points left (into target.finish from right)", () => {
+    const rows = [row("a", 0, 3), row("b", 0, 3)];
+    const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "FF" }], 28);
+    expect(p?.arrowDir).toBe("left");
+  });
+
+  it("SF: arrow points left (into target.finish from right)", () => {
     const rows = [row("a", 5, 3), row("b", 0, 3)];
     const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "SF" }], 28);
     expect(p?.arrowDir).toBe("left");
