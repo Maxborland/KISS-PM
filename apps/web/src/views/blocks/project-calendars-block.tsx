@@ -1,4 +1,5 @@
-﻿import { CalendarDays, Plus } from "lucide-react";
+﻿import { useState } from "react";
+import { CalendarDays, Plus } from "lucide-react";
 
 import { CardPanel } from "@/components/domain/card-panel";
 import { Field, FormGrid, FormSection } from "@/components/domain/form-layout";
@@ -14,11 +15,11 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { mockProjectScreenTitle } from "@/views/catalog";
+import { MOCK_PRODUCTION_CALENDAR } from "@/lib/mock-data/capacity";
+import { formatDate } from "@/lib/mock-data/format";
 import { PageIntro } from "@/views/layout/page-intro";
 
 type WeekdayDef = { label: string; hours: string; on: boolean };
-type Exception = { date: string; reason: string; kind: "holiday" | "short" | "custom" };
-
 const WEEKDAYS: WeekdayDef[] = [
   { label: "Понедельник", hours: "9:00–18:00", on: true },
   { label: "Вторник", hours: "9:00–18:00", on: true },
@@ -29,25 +30,19 @@ const WEEKDAYS: WeekdayDef[] = [
   { label: "Воскресенье", hours: "выходной", on: false }
 ];
 
-const EXCEPTIONS: Exception[] = [
-  { date: "12.06.2026", reason: "День России", kind: "holiday" },
-  { date: "01.06.2026", reason: "Сокращённый день", kind: "short" },
-  { date: "30.05.2026", reason: "Тимбилдинг", kind: "custom" }
-];
-
-const KIND_COPY: Record<Exception["kind"], { label: string; tone: "warning" | "info" | "violet" }> = {
-  holiday: { label: "Праздник", tone: "warning" },
-  short: { label: "Сокр.", tone: "info" },
-  custom: { label: "Кастом", tone: "violet" }
-};
-
-function ExceptionRow({ item, onRemove }: { item: Exception; onRemove?: () => void }) {
-  const meta = KIND_COPY[item.kind];
+function ExceptionRow({
+  item,
+  onRemove
+}: {
+  item: (typeof MOCK_PRODUCTION_CALENDAR.exceptions)[number];
+  onRemove?: () => void;
+}) {
+  const tone = item.workingMinutes === 0 ? "warning" : item.workingMinutes < MOCK_PRODUCTION_CALENDAR.workingMinutesPerDay ? "info" : "violet";
   return (
     <li className="exception-list__item">
-      <span className="mono u-text-xs u-text-strong">{item.date}</span>
-      <span className="flex-1 u-text-body">{item.reason}</span>
-      <Chip variant={meta.tone}>{meta.label}</Chip>
+      <span className="mono u-text-xs u-text-strong">{formatDate(item.date)}</span>
+      <span className="flex-1 u-text-body">{item.reason ?? "Без причины"} · resource {item.resourceId ?? "tenant"}</span>
+      <Chip variant={tone}>{item.workingMinutes} мин</Chip>
       <Button
         variant="ghost"
         size="xs"
@@ -62,6 +57,8 @@ function ExceptionRow({ item, onRemove }: { item: Exception; onRemove?: () => vo
 }
 
 export function ProjectCalendarsBlock() {
+  const [newExceptionDate, setNewExceptionDate] = useState<Date | undefined>();
+
   return (
     <>
       <PageIntro
@@ -97,7 +94,7 @@ export function ProjectCalendarsBlock() {
               </Field>
             </FormGrid>
           </FormSection>
-          <FormSection title="Дни недели" lead="Включите рабочие дни и проверьте часы.">
+          <FormSection title="Дни недели" lead={`${MOCK_PRODUCTION_CALENDAR.workingMinutesPerDay} минут в рабочем дне.`}>
             <SwitchRowList>
               {WEEKDAYS.map((d) => (
                 <SwitchRow key={d.label} label={d.label} description={d.hours} defaultChecked={d.on} />
@@ -107,7 +104,7 @@ export function ProjectCalendarsBlock() {
         </CardPanel>
         <CardPanel
           title="Исключения"
-          subtitle={`${EXCEPTIONS.length} даты`}
+          subtitle={`${MOCK_PRODUCTION_CALENDAR.exceptions.length} даты`}
           actions={
             <Button variant="ghost" size="sm">
               <Plus className="size-4" aria-hidden />
@@ -118,7 +115,7 @@ export function ProjectCalendarsBlock() {
           <FormSection title="Новая дата">
             <FormGrid columns={2}>
               <Field label="Дата" htmlFor="cal-date">
-                <DatePicker placeholder="Выберите дату" />
+                <DatePicker value={newExceptionDate} onChange={setNewExceptionDate} placeholder="Выберите дату" />
               </Field>
               <Field label="Тип" htmlFor="cal-kind">
                 <Select defaultValue="holiday">
@@ -136,8 +133,8 @@ export function ProjectCalendarsBlock() {
           </FormSection>
           <FormSection title="Список исключений">
             <ul className="exception-list">
-              {EXCEPTIONS.map((e) => (
-                <ExceptionRow key={e.date} item={e} />
+              {MOCK_PRODUCTION_CALENDAR.exceptions.map((e) => (
+                <ExceptionRow key={e.id} item={e} />
               ))}
             </ul>
           </FormSection>

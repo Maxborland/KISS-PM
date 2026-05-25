@@ -5,15 +5,11 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { SearchPill } from "@/components/ui/search-pill";
+import { MOCK_AUDIT_EVENTS } from "@/lib/mock-data/control";
+import { formatDate } from "@/lib/mock-data/format";
+import { userAvatar, userName } from "@/lib/mock-data/users";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
-
-const ENTRIES = [
-  { who: { initials: "ИИ", color: "c1" as const, name: "Иванова М." }, when: "23.05 14:32", action: "Изменена стадия", body: "Квалификация → КП", tone: "info" },
-  { who: { initials: "АП", color: "c2" as const, name: "Петров А." }, when: "23.05 12:05", action: "Задача создана", body: "Расчёт сметы — этап 2", tone: "success" },
-  { who: { initials: "КБ", color: "c4" as const, name: "Козлова Е." }, when: "22.05 17:48", action: "Согласован базовый план", body: "v2 принят командой", tone: "violet" },
-  { who: { initials: "ВВ", color: "c3" as const, name: "Васильев В." }, when: "22.05 09:11", action: "Перегруз ресурса", body: "Иванова М. · 112% на неделе 21", tone: "warning" }
-];
 
 export function ProjectAuditBlock() {
   return (
@@ -26,21 +22,30 @@ export function ProjectAuditBlock() {
           Фильтр
         </Button>
       </div>
-      <CardPanel title="Журнал событий" subtitle={`${ENTRIES.length} записей`} flush>
+      <CardPanel title="Журнал событий" subtitle={`${MOCK_AUDIT_EVENTS.length} записей`} flush>
         <ul className="audit-list">
-          {ENTRIES.map((e, i) => (
-            <li key={i} className="audit-list__item">
-              <BemAvatar initials={e.who.initials} color={e.who.color} size="sm" />
+          {MOCK_AUDIT_EVENTS.map((event) => {
+            const avatar = userAvatar(event.actorUserId);
+            const allowed = Boolean(event.permissionResult.allowed);
+            return (
+            <li key={event.id} className="audit-list__item">
+              <BemAvatar initials={avatar.initials} color={avatar.color} size="sm" />
               <div className="audit-list__body">
                 <div className="audit-list__head">
-                  <strong className="u-text-body u-text-strong">{e.who.name}</strong>
-                  <Chip variant={e.tone as "info" | "success" | "violet" | "warning"}>{e.action}</Chip>
+                  <strong className="u-text-body u-text-strong">{userName(event.actorUserId)}</strong>
+                  <Chip variant={allowed ? "success" : "warning"}>{event.actionType}</Chip>
                 </div>
-                <p className="u-text-body u-text-muted">{e.body}</p>
+                <p className="u-text-body u-text-muted">
+                  {event.sourceWorkflow ?? "workflow"} · {String(event.sourceEntity.type ?? "entity")}:{String(event.sourceEntity.id ?? "—")}
+                </p>
+                <p className="u-text-xs u-text-muted mono">
+                  permission {allowed ? "allowed" : "denied"} · correlation {event.correlationId}
+                </p>
               </div>
-              <span className="u-text-xs u-text-muted mono">{e.when}</span>
+              <span className="u-text-xs u-text-muted mono">{formatDate(event.createdAt)}</span>
             </li>
-          ))}
+          );
+          })}
         </ul>
       </CardPanel>
     </>

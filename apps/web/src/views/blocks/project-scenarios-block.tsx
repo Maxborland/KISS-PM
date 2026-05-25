@@ -3,14 +3,12 @@ import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { MOCK_PLANNING_SCENARIOS } from "@/lib/mock-data/capacity";
+import { formatDate, formatRub } from "@/lib/mock-data/format";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
-const SCENARIOS = [
-  { id: "S-1", name: "Базовый", deadline: "12.06", cost: "890 000 ₽", risk: "Средний", spi: "0.94", recommended: false },
-  { id: "S-2", name: "Ускоренный (+1 dev)", deadline: "05.06", cost: "1 050 000 ₽", risk: "Низкий", spi: "1.02", recommended: true },
-  { id: "S-3", name: "Бережный (-1 dev)", deadline: "26.06", cost: "780 000 ₽", risk: "Высокий", spi: "0.81", recommended: false }
-];
+const SCENARIOS = MOCK_PLANNING_SCENARIOS;
 
 export function ProjectScenariosBlock() {
   return (
@@ -38,13 +36,13 @@ export function ProjectScenariosBlock() {
                 <td>
                   <CellStack title={s.name} subtitle={s.id} />
                 </td>
-                <td className="mono">{s.deadline}</td>
-                <td className="mono">{s.cost}</td>
+                <td className="mono">{formatDate(s.deadline)}</td>
+                <td className="mono">{formatRub(s.cost)}</td>
                 <td>
                   <Chip
-                    variant={s.risk === "Низкий" ? "success" : s.risk === "Средний" ? "info" : "warning"}
+                    variant={s.risk <= 20 ? "success" : s.risk <= 30 ? "info" : "warning"}
                   >
-                    {s.risk}
+                    risk {s.risk}
                   </Chip>
                 </td>
                 <td className="mono">{s.spi}</td>

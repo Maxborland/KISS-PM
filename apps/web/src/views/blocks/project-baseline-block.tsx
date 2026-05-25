@@ -5,15 +5,25 @@ import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { MOCK_PROJECT_CRM, mockProjectScreenTitle } from "@/views/catalog";
+import { MOCK_PLAN_BASELINES } from "@/lib/mock-data/capacity";
+import { formatDate } from "@/lib/mock-data/format";
+import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
-const ROWS = [
-  { task: "Аудит процессов", code: "MDS-1", base: "27.05", actual: "29.05", delta: 2 },
-  { task: "Миграция данных", code: "MDS-12", base: "12.06", actual: "12.06", delta: 0 },
-  { task: "Интеграция CRM API", code: "MDS-21", base: "20.06", actual: "18.06", delta: -2 },
-  { task: "Обучение команды", code: "MDS-34", base: "30.06", actual: "05.07", delta: 5 }
-];
+const ROWS = MOCK_PLAN_BASELINES.flatMap((baseline) =>
+  baseline.tasks.map((task, index) => {
+    const delta = index === 0 ? 2 : 0;
+    return {
+      task: task.taskId,
+      code: baseline.id,
+      base: task.plannedFinish,
+      actual: task.plannedFinish,
+      delta,
+      workMinutes: task.workMinutes,
+      capturedAt: baseline.capturedAt
+    };
+  })
+);
 
 function DeltaCell({ d }: { d: number }) {
   if (d === 0)
@@ -48,7 +58,7 @@ export function ProjectBaselineBlock() {
           </>
         }
       />
-      <CardPanel title="Базовый план v2 · 21.05.2026" subtitle="Сравнение с актуальным планом" flush>
+      <CardPanel title={`Базовый план · ${formatDate(MOCK_PLAN_BASELINES[0]?.capturedAt ?? null)}`} subtitle="PlanSnapshot.baselines" flush>
         <DataTable>
           <thead>
             <tr>
@@ -65,8 +75,8 @@ export function ProjectBaselineBlock() {
                 <td>
                   <CellStack title={r.task} subtitle={r.code} />
                 </td>
-                <td className="mono">{r.base}</td>
-                <td className="mono">{r.actual}</td>
+                <td className="mono">{formatDate(r.base)}</td>
+                <td className="mono">{formatDate(r.actual)}</td>
                 <td>
                   <DeltaCell d={r.delta} />
                 </td>

@@ -24,10 +24,14 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).not.toMatch(/welcome-hero__title/);
   });
 
-  it("deals funnel uses Badge not legacy .badge BEM", () => {
-    const source = read("src/views/blocks/deals-block.tsx");
-    expect(source).toContain("<Badge");
-    expect(source).not.toMatch(/badge badge--soft/);
+  it("deals funnel migrated to Kanban widget with funnel boardVariant", () => {
+    const dealsBlock = read("src/views/blocks/deals-block.tsx");
+    expect(dealsBlock).toContain('boardVariant="funnel"');
+    expect(dealsBlock).toContain("DealKanbanCard");
+    expect(dealsBlock).not.toMatch(/<FunnelBoard\b/);
+    expect(dealsBlock).not.toMatch(/badge badge--soft/);
+    const kanban = read("src/widgets/kanban/kanban.tsx");
+    expect(kanban).toContain("<Badge");
   });
 
   it("state screens use bare variant in catalog", () => {
@@ -93,12 +97,15 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       expect(source).not.toMatch(/welcome-hero__title/);
     }
     expect(read("src/views/blocks/space-discipline-block.tsx")).toContain('className="type-h3"');
-    expect(read("src/views/blocks/deals-block.tsx")).toMatch(/<h3 className="deal-card__title"/);
   });
 
-  it("deal-card title uses --text-h3 token (batch 14m)", () => {
+  it("legacy deal-card / funnel BEM removed after kanban unification", () => {
     const css = read("src/styles/bem-supplement.css");
-    expect(css).toMatch(/\.deal-card__title\s*\{[\s\S]*font-size:\s*var\(--text-h3\)/);
+    expect(css).not.toMatch(/\.deal-card\b/);
+    expect(css).not.toMatch(/\.funnel__/);
+    const funnelCss = read("src/styles/widgets/funnel.css");
+    expect(funnelCss).not.toMatch(/\.deal-card\b/);
+    expect(funnelCss).not.toMatch(/\.funnel__/);
   });
 
   it("batch 15 build evidence records successful web build", () => {
@@ -128,6 +135,179 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     ) as { pass: boolean; steps: { name: string; pass: boolean }[] };
     expect(evidence.pass).toBe(true);
     expect(evidence.steps.find((s) => s.name === "copy-scan-106")?.pass).toBe(true);
+  });
+
+  it("interaction batch B1 evidence is green", () => {
+    const evidence = JSON.parse(
+      readFileSync(join(webRoot, ".storybook-verify-tmp/interaction-batch-1-evidence.json"), "utf8")
+    ) as { pass: boolean; deadControlsRemoved: number; newStoriesAdded: string[] };
+    expect(evidence.pass).toBe(true);
+    expect(evidence.deadControlsRemoved).toBeGreaterThan(0);
+    expect(evidence.newStoriesAdded.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("interaction batch B3 evidence is green", () => {
+    const evidence = JSON.parse(
+      readFileSync(join(webRoot, ".storybook-verify-tmp/interaction-batch-3-evidence.json"), "utf8")
+    ) as { pass: boolean; newStoriesAdded: string[] };
+    expect(evidence.pass).toBe(true);
+    expect(evidence.newStoriesAdded.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("interaction batch B3: task wizard uses controlled step and Combobox value", () => {
+    const source = read("src/views/blocks/task-create-modal-block.tsx");
+    expect(source).toContain('"use client"');
+    expect(source).toMatch(/useState<1 \| 2 \| 3>/);
+    expect(source).toMatch(/value=\{projectScopeId\}/);
+    expect(source).toMatch(/onValueChange=\{setProjectScopeId\}/);
+    expect(source).toContain("validateCreateTaskInput");
+  });
+
+  it("task API contract layer mirrors projectWorkParsers", () => {
+    const contract = read("src/views/domain/task-api/task-api-contract.ts");
+    expect(contract).toContain("plannedWork");
+    expect(contract).toContain("durationWorkingDays");
+    expect(contract).toContain("participants");
+    expect(contract).toContain("requiresAcceptance");
+    expect(contract).toContain('"low", "normal", "high", "critical"');
+    expect(contract).not.toMatch(/\burgent\b/);
+    const validation = read("src/views/domain/task-api/task-api-validation.ts");
+    expect(validation).toContain("invalid_task_title");
+    expect(validation).toContain("task_executor_required");
+    expect(validation).toContain("formatPlanDate");
+    const payload = read("src/views/domain/task-api/task-api-payload.ts");
+    expect(payload).toContain("buildCreateTaskBody");
+    expect(payload).toContain("buildUpdateTaskBody");
+    expect(payload).toContain("clientUpdatedAt");
+  });
+
+  it("task wizard removes fake affordances and adopts API priorities", () => {
+    const source = read("src/views/blocks/task-create-modal-block.tsx");
+    expect(source).not.toMatch(/SelectItem value="action">/);
+    expect(source).not.toMatch(/SelectItem value="meeting">/);
+    expect(source).not.toMatch(/value="urgent"/);
+    expect(source).not.toMatch(/<TagsInput/);
+    expect(source).toContain("requiresAcceptance");
+    expect(source).toContain("plannedWork");
+    expect(source).toContain("durationWorkingDays");
+    expect(source).toContain("ParticipantsEditor");
+  });
+
+  it("entity detail variant=task wires UpdateTaskBody fields", () => {
+    const source = read("src/views/blocks/entity-detail-block.tsx");
+    expect(source).toContain('variant?: EntityDetailVariant');
+    expect(source).toContain("buildUpdateTaskPreview");
+    expect(source).toContain("validateUpdateTaskInput");
+    expect(source).toContain("TaskAside");
+    const drawer = read("src/views/blocks/task-detail-drawer.tsx");
+    expect(drawer).toContain('variant="task"');
+    const screen = read("src/views/screens/screen-view.tsx");
+    expect(screen).toMatch(/"03-task-card"[\s\S]*variant="task"/);
+  });
+
+  it("interaction batch B3: projects list switches datasets and opens Sheet", () => {
+    const source = read("src/views/blocks/projects-list-block.tsx");
+    expect(source).toContain("ARCHIVED_PROJECTS");
+    expect(source).toContain("TEMPLATE_PROJECTS");
+    expect(source).toContain("SheetContent");
+    expect(source).toMatch(/value=\{query\}/);
+  });
+
+  it("interaction batch B3: entity detail save dirty and feed compose", () => {
+    const source = read("src/views/blocks/entity-detail-block.tsx");
+    expect(source).toMatch(/const dirty =/);
+    expect(source).toContain("setFeedItems");
+    expect(source).toContain('type="file"');
+  });
+
+  it("interaction batch B3: state error passes onRetry", () => {
+    const source = read("src/views/blocks/state-screen-block.tsx");
+    expect(source).toContain("onRetry");
+  });
+
+  it("interaction batch B1: task kanban card is keyboard-capable; DnD in generic Kanban", () => {
+    const card = read("src/widgets/kanban/task-kanban-card.tsx");
+    expect(card).toMatch(/onOpen\?:/);
+    expect(card).toMatch(/role=\{isInteractive \? "button" : undefined\}/);
+    const board = read("src/widgets/kanban/kanban.tsx");
+    expect(board).toContain("useSortable");
+    expect(board).toContain("DndContext");
+  });
+
+  it("interaction batch B1: dashboard wires period segment and disables stubs with RU title", () => {
+    const source = read("src/views/blocks/dashboard-bento.tsx");
+    expect(source).toContain('name="dashboard-focus-period"');
+    expect(source).toMatch(/disabled\s+title="Демо Storybook:/);
+  });
+
+  it("interaction batch B1: my-work uses generic Kanban and TaskDetailDrawer", () => {
+    const source = read("src/views/blocks/my-work-block.tsx");
+    expect(source).toContain("Kanban<CardModel, ColumnId>");
+    expect(source).toContain("TaskKanbanCard");
+    expect(source).toContain("TaskDetailDrawer");
+    expect(source).toMatch(/initialMode\?: "kanban" \| "list"/);
+  });
+
+  it("interaction batch B1: TaskDetailDrawer renders 03 task-card content + open-as-page link", () => {
+    const source = read("src/views/blocks/task-detail-drawer.tsx");
+    expect(source).toContain("EntityDetailBlock");
+    expect(source).toContain('size="xl"');
+    expect(source).toContain("Открыть как страницу");
+    expect(source).toContain("views-screens--task-card");
+  });
+
+  it("interaction batch B1: dashboard rows open TaskDetailDrawer", () => {
+    const source = read("src/views/blocks/dashboard-bento.tsx");
+    expect(source).toContain("TaskDetailDrawer");
+  });
+
+  it("interaction batch B1: sheet supports size variant", () => {
+    const source = read("src/components/ui/sheet.tsx");
+    expect(source).toContain('export type SheetSize');
+    expect(source).toMatch(/xl:\s*"w-\[1080px\]/);
+  });
+
+  it("interaction batch B1: kanban column actions are DropdownMenu", () => {
+    const source = read("src/widgets/kanban/kanban.tsx");
+    expect(source).toContain("DropdownMenu");
+    expect(source).toContain("Переименовать");
+    expect(source).toContain("Лимит WIP");
+    expect(source).toContain("Добавить карточку");
+  });
+
+  it("interaction batch B1: bem.css no longer applies default cursor:grab to .kanban-card", () => {
+    const css = read("src/styles/bem.css");
+    expect(css).toMatch(/\.kanban-card--draggable\s*\{\s*cursor:\s*grab/);
+    expect(css).not.toMatch(/\.kanban-card\s*\{[^}]*cursor:\s*grab/);
+  });
+
+  it("interaction batch kanban evidence is green (sort + cardview + crm unify)", () => {
+    const evidence = JSON.parse(
+      readFileSync(join(webRoot, ".storybook-verify-tmp/interaction-batch-kanban-evidence.json"), "utf8")
+    ) as {
+      pass: boolean;
+      batch: string;
+      features: { columnSort: unknown; cardView: unknown; crmFunnelUnified: unknown };
+      verification: { typecheck: string; vitest: string; build: string; storybookContract: string };
+    };
+    expect(evidence.pass).toBe(true);
+    expect(evidence.batch).toBe("kanban-legacy-cleanup");
+    expect(evidence.features.columnSort).toBeTruthy();
+    expect(evidence.features.cardView).toBeTruthy();
+    expect(evidence.features.crmFunnelUnified).toBeTruthy();
+    expect(evidence.verification.typecheck).toBe("pass");
+    expect(evidence.verification.storybookContract).toBe("pass");
+  });
+
+  it("field contract sync does not reintroduce known fake affordances", () => {
+    const deals = read("src/views/blocks/deals-block.tsx");
+    const entities = read("src/views/blocks/entities-block.tsx");
+
+    expect(deals).not.toContain('<BemAvatar initials="ВВ"');
+    expect(deals).not.toMatch(/owner:\s*\{\s*initials:\s*"ВЫ",\s*color:\s*"c2"/);
+    expect(entities).not.toContain("12 событий · сегодня");
+    expect(read("src/lib/mock-data/deals.ts")).toContain("satisfies Opportunity[]");
+    expect(read("src/lib/mock-data/tasks.ts")).toContain("satisfies Task[]");
   });
 
   it("Gantt production-grade evidence is green", () => {

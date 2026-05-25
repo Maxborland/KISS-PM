@@ -13,7 +13,11 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { MOCK_WORKSPACE_USERS, userAvatar } from "@/lib/mock-data/users";
 import { PageIntro } from "@/views/layout/page-intro";
+
+const CURRENT_USER = MOCK_WORKSPACE_USERS[2]!;
+const CURRENT_AVATAR = userAvatar(CURRENT_USER.id);
 
 export function AvatarMenuBlock() {
   return (
@@ -24,16 +28,16 @@ export function AvatarMenuBlock() {
           <DropdownMenu defaultOpen>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary">
-                <BemAvatar initials="КБ" color="c4" size="sm" />
-                Камил Б.
+                <BemAvatar initials={CURRENT_AVATAR.initials} color={CURRENT_AVATAR.color} size="sm" />
+                {CURRENT_USER.name}
                 <ChevronDown className="size-4" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[260px]">
               <DropdownMenuLabel>
                 <div className="flex flex-col gap-1">
-                  <strong className="u-text-sm u-text-strong">Камил Б.</strong>
-                  <span className="u-text-xs u-text-muted">kamil@kiss.pm</span>
+                  <strong className="u-text-sm u-text-strong">{CURRENT_USER.name}</strong>
+                  <span className="u-text-xs u-text-muted">{CURRENT_USER.positionName} · {CURRENT_USER.email}</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
