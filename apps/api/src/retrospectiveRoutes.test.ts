@@ -114,6 +114,36 @@ describe("retrospective routes", () => {
     ]);
   });
 
+  it("returns persistence_not_configured when closure routes cannot resolve projects", async () => {
+    const state = createRetrospectiveDataSource();
+    delete state.dataSource.listProjects;
+    const app = createApp({ dataSource: state.dataSource });
+
+    const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    expect(readResponse.status).toBe(501);
+    await expect(readResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
+
+    const previewResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/preview",
+      { method: "POST", headers: mutationHeaders(), body: JSON.stringify({}) }
+    );
+    expect(previewResponse.status).toBe(501);
+    await expect(previewResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
+
+    const closeResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Готово" })
+      }
+    );
+    expect(closeResponse.status).toBe(501);
+    await expect(closeResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
+  });
+
   it("maps closeProject project_not_closable throws to a stable conflict response", async () => {
     const state = createRetrospectiveDataSource({ closeProjectError: "project_not_closable" });
     const app = createApp({ dataSource: state.dataSource });
