@@ -114,6 +114,41 @@ describe("retrospective routes", () => {
     ]);
   });
 
+  it("denies retrospective lesson creation without manage permission and writes denied audit", async () => {
+    const state = createRetrospectiveDataSource({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.retrospectives.read"
+      ]
+    });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/lessons",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({
+          category: "process",
+          title: "Согласовать чеклист",
+          body: "Нужен единый чеклист закрытия.",
+          impact: "positive"
+        })
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(state.auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "retrospective.lesson_create_denied",
+        input: { projectId: "project-alpha" },
+        executionResult: { status: "denied" }
+      })
+    ]);
+  });
+
   it("returns persistence_not_configured when closure routes cannot resolve projects", async () => {
     const state = createRetrospectiveDataSource();
     delete state.dataSource.listProjects;
@@ -263,6 +298,52 @@ describe("retrospective routes", () => {
     expect(
       state.auditEvents.filter((event) => event.actionType === "template_improvement.applied")
     ).toHaveLength(1);
+  });
+
+  it("denies template improvement apply without permission and writes denied audit", async () => {
+    const state = createRetrospectiveDataSource({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.projects.manage",
+        "tenant.project_plan.read",
+        "tenant.management_actions.execute",
+        "tenant.retrospectives.read",
+        "tenant.retrospectives.manage"
+      ]
+    });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const closeResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Работы приняты" })
+      }
+    );
+    expect(closeResponse.status).toBe(200);
+    const closeBody = (await closeResponse.json()) as RetrospectiveReadModel;
+    const actionId = closeBody.templateImprovementActions[0]?.id;
+    expect(actionId).toBeTruthy();
+
+    const response = await app.request(
+      `/api/workspace/projects/project-alpha/closure/template-improvement-actions/${actionId}/apply`,
+      { method: "POST", headers: mutationHeaders(), body: JSON.stringify({}) }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(
+      state.auditEvents.filter((event) => event.actionType === "template_improvement.apply_denied")
+    ).toEqual([
+      expect.objectContaining({
+        input: { projectId: "project-alpha", actionId },
+        executionResult: { status: "denied" }
+      })
+    ]);
+    expect(
+      state.auditEvents.filter((event) => event.actionType === "template_improvement.applied")
+    ).toHaveLength(0);
   });
 
   it("rolls back lesson creation when lesson audit write fails", async () => {
