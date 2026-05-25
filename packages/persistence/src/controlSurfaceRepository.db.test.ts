@@ -167,6 +167,25 @@ describe("control surface repository", () => {
     const afterRejectedDraftSave = await repository.findControlSurface("tenant-alpha", draft.id);
     expect(afterRejectedDraftSave?.status).toBe("archived");
     expect(afterRejectedDraftSave?.archivedAt).not.toBeNull();
+
+    await expect(
+      repository.publishControlSurface({
+        tenantId: "tenant-alpha",
+        surfaceId: draft.id,
+        actorUserId: "user-alpha-admin"
+      })
+    ).rejects.toThrow("control_surface_archived");
+
+    await expect(
+      repository.rollbackControlSurfaceToVersion({
+        tenantId: "tenant-alpha",
+        surfaceId: draft.id,
+        version: 1,
+        actorUserId: "user-alpha-admin"
+      })
+    ).rejects.toThrow("control_surface_archived");
+
+    expect(await repository.listControlSurfaceVersions("tenant-alpha", draft.id)).toHaveLength(1);
   });
 });
 

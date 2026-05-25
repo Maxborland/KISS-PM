@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, ne, or } from "drizzle-orm";
 
 import type {
   ControlSurfaceDefinition,
@@ -178,11 +178,12 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
         .where(
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
-            eq(controlSurfaceDefinitions.id, input.surfaceId)
+            eq(controlSurfaceDefinitions.id, input.surfaceId),
+            ne(controlSurfaceDefinitions.status, "archived")
           )
         )
         .returning();
-      if (!row) throw new Error("Control surface publish returned no row");
+      if (!row) throw new Error("control_surface_archived");
       return { surface: mapControlSurfaceRecord(row), version: versionRecord };
     },
     async archiveControlSurface(input) {
@@ -249,11 +250,12 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
         .where(
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
-            eq(controlSurfaceDefinitions.id, input.surfaceId)
+            eq(controlSurfaceDefinitions.id, input.surfaceId),
+            ne(controlSurfaceDefinitions.status, "archived")
           )
         )
         .returning();
-      if (!row) throw new Error("Control surface rollback returned no row");
+      if (!row) throw new Error("control_surface_archived");
       return { surface: mapControlSurfaceRecord(row), version: versionRecord };
     }
   };

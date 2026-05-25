@@ -42,6 +42,10 @@ describe("attachment validation", () => {
       ok: false,
       error: "external_url_private_host"
     });
+    expect(parseExternalReferenceUrl("http://files.localhost/brief.pdf")).toEqual({
+      ok: false,
+      error: "external_url_private_host"
+    });
     expect(parseExternalReferenceUrl("http://192.168.1.10/brief.pdf")).toEqual({
       ok: false,
       error: "external_url_private_host"
