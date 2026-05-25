@@ -3,7 +3,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createLocalStorageProvider } from "./storageProvider";
+import {
+  createLocalStorageProvider,
+  createStorageProviderFromEnv
+} from "./storageProvider";
 
 describe("local storage provider", () => {
   let root: string | undefined;
@@ -31,5 +34,16 @@ describe("local storage provider", () => {
         mimeType: "text/plain"
       })
     ).rejects.toThrow("storage_key_invalid");
+  });
+});
+
+describe("storage provider env", () => {
+  it("requires an explicit local storage root in production", () => {
+    expect(() =>
+      createStorageProviderFromEnv({
+        NODE_ENV: "production",
+        KISS_PM_STORAGE_PROVIDER: "local"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("kiss_pm_storage_local_root_required");
   });
 });

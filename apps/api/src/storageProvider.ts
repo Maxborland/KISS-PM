@@ -35,6 +35,10 @@ export function createStorageProviderFromEnv(
     });
   }
 
+  if (env.NODE_ENV === "production" && !env.KISS_PM_STORAGE_LOCAL_ROOT) {
+    throw new Error("kiss_pm_storage_local_root_required");
+  }
+
   return createLocalStorageProvider({
     root: env.KISS_PM_STORAGE_LOCAL_ROOT ?? resolve(process.cwd(), ".kiss-pm-storage")
   });
