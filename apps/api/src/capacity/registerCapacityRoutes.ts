@@ -13,6 +13,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 
 import type { ApiRouteDeps } from "../routeTypes";
+import { parseProjectIdParam, parseUserIdParam } from "../routeParamParsers";
 import { createCapacityCache } from "./capacityCache";
 import {
   buildCapacityDrilldown,
@@ -31,17 +32,21 @@ export function invalidateCapacityCacheForTenant(tenantId: string) {
 
 export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
   app.get("/api/workspace/capacity/tree", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
     const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
     if (!monthIso) return context.json({ error: "capacity_invalid_query" }, 400);
+
+    const requestedProjectId = parseOptionalProjectFilter(context.req.query("projectId"));
+    if (requestedProjectId === false) {
+      return context.json({ error: "capacity_invalid_query" }, 400);
+    }
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
 
     const profile = await deps.getActorProfile(actor);
     const access = await resolveCapacityAccess(deps, actor, profile);
     if (!access.ok) return context.json({ error: access.error }, access.status);
 
-    const requestedProjectId = context.req.query("projectId")?.trim() || null;
     if (requestedProjectId && !access.canReadProjects) {
       return context.json({ error: access.projectReadReason }, 403);
     }
@@ -56,11 +61,11 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
   });
 
   app.get("/api/workspace/capacity/summary", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
     const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
     if (!monthIso) return context.json({ error: "capacity_invalid_query" }, 400);
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
 
     const profile = await deps.getActorProfile(actor);
     const access = await resolveCapacityAccess(deps, actor, profile);
@@ -80,15 +85,15 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
   });
 
   app.get("/api/workspace/capacity/drilldown", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
     const monthIso = parseMonthIso(context.req.query("monthIso") ?? "");
-    const resourceId = context.req.query("resourceId")?.trim() || "";
+    const resourceId = parseResourceFilter(context.req.query("resourceId"));
     const date = parseCapacityDate(context.req.query("date") ?? "");
     if (!monthIso || !resourceId || !date || !date.startsWith(`${monthIso}-`)) {
       return context.json({ error: "capacity_invalid_query" }, 400);
     }
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
 
     const profile = await deps.getActorProfile(actor);
     const access = await resolveCapacityAccess(deps, actor, profile);
@@ -107,6 +112,20 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
 
     return context.json(drilldown);
   });
+}
+
+function parseOptionalProjectFilter(value: string | undefined): string | null | false {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  const parsed = parseProjectIdParam(normalized);
+  return parsed.ok ? parsed.value : false;
+}
+
+function parseResourceFilter(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  const parsed = parseUserIdParam(normalized);
+  return parsed.ok ? parsed.value : null;
 }
 
 async function getRawAggregation(

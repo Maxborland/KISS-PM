@@ -48,6 +48,7 @@ import {
   setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
+import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -94,7 +95,9 @@ export function createApp(options: CreateAppOptions = {}) {
 
   async function getActor(userId: string | null) {
     if (!userId) return undefined;
-    const actor = await dataSource.findUserById(userId);
+    const parsedUserId = parseUserIdParam(userId);
+    if (!parsedUserId.ok) return undefined;
+    const actor = await dataSource.findUserById(parsedUserId.value);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }

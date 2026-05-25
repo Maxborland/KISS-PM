@@ -49,7 +49,11 @@ export function parseCustomFieldDefinitionBody(
   if (!systemKey || !isWorkspaceConfigSystemKey(systemKey)) {
     return { ok: false, error: "invalid_system_key" };
   }
-  if (!tenantLabel || !isWorkspaceConfigTenantLabel(tenantLabel)) {
+  if (
+    !tenantLabel ||
+    !isWorkspaceConfigTenantLabel(tenantLabel) ||
+    !isSafeSingleLineText(tenantLabel)
+  ) {
     return { ok: false, error: "invalid_tenant_label" };
   }
   if (!["project", "opportunity"].includes(targetEntity)) {
@@ -113,12 +117,17 @@ export function parseProjectTemplateBody(
   if (!systemKey || !isWorkspaceConfigSystemKey(systemKey)) {
     return { ok: false, error: "invalid_system_key" };
   }
-  if (!tenantLabel || !isWorkspaceConfigTenantLabel(tenantLabel)) {
+  if (
+    !tenantLabel ||
+    !isWorkspaceConfigTenantLabel(tenantLabel) ||
+    !isSafeSingleLineText(tenantLabel)
+  ) {
     return { ok: false, error: "invalid_tenant_label" };
   }
   if (
     description !== undefined &&
-    description.length > workspaceConfigDescriptionMaxLength
+    (description.length > workspaceConfigDescriptionMaxLength ||
+      !isSafeMultilineText(description))
   ) {
     return { ok: false, error: "invalid_description" };
   }
@@ -137,4 +146,12 @@ export function parseProjectTemplateBody(
       status
     }
   };
+}
+
+function isSafeSingleLineText(value: string): boolean {
+  return !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isSafeMultilineText(value: string): boolean {
+  return !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }

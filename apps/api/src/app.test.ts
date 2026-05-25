@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
+import { verifyLoginPassword } from "./authRoutes";
 import type { ApiTenantDataSource, WorkspaceUserRecord } from "./apiTypes";
 import type { ControlSignal, KpiDefinition, PlanSnapshot, PlanningCommand } from "@kiss-pm/domain";
 import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
@@ -79,6 +80,18 @@ describe("KISS PM API Phase 1 shell", () => {
     });
   });
 
+  it("maps unexpected route exceptions to generic API errors", async () => {
+    const app = createApp();
+    app.get("/api/test/internal-error", () => {
+      throw new Error("password=secret internal database failure");
+    });
+
+    const response = await app.request("/api/test/internal-error");
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "internal_error" });
+  });
+
   it("lists deterministic dev users for local Phase 1 login", async () => {
     const app = createApp({ enableDevTenantRoutes: true });
 
@@ -132,6 +145,36 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "cross_tenant_denied"
+    });
+  });
+
+  it("rejects malformed dev tenant route identifiers before persistence lookup", async () => {
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findUserById() {
+        throw new Error("findUserById must not be called for malformed ids");
+      }
+    };
+    const app = createApp({
+      enableDevTenantRoutes: true,
+      dataSource: dataSource as ApiTenantDataSource
+    });
+
+    const invalidLogin = await app.request("/api/session/dev-login?userId=bad%2Fuser");
+    expect(invalidLogin.status).toBe(400);
+    await expect(invalidLogin.json()).resolves.toEqual({ error: "invalid_user_id" });
+
+    const invalidTenant = await app.request("/api/tenant/bad%2Ftenant/users", {
+      headers: { "x-user-id": "user-alpha-admin" }
+    });
+    expect(invalidTenant.status).toBe(400);
+    await expect(invalidTenant.json()).resolves.toEqual({ error: "invalid_tenant_id" });
+
+    const invalidHeaderUser = await app.request("/api/tenant/current", {
+      headers: { "x-user-id": "bad/user" }
+    });
+    expect(invalidHeaderUser.status).toBe(401);
+    await expect(invalidHeaderUser.json()).resolves.toEqual({
+      error: "dev_session_required"
     });
   });
 
@@ -235,6 +278,42 @@ describe("KISS PM API Phase 1 shell", () => {
     });
   });
 
+  it("checks login passwords through the same verifier when email is unknown", () => {
+    const credential = hashPassword("local-admin-password");
+
+    expect(verifyLoginPassword("local-admin-password", credential)).toBe(true);
+    expect(verifyLoginPassword("wrong-password", credential)).toBe(false);
+    expect(verifyLoginPassword("wrong-password", undefined)).toBe(false);
+  });
+
+  it("rejects malformed session cookies before persistence lookup", async () => {
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        throw new Error("session_lookup_should_not_run");
+      },
+      async deleteSessionByTokenHash() {
+        throw new Error("session_delete_should_not_run");
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const me = await app.request("/api/auth/me", {
+      headers: { cookie: "kiss_pm_session=not-a-session-token" }
+    });
+    expect(me.status).toBe(401);
+    await expect(me.json()).resolves.toEqual({ error: "session_required" });
+
+    const logout = await app.request("/api/auth/logout", {
+      method: "POST",
+      headers: {
+        cookie: `kiss_pm_session=${"z".repeat(64)}`,
+        "x-kiss-pm-action": "same-origin"
+      }
+    });
+    expect(logout.status).toBe(200);
+    await expect(logout.json()).resolves.toEqual({ status: "ok" });
+  });
+
   it("rejects oversized login JSON before auth work", async () => {
     const dataSource: Partial<ApiTenantDataSource> = {
       async findCredentialByEmail() {
@@ -259,6 +338,82 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(response.status).toBe(413);
     await expect(response.json()).resolves.toEqual({
       error: "payload_too_large"
+    });
+  });
+
+  it("rejects malformed or oversized login credentials before lookup and password KDF", async () => {
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findCredentialByEmail() {
+        throw new Error("credential_lookup_should_not_run");
+      },
+      async createSession() {
+        throw new Error("session_create_should_not_run");
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const oversizedPassword = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "admin@kiss-pm.local",
+        password: "x".repeat(1025)
+      })
+    });
+    expect(oversizedPassword.status).toBe(400);
+    await expect(oversizedPassword.json()).resolves.toEqual({
+      error: "invalid_login_payload"
+    });
+
+    const oversizedEmail = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: `${"a".repeat(250)}@example.local`,
+        password: "local-admin-password"
+      })
+    });
+    expect(oversizedEmail.status).toBe(400);
+    await expect(oversizedEmail.json()).resolves.toEqual({
+      error: "invalid_login_payload"
+    });
+
+    const missingPassword = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "admin@kiss-pm.local"
+      })
+    });
+    expect(missingPassword.status).toBe(400);
+    await expect(missingPassword.json()).resolves.toEqual({
+      error: "invalid_login_payload"
+    });
+
+    const controlEmail = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "admin\u0000@kiss-pm.local",
+        password: "local-admin-password"
+      })
+    });
+    expect(controlEmail.status).toBe(400);
+    await expect(controlEmail.json()).resolves.toEqual({
+      error: "invalid_login_payload"
+    });
+
+    const malformedEmail = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "not-an-email",
+        password: "local-admin-password"
+      })
+    });
+    expect(malformedEmail.status).toBe(400);
+    await expect(malformedEmail.json()).resolves.toEqual({
+      error: "invalid_login_payload"
     });
   });
 
@@ -567,7 +722,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=stale-token"
+        cookie: "kiss_pm_session=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
       body: JSON.stringify({
         title: "Попытка изменения",
@@ -632,7 +787,7 @@ describe("KISS PM API Phase 1 shell", () => {
     const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
 
     const response = await app.request("/api/tenant/current/kpi-definitions", {
-      headers: { cookie: "kiss_pm_session=control-token" }
+      headers: { cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
     });
 
     expect(response.status).toBe(200);
@@ -709,7 +864,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       body: JSON.stringify({
         code: "project.custom",
@@ -730,6 +885,75 @@ describe("KISS PM API Phase 1 shell", () => {
         executionResult: { status: "denied" }
       })
     ]);
+  });
+
+  it("fails closed before KPI definition upsert when audit transaction support is missing", async () => {
+    let upsertCalled = false;
+    let auditCalled = false;
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.kpi_definitions.manage"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async upsertKpiDefinition(input) {
+        upsertCalled = true;
+        return input;
+      },
+      async appendAuditEvent() {
+        auditCalled = true;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/tenant/current/kpi-definitions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      body: JSON.stringify({
+        code: "project.custom",
+        label: "Custom",
+        formula: { type: "builtin", key: "deadline_delta_days" },
+        thresholdRules: [{ severity: "critical", operator: "gt", value: 0 }]
+      })
+    });
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "persistence_not_configured" });
+    expect(upsertCalled).toBe(false);
+    expect(auditCalled).toBe(false);
   });
 
   it("materializes default KPI definitions before persisting evaluations", async () => {
@@ -794,6 +1018,9 @@ describe("KISS PM API Phase 1 shell", () => {
       async upsertControlSignal(input) {
         return input;
       },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
       async appendAuditEvent() {
         return;
       }
@@ -805,7 +1032,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       body: JSON.stringify({})
     });
@@ -895,6 +1122,9 @@ describe("KISS PM API Phase 1 shell", () => {
         if (currentRun) currentRun.push(input.id);
         return input;
       },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
       async appendAuditEvent() {
         return;
       }
@@ -908,7 +1138,7 @@ describe("KISS PM API Phase 1 shell", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         body: JSON.stringify({})
       });
@@ -1017,6 +1247,9 @@ describe("KISS PM API Phase 1 shell", () => {
         persistedSignals.push(input);
         return input;
       },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
       async appendAuditEvent() {
         return;
       }
@@ -1028,7 +1261,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       body: JSON.stringify({})
     });
@@ -1110,13 +1343,94 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       body: JSON.stringify({})
     });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(createEvaluationCalled).toBe(false);
+  });
+
+  it("fails closed before KPI evaluation writes when audit transaction support is missing", async () => {
+    let snapshotLoaded = false;
+    let createEvaluationCalled = false;
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: [
+            "tenant.project_plan.read",
+            "tenant.control_signals.read",
+            "tenant.control_signals.manage"
+          ]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async listKpiDefinitions() {
+        return [];
+      },
+      async upsertKpiDefinition(input) {
+        return input;
+      },
+      async getPlanSnapshot() {
+        snapshotLoaded = true;
+        return createControlActionSnapshot();
+      },
+      async createKpiEvaluation(input) {
+        createEvaluationCalled = true;
+        return input;
+      },
+      async upsertControlSignal(input) {
+        return input;
+      },
+      async appendAuditEvent() {
+        return;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/projects/project-control/control/evaluate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      body: JSON.stringify({})
+    });
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "persistence_not_configured" });
+    expect(snapshotLoaded).toBe(false);
     expect(createEvaluationCalled).toBe(false);
   });
 
@@ -1172,7 +1486,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       body: JSON.stringify({
         code: "project.invalid",
@@ -1242,7 +1556,7 @@ describe("KISS PM API Phase 1 shell", () => {
 
     const response = await app.request("/api/workspace/projects/project-control/control/read-model", {
       headers: {
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     });
 
@@ -1305,7 +1619,7 @@ describe("KISS PM API Phase 1 shell", () => {
 
     const response = await app.request("/api/workspace/projects/project-control/control/read-model", {
       headers: {
-        cookie: "kiss_pm_session=control-token"
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     });
 
@@ -1383,7 +1697,7 @@ describe("KISS PM API Phase 1 shell", () => {
         method: "POST",
         headers: {
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
       }
     );
@@ -1393,7 +1707,7 @@ describe("KISS PM API Phase 1 shell", () => {
         method: "POST",
         headers: {
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
       }
     );
@@ -1424,6 +1738,1024 @@ describe("KISS PM API Phase 1 shell", () => {
         executionResult: { status: "denied", stage: "apply" }
       })
     ]);
+  });
+
+  it("rejects malformed control route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const badProject = await app.request(
+      "/api/workspace/projects/bad..project/control/read-model"
+    );
+    const badSignal = await app.request(
+      "/api/workspace/projects/project-control/control/signals/bad..signal/actions/action-control-1/preview",
+      {
+        method: "POST",
+        headers: { "x-kiss-pm-action": "same-origin" }
+      }
+    );
+    const badAction = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/bad..action/apply",
+      {
+        method: "POST",
+        headers: { "x-kiss-pm-action": "same-origin" }
+      }
+    );
+    const badCorrectiveAction = await app.request(
+      "/api/workspace/projects/project-control/control/corrective-actions/bad..action",
+      {
+        method: "PATCH",
+        headers: { "x-kiss-pm-action": "same-origin" }
+      }
+    );
+
+    expect(badProject.status).toBe(400);
+    await expect(badProject.json()).resolves.toEqual({ error: "invalid_project_id" });
+    expect(badSignal.status).toBe(400);
+    await expect(badSignal.json()).resolves.toEqual({ error: "invalid_control_signal_id" });
+    expect(badAction.status).toBe(400);
+    await expect(badAction.json()).resolves.toEqual({ error: "invalid_management_action_id" });
+    expect(badCorrectiveAction.status).toBe(400);
+    await expect(badCorrectiveAction.json()).resolves.toEqual({
+      error: "invalid_corrective_action_id"
+    });
+  });
+
+  it("rejects malformed access role route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const patchResponse = await app.request("/api/workspace/access-roles/bad..role", {
+      method: "PATCH",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(patchResponse.status).toBe(400);
+    await expect(patchResponse.json()).resolves.toEqual({ error: "invalid_access_role_id" });
+
+    const deleteResponse = await app.request("/api/workspace/access-roles/bad..role", {
+      method: "DELETE",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(deleteResponse.status).toBe(400);
+    await expect(deleteResponse.json()).resolves.toEqual({ error: "invalid_access_role_id" });
+  });
+
+  it("rejects malformed workspace user and position route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const patchUserResponse = await app.request("/api/workspace/users/bad..user", {
+      method: "PATCH",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(patchUserResponse.status).toBe(400);
+    await expect(patchUserResponse.json()).resolves.toEqual({ error: "invalid_user_id" });
+
+    const deleteUserResponse = await app.request("/api/workspace/users/bad..user", {
+      method: "DELETE",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(deleteUserResponse.status).toBe(400);
+    await expect(deleteUserResponse.json()).resolves.toEqual({ error: "invalid_user_id" });
+
+    const patchPositionResponse = await app.request("/api/workspace/positions/bad..position", {
+      method: "PATCH",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(patchPositionResponse.status).toBe(400);
+    await expect(patchPositionResponse.json()).resolves.toEqual({ error: "invalid_position_id" });
+
+    const deletePositionResponse = await app.request("/api/workspace/positions/bad..position", {
+      method: "DELETE",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(deletePositionResponse.status).toBe(400);
+    await expect(deletePositionResponse.json()).resolves.toEqual({ error: "invalid_position_id" });
+  });
+
+  it("rejects malformed workspace config route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const patchFieldResponse = await app.request(
+      "/api/workspace/config/custom-fields/bad..field",
+      {
+        method: "PATCH",
+        headers: { "x-kiss-pm-action": "same-origin" }
+      }
+    );
+    expect(patchFieldResponse.status).toBe(400);
+    await expect(patchFieldResponse.json()).resolves.toEqual({
+      error: "invalid_custom_field_id"
+    });
+
+    const patchTemplateResponse = await app.request(
+      "/api/workspace/config/project-templates/bad..template",
+      {
+        method: "PATCH",
+        headers: { "x-kiss-pm-action": "same-origin" }
+      }
+    );
+    expect(patchTemplateResponse.status).toBe(400);
+    await expect(patchTemplateResponse.json()).resolves.toEqual({
+      error: "invalid_project_template_id"
+    });
+  });
+
+  it("writes denied audit for workspace config read and mutation permission failures", async () => {
+    const auditEvents: Array<{
+      actionType: string;
+      sourceWorkflow?: string | null;
+      sourceEntity: { type: string; id: string };
+      input: Record<string, unknown>;
+      permissionResult: Record<string, unknown>;
+      executionResult: Record<string, unknown>;
+    }> = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-workspace-config",
+          tenantId: "tenant-alpha",
+          userId: "user-alpha-limited",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === "user-alpha-limited"
+          ? {
+              id: userId,
+              tenantId: "tenant-alpha",
+              name: "Лена Ограниченная",
+              accessProfileId: "limited-profile"
+            }
+          : undefined;
+      },
+      async findAccessProfileById() {
+        return { id: "limited-profile", permissions: [] };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async listCustomFieldDefinitions() {
+        throw new Error("custom field list must not run after denied decision");
+      },
+      async createCustomFieldDefinition() {
+        throw new Error("custom field create must not run after denied decision");
+      },
+      async updateCustomFieldDefinition() {
+        throw new Error("custom field update must not run after denied decision");
+      },
+      async listProjectTemplates() {
+        throw new Error("project template list must not run after denied decision");
+      },
+      async createProjectTemplate() {
+        throw new Error("project template create must not run after denied decision");
+      },
+      async updateProjectTemplate() {
+        throw new Error("project template update must not run after denied decision");
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async appendAuditEvent(input) {
+        auditEvents.push(input);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+    const cookie =
+      "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    const readFields = await app.request("/api/workspace/config/custom-fields", {
+      headers: { cookie }
+    });
+    const createField = await app.request("/api/workspace/config/custom-fields", {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify({})
+    });
+    const readTemplates = await app.request("/api/workspace/config/project-templates", {
+      headers: { cookie }
+    });
+    const updateTemplate = await app.request(
+      "/api/workspace/config/project-templates/template-alpha",
+      {
+        method: "PATCH",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({})
+      }
+    );
+
+    expect(readFields.status).toBe(403);
+    expect(createField.status).toBe(403);
+    expect(readTemplates.status).toBe(403);
+    expect(updateTemplate.status).toBe(403);
+    expect(auditEvents.map((event) => event.actionType)).toEqual([
+      "workspace.config.read_denied",
+      "workspace.custom_field.create_denied",
+      "workspace.config.read_denied",
+      "workspace.project_template.update_denied"
+    ]);
+    expect(auditEvents.map((event) => event.executionResult)).toEqual([
+      { status: "denied" },
+      { status: "denied" },
+      { status: "denied" },
+      { status: "denied" }
+    ]);
+    expect(auditEvents[0]).toMatchObject({
+      sourceWorkflow: "single_workspace_config",
+      sourceEntity: { type: "WorkspaceConfig", id: "custom-fields" },
+      input: { resource: "custom-fields" },
+      permissionResult: { allowed: false, reason: "permission_missing" }
+    });
+    expect(auditEvents[3]).toMatchObject({
+      sourceWorkflow: "single_workspace_config",
+      sourceEntity: { type: "ProjectTemplate", id: "template-alpha" },
+      input: { templateId: "template-alpha" },
+      permissionResult: { allowed: false, reason: "permission_missing" }
+    });
+  });
+
+  it("writes denied audit for RBAC, workspace user, and position permission failures", async () => {
+    const auditEvents: Array<{
+      actionType: string;
+      sourceWorkflow?: string | null;
+      sourceEntity: { type: string; id: string };
+      input: Record<string, unknown>;
+      permissionResult: Record<string, unknown>;
+      executionResult: Record<string, unknown>;
+    }> = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-admin-denied",
+          tenantId: "tenant-alpha",
+          userId: "user-alpha-limited",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === "user-alpha-limited"
+          ? {
+              id: userId,
+              tenantId: "tenant-alpha",
+              name: "Лена Ограниченная",
+              accessProfileId: "limited-profile"
+            }
+          : undefined;
+      },
+      async findAccessProfileById() {
+        return { id: "limited-profile", permissions: [] };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async listAccessProfilesByTenantId() {
+        throw new Error("access profile list must not run after denied decision");
+      },
+      async createAccessProfile() {
+        throw new Error("access profile create must not run after denied decision");
+      },
+      async updateAccessProfile() {
+        throw new Error("access profile update must not run after denied decision");
+      },
+      async deleteAccessProfile() {
+        throw new Error("access profile delete must not run after denied decision");
+      },
+      async listWorkspaceUsers() {
+        return [
+          {
+            id: "user-alpha-limited",
+            tenantId: "tenant-alpha",
+            email: "limited@kiss-pm.local",
+            name: "Лена Ограниченная",
+            accessProfileId: "limited-profile",
+            positionId: null,
+            positionName: null,
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "light",
+            accentColor: "teal"
+          }
+        ];
+      },
+      async createWorkspaceUser() {
+        throw new Error("workspace user create must not run after denied decision");
+      },
+      async updateWorkspaceUser() {
+        throw new Error("workspace user update must not run after denied decision");
+      },
+      async deleteWorkspaceUser() {
+        throw new Error("workspace user delete must not run after denied decision");
+      },
+      async upsertCredential() {
+        throw new Error("credential upsert must not run after denied decision");
+      },
+      async updateCredentialEmail() {
+        throw new Error("credential email update must not run after denied decision");
+      },
+      async listPositions() {
+        throw new Error("position list must not run after denied decision");
+      },
+      async createPosition() {
+        throw new Error("position create must not run after denied decision");
+      },
+      async updatePosition() {
+        throw new Error("position update must not run after denied decision");
+      },
+      async deletePosition() {
+        throw new Error("position delete must not run after denied decision");
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async appendAuditEvent(input) {
+        auditEvents.push(input);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+    const cookie =
+      "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const mutationHeaders = {
+      cookie,
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin"
+    };
+
+    const requestCases = [
+      {
+        label: "read access roles",
+        run: () => app.request("/api/workspace/access-roles", { headers: { cookie } })
+      },
+      {
+        label: "create access profile",
+        run: () =>
+          app.request("/api/tenant/current/access-profiles", {
+            method: "POST",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "update access role",
+        run: () =>
+          app.request("/api/workspace/access-roles/access-profile-limited", {
+            method: "PATCH",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "delete access role",
+        run: () =>
+          app.request("/api/workspace/access-roles/access-profile-limited", {
+            method: "DELETE",
+            headers: mutationHeaders
+          })
+      },
+      {
+        label: "read users",
+        run: () => app.request("/api/workspace/users", { headers: { cookie } })
+      },
+      {
+        label: "create user",
+        run: () =>
+          app.request("/api/workspace/users", {
+            method: "POST",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "update user",
+        run: () =>
+          app.request("/api/workspace/users/user-alpha-target", {
+            method: "PATCH",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "delete user",
+        run: () =>
+          app.request("/api/workspace/users/user-alpha-target", {
+            method: "DELETE",
+            headers: mutationHeaders
+          })
+      },
+      {
+        label: "read positions",
+        run: () => app.request("/api/workspace/positions", { headers: { cookie } })
+      },
+      {
+        label: "create position",
+        run: () =>
+          app.request("/api/workspace/positions", {
+            method: "POST",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "update position",
+        run: () =>
+          app.request("/api/workspace/positions/position-alpha", {
+            method: "PATCH",
+            headers: mutationHeaders,
+            body: JSON.stringify({})
+          })
+      },
+      {
+        label: "delete position",
+        run: () =>
+          app.request("/api/workspace/positions/position-alpha", {
+            method: "DELETE",
+            headers: mutationHeaders
+          })
+      }
+    ];
+
+    for (const requestCase of requestCases) {
+      const response = await requestCase.run();
+      expect(response.status, requestCase.label).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    }
+    expect(auditEvents.map((event) => event.actionType)).toEqual([
+      "tenant.access_profile.read_denied",
+      "tenant.access_profile.create_denied",
+      "tenant.access_profile.update_denied",
+      "tenant.access_profile.delete_denied",
+      "workspace.user.read_denied",
+      "workspace.user.create_denied",
+      "workspace.user.update_denied",
+      "workspace.user.delete_denied",
+      "workspace.position.read_denied",
+      "workspace.position.create_denied",
+      "workspace.position.update_denied",
+      "workspace.position.delete_denied"
+    ]);
+    expect(auditEvents.map((event) => event.executionResult)).toEqual(
+      Array.from({ length: 12 }, () => ({ status: "denied" }))
+    );
+    expect(auditEvents[2]).toMatchObject({
+      sourceWorkflow: "single_workspace_access_roles",
+      sourceEntity: { type: "AccessProfile", id: "access-profile-limited" },
+      input: { roleId: "access-profile-limited" },
+      permissionResult: { allowed: false, reason: "permission_missing" }
+    });
+    expect(auditEvents[6]).toMatchObject({
+      sourceWorkflow: "single_workspace_users",
+      sourceEntity: { type: "TenantUser", id: "user-alpha-target" },
+      input: { userId: "user-alpha-target" },
+      permissionResult: { allowed: false, reason: "permission_missing" }
+    });
+    expect(auditEvents[10]).toMatchObject({
+      sourceWorkflow: "single_workspace_positions",
+      sourceEntity: { type: "Position", id: "position-alpha" },
+      input: { positionId: "position-alpha" },
+      permissionResult: { allowed: false, reason: "permission_missing" }
+    });
+  });
+
+  it("fails closed before user and position mutations when audit transaction support is missing", async () => {
+    const mutationCalls: string[] = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-audit-required",
+          tenantId: "tenant-alpha",
+          userId: "user-alpha-admin",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === "user-alpha-admin"
+          ? {
+              id: userId,
+              tenantId: "tenant-alpha",
+              name: "Анна Администратор",
+              accessProfileId: "admin-profile"
+            }
+          : undefined;
+      },
+      async listWorkspaceUsers() {
+        return [
+          {
+            id: "user-alpha-admin",
+            tenantId: "tenant-alpha",
+            email: "admin@kiss-pm.local",
+            name: "Анна Администратор",
+            accessProfileId: "admin-profile",
+            positionId: null,
+            positionName: null,
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "light",
+            accentColor: "teal"
+          },
+          {
+            id: "user-alpha-target",
+            tenantId: "tenant-alpha",
+            email: "target@kiss-pm.local",
+            name: "Тимур Целевой",
+            accessProfileId: "admin-profile",
+            positionId: null,
+            positionName: null,
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "light",
+            accentColor: "teal"
+          }
+        ];
+      },
+      async findAccessProfileById() {
+        return {
+          id: "admin-profile",
+          permissions: [
+            "tenant.users.manage",
+            "tenant.positions.manage"
+          ]
+        };
+      },
+      async listPositions() {
+        mutationCalls.push("listPositions");
+        return [];
+      },
+      async deleteWorkspaceUser() {
+        mutationCalls.push("deleteWorkspaceUser");
+      },
+      async createPosition() {
+        mutationCalls.push("createPosition");
+        throw new Error("createPosition must not run without audit transaction");
+      },
+      async updatePosition() {
+        mutationCalls.push("updatePosition");
+        throw new Error("updatePosition must not run without audit transaction");
+      },
+      async deletePosition() {
+        mutationCalls.push("deletePosition");
+        throw new Error("deletePosition must not run without audit transaction");
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+    const cookie =
+      "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const mutationHeaders = {
+      cookie,
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin"
+    };
+
+    const responses = [
+      await app.request("/api/workspace/users/user-alpha-target", {
+        method: "DELETE",
+        headers: { cookie, "x-kiss-pm-action": "same-origin" }
+      }),
+      await app.request("/api/workspace/positions", {
+        method: "POST",
+        headers: mutationHeaders,
+        body: JSON.stringify({
+          id: "position-alpha",
+          name: "Руководитель проекта"
+        })
+      }),
+      await app.request("/api/workspace/positions/position-alpha", {
+        method: "PATCH",
+        headers: mutationHeaders,
+        body: JSON.stringify({
+          name: "Руководитель проекта"
+        })
+      }),
+      await app.request("/api/workspace/positions/position-alpha", {
+        method: "DELETE",
+        headers: { cookie, "x-kiss-pm-action": "same-origin" }
+      })
+    ];
+
+    for (const response of responses) {
+      expect(response.status).toBe(501);
+      await expect(response.json()).resolves.toEqual({
+        error: "persistence_not_configured"
+      });
+    }
+    expect(mutationCalls).toEqual([]);
+  });
+
+  it("fails closed before profile mutations when audit transaction support is missing", async () => {
+    const mutationCalls: string[] = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-profile-audit-required",
+          tenantId: "tenant-alpha",
+          userId: "user-alpha-admin",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === "user-alpha-admin"
+          ? {
+              id: userId,
+              tenantId: "tenant-alpha",
+              name: "Анна Администратор",
+              accessProfileId: "admin-profile"
+            }
+          : undefined;
+      },
+      async listWorkspaceUsers() {
+        return [
+          {
+            id: "user-alpha-admin",
+            tenantId: "tenant-alpha",
+            email: "admin@kiss-pm.local",
+            name: "Анна Администратор",
+            accessProfileId: "admin-profile",
+            positionId: null,
+            positionName: null,
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "light",
+            accentColor: "teal"
+          }
+        ];
+      },
+      async updateWorkspaceUser() {
+        mutationCalls.push("updateWorkspaceUser");
+        throw new Error("profile update must not run without audit transaction");
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+    const cookie =
+      "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const mutationHeaders = {
+      cookie,
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin"
+    };
+
+    const profileResponse = await app.request("/api/profile", {
+      method: "PATCH",
+      headers: mutationHeaders,
+      body: JSON.stringify({ name: "Анна Новая" })
+    });
+    const themeResponse = await app.request("/api/profile/theme", {
+      method: "PATCH",
+      headers: mutationHeaders,
+      body: JSON.stringify({ theme: "dark", accentColor: "#0f766e" })
+    });
+
+    for (const response of [profileResponse, themeResponse]) {
+      expect(response.status).toBe(501);
+      await expect(response.json()).resolves.toEqual({
+        error: "persistence_not_configured"
+      });
+    }
+    expect(mutationCalls).toEqual([]);
+  });
+
+  it("rejects unsafe profile metadata before mutation or audit", async () => {
+    const mutationCalls: string[] = [];
+    const auditEvents: unknown[] = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-profile-sanitization",
+          tenantId: "tenant-alpha",
+          userId: "user-alpha-admin",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === "user-alpha-admin"
+          ? {
+              id: userId,
+              tenantId: "tenant-alpha",
+              name: "Анна Администратор",
+              accessProfileId: "admin-profile"
+            }
+          : undefined;
+      },
+      async findAccessProfileById() {
+        return { id: "admin-profile", permissions: ["profile.update"] };
+      },
+      async listWorkspaceUsers() {
+        return [
+          {
+            id: "user-alpha-admin",
+            tenantId: "tenant-alpha",
+            email: "admin@kiss-pm.local",
+            name: "Анна Администратор",
+            accessProfileId: "admin-profile",
+            positionId: null,
+            positionName: null,
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "light",
+            accentColor: "teal"
+          }
+        ];
+      },
+      async updateWorkspaceUser() {
+        mutationCalls.push("updateWorkspaceUser");
+        throw new Error("unsafe profile metadata must not reach mutation");
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async appendAuditEvent(input) {
+        auditEvents.push(input);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+    const cookie =
+      "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    const response = await app.request("/api/profile", {
+      method: "PATCH",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify({ name: "Анна\u0000Администратор" })
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_profile_payload"
+    });
+    expect(mutationCalls).toEqual([]);
+    expect(auditEvents).toEqual([]);
+  });
+
+  it("rejects malformed CRM route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+    const headers = { "x-kiss-pm-action": "same-origin" };
+
+    const badClient = await app.request("/api/workspace/clients/bad..client", {
+      method: "PATCH",
+      headers
+    });
+    const badContact = await app.request("/api/workspace/contacts/bad..contact", {
+      method: "PATCH",
+      headers
+    });
+    const badProduct = await app.request("/api/workspace/products/bad_product", {
+      method: "PATCH",
+      headers
+    });
+    const badProjectType = await app.request(
+      "/api/workspace/project-types/bad..project-type",
+      {
+        method: "PATCH",
+        headers
+      }
+    );
+    const badDealStage = await app.request("/api/workspace/deal-stages/bad..stage", {
+      method: "PATCH",
+      headers
+    });
+
+    expect(badClient.status).toBe(400);
+    await expect(badClient.json()).resolves.toEqual({ error: "invalid_client_id" });
+    expect(badContact.status).toBe(400);
+    await expect(badContact.json()).resolves.toEqual({ error: "invalid_contact_id" });
+    expect(badProduct.status).toBe(400);
+    await expect(badProduct.json()).resolves.toEqual({ error: "invalid_product_id" });
+    expect(badProjectType.status).toBe(400);
+    await expect(badProjectType.json()).resolves.toEqual({
+      error: "invalid_project_type_id"
+    });
+    expect(badDealStage.status).toBe(400);
+    await expect(badDealStage.json()).resolves.toEqual({
+      error: "invalid_deal_stage_id"
+    });
+  });
+
+  it("rejects malformed opportunity route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+    const actionHeaders = { "x-kiss-pm-action": "same-origin" };
+
+    const detail = await app.request("/api/workspace/opportunities/bad..opportunity");
+    const update = await app.request("/api/workspace/opportunities/bad..opportunity", {
+      method: "PATCH",
+      headers: actionHeaders
+    });
+    const stage = await app.request("/api/workspace/opportunities/bad..opportunity/stage", {
+      method: "PATCH",
+      headers: actionHeaders
+    });
+    const finalize = await app.request(
+      "/api/workspace/opportunities/bad..opportunity/finalize",
+      {
+        method: "PATCH",
+        headers: actionHeaders
+      }
+    );
+    const feasibility = await app.request(
+      "/api/workspace/opportunities/bad..opportunity/feasibility",
+      {
+        method: "POST",
+        headers: actionHeaders
+      }
+    );
+    const activate = await app.request(
+      "/api/workspace/opportunities/bad..opportunity/activate",
+      {
+        method: "POST",
+        headers: actionHeaders
+      }
+    );
+
+    for (const response of [detail, update, stage, finalize, feasibility, activate]) {
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "invalid_opportunity_id"
+      });
+    }
+  });
+
+  it("rejects malformed CRM activity route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+    const actionHeaders = { "x-kiss-pm-action": "same-origin" };
+
+    const read = await app.request("/api/workspace/crm/client/bad..client/activity");
+    const comment = await app.request("/api/workspace/crm/client/bad..client/comments", {
+      method: "POST",
+      headers: actionHeaders
+    });
+    const task = await app.request("/api/workspace/crm/client/bad..client/tasks", {
+      method: "POST",
+      headers: actionHeaders
+    });
+    const file = await app.request("/api/workspace/crm/client/bad..client/files", {
+      method: "POST",
+      headers: actionHeaders
+    });
+    const invalidActivity = await app.request(
+      "/api/workspace/crm/client/client-alpha/tasks/bad..activity",
+      {
+        method: "PATCH",
+        headers: actionHeaders
+      }
+    );
+    const invalidEntityType = await app.request(
+      "/api/workspace/crm/invoice/client-alpha/activity"
+    );
+
+    for (const response of [read, comment, task, file]) {
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "invalid_client_id" });
+    }
+    expect(invalidActivity.status).toBe(400);
+    await expect(invalidActivity.json()).resolves.toEqual({
+      error: "invalid_crm_activity_id"
+    });
+    expect(invalidEntityType.status).toBe(400);
+    await expect(invalidEntityType.json()).resolves.toEqual({
+      error: "crm_entity_type_invalid"
+    });
+  });
+
+  it("rejects malformed absence route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const response = await app.request("/api/tenant/current/absences/bad..absence", {
+      method: "DELETE",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "invalid_absence_id" });
+  });
+
+  it("rejects malformed planning route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+    const actionHeaders = { "x-kiss-pm-action": "same-origin" };
+
+    const projectRoutes = [
+      app.request("/api/workspace/projects/bad..project/planning/read-model"),
+      app.request("/api/workspace/projects/bad..project/planning/preview-command", {
+        method: "POST",
+        headers: actionHeaders
+      }),
+      app.request("/api/workspace/projects/bad..project/planning/apply-command", {
+        method: "POST",
+        headers: actionHeaders
+      }),
+      app.request("/api/workspace/projects/bad..project/planning/apply-command-batch", {
+        method: "POST",
+        headers: actionHeaders
+      }),
+      app.request("/api/workspace/projects/bad..project/planning/baselines"),
+      app.request("/api/workspace/projects/bad..project/planning/events"),
+      app.request("/api/workspace/projects/bad..project/planning/auto-solver-runs", {
+        method: "POST",
+        headers: actionHeaders
+      })
+    ];
+
+    for (const responsePromise of projectRoutes) {
+      const response = await responsePromise;
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "invalid_project_id" });
+    }
+
+    const badScenario = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenarios/bad..scenario/apply",
+      {
+        method: "POST",
+        headers: actionHeaders
+      }
+    );
+    expect(badScenario.status).toBe(400);
+    await expect(badScenario.json()).resolves.toEqual({
+      error: "invalid_planning_scenario_id"
+    });
+
+    const badSolverRun = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs/bad..run"
+    );
+    expect(badSolverRun.status).toBe(400);
+    await expect(badSolverRun.json()).resolves.toEqual({
+      error: "invalid_planning_solver_run_id"
+    });
+
+    const badSolverProposal = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs/planning-auto-solver-550e8400-e29b-41d4-a716-446655440000/proposals/bad..proposal/apply",
+      {
+        method: "POST",
+        headers: actionHeaders
+      }
+    );
+    expect(badSolverProposal.status).toBe(400);
+    await expect(badSolverProposal.json()).resolves.toEqual({
+      error: "invalid_planning_solver_proposal_id"
+    });
+
+    const badSavedView = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views/bad..view",
+      {
+        method: "DELETE",
+        headers: actionHeaders
+      }
+    );
+    expect(badSavedView.status).toBe(400);
+    await expect(badSavedView.json()).resolves.toEqual({
+      error: "invalid_saved_view_id"
+    });
+  });
+
+  it("rejects malformed audit query identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const response = await app.request(
+      "/api/tenant/current/audit-events?projectId=bad..project"
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "invalid_project_id" });
+
+    const invalidLimit = await app.request(
+      "/api/tenant/current/audit-events?limit=100.5"
+    );
+    expect(invalidLimit.status).toBe(400);
+    await expect(invalidLimit.json()).resolves.toEqual({ error: "invalid_audit_limit" });
+  });
+
+  it("rejects malformed scheduled-task query before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const badAssignee = await app.request(
+      "/api/tenant/current/scheduled-tasks?assigneeUserId=bad/user&fromDate=2026-06-01&toDate=2026-06-30"
+    );
+    expect(badAssignee.status).toBe(400);
+    await expect(badAssignee.json()).resolves.toEqual({ error: "scheduled_tasks_invalid" });
+
+    const invalidDate = await app.request(
+      "/api/tenant/current/scheduled-tasks?assigneeUserId=user-alpha-admin&fromDate=2026-02-31&toDate=2026-06-30"
+    );
+    expect(invalidDate.status).toBe(400);
+    await expect(invalidDate.json()).resolves.toEqual({ error: "scheduled_tasks_invalid" });
+
+    const oversizedRange = await app.request(
+      "/api/tenant/current/scheduled-tasks?assigneeUserId=user-alpha-admin&fromDate=2026-01-01&toDate=2027-12-31"
+    );
+    expect(oversizedRange.status).toBe(400);
+    await expect(oversizedRange.json()).resolves.toEqual({ error: "scheduled_tasks_invalid" });
   });
 
   it("rejects control action preview when action-specific permissions are missing", async () => {
@@ -1540,7 +2872,7 @@ describe("KISS PM API Phase 1 shell", () => {
         method: "POST",
         headers: {
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
       }
     );
@@ -1700,7 +3032,7 @@ describe("KISS PM API Phase 1 shell", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         body: JSON.stringify({ clientPlanVersion: 5 })
       }
@@ -1858,7 +3190,7 @@ describe("KISS PM API Phase 1 shell", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         body: JSON.stringify({ clientPlanVersion: 5 })
       }
@@ -2017,7 +3349,7 @@ describe("KISS PM API Phase 1 shell", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         body: JSON.stringify({ clientPlanVersion: 5 })
       }
@@ -2159,7 +3491,7 @@ describe("KISS PM API Phase 1 shell", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=control-token"
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         body: JSON.stringify({ clientPlanVersion: 5 })
       }

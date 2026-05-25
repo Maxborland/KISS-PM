@@ -31,7 +31,8 @@ export function createStorageProviderFromEnv(
       bucket: requireEnv(env, "KISS_PM_STORAGE_S3_BUCKET"),
       endpoint: requireEnv(env, "KISS_PM_STORAGE_S3_ENDPOINT"),
       region: env.KISS_PM_STORAGE_S3_REGION ?? "us-east-1",
-      secretAccessKey: requireEnv(env, "KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY")
+      secretAccessKey: requireEnv(env, "KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY"),
+      timeoutMs: parseBoundedIntegerEnv(env, "KISS_PM_STORAGE_S3_TIMEOUT_MS", 15_000, 1_000, 60_000)
     });
   }
 
@@ -86,15 +87,18 @@ export function createS3StorageProvider(input: {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  timeoutMs?: number;
 }): StorageProvider {
-  const endpoint = input.endpoint.replace(/\/+$/, "");
+  const endpoint = normalizeS3Endpoint(input.endpoint);
+  const bucket = normalizeS3Bucket(input.bucket);
+  const timeoutMs = input.timeoutMs ?? 15_000;
 
   async function request(method: string, storageKey: string, bytes?: Uint8Array, mimeType?: string) {
     const encodedKey = storageKey
       .split("/")
       .map((part) => encodeURIComponent(part))
       .join("/");
-    const url = new URL(`${endpoint}/${input.bucket}/${encodedKey}`);
+    const url = new URL(`${endpoint}/${bucket}/${encodedKey}`);
     const payloadHash = sha256(bytes ?? new Uint8Array());
     const now = new Date();
     const amzDate = toAmzDate(now);
@@ -118,7 +122,7 @@ export function createS3StorageProvider(input: {
       url
     });
 
-    const init: RequestInit = { method, headers };
+    const init: RequestInit = { method, headers, signal: AbortSignal.timeout(timeoutMs) };
     if (bytes) init.body = toArrayBuffer(bytes);
     const response = await fetch(url, init);
     if (!response.ok) {
@@ -153,6 +157,46 @@ function requireEnv(env: NodeJS.ProcessEnv, key: string): string {
   const value = env[key];
   if (!value) throw new Error(`${key.toLowerCase()}_required`);
   return value;
+}
+
+function normalizeS3Endpoint(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("kiss_pm_storage_s3_endpoint_invalid");
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("kiss_pm_storage_s3_endpoint_invalid");
+  }
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("kiss_pm_storage_s3_endpoint_invalid");
+  }
+  return url.origin;
+}
+
+function normalizeS3Bucket(value: string): string {
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(trimmed)) {
+    throw new Error("kiss_pm_storage_s3_bucket_invalid");
+  }
+  return trimmed;
+}
+
+function parseBoundedIntegerEnv(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  defaultValue: number,
+  min: number,
+  max: number
+): number {
+  const value = env[key];
+  if (value === undefined || value.trim() === "") return defaultValue;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${key.toLowerCase()}_invalid`);
+  }
+  return parsed;
 }
 
 function sha256(bytes: Uint8Array): string {

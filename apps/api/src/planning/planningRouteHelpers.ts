@@ -4,6 +4,14 @@ import type { Handler } from "hono";
 import { createHash } from "node:crypto";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
+import {
+  parsePlanningScenarioRunIdParam,
+  parsePlanningSolverProposalIdParam,
+  parsePlanningSolverRunIdParam,
+  parseProjectIdParam,
+  parseSavedViewIdParam,
+  type RouteParamParseResult
+} from "../routeParamParsers";
 
 export type PlanningRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -25,16 +33,41 @@ export function errorResponseBody<T extends { ok?: false; status?: number; error
   return body;
 }
 
-export function getRequiredRouteParam(context: Parameters<Handler>[0], ...keys: string[]): string {
+function parseRequiredRouteParam(
+  context: Parameters<Handler>[0],
+  parser: (value: unknown) => RouteParamParseResult,
+  ...keys: string[]
+): RouteParamParseResult {
   for (const key of keys) {
     const value = context.req.param(key);
-    if (value) return value;
+    if (value !== undefined) return parser(value);
   }
-  throw new Error(`missing_route_param:${keys.join("|")}`);
+  return parser(undefined);
 }
 
-export function getScenarioProposalId(context: Parameters<Handler>[0]): string {
-  return getRequiredRouteParam(context, "scenarioId", "proposalId");
+export function parseProjectRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(context, parseProjectIdParam, "projectId");
+}
+
+export function parseScenarioProposalRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(
+    context,
+    parsePlanningScenarioRunIdParam,
+    "scenarioId",
+    "proposalId"
+  );
+}
+
+export function parseSavedViewRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(context, parseSavedViewIdParam, "viewId");
+}
+
+export function parseSolverRunRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(context, parsePlanningSolverRunIdParam, "runId");
+}
+
+export function parseSolverProposalRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(context, parsePlanningSolverProposalIdParam, "proposalId");
 }
 
 export function hashJson(value: unknown): string {

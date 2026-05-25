@@ -47,8 +47,16 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
         sourceWorkflow: input.sourceWorkflow ?? null
       });
     },
-    async listAuditEventsByTenantId(tenantId) {
-      return auditEvents.filter((event) => event.tenantId === tenantId);
+    async listAuditEventsByTenantId(tenantId, options) {
+      return auditEvents
+        .filter(
+          (event) =>
+            event.tenantId === tenantId &&
+            (!options?.projectId ||
+              (event.sourceEntity.type === "Project" &&
+                event.sourceEntity.id === options.projectId))
+        )
+        .slice(0, options?.limit);
     }
   };
 }

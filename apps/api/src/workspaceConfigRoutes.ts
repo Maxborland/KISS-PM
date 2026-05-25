@@ -1,7 +1,8 @@
 import {
   canManageWorkspaceConfig,
   canReadWorkspaceConfig,
-  type AccessProfile
+  type AccessProfile,
+  type PolicyDecision
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
@@ -15,6 +16,10 @@ import {
 } from "./workspaceConfigParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import { getStringField } from "./parseHelpers";
+import {
+  parseCustomFieldIdParam,
+  parseProjectTemplateIdParam
+} from "./routeParamParsers";
 
 type WorkspaceConfigRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -55,7 +60,16 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.config.read_denied",
+        entityType: "WorkspaceConfig",
+        entityId: "custom-fields",
+        commandInput: { resource: "custom-fields" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     return context.json({
       customFields: await dataSource.listCustomFieldDefinitions(actor.tenantId)
@@ -81,7 +95,16 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.custom_field.create_denied",
+        entityType: "CustomFieldDefinition",
+        entityId: "new",
+        commandInput: { operation: "create_custom_field" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -130,6 +153,11 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.patch("/api/workspace/config/custom-fields/:fieldId", async (context) => {
+    const parsedFieldId = parseCustomFieldIdParam(context.req.param("fieldId"));
+    if (!parsedFieldId.ok) {
+      return context.json({ error: parsedFieldId.error }, 400);
+    }
+
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -148,9 +176,18 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.custom_field.update_denied",
+        entityType: "CustomFieldDefinition",
+        entityId: parsedFieldId.value,
+        commandInput: { fieldId: parsedFieldId.value },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
-    const fieldId = context.req.param("fieldId");
+    const fieldId = parsedFieldId.value;
     const existingFields = await dataSource.listCustomFieldDefinitions(actor.tenantId);
     const beforeState =
       existingFields.find((field) => field.id === fieldId) ?? null;
@@ -225,7 +262,16 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.config.read_denied",
+        entityType: "WorkspaceConfig",
+        entityId: "project-templates",
+        commandInput: { resource: "project-templates" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     return context.json({
       projectTemplates: await dataSource.listProjectTemplates(actor.tenantId)
@@ -251,7 +297,16 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.project_template.create_denied",
+        entityType: "ProjectTemplate",
+        entityId: "new",
+        commandInput: { operation: "create_project_template" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -304,6 +359,13 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.patch("/api/workspace/config/project-templates/:templateId", async (context) => {
+    const parsedTemplateId = parseProjectTemplateIdParam(
+      context.req.param("templateId")
+    );
+    if (!parsedTemplateId.ok) {
+      return context.json({ error: parsedTemplateId.error }, 400);
+    }
+
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -322,9 +384,18 @@ export function registerWorkspaceConfigRoutes(
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.project_template.update_denied",
+        entityType: "ProjectTemplate",
+        entityId: parsedTemplateId.value,
+        commandInput: { templateId: parsedTemplateId.value },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
-    const templateId = context.req.param("templateId");
+    const templateId = parsedTemplateId.value;
     const existingTemplates = await dataSource.listProjectTemplates(actor.tenantId);
     const beforeState =
       existingTemplates.find((template) => template.id === templateId) ?? null;
@@ -388,5 +459,34 @@ export function registerWorkspaceConfigRoutes(
     );
 
     return context.json({ projectTemplate });
+  });
+}
+
+async function appendWorkspaceConfigDeniedAudit(
+  deps: WorkspaceConfigRouteDeps,
+  actor: TenantUser,
+  input: {
+    actionType: string;
+    entityType: string;
+    entityId: string;
+    commandInput: Record<string, unknown>;
+    decision: PolicyDecision;
+  }
+) {
+  if (!deps.dataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent({
+    tenantId: actor.tenantId,
+    actorUserId: actor.id,
+    actionType: input.actionType,
+    sourceWorkflow: "single_workspace_config",
+    sourceEntity: {
+      type: input.entityType,
+      id: input.entityId
+    },
+    commandInput: input.commandInput,
+    beforeState: null,
+    afterState: null,
+    permissionResult: input.decision,
+    executionResult: { status: "denied" }
   });
 }

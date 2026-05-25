@@ -13,10 +13,15 @@ import {
 } from "@kiss-pm/domain";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
+import { parseIncludeArchivedQuery } from "./controlSurfaceQuery";
 import { readLimitedJsonBody } from "./jsonBody";
+import { parseControlSurfaceIdParam } from "./routeParamParsers";
 
 export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/tenant/current/control-surfaces", async (context) => {
+    const includeArchived = parseIncludeArchivedQuery(context.req.query("includeArchived"));
+    if (!includeArchived.ok) return context.json({ error: includeArchived.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.listControlSurfaces) {
@@ -36,9 +41,8 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
-    const includeArchived = context.req.query("includeArchived") === "true";
     const surfaces = (await deps.dataSource.listControlSurfaces(actor.tenantId))
-      .filter((surface) => includeArchived || surface.status !== "archived")
+      .filter((surface) => includeArchived.value || surface.status !== "archived")
       .filter((surface) => canReadBuilderState || surface.status === "published")
       .map((surface) => canReadBuilderState ? surface : toPublishedSurfaceReadModel(surface, profile))
       .filter((surface): surface is ControlSurfaceRecord | PublishedControlSurfaceReadModel => Boolean(surface));
@@ -70,6 +74,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.get("/api/tenant/current/control-surfaces/:surfaceId", async (context) => {
+    const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
+    if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
+    const surfaceId = parsedSurfaceId.value;
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.findControlSurface || !deps.dataSource.listControlSurfaceVersions) {
@@ -77,7 +84,6 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    const surfaceId = context.req.param("surfaceId");
     if (!decision.allowed) {
       await appendDeniedAuditIfConfigured(deps, {
         tenantId: actor.tenantId,
@@ -104,7 +110,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/tenant/current/control-surfaces", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.upsertControlSurfaceDraft || !deps.dataSource.appendAuditEvent) {
+    if (!deps.dataSource.upsertControlSurfaceDraft || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
     const profile = await deps.getActorProfile(actor);
@@ -125,38 +131,56 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsed = parseSurfaceDefinitionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const validation = validateControlSurfaceDefinition(parsed.value);
-    const surface = await deps.dataSource.upsertControlSurfaceDraft({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      definition: parsed.value,
-      ownerUserId: parseOwnerUserId(body.value)
-    }).catch((error: unknown) => {
-      if (error instanceof Error && error.message === "control_surface_archived") {
-        return "control_surface_archived" as const;
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.upsertControlSurfaceDraft || !transactionDataSource.appendAuditEvent) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
-      throw error;
-    });
-    if (surface === "control_surface_archived") {
-      return context.json({ error: "control_surface_archived" }, 409);
-    }
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "control_surface.draft_saved",
-      sourceWorkflow: "control_surfaces",
-      sourceEntity: { type: "ControlSurface", id: surface.id },
-      commandInput: { definition: parsed.value },
-      beforeState: null,
-      afterState: { surface, validation },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
+      const validation = validateControlSurfaceDefinition(parsed.value);
+      const surface = await transactionDataSource.upsertControlSurfaceDraft({
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        definition: parsed.value,
+        ownerUserId: parseOwnerUserId(body.value)
+      }).catch((error: unknown) => {
+        if (error instanceof Error && error.message === "control_surface_archived") {
+          return "control_surface_archived" as const;
+        }
+        throw error;
+      });
+      if (surface === "control_surface_archived") {
+        return { ok: false as const, status: 409, error: "control_surface_archived" };
+      }
+      const auditEventId = await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.draft_saved",
+          sourceWorkflow: "control_surfaces",
+          sourceEntity: { type: "ControlSurface", id: surface.id },
+          commandInput: { definition: parsed.value },
+          beforeState: null,
+          afterState: { surface, validation },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, body: { surface, validation, auditEventId } };
     });
 
-    return context.json({ surface, validation, auditEventId }, 201);
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 409) return context.json({ error: result.error }, 409);
+      return context.json({ error: result.error }, 400);
+    }
+
+    return context.json(result.body, 201);
   });
 
   app.post("/api/tenant/current/control-surfaces/:surfaceId/preview", async (context) => {
+    const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
+    if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
+    const surfaceId = parsedSurfaceId.value;
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.findControlSurface) {
@@ -169,7 +193,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
         actionType: "control_surface.preview_denied",
-        surfaceId: context.req.param("surfaceId"),
+        surfaceId,
         permissionResult: decision
       });
       return context.json({ error: decision.reason }, 403);
@@ -179,7 +203,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseOptionalSurfaceDefinitionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const stored = await deps.dataSource.findControlSurface(actor.tenantId, context.req.param("surfaceId"));
+    const stored = await deps.dataSource.findControlSurface(actor.tenantId, surfaceId);
     if (!stored && !parsed.value) return context.json({ error: "control_surface_not_found" }, 404);
     const definition = parsed.value ?? stored?.draftDefinition;
     if (!definition) return context.json({ error: "control_surface_not_found" }, 404);
@@ -200,6 +224,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/tenant/current/control-surfaces/:surfaceId/publish", async (context) => {
+    const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
+    if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
+    const surfaceId = parsedSurfaceId.value;
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -217,13 +244,12 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
         actionType: "control_surface.publish_denied",
-        surfaceId: context.req.param("surfaceId"),
+        surfaceId,
         permissionResult: decision
       });
       return context.json({ error: decision.reason }, 403);
     }
 
-    const surfaceId = context.req.param("surfaceId");
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.findControlSurface || !transactionDataSource.publishControlSurface) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
@@ -304,6 +330,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/tenant/current/control-surfaces/:surfaceId/rollback", async (context) => {
+    const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
+    if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
+    const surfaceId = parsedSurfaceId.value;
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.rollbackControlSurfaceToVersion || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
@@ -316,7 +345,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
         actionType: "control_surface.rollback_denied",
-        surfaceId: context.req.param("surfaceId"),
+        surfaceId,
         permissionResult: decision
       });
       return context.json({ error: decision.reason }, 403);
@@ -326,7 +355,6 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const version = parseVersion(body.value);
     if (version === null) return context.json({ error: "control_surface_invalid" }, 400);
-    const surfaceId = context.req.param("surfaceId");
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.findControlSurface || !transactionDataSource.rollbackControlSurfaceToVersion) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
@@ -395,6 +423,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.delete("/api/tenant/current/control-surfaces/:surfaceId", async (context) => {
+    const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
+    if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
+    const surfaceId = parsedSurfaceId.value;
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.archiveControlSurface || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
@@ -407,13 +438,12 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
         actionType: "control_surface.archive_denied",
-        surfaceId: context.req.param("surfaceId"),
+        surfaceId,
         permissionResult: decision
       });
       return context.json({ error: decision.reason }, 403);
     }
 
-    const surfaceId = context.req.param("surfaceId");
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.findControlSurface || !transactionDataSource.archiveControlSurface) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };

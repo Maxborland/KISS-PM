@@ -5,7 +5,7 @@ import {
   type AttachmentEntityContext
 } from "../attachmentEntityAccess";
 import { buildStorageKey, sha256Hex } from "../attachmentValidation";
-import { appendAttachmentAudit } from "./attachmentAudit";
+import { appendAttachmentAudit, appendAttachmentDeniedAudit } from "./attachmentAudit";
 import type {
   AttachmentResult,
   AttachmentWorkspaceDeps,
@@ -144,6 +144,12 @@ export async function prepareDownload(
   });
   if (!entity.ok) return { ok: false, status: entity.status, error: entity.error };
   if (!entity.value.readDecision.allowed) {
+    await appendAttachmentDeniedAudit(deps, {
+      actor: input.actor,
+      entity: entity.value,
+      error: entity.value.readDecision.reason,
+      permissionResult: entity.value.readDecision
+    });
     return { ok: false, status: 403, error: entity.value.readDecision.reason };
   }
 
