@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { performance } from "node:perf_hooks";
 
 import {
   createDatabase,
@@ -191,6 +192,58 @@ describe("backend management loop DB smoke", () => {
     });
   }
 
+  async function createPlanningTasksBatch(cookie: string, count: number) {
+    const commands = Array.from({ length: count }, (_, index) => ({
+      type: "task.create",
+      payload: {
+        id: `task-load-${index}`,
+        projectId: "project-loop",
+        title: `Нагрузочная задача ${index}`,
+        statusId: "task-status-new",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-02",
+        workMinutes: 120,
+        assignments: [
+          {
+            id: `assignment-load-${index}`,
+            resourceId: "user-alpha-admin",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 120
+          }
+        ]
+      }
+    }));
+    const response = await app.request(
+      "/api/workspace/projects/project-loop/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: mutationHeaders(cookie),
+        body: JSON.stringify({
+          clientPlanVersion: 1,
+          commands,
+          idempotencyKey: "backend-loop-load-tasks"
+        })
+      }
+    );
+    expect(response.status).toBe(200);
+  }
+
+  async function measureP95(
+    iterations: number,
+    request: () => Response | Promise<Response>
+  ): Promise<number> {
+    const durations: number[] = [];
+    for (let index = 0; index < iterations; index += 1) {
+      const startedAt = performance.now();
+      const response = await request();
+      durations.push(performance.now() - startedAt);
+      expect(response.status).toBe(200);
+      await response.arrayBuffer();
+    }
+    return durations.sort((left, right) => left - right)[Math.ceil(durations.length * 0.95) - 1] ?? 0;
+  }
+
   it("runs auth to planning to control to closure to audit", async () => {
     const cookie = await loginAsAdmin();
 
@@ -337,6 +390,37 @@ describe("backend management loop DB smoke", () => {
         })
       ])
     });
+  });
+
+  it("keeps key backend read models inside production-readiness smoke thresholds", async () => {
+    const cookie = await loginAsAdmin();
+    await createPlanningTasksBatch(cookie, 25);
+
+    const planningP95 = await measureP95(5, () =>
+      app.request("/api/workspace/projects/project-loop/planning/read-model", {
+        headers: { cookie }
+      })
+    );
+    const capacityP95 = await measureP95(3, () =>
+      app.request("/api/workspace/capacity/tree?monthIso=2026-06", {
+        headers: { cookie }
+      })
+    );
+    const searchP95 = await measureP95(5, () =>
+      app.request("/api/workspace/search?q=%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B0&limit=20", {
+        headers: { cookie }
+      })
+    );
+    const auditP95 = await measureP95(3, () =>
+      app.request("/api/tenant/current/audit-events?limit=100", {
+        headers: { cookie }
+      })
+    );
+
+    expect(planningP95).toBeLessThan(3_000);
+    expect(capacityP95).toBeLessThan(5_000);
+    expect(searchP95).toBeLessThan(3_000);
+    expect(auditP95).toBeLessThan(3_000);
   });
 });
 

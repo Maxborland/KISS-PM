@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { StorageProvider } from "./storageProvider";
 import type { ApiApp } from "./routeTypes";
 
-export type ReadinessCheckName = "database" | "storage";
+export type ReadinessCheckName = "database" | "storage" | "realtime";
 export type ReadinessCheck = () => Promise<void> | void;
 export type ReadinessChecks = Partial<Record<ReadinessCheckName, ReadinessCheck>>;
 
@@ -72,15 +72,18 @@ async function resolveReadiness(deps: HealthRouteDeps): Promise<{
   body: {
     status: "ready" | "not_ready";
     product: "KISS PM";
-    checks: Record<ReadinessCheckName, ReadinessCheckResponse>;
+    checks: Partial<Record<ReadinessCheckName, ReadinessCheckResponse>>;
   };
 }> {
-  const checks: Record<ReadinessCheckName, ReadinessCheckResponse> = {
+  const checks: Partial<Record<ReadinessCheckName, ReadinessCheckResponse>> = {
     database: await runCheck("database", deps.readinessChecks?.database),
     storage: await runCheck("storage", deps.readinessChecks?.storage, {
       provider: deps.storageProvider.provider
     })
   };
+  if (deps.readinessChecks?.realtime) {
+    checks.realtime = await runCheck("realtime", deps.readinessChecks.realtime);
+  }
   const ready = Object.values(checks).every((check) => check.status === "ok");
 
   return {

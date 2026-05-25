@@ -4,6 +4,7 @@ import {
   assertServerRuntimeConfig,
   readServerRuntimeConfig
 } from "./serverConfig";
+import { setPlanningRealtimeStatusProvider } from "./planningRealtimeHealth";
 import { createServerReadinessChecks } from "./serverReadiness";
 import type { StorageProvider } from "./storageProvider";
 
@@ -35,6 +36,19 @@ describe("server readiness checks", () => {
     ).toThrow("dev_routes_forbidden_in_production");
   });
 
+  it("fails startup configuration for invalid or incomplete planning event backend", () => {
+    expect(() =>
+      readServerRuntimeConfig({
+        PLANNING_EVENTS_BACKEND: "postgres"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("invalid_planning_events_backend");
+    expect(() =>
+      readServerRuntimeConfig({
+        PLANNING_EVENTS_BACKEND: "redis"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("planning_events_redis_url_required");
+  });
+
   it("rejects malformed server port and host configuration", () => {
     expect(() =>
       readServerRuntimeConfig({
@@ -63,12 +77,16 @@ describe("server readiness checks", () => {
       readServerRuntimeConfig({
         HOST: "0.0.0.0",
         KISS_PM_ENABLE_DEV_ROUTES: "true",
+        PLANNING_EVENTS_BACKEND: "redis",
+        PLANNING_EVENTS_REDIS_URL: "redis://127.0.0.1:6379",
         PORT: "4100"
       } as NodeJS.ProcessEnv)
     ).toEqual({
       databaseUrl: undefined,
       enableDevTenantRoutes: true,
       hostname: "0.0.0.0",
+      planningEventsBackend: "redis",
+      planningEventsRedisUrl: "redis://127.0.0.1:6379",
       port: 4100,
       production: false
     });
@@ -76,6 +94,8 @@ describe("server readiness checks", () => {
       databaseUrl: undefined,
       enableDevTenantRoutes: false,
       hostname: "127.0.0.1",
+      planningEventsBackend: "memory",
+      planningEventsRedisUrl: undefined,
       port: 4000,
       production: false
     });
@@ -117,6 +137,43 @@ describe("server readiness checks", () => {
     });
 
     await expect(checks.database?.()).rejects.toThrow("database_schema_not_ready");
+  });
+
+  it("adds realtime readiness only when Redis planning events are enabled", async () => {
+    setPlanningRealtimeStatusProvider(() => ({
+      backend: "redis",
+      connected: true,
+      redisConfigured: true
+    }));
+    const redisChecks = createServerReadinessChecks({
+      planningEventsBackend: "redis",
+      production: true,
+      storageProvider: fakeStorageProvider()
+    });
+    const memoryChecks = createServerReadinessChecks({
+      planningEventsBackend: "memory",
+      production: true,
+      storageProvider: fakeStorageProvider()
+    });
+
+    expect(redisChecks.realtime).toBeTypeOf("function");
+    expect(redisChecks.realtime?.()).toBeUndefined();
+    expect(memoryChecks.realtime).toBeUndefined();
+  });
+
+  it("fails realtime readiness when Redis planning events are configured but disconnected", async () => {
+    setPlanningRealtimeStatusProvider(() => ({
+      backend: "memory",
+      connected: false,
+      redisConfigured: true
+    }));
+    const checks = createServerReadinessChecks({
+      planningEventsBackend: "redis",
+      production: true,
+      storageProvider: fakeStorageProvider()
+    });
+
+    expect(() => checks.realtime?.()).toThrow("planning_realtime_not_ready");
   });
 });
 
