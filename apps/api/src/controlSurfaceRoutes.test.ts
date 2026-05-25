@@ -172,6 +172,7 @@ describe("control surface routes", () => {
 
     expect(republish.status).toBe(409);
     await expect(republish.json()).resolves.toEqual({ error: "control_surface_archived" });
+    expect(state.auditEvents.map((event) => event.actionType)).toContain("control_surface.publish_conflict");
     expect(rollback.status).toBe(409);
     await expect(rollback.json()).resolves.toEqual({ error: "control_surface_archived" });
     const archivedList = await app.request("/api/tenant/current/control-surfaces?includeArchived=true", {
@@ -206,6 +207,7 @@ describe("control surface routes", () => {
         issues: [expect.objectContaining({ code: "visible_field_required" })]
       }
     });
+    expect(state.auditEvents.map((event) => event.actionType)).toContain("control_surface.publish_blocked");
   });
 
   it("requires explicit control surface manage/publish permissions", async () => {
