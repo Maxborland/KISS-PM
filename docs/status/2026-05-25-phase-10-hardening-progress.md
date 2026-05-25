@@ -14,6 +14,7 @@
 | Security headers | Public `/health*` routes не получали baseline security/no-store headers | Baseline headers применяются ко всем API app routes | `pnpm vitest run apps/api/src/app.test.ts apps/api/src/requestSecurity.test.ts` |
 | Attachment privacy | File download response не задавал explicit no-store cache policy | Download response задает `Cache-Control: no-store, private` | `pnpm vitest run --config vitest.db.config.ts apps/api/src/attachmentRoutes.db.test.ts` |
 | External references | IPv6 unspecified literals `[::]` / `[0:...:0]` не отклонялись как unsafe host | URL validation rejects IPv6 unspecified hosts | `pnpm vitest run apps/api/src/attachmentValidation.test.ts apps/api/src/storageProvider.test.ts` |
+| KPI expression safety | Constrained KPI AST валидировал finite листья, но арифметика могла вернуть `Infinity` | KPI expression arithmetic normalizes operation results through finite guard | `pnpm vitest run packages/domain/src/control/controlEngine.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -28,7 +29,7 @@
 |------|------------|
 | Planning / solver apply | Re-run focused review for persisted proposal consistency, stale planVersion, allocation mutation permissions and audit trace |
 | Capacity | Re-run focused review for project filter semantics, hidden contribution masking and cache invalidation after all mutating paths |
-| KPI / action engine | Re-run focused review for expression safety, governed action application and denied-path audit |
+| KPI / action engine | Continue focused review for governed action application and denied-path audit |
 | Control surfaces | Re-run focused review for archive/publish/rollback invariants and action binding safety |
 | Closure / retrospectives | Re-run focused review for immutable snapshot consistency and retry/conflict semantics |
 | Release-like smoke | Add or run backend smoke covering the full management loop from auth to closure/audit |
