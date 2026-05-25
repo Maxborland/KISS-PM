@@ -330,6 +330,9 @@ describe("retrospective routes", () => {
     expect(
       state.auditEvents.filter((event) => event.actionType === "template_improvement.applied")
     ).toHaveLength(1);
+    expect(
+      state.auditEvents.filter((event) => event.actionType === "template_improvement.apply_conflict")
+    ).toHaveLength(1);
   });
 
   it("denies template improvement apply without permission and writes denied audit", async () => {
