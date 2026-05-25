@@ -1,0 +1,51 @@
+{
+  "scope": [
+    "src/views/blocks/my-work-block.tsx",
+    "src/views/blocks/dashboard-bento.tsx",
+    "src/widgets/kanban/kanban-board.tsx",
+    "src/widgets/kanban/kanban-card.tsx"
+  ],
+  "scannedAt": "2026-05-25T11:14:12.141Z",
+  "pass": true,
+  "count": 0,
+  "byFile": {},
+  "violations": [],
+  "outOfScope": [
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 147,
+      "snippet": ".gantt2__col-drag {\n  margin-left: 4px;\n  border: 0;\n  background: transparent;\n  color: var(--muted);\n  font-size: 10px;\n  cursor: grab;\n  padding: 0 2px;\n}"
+    },
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 638,
+      "snippet": ".gantt2__bar--interactive {\n  cursor: grab;\n}"
+    },
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 1283,
+      "snippet": ".gantt2__col-drag {\n  cursor: grab;\n  user-select: none;\n}"
+    },
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 1288,
+      "snippet": ".gantt2__col-drag:active {\n  cursor: grabbing;\n}"
+    },
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 1413,
+      "snippet": ".gantt2__row-handle {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  border: 0;\n  background: transparent;\n  color: var(--muted);\n  cursor: grab;\n  padding: 0 2px;\n  margi"
+    },
+    {
+      "file": "src/styles/widgets/gantt.css",
+      "rule": "cursor-grab-without-dnd-affordance",
+      "line": 1425,
+      "snippet": ".gantt2__row-handle:active {\n  cursor: grabbing;\n}"
+    }
+  ]
+}

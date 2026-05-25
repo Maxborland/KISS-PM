@@ -40,15 +40,25 @@ function SheetOverlay({
   );
 }
 
+export type SheetSize = "md" | "lg" | "xl";
+
 export type SheetContentProps = React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "left" | "right";
+  size?: SheetSize;
   showCloseButton?: boolean;
+};
+
+const SHEET_SIZE_CLASS: Record<SheetSize, string> = {
+  md: "w-[420px] max-w-[90vw]",
+  lg: "w-[720px] max-w-[92vw]",
+  xl: "w-[1080px] max-w-[96vw]"
 };
 
 function SheetContent({
   className,
   children,
   side = "right",
+  size = "md",
   showCloseButton = true,
   ...props
 }: SheetContentProps) {
@@ -57,8 +67,10 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        data-size={size}
         className={cn(
-          "fixed inset-y-0 flex w-[420px] max-w-[90vw] flex-col bg-[var(--panel-elevated)] shadow-[var(--shadow-xl)]",
+          "fixed inset-y-0 flex flex-col bg-[var(--panel-elevated)] shadow-[var(--shadow-xl)]",
+          SHEET_SIZE_CLASS[size],
           side === "right" && "right-0 border-l border-[var(--border)] ds-sheet-content--right",
           side === "left" && "left-0 border-r border-[var(--border)] ds-sheet-content--left",
           className

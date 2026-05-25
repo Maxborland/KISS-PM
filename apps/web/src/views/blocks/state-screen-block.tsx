@@ -1,3 +1,8 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -8,6 +13,8 @@ import { PageIntro } from "@/views/layout/page-intro";
 export type StateKind = "empty" | "error" | "forbidden" | "loading";
 
 export function StateScreenBlock({ kind }: { kind: StateKind }) {
+  const [retryCount, setRetryCount] = useState(0);
+
   const copy = {
     empty: {
       title: "Нет задач",
@@ -16,14 +23,31 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
         <EmptyState
           title="Пока пусто"
           description="Добавьте задачу или измените фильтры."
-          action={<Button variant="primary">Создать задачу</Button>}
+          action={
+            <Button variant="primary" onClick={() => toast.success("Задача создана (демо)")}>
+              Создать задачу
+            </Button>
+          }
         />
       )
     },
     error: {
       title: "Ошибка загрузки",
       lead: "Не удалось получить данные. Повторите позже.",
-      body: <ErrorState title="Что-то пошло не так" description="Проверьте соединение и повторите запрос." />
+      body: (
+        <ErrorState
+          title="Что-то пошло не так"
+          description={
+            retryCount > 0
+              ? `Повтор ${retryCount}: проверьте соединение и повторите запрос.`
+              : "Проверьте соединение и повторите запрос."
+          }
+          onRetry={() => {
+            setRetryCount((n) => n + 1);
+            toast.info("Повтор запроса (демо)");
+          }}
+        />
+      )
     },
     forbidden: {
       title: "Нет доступа",

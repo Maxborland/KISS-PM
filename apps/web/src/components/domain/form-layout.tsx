@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { X } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
@@ -131,10 +131,20 @@ export function FormActions({
 export type TagsInputProps = {
   tags: string[];
   onRemove?: (tag: string) => void;
+  onAdd?: (tag: string) => void;
   placeholder?: string;
 };
 
-export function TagsInput({ tags, onRemove, placeholder = "Добавить тег…" }: TagsInputProps) {
+export function TagsInput({ tags, onRemove, onAdd, placeholder = "Добавить тег…" }: TagsInputProps) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const value = event.currentTarget.value.trim();
+    if (!value || tags.includes(value)) return;
+    onAdd?.(value);
+    event.currentTarget.value = "";
+  };
+
   return (
     <div className="tags-input">
       {tags.map((t) => (
@@ -152,7 +162,12 @@ export function TagsInput({ tags, onRemove, placeholder = "Добавить те
           ) : null}
         </Chip>
       ))}
-      <input className="tags-input__field" placeholder={placeholder} aria-label={placeholder} />
+      <input
+        className="tags-input__field"
+        placeholder={placeholder}
+        aria-label={placeholder}
+        onKeyDown={onAdd ? handleKeyDown : undefined}
+      />
     </div>
   );
 }

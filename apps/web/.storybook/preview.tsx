@@ -2,6 +2,7 @@ import type { Preview } from "@storybook/react";
 import { ThemeProvider } from "next-themes";
 import React from "react";
 
+import { Toaster } from "../src/components/ui/sonner";
 import { TooltipProvider } from "../src/components/ui/tooltip";
 import "../src/app/globals.css";
 import "./storybook-fonts.css";
@@ -30,6 +31,7 @@ const preview: Preview = {
                 <Story />
               </div>
             )}
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       );

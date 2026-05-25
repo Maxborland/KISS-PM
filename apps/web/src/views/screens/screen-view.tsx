@@ -33,6 +33,7 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
       title="Согласовать ТЗ"
       subtitle={mockTaskProjectRef("MDS-39")}
       stage={{ label: "В работе", tone: "info" }}
+      variant="task"
     />
   ),
   "04-create-task-modal": () => <TaskCreateModalBlock />,

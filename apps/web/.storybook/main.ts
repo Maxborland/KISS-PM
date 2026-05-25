@@ -9,6 +9,7 @@ const config: StorybookConfig = {
   // Legacy design-v2 stories removed (batch 8); index is design-v3 only (DESIGN_CONTRACT §10).
   stories: [
     "../src/components/**/*.stories.@(ts|tsx)",
+    "../src/widgets/**/*.stories.@(ts|tsx)",
     "../src/views/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"

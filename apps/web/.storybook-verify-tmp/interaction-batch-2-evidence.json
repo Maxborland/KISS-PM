@@ -1,0 +1,80 @@
+{
+  "batch": "interaction-2",
+  "scope": "CRM: deals + entities + funnel widget",
+  "date": "2026-05-25",
+  "pass": true,
+  "files": {
+    "modified": [
+      "apps/web/src/views/blocks/deals-block.tsx",
+      "apps/web/src/views/blocks/entities-block.tsx",
+      "apps/web/src/views/screens/screens.stories.tsx",
+      "apps/web/src/__health__/storybook-contract.health.test.ts",
+      "apps/web/src/app/globals.css"
+    ],
+    "created": [
+      "apps/web/src/widgets/funnel/types.ts",
+      "apps/web/src/widgets/funnel/use-funnel-state.ts",
+      "apps/web/src/widgets/funnel/deal-card.tsx",
+      "apps/web/src/widgets/funnel/funnel-board.tsx",
+      "apps/web/src/widgets/funnel/index.ts",
+      "apps/web/src/widgets/funnel/funnel.stories.tsx",
+      "apps/web/src/styles/widgets/funnel.css"
+    ]
+  },
+  "p0": {
+    "entities_block": {
+      "import_button_disabled_with_title": true,
+      "add_button_disabled_with_title": true,
+      "filter_button_disabled_with_title": true,
+      "row_action_dropdown_menu": true,
+      "regression_vs_deals_pattern_fixed": true
+    }
+  },
+  "p1": {
+    "entities_search_controlled_filters_rows": true,
+    "entities_row_click_opens_sheet": true,
+    "deals_new_drawer_appends_local_state": true,
+    "deals_search_controlled_filters": true,
+    "deals_card_and_row_click_open_sheet": true,
+    "funnel_widget_extracted": {
+      "files": [
+        "widgets/funnel/funnel-board.tsx",
+        "widgets/funnel/deal-card.tsx",
+        "widgets/funnel/use-funnel-state.ts"
+      ],
+      "props": [
+        "stages",
+        "deals",
+        "onMoveDeal(dealId, toStageId)",
+        "onOpenDeal(id)"
+      ],
+      "dnd_lib": "@dnd-kit/core",
+      "deals_block_composes_funnel_board": true
+    },
+    "forecast_mode": "stat_cards_per_stage"
+  },
+  "p2": {
+    "funnel_stories_variants": ["Default", "Dragging", "Filtered", "EmptyStage"],
+    "screens_stories_added": ["DealsFunnelDragging", "EntitiesClientsFiltered"]
+  },
+  "verification": {
+    "typecheck": { "command": "pnpm --filter @kiss-pm/web typecheck", "exit_code": 0 },
+    "tests": {
+      "command": "pnpm --filter @kiss-pm/web test",
+      "exit_code": 0,
+      "tests_passed": 98,
+      "tests_failed": 0,
+      "files": 18
+    },
+    "build": {
+      "command": "pnpm --filter @kiss-pm/web build",
+      "exit_code": 0,
+      "compiled": true,
+      "static_pages": 3
+    }
+  },
+  "codegraph": {
+    "sync_before": "ok (already up to date, 245 files / 2638 nodes / 6740 edges)",
+    "tools_used": ["status", "sync"]
+  }
+}
