@@ -6,7 +6,7 @@ import { getPlanningRealtimeStatus } from "./planningRealtimeHealth";
 import type { PlanningEventsBackend } from "./serverConfig";
 import type { StorageProvider } from "./storageProvider";
 
-export const expectedDatabaseMigrationTag = "0033_phase_9_closure_retrospectives.sql";
+export const expectedDatabaseMigrationTag = "0034_phase_g_collaboration_communications.sql";
 
 type ReadinessPostgresClient = (
   strings: TemplateStringsArray,

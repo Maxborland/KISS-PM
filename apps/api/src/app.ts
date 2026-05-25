@@ -25,6 +25,7 @@ import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
+import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
@@ -230,6 +231,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAuditRoutes(app, routeDeps);
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
+  registerCollaborationRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);

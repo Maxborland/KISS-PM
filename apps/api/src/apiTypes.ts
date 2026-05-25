@@ -1,10 +1,24 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CollaborationEntityType,
   ControlSignal,
   CorrectiveAction,
+  Conversation,
+  ConversationReadState,
+  DiscussionMessage,
   KpiDefinition,
   KpiEvaluation,
+  Meeting,
+  MeetingActionItem,
+  MeetingExternalLink,
+  MeetingNote,
+  MeetingParticipant,
+  MeetingParticipantResponse,
+  MeetingParticipantRole,
+  MeetingStatus,
+  MessageMention,
+  NotificationPreference,
   PlanSnapshot,
   ProjectClosureSnapshot,
   RetrospectiveLesson,
@@ -13,6 +27,7 @@ import type {
   TenantId,
   TenantUser,
   TemplateImprovementAction,
+  UserNotification,
   UserId
 } from "@kiss-pm/domain";
 import type {
@@ -706,6 +721,127 @@ export type ApiTenantDataSource = {
       projectId?: string | null;
     }
   ): Promise<AuditEventListItem[]>;
+  ensureConversation?(input: Omit<Conversation, "createdAt" | "archivedAt">): Promise<Conversation>;
+  findConversation?(
+    tenantId: TenantId,
+    conversationId: string
+  ): Promise<Conversation | undefined>;
+  listConversationsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<Conversation[]>;
+  createDiscussionMessage?(input: Omit<
+    DiscussionMessage,
+    "createdAt" | "editedAt" | "archivedAt" | "pinnedAt" | "pinnedByUserId"
+  >): Promise<DiscussionMessage>;
+  listDiscussionMessages?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    limit: number;
+  }): Promise<DiscussionMessage[]>;
+  findDiscussionMessage?(
+    tenantId: TenantId,
+    messageId: string
+  ): Promise<DiscussionMessage | undefined>;
+  updateDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    body: string;
+    metadata: Record<string, unknown>;
+  }): Promise<DiscussionMessage | undefined>;
+  archiveDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+  }): Promise<DiscussionMessage | undefined>;
+  pinDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    pinnedByUserId: UserId;
+  }): Promise<DiscussionMessage | undefined>;
+  replaceMessageMentions?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    mentionedUserIds: UserId[];
+  }): Promise<MessageMention[]>;
+  listMessageMentions?(tenantId: TenantId, messageId: string): Promise<MessageMention[]>;
+  getConversationReadState?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    userId: UserId;
+  }): Promise<ConversationReadState>;
+  markConversationRead?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    userId: UserId;
+  }): Promise<ConversationReadState>;
+  createUserNotification?(input: Omit<
+    UserNotification,
+    "createdAt" | "readAt" | "archivedAt"
+  >): Promise<UserNotification>;
+  listUserNotifications?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    status?: "unread" | "read";
+    limit: number;
+  }): Promise<UserNotification[]>;
+  markUserNotificationRead?(input: {
+    tenantId: TenantId;
+    notificationId: string;
+    userId: UserId;
+  }): Promise<UserNotification | undefined>;
+  listNotificationPreferences?(
+    tenantId: TenantId,
+    userId: UserId
+  ): Promise<NotificationPreference[]>;
+  upsertNotificationPreferences?(input: NotificationPreference[]): Promise<NotificationPreference[]>;
+  createMeeting?(input: Omit<Meeting, "createdAt" | "archivedAt">): Promise<Meeting>;
+  updateMeeting?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    title: string;
+    agenda: string;
+    scheduledStart: Date;
+    scheduledFinish: Date;
+    status: MeetingStatus;
+  }): Promise<Meeting | undefined>;
+  findMeeting?(tenantId: TenantId, meetingId: string): Promise<Meeting | undefined>;
+  listMeetingsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<Meeting[]>;
+  replaceMeetingParticipants?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    participants: Array<{
+      userId: UserId;
+      role: MeetingParticipantRole;
+      response: MeetingParticipantResponse;
+    }>;
+  }): Promise<MeetingParticipant[]>;
+  listMeetingParticipants?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingParticipant[]>;
+  createMeetingExternalLink?(input: Omit<
+    MeetingExternalLink,
+    "createdAt" | "archivedAt"
+  >): Promise<MeetingExternalLink>;
+  listMeetingExternalLinks?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingExternalLink[]>;
+  createMeetingNote?(input: Omit<MeetingNote, "createdAt" | "editedAt" | "archivedAt">): Promise<MeetingNote>;
+  listMeetingNotes?(tenantId: TenantId, meetingId: string): Promise<MeetingNote[]>;
+  createMeetingActionItem?(input: Omit<
+    MeetingActionItem,
+    "createdAt" | "archivedAt"
+  >): Promise<MeetingActionItem>;
+  listMeetingActionItems?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingActionItem[]>;
 };
 
 export type CreateAppOptions = {

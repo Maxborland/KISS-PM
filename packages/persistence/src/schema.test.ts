@@ -58,6 +58,17 @@ describe("PostgreSQL persistence schema", () => {
       "file_assets",
       "external_references",
       "entity_attachments",
+      "conversations",
+      "discussion_messages",
+      "message_mentions",
+      "conversation_read_states",
+      "user_notifications",
+      "notification_preferences",
+      "meetings",
+      "meeting_participants",
+      "meeting_external_links",
+      "meeting_notes",
+      "meeting_action_items",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -118,6 +129,17 @@ describe("PostgreSQL persistence schema", () => {
       "file_assets",
       "external_references",
       "entity_attachments",
+      "conversations",
+      "discussion_messages",
+      "message_mentions",
+      "conversation_read_states",
+      "user_notifications",
+      "notification_preferences",
+      "meetings",
+      "meeting_participants",
+      "meeting_external_links",
+      "meeting_notes",
+      "meeting_action_items",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -315,6 +337,61 @@ describe("PostgreSQL persistence schema", () => {
         "source_activity_type",
         "source_activity_id",
         "archived_at"
+      ])
+    );
+  });
+
+  it("stores the Phase G collaboration and communications contract", () => {
+    expect(getPersistenceTableColumns("conversations")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "entity_type",
+        "entity_id",
+        "conversation_type",
+        "created_by_user_id",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("discussion_messages")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "conversation_id",
+        "author_user_id",
+        "body",
+        "metadata",
+        "pinned_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("user_notifications")).toEqual(
+      expect.arrayContaining([
+        "user_id",
+        "notification_type",
+        "source_entity_type",
+        "source_entity_id",
+        "route",
+        "read_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("meetings")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "agenda",
+        "scheduled_start",
+        "scheduled_finish",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("meeting_external_links")).toEqual(
+      expect.arrayContaining(["meeting_id", "provider", "url", "title"])
+    );
+    expect(getPersistenceTableColumns("meeting_action_items")).toEqual(
+      expect.arrayContaining([
+        "meeting_id",
+        "owner_user_id",
+        "target_entity_type",
+        "target_entity_id",
+        "status"
       ])
     );
   });

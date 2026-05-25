@@ -54,3 +54,4 @@ export * from "./planning/autoSolver";
 export * from "./control";
 export * from "./controlSurfaces";
 export * from "./retrospectives";
+export * from "./collaboration";
