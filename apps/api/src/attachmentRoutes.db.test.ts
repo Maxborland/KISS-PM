@@ -280,6 +280,7 @@ describe("attachment and unified search API", () => {
       { headers: { cookie } }
     );
     expect(download.status).toBe(200);
+    expect(download.headers.get("cache-control")).toBe("no-store, private");
     expect(download.headers.get("content-type")).toBe("text/plain");
     expect(download.headers.get("content-disposition")).toContain(".-brief.txt");
     await expect(download.text()).resolves.toBe("hello");

@@ -141,6 +141,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
     const headers = new Headers();
+    headers.set("Cache-Control", "no-store, private");
     headers.set("Content-Type", result.mimeType);
     headers.set("Content-Length", String(result.bytes.byteLength));
     headers.set(
