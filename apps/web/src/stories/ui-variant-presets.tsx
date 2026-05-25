@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { MoreHorizontal } from "lucide-react";
+import { Calendar, MoreHorizontal } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AvatarGroup } from "@/components/ui/avatar-group";
 import { Badge } from "@/components/ui/badge";
 import { BannerInline } from "@/components/ui/banner-inline";
 import {
@@ -37,12 +38,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { IconButton } from "@/components/ui/icon-button";
+import { IconPill } from "@/components/ui/icon-pill";
 import { IlluState } from "@/components/ui/illu-state";
+import { KbdShortcut } from "@/components/ui/kbd-shortcut";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
+import { NumericValue } from "@/components/ui/numeric-value";
 import { PageIntro } from "@/components/ui/page-intro";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProgressRing } from "@/components/ui/progress-ring";
 import {
   Pagination,
   PaginationContent,
@@ -56,6 +62,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchPill } from "@/components/ui/search-pill";
 import { Segmented } from "@/components/ui/segmented";
+import { Sparkline } from "@/components/ui/sparkline";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -64,6 +72,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { TrendArrow } from "@/components/ui/trend-arrow";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { VariantMatrixItem } from "@/stories/variant-matrix";
 
@@ -82,6 +91,21 @@ export const UI_VARIANT_ITEMS = {
     { label: "Инициалы", node: <Avatar><AvatarFallback>ИП</AvatarFallback></Avatar> },
     { label: "Второй цвет", node: <Avatar><AvatarFallback className="bg-[var(--violet-soft)] text-[#6d28d9]">АП</AvatarFallback></Avatar> }
   ),
+  "avatar-group": items({
+    label: "Группа",
+    node: (
+      <AvatarGroup
+        items={[
+          { id: "1", initials: "ИП" },
+          { id: "2", initials: "АК" },
+          { id: "3", initials: "МС" },
+          { id: "4", initials: "ДВ" },
+          { id: "5", initials: "ЕН" }
+        ]}
+        max={3}
+      />
+    )
+  }),
   badge: items(
     { label: "По умолчанию", node: <Badge>По умолчанию</Badge> },
     { label: "Успех", node: <Badge variant="success">Успех</Badge> },
@@ -365,7 +389,41 @@ export const UI_VARIANT_ITEMS = {
         <TooltipContent>Краткая подсказка</TooltipContent>
       </Tooltip>
     )
-  })
+  }),
+  "status-dot": items(
+    { label: "Успех", node: <StatusDot tone="success" label="В срок" /> },
+    { label: "Риск", node: <StatusDot tone="warning" label="Риск" /> },
+    { label: "Просрочка", node: <StatusDot tone="danger" label="Просрочено" /> }
+  ),
+  "progress-bar": items(
+    { label: "65%", node: <ProgressBar value={65} label="Выполнение" className="w-56" /> },
+    { label: "Без подписи", node: <ProgressBar value={40} className="w-48" /> }
+  ),
+  "progress-ring": items(
+    { label: "72%", node: <ProgressRing value={72} /> },
+    { label: "Малый", node: <ProgressRing value={45} size={32} /> }
+  ),
+  "trend-arrow": items(
+    { label: "Рост", node: <TrendArrow direction="up" value="+12%" /> },
+    { label: "Падение", node: <TrendArrow direction="down" value="-4%" /> },
+    { label: "Без изменений", node: <TrendArrow direction="flat" /> }
+  ),
+  sparkline: items({
+    label: "Тренд",
+    node: <Sparkline points={[2, 4, 3, 6, 5, 8, 7]} />
+  }),
+  "kbd-shortcut": items({
+    label: "Поиск",
+    node: <KbdShortcut keys={["⌘", "K"]} description="Глобальный поиск" />
+  }),
+  "numeric-value": items(
+    { label: "Часы", node: <NumericValue value="128" unit="ч" /> },
+    { label: "Процент", node: <NumericValue value="94" unit="%" /> }
+  ),
+  "icon-pill": items(
+    { label: "Средний", node: <IconPill icon={Calendar} label="Календарь" size="md" /> },
+    { label: "Малый", node: <IconPill icon={Calendar} label="Календарь" size="sm" /> }
+  )
 } as const satisfies Record<string, VariantMatrixItem[]>;
 
 export type UiVariantKey = keyof typeof UI_VARIANT_ITEMS;
