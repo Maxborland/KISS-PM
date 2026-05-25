@@ -77,6 +77,23 @@ describe("limited JSON body reader", () => {
     });
   });
 
+  it("accepts zero-padded Content-Length headers", async () => {
+    const result = await readLimitedJsonBody(
+      requestContext(
+        new Request("http://127.0.0.1/api/commands", {
+          method: "POST",
+          headers: {
+            "content-length": "00042",
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({ command: "ok" })
+        })
+      )
+    );
+
+    expect(result).toEqual({ ok: true, value: { command: "ok" } });
+  });
+
   it("rejects Content-Length values above the configured body limit", async () => {
     const result = await readLimitedJsonBody(
       requestContext(

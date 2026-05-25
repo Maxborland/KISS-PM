@@ -67,8 +67,9 @@ export async function readLimitedJsonBody(
 
 function parseContentLength(value: string | null): number | null {
   if (value === null || value === "") return 0;
-  if (!/^(0|[1-9]\d*)$/.test(value)) return null;
-  return Number(value);
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  return Number(normalized);
 }
 
 function isJsonContentType(contentType: string | null): boolean {
