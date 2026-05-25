@@ -1426,6 +1426,164 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(auditActionType).toBe("management_action.denied");
   });
 
+  it("rechecks control action plan delta after acquiring the planning lock", async () => {
+    const snapshot = createControlActionSnapshot();
+    let appliedCommand: PlanningCommand | null = null;
+    let listControlSignalsCalls = 0;
+    const actionCommand: PlanningCommand = {
+      type: "task.update_work_model",
+      payload: {
+        taskId: "task-control-1",
+        taskType: "fixed_units",
+        effortDriven: false,
+        durationMinutes: 420,
+        workMinutes: 420
+      }
+    };
+    const baseSignal: ControlSignal = {
+      id: "signal-control-1",
+      tenantId: "tenant-control",
+      projectId: "project-control",
+      sourceEntity: { type: "Project", id: "project-control" },
+      sourceMetric: "deadline_delta_days",
+      evaluationId: "eval-control-1",
+      severity: "critical",
+      explanation: "Project finish is after deadline",
+      ownerUserId: null,
+      allowedActions: ["apply_planning_delta"],
+      scenarioProposals: [
+        {
+          id: "action-control-1",
+          type: "apply_planning_delta",
+          label: "Compress critical task",
+          targetEntity: { type: "ControlSignal", id: "signal-control-1" },
+          requiredPermissions: ["tenant.project_plan.manage"],
+          planDelta: {
+            commands: [actionCommand],
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            changedDependencyIds: [],
+            acceptedRiskIds: []
+          },
+          input: { taskId: "task-control-1" },
+          explainability: {
+            reason: "Deadline-first correction",
+            deadlineDeltaDays: 0,
+            overloadMinutes: 0,
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            riskScore: 20,
+            cost: 120
+          }
+        }
+      ],
+      status: "open",
+      createdAt: "2026-05-24T00:00:00.000Z",
+      updatedAt: "2026-05-24T00:00:00.000Z"
+    };
+    const lockedSignal: ControlSignal = {
+      ...baseSignal,
+      scenarioProposals: [
+        {
+          ...baseSignal.scenarioProposals[0]!,
+          planDelta: {
+            commands: [],
+            changedTaskIds: [],
+            changedAssignmentIds: [],
+            changedDependencyIds: [],
+            acceptedRiskIds: []
+          }
+        }
+      ]
+    };
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: [
+            "tenant.control_signals.read",
+            "tenant.management_actions.execute",
+            "tenant.project_plan.manage"
+          ]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async lockTenantResourcePlanning() {
+        return;
+      },
+      async listControlSignals() {
+        listControlSignalsCalls += 1;
+        return listControlSignalsCalls === 1 ? [baseSignal] : [lockedSignal];
+      },
+      async getPlanSnapshot() {
+        return snapshot;
+      },
+      async applyPlanningCommand(input) {
+        appliedCommand = input.command;
+      },
+      async incrementPlanVersion() {
+        return 6;
+      },
+      async createActionExecution(input) {
+        return {
+          ...input,
+          createdAt: new Date("2026-05-24T00:00:00.000Z")
+        };
+      },
+      async appendAuditEvent() {
+        return;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/apply",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=control-token"
+        },
+        body: JSON.stringify({ clientPlanVersion: 5 })
+      }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "action_candidate_has_no_plan_delta" });
+    expect(appliedCommand).toBeNull();
+  });
+
   it("requires planning-command permissions for control action plan deltas", async () => {
     const snapshot = createControlActionSnapshot();
     let appliedCommand: PlanningCommand | null = null;

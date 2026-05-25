@@ -395,6 +395,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         if (!lockedSignal || !lockedAction?.planDelta) {
           return { ok: false as const, status: 404, error: "action_candidate_not_found" };
         }
+        if (lockedAction.planDelta.commands.length === 0) {
+          return { ok: false as const, status: 400, error: "action_candidate_has_no_plan_delta" };
+        }
         const lockedDecision = decisionForActionPermissions(lockedAction, actor, profile);
         if (!lockedDecision.allowed) {
           const auditEventId = await appendControlAuditIfConfigured(deps, {
