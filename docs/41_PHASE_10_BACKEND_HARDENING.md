@@ -32,6 +32,8 @@ Phase 10 начинается после закрытия основных backe
 
 Инвентарь ведется в `docs/status/2026-05-25-backend-capability-inventory.md`.
 
+Текущий progress по закрытым hardening gaps ведется в `docs/status/2026-05-25-phase-10-hardening-progress.md`.
+
 ## Hardening matrix
 
 Каждая поверхность проверяется по одной матрице:
