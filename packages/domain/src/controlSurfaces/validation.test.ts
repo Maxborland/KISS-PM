@@ -58,6 +58,30 @@ describe("control surface definition validation", () => {
     });
   });
 
+  it("rejects malformed values inside action permission arrays", () => {
+    const definition = createDefinition({
+      actions: [
+        {
+          id: "open",
+          label: "Открыть график",
+          actionKey: "open_gantt",
+          scope: "row",
+          requiredPermissions: ["tenant.project_plan.read", ""]
+        } as ControlSurfaceDefinition["actions"][number]
+      ]
+    });
+
+    expect(validateControlSurfaceDefinition(definition)).toMatchObject({
+      canPublish: false,
+      issues: [
+        expect.objectContaining({
+          code: "action_permissions_invalid",
+          path: "actions.0.requiredPermissions.1"
+        })
+      ]
+    });
+  });
+
   it("returns validation issues instead of throwing for malformed collection items", () => {
     const definition = createDefinition({
       actions: [
