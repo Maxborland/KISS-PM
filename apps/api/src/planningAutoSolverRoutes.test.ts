@@ -131,6 +131,10 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("planning_solver_run_expired");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_expired"
+    ]);
   });
 
   it("rejects stored proposal payload hash mismatches", async () => {
@@ -149,6 +153,10 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("planning_solver_payload_hash_mismatch");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_payload_hash_mismatch"
+    ]);
   });
 
   it("requires project resource management permission before creating solver proposals", async () => {

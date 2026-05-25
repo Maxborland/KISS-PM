@@ -30,6 +30,7 @@
 | Control surface required-permission exposure | Published surfaces were visible to non-builder readers even when their definition-level required permissions were missing | Non-builder published read-model now hides surfaces unless definition `requiredPermissions` are all granted | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | KPI definition mutation denied audit | KPI definition upsert denied by missing manage permission returned 403 without an audit trail | Denied KPI definition upserts now write safe metadata-only control audit events before returning 403 | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Management action route-level denied audit | Management action preview/apply route-level permission failures returned 403 before loading candidates without audit | Preview/apply now audit safe route metadata for execute/read permission denials before loading action candidates | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
+| Planning auto-solver apply rejection audit | Expired, already-applied, and payload-hash-mismatch solver apply rejections returned 409 without audit | Solver apply now writes rejection-specific audit events before returning governed 409 outcomes | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -42,7 +43,7 @@
 
 | Area | Next check |
 |------|------------|
-| Planning / solver apply | Continue focused review for persisted proposal apply edge cases beyond conflict/precondition audit trace |
+| Planning / solver apply | Continue focused review for accepted-risk reason and missing proposal rejection audit after persisted-run rejection coverage |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
 | Control surfaces | Continue focused review for saved-view/audit mutation boundaries after published permission gates |
