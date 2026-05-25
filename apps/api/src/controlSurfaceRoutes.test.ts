@@ -240,8 +240,23 @@ describe("control surface routes", () => {
     const listResponse = await noReadApp.request("/api/tenant/current/control-surfaces", {
       headers: { cookie: "kiss_pm_session=session-alpha" }
     });
+    const presetsResponse = await noReadApp.request("/api/tenant/current/control-surfaces/presets", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    const detailResponse = await noReadApp.request("/api/tenant/current/control-surfaces/surface-delivery", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
     expect(listResponse.status).toBe(403);
+    expect(presetsResponse.status).toBe(403);
+    expect(detailResponse.status).toBe(403);
     await expect(listResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(presetsResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(detailResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(noReadState.auditEvents.map((event) => event.actionType)).toEqual([
+      "control_surface.read_denied",
+      "control_surface.presets_read_denied",
+      "control_surface.read_denied"
+    ]);
 
     const noPublishState = createSurfaceDataSource({
       permissions: ["tenant.control_surfaces.read", "tenant.control_surfaces.manage"]

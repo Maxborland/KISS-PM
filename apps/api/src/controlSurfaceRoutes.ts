@@ -24,7 +24,16 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendDeniedAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "control_surface.read_denied",
+        surfaceId: "__list__",
+        permissionResult: decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
     const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
     const includeArchived = context.req.query("includeArchived") === "true";
@@ -41,7 +50,16 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendDeniedAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "control_surface.presets_read_denied",
+        surfaceId: "__presets__",
+        permissionResult: decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     return context.json({
       presets: createDefaultControlSurfacePresets(actor.tenantId).map((definition) => ({
@@ -59,10 +77,20 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const surfaceId = context.req.param("surfaceId");
+    if (!decision.allowed) {
+      await appendDeniedAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "control_surface.read_denied",
+        surfaceId,
+        permissionResult: decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
     const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
-    const surface = await deps.dataSource.findControlSurface(actor.tenantId, context.req.param("surfaceId"));
+    const surface = await deps.dataSource.findControlSurface(actor.tenantId, surfaceId);
     if (!surface) return context.json({ error: "control_surface_not_found" }, 404);
     if (!canReadBuilderState) {
       const publishedSurface = toPublishedSurfaceReadModel(surface, profile);
