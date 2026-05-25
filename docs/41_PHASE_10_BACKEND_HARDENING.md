@@ -87,6 +87,8 @@ Phase 10 начинается после закрытия основных backe
   - storage cleanup policy;
   - incident checklist.
 
+Runbook: `docs/runbooks/backend-operations.md`.
+
 ### 10.5 Release-like backend smoke
 
 Финальный smoke обязан пройти контур:

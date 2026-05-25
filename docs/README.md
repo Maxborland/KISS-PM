@@ -51,6 +51,11 @@
 
 - [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
 
+## Runbooks
+
+- [`runbooks/backend-operations.md`](runbooks/backend-operations.md) — Phase 10 backend operations: env, start/update, readiness, migrations, backup/restore, storage cleanup и incident checklist.
+- [`runbooks/e2e-smoke.md`](runbooks/e2e-smoke.md) — локальный browser/API smoke для проверки dev runtime.
+
 ## Референсы
 
 `references/` содержит обязательные материалы для продуктовой проверки: BR2-скриншоты, русское описание паттернов, русские выжимки по MS Project scheduling и визуальные boards дизайн-системы. Референсы нельзя копировать буквально. Из них извлекаются возможности, плотность интерфейса, управленческие сценарии, доменные требования и стабильные UI-паттерны KISS PM.
