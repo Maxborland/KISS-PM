@@ -1,3 +1,5 @@
+import { parsePlanningEventsBackend } from "./serverConfig";
+
 export type PlanRealtimeEvent =
   | { type: "planVersionChanged"; projectId: string; planVersion: number }
   | { type: "planSnapshotInvalidated"; projectId: string; reason: string };
@@ -32,19 +34,16 @@ export class InMemoryPlanningEventPublisher implements PlanningEventPublisher {
 let publisher: PlanningEventPublisher | null = null;
 
 export function createPlanningEventPublisher(): PlanningEventPublisher {
-  const backend = process.env.PLANNING_EVENTS_BACKEND ?? "memory";
+  const backend = parsePlanningEventsBackend(process.env.PLANNING_EVENTS_BACKEND);
   if (backend === "memory") {
     return new InMemoryPlanningEventPublisher();
   }
-  if (backend === "redis") {
-    return new InMemoryPlanningEventPublisher();
-  }
-  throw new Error(`unsupported_planning_events_backend:${backend}`);
+  return new InMemoryPlanningEventPublisher();
 }
 
 /** Async factory used at server boot when Redis is configured. */
 export async function bootstrapPlanningEventPublisher(): Promise<PlanningEventPublisher> {
-  const backend = process.env.PLANNING_EVENTS_BACKEND ?? "memory";
+  const backend = parsePlanningEventsBackend(process.env.PLANNING_EVENTS_BACKEND);
   const memory = new InMemoryPlanningEventPublisher();
   if (backend === "redis") {
     const { createRedisPlanningEventPublisher } = await import("./planningRedisEventBus.js");

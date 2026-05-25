@@ -57,6 +57,29 @@ describe("KISS PM API Phase 1 shell", () => {
     });
   });
 
+  it("includes realtime readiness when the check is configured", async () => {
+    const app = createApp({
+      readinessChecks: {
+        database: async () => {},
+        realtime: async () => {},
+        storage: async () => {}
+      }
+    });
+
+    const response = await app.request("/health/ready");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "ready",
+      product: "KISS PM",
+      checks: {
+        database: { status: "ok" },
+        realtime: { status: "ok" },
+        storage: { status: "ok", provider: "local" }
+      }
+    });
+  });
+
   it("returns stable readiness errors without leaking internal exceptions", async () => {
     const app = createApp({
       readinessChecks: {
