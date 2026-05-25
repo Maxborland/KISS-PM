@@ -1,5 +1,5 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
-import type { PlanningCommand, TenantUser, ValidationIssue } from "@kiss-pm/domain";
+import type { PlanningCommand, ScenarioProposal, TenantUser, ValidationIssue } from "@kiss-pm/domain";
 import type { Handler } from "hono";
 import { createHash } from "node:crypto";
 
@@ -39,6 +39,16 @@ export function getScenarioProposalId(context: Parameters<Handler>[0]): string {
 
 export function hashJson(value: unknown): string {
   return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+export function serializeScenarioProposal(proposal: ScenarioProposal): Record<string, unknown> {
+  return {
+    id: proposal.id,
+    profile: proposal.profile,
+    conflictEffect: proposal.conflictEffect,
+    planDelta: proposal.planDelta,
+    explainability: proposal.explainability
+  };
 }
 
 function stableStringify(value: unknown): string {

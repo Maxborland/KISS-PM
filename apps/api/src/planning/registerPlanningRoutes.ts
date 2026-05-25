@@ -5,8 +5,7 @@ import {
   canReadProjectPlan,
   type AccessProfile
 } from "@kiss-pm/access-control";
-import { isBlockingValidationIssue, proposePlanningScenarios } from "@kiss-pm/domain";
-import type { TenantUser } from "@kiss-pm/domain";
+import { isBlockingValidationIssue, proposePlanningScenarios, type TenantUser } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
@@ -33,6 +32,7 @@ import {
   getRequiredRouteParam,
   getScenarioProposalId,
   hashJson,
+  serializeScenarioProposal,
   summarizeSnapshot,
   validateCommandDataSourcePreconditions,
   type PlanningRouteDeps
@@ -588,6 +588,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     for (const proposal of proposals) {
       const runId = `planning-scenario-${randomUUID()}`;
       const persistedProposal = { ...proposal, id: runId };
+      const proposalPayload = serializeScenarioProposal(persistedProposal);
       await deps.dataSource.createPlanningScenarioRun({
         id: runId,
         tenantId: actor.tenantId,
@@ -595,8 +596,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         planVersion: snapshot.planVersion,
         engineVersion: PLANNING_ENGINE_VERSION,
         targetConflict: parsed.value.target,
-        proposalPayload: persistedProposal as unknown as Record<string, unknown>,
-        proposalPayloadHash: hashJson(persistedProposal),
+        proposalPayload,
+        proposalPayloadHash: hashJson(proposalPayload),
         actorUserId: actor.id,
         expiresAt
       });
