@@ -176,6 +176,19 @@ function validateActionBindings(
         )
       );
     }
+    if (Array.isArray(action.requiredPermissions)) {
+      for (const [permissionIndex, permission] of action.requiredPermissions.entries()) {
+        if (typeof permission !== "string" || permission.trim().length === 0) {
+          issues.push(
+            error(
+              "action_permissions_invalid",
+              `actions.${index}.requiredPermissions.${permissionIndex}`,
+              "Action permissions must contain only non-empty strings"
+            )
+          );
+        }
+      }
+    }
     for (const requiredPermission of registry.requiredPermissions) {
       if (!requiredPermissions.includes(requiredPermission)) {
         issues.push(

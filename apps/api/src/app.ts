@@ -29,6 +29,7 @@ import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
+import { registerHealthRoutes } from "./healthRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
@@ -47,6 +48,7 @@ import {
   setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
+import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -71,7 +73,7 @@ export function createApp(options: CreateAppOptions = {}) {
     return context.json(response.body, response.status);
   });
 
-  app.use("/api/*", async (context, next) => {
+  app.use("*", async (context, next) => {
     context.header("Cache-Control", "no-store, private");
     setApiSecurityHeaders(context);
     await next();
@@ -93,7 +95,9 @@ export function createApp(options: CreateAppOptions = {}) {
 
   async function getActor(userId: string | null) {
     if (!userId) return undefined;
-    const actor = await dataSource.findUserById(userId);
+    const parsedUserId = parseUserIdParam(userId);
+    if (!parsedUserId.ok) return undefined;
+    const actor = await dataSource.findUserById(parsedUserId.value);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }
@@ -208,8 +212,9 @@ export function createApp(options: CreateAppOptions = {}) {
     trustForwardedAuthHeaders
   };
 
-  app.get("/health", (context) => {
-    return context.json({ status: "ok", product: "KISS PM" });
+  registerHealthRoutes(app, {
+    readinessChecks: options.readinessChecks,
+    storageProvider
   });
 
   app.get("/api/health/realtime", async (context) => {

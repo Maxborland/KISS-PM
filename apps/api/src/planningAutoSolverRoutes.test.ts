@@ -5,6 +5,7 @@ import { reducePlanningCommand, type PlanSnapshot } from "@kiss-pm/domain";
 import type { PlanningSolverRunRecord } from "@kiss-pm/persistence";
 import type { ApiTenantDataSource } from "./apiTypes";
 import { createApp } from "./app";
+import { hashJson } from "./planning/planningRouteHelpers";
 
 describe("planning auto-solver API", () => {
   it("persists a solver run and applies the stored proposal through planning commands", async () => {
@@ -49,6 +50,10 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("plan_version_conflict");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_conflict"
+    ]);
   });
 
   it("builds solver runs with resource capacity through the requested deadline", async () => {
@@ -95,7 +100,7 @@ describe("planning auto-solver API", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=solver-token"
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         },
         body: JSON.stringify({
           mode: "schedule",
@@ -127,6 +132,10 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("planning_solver_run_expired");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_expired"
+    ]);
   });
 
   it("rejects stored proposal payload hash mismatches", async () => {
@@ -145,24 +154,124 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("planning_solver_payload_hash_mismatch");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_payload_hash_mismatch"
+    ]);
   });
 
-  it("requires project resource management permission for allocation-changing proposals", async () => {
+  it("audits missing persisted proposal ids before returning not found", async () => {
+    const harness = createApiHarness();
+    const createBody = await createSolverRun(harness);
+
+    const response = await harness.app.request(
+      `/api/workspace/projects/project-solver/planning/auto-solver-runs/${createBody.runId}/proposals/proposal-missing/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        body: JSON.stringify({ clientPlanVersion: 3 })
+      }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("planning_solver_proposal_not_found");
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_proposal_not_found"
+    ]);
+  });
+
+  it("audits accepted-overload proposals that are missing a risk reason", async () => {
+    const harness = createApiHarness();
+    const createBody = await createSolverRun(harness);
+    const storedRun = harness.storedRunBox.value;
+    if (!storedRun) throw new Error("missing_stored_run");
+    const proposals = storedRun.proposals.map((proposal, index) =>
+      index === 0
+        ? {
+            ...proposal,
+            planDelta: {
+              commands: [
+                {
+                  type: "risk.accept_overload",
+                  payload: {
+                    overloadId: "overload-alpha",
+                    acceptedRiskReason: "persisted proposal reason is ignored"
+                  }
+                }
+              ]
+            }
+          }
+        : proposal
+    );
+    harness.storedRunBox.value = {
+      ...storedRun,
+      proposals,
+      proposalPayloadHash: hashJson(proposals)
+    };
+
+    const response = await applyProposal(harness, createBody);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("accepted_risk_reason_required");
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_precondition_failed"
+    ]);
+  });
+
+  it("requires project resource management permission before creating solver proposals", async () => {
     const harness = createApiHarness({
       permissions: ["tenant.project_plan.read", "tenant.project_plan.manage"]
     });
-    const createBody = await createSolverRun(harness);
 
-    const response = await applyProposal(harness, createBody);
+    const response = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
+      }
+    );
     const body = await response.json();
 
     expect(response.status).toBe(403);
     expect(body.error).toBe("permission_missing");
     expect(harness.appliedCommandTypes).toEqual([]);
-    expect(harness.auditActionTypes).toEqual([
-      "planning.auto_solver.run_created",
-      "planning.auto_solver.apply_denied"
-    ]);
+    expect(harness.storedRunBox.value).toBeNull();
+    expect(harness.auditActionTypes).toEqual(["planning.auto_solver.create_denied"]);
+  });
+
+  it("audits denied solver run reads before returning persisted proposals", async () => {
+    const harness = createApiHarness({
+      permissions: ["tenant.project_plan.read"]
+    });
+
+    const response = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs/planning-auto-solver-1",
+      {
+        headers: {
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("permission_missing");
+    expect(harness.auditActionTypes).toEqual(["planning.auto_solver.read_denied"]);
   });
 });
 
@@ -307,7 +416,7 @@ async function createSolverRun(harness: ApiHarness): Promise<SolverRunResponse> 
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=solver-token"
+        cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
     }
@@ -331,7 +440,7 @@ async function applyProposal(
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=solver-token"
+        cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       body: JSON.stringify({ clientPlanVersion: input.clientPlanVersion ?? 3 })
     }

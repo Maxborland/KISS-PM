@@ -172,7 +172,7 @@ Audit viewer, negative RBAC browser coverage и первый workspace config ba
 - Вынесены config parsers в `apps/api/src/workspaceConfigParsers.ts`.
 - Вынесены workspace config routes в `apps/api/src/workspaceConfigRoutes.ts`.
 - `apps/api/src/app.ts` оставлен application composition layer и делегирует auth/config helper-модулям.
-- Для session cookie добавлен secure-cookie guard: локальный HTTP dev остается рабочим, production/self-hosted HTTPS включает `Secure` через `KISS_PM_SECURE_COOKIES=true` или `createApp({ secureCookies: true })`.
+- Для session cookie добавлен secure-cookie guard: локальный HTTP dev остается рабочим, production включает `Secure` по умолчанию, self-hosted HTTPS может явно включить `KISS_PM_SECURE_COOKIES=true` или `createApp({ secureCookies: true })`, а нестандартный non-TLS production должен явно отключить `KISS_PM_SECURE_COOKIES=false`.
 - Исправлен package-level test script `@kiss-pm/api`, чтобы API tests запускались без root include ambiguity.
 
 ## Проверки блока 4
@@ -196,7 +196,7 @@ Audit viewer, negative RBAC browser coverage и первый workspace config ba
 - Requesting Code Review Critical/Important не нашел.
 - Security review нашел Important: session cookie helper не умел ставить `Secure` для HTTPS deployment.
 - Исправлено:
-  - `shouldUseSecureCookies` типизирован через `Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES">>`;
+  - `shouldUseSecureCookies` типизирован через `Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES" | "NODE_ENV">>`;
   - `buildSessionCookieHeader` и `buildExpiredSessionCookieHeader` принимают secure option;
   - `createApp` поддерживает `secureCookies`, а default определяется через env.
 - Повторные Bug Hunt, Requesting Code Review и Security Review Critical/Important не нашли.

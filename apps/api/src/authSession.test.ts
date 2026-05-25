@@ -19,9 +19,14 @@ describe("auth session helpers", () => {
   });
 
   it("extracts the KISS PM session token from a cookie header", () => {
-    expect(getSessionTokenFromCookie("other=1; kiss_pm_session=raw-token")).toBe(
-      "raw-token"
+    const token = "a".repeat(64);
+
+    expect(getSessionTokenFromCookie(`other=1; kiss_pm_session=${token}`)).toBe(
+      token
     );
+    expect(getSessionTokenFromCookie("kiss_pm_session=raw-token")).toBeUndefined();
+    expect(getSessionTokenFromCookie(`kiss_pm_session=${"a".repeat(65)}`)).toBeUndefined();
+    expect(getSessionTokenFromCookie(`kiss_pm_session=${"g".repeat(64)}`)).toBeUndefined();
     expect(getSessionTokenFromCookie(null)).toBeUndefined();
   });
 
@@ -29,25 +34,27 @@ describe("auth session helpers", () => {
     expect(sessionCookieName).toBe("kiss_pm_session");
     expect(sessionTtlSeconds).toBe(7 * 24 * 60 * 60);
     expect(buildSessionCookieHeader("raw-token", { secure: false })).toBe(
-      "kiss_pm_session=raw-token; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800"
+      "kiss_pm_session=raw-token; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=604800"
     );
     expect(buildExpiredSessionCookieHeader({ secure: false })).toBe(
-      "kiss_pm_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0"
+      "kiss_pm_session=; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=0"
     );
   });
 
   it("adds Secure when deployment opts into HTTPS-only cookies", () => {
     expect(buildSessionCookieHeader("raw-token", { secure: true })).toBe(
-      "kiss_pm_session=raw-token; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800; Secure"
+      "kiss_pm_session=raw-token; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=604800; Secure"
     );
     expect(buildExpiredSessionCookieHeader({ secure: true })).toBe(
-      "kiss_pm_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0; Secure"
+      "kiss_pm_session=; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=0; Secure"
     );
   });
 
-  it("reads the explicit production secure-cookie opt-in flag", () => {
+  it("defaults production deployments to HTTPS-only cookies with explicit override", () => {
     expect(shouldUseSecureCookies({ KISS_PM_SECURE_COOKIES: "true" })).toBe(true);
     expect(shouldUseSecureCookies({ KISS_PM_SECURE_COOKIES: "false" })).toBe(false);
+    expect(shouldUseSecureCookies({ NODE_ENV: "production" })).toBe(true);
+    expect(shouldUseSecureCookies({ NODE_ENV: "development" })).toBe(false);
     expect(shouldUseSecureCookies({})).toBe(false);
   });
 });

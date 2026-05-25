@@ -338,6 +338,91 @@ describe("org structure routes (db)", () => {
     expect(body.error).toBe("tenant_org_placement_invalid_department");
   });
 
+  it("rejects unsafe org structure payload shape before replacement", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const app = createApp({ dataSource });
+
+    const requestReplace = (functional: Record<string, unknown>) =>
+      app.request("/api/tenant/current/org-structure", {
+        method: "PUT",
+        headers: {
+          cookie: adminCookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          functional,
+          project: { nodes: [], placements: [] }
+        })
+      });
+
+    const unsafeId = await requestReplace({
+      nodes: [
+        {
+          id: "../dir-1",
+          nodeType: "direction",
+          name: "Инженерия",
+          parentId: null,
+          sortOrder: 0
+        }
+      ],
+      placements: []
+    });
+    expect(unsafeId.status).toBe(400);
+    await expect(unsafeId.json()).resolves.toEqual({
+      error: "tenant_org_structure_invalid"
+    });
+
+    const fractionalSortOrder = await requestReplace({
+      nodes: [
+        {
+          id: "dir-1",
+          nodeType: "direction",
+          name: "Инженерия",
+          parentId: null,
+          sortOrder: 1.5
+        }
+      ],
+      placements: []
+    });
+    expect(fractionalSortOrder.status).toBe(400);
+    await expect(fractionalSortOrder.json()).resolves.toEqual({
+      error: "tenant_org_structure_invalid"
+    });
+
+    const controlName = await requestReplace({
+      nodes: [
+        {
+          id: "dir-1",
+          nodeType: "direction",
+          name: "Инженерия\u0000",
+          parentId: null,
+          sortOrder: 0
+        }
+      ],
+      placements: []
+    });
+    expect(controlName.status).toBe(400);
+    await expect(controlName.json()).resolves.toEqual({
+      error: "tenant_org_structure_invalid"
+    });
+
+    const oversizedNodes = await requestReplace({
+      nodes: Array.from({ length: 501 }, (_, index) => ({
+        id: `dir-${index}`,
+        nodeType: "direction",
+        name: `Направление ${index}`,
+        parentId: null,
+        sortOrder: index
+      })),
+      placements: []
+    });
+    expect(oversizedNodes.status).toBe(400);
+    await expect(oversizedNodes.json()).resolves.toEqual({
+      error: "tenant_org_structure_invalid"
+    });
+  });
+
   it("allows read but denies manage for org reader", async () => {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     const app = createApp({ dataSource });

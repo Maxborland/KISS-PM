@@ -1,4 +1,4 @@
-import type { TenantUser } from "@kiss-pm/domain";
+import type { OpportunityFeasibilityAssessment, TenantUser } from "@kiss-pm/domain";
 import { authorizeOpportunityFeasibility } from "./authorization";
 import { buildFeasibilityAssessment } from "./feasibilityAssessment";
 import { isFinalOpportunityStatus } from "./opportunityStatus";
@@ -44,7 +44,7 @@ export async function checkOpportunityFeasibility(
         opportunityId: opportunity.id,
         status: nextStatus,
         feasibilityStatus: assessment.status,
-        feasibilityResult: assessment as unknown as Record<string, unknown>
+        feasibilityResult: serializeFeasibilityAssessment(assessment)
       });
       if (!updated) {
         return undefined;
@@ -80,5 +80,20 @@ export async function checkOpportunityFeasibility(
     status: 200,
     opportunity: updatedOpportunity,
     assessment
+  };
+}
+
+function serializeFeasibilityAssessment(
+  assessment: OpportunityFeasibilityAssessment
+): Record<string, unknown> {
+  return {
+    opportunityId: assessment.opportunityId,
+    plannedHours: assessment.plannedHours,
+    totalRequiredHours: assessment.totalRequiredHours,
+    workingDays: assessment.workingDays,
+    status: assessment.status,
+    blockers: [...assessment.blockers],
+    warnings: [...assessment.warnings],
+    rows: assessment.rows.map((row) => ({ ...row }))
   };
 }

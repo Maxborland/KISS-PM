@@ -1,19 +1,14 @@
-import {
-  canManageTaskStatuses,
-  canReadProjects,
-  type AccessProfile
-} from "@kiss-pm/access-control";
+import { canManageTaskStatuses, canReadProjects, type AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { TaskStatusRecord } from "@kiss-pm/persistence";
 
-import type {
-  ApiTenantDataSource,
-  ManagementAuditEventInput
-} from "../apiTypes";
+import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
 import type { CreateTaskStatusBody } from "../projectWorkParsers";
+import { appendTaskStatusAudit } from "./taskStatusAudit";
 
 type TaskStatusWorkspaceDeps = {
   dataSource: ApiTenantDataSource;
+  runDataSourceTransaction<T>(operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
@@ -31,13 +26,9 @@ type WorkspaceError = {
   error: string;
 };
 
-type TaskStatusListResult =
-  | { ok: true; taskStatuses: TaskStatusRecord[] }
-  | WorkspaceError;
+type TaskStatusListResult = { ok: true; taskStatuses: TaskStatusRecord[] } | WorkspaceError;
 
-type TaskStatusResult =
-  | { ok: true; taskStatus: TaskStatusRecord }
-  | WorkspaceError;
+type TaskStatusResult = { ok: true; taskStatus: TaskStatusRecord } | WorkspaceError;
 
 export function createTaskStatusWorkspace(deps: TaskStatusWorkspaceDeps) {
   return {
@@ -81,7 +72,7 @@ async function createTaskStatus(
   deps: TaskStatusWorkspaceDeps,
   input: WorkspaceInput & { value: CreateTaskStatusBody }
 ): Promise<TaskStatusResult> {
-  if (!deps.dataSource.createTaskStatus) {
+  if (!deps.dataSource.createTaskStatus || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
     return { ok: false, status: 501, error: "persistence_not_configured" };
   }
 
@@ -92,34 +83,42 @@ async function createTaskStatus(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const taskStatus = await deps.dataSource.createTaskStatus({
-    ...input.value,
-    tenantId: input.actor.tenantId
-  });
-  await deps.appendManagementAuditEvent({
-    tenantId: input.actor.tenantId,
-    actorUserId: input.actor.id,
-    actionType: "task_status.created",
-    sourceWorkflow: "project_work",
-    sourceEntity: { type: "TaskStatus", id: taskStatus.id },
-    commandInput: input.value,
-    beforeState: null,
-    afterState: { id: taskStatus.id, category: taskStatus.category },
-    permissionResult: {
-      allowed: true,
-      reason: decision.reason,
-      permission: "tenant.task_statuses.manage"
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    if (!transactionDataSource.createTaskStatus || !transactionDataSource.appendAuditEvent) {
+      return { ok: false, status: 501, error: "persistence_not_configured" };
     }
-  });
+    const taskStatus = await transactionDataSource.createTaskStatus({
+      ...input.value,
+      tenantId: input.actor.tenantId
+    });
+    await appendTaskStatusAudit(
+      deps,
+      {
+        actor: input.actor,
+        actionType: "task_status.created",
+        taskStatusId: taskStatus.id,
+        commandInput: input.value,
+        beforeState: null,
+        afterState: { id: taskStatus.id, category: taskStatus.category },
+        permissionReason: decision.reason
+      },
+      transactionDataSource
+    );
 
-  return { ok: true, taskStatus };
+    return { ok: true, taskStatus };
+  });
 }
 
 async function updateTaskStatus(
   deps: TaskStatusWorkspaceDeps,
   input: WorkspaceInput & { statusId: string; value: CreateTaskStatusBody }
 ): Promise<TaskStatusResult> {
-  if (!deps.dataSource.updateTaskStatusDefinition || !deps.dataSource.listTaskStatuses) {
+  if (
+    !deps.dataSource.updateTaskStatusDefinition ||
+    !deps.dataSource.listTaskStatuses ||
+    !deps.dataSource.appendAuditEvent ||
+    !deps.dataSource.withTransaction
+  ) {
     return { ok: false, status: 501, error: "persistence_not_configured" };
   }
 
@@ -130,57 +129,69 @@ async function updateTaskStatus(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const before = (await deps.dataSource.listTaskStatuses(input.actor.tenantId)).find(
-    (status) => status.id === input.statusId
-  );
-  if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
-  if (before.isSystem && input.value.status === "archived") {
-    return { ok: false, status: 409, error: "system_task_status_required" };
-  }
-  if (before.isSystem && before.category !== input.value.category) {
-    return { ok: false, status: 409, error: "system_task_status_category_locked" };
-  }
-
-  const taskStatus = await deps.dataSource.updateTaskStatusDefinition({
-    ...input.value,
-    tenantId: input.actor.tenantId
-  });
-  await deps.appendManagementAuditEvent({
-    tenantId: input.actor.tenantId,
-    actorUserId: input.actor.id,
-    actionType: "task_status.updated",
-    sourceWorkflow: "project_work",
-    sourceEntity: { type: "TaskStatus", id: taskStatus.id },
-    commandInput: input.value,
-    beforeState: {
-      id: before.id,
-      name: before.name,
-      category: before.category,
-      sortOrder: before.sortOrder,
-      status: before.status
-    },
-    afterState: {
-      id: taskStatus.id,
-      name: taskStatus.name,
-      category: taskStatus.category,
-      sortOrder: taskStatus.sortOrder,
-      status: taskStatus.status
-    },
-    permissionResult: {
-      allowed: true,
-      reason: decision.reason,
-      permission: "tenant.task_statuses.manage"
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    if (
+      !transactionDataSource.updateTaskStatusDefinition ||
+      !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.appendAuditEvent
+    ) {
+      return { ok: false, status: 501, error: "persistence_not_configured" };
     }
-  });
+    const before = (await transactionDataSource.listTaskStatuses(input.actor.tenantId)).find(
+      (status) => status.id === input.statusId
+    );
+    if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
+    if (before.isSystem && input.value.status === "archived") {
+      return { ok: false, status: 409, error: "system_task_status_required" };
+    }
+    if (before.isSystem && before.category !== input.value.category) {
+      return { ok: false, status: 409, error: "system_task_status_category_locked" };
+    }
 
-  return { ok: true, taskStatus };
+    const taskStatus = await transactionDataSource.updateTaskStatusDefinition({
+      ...input.value,
+      tenantId: input.actor.tenantId
+    });
+    await appendTaskStatusAudit(
+      deps,
+      {
+        actor: input.actor,
+        actionType: "task_status.updated",
+        taskStatusId: taskStatus.id,
+        commandInput: input.value,
+        beforeState: {
+          id: before.id,
+          name: before.name,
+          category: before.category,
+          sortOrder: before.sortOrder,
+          status: before.status
+        },
+        afterState: {
+          id: taskStatus.id,
+          name: taskStatus.name,
+          category: taskStatus.category,
+          sortOrder: taskStatus.sortOrder,
+          status: taskStatus.status
+        },
+        permissionReason: decision.reason
+      },
+      transactionDataSource
+    );
+
+    return { ok: true, taskStatus };
+  });
 }
 
 async function archiveTaskStatus(
   deps: TaskStatusWorkspaceDeps,
   input: WorkspaceInput & { statusId: string }
 ): Promise<TaskStatusResult> {
-  if (!deps.dataSource.archiveTaskStatus || !deps.dataSource.listTaskStatuses) {
+  if (
+    !deps.dataSource.archiveTaskStatus ||
+    !deps.dataSource.listTaskStatuses ||
+    !deps.dataSource.appendAuditEvent ||
+    !deps.dataSource.withTransaction
+  ) {
     return { ok: false, status: 501, error: "persistence_not_configured" };
   }
 
@@ -191,35 +202,42 @@ async function archiveTaskStatus(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const before = (await deps.dataSource.listTaskStatuses(input.actor.tenantId)).find(
-    (status) => status.id === input.statusId
-  );
-  if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
-  if (before.isSystem) {
-    return { ok: false, status: 409, error: "system_task_status_required" };
-  }
-
-  const taskStatus = await deps.dataSource.archiveTaskStatus(
-    input.actor.tenantId,
-    input.statusId
-  );
-  if (!taskStatus) return { ok: false, status: 404, error: "task_status_not_found" };
-
-  await deps.appendManagementAuditEvent({
-    tenantId: input.actor.tenantId,
-    actorUserId: input.actor.id,
-    actionType: "task_status.archived",
-    sourceWorkflow: "project_work",
-    sourceEntity: { type: "TaskStatus", id: taskStatus.id },
-    commandInput: { id: taskStatus.id },
-    beforeState: { id: before.id, status: before.status },
-    afterState: { id: taskStatus.id, status: taskStatus.status },
-    permissionResult: {
-      allowed: true,
-      reason: decision.reason,
-      permission: "tenant.task_statuses.manage"
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    if (
+      !transactionDataSource.archiveTaskStatus ||
+      !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.appendAuditEvent
+    ) {
+      return { ok: false, status: 501, error: "persistence_not_configured" };
     }
-  });
+    const before = (await transactionDataSource.listTaskStatuses(input.actor.tenantId)).find(
+      (status) => status.id === input.statusId
+    );
+    if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
+    if (before.isSystem) {
+      return { ok: false, status: 409, error: "system_task_status_required" };
+    }
 
-  return { ok: true, taskStatus };
+    const taskStatus = await transactionDataSource.archiveTaskStatus(
+      input.actor.tenantId,
+      input.statusId
+    );
+    if (!taskStatus) return { ok: false, status: 404, error: "task_status_not_found" };
+
+    await appendTaskStatusAudit(
+      deps,
+      {
+        actor: input.actor,
+        actionType: "task_status.archived",
+        taskStatusId: taskStatus.id,
+        commandInput: { id: taskStatus.id },
+        beforeState: { id: before.id, status: before.status },
+        afterState: { id: taskStatus.id, status: taskStatus.status },
+        permissionReason: decision.reason
+      },
+      transactionDataSource
+    );
+
+    return { ok: true, taskStatus };
+  });
 }

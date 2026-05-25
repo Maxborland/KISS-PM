@@ -69,7 +69,9 @@ Canonical doc для реализованного среза Phase D (ветка
 - UI: `/settings/org-structure`, `features/org-structure/*`; consumers: матрица ресурсов (4 уровня + toggle), фильтры Users по placements.
 - **Конкурентное редактирование:** last-write-wins; черновик UI защищён `isDraftDirty` от refetch. Optimistic lock / etag — Phase E+ (см. `docs/decisions/tenant-org-structure.md`).
 
-## Phase E (planned) — Tenant resource load report
+## Phase E — Tenant resource load report
+
+Backend status: реализовано в PR #22. Дальше это поверхность Phase 10 hardening, а не новая feature-фаза.
 
 - Агрегация загрузки **по всем проектам** tenant (не вкладка одного проекта).
 - Группировка по выбранному org track: направление → отдел/команда → должность → сотрудник.

@@ -1,11 +1,13 @@
 import {
   canManageTenantUsers,
-  canReadTenantUsers
+  canReadTenantUsers,
+  type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { UserId } from "@kiss-pm/domain";
+import type { TenantUser, UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   parseWorkspaceUserBody,
@@ -35,7 +37,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceUserDeniedAudit(deps, actor, {
+        actionType: "workspace.user.read_denied",
+        entityId: "users",
+        commandInput: { resource: "users" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     return context.json({
       users: await dataSource.listWorkspaceUsers(actor.tenantId)
@@ -64,7 +74,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceUserDeniedAudit(deps, actor, {
+        actionType: "workspace.user.create_denied",
+        entityId: "new",
+        commandInput: { operation: "create_user" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -145,6 +163,9 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.patch("/api/workspace/users/:userId", async (context) => {
+    const parsedUserId = parseUserIdParam(context.req.param("userId"));
+    if (!parsedUserId.ok) return context.json({ error: parsedUserId.error }, 400);
+    const userId = parsedUserId.value;
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -166,24 +187,32 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceUserDeniedAudit(deps, actor, {
+        actionType: "workspace.user.update_denied",
+        entityId: userId,
+        commandInput: { userId },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const workspaceUsers = await dataSource.listWorkspaceUsers(actor.tenantId);
     const beforeState =
-      workspaceUsers.find((user) => user.id === context.req.param("userId")) ?? null;
+      workspaceUsers.find((user) => user.id === userId) ?? null;
     if (!beforeState) return context.json({ error: "user_not_found" }, 404);
 
     const parsed = parseWorkspaceUserPatchBody(
       body.value,
       actor.tenantId,
-      context.req.param("userId"),
+      userId,
       beforeState
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     if (
-      actor.id === context.req.param("userId") &&
+      actor.id === userId &&
       (parsed.value.status !== "active" ||
         parsed.value.accessProfileId !== actor.accessProfileId)
     ) {
@@ -193,7 +222,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       workspaceUsers.some(
         (user) =>
-          user.id !== context.req.param("userId") &&
+          user.id !== userId &&
           user.email === parsed.value.email
       )
     ) {
@@ -232,6 +261,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
           updatedUser.email
         );
       }
+      if (
+        shouldRevokeSessionsAfterUserUpdate(beforeState, updatedUser) &&
+        transactionDataSource.deleteSessionsByUserId
+      ) {
+        await transactionDataSource.deleteSessionsByUserId(
+          updatedUser.tenantId,
+          updatedUser.id
+        );
+      }
 
       await appendManagementAuditEvent(
         {
@@ -259,15 +297,22 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.delete("/api/workspace/users/:userId", async (context) => {
+    const parsedUserId = parseUserIdParam(context.req.param("userId"));
+    if (!parsedUserId.ok) return context.json({ error: parsedUserId.error }, 400);
+    const userId = parsedUserId.value as UserId;
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.deleteWorkspaceUser || !dataSource.listWorkspaceUsers) {
+    if (
+      !dataSource.deleteWorkspaceUser ||
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const userId = context.req.param("userId") as UserId;
     if (actor.id === userId) {
       return context.json({ error: "self_user_delete_forbidden" }, 400);
     }
@@ -277,7 +322,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendWorkspaceUserDeniedAudit(deps, actor, {
+        actionType: "workspace.user.delete_denied",
+        entityId: userId,
+        commandInput: { userId },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     const beforeState =
       (await dataSource.listWorkspaceUsers(actor.tenantId)).find(
@@ -286,23 +339,79 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     if (!beforeState) return context.json({ error: "user_not_found" }, 404);
 
-    await dataSource.deleteWorkspaceUser(actor.tenantId, userId);
-    await appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "workspace.user.deleted",
-      sourceWorkflow: "single_workspace_users",
-      sourceEntity: {
-        type: "TenantUser",
-        id: userId
-      },
-      commandInput: { id: userId },
-      beforeState,
-      afterState: null,
-      permissionResult: decision
+    await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.deleteWorkspaceUser) {
+        throw new Error("transactional_user_delete_not_configured");
+      }
+
+      await transactionDataSource.deleteWorkspaceUser(actor.tenantId, userId);
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "workspace.user.deleted",
+          sourceWorkflow: "single_workspace_users",
+          sourceEntity: {
+            type: "TenantUser",
+            id: userId
+          },
+          commandInput: { id: userId },
+          beforeState,
+          afterState: null,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
     });
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ status: "deleted" });
   });
+}
+
+async function appendWorkspaceUserDeniedAudit(
+  deps: ApiRouteDeps,
+  actor: TenantUser,
+  input: {
+    actionType: string;
+    entityId: string;
+    commandInput: Record<string, unknown>;
+    decision: PolicyDecision;
+  }
+) {
+  if (!deps.dataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent({
+    tenantId: actor.tenantId,
+    actorUserId: actor.id,
+    actionType: input.actionType,
+    sourceWorkflow: "single_workspace_users",
+    sourceEntity: {
+      type: "TenantUser",
+      id: input.entityId
+    },
+    commandInput: input.commandInput,
+    beforeState: null,
+    afterState: null,
+    permissionResult: input.decision,
+    executionResult: { status: "denied" }
+  });
+}
+
+function shouldRevokeSessionsAfterUserUpdate(
+  before: {
+    accessProfileId: string;
+    email: string;
+    status: string;
+  },
+  after: {
+    accessProfileId: string;
+    email: string;
+    status: string;
+  }
+): boolean {
+  return (
+    before.accessProfileId !== after.accessProfileId ||
+    before.email !== after.email ||
+    before.status !== after.status
+  );
 }

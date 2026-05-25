@@ -8,6 +8,42 @@ import type {
 
 const maxDisplayNameLength = 180;
 const maxUrlLength = 1200;
+const maxAttachmentIdLength = 240;
+const maxEntityIdLength = 200;
+const maxExternalIdLength = 240;
+const maxRelationTypeLength = 80;
+const maxMetadataLength = 8192;
+const maxMetadataDepth = 5;
+const maxMetadataEntries = 100;
+const maxMetadataArrayItems = 100;
+const maxMetadataKeyLength = 120;
+const maxMetadataStringLength = 1000;
+const controlCharacterPattern = /[\u0000-\u001f\u007f]/;
+const windowsReservedNames = new Set([
+  "con",
+  "prn",
+  "aux",
+  "nul",
+  "com1",
+  "com2",
+  "com3",
+  "com4",
+  "com5",
+  "com6",
+  "com7",
+  "com8",
+  "com9",
+  "lpt1",
+  "lpt2",
+  "lpt3",
+  "lpt4",
+  "lpt5",
+  "lpt6",
+  "lpt7",
+  "lpt8",
+  "lpt9"
+]);
+const blockedMetadataKeys = new Set(["__proto__", "prototype", "constructor"]);
 
 export const attachmentEntityTypes = [
   "opportunity",
@@ -33,6 +69,14 @@ export const externalReferenceConnectorTypes = [
 export type ParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
+
+type JsonMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonMetadataValue[]
+  | { [key: string]: JsonMetadataValue };
 
 export function parseAttachmentEntityType(value: unknown): ParseResult<AttachmentEntityType> {
   if (typeof value !== "string") return { ok: false, error: "attachment_entity_type_invalid" };
@@ -61,17 +105,79 @@ export function sanitizeFileName(value: unknown): ParseResult<string> {
   if (typeof value !== "string") return { ok: false, error: "file_name_required" };
   const trimmed = value.trim();
   if (!trimmed) return { ok: false, error: "file_name_required" };
-  const withoutControl = trimmed.replace(/[\u0000-\u001f\u007f]/g, "");
-  const normalized = withoutControl
-    .replace(/[\\/]+/g, "-")
-    .replace(/\.\.+/g, ".")
-    .replace(/[<>:"|?*]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
+  const normalized = normalizeFileSegment(trimmed).replace(/\s+/g, " ");
   if (!normalized || normalized === "." || normalized === "..") {
     return { ok: false, error: "file_name_invalid" };
   }
   return { ok: true, value: normalized.slice(0, maxDisplayNameLength) };
+}
+
+export function parseAttachmentId(value: unknown): ParseResult<string> {
+  if (typeof value !== "string") return { ok: false, error: "attachment_id_required" };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, error: "attachment_id_required" };
+  if (
+    trimmed.length > maxAttachmentIdLength ||
+    /[\u0000-\u001f\u007f]/.test(trimmed) ||
+    /[\\/]/.test(trimmed) ||
+    trimmed.includes("..") ||
+    !/^attachment(?:-task)?-[a-zA-Z0-9._:-]+$/.test(trimmed)
+  ) {
+    return { ok: false, error: "attachment_id_invalid" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+export function parseAttachmentEntityId(value: unknown): ParseResult<string> {
+  if (typeof value !== "string") {
+    return { ok: false, error: "attachment_entity_id_required" };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, error: "attachment_entity_id_required" };
+  if (
+    trimmed.length > maxEntityIdLength ||
+    /[\u0000-\u001f\u007f]/.test(trimmed) ||
+    /[\\/]/.test(trimmed) ||
+    trimmed.includes("..")
+  ) {
+    return { ok: false, error: "attachment_entity_id_invalid" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+export function parseRelationType(value: unknown): ParseResult<string> {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: "attachment" };
+  }
+  if (typeof value !== "string") {
+    return { ok: false, error: "attachment_relation_type_invalid" };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: "attachment" };
+  if (
+    trimmed.length > maxRelationTypeLength ||
+    /[\u0000-\u001f\u007f]/.test(trimmed) ||
+    !/^[a-zA-Z0-9._:-]+$/.test(trimmed)
+  ) {
+    return { ok: false, error: "attachment_relation_type_invalid" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+export function parseExternalId(value: unknown): ParseResult<string | null> {
+  if (value === undefined || value === null || value === "") return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, error: "external_id_invalid" };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (
+    trimmed.length > maxExternalIdLength ||
+    /[\u0000-\u001f\u007f]/.test(trimmed) ||
+    /[\\/]/.test(trimmed) ||
+    trimmed.includes("..")
+  ) {
+    return { ok: false, error: "external_id_invalid" };
+  }
+  return { ok: true, value: trimmed };
 }
 
 export function parseMimeType(value: unknown): ParseResult<string> {
@@ -116,6 +222,9 @@ export function parseExternalReferenceUrl(value: unknown): ParseResult<string> {
 
 export function parseReferenceTitle(value: unknown): ParseResult<string> {
   if (typeof value !== "string") return { ok: false, error: "external_title_required" };
+  if (controlCharacterPattern.test(value)) {
+    return { ok: false, error: "external_title_invalid" };
+  }
   const trimmed = value.trim().replace(/\s+/g, " ");
   if (!trimmed) return { ok: false, error: "external_title_required" };
   return { ok: true, value: trimmed.slice(0, maxDisplayNameLength) };
@@ -123,12 +232,14 @@ export function parseReferenceTitle(value: unknown): ParseResult<string> {
 
 export function parseMetadata(value: unknown): ParseResult<Record<string, unknown>> {
   if (value === undefined || value === null) return { ok: true, value: {} };
-  if (typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, error: "external_metadata_invalid" };
+  const sanitized = sanitizeMetadataRecord(value, 0);
+  if (!sanitized.ok) return sanitized;
+  const serialized = stringifyMetadata(sanitized.value);
+  if (!serialized.ok) return serialized;
+  if (serialized.value.length > maxMetadataLength) {
+    return { ok: false, error: "external_metadata_too_large" };
   }
-  const serialized = JSON.stringify(value);
-  if (serialized.length > 8192) return { ok: false, error: "external_metadata_too_large" };
-  return { ok: true, value: value as Record<string, unknown> };
+  return { ok: true, value: sanitized.value };
 }
 
 export function buildStorageKey(input: {
@@ -136,8 +247,10 @@ export function buildStorageKey(input: {
   assetId: string;
   safeDisplayName: string;
 }): string {
-  const suffix = input.safeDisplayName.replace(/[^a-zA-Z0-9._-]+/g, "-");
-  return `${input.tenantId}/${input.assetId}/${suffix}`;
+  const tenantSegment = normalizeFileSegment(input.tenantId) || "tenant";
+  const assetSegment = normalizeFileSegment(input.assetId) || "asset";
+  const suffix = normalizeFileSegment(input.safeDisplayName) || "download";
+  return `${tenantSegment}/${assetSegment}/${suffix}`;
 }
 
 export function parseStorageProvider(value: string | undefined): FileAssetProvider {
@@ -156,7 +269,10 @@ function isBlockedHost(hostname: string): boolean {
   if (mappedIpv4Parts) return isBlockedIpv4Parts(mappedIpv4Parts);
   if (
     normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "::" ||
     normalized === "::1" ||
+    normalized === "0:0:0:0:0:0:0:0" ||
     normalized === "0:0:0:0:0:0:0:1"
   ) {
     return true;
@@ -211,4 +327,94 @@ function isBlockedIpv4Parts(parts: number[]): boolean {
     (first === 169 && second === 254) ||
     first === 0
   );
+}
+
+function normalizeFileSegment(value: string): string {
+  const withoutControl = value.replace(/[\u0000-\u001f\u007f]/g, "");
+  const normalized = withoutControl
+    .replace(/[\\/]+/g, "-")
+    .replace(/\.\.+/g, ".")
+    .replace(/[<>:"|?*]/g, "-")
+    .replace(/[^\p{L}\p{N}._\-\s]+/gu, "-")
+    .replace(/^[.\-\s]+/g, "")
+    .replace(/[.\-\s]+$/g, "")
+    .replace(/-+/g, "-")
+    .trim();
+  if (!normalized || normalized === "." || normalized === "..") return "";
+  const baseName = normalized.split(".")[0]?.toLowerCase() ?? "";
+  if (windowsReservedNames.has(baseName)) return `file-${normalized}`;
+  return normalized;
+}
+
+function sanitizeMetadataRecord(
+  value: unknown,
+  depth: number
+): ParseResult<Record<string, JsonMetadataValue>> {
+  if (!isPlainRecord(value) || depth >= maxMetadataDepth) {
+    return { ok: false, error: "external_metadata_invalid" };
+  }
+  const entries = Object.entries(value);
+  if (entries.length > maxMetadataEntries) {
+    return { ok: false, error: "external_metadata_invalid" };
+  }
+
+  const sanitized: Record<string, JsonMetadataValue> = {};
+  for (const [key, rawValue] of entries) {
+    if (
+      !key ||
+      key.length > maxMetadataKeyLength ||
+      controlCharacterPattern.test(key) ||
+      blockedMetadataKeys.has(key)
+    ) {
+      return { ok: false, error: "external_metadata_invalid" };
+    }
+    const parsedValue = sanitizeMetadataValue(rawValue, depth + 1);
+    if (!parsedValue.ok) return parsedValue;
+    sanitized[key] = parsedValue.value;
+  }
+  return { ok: true, value: sanitized };
+}
+
+function sanitizeMetadataValue(
+  value: unknown,
+  depth: number
+): ParseResult<JsonMetadataValue> {
+  if (value === null || typeof value === "boolean") return { ok: true, value };
+  if (typeof value === "string") {
+    if (value.length > maxMetadataStringLength || controlCharacterPattern.test(value)) {
+      return { ok: false, error: "external_metadata_invalid" };
+    }
+    return { ok: true, value };
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return { ok: false, error: "external_metadata_invalid" };
+    return { ok: true, value };
+  }
+  if (Array.isArray(value)) {
+    if (depth >= maxMetadataDepth || value.length > maxMetadataArrayItems) {
+      return { ok: false, error: "external_metadata_invalid" };
+    }
+    const items: JsonMetadataValue[] = [];
+    for (const item of value) {
+      const parsedItem = sanitizeMetadataValue(item, depth + 1);
+      if (!parsedItem.ok) return parsedItem;
+      items.push(parsedItem.value);
+    }
+    return { ok: true, value: items };
+  }
+  return sanitizeMetadataRecord(value, depth);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function stringifyMetadata(value: Record<string, JsonMetadataValue>): ParseResult<string> {
+  try {
+    return { ok: true, value: JSON.stringify(value) };
+  } catch {
+    return { ok: false, error: "external_metadata_invalid" };
+  }
 }

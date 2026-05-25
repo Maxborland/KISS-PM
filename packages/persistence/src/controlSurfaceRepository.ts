@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, ne, or } from "drizzle-orm";
 
 import type {
   ControlSurfaceDefinition,
@@ -152,16 +152,8 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
     async publishControlSurface(input) {
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!existing) throw new Error("control_surface_not_found");
+      if (existing.status === "archived") throw new Error("control_surface_archived");
       const now = new Date();
-      const versionRecord = await insertSurfaceVersion(db, {
-        tenantId: input.tenantId,
-        surfaceId: existing.id,
-        version: existing.draftVersion,
-        definition: existing.draftDefinition,
-        actorUserId: input.actorUserId,
-        auditEventId: input.auditEventId ?? null,
-        createdAt: now
-      });
       const [row] = await db
         .update(controlSurfaceDefinitions)
         .set({
@@ -177,11 +169,21 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
         .where(
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
-            eq(controlSurfaceDefinitions.id, input.surfaceId)
+            eq(controlSurfaceDefinitions.id, input.surfaceId),
+            ne(controlSurfaceDefinitions.status, "archived")
           )
         )
         .returning();
-      if (!row) throw new Error("Control surface publish returned no row");
+      if (!row) throw new Error("control_surface_archived");
+      const versionRecord = await insertSurfaceVersion(db, {
+        tenantId: input.tenantId,
+        surfaceId: existing.id,
+        version: existing.draftVersion,
+        definition: existing.draftDefinition,
+        actorUserId: input.actorUserId,
+        auditEventId: input.auditEventId ?? null,
+        createdAt: now
+      });
       return { surface: mapControlSurfaceRecord(row), version: versionRecord };
     },
     async archiveControlSurface(input) {
@@ -220,17 +222,9 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
       const target = versions.find((candidate) => candidate.version === input.version);
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!target || !existing) return undefined;
+      if (existing.status === "archived") throw new Error("control_surface_archived");
       const now = new Date();
       const nextVersion = existing.currentVersion + 1;
-      const versionRecord = await insertSurfaceVersion(db, {
-        tenantId: input.tenantId,
-        surfaceId: input.surfaceId,
-        version: nextVersion,
-        definition: target.definition,
-        actorUserId: input.actorUserId,
-        auditEventId: input.auditEventId ?? null,
-        createdAt: now
-      });
       const [row] = await db
         .update(controlSurfaceDefinitions)
         .set({
@@ -247,11 +241,21 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
         .where(
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
-            eq(controlSurfaceDefinitions.id, input.surfaceId)
+            eq(controlSurfaceDefinitions.id, input.surfaceId),
+            ne(controlSurfaceDefinitions.status, "archived")
           )
         )
         .returning();
-      if (!row) throw new Error("Control surface rollback returned no row");
+      if (!row) throw new Error("control_surface_archived");
+      const versionRecord = await insertSurfaceVersion(db, {
+        tenantId: input.tenantId,
+        surfaceId: input.surfaceId,
+        version: nextVersion,
+        definition: target.definition,
+        actorUserId: input.actorUserId,
+        auditEventId: input.auditEventId ?? null,
+        createdAt: now
+      });
       return { surface: mapControlSurfaceRecord(row), version: versionRecord };
     }
   };

@@ -2,7 +2,7 @@
 
 ## Статус
 
-Этот документ фиксирует backend-only scope Phase 7 поверх уже существующего planning engine.
+Backend-scope Phase 7 реализован до Phase 10 поверх planning engine. Этот документ остается canonical contract для KPI definitions, evaluations, signals, governed actions и action engine; Phase 10 проверяет его как production hardening surface.
 
 UI control surfaces, frontend KPI dashboards и визуальный audit viewer не входят в первый backend slice. Backend обязан вернуть стабильные read models и governed action contracts, чтобы будущий UI не придумывал собственную логику.
 

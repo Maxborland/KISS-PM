@@ -2,7 +2,7 @@
 
 ## Статус
 
-Это плановый cross-cutting slice после Phase 4 starter и до Phase 5 Gantt/WBS.
+Backend-scope реализован как Phase F storage/search backend (PR #23). Этот документ остается canonical product/architecture contract для storage, external references и connector references; Phase 10 проверяет его как production hardening surface.
 
 Текущий `CrmActivity.type = file` хранит только metadata/link: `fileUrl`, `fileSizeBytes`, `mimeType`. Это осознанный временный контракт, а не полноценный storage layer.
 

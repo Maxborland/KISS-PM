@@ -35,10 +35,26 @@
 29. `28_PHASE_4_2_TASK_WORKSPACE.md` — полноценный task workspace: список/канбан, CRUD задач, карточка задачи, статусы задач, права редактирования, bulk и activity.
 30. `30_PHASE_5_6_MS_PROJECT_CLASS_BACKEND.md` — backend planning engine contract: PlanSnapshot, PlanningCommand, scheduling core, resource planning, scenario proposals, права, audit и API.
 31. `31_PHASE_7_PLANNING_WORKSPACE_UI_CONTRACT.md` — UI/product contract для MS Project-like planning workspace: Gantt/WBS, resource sheet, resource matrix, scenario UX и browser acceptance.
+32. `31_PLANNING_WORKSPACE_UI_DESIGN.md` — визуальный контракт planning workspace: утвержденные reference screens, вкладки проекта и требования к Gantt/WBS плотности.
+33. `32_PHASE_B_PLANNING_UI_DECISIONS.md` — решения по извлечению и адаптации BR2 Gantt UI boundaries.
+34. `33_PHASE_C_1_GRID_PARITY_REALTIME.md` — Phase C.1 UI contract для grid/Gantt parity и realtime command preview.
+35. `34_PHASE_C_2_RESOURCES_ASSIGNMENTS_CALENDARS.md` — Phase C.2 UI contract для ресурсов, назначений и календарей.
+36. `35_PHASE_C_3_SCENARIOS_BASELINE.md` — Phase C.3 UI contract для сценариев и baseline.
+37. `36_PHASE_C_4_PROJECT_AUDIT_SETTINGS.md` — Phase C.4 UI contract для project audit/settings.
+38. `37_PHASE_C_5_HARDENING.md` — Phase C.5 UI hardening contract.
+39. `38_PHASE_D_PLAN.md` — Phase D/E planning: production calendars, absences, оргструктура и tenant resource load.
+40. `39_PHASE_7_KPI_SIGNALS_ACTION_ENGINE_BACKEND.md` — backend contract для KPI definitions, evaluations, signals, governed actions и action engine.
+41. `40_PHASE_8_CONTROL_SURFACES_BUILDER_BACKEND.md` — backend contract для configurable control surfaces, drafts, publish/archive, widgets and action bindings.
+42. `41_PHASE_10_BACKEND_HARDENING.md` — backend production hardening: security/privacy, DB/migrations, performance, operations readiness и release-like smoke.
 
 ## Планы исправлений
 
 - [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
+
+## Runbooks
+
+- [`runbooks/backend-operations.md`](runbooks/backend-operations.md) — Phase 10 backend operations: env, start/update, readiness, migrations, backup/restore, storage cleanup и incident checklist.
+- [`runbooks/e2e-smoke.md`](runbooks/e2e-smoke.md) — локальный browser/API smoke для проверки dev runtime.
 
 ## Референсы
 
