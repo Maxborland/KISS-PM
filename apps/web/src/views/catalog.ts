@@ -85,7 +85,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     pageTitle: "Добро пожаловать, Камил",
     lead: "Ваш персональный дашборд: 12 задач, 8 сделок, 3 митинга на сегодня.",
     breadcrumb: [{ label: "Дашборд", current: true }],
-    activeNav: "Задачи"
+    activeNav: "Дашборд"
   },
   "02-my-work": {
     id: "02-my-work",

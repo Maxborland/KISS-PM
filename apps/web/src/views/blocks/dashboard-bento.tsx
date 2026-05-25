@@ -38,7 +38,7 @@ export function DashboardBento() {
               <Clock className="size-4" aria-hidden />
             </span>
           </div>
-          <div className="tile__value tile__value--xl">83%</div>
+          <div className="tile__value tile__value--kpi">83%</div>
           <div className="tile__sub">Среднее завершение</div>
         </div>
         <div className="bento__cell tile tile--gradient-cool">
@@ -48,7 +48,7 @@ export function DashboardBento() {
               <CheckCircle2 className="size-4" aria-hidden />
             </span>
           </div>
-          <div className="tile__value tile__value--xl">56%</div>
+          <div className="tile__value tile__value--kpi">56%</div>
           <div className="tile__sub">Среднее завершение</div>
         </div>
         <div className="bento__cell tile">
@@ -64,7 +64,7 @@ export function DashboardBento() {
               <TrendingUp className="size-4" aria-hidden />
               +2 неделя
             </span>
-            <span className="u-text-xs u-text-muted">vs прошлая</span>
+            <span className="u-text-xs u-text-muted">к прошлой</span>
           </div>
         </div>
         <div className="bento__cell tile">
@@ -97,8 +97,8 @@ export function DashboardBento() {
             <svg viewBox="0 0 600 200" width="100%" height={200} preserveAspectRatio="none" aria-hidden>
               <defs>
                 <linearGradient id="g-warm" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#fda4af" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#fda4af" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--danger)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <path
@@ -107,14 +107,14 @@ export function DashboardBento() {
               />
               <path
                 d="M0,140 C60,80 120,160 180,90 C240,30 300,130 360,80 C420,40 480,140 540,90 L600,110"
-                stroke="#ef4444"
+                stroke="var(--danger)"
                 strokeWidth={2}
                 fill="none"
               />
             </svg>
             <div className="u-between u-mt-3">
               <span className="u-text-xs u-text-muted">
-                Avg концентрация: <strong className="u-text-strong">41%</strong>
+                Средняя концентрация: <strong className="u-text-strong">41%</strong>
               </span>
               <div className="legend-row">
                 <span className="legend-item">

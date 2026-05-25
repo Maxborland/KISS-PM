@@ -1,5 +1,8 @@
 /** Типы простого Gantt widget. */
 
+/** Масштаб timeline (связан с Segmented в planning toolbar). */
+export type GanttZoom = "hour" | "day" | "week" | "month";
+
 /** Строка WBS — задача / стадия / суммарная. */
 export type GanttRow = {
   id: string;

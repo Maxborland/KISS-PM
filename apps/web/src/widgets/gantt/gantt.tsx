@@ -4,9 +4,14 @@ import type { CSSProperties } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import type { GanttData, GanttDayHeader, GanttRow } from "./types";
+import type { GanttData, GanttDayHeader, GanttRow, GanttZoom } from "./types";
 
-const DAY_W = 28;
+const DAY_W_BY_ZOOM: Record<GanttZoom, number> = {
+  hour: 44,
+  day: 28,
+  week: 18,
+  month: 12
+};
 
 function pctLabel(progress: number | undefined) {
   const p = Math.round((progress ?? 0) * 100);
@@ -140,20 +145,31 @@ function DataRow({
   );
 }
 
-export function Gantt({ data, className }: { data: GanttData; className?: string }) {
+export function Gantt({
+  data,
+  className,
+  zoom = "day"
+}: {
+  data: GanttData;
+  className?: string;
+  zoom?: GanttZoom;
+}) {
+  const dayW = DAY_W_BY_ZOOM[zoom];
   const totalDays = data.days.length;
-  const chartWidth = totalDays * DAY_W;
+  const chartWidth = totalDays * dayW;
   const todayIndex = data.days.findIndex((d) => d.today);
+  const zoomLabel = { hour: "час", day: "день", week: "неделя", month: "месяц" }[zoom];
 
   return (
     <div
       className={cn("gantt2", className)}
       role="grid"
-      aria-label={`Диаграмма Ганта · ${data.monthLabel ?? ""}`}
+      aria-label={`Диаграмма Ганта · ${data.monthLabel ?? ""} · масштаб: ${zoomLabel}`}
+      data-gantt-zoom={zoom}
       style={
         {
           "--gantt-chart-w": `${chartWidth}px`,
-          "--gantt-day-w": `${DAY_W}px`
+          "--gantt-day-w": `${dayW}px`
         } as CSSProperties
       }
     >

@@ -111,7 +111,7 @@ export function GanttSliceBlock({ title, lead }: GanttSliceBlockProps) {
           <span className="gantt-stats__value">15</span>
         </span>
       </div>
-      <Gantt data={GANTT_MOCK} />
+      <Gantt data={GANTT_MOCK} zoom={zoom} />
     </>
   );
 }

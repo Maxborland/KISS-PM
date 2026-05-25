@@ -7,6 +7,12 @@ import { Field, FormGrid, FormSection } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,19 +55,25 @@ export function EntityDetailBlock({ title, subtitle, stage, feed, primary, aside
         lead={subtitle}
         actions={
           <>
-            <Button variant="secondary">
-              <Calendar className="size-4" aria-hidden />
-              Запланировать
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton label="Действия" variant="ghost">
+                  <MoreHorizontal />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <Calendar className="size-4" aria-hidden />
+                  Запланировать
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="primary">Сохранить</Button>
-            <IconButton label="Действия" variant="ghost">
-              <MoreHorizontal />
-            </IconButton>
           </>
         }
       />
       {stage ? (
-        <div className="ds-demo__row u-mb-3">
+        <div className="entity-stage-bar">
           <Chip variant={stage.tone ?? "info"}>{stage.label}</Chip>
           <BemAvatarStack more="+2">
             <BemAvatar initials="ИИ" color="c1" />
@@ -102,7 +114,7 @@ export function EntityDetailBlock({ title, subtitle, stage, feed, primary, aside
                 <IconButton label="Прикрепить" variant="ghost">
                   <Paperclip />
                 </IconButton>
-                <Button variant="primary" size="sm">
+                <Button variant="secondary" size="sm">
                   <Send className="size-4" aria-hidden />
                   Отправить
                 </Button>

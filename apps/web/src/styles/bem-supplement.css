@@ -690,6 +690,14 @@
 }
 
 /* ============================================
+   Dashboard bento — KPI scale (§2: не выше h1)
+   ============================================ */
+.bento .tile__value--kpi {
+  font-size: var(--text-h2);
+  line-height: var(--lh-h2);
+}
+
+/* ============================================
    Sales funnel + deal cards
    ============================================ */
 .funnel {
@@ -798,6 +806,18 @@
 .entity-grid__aside {
   position: sticky;
   top: var(--space-4);
+}
+
+.entity-stage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-3);
+  padding: var(--space-4);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 /* Activity feed (for entity detail) */
