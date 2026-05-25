@@ -1170,6 +1170,69 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(readModelLoaded).toBe(false);
   });
 
+  it("requires KPI definition read permission before exposing control read-model definitions", async () => {
+    let readModelLoaded = false;
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.project_plan.read", "tenant.control_signals.read"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async listKpiDefinitions() {
+        readModelLoaded = true;
+        return [];
+      },
+      async listKpiEvaluations() {
+        readModelLoaded = true;
+        return [];
+      },
+      async listControlSignals() {
+        readModelLoaded = true;
+        return [];
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/projects/project-control/control/read-model", {
+      headers: {
+        cookie: "kiss_pm_session=control-token"
+      }
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(readModelLoaded).toBe(false);
+  });
+
   it("rejects control action preview when action-specific permissions are missing", async () => {
     let createdExecutionStatus: string | null = null;
     let auditActionType: string | null = null;

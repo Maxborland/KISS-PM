@@ -90,6 +90,8 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const readPlanDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
     if (!readPlanDecision.allowed) return context.json({ error: readPlanDecision.reason }, 403);
+    const kpiDefinitionsDecision = canReadKpiDefinitions({ actor, profile, targetTenantId: actor.tenantId });
+    if (!kpiDefinitionsDecision.allowed) return context.json({ error: kpiDefinitionsDecision.reason }, 403);
     const controlDecision = canReadControlSignals({ actor, profile, targetTenantId: actor.tenantId });
     if (!controlDecision.allowed) return context.json({ error: controlDecision.reason }, 403);
     if (!deps.dataSource.listKpiEvaluations || !deps.dataSource.listControlSignals) {
