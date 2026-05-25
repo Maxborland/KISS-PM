@@ -152,6 +152,7 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
     async publishControlSurface(input) {
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!existing) throw new Error("control_surface_not_found");
+      if (existing.status === "archived") throw new Error("control_surface_archived");
       const now = new Date();
       const versionRecord = await insertSurfaceVersion(db, {
         tenantId: input.tenantId,
@@ -220,6 +221,7 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
       const target = versions.find((candidate) => candidate.version === input.version);
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!target || !existing) return undefined;
+      if (existing.status === "archived") throw new Error("control_surface_archived");
       const now = new Date();
       const nextVersion = existing.currentVersion + 1;
       const versionRecord = await insertSurfaceVersion(db, {

@@ -202,6 +202,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       const before = await transactionDataSource.findControlSurface(actor.tenantId, surfaceId);
       if (!before) return { ok: false as const, status: 404, error: "control_surface_not_found" };
+      if (before.status === "archived") {
+        return { ok: false as const, status: 409, error: "control_surface_archived" };
+      }
       const validation = validateControlSurfaceDefinition(before.draftDefinition);
       if (!validation.canPublish) {
         return {
@@ -239,6 +242,9 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     if (!result.ok) {
       if (result.status === 409) {
+        if (result.error === "control_surface_archived") {
+          return context.json({ error: result.error }, 409);
+        }
         return context.json({ error: result.error, validation: result.validation }, 409);
       }
       if (result.status === 501) return context.json({ error: result.error }, 501);
@@ -277,6 +283,10 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       const before = await transactionDataSource.findControlSurface(actor.tenantId, surfaceId);
+      if (!before) return { ok: false as const, status: 404, error: "control_surface_version_not_found" };
+      if (before.status === "archived") {
+        return { ok: false as const, status: 409, error: "control_surface_archived" };
+      }
       const auditEventId = `audit-${randomUUID()}`;
       const rollback = await transactionDataSource.rollbackControlSurfaceToVersion({
         tenantId: actor.tenantId,
@@ -285,7 +295,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         actorUserId: actor.id,
         auditEventId
       });
-      if (!before || !rollback) {
+      if (!rollback) {
         return { ok: false as const, status: 404, error: "control_surface_version_not_found" };
       }
       await deps.appendManagementAuditEvent(
@@ -307,6 +317,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return { ok: true as const, body: { ...rollback, auditEventId } };
     });
     if (!result.ok) {
+      if (result.status === 409) return context.json({ error: result.error }, 409);
       if (result.status === 501) return context.json({ error: result.error }, 501);
       if (result.status === 404) return context.json({ error: result.error }, 404);
       return context.json({ error: result.error }, 400);

@@ -138,6 +138,50 @@ describe("control surface routes", () => {
     });
   });
 
+  it("does not republish or roll back archived surfaces", async () => {
+    const state = createSurfaceDataSource();
+    const app = createApp({ dataSource: state.dataSource });
+    const definition = createDefinition();
+    await app.request("/api/tenant/current/control-surfaces", {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({ definition })
+    });
+    const firstPublish = await app.request(`/api/tenant/current/control-surfaces/${definition.id}/publish`, {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({})
+    });
+    expect(firstPublish.status).toBe(200);
+    const archive = await app.request(`/api/tenant/current/control-surfaces/${definition.id}`, {
+      method: "DELETE",
+      headers: mutationHeaders()
+    });
+    expect(archive.status).toBe(200);
+
+    const republish = await app.request(`/api/tenant/current/control-surfaces/${definition.id}/publish`, {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({})
+    });
+    const rollback = await app.request(`/api/tenant/current/control-surfaces/${definition.id}/rollback`, {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({ version: 1 })
+    });
+
+    expect(republish.status).toBe(409);
+    await expect(republish.json()).resolves.toEqual({ error: "control_surface_archived" });
+    expect(rollback.status).toBe(409);
+    await expect(rollback.json()).resolves.toEqual({ error: "control_surface_archived" });
+    const archivedList = await app.request("/api/tenant/current/control-surfaces?includeArchived=true", {
+      headers: { cookie: "kiss_pm_session=session-alpha" }
+    });
+    await expect(archivedList.json()).resolves.toMatchObject({
+      surfaces: [expect.objectContaining({ id: definition.id, status: "archived" })]
+    });
+  });
+
   it("blocks publish when the draft definition is invalid", async () => {
     const state = createSurfaceDataSource();
     const app = createApp({ dataSource: state.dataSource });
