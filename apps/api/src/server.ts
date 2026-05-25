@@ -6,8 +6,11 @@ import {
 } from "@kiss-pm/persistence";
 import { createApp, type CreateAppOptions } from "./app";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
+import { assertServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
 import { createStorageProviderFromEnv } from "./storageProvider";
+
+assertServerRuntimeConfig();
 
 const port = Number.parseInt(process.env.PORT ?? "4000", 10);
 const hostname = process.env.HOST ?? "127.0.0.1";

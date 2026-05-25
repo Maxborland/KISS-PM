@@ -9,14 +9,15 @@
 | Area | Gap | Resolution | Evidence |
 |------|-----|------------|----------|
 | Operations readiness | Не было разделения liveness/readiness и provider checks | Добавлены `/health/live`, `/api/health/live`, `/health/ready`, `/api/health/ready`; readiness проверяет DB/storage | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
-| Operations readiness | Production мог быть ready без `DATABASE_URL` и уйти в in-memory datasource | Server readiness fail-closed для production без Postgres | `pnpm vitest run apps/api/src/serverReadiness.test.ts apps/api/src/app.test.ts` |
+| Operations readiness | Production мог стартовать без `DATABASE_URL` и уйти в in-memory datasource | Server startup config now fails closed for production without Postgres before `createApp` can fall back to demo persistence | `pnpm vitest run apps/api/src/serverReadiness.test.ts apps/api/src/app.test.ts` |
+| Operations readiness | DB readiness делал только `select 1`, поэтому пустая/unmigrated база могла считаться ready | Readiness now verifies the expected latest migration tag in `kiss_pm_migrations` after connectivity check | `pnpm vitest run apps/api/src/serverReadiness.test.ts`, `pnpm typecheck` |
 | Operations readiness | Production local storage мог писать в default `.kiss-pm-storage` без явного root | `KISS_PM_STORAGE_LOCAL_ROOT` обязателен для local storage в production | `pnpm vitest run apps/api/src/storageProvider.test.ts apps/api/src/serverReadiness.test.ts` |
 | Security headers | Public `/health*` routes не получали baseline security/no-store headers | Baseline headers применяются ко всем API app routes | `pnpm vitest run apps/api/src/app.test.ts apps/api/src/requestSecurity.test.ts` |
 | Attachment privacy | File download response не задавал explicit no-store cache policy | Download response задает `Cache-Control: no-store, private` | `pnpm vitest run --config vitest.db.config.ts apps/api/src/attachmentRoutes.db.test.ts` |
-| External references | IPv6 unspecified literals `[::]` / `[0:...:0]` не отклонялись как unsafe host | URL validation rejects IPv6 unspecified hosts | `pnpm vitest run apps/api/src/attachmentValidation.test.ts apps/api/src/storageProvider.test.ts` |
+| External references | IPv6 unspecified literals `[::]` / `[0:...:0]` and `.localhost` subdomains не отклонялись как unsafe hosts | URL validation rejects IPv6 unspecified hosts and local-use `.localhost` names | `pnpm vitest run apps/api/src/attachmentValidation.test.ts apps/api/src/storageProvider.test.ts` |
 | KPI expression safety | Constrained KPI AST валидировал finite листья, но арифметика могла вернуть `Infinity` | KPI expression arithmetic normalizes operation results through finite guard | `pnpm vitest run packages/domain/src/control/controlEngine.test.ts`, `pnpm typecheck` |
 | Control action apply | После planning lock повторно проверялось наличие `planDelta`, но не пустой command list | Locked action recheck rejects empty planDelta before preview/apply/version increment | `pnpm vitest run apps/api/src/app.test.ts packages/domain/src/control/controlEngine.test.ts`, `pnpm typecheck` |
-| Control surface lifecycle | Archived control surface можно было восстановить через publish/rollback paths | Publish/rollback reject archived surfaces; persistence adds secondary invariant guard | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts packages/persistence/src/migration.test.ts`, `pnpm typecheck` |
+| Control surface lifecycle | Archived control surface можно было восстановить через publish/rollback paths, including a possible archive race between read and update | Publish/rollback reject archived surfaces; persistence update predicates now atomically require non-archived status | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts packages/persistence/src/controlSurfaceRepository.db.test.ts packages/persistence/src/migration.test.ts`, `pnpm typecheck` |
 | Closure denied audit | Lesson creation and template improvement apply returned 403 without denied audit | Retrospective lesson and template improvement denied paths write closure audit events | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 | Release-like smoke | Не было DB smoke, который проходит полный backend management loop | Добавлен сквозной DB smoke: auth → planning apply → control evaluate → closure close → audit read | `pnpm vitest run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts`, `pnpm typecheck` |
 | Planning auto-solver permissions | Solver run proposals could expose assignment/allocation deltas to plan managers without resource-manage permission | Auto-solver run create/read now require resource management permission before persisted proposal data is returned | `pnpm vitest run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts`, `pnpm typecheck` |
@@ -49,7 +50,7 @@
 
 ## Broad verification
 
-- `pnpm test`: passed, 56 files, 357 tests, 1 skipped.
+- `pnpm test`: passed, 56 files, 361 tests, 1 skipped.
 - `pnpm test:db`: passed.
 - `pnpm typecheck`: passed for every code slice.
 - `git diff --check`: passed for every code slice.
