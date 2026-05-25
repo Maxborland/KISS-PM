@@ -24,6 +24,7 @@
 | Control action preview permissions | Management action preview returned persisted `planDelta` with only execute/control-read permissions, before action-specific permission checks | Preview now runs the same action-specific permission gate as apply, writes denied audit/execution on refusal, and control read-model requires project plan read | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Control surface action binding safety | Action permission arrays accepted non-string/blank entries as long as the mandatory permissions were present | Control surface validation now rejects malformed permission array entries before publish | `pnpm vitest run packages/domain/src/controlSurfaces/validation.test.ts apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | Closure snapshot read boundary | Project close built and returned a plan-derived closure snapshot without requiring project plan read permission | Close permission composition now requires `tenant.project_plan.read` before snapshot construction, and denied close remains audited | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
+| Planning auto-solver apply audit | Persisted solver apply returned stale plan/precondition 409 responses without an audit trail | Solver apply now writes conflict/precondition audit events before returning governed 409 outcomes | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -36,7 +37,7 @@
 
 | Area | Next check |
 |------|------------|
-| Planning / solver apply | Continue focused review for persisted proposal apply conflict semantics and audit trace after resource permission hardening |
+| Planning / solver apply | Continue focused review for persisted proposal apply edge cases beyond conflict/precondition audit trace |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for KPI definition mutation audit/read exposure beyond control action preview |
 | Control surfaces | Continue focused review for published read-model shape after action binding validation hardening |

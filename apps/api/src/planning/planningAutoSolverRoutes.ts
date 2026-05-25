@@ -237,6 +237,26 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
           snapshot.planVersion !== run.clientPlanVersion ||
           parsedApply.value.clientPlanVersion !== run.clientPlanVersion
         ) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_conflict",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: {
+              runId,
+              proposalId,
+              clientPlanVersion: parsedApply.value.clientPlanVersion
+            },
+            beforeState: summarizeSnapshot(snapshot),
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: {
+              status: "conflict",
+              runPlanVersion: run.clientPlanVersion,
+              currentPlanVersion: snapshot.planVersion
+            }
+          }, transactionDataSource);
           return {
             ok: false as const,
             status: 409,
@@ -282,6 +302,21 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
           actor.tenantId
         );
         if (preview.validationIssues.some(isBlockingValidationIssue)) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_precondition_failed",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId, commands },
+            beforeState: summarizeSnapshot(snapshot),
+            afterState: null,
+            permissionResult: { allowed: true, reason: "same_tenant_permission_granted" },
+            executionResult: {
+              status: "precondition_failed",
+              validationIssues: preview.validationIssues
+            }
+          }, transactionDataSource);
           return {
             ok: false as const,
             status: 409,
