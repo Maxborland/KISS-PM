@@ -151,6 +151,13 @@ const phase8ControlSurfacesMigration = readFileSync(
   new URL("../migrations/0032_phase_8_control_surfaces.sql", import.meta.url),
   "utf8"
 );
+const phase9ClosureRetrospectivesMigration = readFileSync(
+  new URL(
+    "../migrations/0033_phase_9_closure_retrospectives.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -234,6 +241,29 @@ describe("Phase 8 SQL migration", () => {
     );
     expect(phase8ControlSurfacesMigration).toContain(
       "CONSTRAINT control_surface_versions_surface_fk"
+    );
+  });
+});
+
+describe("Phase 9 SQL migration", () => {
+  it("creates immutable closure snapshots, lessons and template improvement actions", () => {
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS project_closure_snapshots"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS retrospective_lessons"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS template_improvement_actions"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "project_closure_snapshots_tenant_project_uidx"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CONSTRAINT template_improvement_actions_template_fk"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "ALTER TABLE projects"
     );
   });
 });

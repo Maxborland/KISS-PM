@@ -44,6 +44,9 @@ export const permissions = [
   "tenant.control_surfaces.read",
   "tenant.control_surfaces.manage",
   "tenant.control_surfaces.publish",
+  "tenant.retrospectives.read",
+  "tenant.retrospectives.manage",
+  "tenant.template_improvements.apply",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -542,6 +545,39 @@ export function canPublishControlSurfaces(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.control_surfaces.publish"
+  });
+}
+
+export function canReadRetrospectives(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.retrospectives.read"
+  });
+}
+
+export function canManageRetrospectives(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.retrospectives.manage"
+  });
+}
+
+export function canApplyTemplateImprovements(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.template_improvements.apply"
   });
 }
 

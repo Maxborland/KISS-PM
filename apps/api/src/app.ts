@@ -38,6 +38,7 @@ import { registerOrgStructureRoutes } from "./orgStructureRoutes";
 import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import { registerRetrospectiveRoutes } from "./retrospectiveRoutes";
 import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
 import { registerSearchRoutes } from "./searchRoutes";
 import { createStorageProviderFromEnv } from "./storageProvider";
@@ -235,6 +236,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAbsencesRoutes(app, routeDeps);
   registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
+  registerRetrospectiveRoutes(app, routeDeps);
   registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);

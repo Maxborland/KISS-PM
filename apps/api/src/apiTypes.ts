@@ -6,9 +6,13 @@ import type {
   KpiDefinition,
   KpiEvaluation,
   PlanSnapshot,
+  ProjectClosureSnapshot,
+  RetrospectiveLesson,
+  RetrospectiveReadModel,
   Tenant,
   TenantId,
   TenantUser,
+  TemplateImprovementAction,
   UserId
 } from "@kiss-pm/domain";
 import type {
@@ -267,12 +271,13 @@ export type ProjectRecord = {
   templateId: string | null;
   createdAt: Date;
   activatedAt: Date | null;
+  closedAt: Date | null;
   demand: PositionDemandRecord[];
 };
 
 export type ProjectInput = Omit<
   ProjectRecord,
-  "createdAt" | "activatedAt" | "sourceType" | "sourceOpportunityId"
+  "createdAt" | "activatedAt" | "closedAt" | "sourceType" | "sourceOpportunityId"
 > & {
   sourceOpportunityId: string;
 };
@@ -578,6 +583,36 @@ export type ApiTenantDataSource = {
   listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
   createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
   listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
+  getRetrospectiveReadModel?(
+    tenantId: TenantId,
+    projectId: string
+  ): Promise<RetrospectiveReadModel>;
+  closeProject?(input: {
+    snapshot: Omit<ProjectClosureSnapshot, "closedAt"> & { closedAt: Date };
+    lessons: Array<Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }>;
+    templateImprovementActions: Array<
+      Omit<TemplateImprovementAction, "createdAt" | "appliedAt"> & {
+        createdAt?: Date;
+        appliedAt?: Date | null;
+      }
+    >;
+  }): Promise<RetrospectiveReadModel>;
+  addRetrospectiveLesson?(
+    input: Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }
+  ): Promise<RetrospectiveLesson>;
+  applyTemplateImprovementAction?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionId: string;
+    actorUserId: UserId;
+    auditEventId: string;
+    appliedAt: Date;
+  }): Promise<TemplateImprovementAction | undefined>;
+  listTemplateImprovementActions?(input: {
+    tenantId: TenantId;
+    templateId: string;
+    status?: TemplateImprovementAction["status"];
+  }): Promise<TemplateImprovementAction[]>;
   listControlSurfaces?(tenantId: TenantId): Promise<ControlSurfaceRecord[]>;
   findControlSurface?(tenantId: TenantId, surfaceId: string): Promise<ControlSurfaceRecord | undefined>;
   upsertControlSurfaceDraft?(input: ControlSurfaceDraftInput): Promise<ControlSurfaceRecord>;
