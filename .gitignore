@@ -17,4 +17,7 @@ Thumbs.db
 .tmp/
 tmp/
 .worktrees/
-apps/web/.storybook-verify-tmp/*.png
+# Storybook / visual audit — local & CI artifacts only (see docs/design-v3/STORYBOOK-STRUCTURE.md §7)
+apps/web/.storybook-verify-tmp/
+apps/web/storybook-static/
+output/

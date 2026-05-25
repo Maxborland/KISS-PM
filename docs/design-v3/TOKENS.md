@@ -262,6 +262,41 @@ shadcn использует Tailwind-классы, а Tailwind v4 `@theme inline
 - ❌ `planning-ui-approved` `--radius-lg: 14px` — нечётное значение, ломает 4-grid.
 - ❌ `planning-ui-approved` `--text: #020617` для body — слишком тёмный, низкий комфорт.
 
+## Phase 1 production-grade deltas (2026-05-26)
+
+Добавлены в `apps/web/src/styles/tokens.css` без глобального репейнта приложения.
+
+| Token | Значение | Назначение |
+|-------|----------|------------|
+| `--font-display` | Inter Tight → Plus Jakarta fallback | Заголовки h1–h3, display KPI |
+| `--text-display` | `40px` / `--lh-display` `44px` | Hero/display вне scale h1–h4 |
+| `--text-eyebrow` | `11px` / `--letter-eyebrow` `0.08em` | Надзаголовки секций, labels |
+| `--brand-grad` | blue → navy gradient | Только разрешённые поверхности (§3c контракта) |
+| `--shadow-floating` | multi-layer | Floating tier (command, overlay) |
+| `--row-h-ultra` | `24px` | Ultra density |
+| `--row-h-compact` | `32px` | Compact lists / Gantt rows |
+| `--row-h-cozy` | `40px` | Cozy / decision rows |
+| `--_dark-*` | stub в `@media (prefers-color-scheme: dark)` | Reserved palette, light theme не меняется |
+
+Storybook Foundations: `Foundations/Colors`, `Typography`, `Density`, `Depth`, `Iconography`.
+
+## Polish v3 delta (2026-05-25)
+
+Reconciliation для эпика polish — **не затрагивает** `tokens.planning.css`.
+
+| Token | Было (design-v2 baseline) | Стало | Зачем |
+|---|---|---|---|
+| `--canvas` | `#eef0f4` | `#e9ecf2` | Контраст с white panel ≥ 1.12 |
+| `--canvas-tint` | `#f4f5f8` | `#f1f3f7` | Согласованность с canvas |
+| `--border-strong` | `#d4d8e0` | `#c9cfd9` | Читаемые hairlines |
+| `--shadow-panel` | 2-layer | 3-layer stack | «Парение» bento/kanban |
+| `--shadow-panel-hover` | — | новый | Hover lift tiles/cards |
+| `--shadow-inset-highlight` | частично `--shadow-inset` | унифицирован | Верхний блик panel |
+| `--lift-sm` / `--lift-md` / `--press` | — | новые | Motion utilities (transform) |
+| `--ring-focus` | ring only | ring + 1px accent | a11y focus stack |
+
+Подробный план: `DESIGN-POLISH-V3-PLAN.md`.
+
 ## Ссылки
 
 - `ARCHITECTURE-DECISIONS.md` — 16 зафиксированных решений

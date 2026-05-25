@@ -13,6 +13,15 @@ const EN_DEV =
   /\b(Primary|Secondary|Outline|Ghost|Destructive|Default|Success|Warning|Danger|Dialog|Sheet|Popover|Menu|Toast)\b/;
 const CYRILLIC = /[А-Яа-яЁё]/;
 
+/** Phase 0 — Storybook interaction/error UI must not appear on product screens. */
+const SCREEN_ERROR_MARKERS = [
+  /Found multiple elements/i,
+  /TestingLibraryElementError/i,
+  /Unable to find an element/i,
+  /The story failed to render/i,
+  /Storybook preview failed/i
+];
+
 const storyIds = Object.values(index.entries)
   .filter((e) => e.type === "story")
   .map((e) => e.id)
@@ -52,9 +61,22 @@ for (const id of storyIds) {
   const hasNoPreview = text.includes("No Preview");
   const hasEnDev = EN_DEV.test(text);
   const hasCyrillic = CYRILLIC.test(text);
-  const pass = !hasNoPreview && hasCyrillic && !hasEnDev;
+  const isProductScreen = id.startsWith("views-screens--");
+  const screenErrorMarkers = isProductScreen
+    ? SCREEN_ERROR_MARKERS.filter((re) => re.test(text)).map((re) => re.source)
+    : [];
+  const hasScreenError = screenErrorMarkers.length > 0;
+  const pass = !hasNoPreview && hasCyrillic && !hasEnDev && !hasScreenError;
 
-  storyResults.push({ id, hasNoPreview, hasEnDev, hasCyrillic, pass });
+  storyResults.push({
+    id,
+    hasNoPreview,
+    hasEnDev,
+    hasCyrillic,
+    hasScreenError,
+    screenErrorMarkers,
+    pass
+  });
 }
 
 await browser.close();
@@ -71,6 +93,25 @@ const audit = {
 };
 
 writeFileSync(join(outDir, "batch15c-copy-scan-evidence.json"), `${JSON.stringify(audit, null, 2)}\n`, "utf8");
+
+const screenStories = storyResults.filter((r) => r.id.startsWith("views-screens--"));
+const screenErrorFailures = screenStories.filter((r) => r.hasScreenError);
+writeFileSync(
+  join(outDir, "phase0-screen-error-gate.json"),
+  `${JSON.stringify(
+    {
+      batch: "phase0-screen-error-gate",
+      date: "2026-05-26",
+      storiesChecked: screenStories.length,
+      passCount: screenStories.filter((r) => r.pass).length,
+      failures: screenErrorFailures,
+      pass: screenErrorFailures.length === 0
+    },
+    null,
+    2
+  )}\n`,
+  "utf8"
+);
 console.log(JSON.stringify({ pass: audit.pass, checked: audit.storiesChecked, failures: failures.length }, null, 2));
 if (failures.length > 0) {
   console.log("Failed ids:", failures.map((f) => f.id).join(", "));

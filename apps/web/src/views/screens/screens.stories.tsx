@@ -13,6 +13,17 @@ import { MOCK_PROJECT_CRM, SCREEN_META } from "@/views/catalog";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { ScreenView } from "@/views/screens/screen-view";
 
+/** Колонка Kanban/Funnel: заголовок в `.kanban-col__title` (без глобального getByText). */
+function kanbanColumnByTitle(root: HTMLElement, title: string): HTMLElement {
+  const cols = root.querySelectorAll<HTMLElement>(".kanban-col");
+  for (const col of cols) {
+    const head = col.querySelector(".kanban-col__title");
+    const label = head?.textContent?.trim() ?? "";
+    if (label.startsWith(title)) return col;
+  }
+  throw new Error(`Kanban column "${title}" not found`);
+}
+
 const meta: Meta<typeof ScreenView> = {
   title: "Views/Screens",
   component: ScreenView,
@@ -71,8 +82,8 @@ export const MyWorkKanbanDragging: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const card = await canvas.findByLabelText(/Открыть карточку MDS-39/i);
-    const target = canvas.getByText("В работе").closest(".kanban-col") as HTMLElement | null;
-    if (!card || !target) return;
+    const target = kanbanColumnByTitle(canvasElement, "В работе");
+    if (!card) return;
 
     const cardRect = card.getBoundingClientRect();
     const targetRect = target.getBoundingClientRect();
@@ -100,7 +111,7 @@ export const MyWorkKanbanDragging: Story = {
     });
 
     await waitFor(() => {
-      const inProgressCol = canvas.getByText("В работе").closest(".kanban-col") as HTMLElement;
+      const inProgressCol = kanbanColumnByTitle(canvasElement, "В работе");
       expect(within(inProgressCol).queryByText("Новая страница продукта")).toBeTruthy();
     });
 
@@ -132,8 +143,8 @@ export const DealsFunnelDragging: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const card = await canvas.findByLabelText(/Открыть сделку DEAL-103/i);
-    const target = canvas.getByText("КП").closest(".funnel__col") as HTMLElement | null;
-    if (!card || !target) return;
+    const target = kanbanColumnByTitle(canvasElement, "КП");
+    if (!card) return;
     const cardRect = card.getBoundingClientRect();
     const targetRect = target.getBoundingClientRect();
     fireEvent.pointerDown(card, {
@@ -158,7 +169,7 @@ export const DealsFunnelDragging: Story = {
       clientY: targetRect.top + targetRect.height / 2
     });
     await waitFor(() => {
-      const proposalCol = canvas.getByText("КП").closest(".funnel__col") as HTMLElement;
+      const proposalCol = kanbanColumnByTitle(canvasElement, "КП");
       expect(within(proposalCol).queryByText("Аудит Salesforce")).toBeTruthy();
     });
   }
@@ -191,7 +202,8 @@ export const CreateTaskModalValidation: Story = {
     fireEvent.change(nameInput, { target: { value: "Согласовать ТЗ" } });
     fireEvent.click(next);
     await waitFor(() => {
-      expect(canvas.getByText("Участники")).toBeTruthy();
+      expect(canvas.getByRole("heading", { level: 3, name: "Участники" })).toBeTruthy();
+      expect(canvas.getByRole("button", { name: /3\s+Участники/ })).toHaveAttribute("aria-current", "step");
     });
   }
 };
@@ -209,7 +221,8 @@ export const CreateTaskModalApiPayload: Story = {
     fireEvent.change(nameInput, { target: { value: "Согласовать ТЗ" } });
     fireEvent.click(canvas.getByRole("button", { name: "Далее" }));
     await waitFor(() => {
-      expect(canvas.getByText("Участники")).toBeTruthy();
+      expect(canvas.getByRole("heading", { level: 3, name: "Участники" })).toBeTruthy();
+      expect(canvas.getByRole("button", { name: /3\s+Участники/ })).toHaveAttribute("aria-current", "step");
     });
     fireEvent.click(canvas.getByRole("button", { name: "Создать" }));
     await waitFor(() => {

@@ -11,7 +11,7 @@
 | Область | Правило |
 |--------|---------|
 | UI copy | **Русский** по умолчанию (кнопки, заголовки, пустые состояния, ошибки, табы, breadcrumbs). |
-| Storybook sidebar | Имена stories на **русском** (как продуктовые экраны), без `Dashboard` / `My work` / `State · empty`. |
+| Storybook sidebar | **Имена stories (`name`)** на русском для product screens и Foundations demos. **Корни секций** (`Foundations`, `UI`, `Widgets`, `Views`) пока English/system до Phase 8 — см. [`STORYBOOK-STRUCTURE.md`](./STORYBOOK-STRUCTURE.md). Без `Dashboard` / `My work` в `Views/Screens`. |
 | EN в UI | Только: устойчивые коды (`PRJ-2026-014`, `MDS-39`), зарегистрированные термины в скобках (`ИСП (SPI)`), бренды устройств (`iPhone` — по необходимости). |
 | Запрещено в UI | Dev-лейблы (`Primary`, `Default`, `Dialog`, `Toast`), жаргон (`tenant` → **арендатор**, `baseline` → **базовый план**, `What-if` → **сценарии «что если»**). |
 | Storybook catalog | Не показывать EN variant names как пользовательский текст; EN допустим в `argTypes`/docs. |
@@ -73,6 +73,50 @@
 **NEVER**
 
 - Смешивать «рыхлые» таблицы (td 48px) и compact на одном экране без причины — списки сущностей: `DataTable` + `table--compact` или выровненная высота строк.
+
+### 3a. Density tiers (Phase 1)
+
+| Tier | Token | Высота строк | Где |
+|------|--------|--------------|-----|
+| Ultra | `--row-h-ultra` | **24px** | Плотные матрицы, вторичные списки, inline-строки |
+| Compact | `--row-h-compact` | **32px** | Таблицы, Kanban meta, Gantt grid (по умолчанию для списков) |
+| Cozy | `--row-h-cozy` | **40px** | Decision surfaces, формы с крупным touch-target |
+| Free | без фиксированного token | по контенту | Hero, empty L4, маркетинговые блоки |
+
+**MUST:** один dominant tier на экране; смешивать ultra + cozy в одной таблице без причины — **NEVER**.
+
+Базовый `--row-h` (30px) сохранён для legacy compact UI; новые экраны предпочитают tier-токены.
+
+### 3b. Depth tiers (Phase 1)
+
+| Tier | Токены / приём | Где |
+|------|----------------|-----|
+| Flat | border `--border`, без shadow | Вложенные ячейки, inset panels |
+| Resting | `--shadow-xs` / `--shadow-sm` | Карточки по умолчанию, `CardPanel` |
+| Elevated | `--shadow-md` / `--shadow-panel` | Popover content, sticky sub-panels |
+| Floating | `--shadow-floating` | Command palette, drag overlay, modals above canvas |
+
+**NEVER:** `--shadow-floating` на каждой карточке списка — только transient / overlay слой.
+
+### 3c. Brand gradient (`--brand-grad`)
+
+**MUST**
+
+- Градиент **не** на `body`, sidebar, topbar и массовых таблицах.
+- Допустимо: акцентная плитка дашборда (bento), hero KPI, маркетинговый callout в Storybook Foundations, primary CTA strip **внутри** одной плитки.
+
+**NEVER**
+
+- Глобальный `background: var(--brand-grad)` на `.app-content` или shell.
+- Градиент вместо `--accent` для обычных кнопок и ссылок.
+
+### 3d. Язык и Storybook (production-grade)
+
+| Область | Правило |
+|--------|---------|
+| UI copy | Русский (см. §1). |
+| API / types / fixtures | English identifiers. |
+| Product Storybook `Views/Screens` | Default-сценарий = **готовый экран** на 1440px: shell + плотность данных + без error UI (см. [`PRODUCTION-GRADE-BRIEF.md`](./PRODUCTION-GRADE-BRIEF.md)). |
 
 ---
 
@@ -220,6 +264,7 @@
 
 - Импорты UI на экранах: `@/components/ui`, `@/components/domain`, `@/widgets`, `@/shell`, `@/views/layout`.
 - Единый `PageIntro`: `@/views/layout/page-intro` (не дублировать `@/components/ui/page-intro` на экранах).
+- Storybook в репо: обзор [`Foundations/Контракт дизайна`](../../apps/web/src/stories/foundations/DesignContract.stories.tsx); таксономия [`STORYBOOK-STRUCTURE.md`](./STORYBOOK-STRUCTURE.md); scope PR [`PHASE-0-1-SCOPE-BOUNDARY.md`](./PHASE-0-1-SCOPE-BOUNDARY.md).
 - Аудит-основа: [`STORYBOOK-CONTRACT-AUDIT-2026-05-24.md`](./STORYBOOK-CONTRACT-AUDIT-2026-05-24.md) (batch 10).
 
-_Версия: 1.0 · design-v3 rebuild worktree._
+_Версия: 1.1 · Phase 1 foundations (density, depth, brand-grad)._
