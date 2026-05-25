@@ -18,9 +18,9 @@ export function LoginScreenView() {
               </div>
             </div>
             <h1 className="login-card__title">Войти</h1>
-            <p className="login-card__lead">Корпоративный email и пароль tenant.</p>
+            <p className="login-card__lead">Корпоративный email и пароль арендатора.</p>
             <div className="login-card__form">
-              <Field label="Email" required htmlFor="login-email">
+              <Field label="Эл. почта" required htmlFor="login-email">
                 <Input
                   id="login-email"
                   type="email"

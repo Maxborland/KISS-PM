@@ -154,13 +154,13 @@ export function IconButtonShowcase() {
         </IconButton>
       </section>
       <section className="ds-demo__row u-mt-3">
-        <IconButton label="sm" size="sm" variant="ghost">
+        <IconButton label="Маленький" size="sm" variant="ghost">
           <Star />
         </IconButton>
-        <IconButton label="md" size="md" variant="ghost">
+        <IconButton label="Средний" size="md" variant="ghost">
           <Star />
         </IconButton>
-        <IconButton label="lg" size="lg" variant="ghost">
+        <IconButton label="Большой" size="lg" variant="ghost">
           <Star />
         </IconButton>
       </section>
@@ -170,7 +170,7 @@ export function IconButtonShowcase() {
 
 export function AvatarShowcase() {
   return (
-    <ShowcaseFrame title="Avatar">
+    <ShowcaseFrame title="Аватар">
       <div className="ds-demo__row">
         <BemAvatar initials="ИИ" color="c1" size="sm" />
         <BemAvatar initials="АП" color="c2" />
@@ -265,7 +265,7 @@ export function TableShowcase() {
 
 export function EntityRowShowcase() {
   return (
-    <ShowcaseFrame title="Entity row" wide>
+    <ShowcaseFrame title="Строка сущности" wide>
       <DataTable>
         <tbody>
           <tr>
@@ -293,7 +293,7 @@ export function EntityRowShowcase() {
 
 export function KanbanShowcase() {
   return (
-    <ShowcaseFrame title="Kanban" wide>
+    <ShowcaseFrame title="Канбан" wide>
       <KanbanBoard>
         <KanbanColumn title="Бэклог" count={24}>
           <KanbanCard
@@ -310,7 +310,7 @@ export function KanbanShowcase() {
         <KanbanColumn title="В работе" count={4}>
           <KanbanCard
             id="MDS-2"
-            title="Sales deck"
+            title="Презентация для клиента"
             priority="low"
             priorityLabel="Низкий"
             highlight
@@ -329,7 +329,7 @@ export function KanbanShowcase() {
 
 export function KanbanCardShowcase() {
   return (
-    <ShowcaseFrame title="Kanban card">
+    <ShowcaseFrame title="Карточка канбана">
       <KanbanCard
         id="MDS-39"
         title="Новая страница продукта"
@@ -380,7 +380,7 @@ export function FormShowcase() {
               <DatePicker placeholder="Выберите дату" />
             </Field>
             <Field
-              label="Email уведомлений"
+              label="Почта — уведомления"
               error="Введите корректный email"
               htmlFor="deal-email"
               full
@@ -406,7 +406,7 @@ export function FormShowcase() {
 
 export function CardShowcase() {
   return (
-    <ShowcaseFrame title="Card">
+    <ShowcaseFrame title="Карточка">
       <CardPanel title="Активные проекты" subtitle="За последние 30 дней" actions={<Button variant="ghost" size="sm">Все</Button>}>
         <p className="u-text-sm u-text-muted">Контент карточки с метриками и списком.</p>
       </CardPanel>
@@ -416,12 +416,12 @@ export function CardShowcase() {
 
 export function InputShowcase() {
   return (
-    <ShowcaseFrame title="Input">
+    <ShowcaseFrame title="Поле ввода">
       <FormGrid columns={1}>
         <Field label="Название" required htmlFor="in-name">
           <Input id="in-name" placeholder="Введите название" />
         </Field>
-        <Field label="Email" hint="Используется для уведомлений" htmlFor="in-email">
+        <Field label="Эл. почта" hint="Используется для уведомлений" htmlFor="in-email">
           <Input id="in-email" type="email" placeholder="user@example.com" />
         </Field>
         <Field label="С ошибкой" error="Поле обязательно" htmlFor="in-err">
@@ -470,7 +470,7 @@ export function ShellShowcase() {
 
 export function CommandPaletteShowcase() {
   return (
-    <ShowcaseFrame title="Command palette">
+    <ShowcaseFrame title="Командная палитра">
       <Command className="max-w-md border border-[var(--border)] rounded-[var(--radius-md)]">
         <CommandInput placeholder="Поиск…" />
         <CommandList>
@@ -487,7 +487,7 @@ export function CommandPaletteShowcase() {
 
 export function EmptyShowcase() {
   return (
-    <ShowcaseFrame title="Empty">
+    <ShowcaseFrame title="Пустое состояние">
       <EmptyState title="Нет проектов" description="Создайте первый проект из CRM." action={<Button size="sm">Создать</Button>} />
     </ShowcaseFrame>
   );
@@ -495,7 +495,7 @@ export function EmptyShowcase() {
 
 export function LoadingSkeletonShowcase() {
   return (
-    <ShowcaseFrame title="Loading skeleton" hint="Text · Title · Avatar · Row · Block · Chip">
+    <ShowcaseFrame title="Скелетон загрузки" hint="Текст · заголовок · аватар · строка · блок · чип">
       <LoadingState label="Загрузка портфеля…" />
       <div className="u-mt-4 grid grid-cols-2 gap-[var(--space-4)]">
         <CardPanel title="Список задач" flush>
@@ -529,11 +529,11 @@ export function LoadingSkeletonShowcase() {
 
 export function ErrorStateShowcase() {
   return (
-    <ShowcaseFrame title="Error state">
+    <ShowcaseFrame title="Состояние ошибки">
       <ErrorState
         title="Не удалось загрузить данные"
         description="Сервер вернул 503. Подождите 30 секунд и повторите."
-        hint="Если ошибка повторится, проверьте статус integration adapter в админке tenant."
+        hint="Если ошибка повторится, проверьте статус адаптера интеграции в админке арендатора."
         onRetry={() => {
           /* demo retry */
         }}
@@ -544,7 +544,7 @@ export function ErrorStateShowcase() {
 
 export function ForbiddenStateShowcase() {
   return (
-    <ShowcaseFrame title="Forbidden">
+    <ShowcaseFrame title="Нет доступа">
       <ForbiddenState title="Нет доступа" description="Обратитесь к администратору." />
     </ShowcaseFrame>
   );
@@ -552,7 +552,7 @@ export function ForbiddenStateShowcase() {
 
 export function BreadcrumbsShowcase() {
   return (
-    <ShowcaseFrame title="Breadcrumbs">
+    <ShowcaseFrame title="Хлебные крошки">
       <TopbarBreadcrumbs items={[{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }]} />
     </ShowcaseFrame>
   );
@@ -560,7 +560,7 @@ export function BreadcrumbsShowcase() {
 
 export function ChipShowcase() {
   return (
-    <ShowcaseFrame title="Chip">
+    <ShowcaseFrame title="Чип">
       <div className="ds-demo__row">
         <Chip variant="info">В работе</Chip>
         <Chip variant="violet">CRM</Chip>
@@ -572,7 +572,7 @@ export function ChipShowcase() {
 
 export function CheckboxShowcase() {
   return (
-    <ShowcaseFrame title="Checkbox">
+    <ShowcaseFrame title="Флажок">
       <div className="flex items-center gap-2">
         <Checkbox id="sc1" defaultChecked />
         <Label htmlFor="sc1">Согласен с политикой</Label>
@@ -583,7 +583,7 @@ export function CheckboxShowcase() {
 
 export function SwitchShowcase() {
   return (
-    <ShowcaseFrame title="Switch">
+    <ShowcaseFrame title="Переключатель">
       <div className="flex items-center gap-2">
         <Switch id="sw1" defaultChecked />
         <Label htmlFor="sw1">Уведомления</Label>
@@ -664,7 +664,7 @@ export function PopoverShowcase() {
 
 export function DropdownShowcase() {
   return (
-    <ShowcaseFrame title="Dropdown">
+    <ShowcaseFrame title="Выпадающее меню">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline">Меню</Button>
@@ -696,7 +696,7 @@ export function TooltipShowcase() {
 export function TabsShowcase() {
   const [tab, setTab] = useState<"a" | "b">("a");
   return (
-    <ShowcaseFrame title="Tabs">
+    <ShowcaseFrame title="Вкладки">
       <Segmented
         name="demo-tabs"
         options={[
@@ -712,7 +712,7 @@ export function TabsShowcase() {
 
 export function ComboboxShowcase() {
   return (
-    <ShowcaseFrame title="Combobox">
+    <ShowcaseFrame title="Комбобокс">
       <Combobox
         className="max-w-xs"
         options={[
@@ -727,12 +727,12 @@ export function ComboboxShowcase() {
 export function DatePickerShowcase() {
   const [date, setDate] = useState<Date | undefined>(undefined);
   return (
-    <ShowcaseFrame title="Date picker · popover + calendar">
+    <ShowcaseFrame title="Выбор даты · поповер и календарь">
       <FormGrid columns={2}>
         <Field label="Дата релиза" required htmlFor="dp-1">
           <DatePicker value={date} onChange={setDate} />
         </Field>
-        <Field label="Дедлайн (disabled)" htmlFor="dp-2">
+        <Field label="Дедлайн (недоступно)" htmlFor="dp-2">
           <DatePicker placeholder="Не задано" disabled />
         </Field>
       </FormGrid>
@@ -745,7 +745,7 @@ export function DatePickerShowcase() {
 
 export function SelectShowcase() {
   return (
-    <ShowcaseFrame title="Select" hint="Radix Select c токенами design-v3">
+    <ShowcaseFrame title="Список" hint="Select с токенами design-v3">
       <FormGrid columns={1}>
         <Field label="Статус" required htmlFor="sel-status">
           <Select defaultValue="in-progress">
@@ -798,7 +798,7 @@ export function RadioShowcase() {
 
 export function TextareaShowcase() {
   return (
-    <ShowcaseFrame title="Textarea">
+    <ShowcaseFrame title="Многострочное поле">
       <Textarea placeholder="Описание задачи" rows={3} />
     </ShowcaseFrame>
   );
@@ -806,7 +806,7 @@ export function TextareaShowcase() {
 
 export function AlertShowcase() {
   return (
-    <ShowcaseFrame title="Alert">
+    <ShowcaseFrame title="Предупреждение">
       <Alert variant="warning">
         <AlertTitle>Внимание</AlertTitle>
         <AlertDescription>Перегруз ресурса на следующей неделе.</AlertDescription>
@@ -832,7 +832,7 @@ export function ContextMenuShowcase() {
 
 export function PaginationShowcase() {
   return (
-    <ShowcaseFrame title="Pagination">
+    <ShowcaseFrame title="Пагинация">
       <div className="btn-group">
         <Button variant="ghost" size="sm">
           Назад
@@ -853,7 +853,7 @@ export function PaginationShowcase() {
 
 export function KbdShowcase() {
   return (
-    <ShowcaseFrame title="Kbd · keyboard hints">
+    <ShowcaseFrame title="Клавиши · подсказки">
       <div className="ds-demo__row">
         <Kbd>Esc</Kbd>
         <Kbd>↩</Kbd>
@@ -876,7 +876,7 @@ export function KbdShowcase() {
 
 export function LabelShowcase() {
   return (
-    <ShowcaseFrame title="Label · field caption">
+    <ShowcaseFrame title="Подпись поля">
       <div className="flex flex-col gap-[var(--space-3)]">
         <div className="flex flex-col gap-[var(--space-1)]">
           <Label htmlFor="lab-1">Обычный label</Label>
@@ -892,7 +892,7 @@ export function LabelShowcase() {
           <Label htmlFor="lab-3" srOnly>
             Скрытый label
           </Label>
-          <Input id="lab-3" placeholder="Только для скринридеров" aria-label="Скрытый label" />
+          <Input id="lab-3" placeholder="Только для скринридеров" aria-label="Скрытая подпись" />
         </div>
       </div>
     </ShowcaseFrame>
@@ -901,13 +901,13 @@ export function LabelShowcase() {
 
 export function SearchPillShowcase() {
   return (
-    <ShowcaseFrame title="Search pill" hint="md/sm · focus · loading · disabled · с шорткатом">
+    <ShowcaseFrame title="Поисковая строка" hint="md/sm · фокус · загрузка · недоступно · с шорткатом">
       <div className="flex flex-col gap-[var(--space-3)] max-w-md">
         <SearchPill placeholder="Поиск задач, проектов, людей…" shortcut={["⌘", "K"]} />
         <SearchPill placeholder="Без шортката" />
         <SearchPill placeholder="Маленький" size="sm" shortcut="/" />
         <SearchPill placeholder="Загрузка" loading />
-        <SearchPill placeholder="Disabled" disabled defaultValue="..." />
+        <SearchPill placeholder="Отключено" disabled defaultValue="..." />
       </div>
     </ShowcaseFrame>
   );

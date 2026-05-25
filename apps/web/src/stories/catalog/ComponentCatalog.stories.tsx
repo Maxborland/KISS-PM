@@ -106,7 +106,7 @@ function CatalogPage() {
         </div>
       </Section>
 
-      <Section title="Feedback и состояния">
+      <Section title="Состояния и обратная связь">
         <BannerInline variant="info">Информационный баннер для согласования токенов.</BannerInline>
         <Alert variant="warning">
           <AlertTitle>Внимание</AlertTitle>

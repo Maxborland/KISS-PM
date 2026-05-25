@@ -56,7 +56,7 @@ export function SettingsBlock() {
             <Field label="Имя" required htmlFor="set-name">
               <Input id="set-name" defaultValue="Камил Б." />
             </Field>
-            <Field label="Email" required htmlFor="set-email">
+            <Field label="Эл. почта" required htmlFor="set-email">
               <Input id="set-email" type="email" defaultValue="kamil@kiss.pm" />
             </Field>
             <Field label="Локаль" htmlFor="set-locale">
@@ -88,17 +88,17 @@ export function SettingsBlock() {
         <FormSection title="Уведомления" lead="Каналы и частота.">
           <SwitchRowList>
             <SwitchRow
-              label="Email — упоминания"
+              label="Почта — упоминания"
               description="Когда вас тегают в комментариях задач или сделок"
               defaultChecked
             />
             <SwitchRow
-              label="Email — дайджест по понедельникам"
+              label="Почта — дайджест по понедельникам"
               description="Сводка прогресса проектов за неделю"
               defaultChecked
             />
             <SwitchRow
-              label="Slack — control signals"
+              label="Slack — сигналы управления"
               description="KPI-сигналы и риски сроков прямо в канал"
             />
           </SwitchRowList>

@@ -19,7 +19,7 @@ import { PageIntro } from "@/views/layout/page-intro";
 export function TaskCreateModalBlock() {
   return (
     <>
-      <PageIntro title="Новая задача" lead="Модальное создание с stepper и формой." />
+      <PageIntro title="Новая задача" lead="Модальное создание с пошаговым мастером и формой." />
       <CardPanel className="modal-mock">
         <ol className="stepper">
           <li className="stepper__item is-done">

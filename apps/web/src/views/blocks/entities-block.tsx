@@ -14,10 +14,10 @@ export type EntityKind = "clients" | "contacts" | "products";
 const COPY: Record<EntityKind, { title: string; lead: string; cols: string[]; rows: Array<Record<string, unknown>> }> = {
   clients: {
     title: "Клиенты",
-    lead: "Справочник клиентов tenant.",
+    lead: "Справочник клиентов арендатора.",
     cols: ["Клиент", "Менеджер", "Сегмент", "Сделок", "Сумма"],
     rows: [
-      { name: "ООО «Ромашка»", code: "CLI-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, segment: "Enterprise", deals: 4, amount: "3 240 000 ₽" },
+      { name: "ООО «Ромашка»", code: "CLI-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, segment: "Крупный бизнес", deals: 4, amount: "3 240 000 ₽" },
       { name: "АО «Техно»", code: "CLI-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, segment: "Mid-market", deals: 2, amount: "890 000 ₽" },
       { name: "ACME Studio", code: "CLI-003", manager: { initials: "КБ", color: "c4" as const, name: "Козлова" }, segment: "SMB", deals: 1, amount: "320 000 ₽" }
     ]
@@ -25,7 +25,7 @@ const COPY: Record<EntityKind, { title: string; lead: string; cols: string[]; ro
   contacts: {
     title: "Контакты",
     lead: "Контактные лица и связи с CRM.",
-    cols: ["Контакт", "Компания", "Должность", "Email", "Активность"],
+    cols: ["Контакт", "Компания", "Должность", "Эл. почта", "Активность"],
     rows: [
       { name: "Алексей Иванов", code: "CTC-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, company: "ООО «Ромашка»", role: "CFO", email: "ai@romashka.ru" },
       { name: "Мария Петрова", code: "CTC-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, company: "АО «Техно»", role: "Operations", email: "mp@tehno.ru" }

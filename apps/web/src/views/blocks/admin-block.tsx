@@ -81,8 +81,8 @@ export function AdminBlock() {
           <SwitchRowList>
             <SwitchRow label="2FA обязательна" description="Двухфакторная аутентификация для всех" defaultChecked />
             <SwitchRow label="Сессии — 8 часов" description="Автовыход после 8 часов неактивности" defaultChecked />
-            <SwitchRow label="SSO (SAML)" description="Корпоративный single sign-on" />
-            <SwitchRow label="Domain allowlist" description="Только email из доменов tenant" />
+            <SwitchRow label="SSO (SAML)" description="Корпоративный единый вход (SSO)" />
+            <SwitchRow label="Разрешённые домены" description="Только адреса email из доменов арендатора" />
           </SwitchRowList>
         </CardPanel>
       </div>

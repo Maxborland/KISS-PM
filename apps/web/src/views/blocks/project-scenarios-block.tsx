@@ -17,7 +17,7 @@ export function ProjectScenariosBlock() {
     <>
       <PageIntro
         title={mockProjectScreenTitle("Сценарии")}
-        lead="What-if и сравнение вариантов."
+        lead="Сценарии «что если» и сравнение вариантов."
         actions={<Button variant="primary">Принять сценарий</Button>}
       />
       <CardPanel title="Сравнение" subtitle={`${SCENARIOS.length} варианта`} flush>

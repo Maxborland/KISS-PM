@@ -237,7 +237,7 @@ export const UI_VARIANT_ITEMS = {
   "loading-state": items({ label: "Загрузка", node: <LoadingState label="Загрузка портфеля…" /> }),
   "page-intro": items({
     label: "Вступление",
-    node: <PageIntro title="Список проектов" lead="Активные и архивные проекты tenant." />
+    node: <PageIntro title="Список проектов" lead="Активные и архивные проекты арендатора." />
   }),
   pagination: items({
     label: "Страницы",

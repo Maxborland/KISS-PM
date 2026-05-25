@@ -74,9 +74,9 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
   "00-space-discipline": {
     id: "00-space-discipline",
     storyTitle: "00 Дисциплина отступов",
-    pageTitle: "Overlay вместо push",
-    lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только overlay.",
-    breadcrumb: [{ label: "Design", current: true }],
+    pageTitle: "Наложение вместо сдвига",
+    lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только наложение поверх.",
+    breadcrumb: [{ label: "Витрина", current: true }],
     activeNav: "Дашборд"
   },
   "01-dashboard": {
@@ -107,7 +107,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     id: "04-create-task-modal",
     storyTitle: "04 Модалка создания задачи",
     pageTitle: "Новая задача",
-    lead: "Модальное создание с stepper и формой.",
+    lead: "Модальное создание с пошаговым мастером и формой.",
     breadcrumb: [{ label: "Задачи", current: true }],
     activeNav: "Задачи"
   },
@@ -147,7 +147,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     id: "08-entities-clients",
     storyTitle: "08 Справочник клиентов",
     pageTitle: "Клиенты",
-    lead: "Справочник клиентов tenant.",
+    lead: "Справочник клиентов арендатора.",
     breadcrumb: [{ label: "Справочники" }, { label: "Клиенты", current: true }],
     activeNav: "Интеграции"
   },
@@ -251,7 +251,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     id: "19-login",
     storyTitle: "19 Вход",
     pageTitle: "Войти в KISS PM",
-    lead: "Используйте корпоративный email tenant.",
+    lead: "Используйте корпоративный email арендатора.",
     breadcrumb: [],
     variant: "login"
   },

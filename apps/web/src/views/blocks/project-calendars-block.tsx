@@ -66,7 +66,7 @@ export function ProjectCalendarsBlock() {
     <>
       <PageIntro
         title={mockProjectScreenTitle("Календари")}
-        lead="Рабочие часы и исключения tenant-календаря."
+        lead="Рабочие часы и исключения календаря арендатора."
         actions={
           <>
             <Button variant="ghost" size="sm">
@@ -80,7 +80,7 @@ export function ProjectCalendarsBlock() {
         }
       />
       <div className="grid-2">
-        <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь tenant">
+        <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь арендатора">
           <FormSection title="Шаблон" lead="Выберите базовый паттерн или настройте дни вручную.">
             <FormGrid columns={1}>
               <Field label="Шаблон" htmlFor="cal-template">

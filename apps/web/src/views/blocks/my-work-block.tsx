@@ -33,7 +33,7 @@ export function MyWorkBlock() {
               id="MDS-39"
               title="Новая страница продукта"
               priority="urgent"
-              priorityLabel="Urgent"
+              priorityLabel="Срочно"
               meta={[{ label: "Новая Homepage" }, { label: "Срок: 29 июля" }]}
               assignees={[{ initials: "ИИ", color: "c1" }]}
               comments={13}
@@ -43,7 +43,7 @@ export function MyWorkBlock() {
           <KanbanColumn title="В работе" count={4}>
             <KanbanCard
               id="MDS-2"
-              title="Sales deck"
+              title="Презентация для клиента"
               priority="low"
               priorityLabel="Low"
               highlight
