@@ -98,12 +98,13 @@ export type ProjectRecord = {
   templateId: string | null;
   createdAt: Date;
   activatedAt: Date | null;
+  closedAt: Date | null;
   demand: PositionDemandRecord[];
 };
 
 export type ProjectInput = Omit<
   ProjectRecord,
-  "createdAt" | "activatedAt" | "sourceType" | "sourceOpportunityId"
+  "createdAt" | "activatedAt" | "closedAt" | "sourceType" | "sourceOpportunityId"
 > & {
   sourceOpportunityId: string;
 };
@@ -704,6 +705,7 @@ function mapProjectRecord(
     templateId: row.templateId,
     createdAt: row.createdAt,
     activatedAt: row.activatedAt,
+    closedAt: row.closedAt,
     demand
   };
 }

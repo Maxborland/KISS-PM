@@ -369,7 +369,8 @@ export const projects = pgTable(
     plannedHours: integer("planned_hours").notNull(),
     templateId: text("template_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-    activatedAt: timestamp("activated_at", { withTimezone: true })
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true })
   },
   (table) => [
     primaryKey({
@@ -1527,6 +1528,162 @@ export const actionExecutions = pgTable(
   ]
 );
 
+export const projectClosureSnapshots = pgTable(
+  "project_closure_snapshots",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    projectStatusBefore: text("project_status_before").notNull(),
+    planVersion: integer("plan_version").notNull(),
+    snapshotPayload: jsonb("snapshot_payload")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    planFactSummary: jsonb("plan_fact_summary")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    closedByUserId: text("closed_by_user_id").notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }).notNull(),
+    closeReason: text("close_reason").notNull(),
+    auditEventId: text("audit_event_id")
+  },
+  (table) => [
+    primaryKey({
+      name: "project_closure_snapshots_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    uniqueIndex("project_closure_snapshots_tenant_project_uidx").on(
+      table.tenantId,
+      table.projectId
+    ),
+    foreignKey({
+      name: "project_closure_snapshots_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "project_closure_snapshots_closed_by_fk",
+      columns: [table.tenantId, table.closedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("project_closure_snapshots_tenant_closed_idx").on(
+      table.tenantId,
+      table.closedAt
+    ),
+    check("project_closure_snapshots_plan_version_chk", sql`${table.planVersion} > 0`)
+  ]
+);
+
+export const retrospectiveLessons = pgTable(
+  "retrospective_lessons",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    snapshotId: text("snapshot_id").notNull(),
+    category: text("category").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    impact: text("impact").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "retrospective_lessons_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "retrospective_lessons_snapshot_fk",
+      columns: [table.tenantId, table.snapshotId],
+      foreignColumns: [projectClosureSnapshots.tenantId, projectClosureSnapshots.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "retrospective_lessons_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "retrospective_lessons_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("retrospective_lessons_tenant_project_created_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.createdAt
+    ),
+    check(
+      "retrospective_lessons_category_chk",
+      sql`${table.category} in ('schedule', 'scope', 'resource', 'quality', 'communication', 'commercial', 'process')`
+    ),
+    check(
+      "retrospective_lessons_impact_chk",
+      sql`${table.impact} in ('positive', 'negative', 'neutral')`
+    )
+  ]
+);
+
+export const templateImprovementActions = pgTable(
+  "template_improvement_actions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    snapshotId: text("snapshot_id").notNull(),
+    templateId: text("template_id").notNull(),
+    status: text("status").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    impact: jsonb("impact").$type<Record<string, unknown>>().notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    appliedByUserId: text("applied_by_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    auditEventId: text("audit_event_id")
+  },
+  (table) => [
+    primaryKey({
+      name: "template_improvement_actions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "template_improvement_actions_snapshot_fk",
+      columns: [table.tenantId, table.snapshotId],
+      foreignColumns: [projectClosureSnapshots.tenantId, projectClosureSnapshots.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "template_improvement_actions_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "template_improvement_actions_template_fk",
+      columns: [table.tenantId, table.templateId],
+      foreignColumns: [projectTemplates.tenantId, projectTemplates.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "template_improvement_actions_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "template_improvement_actions_applied_by_fk",
+      columns: [table.tenantId, table.appliedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("template_improvement_actions_tenant_template_status_idx").on(
+      table.tenantId,
+      table.templateId,
+      table.status
+    ),
+    check(
+      "template_improvement_actions_status_chk",
+      sql`${table.status} in ('proposed', 'applied', 'rejected')`
+    )
+  ]
+);
+
 export const controlSurfaceDefinitions = pgTable(
   "control_surface_definitions",
   {
@@ -1969,6 +2126,9 @@ export type PersistenceTableName =
   | "control_signals"
   | "corrective_actions"
   | "action_executions"
+  | "project_closure_snapshots"
+  | "retrospective_lessons"
+  | "template_improvement_actions"
   | "control_surface_definitions"
   | "control_surface_versions"
   | "tenant_production_calendars"
@@ -2031,6 +2191,9 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "control_signals",
   "corrective_actions",
   "action_executions",
+  "project_closure_snapshots",
+  "retrospective_lessons",
+  "template_improvement_actions",
   "control_surface_definitions",
   "control_surface_versions",
   "tenant_production_calendars",
@@ -2086,6 +2249,9 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "control_signals",
   "corrective_actions",
   "action_executions",
+  "project_closure_snapshots",
+  "retrospective_lessons",
+  "template_improvement_actions",
   "control_surface_definitions",
   "control_surface_versions",
   "tenant_production_calendars",
@@ -2237,7 +2403,8 @@ const tableColumns = {
     "planned_hours",
     "template_id",
     "created_at",
-    "activated_at"
+    "activated_at",
+    "closed_at"
   ],
   project_position_demands: [
     "tenant_id",
@@ -2500,6 +2667,47 @@ const tableColumns = {
     "status",
     "audit_event_id",
     "created_at"
+  ],
+  project_closure_snapshots: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "project_status_before",
+    "plan_version",
+    "snapshot_payload",
+    "plan_fact_summary",
+    "closed_by_user_id",
+    "closed_at",
+    "close_reason",
+    "audit_event_id"
+  ],
+  retrospective_lessons: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "snapshot_id",
+    "category",
+    "title",
+    "body",
+    "impact",
+    "created_by_user_id",
+    "created_at"
+  ],
+  template_improvement_actions: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "snapshot_id",
+    "template_id",
+    "status",
+    "title",
+    "description",
+    "impact",
+    "created_by_user_id",
+    "applied_by_user_id",
+    "created_at",
+    "applied_at",
+    "audit_event_id"
   ],
   control_surface_definitions: [
     "id",
