@@ -72,7 +72,7 @@ export function createApp(options: CreateAppOptions = {}) {
     return context.json(response.body, response.status);
   });
 
-  app.use("/api/*", async (context, next) => {
+  app.use("*", async (context, next) => {
     context.header("Cache-Control", "no-store, private");
     setApiSecurityHeaders(context);
     await next();
