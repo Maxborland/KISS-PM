@@ -261,9 +261,14 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile,
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
     const projectId = context.req.param("projectId");
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "retrospective.lesson_create_denied", {
+        projectId
+      }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
+
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (
         !transactionDataSource.getRetrospectiveReadModel ||
@@ -328,9 +333,15 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       const profile = await deps.getActorProfile(actor);
       const decision = templateImprovementDecision(actor, profile);
-      if (!decision.allowed) return context.json({ error: decision.reason }, 403);
       const projectId = context.req.param("projectId");
       const actionId = context.req.param("actionId");
+      if (!decision.allowed) {
+        await appendDeniedAudit(deps, actor, "template_improvement.apply_denied", {
+          projectId,
+          actionId
+        }, decision);
+        return context.json({ error: decision.reason }, 403);
+      }
       const auditEventId = `audit-${randomUUID()}`;
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (

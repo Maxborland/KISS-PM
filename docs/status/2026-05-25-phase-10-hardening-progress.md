@@ -17,6 +17,7 @@
 | KPI expression safety | Constrained KPI AST валидировал finite листья, но арифметика могла вернуть `Infinity` | KPI expression arithmetic normalizes operation results through finite guard | `pnpm vitest run packages/domain/src/control/controlEngine.test.ts`, `pnpm typecheck` |
 | Control action apply | После planning lock повторно проверялось наличие `planDelta`, но не пустой command list | Locked action recheck rejects empty planDelta before preview/apply/version increment | `pnpm vitest run apps/api/src/app.test.ts packages/domain/src/control/controlEngine.test.ts`, `pnpm typecheck` |
 | Control surface lifecycle | Archived control surface можно было восстановить через publish/rollback paths | Publish/rollback reject archived surfaces; persistence adds secondary invariant guard | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts packages/persistence/src/migration.test.ts`, `pnpm typecheck` |
+| Closure denied audit | Lesson creation and template improvement apply returned 403 without denied audit | Retrospective lesson and template improvement denied paths write closure audit events | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -33,5 +34,5 @@
 | Capacity | Re-run focused review for project filter semantics, hidden contribution masking and cache invalidation after all mutating paths |
 | KPI / action engine | Continue focused review for denied-path audit completeness and read-model exposure |
 | Control surfaces | Continue focused review for action binding safety and published read-model shape |
-| Closure / retrospectives | Re-run focused review for immutable snapshot consistency and retry/conflict semantics |
+| Closure / retrospectives | Continue focused review for immutable snapshot consistency and retry/conflict semantics |
 | Release-like smoke | Add or run backend smoke covering the full management loop from auth to closure/audit |
