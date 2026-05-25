@@ -46,7 +46,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/workspace/projects/:projectId/closure", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.getRetrospectiveReadModel) {
+    if (!deps.dataSource.getRetrospectiveReadModel || !deps.dataSource.listProjects) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
     const profile = await deps.getActorProfile(actor);
@@ -66,7 +66,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/projects/:projectId/closure/preview", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.getPlanSnapshot || !deps.dataSource.listProjectTasks) {
+    if (
+      !deps.dataSource.getPlanSnapshot ||
+      !deps.dataSource.listProjectTasks ||
+      !deps.dataSource.listProjects
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
     const profile = await deps.getActorProfile(actor);
@@ -103,6 +107,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       !deps.dataSource.getPlanSnapshot ||
       !deps.dataSource.listProjectTasks ||
+      !deps.dataSource.listProjects ||
       !deps.dataSource.closeProject ||
       !deps.dataSource.withTransaction ||
       !deps.dataSource.appendAuditEvent
@@ -128,6 +133,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (
         !transactionDataSource.getPlanSnapshot ||
         !transactionDataSource.listProjectTasks ||
+        !transactionDataSource.listProjects ||
         !transactionDataSource.closeProject ||
         !transactionDataSource.appendAuditEvent
       ) {
