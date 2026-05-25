@@ -202,7 +202,7 @@ describe("planning auto-solver API", () => {
                   type: "risk.accept_overload",
                   payload: {
                     overloadId: "overload-alpha",
-                    acceptedRiskReason: "placeholder"
+                    acceptedRiskReason: "persisted proposal reason is ignored"
                   }
                 }
               ]

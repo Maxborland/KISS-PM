@@ -65,7 +65,7 @@ export function parseScenarioTargetRecord(input: Record<string, unknown>): Scena
   ) {
     return null;
   }
-  if (!Array.isArray(input.taskIds) || input.taskIds.some((taskId) => typeof taskId !== "string")) {
+  if (!isStringArray(input.taskIds)) {
     return null;
   }
   return {
@@ -73,30 +73,37 @@ export function parseScenarioTargetRecord(input: Record<string, unknown>): Scena
     resourceId: input.resourceId,
     date: input.date,
     overloadMinutes: input.overloadMinutes,
-    taskIds: input.taskIds as string[]
+    taskIds: input.taskIds
   };
 }
 
 export function parseScenarioProposal(input: Record<string, unknown>): ScenarioProposal | null {
-  if (!Array.isArray((input as { planDelta?: { commands?: unknown[] } }).planDelta?.commands)) {
+  const planDelta = isRecord(input.planDelta) ? input.planDelta : null;
+  if (!Array.isArray(planDelta?.commands)) {
     return null;
   }
-  const commands = (input as { planDelta: { commands: unknown[] } }).planDelta.commands.map((command) =>
-    parsePlanningCommand(command)
-  );
+  const commands = planDelta.commands.map((command) => parsePlanningCommand(command));
   if (commands.some((command) => !command.ok)) return null;
   return {
-    ...(input as unknown as ScenarioProposal),
+    ...input,
     planDelta: {
-      ...(input as unknown as ScenarioProposal).planDelta,
+      ...planDelta,
       commands: commands.map((command) => (command.ok ? command.value : neverCommand()))
     }
-  };
+  } as ScenarioProposal;
 }
 
 function sameStringSet(left: string[], right: string[]): boolean {
   const normalize = (values: string[]) => [...new Set(values)].sort().join("\n");
   return normalize(left) === normalize(right);
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function isStringArray(input: unknown): input is string[] {
+  return Array.isArray(input) && input.every((item) => typeof item === "string");
 }
 
 function neverCommand(): PlanningCommand {

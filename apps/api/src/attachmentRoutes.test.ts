@@ -33,7 +33,7 @@ function streamedRequest(chunks: Uint8Array[]): Request {
   });
 
   return new Request("http://localhost/api/workspace/attachments/files", {
-    body: body as unknown as BodyInit,
+    body,
     duplex: "half",
     method: "POST"
   } as RequestInit & { duplex: "half" });

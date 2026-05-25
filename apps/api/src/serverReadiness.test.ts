@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { PostgresClient } from "@kiss-pm/persistence";
 
 import { assertServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
@@ -80,7 +79,7 @@ function fakeStorageProvider(): StorageProvider {
   };
 }
 
-function fakePostgresClient(results: unknown[][]): PostgresClient {
+function fakePostgresClient(results: unknown[][]) {
   let index = 0;
-  return (async () => results[index++] ?? []) as unknown as PostgresClient;
+  return async () => results[index++] ?? [];
 }

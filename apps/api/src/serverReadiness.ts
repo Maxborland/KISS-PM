@@ -1,5 +1,3 @@
-import type { PostgresClient } from "@kiss-pm/persistence";
-
 import {
   checkStorageProviderReadWrite,
   type ReadinessChecks
@@ -8,8 +6,13 @@ import type { StorageProvider } from "./storageProvider";
 
 export const expectedDatabaseMigrationTag = "0033_phase_9_closure_retrospectives.sql";
 
+type ReadinessPostgresClient = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => unknown;
+
 export function createServerReadinessChecks(input: {
-  postgresClient?: PostgresClient | undefined;
+  postgresClient?: ReadinessPostgresClient | undefined;
   storageProvider: StorageProvider;
   production: boolean;
 }): ReadinessChecks {
@@ -27,7 +30,7 @@ export function createServerReadinessChecks(input: {
         where tag = ${expectedDatabaseMigrationTag}
         limit 1
       `;
-      if (rows.length !== 1) {
+      if (!Array.isArray(rows) || rows.length !== 1) {
         throw new Error("database_schema_not_ready");
       }
     };
