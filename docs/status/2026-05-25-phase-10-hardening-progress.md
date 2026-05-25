@@ -39,21 +39,21 @@
 | Control surface publish failure audit | Publish blocked/archived conflicts returned 409 without mutation audit | Publish conflicts now write control surface failure audit with validation/reason metadata | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | Control surface rollback/archive failure audit | Rollback/archive not-found or archived conflicts returned errors without mutation audit | Rollback/archive failure paths now write control surface failure audit with reason metadata | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | Control surface read denied audit | Control surface list/detail/preset denied paths returned 403 without audit | Control surface read/preset denials now write best-effort denied audit | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
+| Storage/search security sweep | Before Phase 10, route-adjacent risky sinks needed explicit review against security guidance | Redirect/eval/shell patterns are absent; filesystem access is limited to storage provider/migration/test paths; local storage resolves keys under configured root; outbound runtime `fetch` is limited to env-configured S3 provider; external references are never server-fetched | `rg "redirect\\(|location\\(" apps/api packages -n`, `rg "new Function|eval\\(" apps/api packages -n`, `rg "child_process|exec\\(|spawn\\(" apps/api packages -n`, `rg "sendFile|createReadStream|readFile|writeFile|unlink\\(|rm\\(" apps/api packages -n`, `rg "fetch\\(|axios|http\\.request|https\\.request" apps/api packages -n`, `pnpm test`, `pnpm test:db`, `pnpm typecheck` |
+| Capacity lifecycle invalidation review | Less common capacity-committed lifecycle statuses could leave cache stale if a public transition existed outside activate/close | Reviewed lifecycle entrypoints: activation, close, planning apply, solver apply, task assignment/status updates, absences, calendars, org/position/user changes invalidate capacity cache; `paused/cancelled` have no public project transition route in this backend slice | `rg "paused|cancelled|activateProjectDraft|closeProject|invalidateCapacity" apps/api packages -n`, `codegraph_context: Capacity cache invalidation and capacity-committed project lifecycle statuses`, `pnpm test:db` |
+| Planning / solver persistence mapping review | Low-level persistence failures after governed solver apply could be over-mapped and hide real DB bugs | Reviewed solver apply flow: known stale/precondition/proposal/hash/expiry/business conflicts now return stable audited responses; unknown persistence errors remain un-mapped 500s so data-source bugs are not disguised as business outcomes | `codegraph_context: Planning auto solver apply low-level persistence failure mapping`, `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm test:db` |
+| KPI / action engine persistence review | Action execution persistence edge cases needed a final pass after route-level denied audit fixes | Reviewed management action flow: route-level denials are audited before candidate loading; governed preview/apply paths keep transaction rollback semantics; unknown persistence failures remain 500 instead of partial success or false business conflicts | `codegraph_context: Management action execution persistence edge cases`, `pnpm vitest run apps/api/src/app.test.ts`, `pnpm test` |
+| Control surface persistence mapping review | Publish/rollback/archive low-level persistence failures needed a final pass after read denied audit symmetry | Reviewed control surface mutation paths: not-found/archived/validation conflicts now have audited stable responses; unknown repository failures remain 500 so persistence bugs surface during verification | `codegraph_context: Control surface low-level persistence failure mapping`, `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm test` |
+| Closure auxiliary persistence mapping review | Closure auxiliary commands needed a final pass beyond close-project race handling | Reviewed close, lesson, template improvement preview/apply/retry paths: known denied/conflict/not-found/retry outcomes now audit and map stably; unknown persistence failures are not converted into business errors | `codegraph_context: Closure auxiliary command persistence failure mapping`, `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm test` |
+| Release-like smoke | Phase 10 needs a backend loop gate that stays in the verification set instead of becoming a one-off check | Backend management loop DB smoke remains part of broad verification; expand it only when a new backend phase adds a mandatory loop step | `pnpm test:db`, `apps/api/src/backendManagementLoop.db.test.ts` |
 
 ## Broad verification
 
-- `pnpm test`: passed, 56 files, 340 tests.
+- `pnpm test`: passed, 56 files, 357 tests, 1 skipped.
 - `pnpm test:db`: passed.
 - `pnpm typecheck`: passed for every code slice.
 - `git diff --check`: passed for every code slice.
 
 ## Remaining Phase 10 audit queue
 
-| Area | Next check |
-|------|------------|
-| Planning / solver apply | Continue focused review for low-level persistence failure mapping after route-level denied audit symmetry |
-| Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
-| KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
-| Control surfaces | Continue focused review for low-level persistence failure mapping after read denied audit symmetry |
-| Closure / retrospectives | Continue focused review for persistence failure mapping in closure auxiliary commands |
-| Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |
+No open backend hardening gaps remain before Phase 10 in this branch. Future backend phases should add their own rows and expand the release-like DB smoke when they introduce a mandatory loop step.
