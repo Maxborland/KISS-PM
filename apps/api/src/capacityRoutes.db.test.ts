@@ -722,6 +722,53 @@ describe("capacity API routes", () => {
     );
   });
 
+  it("invalidates capacity cache after project closure removes committed load", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await createProject({
+      projectId: "project-closure-capacity",
+      opportunityId: "opportunity-closure-capacity",
+      title: "Закрываемый проект",
+      status: "active"
+    });
+    await createPlanningTask(adminCookie, {
+      projectId: "project-closure-capacity",
+      taskId: "task-closure-capacity",
+      assignmentId: "assignment-closure-capacity",
+      title: "Работа перед закрытием",
+      workMinutes: 180
+    });
+
+    const before = await app.request("/api/workspace/capacity/tree?monthIso=2026-06", {
+      headers: { cookie: adminCookie }
+    });
+    expect(before.status).toBe(200);
+    expect(findResourceDay(await before.json(), "user-alpha-resource-reader", "2026-06-02")).toEqual(
+      expect.objectContaining({ workMinutes: 180 })
+    );
+
+    const close = await app.request(
+      "/api/workspace/projects/project-closure-capacity/closure/close",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ closeReason: "Работы завершены" })
+      }
+    );
+    expect(close.status).toBe(200);
+
+    const after = await app.request("/api/workspace/capacity/tree?monthIso=2026-06", {
+      headers: { cookie: adminCookie }
+    });
+    expect(after.status).toBe(200);
+    expect(findResourceDay(await after.json(), "user-alpha-resource-reader", "2026-06-02")).toEqual(
+      expect.objectContaining({ workMinutes: 0, overloadMinutes: 0 })
+    );
+  });
+
   it("returns capacity summary for admin", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const response = await app.request("/api/workspace/capacity/summary?monthIso=2026-05", {
