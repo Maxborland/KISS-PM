@@ -175,6 +175,7 @@ describe("control surface routes", () => {
     expect(state.auditEvents.map((event) => event.actionType)).toContain("control_surface.publish_conflict");
     expect(rollback.status).toBe(409);
     await expect(rollback.json()).resolves.toEqual({ error: "control_surface_archived" });
+    expect(state.auditEvents.map((event) => event.actionType)).toContain("control_surface.rollback_conflict");
     const archivedList = await app.request("/api/tenant/current/control-surfaces?includeArchived=true", {
       headers: { cookie: "kiss_pm_session=session-alpha" }
     });
