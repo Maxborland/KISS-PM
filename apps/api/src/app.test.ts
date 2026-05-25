@@ -15,6 +15,68 @@ describe("KISS PM API Phase 1 shell", () => {
     await expect(response.json()).resolves.toEqual({ status: "ok", product: "KISS PM" });
   });
 
+  it("returns liveness status on public and API health routes", async () => {
+    const app = createApp();
+
+    const publicResponse = await app.request("/health/live");
+    const apiResponse = await app.request("/api/health/live");
+
+    expect(publicResponse.status).toBe(200);
+    await expect(publicResponse.json()).resolves.toEqual({
+      status: "live",
+      product: "KISS PM"
+    });
+    expect(apiResponse.status).toBe(200);
+    await expect(apiResponse.json()).resolves.toEqual({
+      status: "live",
+      product: "KISS PM"
+    });
+  });
+
+  it("returns readiness when dependency checks pass", async () => {
+    const app = createApp({
+      readinessChecks: {
+        database: async () => {},
+        storage: async () => {}
+      }
+    });
+
+    const response = await app.request("/health/ready");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "ready",
+      product: "KISS PM",
+      checks: {
+        database: { status: "ok" },
+        storage: { status: "ok", provider: "local" }
+      }
+    });
+  });
+
+  it("returns stable readiness errors without leaking internal exceptions", async () => {
+    const app = createApp({
+      readinessChecks: {
+        database: async () => {
+          throw new Error("password=secret internal host");
+        },
+        storage: async () => {}
+      }
+    });
+
+    const response = await app.request("/api/health/ready");
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      status: "not_ready",
+      product: "KISS PM",
+      checks: {
+        database: { status: "error", error: "database_unavailable" },
+        storage: { status: "ok", provider: "local" }
+      }
+    });
+  });
+
   it("lists deterministic dev users for local Phase 1 login", async () => {
     const app = createApp({ enableDevTenantRoutes: true });
 

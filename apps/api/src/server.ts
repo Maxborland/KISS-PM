@@ -4,8 +4,13 @@ import {
   createPostgresClient,
   createPostgresTenantDataSource
 } from "@kiss-pm/persistence";
-import { createApp } from "./app";
+import { createApp, type CreateAppOptions } from "./app";
+import {
+  checkStorageProviderReadWrite,
+  type ReadinessChecks
+} from "./healthRoutes";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
+import { createStorageProviderFromEnv } from "./storageProvider";
 
 const port = Number.parseInt(process.env.PORT ?? "4000", 10);
 const hostname = process.env.HOST ?? "127.0.0.1";
@@ -17,14 +22,30 @@ const dataSource = postgresClient
   ? createPostgresTenantDataSource(createDatabase(postgresClient))
   : undefined;
 const enableDevTenantRoutes = process.env.KISS_PM_ENABLE_DEV_ROUTES === "true";
+const storageProvider = createStorageProviderFromEnv();
+const readinessChecks: ReadinessChecks = {
+  storage: () => checkStorageProviderReadWrite(storageProvider)
+};
+if (postgresClient) {
+  readinessChecks.database = async () => {
+    await postgresClient`select 1`;
+  };
+}
 
 const publisher = await bootstrapPlanningEventPublisher();
 setPlanningEventPublisher(publisher);
 
+const appOptions: CreateAppOptions = {
+  enableDevTenantRoutes,
+  readinessChecks,
+  storageProvider
+};
+if (dataSource) {
+  appOptions.dataSource = dataSource;
+}
+
 serve({
-  fetch: (dataSource
-    ? createApp({ dataSource, enableDevTenantRoutes })
-    : createApp({ enableDevTenantRoutes })).fetch,
+  fetch: createApp(appOptions).fetch,
   hostname,
   port
 });

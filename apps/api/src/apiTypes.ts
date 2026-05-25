@@ -50,6 +50,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
 
 export type AccessProfileRecord = AccessProfile & {
@@ -704,6 +705,7 @@ export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   storageProvider?: StorageProvider;
   authRateLimiter?: AuthRateLimiter;
+  readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];
   trustForwardedAuthHeaders?: boolean;
