@@ -98,6 +98,10 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
       }
 
       const existing = existingRows[0];
+      if (existing?.status === "archived") {
+        throw new Error("control_surface_archived");
+      }
+
       const id = existing?.id ?? input.definition.id;
       const draftVersion = existing
         ? Math.max(existing.draftVersion, existing.currentVersion + 1)
