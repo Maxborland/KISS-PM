@@ -27,6 +27,7 @@
 | Planning auto-solver apply audit | Persisted solver apply returned stale plan/precondition 409 responses without an audit trail | Solver apply now writes conflict/precondition audit events before returning governed 409 outcomes | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 | KPI definition read exposure | Control read-model returned KPI definitions without requiring the dedicated KPI definition read permission | Control read-model now requires `tenant.kpi_definitions.read` before loading definitions/evaluations/signals | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 | Control surface published action exposure | Published control surface read-model returned actions even when the actor lacked action-specific permissions | Non-builder published read-model now filters actions by actor permissions while builder state remains complete | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
+| Control surface required-permission exposure | Published surfaces were visible to non-builder readers even when their definition-level required permissions were missing | Non-builder published read-model now hides surfaces unless definition `requiredPermissions` are all granted | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -42,6 +43,6 @@
 | Planning / solver apply | Continue focused review for persisted proposal apply edge cases beyond conflict/precondition audit trace |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for KPI definition mutation audit semantics after read exposure hardening |
-| Control surfaces | Continue focused review for published data-source/required-permission visibility after action filtering |
+| Control surfaces | Continue focused review for saved-view/audit mutation boundaries after published permission gates |
 | Closure / retrospectives | Continue focused review for immutable snapshot retry/conflict semantics after read-boundary hardening |
 | Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |
