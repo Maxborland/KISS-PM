@@ -34,6 +34,7 @@
 | Planning auto-solver proposal rejection audit | Missing proposal ids and accepted-overload proposals without risk reason returned errors without audit | Solver apply now audits missing proposal and accepted-risk-reason precondition failures before returning 404/409 | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 | Planning auto-solver route-level denied audit | Solver run create/read/apply route-level permission denials returned 403 without audit | Solver create/read/apply now write safe route-metadata denied audit before exposing or applying persisted proposals | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm typecheck` |
 | Closure retry/conflict audit | Close-project race outcomes mapped to stable 404/409 but left no audit trail | Closure close now audits not-found/closability race failures without writing success `project.closed` audit | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
+| Template improvement apply retry audit | Retrying or mis-targeting template improvement apply returned 404/409 without audit | Template improvement apply now audits not-found/not-proposed/already-applied failures without duplicate success audit | `pnpm vitest run apps/api/src/retrospectiveRoutes.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -50,5 +51,5 @@
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
 | KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
 | Control surfaces | Continue focused review for saved-view/audit mutation boundaries after published permission gates |
-| Closure / retrospectives | Continue focused review for template-improvement retry/error semantics after close conflict audit |
+| Closure / retrospectives | Continue focused review for retrospective read/preview denied audit symmetry after template-improvement retry audit |
 | Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |

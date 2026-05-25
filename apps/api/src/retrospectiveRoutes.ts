@@ -390,6 +390,14 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             (candidate) => candidate.id === actionId
           );
           if (existingAction?.status === "applied") {
+            await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+              actor,
+              projectId,
+              actionId,
+              existingAction,
+              permissionResult: decision,
+              error: "template_improvement_action_already_applied"
+            });
             return {
               ok: false as const,
               status: 409,
@@ -397,12 +405,28 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             };
           }
           if (existingAction) {
+            await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+              actor,
+              projectId,
+              actionId,
+              existingAction,
+              permissionResult: decision,
+              error: "template_improvement_action_not_proposed"
+            });
             return {
               ok: false as const,
               status: 409,
               error: "template_improvement_action_not_proposed"
             };
           }
+          await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+            actor,
+            projectId,
+            actionId,
+            existingAction: null,
+            permissionResult: decision,
+            error: "template_improvement_action_not_found"
+          });
           return {
             ok: false as const,
             status: 404,
@@ -671,6 +695,42 @@ async function appendClosureFailureAudit(
         project: input.project,
         planVersion: input.planVersion
       },
+      afterState: null,
+      permissionResult: input.permissionResult,
+      executionResult: { status: "failed", reason: input.error }
+    },
+    auditDataSource
+  );
+}
+
+async function appendTemplateImprovementApplyFailureAudit(
+  deps: ApiRouteDeps,
+  auditDataSource: ApiTenantDataSource,
+  input: {
+    actor: TenantUser;
+    projectId: string;
+    actionId: string;
+    existingAction: TemplateImprovementAction | null;
+    permissionResult: PolicyDecision;
+    error:
+      | "template_improvement_action_already_applied"
+      | "template_improvement_action_not_proposed"
+      | "template_improvement_action_not_found";
+  }
+) {
+  if (!auditDataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent(
+    {
+      tenantId: input.actor.tenantId,
+      actorUserId: input.actor.id,
+      actionType:
+        input.error === "template_improvement_action_not_found"
+          ? "template_improvement.apply_failed"
+          : "template_improvement.apply_conflict",
+      sourceWorkflow: "closure",
+      sourceEntity: { type: "TemplateImprovementAction", id: input.actionId },
+      commandInput: { projectId: input.projectId, actionId: input.actionId },
+      beforeState: input.existingAction ? { action: input.existingAction } : null,
       afterState: null,
       permissionResult: input.permissionResult,
       executionResult: { status: "failed", reason: input.error }
