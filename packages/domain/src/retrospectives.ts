@@ -116,7 +116,7 @@ export function buildClosurePlanFactSummary(input: {
     planVersion: input.snapshot.planVersion,
     plannedStart: input.snapshot.project.plannedStart,
     plannedFinish: input.snapshot.project.plannedFinish,
-    actualStart: earliestTaskStart(input.snapshot),
+    actualStart: earliestTaskStart(input.snapshot, factByTaskId),
     actualFinish,
     plannedWorkMinutes,
     actualWorkMinutes,
@@ -173,8 +173,15 @@ export function buildTemplateImprovementImpact(
   };
 }
 
-function earliestTaskStart(snapshot: PlanSnapshot): string | null {
+function earliestTaskStart(
+  snapshot: PlanSnapshot,
+  factByTaskId: Map<string, ClosureFactTask>
+): string | null {
   return snapshot.tasks
+    .filter((task) => {
+      const fact = factByTaskId.get(task.id);
+      return isTaskStarted(task.percentComplete, fact);
+    })
     .map((task) => task.plannedStart)
     .filter((date): date is string => Boolean(date))
     .sort((left, right) => left.localeCompare(right))[0] ?? null;
@@ -188,11 +195,22 @@ function latestTaskFinish(
     const fact = factByTaskId.get(task.id);
     return fact?.statusCategory === "done" || (fact?.progress ?? task.percentComplete) >= 100;
   });
-  const source = finishedTasks.length > 0 ? finishedTasks : snapshot.tasks;
-  return source
+  return finishedTasks
     .map((task) => task.plannedFinish)
     .filter((date): date is string => Boolean(date))
     .sort((left, right) => right.localeCompare(left))[0] ?? null;
+}
+
+function isTaskStarted(percentComplete: number, fact: ClosureFactTask | undefined): boolean {
+  if (fact) {
+    return (
+      fact.actualWorkMinutes > 0 ||
+      fact.progress > 0 ||
+      fact.statusCategory === "done" ||
+      fact.statusCategory === "in_progress"
+    );
+  }
+  return percentComplete > 0;
 }
 
 function daysBetween(start: string, finish: string): number {
