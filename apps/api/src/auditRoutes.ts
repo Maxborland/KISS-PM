@@ -28,10 +28,17 @@ export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: decision.reason }, 403);
     }
 
+    const projectId = context.req.query("projectId");
     const auditEvents = await dataSource.listAuditEventsByTenantId(actor.tenantId);
+    const filtered = projectId
+      ? auditEvents.filter(
+          (event) =>
+            event.sourceEntity?.type === "Project" && event.sourceEntity.id === projectId
+        )
+      : auditEvents;
 
     return context.json({
-      auditEvents: auditEvents.map((event) => ({
+      auditEvents: filtered.map((event) => ({
         ...event,
         createdAt: event.createdAt.toISOString()
       }))

@@ -205,6 +205,85 @@ describe("resource planning", () => {
     expect(matrix.overloads).toEqual([]);
   });
 
+  it("uses explicit assignment allocations instead of even distribution", () => {
+    const baseTask = createSnapshot().tasks[0];
+    if (!baseTask) throw new Error("missing base task");
+    const snapshot = {
+      ...createSnapshot(),
+      tasks: [
+        {
+          ...baseTask,
+          durationMinutes: 960,
+          workMinutes: 960
+        }
+      ],
+      assignments: [
+        {
+          id: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          role: "executor" as const,
+          unitsPermille: 1000,
+          workMinutes: 960,
+          calendarId: null
+        }
+      ],
+      assignmentAllocations: [
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-01",
+          workMinutes: 240
+        },
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-02",
+          workMinutes: 720
+        }
+      ],
+      reservations: []
+    };
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      assignmentAllocations: snapshot.assignmentAllocations,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-02",
+      granularities: ["day"]
+    });
+
+    expect(matrix.buckets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          date: "2026-06-01",
+          assignedMinutes: 240
+        }),
+        expect.objectContaining({
+          date: "2026-06-02",
+          assignedMinutes: 720
+        })
+      ])
+    );
+    expect(matrix.overloads).toEqual([
+      expect.objectContaining({
+        date: "2026-06-02",
+        overloadMinutes: 240
+      })
+    ]);
+  });
+
   it("allocates task load by working instants instead of date labels", () => {
     const baseTask = createSnapshot().tasks[0];
     if (!baseTask) throw new Error("missing base task");

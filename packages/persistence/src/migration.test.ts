@@ -126,6 +126,27 @@ const phase56PlanningCommandIdempotencyMigration = readFileSync(
   ),
   "utf8"
 );
+const phase7KpiSignalActionEngineMigration = readFileSync(
+  new URL(
+    "../migrations/0028_phase_7_kpi_signal_action_engine.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase7KpiEvaluationDecimalMigration = readFileSync(
+  new URL(
+    "../migrations/0029_phase_7_kpi_evaluation_decimal_value.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase78AutoSolverAllocationsMigration = readFileSync(
+  new URL(
+    "../migrations/0030_phase_7_8_auto_solver_allocations.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -147,6 +168,46 @@ describe("Phase 1.2 SQL migration", () => {
     );
     expect(uniqueIndexPosition).toBeGreaterThanOrEqual(0);
     expect(sameTenantForeignKeyPosition).toBeGreaterThan(uniqueIndexPosition);
+  });
+});
+
+describe("Phase 7 SQL migration", () => {
+  it("creates tenant-scoped KPI, signal and action engine tables", () => {
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "kpi_definitions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "kpi_evaluations"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "control_signals"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "corrective_actions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "action_executions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "kpi_definitions_pkey" PRIMARY KEY ("tenant_id","id")'
+    );
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "control_signals_pkey" PRIMARY KEY ("tenant_id","project_id","id")'
+    );
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "corrective_actions_signal_fk" FOREIGN KEY ("tenant_id","project_id","control_signal_id")'
+    );
+  });
+
+  it("keeps KPI evaluation values decimal-safe for expression formulas", () => {
+    expect(phase7KpiEvaluationDecimalMigration).toContain(
+      'ALTER COLUMN "calculated_value" TYPE double precision'
+    );
+  });
+
+  it("adds persisted auto-solver runs and explicit assignment allocations", () => {
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS task_assignment_allocations"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS planning_solver_runs"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "task_assignment_allocations_assignment_date_uidx"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CONSTRAINT planning_solver_runs_mode_chk CHECK (mode IN ('schedule', 'repair'))"
+    );
   });
 });
 

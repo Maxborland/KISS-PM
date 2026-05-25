@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — График · задача выделена</title>
+  <link rel="stylesheet" href="schedule.css" />
+  <style>
+    .schedule {
+      height: calc(100vh - var(--topbar-height) - var(--tabs-height) - 24px);
+    }
+    .schedule__body {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+    .schedule__wbs-pane {
+      flex: 0 0 var(--wbs-width);
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      left: 0;
+      z-index: var(--z-sticky-col);
+    }
+    .schedule__gantt-pane {
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      position: relative;
+    }
+    .head-row {
+      height: var(--row-h);
+      display: grid;
+      grid-template-columns: 40px 1fr 56px 96px 130px 130px 28px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      background: var(--panel-strong);
+      color: var(--muted-strong);
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: var(--z-sticky-header);
+    }
+    .gantt-head-row {
+      height: var(--row-h);
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--cell-week);
+      width: 1960px;
+      background: var(--panel-strong);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: var(--z-sticky-header);
+    }
+    .gantt-head-cell {
+      display: flex; align-items: center; padding: 0 10px;
+      border-right: 1px solid var(--border);
+      font-size: 11px; color: var(--muted-strong);
+    }
+    .gantt-head-cell .month { font-weight: 600; color: var(--text); margin-right: 6px; }
+    .gantt-rows {
+      position: relative;
+      width: 1960px;
+      height: calc(var(--row-h) * 8);
+    }
+    .gantt-row-bg {
+      position: absolute; left: 0; right: 0; height: var(--row-h);
+      border-bottom: 1px solid var(--border);
+      background-image: linear-gradient(to right, transparent 0 139px, var(--panel-subtle) 139px 140px);
+      background-size: var(--cell-week) var(--row-h);
+    }
+    .gantt-row-bg.alt { background-color: rgba(2,6,23,0.012); }
+    .gantt-row-bg.selected {
+      background-color: var(--info-soft);
+    }
+    .wbs-cell.selected {
+      background: var(--info-soft);
+    }
+    .gantt-bar {
+      position: absolute;
+      top: calc((var(--row-h) - var(--gantt-bar-h)) / 2);
+      height: var(--gantt-bar-h);
+      border-radius: var(--radius-xs);
+      background: #cbd5e1;
+      border: 1px solid #94a3b8;
+      box-shadow: var(--shadow-1);
+    }
+    .gantt-bar .progress {
+      height: 100%;
+      background: repeating-linear-gradient(45deg, #475467 0 4px, #64748b 4px 8px);
+      border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+      opacity: 0.45;
+    }
+    .gantt-bar.critical { border-left: 3px solid var(--critical-stripe); }
+    .gantt-bar.summary-bar {
+      height: 8px; top: calc((var(--row-h) - 8px) / 2);
+      background: var(--text); border-radius: 1px; border: 0;
+    }
+    .gantt-bar.selected-bar {
+      outline: 2px solid var(--accent-soft);
+      outline-offset: 2px;
+    }
+    .gantt-milestone {
+      position: absolute;
+      width: 14px; height: 14px;
+      transform: translate(-7px,0) rotate(45deg);
+      top: calc((var(--row-h) - 14px) / 2);
+      background: var(--accent);
+    }
+    .gantt-baseline {
+      position: absolute; height: 4px; background: var(--muted); opacity: 0.7;
+      border-radius: 2px;
+    }
+    .gantt-today {
+      position: absolute; top: 0; bottom: 0; width: 0;
+      border-left: 1px dashed var(--info); z-index: 5;
+    }
+    .gantt-today-label {
+      position: absolute; top: 2px; background: var(--info); color: #fff;
+      font-size: 10px; padding: 1px 6px; border-radius: 2px;
+      transform: translateX(-50%); z-index: 5;
+    }
+    .gantt-deadline {
+      position: absolute; top: 0; bottom: 0; width: 0;
+      border-left: 1px solid var(--warning); z-index: 5;
+    }
+    .gantt-deadline-label {
+      position: absolute; top: 2px; background: var(--warning); color: #fff;
+      font-size: 10px; padding: 1px 6px; border-radius: 2px;
+      transform: translateX(-50%); z-index: 5;
+    }
+
+    /* inspector overlay */
+    .inspector {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 360px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-2);
+      display: flex;
+      flex-direction: column;
+      z-index: 12;
+    }
+    .inspector__head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .inspector__title {
+      font-weight: 600;
+      flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .inspector__tabs {
+      display: flex; gap: 0; padding: 0 8px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .inspector__tab {
+      padding: 8px 10px;
+      color: var(--muted-strong);
+      font-size: 12px;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .inspector__tab--active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+      font-weight: 500;
+    }
+    .inspector__body {
+      padding: 14px;
+      overflow: auto;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .field {
+      display: grid; grid-template-columns: 110px 1fr;
+      gap: 12px;
+      align-items: center;
+      font-size: 12.5px;
+    }
+    .field label { color: var(--muted); }
+    .field .value {
+      background: var(--panel-subtle);
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .inspector .section-title {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 8px;
+    }
+    .inspector .deps-row {
+      display: grid;
+      grid-template-columns: 50px 1fr 56px 60px;
+      font-size: 12px;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .schedule-host {
+      position: relative;
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .schedule-host .schedule__body {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><span class="sidebar__brand-mark"></span> KISS PM</div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item"><span>Мои задачи</span><span class="sidebar__item-badge">12</span></div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span><span class="sidebar__item-badge">8</span></div>
+      <div class="sidebar__item"><span>Сделки</span><span class="sidebar__item-badge">37</span></div>
+      <div class="sidebar__item"><span>Ресурсы</span><span class="sidebar__item-badge">42</span></div>
+      <div class="sidebar__group">Аналитика</div>
+      <div class="sidebar__item"><span>Загрузка</span></div>
+      <div class="sidebar__item"><span>KPI</span></div>
+      <div class="sidebar__footer">v0.1 dev</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2</div>
+            <div class="topbar__meta">
+              <span class="chip chip--info">В работе</span>
+              <span>план v17</span>
+              <span>Дедлайн 12.07.2026</span>
+            </div>
+          </div>
+        </div>
+        <label class="topbar__search">
+          <span class="muted">⌕</span>
+          <input type="text" placeholder="Найти задачу или ресурс" />
+        </label>
+        <div class="topbar__actions">
+          <button class="icon-btn">●</button>
+          <button class="icon-btn">И</button>
+        </div>
+      </header>
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item tabs__item--active">График</span>
+        <span class="tabs__item">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+        <span class="tabs__status"><span class="tabs__status-dot"></span> Сохранено</span>
+      </nav>
+
+      <section class="content" style="padding:12px 16px 0;">
+        <div class="schedule">
+          <div class="schedule__toolbar">
+            <button class="btn btn--sm">+ Задача</button>
+            <button class="btn btn--sm">+ Подзадача</button>
+            <span class="schedule__toolbar-divider"></span>
+            <button class="btn btn--sm">← Outdent</button>
+            <button class="btn btn--sm">→ Indent</button>
+            <span class="schedule__toolbar-divider"></span>
+            <button class="btn btn--sm">Зависимость</button>
+            <button class="btn btn--sm">Baseline</button>
+            <span class="schedule__toolbar-divider"></span>
+            <div class="schedule__toolbar-zoom">
+              <button>День</button>
+              <button class="active">Неделя</button>
+              <button>Месяц</button>
+            </div>
+            <span class="space"></span>
+            <span class="chip chip--info">Выделено: WBS 3.2.1 «WBS + Gantt»</span>
+          </div>
+
+          <div class="schedule-host">
+            <div class="schedule__body" style="margin-right:360px;">
+              <!-- WBS pane (8 rows) -->
+              <div class="schedule__wbs-pane">
+                <div class="head-row">
+                  <div>#</div><div>Название</div><div>Длит</div><div>Финиш</div>
+                  <div>Прогресс</div><div>Назначения</div><div>!</div>
+                </div>
+                <div>
+                  <div class="wbs-cell summary depth-1"><span class="num">3</span><span class="title"><span class="caret">▾</span>Реализация</span><span class="duration">55 дн</span><span class="finish">29.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:54%"></span></span>54%</span><span class="assignees"><span class="avatar">+5</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell summary depth-2"><span class="num">3.1</span><span class="title"><span class="caret">▾</span>Backend</span><span class="duration">55 дн</span><span class="finish">22.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:64%"></span></span>64%</span><span class="assignees"><span class="avatar">+3</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell depth-3"><span class="num">3.1.1</span><span class="title">Планировочный движок</span><span class="duration">39 дн</span><span class="finish">08.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:92%"></span></span>92%</span><span class="assignees"><span class="avatar">СП</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell depth-3"><span class="num">3.1.2</span><span class="title">Аудит и права</span><span class="duration">39 дн</span><span class="finish">22.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:48%"></span></span>48%</span><span class="assignees"><span class="avatar">ДК</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell summary depth-2"><span class="num">3.2</span><span class="title"><span class="caret">▾</span>Frontend</span><span class="duration">53 дн</span><span class="finish">05.06.2026</span><span class="progress"><span class="progress-bar"><span style="width:42%"></span></span>42%</span><span class="assignees"><span class="avatar">+2</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell depth-3 selected"><span class="num">3.2.1</span><span class="title">WBS + Gantt</span><span class="duration">46 дн</span><span class="finish">29.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:38%"></span></span>38%</span><span class="assignees"><span class="avatar">МК</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell depth-3"><span class="num">3.2.2</span><span class="title">Inspector задачи</span><span class="duration">25 дн</span><span class="finish">22.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:14%"></span></span>14%</span><span class="assignees"><span class="avatar">МК</span></span><span class="issue empty"></span></div>
+                  <div class="wbs-cell depth-3"><span class="num">3.2.3</span><span class="title">Сценарии</span><span class="duration">25 дн</span><span class="finish">05.06.2026</span><span class="progress"><span class="progress-bar"><span style="width:0%"></span></span>0%</span><span class="assignees"><span class="avatar">ЕЛ</span></span><span class="issue empty"></span></div>
+                </div>
+              </div>
+
+              <div class="schedule__gantt-pane">
+                <div class="gantt-head-row">
+                  <div class="gantt-head-cell"><span class="month">Мар</span>30</div>
+                  <div class="gantt-head-cell"><span class="month">Апр</span>06</div>
+                  <div class="gantt-head-cell">13</div>
+                  <div class="gantt-head-cell">20</div>
+                  <div class="gantt-head-cell">27</div>
+                  <div class="gantt-head-cell"><span class="month">Май</span>04</div>
+                  <div class="gantt-head-cell">11</div>
+                  <div class="gantt-head-cell">18</div>
+                  <div class="gantt-head-cell">25</div>
+                  <div class="gantt-head-cell"><span class="month">Июн</span>01</div>
+                  <div class="gantt-head-cell">08</div>
+                  <div class="gantt-head-cell">15</div>
+                  <div class="gantt-head-cell">22</div>
+                  <div class="gantt-head-cell">29</div>
+                </div>
+                <div class="gantt-rows">
+                  <div class="gantt-row-bg" style="top:0px"></div>
+                  <div class="gantt-row-bg alt" style="top:36px"></div>
+                  <div class="gantt-row-bg" style="top:72px"></div>
+                  <div class="gantt-row-bg alt" style="top:108px"></div>
+                  <div class="gantt-row-bg" style="top:144px"></div>
+                  <div class="gantt-row-bg alt selected" style="top:180px"></div>
+                  <div class="gantt-row-bg" style="top:216px"></div>
+                  <div class="gantt-row-bg alt" style="top:252px"></div>
+
+                  <!-- today at week 7 (18.05) = x = 7 * 140 = 980 -->
+                  <div class="gantt-today" style="left:1120px"></div>
+                  <div class="gantt-today-label" style="left:1120px">Сегодня</div>
+
+                  <!-- 3 summary row 0 -->
+                  <div class="gantt-bar summary-bar" style="top:14px;left:0px;width:1400px"></div>
+                  <!-- 3.1 summary row 1 -->
+                  <div class="gantt-bar summary-bar" style="top:50px;left:0px;width:1240px"></div>
+                  <!-- 3.1.1 row 2 critical -->
+                  <div class="gantt-bar critical" style="top:81px;left:0px;width:780px">
+                    <span class="progress" style="width:92%"></span>
+                  </div>
+                  <!-- 3.1.2 row 3 -->
+                  <div class="gantt-bar" style="top:117px;left:280px;width:780px">
+                    <span class="progress" style="width:48%"></span>
+                  </div>
+                  <!-- 3.2 summary row 4 -->
+                  <div class="gantt-bar summary-bar" style="top:158px;left:280px;width:1060px"></div>
+                  <!-- 3.2.1 row 5 critical SELECTED -->
+                  <div class="gantt-bar critical selected-bar" style="top:189px;left:280px;width:920px">
+                    <span class="progress" style="width:38%"></span>
+                  </div>
+                  <div class="gantt-baseline" style="top:209px;left:280px;width:860px"></div>
+                  <!-- 3.2.2 row 6 -->
+                  <div class="gantt-bar" style="top:225px;left:560px;width:500px">
+                    <span class="progress" style="width:14%"></span>
+                  </div>
+                  <!-- 3.2.3 row 7 -->
+                  <div class="gantt-bar" style="top:261px;left:840px;width:500px">
+                    <span class="progress" style="width:0%"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- inspector overlay -->
+            <aside class="inspector">
+              <div class="inspector__head">
+                <span class="chip chip--outline mono">WBS 3.2.1</span>
+                <div class="inspector__title">WBS + Gantt</div>
+                <button class="icon-btn" title="Закрыть">×</button>
+              </div>
+              <div class="inspector__tabs">
+                <span class="inspector__tab inspector__tab--active">Общие</span>
+                <span class="inspector__tab">Зависимости</span>
+                <span class="inspector__tab">Ресурсы</span>
+                <span class="inspector__tab">Constraints</span>
+                <span class="inspector__tab">Заметки</span>
+                <span class="inspector__tab">Аудит</span>
+                <span class="inspector__tab">Advanced</span>
+              </div>
+              <div class="inspector__body">
+                <div>
+                  <span class="chip chip--danger">На критическом пути</span>
+                  <span class="chip chip--outline">Резерв 0 дн</span>
+                </div>
+                <div class="field"><label>Название</label><div class="value">WBS + Gantt</div></div>
+                <div class="field"><label>Статус</label><div class="value">В работе</div></div>
+                <div class="field"><label>Прогресс</label><div class="value">38%</div></div>
+                <div class="field"><label>Начало</label><div class="value">13.04.2026</div></div>
+                <div class="field"><label>Финиш</label><div class="value">29.05.2026</div></div>
+                <div class="field"><label>Длительность</label><div class="value">46 дн (расчёт)</div></div>
+                <div class="field"><label>Работа</label><div class="value">320 ч</div></div>
+                <div class="section-title">Зависимости (3)</div>
+                <div>
+                  <div class="deps-row"><span class="mono muted">3.1.1</span><span>Планировочный движок</span><span class="chip chip--outline">SS</span><span class="mono">+0</span></div>
+                  <div class="deps-row"><span class="mono muted">2.2</span><span>Контур безопасности</span><span class="chip chip--outline">FS</span><span class="mono">+2</span></div>
+                  <div class="deps-row"><span class="mono muted">5.1</span><span>Запуск пилота</span><span class="chip chip--outline">FS</span><span class="mono">+0</span></div>
+                </div>
+                <div class="section-title">Назначения (1)</div>
+                <div>
+                  <div class="deps-row"><span class="mono muted">МК</span><span>Михаил К.</span><span class="chip chip--outline">Исп.</span><span class="mono">100%</span></div>
+                </div>
+                <div class="banner banner--muted">Открыть «Аудит» для полной истории изменений задачи</div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <footer class="bottom-bar bottom-bar--hidden"></footer>
+    </main>
+  </div>
+</body>
+</html>

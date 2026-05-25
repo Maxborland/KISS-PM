@@ -36,6 +36,7 @@ describe("planning parsers", () => {
       { type: "task.update_schedule", payload: { taskId: "task-a", plannedStart: "2026-06-02", plannedFinish: null } },
       { type: "task.update_work_model", payload: { taskId: "task-a", taskType: "fixed_work", effortDriven: true, durationMinutes: 480, workMinutes: 960 } },
       { type: "task.update_status", payload: { taskId: "task-a", statusId: "task-status-done" } },
+      { type: "task.update_progress", payload: { taskId: "task-a", percentComplete: 50 } },
       { type: "task.move_wbs", payload: { taskId: "task-a", parentTaskId: null, sortOrder: 0 } },
       { type: "task.delete_or_archive", payload: { taskId: "task-a", mode: "archive" } },
       { type: "dependency.upsert", payload: { id: "dep-a-b", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "FS", lagMinutes: 0 } },

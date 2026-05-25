@@ -24,13 +24,19 @@ import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
+import { registerControlRoutes } from "./controlRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
+import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
+import { registerAbsencesRoutes } from "./absencesRoutes";
+import { registerOrgStructureRoutes } from "./orgStructureRoutes";
+import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
 import {
   isTrustedBrowserMutationRequest,
   setApiSecurityHeaders,
@@ -199,17 +205,28 @@ export function createApp(options: CreateAppOptions = {}) {
     return context.json({ status: "ok", product: "KISS PM" });
   });
 
+  app.get("/api/health/realtime", async (context) => {
+    const { getPlanningRealtimeStatus } = await import("./planningRealtimeHealth.js");
+    return context.json(getPlanningRealtimeStatus());
+  });
+
   registerAuthRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
   }
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
+  registerControlRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
   registerPlanningRoutes(app, routeDeps);
+  registerCapacityRoutes(app, routeDeps);
+  registerProductionCalendarRoutes(app, routeDeps);
+  registerAbsencesRoutes(app, routeDeps);
+  registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
+  registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

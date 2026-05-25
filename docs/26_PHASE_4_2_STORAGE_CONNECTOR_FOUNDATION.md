@@ -134,5 +134,5 @@ connector adapter
 - Phase 3.1 и `25_CRM_ENTITY_WORKSPACE_TEMPLATE.md` используют metadata-only ссылки до этого slice.
 - Phase 4 starter создает `Task`; attachment support для задач добавляется здесь или сразу после него.
 - Phase 5 Gantt/WBS не должен проектировать собственные вложения: он использует этот общий contract.
-- Phase 7 KPI/signals/control actions используют attachments as evidence, но не владеют storage.
-- Phase 10 production hardening расширит provider security, backup, retention и monitoring.
+- Phase 8 KPI/signals/control actions используют attachments as evidence, но не владеют storage.
+- Phase 11 production hardening расширит provider security, backup, retention и monitoring.

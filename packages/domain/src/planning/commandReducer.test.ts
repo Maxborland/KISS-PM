@@ -101,6 +101,14 @@ describe("planning command reducer", () => {
       {
         type: "project.deadline.move",
         payload: { deadline: "2026-07-01", reason: "scope changed" }
+      },
+      {
+        type: "project.settings.update",
+        payload: { calendarId: "tenant-default" }
+      },
+      {
+        type: "task.update_custom_field",
+        payload: { taskId: "task-a", fieldKey: "sprint", value: "S1" }
       }
     ];
 
@@ -193,6 +201,27 @@ describe("planning command reducer", () => {
       plannedFinish: "2026-06-06",
       plannedStartInstant: { date: "2026-06-05", minuteOfDay: 240 }
     });
+  });
+
+  it("rejects task schedule updates that finish before they start", () => {
+    const snapshot = createSnapshot();
+
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-a",
+        plannedStart: "2026-06-10",
+        plannedFinish: "2026-06-09"
+      }
+    });
+
+    expect(result.nextSnapshot).toBe(snapshot);
+    expect(result.validationIssues).toEqual([
+      expect.objectContaining({
+        code: "planning_command_invalid",
+        severity: "error"
+      })
+    ]);
   });
 
   it("removes archived tasks and their active planning edges from preview snapshots", () => {
@@ -435,7 +464,10 @@ function createSnapshot(): PlanSnapshot {
       }
     ],
     baselines: [],
-    calendars: [{ id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }],
+    calendars: [
+      { id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 },
+      { id: "tenant-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }
+    ],
     calendarExceptions: [],
     resources: [
       { id: "resource-alpha", userId: "user-alpha", positionId: "engineer", teamId: null, name: "Alpha", calendarId: null }

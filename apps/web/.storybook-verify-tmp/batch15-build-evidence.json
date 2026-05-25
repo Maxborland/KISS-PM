@@ -1,0 +1,8 @@
+{
+  "batch": "15",
+  "date": "2026-05-24",
+  "command": "pnpm --filter @kiss-pm/web build",
+  "pass": true,
+  "exitCode": 0,
+  "via": "batch16-ci"
+}

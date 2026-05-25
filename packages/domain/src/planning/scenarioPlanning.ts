@@ -157,6 +157,7 @@ function evaluateProposalEffect(
     plan: calculatedPlan,
     resources: nextSnapshot.resources,
     assignments: nextSnapshot.assignments,
+    assignmentAllocations: nextSnapshot.assignmentAllocations,
     calendars: nextSnapshot.calendars,
     calendarExceptions: nextSnapshot.calendarExceptions,
     reservations: nextSnapshot.reservations,
