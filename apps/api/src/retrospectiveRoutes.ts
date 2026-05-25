@@ -143,6 +143,15 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const project = await findProject(transactionDataSource, actor.tenantId, projectId);
       if (!project) return { ok: false as const, status: 404, error: "project_not_found" };
       if (project.status !== "active" && project.status !== "paused") {
+        await appendClosureFailureAudit(deps, transactionDataSource, {
+          actor,
+          projectId,
+          project,
+          planVersion: null,
+          closeReason: parsed.value.closeReason,
+          permissionResult: decision,
+          error: "project_not_closable"
+        });
         return { ok: false as const, status: 409, error: "project_not_closable" };
       }
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -203,7 +212,18 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
         });
       } catch (error) {
         const mappedError = closurePersistenceErrorResult(error);
-        if (mappedError) return mappedError;
+        if (mappedError) {
+          await appendClosureFailureAudit(deps, transactionDataSource, {
+            actor,
+            projectId,
+            project,
+            planVersion: snapshot.planVersion,
+            closeReason: parsed.value.closeReason,
+            permissionResult: decision,
+            error: mappedError.error
+          });
+          return mappedError;
+        }
         throw error;
       }
       await deps.appendManagementAuditEvent(
@@ -622,6 +642,41 @@ async function appendDeniedAudit(
     executionResult: { status: "denied" }
   };
   await deps.appendManagementAuditEvent(auditInput);
+}
+
+async function appendClosureFailureAudit(
+  deps: ApiRouteDeps,
+  auditDataSource: ApiTenantDataSource,
+  input: {
+    actor: TenantUser;
+    projectId: string;
+    project: ProjectRecord;
+    planVersion: number | null;
+    closeReason: string;
+    permissionResult: PolicyDecision;
+    error: "project_not_found" | "project_not_closable";
+  }
+) {
+  if (!auditDataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent(
+    {
+      tenantId: input.actor.tenantId,
+      actorUserId: input.actor.id,
+      actionType:
+        input.error === "project_not_closable" ? "project.close_conflict" : "project.close_failed",
+      sourceWorkflow: "closure",
+      sourceEntity: { type: "Project", id: input.projectId },
+      commandInput: { closeReason: input.closeReason },
+      beforeState: {
+        project: input.project,
+        planVersion: input.planVersion
+      },
+      afterState: null,
+      permissionResult: input.permissionResult,
+      executionResult: { status: "failed", reason: input.error }
+    },
+    auditDataSource
+  );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

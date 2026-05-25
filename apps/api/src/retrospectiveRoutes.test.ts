@@ -225,6 +225,7 @@ describe("retrospective routes", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({ error: "project_not_closable" });
     expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.closed");
+    expect(state.auditEvents.map((event) => event.actionType)).toEqual(["project.close_conflict"]);
   });
 
   it("maps closeProject project_not_found throws to a stable not found response", async () => {
@@ -243,6 +244,7 @@ describe("retrospective routes", () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
     expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.closed");
+    expect(state.auditEvents.map((event) => event.actionType)).toEqual(["project.close_failed"]);
   });
 
   it("applies template improvement through governed action and exposes template insights", async () => {
