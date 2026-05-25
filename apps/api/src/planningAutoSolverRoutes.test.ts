@@ -49,6 +49,10 @@ describe("planning auto-solver API", () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe("plan_version_conflict");
     expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.auditActionTypes).toEqual([
+      "planning.auto_solver.run_created",
+      "planning.auto_solver.apply_conflict"
+    ]);
   });
 
   it("builds solver runs with resource capacity through the requested deadline", async () => {
@@ -147,22 +151,30 @@ describe("planning auto-solver API", () => {
     expect(harness.appliedCommandTypes).toEqual([]);
   });
 
-  it("requires project resource management permission for allocation-changing proposals", async () => {
+  it("requires project resource management permission before creating solver proposals", async () => {
     const harness = createApiHarness({
       permissions: ["tenant.project_plan.read", "tenant.project_plan.manage"]
     });
-    const createBody = await createSolverRun(harness);
 
-    const response = await applyProposal(harness, createBody);
+    const response = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=solver-token"
+        },
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
+      }
+    );
     const body = await response.json();
 
     expect(response.status).toBe(403);
     expect(body.error).toBe("permission_missing");
     expect(harness.appliedCommandTypes).toEqual([]);
-    expect(harness.auditActionTypes).toEqual([
-      "planning.auto_solver.run_created",
-      "planning.auto_solver.apply_denied"
-    ]);
+    expect(harness.storedRunBox.value).toBeNull();
+    expect(harness.auditActionTypes).toEqual([]);
   });
 });
 
