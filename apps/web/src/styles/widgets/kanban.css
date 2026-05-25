@@ -1,0 +1,40 @@
+/* ============================================
+   Kanban widget — variants
+   Base .kanban / .kanban-col / .kanban-card live in bem.css.
+   This file extends the generic widget with optional board variants.
+   ============================================ */
+
+/* CRM-funnel variant: 5 panel-style columns, same DnD affordances. */
+.kanban--funnel {
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+}
+
+.kanban--funnel .kanban-col {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.kanban--funnel .kanban-col__head {
+  padding: 0 0 var(--space-1);
+}
+
+.kanban--funnel .kanban-col__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-strong);
+}
+
+.kanban--funnel .kanban-col__body {
+  gap: var(--space-2);
+}
+
+/* Make funnel columns wrap nicely on narrow viewports. */
+@media (max-width: 1280px) {
+  .kanban--funnel {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
