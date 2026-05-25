@@ -567,12 +567,16 @@ export function createPostgresTenantDataSource(
           sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
         );
       }
-      const rows = await db
-        .select()
-        .from(auditEvents)
-        .where(and(...filters))
-        .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id))
-        .limit(options?.limit ?? 100);
+      const buildQuery = () =>
+        db
+          .select()
+          .from(auditEvents)
+          .where(and(...filters))
+          .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+      const rows =
+        options?.limit === undefined
+          ? await buildQuery()
+          : await buildQuery().limit(options.limit);
 
       return rows.map((row) => ({
         id: row.id,
