@@ -28,7 +28,7 @@ function fakeDate(dayIndex: number) {
   return `${String(d).padStart(2, "0")}.05.2026`;
 }
 
-function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
+function ChartBar({ row }: { row: GanttRow }) {
   const start = row.startDay + 1;
   const span = Math.max(row.durationDays, 1);
   const col = { gridColumn: `${start} / span ${span}` } as const;
@@ -94,28 +94,13 @@ function ChartHead2({ days }: { days: GanttDayHeader[] }) {
   );
 }
 
-function DataRow({
-  row,
-  index,
-  todayIndex
-}: {
-  row: GanttRow;
-  index: number;
-  todayIndex: number;
-}) {
+function WbsCells({ row, index }: { row: GanttRow; index: number }) {
   const resources =
     row.assignee && row.kind === "task" ? `Инициалы ${row.assignee.initials}` : "—";
   const labor = row.kind === "task" ? `${Math.round(row.durationDays * 8)}ч` : "—";
 
   return (
-    <div
-      className={cn(
-        "gantt2__row",
-        row.kind === "summary" && "gantt2__row--group",
-        row.critical && row.kind === "task" && "gantt2__row--selected"
-      )}
-      role="row"
-    >
+    <>
       <div className="gantt2__cell gantt2__cell--num">{index + 1}</div>
       <div className="gantt2__cell">
         <span className="wbs-mode">Авто</span>
@@ -131,16 +116,21 @@ function DataRow({
       <div className="gantt2__cell gantt2__cell--center gantt2__cell--muted">—</div>
       <div className="gantt2__cell">{resources}</div>
       <div className="gantt2__cell gantt2__cell--right">{labor}</div>
-      <div className="gantt2__cell gantt2__cell--chart">
-        {todayIndex >= 0 ? (
-          <div
-            className="gantt2__today"
-            style={{ gridColumn: todayIndex + 1 }}
-            aria-hidden
-          />
-        ) : null}
-        <ChartBar row={row} todayIndex={todayIndex} />
-      </div>
+    </>
+  );
+}
+
+function ChartRowCell({ row, todayIndex, dayCount }: { row: GanttRow; todayIndex: number; dayCount: number }) {
+  const chartGridStyle = {
+    gridTemplateColumns: `repeat(${dayCount}, var(--gantt-day-w, 28px))`
+  } as const;
+
+  return (
+    <div className="gantt2__cell gantt2__cell--chart" style={chartGridStyle}>
+      {todayIndex >= 0 ? (
+        <div className="gantt2__today" style={{ gridColumn: todayIndex + 1 }} aria-hidden />
+      ) : null}
+      <ChartBar row={row} />
     </div>
   );
 }
@@ -155,10 +145,13 @@ export function Gantt({
   zoom?: GanttZoom;
 }) {
   const dayW = DAY_W_BY_ZOOM[zoom];
-  const totalDays = data.days.length;
-  const chartWidth = totalDays * dayW;
+  const dayCount = data.days.length;
+  const chartWidth = dayCount * dayW;
   const todayIndex = data.days.findIndex((d) => d.today);
   const zoomLabel = { hour: "час", day: "день", week: "неделя", month: "месяц" }[zoom];
+  const chartGridStyle = {
+    gridTemplateColumns: `repeat(${dayCount}, var(--gantt-day-w, 28px))`
+  } as const;
 
   return (
     <div
@@ -169,49 +162,85 @@ export function Gantt({
       style={
         {
           "--gantt-chart-w": `${chartWidth}px`,
-          "--gantt-day-w": `${dayW}px`
+          "--gantt-day-w": `${dayW}px`,
+          "--gantt-day-count": String(dayCount)
         } as CSSProperties
       }
     >
-      <div className="gantt2__inner">
-        <div className="gantt2__row gantt2__row--head1" role="row">
-          <div className="gantt2__cell gantt2__cell--num">#</div>
-          <div className="gantt2__cell">Реж</div>
-          <div className="gantt2__cell">WBS</div>
-          <div className="gantt2__cell">Название задачи</div>
-          <div className="gantt2__cell gantt2__cell--center">Длит.</div>
-          <div className="gantt2__cell gantt2__cell--center">% зав.</div>
-          <div className="gantt2__cell gantt2__cell--center">Начало</div>
-          <div className="gantt2__cell gantt2__cell--center">Окончание</div>
-          <div className="gantt2__cell gantt2__cell--center">Предш.</div>
-          <div className="gantt2__cell">Ресурсы</div>
-          <div className="gantt2__cell gantt2__cell--center">Труд.</div>
-          <div className="gantt2__cell gantt2__cell--chart gantt2__cell--chart-head1">
-            <ChartHead1
-              days={data.days}
-              {...(data.monthLabel !== undefined ? { monthLabel: data.monthLabel } : {})}
-            />
+      <div className="gantt2__split">
+        <div className="gantt2__wbs" role="rowgroup" aria-label="Таблица WBS">
+          <div className="gantt2__row gantt2__row--head1 gantt2__row--wbs" role="row">
+            <div className="gantt2__cell gantt2__cell--num">#</div>
+            <div className="gantt2__cell">Реж</div>
+            <div className="gantt2__cell">WBS</div>
+            <div className="gantt2__cell">Название задачи</div>
+            <div className="gantt2__cell gantt2__cell--center">Длит.</div>
+            <div className="gantt2__cell gantt2__cell--center">% зав.</div>
+            <div className="gantt2__cell gantt2__cell--center">Начало</div>
+            <div className="gantt2__cell gantt2__cell--center">Окончание</div>
+            <div className="gantt2__cell gantt2__cell--center">Предш.</div>
+            <div className="gantt2__cell">Ресурсы</div>
+            <div className="gantt2__cell gantt2__cell--center">Труд.</div>
+          </div>
+          <div className="gantt2__row gantt2__row--head2 gantt2__row--wbs" role="row">
+            <div className="gantt2__cell gantt2__cell--num">№</div>
+            <div className="gantt2__cell" />
+            <div className="gantt2__cell" />
+            <div className="gantt2__cell" />
+            <div className="gantt2__cell gantt2__cell--center">дни</div>
+            <div className="gantt2__cell gantt2__cell--center">%</div>
+            <div className="gantt2__cell gantt2__cell--center">дата</div>
+            <div className="gantt2__cell gantt2__cell--center">дата</div>
+            <div className="gantt2__cell gantt2__cell--center">#</div>
+            <div className="gantt2__cell" />
+            <div className="gantt2__cell gantt2__cell--center">ч</div>
+          </div>
+          {data.rows.map((row, index) => (
+            <div
+              key={row.id}
+              className={cn(
+                "gantt2__row",
+                "gantt2__row--wbs",
+                row.kind === "summary" && "gantt2__row--group",
+                row.critical && row.kind === "task" && "gantt2__row--selected"
+              )}
+              role="row"
+            >
+              <WbsCells row={row} index={index} />
+            </div>
+          ))}
+        </div>
+        <div className="gantt2__chart-scroll" role="rowgroup" aria-label="График сроков">
+          <div className="gantt2__chart-inner" style={{ width: chartWidth }}>
+            <div className="gantt2__row gantt2__row--head1 gantt2__row--chart" role="row">
+              <div className="gantt2__cell gantt2__cell--chart gantt2__cell--chart-head1" style={chartGridStyle}>
+                <ChartHead1
+                  days={data.days}
+                  {...(data.monthLabel !== undefined ? { monthLabel: data.monthLabel } : {})}
+                />
+              </div>
+            </div>
+            <div className="gantt2__row gantt2__row--head2 gantt2__row--chart" role="row">
+              <div className="gantt2__cell gantt2__cell--chart gantt2__cell--chart-head2" style={chartGridStyle}>
+                <ChartHead2 days={data.days} />
+              </div>
+            </div>
+            {data.rows.map((row, index) => (
+              <div
+                key={row.id}
+                className={cn(
+                  "gantt2__row",
+                  "gantt2__row--chart",
+                  row.kind === "summary" && "gantt2__row--group",
+                  row.critical && row.kind === "task" && "gantt2__row--selected"
+                )}
+                role="row"
+              >
+                <ChartRowCell row={row} todayIndex={todayIndex} dayCount={dayCount} />
+              </div>
+            ))}
           </div>
         </div>
-        <div className="gantt2__row gantt2__row--head2" role="row">
-          <div className="gantt2__cell gantt2__cell--num">№</div>
-          <div className="gantt2__cell" />
-          <div className="gantt2__cell" />
-          <div className="gantt2__cell" />
-          <div className="gantt2__cell gantt2__cell--center">дни</div>
-          <div className="gantt2__cell gantt2__cell--center">%</div>
-          <div className="gantt2__cell gantt2__cell--center">дата</div>
-          <div className="gantt2__cell gantt2__cell--center">дата</div>
-          <div className="gantt2__cell gantt2__cell--center">#</div>
-          <div className="gantt2__cell" />
-          <div className="gantt2__cell gantt2__cell--center">ч</div>
-          <div className="gantt2__cell gantt2__cell--chart gantt2__cell--chart-head2">
-            <ChartHead2 days={data.days} />
-          </div>
-        </div>
-        {data.rows.map((row, index) => (
-          <DataRow key={row.id} row={row} index={index} todayIndex={todayIndex} />
-        ))}
       </div>
     </div>
   );
