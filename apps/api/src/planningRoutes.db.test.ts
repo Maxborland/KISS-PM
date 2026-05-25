@@ -959,6 +959,51 @@ describe("planning API routes", () => {
     await expect(deniedApply.json()).resolves.toEqual({ error: "permission_missing" });
   });
 
+  it("requires resource management permission to create and read auto-solver runs", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const limitedManagerCookie = await loginAs(
+      "plan-manager-no-resource-manage@kiss-pm.local",
+      "local-plan-manager-password"
+    );
+
+    const deniedCreate = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: limitedManagerCookie
+        },
+        body: JSON.stringify({ mode: "repair", clientPlanVersion: 1 })
+      }
+    );
+    expect(deniedCreate.status).toBe(403);
+    await expect(deniedCreate.json()).resolves.toEqual({ error: "permission_missing" });
+
+    const created = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ mode: "repair", clientPlanVersion: 1 })
+      }
+    );
+    expect(created.status).toBe(200);
+    const createdBody = await created.json();
+
+    const deniedRead = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${createdBody.runId}`,
+      { headers: { cookie: limitedManagerCookie } }
+    );
+    expect(deniedRead.status).toBe(403);
+    await expect(deniedRead.json()).resolves.toEqual({ error: "permission_missing" });
+  });
+
   it("requires plan management permission when assigned task creation also allocates resources", async () => {
     const resourceManagerCookie = await loginAs(
       "resource-manager-no-plan@kiss-pm.local",
