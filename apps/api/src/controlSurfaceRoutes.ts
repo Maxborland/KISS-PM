@@ -103,7 +103,15 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
       actorUserId: actor.id,
       definition: parsed.value,
       ownerUserId: parseOwnerUserId(body.value)
+    }).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "control_surface_archived") {
+        return "control_surface_archived" as const;
+      }
+      throw error;
     });
+    if (surface === "control_surface_archived") {
+      return context.json({ error: "control_surface_archived" }, 409);
+    }
     const auditEventId = await deps.appendManagementAuditEvent({
       tenantId: actor.tenantId,
       actorUserId: actor.id,
