@@ -240,6 +240,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       !deps.dataSource.getRetrospectiveReadModel ||
       !deps.dataSource.addRetrospectiveLesson ||
+      !deps.dataSource.withTransaction ||
       !deps.dataSource.appendAuditEvent
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
@@ -257,30 +258,53 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     const projectId = context.req.param("projectId");
-    const readModel = await deps.dataSource.getRetrospectiveReadModel(actor.tenantId, projectId);
-    if (!readModel.snapshot) return context.json({ error: "closure_snapshot_not_found" }, 404);
-    const lesson = await deps.dataSource.addRetrospectiveLesson({
-      ...parsed.value,
-      id: `lesson-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      projectId,
-      snapshotId: readModel.snapshot.id,
-      createdByUserId: actor.id,
-      createdAt: new Date()
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.getRetrospectiveReadModel ||
+        !transactionDataSource.addRetrospectiveLesson ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      const readModel = await transactionDataSource.getRetrospectiveReadModel(
+        actor.tenantId,
+        projectId
+      );
+      if (!readModel.snapshot) {
+        return { ok: false as const, status: 404, error: "closure_snapshot_not_found" };
+      }
+      const lesson = await transactionDataSource.addRetrospectiveLesson({
+        ...parsed.value,
+        id: `lesson-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        projectId,
+        snapshotId: readModel.snapshot.id,
+        createdByUserId: actor.id,
+        createdAt: new Date()
+      });
+      const auditEventId = await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "retrospective.lesson.created",
+          sourceWorkflow: "closure",
+          sourceEntity: { type: "ProjectClosureSnapshot", id: readModel.snapshot.id },
+          commandInput: { lesson },
+          beforeState: null,
+          afterState: { lesson },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, body: { lesson, auditEventId } };
     });
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "retrospective.lesson.created",
-      sourceWorkflow: "closure",
-      sourceEntity: { type: "ProjectClosureSnapshot", id: readModel.snapshot.id },
-      commandInput: { lesson },
-      beforeState: null,
-      afterState: { lesson },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
-    });
-    return context.json({ lesson, auditEventId }, 201);
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      return context.json({ error: result.error }, 400);
+    }
+    return context.json(result.body, 201);
   });
 
   app.post(
@@ -290,6 +314,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (
         !deps.dataSource.applyTemplateImprovementAction ||
+        !deps.dataSource.getRetrospectiveReadModel ||
         !deps.dataSource.appendAuditEvent ||
         !deps.dataSource.withTransaction
       ) {
@@ -304,6 +329,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
           !transactionDataSource.applyTemplateImprovementAction ||
+          !transactionDataSource.getRetrospectiveReadModel ||
           !transactionDataSource.appendAuditEvent
         ) {
           return { ok: false as const, status: 501, error: "persistence_not_configured" };
@@ -317,6 +343,27 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
           appliedAt: new Date()
         });
         if (!action) {
+          const readModel = await transactionDataSource.getRetrospectiveReadModel(
+            actor.tenantId,
+            projectId
+          );
+          const existingAction = readModel.templateImprovementActions.find(
+            (candidate) => candidate.id === actionId
+          );
+          if (existingAction?.status === "applied") {
+            return {
+              ok: false as const,
+              status: 409,
+              error: "template_improvement_action_already_applied"
+            };
+          }
+          if (existingAction) {
+            return {
+              ok: false as const,
+              status: 409,
+              error: "template_improvement_action_not_proposed"
+            };
+          }
           return {
             ok: false as const,
             status: 404,
@@ -344,6 +391,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (!result.ok) {
         if (result.status === 501) return context.json({ error: result.error }, 501);
         if (result.status === 404) return context.json({ error: result.error }, 404);
+        if (result.status === 409) return context.json({ error: result.error }, 409);
         return context.json({ error: result.error }, 400);
       }
       return context.json(result.body);
