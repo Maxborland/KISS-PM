@@ -307,7 +307,10 @@ describe("control surface routes", () => {
     expect(listBody.surfaces[0]).toMatchObject({
       id: publishedDefinition.id,
       status: "published",
-      publishedDefinition: expect.objectContaining({ name: "Project Delivery" })
+      publishedDefinition: expect.objectContaining({
+        name: "Project Delivery",
+        actions: []
+      })
     });
     expect(listBody.surfaces[0]).not.toHaveProperty("draftDefinition");
 
@@ -322,7 +325,10 @@ describe("control surface routes", () => {
     };
     expect(detailBody).not.toHaveProperty("versions");
     expect(detailBody.surface).not.toHaveProperty("draftDefinition");
-    expect(detailBody.surface.publishedDefinition).toMatchObject({ name: "Project Delivery" });
+    expect(detailBody.surface.publishedDefinition).toMatchObject({
+      name: "Project Delivery",
+      actions: []
+    });
 
     const draftDetailResponse = await app.request(
       "/api/tenant/current/control-surfaces/surface-draft-only",
