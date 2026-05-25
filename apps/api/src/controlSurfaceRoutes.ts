@@ -31,7 +31,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const surfaces = (await deps.dataSource.listControlSurfaces(actor.tenantId))
       .filter((surface) => includeArchived || surface.status !== "archived")
       .filter((surface) => canReadBuilderState || surface.status === "published")
-      .map((surface) => canReadBuilderState ? surface : toPublishedSurfaceReadModel(surface))
+      .map((surface) => canReadBuilderState ? surface : toPublishedSurfaceReadModel(surface, profile))
       .filter((surface): surface is ControlSurfaceRecord | PublishedControlSurfaceReadModel => Boolean(surface));
     return context.json({ surfaces });
   });
@@ -65,7 +65,7 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const surface = await deps.dataSource.findControlSurface(actor.tenantId, context.req.param("surfaceId"));
     if (!surface) return context.json({ error: "control_surface_not_found" }, 404);
     if (!canReadBuilderState) {
-      const publishedSurface = toPublishedSurfaceReadModel(surface);
+      const publishedSurface = toPublishedSurfaceReadModel(surface, profile);
       if (!publishedSurface) return context.json({ error: "control_surface_not_found" }, 404);
       return context.json({ surface: publishedSurface });
     }
@@ -508,9 +508,11 @@ function canReadControlSurfaceBuilderState(input: {
 }
 
 function toPublishedSurfaceReadModel(
-  surface: ControlSurfaceRecord
+  surface: ControlSurfaceRecord,
+  profile: Parameters<typeof canManageControlSurfaces>[0]["profile"]
 ): PublishedControlSurfaceReadModel | null {
   if (surface.status !== "published" || !surface.publishedDefinition) return null;
+  const grantedPermissions = new Set<string>(profile.permissions);
   return {
     id: surface.id,
     tenantId: surface.tenantId,
@@ -520,7 +522,12 @@ function toPublishedSurfaceReadModel(
     ownerUserId: surface.ownerUserId,
     status: "published",
     currentVersion: surface.currentVersion,
-    publishedDefinition: surface.publishedDefinition,
+    publishedDefinition: {
+      ...surface.publishedDefinition,
+      actions: surface.publishedDefinition.actions.filter((action) =>
+        action.requiredPermissions.every((permission) => grantedPermissions.has(permission))
+      )
+    },
     createdAt: surface.createdAt,
     updatedAt: surface.updatedAt,
     publishedAt: surface.publishedAt
