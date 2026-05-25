@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseCreateCrmCommentBody,
   parseCreateCrmFileBody,
   parseCreateCrmTaskBody,
   parseCrmActivityEntityType,
@@ -39,6 +40,28 @@ describe("CRM activity parsers", () => {
         dueDate: "June 1 2026"
       })
     ).toEqual({ ok: false, error: "task_due_date_invalid" });
+  });
+
+  it("rejects unsafe CRM task metadata before activity persistence", () => {
+    expect(
+      parseCreateCrmTaskBody({
+        title: "Подготовить КП\nX-Audit: spoof"
+      })
+    ).toEqual({ ok: false, error: "task_title_required" });
+
+    expect(
+      parseCreateCrmTaskBody({
+        title: "Подготовить КП",
+        body: "Visible\u0000hidden"
+      })
+    ).toEqual({ ok: false, error: "task_body_invalid" });
+
+    expect(
+      parseCreateCrmTaskBody({
+        title: "Подготовить КП",
+        assigneeUserId: "user-alpha\nhidden"
+      })
+    ).toEqual({ ok: false, error: "task_assignee_invalid" });
   });
 
   it("accepts only supported task statuses", () => {
@@ -105,5 +128,41 @@ describe("CRM activity parsers", () => {
         fileUrl: "/uploads/brief.pdf"
       })
     ).toEqual({ ok: false, error: "file_url_invalid" });
+
+    expect(
+      parseCreateCrmFileBody({
+        title: "Бриф клиента",
+        fileUrl: "https://user:secret@example.test/brief.pdf"
+      })
+    ).toEqual({ ok: false, error: "file_url_invalid" });
+
+    expect(
+      parseCreateCrmFileBody({
+        title: "Бриф клиента",
+        fileUrl: "http://127.0.0.1/brief.pdf"
+      })
+    ).toEqual({ ok: false, error: "file_url_invalid" });
+  });
+
+  it("rejects unsafe CRM comments and file metadata", () => {
+    expect(parseCreateCrmCommentBody({ body: "Комментарий\u0000скрыто" })).toEqual({
+      ok: false,
+      error: "comment_body_required"
+    });
+
+    expect(
+      parseCreateCrmFileBody({
+        title: "Бриф\nhidden",
+        fileUrl: "https://example.test/brief.pdf"
+      })
+    ).toEqual({ ok: false, error: "file_title_required" });
+
+    expect(
+      parseCreateCrmFileBody({
+        title: "Бриф клиента",
+        fileUrl: "https://example.test/brief.pdf",
+        mimeType: "application/pdf\nhidden"
+      })
+    ).toEqual({ ok: false, error: "file_mime_type_invalid" });
   });
 });

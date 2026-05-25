@@ -20,8 +20,10 @@ import { canReadPlanningReadModel, permissionForCommand } from "./planningRouteA
 import {
   appendPlanningAuditIfConfigured,
   errorResponseBody,
-  getRequiredRouteParam,
   hashJson,
+  parseProjectRouteParam,
+  parseSolverProposalRouteParam,
+  parseSolverRunRouteParam,
   summarizeSnapshot,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
@@ -35,12 +37,16 @@ type AutoSolverRunEnvelope = {
 
 export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteDeps): void {
   app.post("/api/workspace/projects/:projectId/planning/auto-solver-runs", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
       !deps.dataSource.getPlanSnapshot ||
       !deps.dataSource.createPlanningSolverRun ||
-      !deps.dataSource.appendAuditEvent
+      !deps.dataSource.appendAuditEvent ||
+      !deps.dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -51,7 +57,7 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const projectId = getRequiredRouteParam(context, "projectId");
+    const projectId = parsedProjectId.value;
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       await appendAutoSolverDeniedAuditIfConfigured(deps, {
@@ -121,39 +127,49 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       id: `proposal-${index + 1}`
     }));
     const proposalPayloadHash = hashJson(proposals);
-    const run = await deps.dataSource.createPlanningSolverRun({
-      id: runId,
-      tenantId: actor.tenantId,
-      projectId,
-      mode: parsed.value.mode,
-      clientPlanVersion: snapshot.planVersion,
-      engineVersion: PLANNING_ENGINE_VERSION,
-      inputSnapshotMetadata: {
-        ...summarizeSnapshot(snapshot),
+    const run = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createPlanningSolverRun || !transactionDataSource.appendAuditEvent) {
+        throw new Error("persistence_not_configured");
+      }
+      const persistedRun = await transactionDataSource.createPlanningSolverRun({
+        id: runId,
+        tenantId: actor.tenantId,
+        projectId,
+        mode: parsed.value.mode,
+        clientPlanVersion: snapshot.planVersion,
+        engineVersion: PLANNING_ENGINE_VERSION,
+        inputSnapshotMetadata: {
+          ...summarizeSnapshot(snapshot),
+          targetDeadline: parsed.value.targetDeadline ?? null,
+          search: runResult.search
+        },
         targetDeadline: parsed.value.targetDeadline ?? null,
-        search: runResult.search
-      },
-      targetDeadline: parsed.value.targetDeadline ?? null,
-      proposals,
-      proposalPayloadHash,
-      actorUserId: actor.id,
-      expiresAt
-    });
-    await appendPlanningAuditIfConfigured(deps, {
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "planning.auto_solver.run_created",
-      sourceWorkflow: "planning",
-      sourceEntity: { type: "Project", id: projectId },
-      commandInput: parsed.value,
-      beforeState: summarizeSnapshot(snapshot),
-      afterState: {
-        runId,
-        proposalCount: proposals.length,
-        expiresAt: expiresAt.toISOString()
-      },
-      permissionResult: manageDecision,
-      executionResult: { status: "succeeded" }
+        proposals,
+        proposalPayloadHash,
+        actorUserId: actor.id,
+        expiresAt
+      });
+      await appendPlanningAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.auto_solver.run_created",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: parsed.value,
+          beforeState: summarizeSnapshot(snapshot),
+          afterState: {
+            runId,
+            proposalCount: proposals.length,
+            expiresAt: expiresAt.toISOString()
+          },
+          permissionResult: manageDecision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return persistedRun;
     });
 
     return context.json({
@@ -170,6 +186,11 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
   });
 
   app.get("/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+    const parsedRunId = parseSolverRunRouteParam(context);
+    if (!parsedRunId.ok) return context.json({ error: parsedRunId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.findPlanningSolverRun) {
@@ -177,8 +198,8 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
     }
 
     const profile = await deps.getActorProfile(actor);
-    const projectId = getRequiredRouteParam(context, "projectId");
-    const runId = getRequiredRouteParam(context, "runId");
+    const projectId = parsedProjectId.value;
+    const runId = parsedRunId.value;
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
       await appendAutoSolverDeniedAuditIfConfigured(deps, {
@@ -230,6 +251,13 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
   app.post(
     "/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId/proposals/:proposalId/apply",
     async (context) => {
+      const parsedProjectId = parseProjectRouteParam(context);
+      if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+      const parsedRunId = parseSolverRunRouteParam(context);
+      if (!parsedRunId.ok) return context.json({ error: parsedRunId.error }, 400);
+      const parsedProposalId = parseSolverProposalRouteParam(context);
+      if (!parsedProposalId.ok) return context.json({ error: parsedProposalId.error }, 400);
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (!deps.dataSource.appendAuditEvent) {
@@ -242,9 +270,9 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       if (!parsedApply.ok) return context.json({ error: "planning_solver_invalid" }, 400);
 
       const profile = await deps.getActorProfile(actor);
-      const projectId = getRequiredRouteParam(context, "projectId");
-      const runId = getRequiredRouteParam(context, "runId");
-      const proposalId = getRequiredRouteParam(context, "proposalId");
+      const projectId = parsedProjectId.value;
+      const runId = parsedRunId.value;
+      const proposalId = parsedProposalId.value;
       const readDecision = canReadPlanningReadModel({ actor, profile });
       if (!readDecision.allowed) {
         await appendAutoSolverDeniedAuditIfConfigured(deps, {

@@ -19,6 +19,7 @@ import {
   parseProjectActivationBody
 } from "./projectIntakeParsers";
 import { createProjectIntakeService } from "./projectIntakeService";
+import { parseOpportunityIdParam } from "./routeParamParsers";
 
 type ProjectIntakeRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -64,6 +65,9 @@ export function registerProjectIntakeRoutes(
   });
 
   app.get("/api/workspace/opportunities/:opportunityId", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!dataSource.findOpportunityById) {
@@ -79,7 +83,7 @@ export function registerProjectIntakeRoutes(
 
     const opportunity = await dataSource.findOpportunityById(
       actor.tenantId,
-      context.req.param("opportunityId")
+      opportunityId.value
     );
     if (!opportunity) return context.json({ error: "opportunity_not_found" }, 404);
 
@@ -108,13 +112,15 @@ export function registerProjectIntakeRoutes(
   });
 
   app.patch("/api/workspace/opportunities/:opportunityId", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    const opportunityId = context.req.param("opportunityId");
 
     const preflight = await projectIntakeService.preflightUpdateOpportunity({
       actor,
-      opportunityId
+      opportunityId: opportunityId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -125,7 +131,7 @@ export function registerProjectIntakeRoutes(
 
     const result = await projectIntakeService.updateOpportunity({
       actor,
-      opportunityId,
+      opportunityId: opportunityId.value,
       input: parsed.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
@@ -134,13 +140,15 @@ export function registerProjectIntakeRoutes(
   });
 
   app.patch("/api/workspace/opportunities/:opportunityId/stage", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    const opportunityId = context.req.param("opportunityId");
 
     const preflight = await projectIntakeService.preflightChangeOpportunityStage({
       actor,
-      opportunityId
+      opportunityId: opportunityId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -151,7 +159,7 @@ export function registerProjectIntakeRoutes(
 
     const result = await projectIntakeService.changeOpportunityStage({
       actor,
-      opportunityId,
+      opportunityId: opportunityId.value,
       stageId: parsed.value.stageId
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
@@ -160,13 +168,15 @@ export function registerProjectIntakeRoutes(
   });
 
   app.patch("/api/workspace/opportunities/:opportunityId/finalize", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    const opportunityId = context.req.param("opportunityId");
 
     const preflight = await projectIntakeService.preflightFinalizeOpportunity({
       actor,
-      opportunityId
+      opportunityId: opportunityId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -177,7 +187,7 @@ export function registerProjectIntakeRoutes(
 
     const result = await projectIntakeService.finalizeOpportunity({
       actor,
-      opportunityId,
+      opportunityId: opportunityId.value,
       finalAction: parsed.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
@@ -186,12 +196,15 @@ export function registerProjectIntakeRoutes(
   });
 
   app.post("/api/workspace/opportunities/:opportunityId/feasibility", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
     const result = await projectIntakeService.checkOpportunityFeasibility({
       actor,
-      opportunityId: context.req.param("opportunityId")
+      opportunityId: opportunityId.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
@@ -202,13 +215,15 @@ export function registerProjectIntakeRoutes(
   });
 
   app.post("/api/workspace/opportunities/:opportunityId/activate", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
-    const opportunityId = context.req.param("opportunityId");
 
     const preflight = await projectIntakeService.preflightProjectActivation({
       actor,
-      opportunityId
+      opportunityId: opportunityId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -219,7 +234,7 @@ export function registerProjectIntakeRoutes(
 
     const result = await projectIntakeService.activateProjectFromOpportunity({
       actor,
-      opportunityId,
+      opportunityId: opportunityId.value,
       activation: parsed.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);

@@ -10,16 +10,16 @@ import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRou
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseCreateTaskBody,
-  parseCreateTaskStatusBody,
   parseTaskCommentBody,
   parseUpdateTaskBody,
   parseUpdateTaskStatusBody
 } from "./projectWorkParsers";
+import { parseProjectIdParam, parseTaskIdParam } from "./routeParamParsers";
 import { createTaskCommandWorkspace } from "./project-work/taskCommandWorkspace";
 import { createTaskReadWorkspace } from "./project-work/taskReadWorkspace";
-import { createTaskStatusWorkspace } from "./project-work/taskStatusWorkspace";
+import { registerTaskStatusRoutes } from "./project-work/taskStatusRoutes";
 
-type ProjectWorkRouteDeps = {
+export type ProjectWorkRouteDeps = {
   dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
@@ -37,83 +37,15 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     getActorProfile,
     getSessionActorFromHeaders
   } = deps;
-  const taskStatusWorkspace = createTaskStatusWorkspace(deps);
   const taskCommandWorkspace = createTaskCommandWorkspace(deps);
   const taskReadWorkspace = createTaskReadWorkspace(deps);
 
-  app.get("/api/workspace/task-statuses", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
-    const profile = await getActorProfile(actor);
-    const result = await taskStatusWorkspace.listTaskStatuses({ actor, profile });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-
-    return context.json({
-      taskStatuses: result.taskStatuses
-    });
-  });
-
-  app.post("/api/workspace/task-statuses", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
-    const profile = await getActorProfile(actor);
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCreateTaskStatusBody(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const result = await taskStatusWorkspace.createTaskStatus({
-      actor,
-      profile,
-      value: parsed.value
-    });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-
-    return context.json({ taskStatus: result.taskStatus }, 201);
-  });
-
-  app.patch("/api/workspace/task-statuses/:statusId", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
-    const profile = await getActorProfile(actor);
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCreateTaskStatusBody({
-      ...(body.value && typeof body.value === "object" ? body.value : {}),
-      id: context.req.param("statusId")
-    });
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const result = await taskStatusWorkspace.updateTaskStatus({
-      actor,
-      profile,
-      statusId: context.req.param("statusId"),
-      value: parsed.value
-    });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-
-    return context.json({ taskStatus: result.taskStatus });
-  });
-
-  app.delete("/api/workspace/task-statuses/:statusId", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
-    const profile = await getActorProfile(actor);
-    const result = await taskStatusWorkspace.archiveTaskStatus({
-      actor,
-      profile,
-      statusId: context.req.param("statusId")
-    });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-
-    return context.json({ taskStatus: result.taskStatus });
-  });
+  registerTaskStatusRoutes(app, deps);
 
   app.get("/api/workspace/projects/:projectId", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
@@ -121,7 +53,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const result = await taskReadWorkspace.getProjectDetail({
       actor,
       profile,
-      projectId: context.req.param("projectId")
+      projectId: projectId.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
@@ -132,6 +64,9 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.get("/api/workspace/projects/:projectId/tasks", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
@@ -139,7 +74,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const result = await taskReadWorkspace.listProjectTasks({
       actor,
       profile,
-      projectId: context.req.param("projectId")
+      projectId: projectId.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
@@ -162,6 +97,9 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.get("/api/workspace/tasks/:taskId", async (context) => {
+    const taskId = parseTaskIdParam(context.req.param("taskId"));
+    if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
@@ -169,7 +107,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const result = await taskReadWorkspace.getTaskDetail({
       actor,
       profile,
-      taskId: context.req.param("taskId")
+      taskId: taskId.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
@@ -213,14 +151,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.post("/api/workspace/projects/:projectId/tasks", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await getActorProfile(actor);
-    const projectId = context.req.param("projectId");
     const preflight = await taskCommandWorkspace.preflightCreateProjectTask({
       actor,
       profile,
-      projectId
+      projectId: projectId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -232,7 +172,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const createResult = await taskCommandWorkspace.createProjectTask({
       actor,
       profile,
-      projectId,
+      projectId: projectId.value,
       body: parsed.value
     });
     if (!createResult.ok) {
@@ -244,14 +184,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.patch("/api/workspace/tasks/:taskId", async (context) => {
+    const taskId = parseTaskIdParam(context.req.param("taskId"));
+    if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await getActorProfile(actor);
-    const taskId = context.req.param("taskId");
     const preflight = await taskCommandWorkspace.preflightUpdateTask({
       actor,
       profile,
-      taskId
+      taskId: taskId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -263,7 +205,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const updateResult = await taskCommandWorkspace.updateTask({
       actor,
       profile,
-      taskId,
+      taskId: taskId.value,
       body: parsed.value
     });
     if (!updateResult.ok) {
@@ -275,13 +217,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.delete("/api/workspace/tasks/:taskId", async (context) => {
+    const taskId = parseTaskIdParam(context.req.param("taskId"));
+    if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await getActorProfile(actor);
     const archiveResult = await taskCommandWorkspace.archiveTask({
       actor,
       profile,
-      taskId: context.req.param("taskId")
+      taskId: taskId.value
     });
     if (!archiveResult.ok) {
       return context.json({ error: archiveResult.error }, archiveResult.status);
@@ -294,14 +239,18 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   app.patch(
     "/api/workspace/projects/:projectId/tasks/:taskId/status",
     async (context) => {
+      const projectId = parseProjectIdParam(context.req.param("projectId"));
+      if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+      const taskId = parseTaskIdParam(context.req.param("taskId"));
+      if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
       const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       const profile = await getActorProfile(actor);
-      const projectId = context.req.param("projectId");
       const preflight = await taskCommandWorkspace.preflightTransitionTaskStatus({
         actor,
         profile,
-        projectId
+        projectId: projectId.value
       });
       if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -313,8 +262,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       const transition = await taskCommandWorkspace.transitionTaskStatus({
         actor,
         profile,
-        projectId,
-        taskId: context.req.param("taskId"),
+        projectId: projectId.value,
+        taskId: taskId.value,
         body: parsed.value
       });
 
@@ -327,6 +276,9 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   );
 
   app.get("/api/workspace/tasks/:taskId/activity", async (context) => {
+    const taskId = parseTaskIdParam(context.req.param("taskId"));
+    if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
@@ -334,7 +286,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const result = await taskReadWorkspace.listTaskActivity({
       actor,
       profile,
-      taskId: context.req.param("taskId")
+      taskId: taskId.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 
@@ -345,14 +297,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   });
 
   app.post("/api/workspace/tasks/:taskId/comments", async (context) => {
+    const taskId = parseTaskIdParam(context.req.param("taskId"));
+    if (!taskId.ok) return context.json({ error: taskId.error }, 400);
+
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await getActorProfile(actor);
-    const taskId = context.req.param("taskId");
     const preflight = await taskCommandWorkspace.preflightCreateTaskComment({
       actor,
       profile,
-      taskId
+      taskId: taskId.value
     });
     if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
 
@@ -364,7 +318,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const result = await taskCommandWorkspace.createTaskComment({
       actor,
       profile,
-      taskId,
+      taskId: taskId.value,
       body: parsed.value
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);

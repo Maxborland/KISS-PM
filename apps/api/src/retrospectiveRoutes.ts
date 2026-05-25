@@ -27,6 +27,11 @@ import { randomUUID } from "node:crypto";
 import type { ApiTenantDataSource, ManagementAuditEventInput, ProjectRecord } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import {
+  parseProjectIdParam,
+  parseProjectTemplateIdParam,
+  parseTemplateImprovementActionIdParam
+} from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 type TemplateImprovementActionPersistenceInput = Omit<
@@ -45,6 +50,9 @@ type ClosureFailureResult = {
 
 export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/workspace/projects/:projectId/closure", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.getRetrospectiveReadModel || !deps.dataSource.listProjects) {
@@ -52,7 +60,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
     if (!decision.allowed) {
       await appendDeniedAudit(deps, actor, "closure.read_denied", { projectId }, decision);
       return context.json({ error: decision.reason }, 403);
@@ -68,6 +76,9 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/closure/preview", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -79,7 +90,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
     if (!decision.allowed) {
       await appendDeniedAudit(deps, actor, "closure.preview_denied", { projectId }, decision);
       return context.json({ error: decision.reason }, 403);
@@ -109,6 +120,9 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/closure/close", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -130,11 +144,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const decision = closeDecision(actor, profile);
     if (!decision.allowed) {
       await appendDeniedAudit(deps, actor, "project.close_denied", {
-        projectId: context.req.param("projectId")
+        projectId: parsedProjectId.value
       }, decision);
       return context.json({ error: decision.reason }, 403);
     }
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (
@@ -269,6 +283,9 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/closure/lessons", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -289,7 +306,7 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile,
       targetTenantId: actor.tenantId
     });
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
     if (!decision.allowed) {
       await appendDeniedAudit(deps, actor, "retrospective.lesson_create_denied", {
         projectId
@@ -349,6 +366,17 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post(
     "/api/workspace/projects/:projectId/closure/template-improvement-actions/:actionId/apply",
     async (context) => {
+      const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+      if (!parsedProjectId.ok) {
+        return context.json({ error: parsedProjectId.error }, 400);
+      }
+      const parsedActionId = parseTemplateImprovementActionIdParam(
+        context.req.param("actionId")
+      );
+      if (!parsedActionId.ok) {
+        return context.json({ error: parsedActionId.error }, 400);
+      }
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (
@@ -361,8 +389,8 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       const profile = await deps.getActorProfile(actor);
       const decision = templateImprovementDecision(actor, profile);
-      const projectId = context.req.param("projectId");
-      const actionId = context.req.param("actionId");
+      const projectId = parsedProjectId.value;
+      const actionId = parsedActionId.value;
       if (!decision.allowed) {
         await appendDeniedAudit(deps, actor, "template_improvement.apply_denied", {
           projectId,
@@ -468,6 +496,13 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   );
 
   app.get("/api/tenant/current/project-templates/:templateId/retrospective-insights", async (context) => {
+    const parsedTemplateId = parseProjectTemplateIdParam(
+      context.req.param("templateId")
+    );
+    if (!parsedTemplateId.ok) {
+      return context.json({ error: parsedTemplateId.error }, 400);
+    }
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.listTemplateImprovementActions) {
@@ -478,11 +513,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const actions = await deps.dataSource.listTemplateImprovementActions({
       tenantId: actor.tenantId,
-      templateId: context.req.param("templateId"),
+      templateId: parsedTemplateId.value,
       status: "applied"
     });
     return context.json({
-      templateId: context.req.param("templateId"),
+      templateId: parsedTemplateId.value,
       appliedImprovements: actions,
       estimationLearning: summarizeTemplateLearning(actions)
     });

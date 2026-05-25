@@ -5,6 +5,7 @@ import { streamSSE } from "hono/streaming";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import { subscribePlanningEvents, type PlanRealtimeEvent } from "./planningEventBus";
+import { parseProjectIdParam } from "./routeParamParsers";
 
 type PlanningEventsRouteDeps = {
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
@@ -13,6 +14,9 @@ type PlanningEventsRouteDeps = {
 
 export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRouteDeps) {
   app.get("/api/workspace/projects/:projectId/planning/events", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
 
@@ -26,7 +30,7 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
       return context.json({ error: planDecision.reason }, 403);
     }
 
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
 
     return streamSSE(context, async (stream) => {
       const send = async (event: PlanRealtimeEvent) => {

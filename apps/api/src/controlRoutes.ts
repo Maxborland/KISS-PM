@@ -38,6 +38,12 @@ import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
 import { permissionForCommand } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
+import {
+  parseControlSignalIdParam,
+  parseCorrectiveActionIdParam,
+  parseManagementActionIdParam,
+  parseProjectIdParam
+} from "./routeParamParsers";
 
 export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/tenant/current/kpi-definitions", async (context) => {
@@ -81,24 +87,42 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseKpiDefinitionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!deps.dataSource.withTransaction) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
-    const definition = await deps.dataSource.upsertKpiDefinition(parsed.value);
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "kpi.definition.upserted",
-      sourceWorkflow: "control",
-      sourceEntity: { type: "KpiDefinition", id: definition.id },
-      commandInput: { definition },
-      beforeState: null,
-      afterState: { definition },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.upsertKpiDefinition || !transactionDataSource.appendAuditEvent) {
+        return { ok: false as const };
+      }
+      const definition = await transactionDataSource.upsertKpiDefinition(parsed.value);
+      const auditEventId = await appendControlAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "kpi.definition.upserted",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "KpiDefinition", id: definition.id },
+          commandInput: { definition },
+          beforeState: null,
+          afterState: { definition },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, definition, auditEventId };
     });
+    if (!result.ok) return context.json({ error: "persistence_not_configured" }, 501);
+    const { definition, auditEventId } = result;
     return context.json({ definition, auditEventId });
   });
 
   app.get("/api/workspace/projects/:projectId/control/read-model", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await deps.getActorProfile(actor);
@@ -111,19 +135,18 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!deps.dataSource.listKpiEvaluations || !deps.dataSource.listControlSignals) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
-    const projectId = context.req.param("projectId");
     const definitions = await listDefinitionsOrDefaults(deps, actor.tenantId);
     const [evaluations, signals, correctiveActions, actionExecutions] = await Promise.all([
-      deps.dataSource.listKpiEvaluations(actor.tenantId, projectId),
-      deps.dataSource.listControlSignals(actor.tenantId, projectId),
-      deps.dataSource.listCorrectiveActions?.(actor.tenantId, projectId) ?? Promise.resolve([]),
-      deps.dataSource.listActionExecutions?.(actor.tenantId, projectId) ?? Promise.resolve([])
+      deps.dataSource.listKpiEvaluations(actor.tenantId, projectId.value),
+      deps.dataSource.listControlSignals(actor.tenantId, projectId.value),
+      deps.dataSource.listCorrectiveActions?.(actor.tenantId, projectId.value) ?? Promise.resolve([]),
+      deps.dataSource.listActionExecutions?.(actor.tenantId, projectId.value) ?? Promise.resolve([])
     ]);
     const auditEvents = ((await deps.dataSource.listAuditEventsByTenantId?.(actor.tenantId)) ?? [])
       .filter((event) => event.sourceWorkflow === "control")
       .filter(
         (event) =>
-          event.sourceEntity.id === projectId ||
+          event.sourceEntity.id === projectId.value ||
           signals.some((signal) => event.sourceEntity.id === signal.id) ||
           correctiveActions.some((action) => event.sourceEntity.id === action.id)
       );
@@ -138,6 +161,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/control/evaluate", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -157,12 +183,16 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!controlDecision.allowed) return context.json({ error: controlDecision.reason }, 403);
     const controlManageDecision = canManageControlSignals({ actor, profile, targetTenantId: actor.tenantId });
     if (!controlManageDecision.allowed) return context.json({ error: controlManageDecision.reason }, 403);
-    const projectId = context.req.param("projectId");
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
+    if (!deps.dataSource.withTransaction) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
 
     const now = new Date().toISOString();
-    const definitions = await ensureDefinitionsOrDefaults(deps, actor.tenantId);
+    const definitions = await deps.runDataSourceTransaction((transactionDataSource) =>
+      ensureDefinitionsOrDefaults(deps, actor.tenantId, transactionDataSource)
+    );
     const calculatedPlan = calculatePlan(snapshot, {
       calculatedAt: now,
       engineVersion: PLANNING_ENGINE_VERSION
@@ -200,41 +230,59 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       scenarioProposals: proposals.filter((proposal) => proposal.targetEntity.id === signal.id)
     }));
 
-    const persistedEvaluations = [];
-    for (const evaluation of evaluations) {
-      persistedEvaluations.push(await deps.dataSource.createKpiEvaluation(evaluation));
-    }
-    const persistedSignals = [];
-    for (const signal of signals) {
-      persistedSignals.push(await deps.dataSource.upsertControlSignal(signal));
-    }
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "kpi.evaluated",
-      sourceWorkflow: "control",
-      sourceEntity: { type: "Project", id: projectId },
-      commandInput: { projectId, planVersion: snapshot.planVersion },
-      beforeState: null,
-      afterState: {
-        evaluationIds: persistedEvaluations.map((evaluation) => evaluation.id),
-        signalIds: persistedSignals.map((signal) => signal.id)
-      },
-      permissionResult: controlManageDecision,
-      executionResult: { status: "succeeded" }
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.createKpiEvaluation ||
+        !transactionDataSource.upsertControlSignal ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const };
+      }
+      const persistedEvaluations = [];
+      for (const evaluation of evaluations) {
+        persistedEvaluations.push(await transactionDataSource.createKpiEvaluation(evaluation));
+      }
+      const persistedSignals = [];
+      for (const signal of signals) {
+        persistedSignals.push(await transactionDataSource.upsertControlSignal(signal));
+      }
+      const auditEventId = await appendControlAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "kpi.evaluated",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "Project", id: projectId.value },
+          commandInput: { projectId: projectId.value, planVersion: snapshot.planVersion },
+          beforeState: null,
+          afterState: {
+            evaluationIds: persistedEvaluations.map((evaluation) => evaluation.id),
+            signalIds: persistedSignals.map((signal) => signal.id)
+          },
+          permissionResult: controlManageDecision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, persistedEvaluations, persistedSignals, auditEventId };
     });
+    if (!result.ok) return context.json({ error: "persistence_not_configured" }, 501);
 
     return context.json({
-      evaluations: persistedEvaluations,
-      signals: persistedSignals,
+      evaluations: result.persistedEvaluations,
+      signals: result.persistedSignals,
       actionCandidates: proposals,
-      auditEventId
+      auditEventId: result.auditEventId
     });
   });
 
   app.post(
     "/api/workspace/projects/:projectId/control/signals/:signalId/actions/:actionId/preview",
     async (context) => {
+      const routeIds = parseControlActionRouteParams(context);
+      if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (
@@ -246,9 +294,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
       const profile = await deps.getActorProfile(actor);
-      const projectId = context.req.param("projectId");
-      const signalId = context.req.param("signalId");
-      const actionId = context.req.param("actionId");
+      const { projectId, signalId, actionId } = routeIds.value;
       const decision = canExecuteManagementActions({ actor, profile, targetTenantId: actor.tenantId });
       if (!decision.allowed) {
         await appendManagementActionDeniedAudit(deps, {
@@ -363,6 +409,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post(
     "/api/workspace/projects/:projectId/control/signals/:signalId/actions/:actionId/apply",
     async (context) => {
+      const routeIds = parseControlActionRouteParams(context);
+      if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (
@@ -373,10 +422,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       ) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
-
-      const projectId = context.req.param("projectId");
-      const signalId = context.req.param("signalId");
-      const actionId = context.req.param("actionId");
+      const { projectId, signalId, actionId } = routeIds.value;
 
       const profile = await deps.getActorProfile(actor);
       const executeDecision = canExecuteManagementActions({
@@ -669,6 +715,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   );
 
   app.post("/api/workspace/projects/:projectId/control/signals/:signalId/status", async (context) => {
+    const routeIds = parseControlSignalRouteParams(context);
+    if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -685,37 +734,61 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canManageControlSignals({ actor, profile, targetTenantId: actor.tenantId });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const { projectId, signalId } = routeIds.value;
+    if (!deps.dataSource.withTransaction) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
-    const projectId = context.req.param("projectId");
-    const signalId = context.req.param("signalId");
-    const signal = (await deps.dataSource.listControlSignals(actor.tenantId, projectId)).find(
-      (candidate) => candidate.id === signalId
-    );
-    if (!signal) return context.json({ error: "control_signal_not_found" }, 404);
-
-    const updated = await deps.dataSource.upsertControlSignal({
-      ...signal,
-      status: parsed.value.status,
-      updatedAt: new Date().toISOString()
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.listControlSignals ||
+        !transactionDataSource.upsertControlSignal ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      const signal = (await transactionDataSource.listControlSignals(actor.tenantId, projectId)).find(
+        (candidate) => candidate.id === signalId
+      );
+      if (!signal) return { ok: false as const, status: 404, error: "control_signal_not_found" };
+      const updated = await transactionDataSource.upsertControlSignal({
+        ...signal,
+        status: parsed.value.status,
+        updatedAt: new Date().toISOString()
+      });
+      const auditEventId = await appendControlAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType:
+            parsed.value.status === "accepted_risk"
+              ? "control_signal.risk_accepted"
+              : "control_signal.status_changed",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "ControlSignal", id: signalId },
+          commandInput: parsed.value,
+          beforeState: { signal },
+          afterState: { signal: updated },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, signal: updated, auditEventId };
     });
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType:
-        parsed.value.status === "accepted_risk" ? "control_signal.risk_accepted" : "control_signal.status_changed",
-      sourceWorkflow: "control",
-      sourceEntity: { type: "ControlSignal", id: signalId },
-      commandInput: parsed.value,
-      beforeState: { signal },
-      afterState: { signal: updated },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
-    });
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      return context.json({ error: result.error }, 404);
+    }
 
-    return context.json({ signal: updated, auditEventId });
+    return context.json({ signal: result.signal, auditEventId: result.auditEventId });
   });
 
   app.post("/api/workspace/projects/:projectId/control/signals/:signalId/corrective-actions", async (context) => {
+    const routeIds = parseControlSignalRouteParams(context);
+    if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -730,45 +803,74 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const projectId = context.req.param("projectId");
-    const signalId = context.req.param("signalId");
-    const signal = (await deps.dataSource.listControlSignals(actor.tenantId, projectId)).find(
-      (candidate) => candidate.id === signalId
-    );
-    if (!signal) return context.json({ error: "control_signal_not_found" }, 404);
+    const { projectId, signalId } = routeIds.value;
     const parsed = parseCorrectiveActionBody(body.value, actor.tenantId, projectId, signalId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!deps.dataSource.withTransaction) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
-    const correctiveAction = await deps.dataSource.createCorrectiveAction(parsed.value);
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "corrective_action.created",
-      sourceWorkflow: "control",
-      sourceEntity: { type: "ControlSignal", id: signalId },
-      commandInput: { correctiveAction },
-      beforeState: { signal },
-      afterState: { correctiveAction },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.listControlSignals ||
+        !transactionDataSource.createCorrectiveAction ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      const signal = (await transactionDataSource.listControlSignals(actor.tenantId, projectId)).find(
+        (candidate) => candidate.id === signalId
+      );
+      if (!signal) return { ok: false as const, status: 404, error: "control_signal_not_found" };
+      const correctiveAction = await transactionDataSource.createCorrectiveAction(parsed.value);
+      const auditEventId = await appendControlAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "corrective_action.created",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "ControlSignal", id: signalId },
+          commandInput: { correctiveAction },
+          beforeState: { signal },
+          afterState: { correctiveAction },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      const execution = await transactionDataSource.createActionExecution?.({
+        id: `action-exec-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        projectId,
+        actionType: "create_corrective_action",
+        targetEntity: { type: "ControlSignal", id: signalId },
+        actorUserId: actor.id,
+        input: { correctiveAction },
+        previewPayload: null,
+        resultPayload: { correctiveAction },
+        status: "succeeded",
+        auditEventId
+      });
+      return { ok: true as const, correctiveAction, actionExecution: execution ?? null, auditEventId };
     });
-    const execution = await deps.dataSource.createActionExecution?.({
-      id: `action-exec-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      projectId,
-      actionType: "create_corrective_action",
-      targetEntity: { type: "ControlSignal", id: signalId },
-      actorUserId: actor.id,
-      input: { correctiveAction },
-      previewPayload: null,
-      resultPayload: { correctiveAction },
-      status: "succeeded",
-      auditEventId
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      return context.json({ error: result.error }, 404);
+    }
+    return context.json({
+      correctiveAction: result.correctiveAction,
+      actionExecution: result.actionExecution,
+      auditEventId: result.auditEventId
     });
-    return context.json({ correctiveAction, actionExecution: execution ?? null, auditEventId });
   });
 
   app.patch("/api/workspace/projects/:projectId/control/corrective-actions/:correctiveActionId", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+    const correctiveActionId = parseCorrectiveActionIdParam(context.req.param("correctiveActionId"));
+    if (!correctiveActionId.ok) return context.json({ error: correctiveActionId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -783,31 +885,80 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canManageCorrectiveActions({ actor, profile, targetTenantId: actor.tenantId });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!deps.dataSource.withTransaction) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
-    const projectId = context.req.param("projectId");
-    const correctiveActionId = context.req.param("correctiveActionId");
-    const existing = (await deps.dataSource.listCorrectiveActions(actor.tenantId, projectId)).find(
-      (candidate) => candidate.id === correctiveActionId
-    );
-    if (!existing) return context.json({ error: "corrective_action_not_found" }, 404);
-    const parsed = parseCorrectiveActionPatchBody(body.value, existing);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const correctiveAction = await deps.dataSource.updateCorrectiveAction(parsed.value);
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "corrective_action.updated",
-      sourceWorkflow: "control",
-      sourceEntity: { type: "CorrectiveAction", id: correctiveAction.id },
-      commandInput: { correctiveAction },
-      beforeState: { correctiveAction: existing },
-      afterState: { correctiveAction },
-      permissionResult: decision,
-      executionResult: { status: "succeeded" }
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.listCorrectiveActions ||
+        !transactionDataSource.updateCorrectiveAction ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      const existing = (await transactionDataSource.listCorrectiveActions(actor.tenantId, projectId.value)).find(
+        (candidate) => candidate.id === correctiveActionId.value
+      );
+      if (!existing) return { ok: false as const, status: 404, error: "corrective_action_not_found" };
+      const parsed = parseCorrectiveActionPatchBody(body.value, existing);
+      if (!parsed.ok) return { ok: false as const, status: 400, error: parsed.error };
+      const correctiveAction = await transactionDataSource.updateCorrectiveAction(parsed.value);
+      const auditEventId = await appendControlAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "corrective_action.updated",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "CorrectiveAction", id: correctiveAction.id },
+          commandInput: { correctiveAction },
+          beforeState: { correctiveAction: existing },
+          afterState: { correctiveAction },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, correctiveAction, auditEventId };
     });
-    return context.json({ correctiveAction, auditEventId });
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      return context.json({ error: result.error }, 400);
+    }
+    return context.json({ correctiveAction: result.correctiveAction, auditEventId: result.auditEventId });
   });
+}
+
+type RouteParamContext = {
+  req: {
+    param(name: string): string;
+  };
+};
+
+function parseControlSignalRouteParams(
+  context: RouteParamContext
+):
+  | { ok: true; value: { projectId: string; signalId: string } }
+  | { ok: false; error: string } {
+  const projectId = parseProjectIdParam(context.req.param("projectId"));
+  if (!projectId.ok) return projectId;
+  const signalId = parseControlSignalIdParam(context.req.param("signalId"));
+  if (!signalId.ok) return signalId;
+  return { ok: true, value: { projectId: projectId.value, signalId: signalId.value } };
+}
+
+function parseControlActionRouteParams(
+  context: RouteParamContext
+):
+  | { ok: true; value: { projectId: string; signalId: string; actionId: string } }
+  | { ok: false; error: string } {
+  const signalRoute = parseControlSignalRouteParams(context);
+  if (!signalRoute.ok) return signalRoute;
+  const actionId = parseManagementActionIdParam(context.req.param("actionId"));
+  if (!actionId.ok) return actionId;
+  return { ok: true, value: { ...signalRoute.value, actionId: actionId.value } };
 }
 
 async function listDefinitionsOrDefaults(deps: ApiRouteDeps, tenantId: string): Promise<KpiDefinition[]> {
@@ -815,13 +966,17 @@ async function listDefinitionsOrDefaults(deps: ApiRouteDeps, tenantId: string): 
   return definitions.length > 0 ? definitions : createDefaultProjectKpiDefinitions(tenantId);
 }
 
-async function ensureDefinitionsOrDefaults(deps: ApiRouteDeps, tenantId: string): Promise<KpiDefinition[]> {
-  const definitions = await deps.dataSource.listKpiDefinitions?.(tenantId);
+async function ensureDefinitionsOrDefaults(
+  deps: ApiRouteDeps,
+  tenantId: string,
+  dataSource: ApiRouteDeps["dataSource"] = deps.dataSource
+): Promise<KpiDefinition[]> {
+  const definitions = await dataSource.listKpiDefinitions?.(tenantId);
   if (!definitions || definitions.length > 0) return definitions ?? createDefaultProjectKpiDefinitions(tenantId);
   const defaults = createDefaultProjectKpiDefinitions(tenantId);
   const persisted: KpiDefinition[] = [];
   for (const definition of defaults) {
-    const upserted = await deps.dataSource.upsertKpiDefinition?.(definition);
+    const upserted = await dataSource.upsertKpiDefinition?.(definition);
     if (!upserted) throw new Error("kpi_definition_persistence_not_configured");
     persisted.push(upserted);
   }

@@ -1,10 +1,12 @@
-import { parseWorkspaceSearchLimit, parseWorkspaceSearchTypes, normalizeWorkspaceSearchQuery } from "./searchQuery";
+import { parseWorkspaceSearchLimit } from "./searchLimit";
+import { parseWorkspaceSearchQuery, parseWorkspaceSearchTypes, normalizeWorkspaceSearchQuery } from "./searchQuery";
 import { rankAndLimit } from "./searchScoring";
 import type { SearchResult, WorkspaceSearchInput, WorkspaceSearchSource } from "./searchTypes";
 import { workspaceSearchSources } from "./workspaceSearchSources";
 
 export type { SearchResult, WorkspaceSearchInput } from "./searchTypes";
-export { normalizeWorkspaceSearchQuery, parseWorkspaceSearchLimit, parseWorkspaceSearchTypes } from "./searchQuery";
+export { parseWorkspaceSearchLimit } from "./searchLimit";
+export { normalizeWorkspaceSearchQuery, parseWorkspaceSearchQuery, parseWorkspaceSearchTypes } from "./searchQuery";
 
 export async function searchWorkspace(input: WorkspaceSearchInput): Promise<SearchResult[]> {
   const sourceLimit = input.limit * 2;

@@ -164,12 +164,19 @@ export type PostgresTenantDataSource = CrmRepository &
   createSession(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash(tokenHash: string): Promise<void>;
+  deleteSessionsByUserId(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
-  listAuditEventsByTenantId(tenantId: TenantId): Promise<AuditEventListItem[]>;
+  listAuditEventsByTenantId(
+    tenantId: TenantId,
+    options?: {
+      limit?: number;
+      projectId?: string | null;
+    }
+  ): Promise<AuditEventListItem[]>;
 };
 
 export function createPostgresTenantDataSource(
@@ -510,6 +517,11 @@ export function createPostgresTenantDataSource(
     async deleteSessionByTokenHash(tokenHash) {
       await db.delete(userSessions).where(eq(userSessions.tokenHash, tokenHash));
     },
+    async deleteSessionsByUserId(tenantId, userId) {
+      await db
+        .delete(userSessions)
+        .where(and(eq(userSessions.tenantId, tenantId), eq(userSessions.userId, userId)));
+    },
     async withTransaction(operation) {
       return db.transaction((transaction) =>
         operation(
@@ -547,12 +559,20 @@ export function createPostgresTenantDataSource(
         createdAt: event.createdAt
       });
     },
-    async listAuditEventsByTenantId(tenantId) {
+    async listAuditEventsByTenantId(tenantId, options) {
+      const filters = [eq(auditEvents.tenantId, tenantId)];
+      if (options?.projectId) {
+        filters.push(
+          sql`${auditEvents.sourceEntity} ->> 'type' = 'Project'`,
+          sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
+        );
+      }
       const rows = await db
         .select()
         .from(auditEvents)
-        .where(eq(auditEvents.tenantId, tenantId))
-        .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+        .where(and(...filters))
+        .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id))
+        .limit(options?.limit ?? 100);
 
       return rows.map((row) => ({
         id: row.id,

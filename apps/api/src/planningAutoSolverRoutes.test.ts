@@ -100,7 +100,7 @@ describe("planning auto-solver API", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=solver-token"
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         },
         body: JSON.stringify({
           mode: "schedule",
@@ -171,7 +171,7 @@ describe("planning auto-solver API", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=solver-token"
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         },
         body: JSON.stringify({ clientPlanVersion: 3 })
       }
@@ -240,7 +240,7 @@ describe("planning auto-solver API", () => {
         headers: {
           "content-type": "application/json",
           "x-kiss-pm-action": "same-origin",
-          cookie: "kiss_pm_session=solver-token"
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         },
         body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
       }
@@ -263,7 +263,7 @@ describe("planning auto-solver API", () => {
       "/api/workspace/projects/project-solver/planning/auto-solver-runs/planning-auto-solver-1",
       {
         headers: {
-          cookie: "kiss_pm_session=solver-token"
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         }
       }
     );
@@ -416,7 +416,7 @@ async function createSolverRun(harness: ApiHarness): Promise<SolverRunResponse> 
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=solver-token"
+        cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
     }
@@ -440,7 +440,7 @@ async function applyProposal(
       headers: {
         "content-type": "application/json",
         "x-kiss-pm-action": "same-origin",
-        cookie: "kiss_pm_session=solver-token"
+        cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       body: JSON.stringify({ clientPlanVersion: input.clientPlanVersion ?? 3 })
     }

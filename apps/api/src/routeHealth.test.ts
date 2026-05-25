@@ -31,6 +31,7 @@ describe("API route health budgets", () => {
     { path: "project-work/taskCommandTypes.ts", maxLines: 90 },
     { path: "project-work/taskCommandWorkspace.ts", maxLines: 90 },
     { path: "project-work/taskCommentCommands.ts", maxLines: 90 },
+    { path: "project-work/taskStatusRoutes.ts", maxLines: 90 },
     { path: "project-work/taskCommandActivities.ts", maxLines: 70 }
   ])("$path stays within its extracted module budget", ({ path, maxLines }) => {
     expect(lineCount(path), `${path} should be <= ${maxLines} lines`).toBeLessThanOrEqual(maxLines);
@@ -45,6 +46,7 @@ describe("API route health budgets", () => {
     { path: "search/workspaceSearch.ts", maxLines: 60 },
     { path: "search/workspaceSearchSources.ts", maxLines: 290 },
     { path: "search/searchScoring.ts", maxLines: 40 },
+    { path: "search/searchLimit.ts", maxLines: 30 },
     { path: "search/searchQuery.ts", maxLines: 30 },
     { path: "search/searchRouting.ts", maxLines: 20 },
     { path: "search/searchTypes.ts", maxLines: 40 }

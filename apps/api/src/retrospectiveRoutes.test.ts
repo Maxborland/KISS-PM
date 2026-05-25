@@ -15,6 +15,49 @@ import { createApp } from "./app";
 import type { ApiTenantDataSource, AuditEventListItem, ProjectRecord } from "./apiTypes";
 
 describe("retrospective routes", () => {
+  it("rejects malformed route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+    const actionHeaders = { "x-kiss-pm-action": "same-origin" };
+
+    const read = await app.request("/api/workspace/projects/bad..project/closure");
+    const preview = await app.request(
+      "/api/workspace/projects/bad..project/closure/preview",
+      { method: "POST", headers: actionHeaders }
+    );
+    const close = await app.request("/api/workspace/projects/bad..project/closure/close", {
+      method: "POST",
+      headers: actionHeaders
+    });
+    const lessons = await app.request(
+      "/api/workspace/projects/bad..project/closure/lessons",
+      { method: "POST", headers: actionHeaders }
+    );
+    const badProjectApply = await app.request(
+      "/api/workspace/projects/bad..project/closure/template-improvement-actions/template-improvement-550e8400-e29b-41d4-a716-446655440000/apply",
+      { method: "POST", headers: actionHeaders }
+    );
+    const badActionApply = await app.request(
+      "/api/workspace/projects/project-alpha/closure/template-improvement-actions/bad..action/apply",
+      { method: "POST", headers: actionHeaders }
+    );
+    const insights = await app.request(
+      "/api/tenant/current/project-templates/bad..template/retrospective-insights"
+    );
+
+    for (const response of [read, preview, close, lessons, badProjectApply]) {
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "invalid_project_id" });
+    }
+    expect(badActionApply.status).toBe(400);
+    await expect(badActionApply.json()).resolves.toEqual({
+      error: "invalid_template_improvement_action_id"
+    });
+    expect(insights.status).toBe(400);
+    await expect(insights.json()).resolves.toEqual({
+      error: "invalid_project_template_id"
+    });
+  });
+
   it("previews and closes an active project with snapshot, lessons, template action and audit", async () => {
     const state = createRetrospectiveDataSource();
     const app = createApp({ dataSource: state.dataSource });
@@ -149,7 +192,7 @@ describe("retrospective routes", () => {
     const app = createApp({ dataSource: state.dataSource });
 
     const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     const previewResponse = await app.request(
       "/api/workspace/projects/project-alpha/closure/preview",
@@ -207,7 +250,7 @@ describe("retrospective routes", () => {
     const app = createApp({ dataSource: state.dataSource });
 
     const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(readResponse.status).toBe(501);
     await expect(readResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
@@ -301,7 +344,7 @@ describe("retrospective routes", () => {
 
     const insightsResponse = await app.request(
       "/api/tenant/current/project-templates/template-alpha/retrospective-insights",
-      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+      { headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } }
     );
     expect(insightsResponse.status).toBe(200);
     await expect(insightsResponse.json()).resolves.toMatchObject({
@@ -435,7 +478,7 @@ describe("retrospective routes", () => {
     expect(lessonResponse.status).toBe(500);
     state.failAuditActionTypes.clear();
     const readResponse = await app.request("/api/workspace/projects/project-alpha/closure", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(readResponse.status).toBe(200);
     const readBody = (await readResponse.json()) as RetrospectiveReadModel;
@@ -612,7 +655,7 @@ function createRetrospectiveDataSource(
 function mutationHeaders() {
   return {
     "content-type": "application/json",
-    cookie: "kiss_pm_session=session-alpha",
+    cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "x-kiss-pm-action": "same-origin"
   };
 }

@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { Hono } from "hono";
 import {
   isTrustedBrowserMutationRequest,
+  setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
 
 describe("request security helpers", () => {
+  it("sets a browser security header baseline for API responses", async () => {
+    const app = new Hono();
+    app.get("/headers", (context) => {
+      setApiSecurityHeaders(context);
+      return context.json({ ok: true });
+    });
+
+    const response = await app.request("/headers");
+
+    expect(response.headers.get("content-security-policy")).toBe(
+      "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+    );
+    expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
+    expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("x-permitted-cross-domain-policies")).toBe("none");
+  });
+
   it("accepts same-origin browser mutations", () => {
     const request = new Request("http://127.0.0.1:4000/api/workspace/users", {
       method: "POST",
@@ -49,8 +70,18 @@ describe("request security helpers", () => {
     expect(
       trustedMutationOriginsFromEnv({
         NODE_ENV: "production",
-        KISS_PM_TRUSTED_MUTATION_ORIGINS: "https://pm.example.com"
+        KISS_PM_TRUSTED_MUTATION_ORIGINS: "https://pm.example.com/"
       })
     ).toEqual(["https://pm.example.com"]);
+  });
+
+  it("normalizes trusted origins from env and ignores invalid origin shapes", () => {
+    expect(
+      trustedMutationOriginsFromEnv({
+        NODE_ENV: "production",
+        KISS_PM_TRUSTED_MUTATION_ORIGINS:
+          " https://pm.example.com:443/ , javascript:alert(1), https://user:pass@pm.example.com, https://pm.example.com/app, https://app.example.com "
+      })
+    ).toEqual(["https://pm.example.com", "https://app.example.com"]);
   });
 });

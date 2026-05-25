@@ -12,12 +12,22 @@ import type {
 } from "./apiTypes";
 import { serializeAttachment } from "./attachmentSerialization";
 import {
+  parseContentLength,
+  parseMultipartContentType,
+  readBoundedMultipartRequest,
+  toArrayBuffer
+} from "./attachmentUploadRequest";
+import {
+  parseAttachmentEntityId,
   parseAttachmentEntityType,
+  parseAttachmentId,
   parseConnectorType,
+  parseExternalId,
   parseExternalReferenceUrl,
   parseMetadata,
   parseMimeType,
   parsePositiveSize,
+  parseRelationType,
   parseReferenceTitle,
   sanitizeFileName
 } from "./attachmentValidation";
@@ -51,13 +61,13 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
 
     const entityType = parseAttachmentEntityType(context.req.query("entityType"));
     if (!entityType.ok) return context.json({ error: entityType.error }, 400);
-    const entityId = context.req.query("entityId")?.trim();
-    if (!entityId) return context.json({ error: "attachment_entity_id_required" }, 400);
+    const entityId = parseAttachmentEntityId(context.req.query("entityId"));
+    if (!entityId.ok) return context.json({ error: entityId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
     const result = await attachmentWorkspace.listAttachments({
       actor,
-      entityId,
+      entityId: entityId.value,
       entityType: entityType.value,
       profile
     });
@@ -89,9 +99,13 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!actor) return context.json({ error: "session_required" }, 401);
 
     const contentLength = parseContentLength(context.req.header("content-length"));
-    if (contentLength !== null && contentLength > maxMultipartEnvelopeBytes) {
+    if (!contentLength.ok) return context.json({ error: contentLength.error }, 400);
+    if (contentLength.value !== null && contentLength.value > maxMultipartEnvelopeBytes) {
       return context.json({ error: "file_too_large" }, 413);
     }
+
+    const contentType = parseMultipartContentType(context.req.header("content-type"));
+    if (!contentType.ok) return context.json({ error: contentType.error }, 415);
 
     const boundedRequest = await readBoundedMultipartRequest(
       context.req.raw,
@@ -117,11 +131,13 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
   app.delete("/api/workspace/attachments/:attachmentId", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+    const attachmentId = parseAttachmentId(context.req.param("attachmentId"));
+    if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
     const result = await attachmentWorkspace.archiveAttachment({
       actor,
-      attachmentId: context.req.param("attachmentId"),
+      attachmentId: attachmentId.value,
       profile
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
@@ -131,11 +147,13 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
   app.get("/api/workspace/attachments/:attachmentId/download", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+    const attachmentId = parseAttachmentId(context.req.param("attachmentId"));
+    if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
     const result = await attachmentWorkspace.prepareDownload({
       actor,
-      attachmentId: context.req.param("attachmentId"),
+      attachmentId: attachmentId.value,
       profile
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
@@ -176,8 +194,10 @@ async function parseUploadForm(request: Request): Promise<
   }
   const entityType = parseAttachmentEntityType(form.get("entityType"));
   if (!entityType.ok) return { ok: false, status: 400, error: entityType.error };
-  const entityId = String(form.get("entityId") ?? "").trim();
-  if (!entityId) return { ok: false, status: 400, error: "attachment_entity_id_required" };
+  const entityId = parseAttachmentEntityId(form.get("entityId"));
+  if (!entityId.ok) return { ok: false, status: 400, error: entityId.error };
+  const relationType = parseRelationType(form.get("relationType"));
+  if (!relationType.ok) return { ok: false, status: 400, error: relationType.error };
   const file = form.get("file");
   if (!isUploadFile(file)) return { ok: false, status: 400, error: "file_required" };
 
@@ -203,8 +223,8 @@ async function parseUploadForm(request: Request): Promise<
     ok: true,
     value: {
       entityType: entityType.value,
-      entityId,
-      relationType: parseRelationType(form.get("relationType")),
+      entityId: entityId.value,
+      relationType: relationType.value,
       originalName: file.name,
       safeDisplayName: originalName.value,
       mimeType: mimeType.value,
@@ -229,29 +249,31 @@ function parseExternalReferenceBody(value: unknown): {
   const body = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const entityType = parseAttachmentEntityType(body.entityType);
   if (!entityType.ok) return entityType;
-  const entityId = typeof body.entityId === "string" ? body.entityId.trim() : "";
-  if (!entityId) return { ok: false, error: "attachment_entity_id_required" };
+  const entityId = parseAttachmentEntityId(body.entityId);
+  if (!entityId.ok) return entityId;
   const connectorType = parseConnectorType(body.connectorType);
   if (!connectorType.ok) return connectorType;
+  const externalId = parseExternalId(body.externalId);
+  if (!externalId.ok) return externalId;
   const url = parseExternalReferenceUrl(body.url);
   if (!url.ok) return url;
   const title = parseReferenceTitle(body.title);
   if (!title.ok) return title;
   const metadata = parseMetadata(body.metadata);
   if (!metadata.ok) return metadata;
+  const relationType = parseRelationType(body.relationType);
+  if (!relationType.ok) return relationType;
   return {
     ok: true,
     value: {
       entityType: entityType.value,
-      entityId,
+      entityId: entityId.value,
       connectorType: connectorType.value,
-      externalId: typeof body.externalId === "string" && body.externalId.trim()
-        ? body.externalId.trim().slice(0, 240)
-        : null,
+      externalId: externalId.value,
       url: url.value,
       title: title.value,
       metadata: metadata.value,
-      relationType: parseRelationType(body.relationType)
+      relationType: relationType.value
     }
   };
 }
@@ -267,61 +289,6 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
   );
 }
 
-function parseRelationType(value: unknown): string {
-  const relationType = typeof value === "string" ? value.trim() : "";
-  return relationType ? relationType.slice(0, 80) : "attachment";
-}
-
 function escapeDownloadName(value: string): string {
   return value.replace(/["\\\r\n]/g, "_");
-}
-
-function parseContentLength(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-export async function readBoundedMultipartRequest(
-  request: Request,
-  maxBytes: number
-): Promise<
-  | { ok: true; request: Request }
-  | { ok: false; status: 413; error: "file_too_large" }
-> {
-  if (!request.body) return { ok: true, request };
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined);
-      return { ok: false, status: 413, error: "file_too_large" };
-    }
-    chunks.push(value);
-  }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return {
-    ok: true,
-    request: new Request(request.url, {
-      body: toArrayBuffer(bytes),
-      headers: request.headers,
-      method: request.method
-    })
-  };
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }

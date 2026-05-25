@@ -17,7 +17,8 @@ describe("planning API route health budgets", () => {
     { path: "planningReadModel.ts", maxLines: 140 },
     { path: "planningCommandCore.ts", maxLines: 90 },
     { path: "planningScenarioIntegrity.ts", maxLines: 120 },
-    { path: "planningRouteAuth.ts", maxLines: 50 }
+    { path: "planningRouteAuth.ts", maxLines: 50 },
+    { path: "planningSavedViewRoutes.ts", maxLines: 120 }
   ])("$path stays within line budget", ({ path, maxLines }) => {
     expect(lineCount(path), `${path} should be ≤ ${maxLines} lines`).toBeLessThanOrEqual(maxLines);
   });

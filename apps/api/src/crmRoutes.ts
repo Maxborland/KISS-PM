@@ -26,6 +26,13 @@ import {
   parseProjectTypeBody
 } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
+import {
+  parseClientIdParam,
+  parseContactIdParam,
+  parseDealStageIdParam,
+  parseProductIdParam,
+  parseProjectTypeIdParam
+} from "./routeParamParsers";
 
 type CrmRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -119,6 +126,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.patch("/api/workspace/clients/:clientId", async (context) => {
+    const parsedClientId = parseClientIdParam(context.req.param("clientId"));
+    if (!parsedClientId.ok) {
+      return context.json({ error: parsedClientId.error }, 400);
+    }
+
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -135,7 +147,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    const clientId = context.req.param("clientId");
+    const clientId = parsedClientId.value;
     if (!decision.allowed) {
       await appendDeniedAudit({
         actor,
@@ -258,6 +270,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.patch("/api/workspace/contacts/:contactId", async (context) => {
+    const parsedContactId = parseContactIdParam(context.req.param("contactId"));
+    if (!parsedContactId.ok) {
+      return context.json({ error: parsedContactId.error }, 400);
+    }
+
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -275,7 +292,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    const contactId = context.req.param("contactId");
+    const contactId = parsedContactId.value;
     if (!decision.allowed) {
       await appendDeniedAudit({
         actor,
@@ -398,6 +415,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.patch("/api/workspace/products/:productId", async (context) => {
+    const parsedProductId = parseProductIdParam(context.req.param("productId"));
+    if (!parsedProductId.ok) {
+      return context.json({ error: parsedProductId.error }, 400);
+    }
+
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -414,7 +436,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    const productId = context.req.param("productId");
+    const productId = parsedProductId.value;
     if (!decision.allowed) {
       await appendDeniedAudit({
         actor,
@@ -534,6 +556,13 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.patch("/api/workspace/project-types/:projectTypeId", async (context) => {
+    const parsedProjectTypeId = parseProjectTypeIdParam(
+      context.req.param("projectTypeId")
+    );
+    if (!parsedProjectTypeId.ok) {
+      return context.json({ error: parsedProjectTypeId.error }, 400);
+    }
+
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -550,7 +579,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    const projectTypeId = context.req.param("projectTypeId");
+    const projectTypeId = parsedProjectTypeId.value;
     if (!decision.allowed) {
       await appendDeniedAudit({
         actor,
@@ -671,6 +700,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.patch("/api/workspace/deal-stages/:stageId", async (context) => {
+    const parsedStageId = parseDealStageIdParam(context.req.param("stageId"));
+    if (!parsedStageId.ok) {
+      return context.json({ error: parsedStageId.error }, 400);
+    }
+
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -687,7 +721,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    const stageId = context.req.param("stageId");
+    const stageId = parsedStageId.value;
     if (!decision.allowed) {
       await appendDeniedAudit({
         actor,

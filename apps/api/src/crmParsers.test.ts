@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { parseProductBody } from "./crmParsers";
+import {
+  parseClientBody,
+  parseContactBody,
+  parseDealStageBody,
+  parseProductBody,
+  parseProjectTypeBody
+} from "./crmParsers";
 
 describe("crm parsers", () => {
   it("normalizes product input for the current tenant", () => {
@@ -59,5 +65,99 @@ describe("crm parsers", () => {
         "tenant-alpha"
       )
     ).toEqual({ ok: false, error: "invalid_product_type" });
+  });
+
+  it("rejects control characters in CRM display fields before persistence", () => {
+    expect(
+      parseClientBody(
+        {
+          id: "client-acme",
+          name: "ACME\nInjected",
+          status: "active"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_client_name" });
+
+    expect(
+      parseContactBody(
+        {
+          id: "contact-main",
+          clientId: "client-acme",
+          name: "Иван",
+          email: "ivan@example.com",
+          phone: "+7\u0000123",
+          status: "active"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_contact_phone" });
+
+    expect(
+      parseProductBody(
+        {
+          id: "product-implementation",
+          name: "Внедрение",
+          sku: "KISS\nIMPL",
+          type: "service",
+          unit: "час",
+          price: 6000
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_product_sku" });
+
+    expect(
+      parseProjectTypeBody(
+        {
+          id: "project-type-implementation",
+          name: "Внедрение",
+          description: "Безопасное описание\u0000"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_description" });
+
+    expect(
+      parseDealStageBody(
+        {
+          id: "deal-stage-new",
+          name: "Новая\tстадия",
+          sortOrder: 1,
+          status: "active"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_deal_stage_name" });
+  });
+
+  it("normalizes contact email casing while preserving safe CRM text", () => {
+    expect(
+      parseContactBody(
+        {
+          id: "contact-main",
+          clientId: "client-acme",
+          name: " Иван ",
+          email: " IVAN@EXAMPLE.COM ",
+          phone: "+7 900 000-00-00",
+          role: "Заказчик",
+          status: "active"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({
+      ok: true,
+      value: {
+        id: "contact-main",
+        tenantId: "tenant-alpha",
+        clientId: "client-acme",
+        name: "Иван",
+        email: "ivan@example.com",
+        phone: "+7 900 000-00-00",
+        telegram: null,
+        role: "Заказчик",
+        status: "active"
+      }
+    });
   });
 });

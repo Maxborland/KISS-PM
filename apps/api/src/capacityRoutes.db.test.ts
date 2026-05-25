@@ -320,6 +320,20 @@ describe("capacity API routes", () => {
     );
     expect(drilldown.status).toBe(400);
     expect(await drilldown.json()).toEqual({ error: "capacity_invalid_query" });
+
+    const malformedProjectFilter = await app.request(
+      "/api/workspace/capacity/tree?monthIso=2026-06&projectId=bad..project",
+      { headers: { cookie } }
+    );
+    expect(malformedProjectFilter.status).toBe(400);
+    expect(await malformedProjectFilter.json()).toEqual({ error: "capacity_invalid_query" });
+
+    const malformedResource = await app.request(
+      "/api/workspace/capacity/drilldown?monthIso=2026-06&resourceId=bad/resource&date=2026-06-02",
+      { headers: { cookie } }
+    );
+    expect(malformedResource.status).toBe(400);
+    expect(await malformedResource.json()).toEqual({ error: "capacity_invalid_query" });
   });
 
   it("rejects invalid and unreadable project filters instead of returning tenant-wide data", async () => {

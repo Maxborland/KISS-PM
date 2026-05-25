@@ -8,6 +8,48 @@ import type { ApiTenantDataSource } from "./apiTypes";
 import { registerSearchRoutes } from "./searchRoutes";
 
 describe("unified search routes", () => {
+  it("rejects malformed or oversized search filters before session and source lookup", async () => {
+    const app = new Hono();
+
+    registerSearchRoutes(app, {
+      dataSource: {
+        findTenantById: async () => {
+          throw new Error("findTenantById should not be called");
+        },
+        findUserById: async () => {
+          throw new Error("findUserById should not be called");
+        },
+        listDevUsers: async () => {
+          throw new Error("listDevUsers should not be called");
+        },
+        listProjects: async () => {
+          throw new Error("listProjects should not be called");
+        },
+        listUsersByTenantId: async () => {
+          throw new Error("listUsersByTenantId should not be called");
+        }
+      } satisfies ApiTenantDataSource,
+      getActorProfile: async () => {
+        throw new Error("getActorProfile should not be called");
+      },
+      getSessionActorFromHeaders: async () => {
+        throw new Error("getSessionActorFromHeaders should not be called");
+      }
+    });
+
+    const oversizedQuery = await app.request(`/api/workspace/search?q=${"a".repeat(121)}`);
+    expect(oversizedQuery.status).toBe(400);
+    await expect(oversizedQuery.json()).resolves.toEqual({ error: "search_query_invalid" });
+
+    const invalidTypes = await app.request("/api/workspace/search?q=crm&types=project,../../secret");
+    expect(invalidTypes.status).toBe(400);
+    await expect(invalidTypes.json()).resolves.toEqual({ error: "search_types_invalid" });
+
+    const invalidLimit = await app.request("/api/workspace/search?q=crm&limit=20.5");
+    expect(invalidLimit.status).toBe(400);
+    await expect(invalidLimit.json()).resolves.toEqual({ error: "search_limit_invalid" });
+  });
+
   it("filters project tasks before applying the source limit", async () => {
     const app = new Hono();
     const actor = {
@@ -43,7 +85,7 @@ describe("unified search routes", () => {
     });
 
     const response = await app.request("/api/workspace/search?q=договор&limit=1", {
-      headers: { cookie: "kiss_pm_session=test" }
+      headers: { cookie: "kiss_pm_session=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }
     });
 
     expect(response.status).toBe(200);

@@ -12,6 +12,51 @@ import { createApp } from "./app";
 import type { ApiTenantDataSource, AuditEventListItem } from "./apiTypes";
 
 describe("control surface routes", () => {
+  it("rejects malformed includeArchived query before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const response = await app.request("/api/tenant/current/control-surfaces?includeArchived=1");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "invalid_include_archived" });
+  });
+
+  it("rejects malformed control surface route identifiers before session and persistence lookup", async () => {
+    const app = createApp();
+
+    const detailResponse = await app.request("/api/tenant/current/control-surfaces/bad..surface");
+    expect(detailResponse.status).toBe(400);
+    await expect(detailResponse.json()).resolves.toEqual({ error: "invalid_control_surface_id" });
+
+    const previewResponse = await app.request("/api/tenant/current/control-surfaces/bad..surface/preview", {
+      method: "POST",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(previewResponse.status).toBe(400);
+    await expect(previewResponse.json()).resolves.toEqual({ error: "invalid_control_surface_id" });
+
+    const publishResponse = await app.request("/api/tenant/current/control-surfaces/bad..surface/publish", {
+      method: "POST",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(publishResponse.status).toBe(400);
+    await expect(publishResponse.json()).resolves.toEqual({ error: "invalid_control_surface_id" });
+
+    const rollbackResponse = await app.request("/api/tenant/current/control-surfaces/bad..surface/rollback", {
+      method: "POST",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(rollbackResponse.status).toBe(400);
+    await expect(rollbackResponse.json()).resolves.toEqual({ error: "invalid_control_surface_id" });
+
+    const archiveResponse = await app.request("/api/tenant/current/control-surfaces/bad..surface", {
+      method: "DELETE",
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(archiveResponse.status).toBe(400);
+    await expect(archiveResponse.json()).resolves.toEqual({ error: "invalid_control_surface_id" });
+  });
+
   it("saves, previews, publishes and rolls back a versioned surface with audit", async () => {
     const state = createSurfaceDataSource();
     const app = createApp({ dataSource: state.dataSource });
@@ -91,7 +136,7 @@ describe("control surface routes", () => {
     const app = createApp({ dataSource: state.dataSource });
 
     const presetsResponse = await app.request("/api/tenant/current/control-surfaces/presets", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(presetsResponse.status).toBe(200);
     const presetsBody = (await presetsResponse.json()) as {
@@ -123,14 +168,14 @@ describe("control surface routes", () => {
     await expect(draftSaveResponse.json()).resolves.toEqual({ error: "control_surface_archived" });
 
     const listResponse = await app.request("/api/tenant/current/control-surfaces", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(listResponse.status).toBe(200);
     await expect(listResponse.json()).resolves.toEqual({ surfaces: [] });
 
     const archivedListResponse = await app.request(
       "/api/tenant/current/control-surfaces?includeArchived=true",
-      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+      { headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } }
     );
     expect(archivedListResponse.status).toBe(200);
     await expect(archivedListResponse.json()).resolves.toMatchObject({
@@ -177,7 +222,7 @@ describe("control surface routes", () => {
     await expect(rollback.json()).resolves.toEqual({ error: "control_surface_archived" });
     expect(state.auditEvents.map((event) => event.actionType)).toContain("control_surface.rollback_conflict");
     const archivedList = await app.request("/api/tenant/current/control-surfaces?includeArchived=true", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     await expect(archivedList.json()).resolves.toMatchObject({
       surfaces: [expect.objectContaining({ id: definition.id, status: "archived" })]
@@ -233,18 +278,36 @@ describe("control surface routes", () => {
     ]);
   });
 
+  it("fails closed before saving a draft when success audit cannot be transactional", async () => {
+    const state = createSurfaceDataSource();
+    delete state.dataSource.withTransaction;
+    const app = createApp({ dataSource: state.dataSource });
+    const definition = createDefinition({ id: "surface-audit-required" });
+
+    const response = await app.request("/api/tenant/current/control-surfaces", {
+      method: "POST",
+      headers: mutationHeaders(),
+      body: JSON.stringify({ definition })
+    });
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "persistence_not_configured" });
+    await expect(state.dataSource.findControlSurface?.("tenant-alpha", definition.id)).resolves.toBeUndefined();
+    expect(state.auditEvents).toHaveLength(0);
+  });
+
   it("requires read permission and separately blocks publish without publish permission", async () => {
     const noReadState = createSurfaceDataSource({ permissions: [] });
     const noReadApp = createApp({ dataSource: noReadState.dataSource });
 
     const listResponse = await noReadApp.request("/api/tenant/current/control-surfaces", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     const presetsResponse = await noReadApp.request("/api/tenant/current/control-surfaces/presets", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     const detailResponse = await noReadApp.request("/api/tenant/current/control-surfaces/surface-delivery", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(listResponse.status).toBe(403);
     expect(presetsResponse.status).toBe(403);
@@ -307,14 +370,14 @@ describe("control surface routes", () => {
     });
 
     const listResponse = await app.request("/api/tenant/current/control-surfaces", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(listResponse.status).toBe(200);
     await expect(listResponse.json()).resolves.toEqual({ surfaces: [] });
 
     const detailResponse = await app.request(
       `/api/tenant/current/control-surfaces/${publishedDefinition.id}`,
-      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+      { headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } }
     );
     expect(detailResponse.status).toBe(404);
     await expect(detailResponse.json()).resolves.toEqual({ error: "control_surface_not_found" });
@@ -349,7 +412,7 @@ describe("control surface routes", () => {
     });
 
     const listResponse = await app.request("/api/tenant/current/control-surfaces", {
-      headers: { cookie: "kiss_pm_session=session-alpha" }
+      headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
     });
     expect(listResponse.status).toBe(200);
     const listBody = (await listResponse.json()) as { surfaces: Array<Record<string, unknown>> };
@@ -366,7 +429,7 @@ describe("control surface routes", () => {
 
     const detailResponse = await app.request(
       `/api/tenant/current/control-surfaces/${publishedDefinition.id}`,
-      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+      { headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } }
     );
     expect(detailResponse.status).toBe(200);
     const detailBody = (await detailResponse.json()) as {
@@ -382,7 +445,7 @@ describe("control surface routes", () => {
 
     const draftDetailResponse = await app.request(
       "/api/tenant/current/control-surfaces/surface-draft-only",
-      { headers: { cookie: "kiss_pm_session=session-alpha" } }
+      { headers: { cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } }
     );
     expect(draftDetailResponse.status).toBe(404);
     await expect(draftDetailResponse.json()).resolves.toEqual({ error: "control_surface_not_found" });
@@ -589,7 +652,7 @@ function createSurfaceDataSource(input: { permissions?: AccessProfile["permissio
 function mutationHeaders() {
   return {
     "content-type": "application/json",
-    cookie: "kiss_pm_session=session-alpha",
+    cookie: "kiss_pm_session=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "x-kiss-pm-action": "same-origin"
   };
 }

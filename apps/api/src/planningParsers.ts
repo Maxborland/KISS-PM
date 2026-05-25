@@ -44,6 +44,10 @@ const constraintTypes = [
   "must_start_on",
   "must_finish_on"
 ] as const;
+const maxPlanningStringLength = 500;
+const maxTaskCustomFieldKeyLength = 120;
+const maxTaskCustomFieldValueLength = 500;
+const unsafeObjectKeys = new Set(["__proto__", "prototype", "constructor"]);
 
 export function parsePlanningCommandEnvelope(input: unknown): PlanningCommandEnvelopeParseResult {
   if (!isObject(input)) return { ok: false, error: "planning_command_invalid" };
@@ -108,11 +112,13 @@ export function parseScenarioApplyEnvelope(input: unknown):
   if (clientPlanVersion === null || clientPlanVersion < 1) {
     return { ok: false, error: "planning_scenario_invalid" };
   }
+  const acceptedRiskReason = parseOptionalBoundedString(input, "acceptedRiskReason");
+  if (!acceptedRiskReason.ok) return { ok: false, error: "planning_scenario_invalid" };
   return {
     ok: true,
     value: {
       clientPlanVersion,
-      acceptedRiskReason: getOptionalString(input, "acceptedRiskReason")
+      acceptedRiskReason: acceptedRiskReason.value
     }
   };
 }
@@ -310,11 +316,12 @@ export function parsePlanningCommand(input: unknown):
     }
     case "task.update_custom_field": {
       const taskId = getString(payload, "taskId");
-      const fieldKey = getString(payload, "fieldKey");
-      if (!taskId || !fieldKey) return { ok: false, error: "planning_command_invalid" };
+      const fieldKey = parseTaskCustomFieldKey(payload.fieldKey);
+      const value = parseTaskCustomFieldValue(payload.value);
+      if (!taskId || !fieldKey || !value.ok) return { ok: false, error: "planning_command_invalid" };
       return {
         ok: true,
-        value: { type, payload: { taskId, fieldKey, value: payload.value } }
+        value: { type, payload: { taskId, fieldKey, value: value.value } }
       };
     }
     default:
@@ -385,9 +392,7 @@ function parseScenarioTarget(input: Record<string, unknown>):
   ) {
     return { ok: false, error: "planning_scenario_invalid" };
   }
-  const taskIds = input.taskIds.map((item) =>
-    typeof item === "string" && item.trim().length > 0 ? item.trim() : null
-  );
+  const taskIds = input.taskIds.map((item) => parseBoundedString(item));
   if (taskIds.some((taskId) => taskId === null)) {
     return { ok: false, error: "planning_scenario_invalid" };
   }
@@ -408,14 +413,27 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function getString(input: Record<string, unknown>, key: string): string | null {
-  const value = input[key];
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return parseBoundedString(input[key]);
 }
 
 function getOptionalString(input: Record<string, unknown>, key: string): string | null {
   const value = input[key];
   if (value === null || value === undefined) return null;
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return parseBoundedString(value);
+}
+
+function parseOptionalBoundedString(input: Record<string, unknown>, key: string):
+  | { ok: true; value: string | null }
+  | { ok: false } {
+  if (!(key in input) || input[key] === null || input[key] === undefined) {
+    return { ok: true, value: null };
+  }
+  if (typeof input[key] !== "string") return { ok: false };
+  const raw = input[key];
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { ok: true, value: null };
+  const value = parseBoundedString(raw);
+  return value === null ? { ok: false } : { ok: true, value };
 }
 
 function parseCommandEnvelopeFields(input: Record<string, unknown>):
@@ -494,4 +512,43 @@ function isTaskType(value: string | null): value is TaskType {
 
 function isConstraintType(value: string | null): value is PlanConstraintType {
   return constraintTypes.includes(value as PlanConstraintType);
+}
+
+function parseBoundedString(value: unknown, maxLength: number = maxPlanningStringLength): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > maxLength || hasUnsafeSingleLineControl(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+function parseTaskCustomFieldKey(value: unknown): string | null {
+  const key = parseBoundedString(value, maxTaskCustomFieldKeyLength);
+  if (key === null || unsafeObjectKeys.has(key) || !/^[A-Za-z0-9_-]+$/.test(key)) return null;
+  return key;
+}
+
+function parseTaskCustomFieldValue(value: unknown):
+  | { ok: true; value: string | number | boolean | null }
+  | { ok: false } {
+  if (value === null || typeof value === "boolean") return { ok: true, value };
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? { ok: true, value } : { ok: false };
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (
+      normalized.length > maxTaskCustomFieldValueLength ||
+      hasUnsafeSingleLineControl(normalized)
+    ) {
+      return { ok: false };
+    }
+    return { ok: true, value: normalized };
+  }
+  return { ok: false };
+}
+
+function hasUnsafeSingleLineControl(value: string): boolean {
+  return /[\u0000-\u001f\u007f]/.test(value);
 }
