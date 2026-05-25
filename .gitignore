@@ -7,6 +7,8 @@ coverage/
 playwright-report/
 test-results/
 .playwright-mcp/
+.codegraph/
+.cursor/
 .env
 .env.*
 !.env.example

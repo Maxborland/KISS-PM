@@ -8,12 +8,17 @@ type JsonBodyReadResult =
   | {
       ok: false;
       status: 400;
-      error: "invalid_json";
+      error: "invalid_json" | "invalid_content_length";
     }
   | {
       ok: false;
       status: 413;
       error: "payload_too_large";
+    }
+  | {
+      ok: false;
+      status: 415;
+      error: "unsupported_media_type";
     };
 
 export async function readLimitedJsonBody(
@@ -21,13 +26,18 @@ export async function readLimitedJsonBody(
   fallback: unknown = null,
   maxBytes: number = defaultMaxJsonBodyBytes
 ): Promise<JsonBodyReadResult> {
-  const contentLength = Number(context.req.raw.headers.get("content-length") ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+  const contentLength = parseContentLength(context.req.raw.headers.get("content-length"));
+  if (contentLength === null) return { ok: false, status: 400, error: "invalid_content_length" };
+  if (contentLength > maxBytes) {
     return { ok: false, status: 413, error: "payload_too_large" };
   }
 
   const body = context.req.raw.body;
   if (!body) return { ok: true, value: fallback };
+
+  if (!isJsonContentType(context.req.raw.headers.get("content-type"))) {
+    return { ok: false, status: 415, error: "unsupported_media_type" };
+  }
 
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -53,4 +63,19 @@ export async function readLimitedJsonBody(
   } catch {
     return { ok: false, status: 400, error: "invalid_json" };
   }
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (value === null || value === "") return 0;
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  return Number(normalized);
+}
+
+function isJsonContentType(contentType: string | null): boolean {
+  const mediaType = contentType?.split(";")[0]?.trim().toLowerCase();
+  return (
+    mediaType === "application/json" ||
+    Boolean(mediaType?.startsWith("application/") && mediaType.endsWith("+json"))
+  );
 }

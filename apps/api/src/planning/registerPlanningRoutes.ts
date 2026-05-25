@@ -1,21 +1,17 @@
 import {
   canApplyPlanningScenarios,
-  canManageProjectPlan,
-  canPreviewPlanningScenarios,
-  canReadProjectPlan,
-  type AccessProfile
+  canPreviewPlanningScenarios
 } from "@kiss-pm/access-control";
 import { isBlockingValidationIssue, proposePlanningScenarios } from "@kiss-pm/domain";
-import type { TenantUser } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
 import { readLimitedJsonBody } from "../jsonBody";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
+import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
 import {
   parsePlanningCommandEnvelope,
   parsePlanningCommandBatchEnvelope,
@@ -30,9 +26,10 @@ import {
   appendPlanningAuditIfConfigured,
   auditActionForCommand,
   errorResponseBody,
-  getRequiredRouteParam,
-  getScenarioProposalId,
   hashJson,
+  parseProjectRouteParam,
+  parseScenarioProposalRouteParam,
+  serializeScenarioProposal,
   summarizeSnapshot,
   validateCommandDataSourcePreconditions,
   type PlanningRouteDeps
@@ -63,8 +60,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     getActorProfile: deps.getActorProfile
   });
   registerPlanningAutoSolverRoutes(app, deps);
+  registerPlanningSavedViewRoutes(app, deps);
 
   app.get("/api/workspace/projects/:projectId/planning/read-model", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.getPlanSnapshot) {
@@ -75,13 +76,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const decision = canReadPlanningReadModel({ actor, profile });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, context.req.param("projectId"));
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
 
     return context.json(createPlanningReadModel(snapshot));
   });
 
   app.post("/api/workspace/projects/:projectId/planning/preview-command", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.getPlanSnapshot) {
@@ -110,7 +114,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, 403);
     }
 
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, context.req.param("projectId"));
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
       return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
@@ -142,6 +146,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/planning/apply-command", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.appendAuditEvent) {
@@ -161,7 +168,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         actionType: "planning.command_denied",
         sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: context.req.param("projectId") },
+        sourceEntity: { type: "Project", id: parsedProjectId.value },
         commandInput: { command: parsed.value.command },
         beforeState: null,
         afterState: null,
@@ -177,7 +184,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         actionType: "planning.command_denied",
         sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: context.req.param("projectId") },
+        sourceEntity: { type: "Project", id: parsedProjectId.value },
         commandInput: { command: parsed.value.command },
         beforeState: null,
         afterState: null,
@@ -204,7 +211,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
-      const projectId = context.req.param("projectId");
+      const projectId = parsedProjectId.value;
       await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
       const idempotencyKey = parsed.value.idempotencyKey;
       const requestHash = idempotencyKey
@@ -328,13 +335,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
     emitPlanVersionFromBody(
       actor.tenantId,
-      context.req.param("projectId"),
+      parsedProjectId.value,
       result.body as { newPlanVersion?: number }
     );
     return context.json(result.body);
   });
 
   app.post("/api/workspace/projects/:projectId/planning/apply-command-batch", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.appendAuditEvent) {
@@ -347,7 +357,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
     for (const command of parsed.value.commands) {
       const decision = permissionForCommand(command, actor, profile);
       if (!decision.allowed) {
@@ -503,6 +513,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
   if (process.env.KISS_PM_E2E_TEST_HOOKS === "1") {
     app.post("/api/workspace/projects/:projectId/planning/test/bump-plan-version", async (context) => {
+      const parsedProjectId = parseProjectRouteParam(context);
+      if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (!deps.dataSource.incrementPlanVersion) {
@@ -511,7 +524,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const profile = await deps.getActorProfile(actor);
       const readDecision = canReadPlanningReadModel({ actor, profile });
       if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
-      const projectId = context.req.param("projectId");
+      const projectId = parsedProjectId.value;
       const newPlanVersion = await deps.dataSource.incrementPlanVersion(actor.tenantId, projectId);
       notifyPlanVersionChanged(projectId, newPlanVersion);
       return context.json({ newPlanVersion });
@@ -519,6 +532,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   }
 
   app.get("/api/workspace/projects/:projectId/planning/baselines", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.getPlanSnapshot) {
@@ -527,7 +543,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, context.req.param("projectId"));
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     return context.json({
       baselines: snapshot.baselines.map((baseline) => ({
@@ -539,12 +555,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   });
 
   const previewScenarioProposals: Handler = async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
       !deps.dataSource.getPlanSnapshot ||
       !deps.dataSource.createPlanningScenarioRun ||
-      !deps.dataSource.appendAuditEvent
+      !deps.dataSource.appendAuditEvent ||
+      !deps.dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -569,7 +589,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, 403);
     }
 
-    const projectId = getRequiredRouteParam(context, "projectId");
+    const projectId = parsedProjectId.value;
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -584,38 +604,49 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       target: parsed.value.target
     });
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const persistedProposals = [];
-    for (const proposal of proposals) {
-      const runId = `planning-scenario-${randomUUID()}`;
-      const persistedProposal = { ...proposal, id: runId };
-      await deps.dataSource.createPlanningScenarioRun({
-        id: runId,
-        tenantId: actor.tenantId,
-        projectId,
-        planVersion: snapshot.planVersion,
-        engineVersion: PLANNING_ENGINE_VERSION,
-        targetConflict: parsed.value.target,
-        proposalPayload: persistedProposal as unknown as Record<string, unknown>,
-        proposalPayloadHash: hashJson(persistedProposal),
-        actorUserId: actor.id,
-        expiresAt
-      });
-      persistedProposals.push(persistedProposal);
-    }
-    await appendPlanningAuditIfConfigured(deps, {
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "planning.scenario.previewed",
-      sourceWorkflow: "planning",
-      sourceEntity: { type: "Project", id: projectId },
-      commandInput: { target: parsed.value.target },
-      beforeState: { planVersion: snapshot.planVersion },
-      afterState: {
-        proposalIds: persistedProposals.map((proposal) => proposal.id),
-        proposalCount: persistedProposals.length,
-        expiresAt: expiresAt.toISOString()
-      },
-      permissionResult: decision
+    const persistedProposals = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createPlanningScenarioRun || !transactionDataSource.appendAuditEvent) {
+        throw new Error("persistence_not_configured");
+      }
+      const transactionProposals = [];
+      for (const proposal of proposals) {
+        const runId = `planning-scenario-${randomUUID()}`;
+        const persistedProposal = { ...proposal, id: runId };
+        const proposalPayload = serializeScenarioProposal(persistedProposal);
+        await transactionDataSource.createPlanningScenarioRun({
+          id: runId,
+          tenantId: actor.tenantId,
+          projectId,
+          planVersion: snapshot.planVersion,
+          engineVersion: PLANNING_ENGINE_VERSION,
+          targetConflict: parsed.value.target,
+          proposalPayload,
+          proposalPayloadHash: hashJson(proposalPayload),
+          actorUserId: actor.id,
+          expiresAt
+        });
+        transactionProposals.push(persistedProposal);
+      }
+      await appendPlanningAuditIfConfigured(
+        deps,
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.scenario.previewed",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { target: parsed.value.target },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: {
+            proposalIds: transactionProposals.map((proposal) => proposal.id),
+            proposalCount: transactionProposals.length,
+            expiresAt: expiresAt.toISOString()
+          },
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+      return transactionProposals;
     });
 
     return context.json({
@@ -630,6 +661,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   app.post("/api/workspace/projects/:projectId/planning/scenario-proposals", previewScenarioProposals);
 
   const applyScenarioProposal: Handler = async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+    const parsedScenarioRunId = parseScenarioProposalRouteParam(context);
+    if (!parsedScenarioRunId.ok) return context.json({ error: parsedScenarioRunId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.appendAuditEvent) {
@@ -653,9 +689,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         actionType: "planning.scenario_denied",
         sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: getRequiredRouteParam(context, "projectId") },
+        sourceEntity: { type: "Project", id: parsedProjectId.value },
         commandInput: {
-          scenarioRunId: getScenarioProposalId(context),
+          scenarioRunId: parsedScenarioRunId.value,
           clientPlanVersion: parsed.value.clientPlanVersion
         },
         beforeState: null,
@@ -672,9 +708,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         actionType: "planning.scenario_denied",
         sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: getRequiredRouteParam(context, "projectId") },
+        sourceEntity: { type: "Project", id: parsedProjectId.value },
         commandInput: {
-          scenarioRunId: getScenarioProposalId(context),
+          scenarioRunId: parsedScenarioRunId.value,
           clientPlanVersion: parsed.value.clientPlanVersion
         },
         beforeState: null,
@@ -697,7 +733,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
-      const projectId = getRequiredRouteParam(context, "projectId");
+      const projectId = parsedProjectId.value;
       await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
@@ -713,7 +749,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const scenarioRun = await transactionDataSource.findPlanningScenarioRun(
         actor.tenantId,
         projectId,
-        getScenarioProposalId(context)
+        parsedScenarioRunId.value
       );
       if (!scenarioRun) return { ok: false as const, status: 404, error: "scenario_not_found" };
       if (scenarioRun.appliedAt) return { ok: false as const, status: 409, error: "planning_scenario_already_applied" };
@@ -836,7 +872,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
     emitPlanVersionFromBody(
       actor.tenantId,
-      getRequiredRouteParam(context, "projectId"),
+      parsedProjectId.value,
       result.body as { newPlanVersion?: number }
     );
     return context.json(result.body);
@@ -845,84 +881,4 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   app.post("/api/workspace/projects/:projectId/planning/scenarios/:scenarioId/apply", applyScenarioProposal);
   app.post("/api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply", applyScenarioProposal);
 
-  app.get("/api/workspace/projects/:projectId/planning/saved-views", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listSavedViews) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const readDecision = canReadProjectPlan({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
-
-    const projectId = context.req.param("projectId");
-    const views = await deps.dataSource.listSavedViews(actor.tenantId, projectId, actor.id);
-    return context.json({ savedViews: views });
-  });
-
-  app.post("/api/workspace/projects/:projectId/planning/saved-views", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.createSavedView) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageProjectPlan({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const record = body.value as Record<string, unknown>;
-    const name = typeof record.name === "string" ? record.name.trim() : "";
-    const scope = record.scope === "project" ? "project" : "user";
-    const payload =
-      record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
-        ? (record.payload as Record<string, unknown>)
-        : null;
-    if (!name || !payload) return context.json({ error: "saved_view_invalid" }, 400);
-
-    const projectId = context.req.param("projectId");
-    const view = await deps.dataSource.createSavedView({
-      id: `saved-view-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      projectId,
-      ownerUserId: actor.id,
-      scope,
-      name,
-      payload
-    });
-    return context.json({ savedView: view }, 201);
-  });
-
-  app.delete("/api/workspace/projects/:projectId/planning/saved-views/:viewId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.deleteSavedView) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageProjectPlan({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const deleted = await deps.dataSource.deleteSavedView(
-      actor.tenantId,
-      context.req.param("projectId"),
-      context.req.param("viewId"),
-      actor.id
-    );
-    if (!deleted) return context.json({ error: "saved_view_not_found" }, 404);
-    return context.json({ ok: true });
-  });
 }

@@ -15,12 +15,19 @@ import { randomUUID } from "node:crypto";
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import { parseUserIdParam } from "./routeParamParsers";
 
 type ProductionCalendarRouteDeps = {
   dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
-  appendManagementAuditEvent(input: ManagementAuditEventInput): Promise<string>;
+  runDataSourceTransaction<T>(
+    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+  ): Promise<T>;
+  appendManagementAuditEvent(
+    input: ManagementAuditEventInput,
+    auditDataSource?: ApiTenantDataSource
+  ): Promise<string>;
 };
 
 function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
@@ -32,7 +39,9 @@ function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
 
 function parseYear(value: string | undefined): number | null {
   if (!value) return new Date().getUTCFullYear();
-  const year = Number.parseInt(value, 10);
+  const normalized = value.trim();
+  if (!/^\d{4}$/.test(normalized)) return null;
+  const year = Number.parseInt(normalized, 10);
   if (!Number.isInteger(year) || year < 2000 || year > 2100) return null;
   return year;
 }
@@ -44,6 +53,7 @@ function parseBulkBody(input: unknown):
     return { ok: false, error: "production_calendar_invalid" };
   }
   const exceptions = (input as { exceptions: unknown[] }).exceptions;
+  if (exceptions.length > 500) return { ok: false, error: "production_calendar_invalid" };
   const items: TenantProductionCalendarBulkItem[] = [];
   for (const entry of exceptions) {
     if (!entry || typeof entry !== "object") return { ok: false, error: "production_calendar_invalid" };
@@ -51,23 +61,56 @@ function parseBulkBody(input: unknown):
     const id = typeof row.id === "string" && row.id.trim() ? row.id.trim() : randomUUID();
     const date = typeof row.date === "string" ? row.date.trim() : "";
     const workingMinutes = typeof row.workingMinutes === "number" ? row.workingMinutes : null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || workingMinutes === null || workingMinutes < 0) {
+    if (
+      !isSafeCalendarIdentifier(id) ||
+      !isValidCalendarDate(date) ||
+      workingMinutes === null ||
+      !Number.isInteger(workingMinutes) ||
+      workingMinutes < 0 ||
+      workingMinutes > 1_440
+    ) {
       return { ok: false, error: "production_calendar_invalid" };
     }
+    const resourceId = parseOptionalResourceId(row.resourceId);
+    if (resourceId === false) return { ok: false, error: "production_calendar_invalid" };
+    const reason = parseOptionalReason(row.reason);
+    if (reason === false) return { ok: false, error: "production_calendar_invalid" };
     items.push({
       id,
       date,
       workingMinutes,
-      reason: typeof row.reason === "string" ? row.reason : null,
-      resourceId:
-        row.resourceId === null || row.resourceId === undefined
-          ? null
-          : typeof row.resourceId === "string"
-            ? row.resourceId
-            : null
+      reason,
+      resourceId
     });
   }
   return { ok: true, value: items };
+}
+
+function isSafeCalendarIdentifier(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{2,119}$/.test(value);
+}
+
+function isValidCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function parseOptionalResourceId(value: unknown): string | null | false {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return false;
+  const parsed = parseUserIdParam(value.trim());
+  return parsed.ok ? parsed.value : false;
+}
+
+function parseOptionalReason(value: unknown): string | null | false {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return false;
+  const normalized = value.trim();
+  if (normalized.length > 240 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+    return false;
+  }
+  return normalized || null;
 }
 
 export function registerProductionCalendarRoutes(
@@ -75,10 +118,16 @@ export function registerProductionCalendarRoutes(
   deps: ProductionCalendarRouteDeps
 ) {
   app.get("/api/tenant/current/production-calendar", async (context) => {
+    const year = parseYear(context.req.query("year"));
+    if (year === null) return context.json({ error: "production_calendar_invalid" }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const db = resolveDb(deps.dataSource);
     if (!db) return context.json({ error: "persistence_not_configured" }, 501);
+    if (!deps.dataSource.withTransaction || !deps.dataSource.appendAuditEvent) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
     const profile = await deps.getActorProfile(actor);
     const decision = canReadWorkspaceConfig({
@@ -87,9 +136,6 @@ export function registerProductionCalendarRoutes(
       targetTenantId: actor.tenantId
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    const year = parseYear(context.req.query("year"));
-    if (year === null) return context.json({ error: "production_calendar_invalid" }, 400);
 
     const repository = createTenantProductionCalendarRepository(db);
     return context.json(await repository.getProductionCalendar(actor.tenantId, year));
@@ -114,22 +160,32 @@ export function registerProductionCalendarRoutes(
     const parsed = parseBulkBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const repository = createTenantProductionCalendarRepository(db);
-    await repository.bulkUpsertExceptions(actor.tenantId, parsed.value);
+    await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const transactionDb = resolveDb(transactionDataSource);
+      if (!transactionDb) {
+        throw new Error("transactional_production_calendar_not_configured");
+      }
+      const repository = createTenantProductionCalendarRepository(transactionDb);
+      await repository.bulkUpsertExceptions(actor.tenantId, parsed.value);
 
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.production_calendar.updated",
-      sourceWorkflow: "workspace_config",
-      sourceEntity: { type: "tenant_production_calendar", id: "tenant-default" },
-      commandInput: { exceptionCount: parsed.value.length },
-      beforeState: null,
-      afterState: { exceptionCount: parsed.value.length },
-      permissionResult: decision
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.production_calendar.updated",
+          sourceWorkflow: "workspace_config",
+          sourceEntity: { type: "tenant_production_calendar", id: "tenant-default" },
+          commandInput: { exceptionCount: parsed.value.length },
+          beforeState: null,
+          afterState: { exceptionCount: parsed.value.length },
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
     });
 
     invalidateCapacityCacheForTenant(actor.tenantId);
+    const repository = createTenantProductionCalendarRepository(db);
     const year = new Date().getUTCFullYear();
     return context.json(await repository.getProductionCalendar(actor.tenantId, year));
   });

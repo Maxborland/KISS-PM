@@ -14,7 +14,12 @@ export function parseCookie(cookieHeader: string | null): Record<string, string>
 }
 
 export function getSessionTokenFromCookie(cookieHeader: string | null) {
-  return parseCookie(cookieHeader)[sessionCookieName];
+  const token = parseCookie(cookieHeader)[sessionCookieName];
+  return isSessionToken(token) ? token : undefined;
+}
+
+function isSessionToken(value: string | undefined): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 }
 
 type CookieOptions = {
@@ -26,22 +31,24 @@ export function buildSessionCookieHeader(
   options: CookieOptions = {}
 ) {
   return appendSecureFlag(
-    `${sessionCookieName}=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${sessionTtlSeconds}`,
+    `${sessionCookieName}=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=${sessionTtlSeconds}`,
     options
   );
 }
 
 export function buildExpiredSessionCookieHeader(options: CookieOptions = {}) {
   return appendSecureFlag(
-    `${sessionCookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    `${sessionCookieName}=; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=0`,
     options
   );
 }
 
 export function shouldUseSecureCookies(
-  env: Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES">> = process.env
+  env: Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES" | "NODE_ENV">> = process.env
 ) {
-  return env.KISS_PM_SECURE_COOKIES === "true";
+  if (env.KISS_PM_SECURE_COOKIES === "true") return true;
+  if (env.KISS_PM_SECURE_COOKIES === "false") return false;
+  return env.NODE_ENV === "production";
 }
 
 function appendSecureFlag(header: string, options: CookieOptions) {

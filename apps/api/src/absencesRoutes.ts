@@ -16,13 +16,23 @@ import { randomUUID } from "node:crypto";
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import { parseAbsenceIdParam, parseUserIdParam } from "./routeParamParsers";
 
 type AbsencesRouteDeps = {
   dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
-  appendManagementAuditEvent(input: ManagementAuditEventInput): Promise<string>;
+  runDataSourceTransaction<T>(
+    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+  ): Promise<T>;
+  appendManagementAuditEvent(
+    input: ManagementAuditEventInput,
+    auditDataSource?: ApiTenantDataSource
+  ): Promise<string>;
 };
+
+const maxAbsenceReasonLength = 500;
+const maxAbsenceRangeDays = 370;
 
 function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
   if ("db" in dataSource && dataSource.db) {
@@ -32,8 +42,36 @@ function resolveDb(dataSource: ApiTenantDataSource): KissPmDatabase | null {
 }
 
 function parseIsoDate(value: string | undefined): string | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null;
-  return value.trim();
+  const normalized = value?.trim();
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+  const timestamp = isoDateToUtcDay(normalized);
+  if (timestamp === null) return null;
+  return normalized;
+}
+
+function isoDateToUtcDay(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return Math.floor(timestamp / 86_400_000);
+}
+
+function isValidAbsenceRange(fromDate: string, toDate: string): boolean {
+  const fromDay = isoDateToUtcDay(fromDate);
+  const toDay = isoDateToUtcDay(toDate);
+  if (fromDay === null || toDay === null || toDay < fromDay) return false;
+  return toDay - fromDay + 1 <= maxAbsenceRangeDays;
 }
 
 function isAbsenceType(value: string): value is ResourceAbsenceType {
@@ -56,7 +94,7 @@ function parseCreateBody(input: unknown):
     return { ok: false, error: "resource_absence_invalid" };
   }
   const row = input as Record<string, unknown>;
-  const userId = typeof row.userId === "string" ? row.userId.trim() : "";
+  const userId = parseUserIdParam(row.userId);
   const type = typeof row.type === "string" ? row.type.trim() : "";
   const dateFrom = typeof row.dateFrom === "string" ? row.dateFrom.trim() : "";
   const dateTo = typeof row.dateTo === "string" ? row.dateTo.trim() : "";
@@ -66,15 +104,24 @@ function parseCreateBody(input: unknown):
       : typeof row.reason === "string"
         ? row.reason.trim() || null
         : null;
-  if (!userId || !isAbsenceType(type) || !parseIsoDate(dateFrom) || !parseIsoDate(dateTo)) {
+  if (!userId.ok) {
+    return { ok: false, error: "invalid_user_id" };
+  }
+  if (!isAbsenceType(type) || !parseIsoDate(dateFrom) || !parseIsoDate(dateTo)) {
     return { ok: false, error: "resource_absence_invalid" };
   }
-  if (dateTo < dateFrom) {
+  if (!isValidAbsenceRange(dateFrom, dateTo)) {
     return { ok: false, error: "resource_absence_invalid_range" };
+  }
+  if (reason && (reason.length > maxAbsenceReasonLength || /[\u0000-\u001f\u007f]/.test(reason))) {
+    return { ok: false, error: "resource_absence_invalid" };
+  }
+  if (row.reason !== null && row.reason !== undefined && typeof row.reason !== "string") {
+    return { ok: false, error: "resource_absence_invalid" };
   }
   return {
     ok: true,
-    value: { userId, type, dateFrom, dateTo, reason }
+    value: { userId: userId.value, type, dateFrom, dateTo, reason }
   };
 }
 
@@ -84,6 +131,9 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
     if (!actor) return context.json({ error: "session_required" }, 401);
     const db = resolveDb(deps.dataSource);
     if (!db) return context.json({ error: "persistence_not_configured" }, 501);
+    if (!deps.dataSource.withTransaction || !deps.dataSource.appendAuditEvent) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
     const profile = await deps.getActorProfile(actor);
     const decision = canReadAbsences({
@@ -98,10 +148,22 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
     if (!fromDate || !toDate) {
       return context.json({ error: "resource_absence_invalid_range" }, 400);
     }
+    if (!isValidAbsenceRange(fromDate, toDate)) {
+      return context.json({ error: "resource_absence_invalid_range" }, 400);
+    }
 
-    const userId = context.req.query("userId")?.trim() || undefined;
+    const rawUserId = context.req.query("userId")?.trim() || undefined;
+    const userId = rawUserId ? parseUserIdParam(rawUserId) : undefined;
+    if (userId && !userId.ok) {
+      return context.json({ error: userId.error }, 400);
+    }
     const repository = createResourceAbsencesRepository(db);
-    const absences = await repository.listAbsences(actor.tenantId, fromDate, toDate, userId);
+    const absences = await repository.listAbsences(
+      actor.tenantId,
+      fromDate,
+      toDate,
+      userId?.value
+    );
     return context.json({ absences });
   });
 
@@ -124,28 +186,39 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
     const parsed = parseCreateBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const repository = createResourceAbsencesRepository(db);
-    const absence = await repository.createAbsence({
-      id: randomUUID(),
-      tenantId: actor.tenantId,
-      userId: parsed.value.userId,
-      type: parsed.value.type,
-      dateFrom: parsed.value.dateFrom,
-      dateTo: parsed.value.dateTo,
-      reason: parsed.value.reason,
-      createdBy: actor.id
-    });
+    const absence = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const transactionDb = resolveDb(transactionDataSource);
+      if (!transactionDb) {
+        throw new Error("transactional_absence_create_not_configured");
+      }
+      const repository = createResourceAbsencesRepository(transactionDb);
+      const created = await repository.createAbsence({
+        id: randomUUID(),
+        tenantId: actor.tenantId,
+        userId: parsed.value.userId,
+        type: parsed.value.type,
+        dateFrom: parsed.value.dateFrom,
+        dateTo: parsed.value.dateTo,
+        reason: parsed.value.reason,
+        createdBy: actor.id
+      });
 
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.absence.created",
-      sourceWorkflow: "tenant.absences",
-      sourceEntity: { type: "resource_absence", id: absence.id },
-      commandInput: parsed.value,
-      beforeState: null,
-      afterState: absence,
-      permissionResult: decision
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.absence.created",
+          sourceWorkflow: "tenant.absences",
+          sourceEntity: { type: "resource_absence", id: created.id },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return created;
     });
 
     invalidateCapacityCacheForTenant(actor.tenantId);
@@ -153,10 +226,18 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
   });
 
   app.delete("/api/tenant/current/absences/:id", async (context) => {
+    const parsedAbsenceId = parseAbsenceIdParam(context.req.param("id"));
+    if (!parsedAbsenceId.ok) {
+      return context.json({ error: parsedAbsenceId.error }, 400);
+    }
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const db = resolveDb(deps.dataSource);
     if (!db) return context.json({ error: "persistence_not_configured" }, 501);
+    if (!deps.dataSource.withTransaction || !deps.dataSource.appendAuditEvent) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
     const profile = await deps.getActorProfile(actor);
     const decision = canManageAbsences({
@@ -166,27 +247,38 @@ export function registerAbsencesRoutes(app: Hono, deps: AbsencesRouteDeps) {
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    const absenceId = context.req.param("id")?.trim();
-    if (!absenceId) return context.json({ error: "resource_absence_invalid" }, 400);
+    const absenceId = parsedAbsenceId.value;
 
-    const repository = createResourceAbsencesRepository(db);
-    const existing = (
-      await repository.listAbsences(actor.tenantId, "1970-01-01", "2999-12-31")
-    ).find((item) => item.id === absenceId);
-    const deleted = await repository.deleteAbsence(actor.tenantId, absenceId);
-    if (!deleted) return context.json({ error: "resource_absence_not_found" }, 404);
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const transactionDb = resolveDb(transactionDataSource);
+      if (!transactionDb) {
+        throw new Error("transactional_absence_delete_not_configured");
+      }
+      const repository = createResourceAbsencesRepository(transactionDb);
+      const existing = (
+        await repository.listAbsences(actor.tenantId, "1970-01-01", "2999-12-31")
+      ).find((item) => item.id === absenceId);
+      const deleted = await repository.deleteAbsence(actor.tenantId, absenceId);
+      if (!deleted) return { deleted: false };
 
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "tenant.absence.deleted",
-      sourceWorkflow: "tenant.absences",
-      sourceEntity: { type: "resource_absence", id: absenceId },
-      commandInput: { id: absenceId },
-      beforeState: existing ?? null,
-      afterState: null,
-      permissionResult: decision
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "tenant.absence.deleted",
+          sourceWorkflow: "tenant.absences",
+          sourceEntity: { type: "resource_absence", id: absenceId },
+          commandInput: { id: absenceId },
+          beforeState: existing ?? null,
+          afterState: null,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return { deleted: true };
     });
+    if (!result.deleted) return context.json({ error: "resource_absence_not_found" }, 404);
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ ok: true });

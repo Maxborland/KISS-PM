@@ -28,18 +28,18 @@ export function evaluateKpiExpression(
     case "binary": {
       const left = evaluateKpiExpression(expression.left, metrics);
       const right = evaluateKpiExpression(expression.right, metrics);
-      if (expression.op === "add") return left + right;
-      if (expression.op === "sub") return left - right;
-      if (expression.op === "mul") return left * right;
+      if (expression.op === "add") return finite(left + right);
+      if (expression.op === "sub") return finite(left - right);
+      if (expression.op === "mul") return finite(left * right);
       if (right === 0) return 0;
-      return left / right;
+      return finite(left / right);
     }
     case "unary":
-      return Math.abs(evaluateKpiExpression(expression.value, metrics));
+      return finite(Math.abs(evaluateKpiExpression(expression.value, metrics)));
     case "aggregate": {
       const values = expression.values.map((value) => evaluateKpiExpression(value, metrics));
       if (values.length === 0) return 0;
-      return expression.op === "min" ? Math.min(...values) : Math.max(...values);
+      return finite(expression.op === "min" ? Math.min(...values) : Math.max(...values));
     }
   }
 }

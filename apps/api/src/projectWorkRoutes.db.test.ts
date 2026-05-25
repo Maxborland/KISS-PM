@@ -216,6 +216,59 @@ describe("project work API routes", () => {
     await client.end();
   });
 
+  it("rejects malformed project work route identifiers before persistence lookup", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+
+    const badProjectDetail = await app.request("/api/workspace/projects/bad..project", {
+      headers: { cookie: adminCookie }
+    });
+    const badTaskDetail = await app.request("/api/workspace/tasks/bad..task", {
+      headers: { cookie: adminCookie }
+    });
+    const badStatusPatch = await app.request("/api/workspace/task-statuses/bad..status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        name: "Новый статус",
+        category: "waiting",
+        sortOrder: 30
+      })
+    });
+    const badTransitionTask = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/bad..task/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+
+    expect(badProjectDetail.status).toBe(400);
+    await expect(badProjectDetail.json()).resolves.toEqual({
+      error: "invalid_project_id"
+    });
+    expect(badTaskDetail.status).toBe(400);
+    await expect(badTaskDetail.json()).resolves.toEqual({
+      error: "invalid_task_id"
+    });
+    expect(badStatusPatch.status).toBe(400);
+    await expect(badStatusPatch.json()).resolves.toEqual({
+      error: "invalid_task_status_id"
+    });
+    expect(badTransitionTask.status).toBe(400);
+    await expect(badTransitionTask.json()).resolves.toEqual({
+      error: "invalid_task_id"
+    });
+  });
+
   it("creates a project task, returns it in project detail and My Work, and writes audit", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");

@@ -134,6 +134,63 @@ describe("Phase 7 control engine", () => {
       })
     ).toBe(false);
   });
+
+  it("keeps KPI expression arithmetic finite after numeric overflow", () => {
+    const snapshot = createLateOverloadedSnapshot();
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-24T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    const resourceLoad = buildResourceLoadMatrix({
+      plan: calculatedPlan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: snapshot.project.plannedStart,
+      rangeFinish: calculatedPlan.projectFinish ?? snapshot.project.plannedFinish,
+      granularities: ["day"]
+    });
+    const [evaluation] = evaluateProjectKpis({
+      definitions: [
+        {
+          id: "kpi-overflow",
+          tenantId: "tenant-a",
+          entityType: "project",
+          code: "overflow",
+          label: "Overflow guard",
+          formula: {
+            type: "expression",
+            expression: {
+              type: "binary",
+              op: "mul",
+              left: { type: "number", value: 1e308 },
+              right: { type: "number", value: 1e308 }
+            }
+          },
+          unit: "count",
+          period: "snapshot",
+          thresholdRules: [{ severity: "critical", operator: "gt", value: 0 }],
+          ownerRole: null,
+          allowedActions: ["create_corrective_action"],
+          version: 1,
+          status: "active"
+        }
+      ],
+      snapshot,
+      calculatedPlan,
+      resourceLoad,
+      evaluatedAt: "2026-05-24T00:00:00.000Z"
+    });
+
+    expect(evaluation).toEqual(
+      expect.objectContaining({
+        calculatedValue: 0,
+        severity: "ok"
+      })
+    );
+  });
 });
 
 function createLateOverloadedSnapshot(): PlanSnapshot {

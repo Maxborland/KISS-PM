@@ -32,6 +32,7 @@ const maxLengths = {
 const maxCustomFields = 50;
 const maxCustomFieldKeyLength = 120;
 const maxCustomFieldValueLength = 500;
+const unsafeCustomFieldKeys = new Set(["__proto__", "prototype", "constructor"]);
 const finalStatuses = new Set<OpportunityFinalStatus>([
   "won_closed",
   "lost_rejected"
@@ -115,19 +116,19 @@ function parseOpportunityFields(
   if (!stageId || !idPattern.test(stageId)) {
     return { ok: false, error: "invalid_deal_stage_id" };
   }
-  if (clientName.length > maxLengths.clientName) {
+  if (!isSafeSingleLineText(clientName, maxLengths.clientName)) {
     return { ok: false, error: "invalid_client_name" };
   }
-  if (contactName.length > maxLengths.contactName) {
+  if (!isSafeSingleLineText(contactName, maxLengths.contactName)) {
     return { ok: false, error: "invalid_client_name" };
   }
-  if (!title || title.length > maxLengths.title) {
+  if (!title || !isSafeSingleLineText(title, maxLengths.title)) {
     return { ok: false, error: "invalid_opportunity_title" };
   }
-  if (projectType.length > maxLengths.projectType) {
+  if (!isSafeSingleLineText(projectType, maxLengths.projectType)) {
     return { ok: false, error: "invalid_project_type" };
   }
-  if (description.length > maxLengths.description) {
+  if (!isSafeMultilineText(description, maxLengths.description)) {
     return { ok: false, error: "invalid_description" };
   }
   if (templateId !== null && !idPattern.test(templateId)) {
@@ -193,7 +194,7 @@ export function parseOpportunityFinalActionBody(
   if (!status || !finalStatuses.has(status as OpportunityFinalStatus)) {
     return { ok: false, error: "invalid_opportunity_final_status" };
   }
-  if (!reason || reason.length > 500) {
+  if (!reason || !isSafeMultilineText(reason, 500)) {
     return { ok: false, error: "invalid_opportunity_final_reason" };
   }
 
@@ -214,7 +215,7 @@ export function parseProjectActivationBody(
   const acceptedRiskReason = getOptionalString(input, "acceptedRiskReason") ?? null;
 
   if (!idPattern.test(id)) return { ok: false, error: "invalid_project_id" };
-  if (acceptedRiskReason !== null && acceptedRiskReason.length > 500) {
+  if (acceptedRiskReason !== null && !isSafeMultilineText(acceptedRiskReason, 500)) {
     return { ok: false, error: "invalid_risk_reason" };
   }
 
@@ -244,6 +245,7 @@ function parseCustomFieldValues(
   for (const [key, rawValue] of entries) {
     if (
       !key ||
+      unsafeCustomFieldKeys.has(key) ||
       key.length > maxCustomFieldKeyLength ||
       !/^[a-zA-Z0-9_-]+$/.test(key)
     ) {
@@ -258,7 +260,7 @@ function parseCustomFieldValues(
     }
 
     const fieldValue = String(rawValue).trim();
-    if (fieldValue.length > maxCustomFieldValueLength) {
+    if (!isSafeSingleLineText(fieldValue, maxCustomFieldValueLength)) {
       return { ok: false, error: "invalid_custom_field_value" };
     }
     if (fieldValue) customFieldValues[key] = fieldValue;
@@ -343,4 +345,12 @@ function parseProbability(value: unknown): number | null {
 
 function getDateDiffDays(start: Date, finish: Date): number {
   return Math.floor((finish.getTime() - start.getTime()) / 86_400_000);
+}
+
+function isSafeSingleLineText(value: string, maxLength: number): boolean {
+  return value.length <= maxLength && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isSafeMultilineText(value: string, maxLength: number): boolean {
+  return value.length <= maxLength && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }

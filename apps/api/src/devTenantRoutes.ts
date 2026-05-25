@@ -1,4 +1,5 @@
 import { canReadTenantUsers } from "@kiss-pm/access-control";
+import { parseTenantIdParam, parseUserIdParam } from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -17,7 +18,13 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.get("/api/session/dev-login", async (context) => {
-    const userId = context.req.query("userId") ?? null;
+    const requestedUserId = context.req.query("userId") ?? null;
+    if (requestedUserId !== null) {
+      const parsedUserId = parseUserIdParam(requestedUserId);
+      if (!parsedUserId.ok) return context.json({ error: parsedUserId.error }, 400);
+    }
+
+    const userId = requestedUserId?.trim() ?? null;
     const actor = await getActor(userId);
 
     if (!actor) {
@@ -60,6 +67,9 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.get("/api/tenant/:tenantId/users", async (context) => {
+    const parsedTenantId = parseTenantIdParam(context.req.param("tenantId"));
+    if (!parsedTenantId.ok) return context.json({ error: parsedTenantId.error }, 400);
+
     const actor = await getDevActorFromHeaders({
       cookie: context.req.header("cookie") ?? null,
       userId: context.req.header("x-user-id") ?? null
@@ -69,7 +79,7 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "dev_session_required" }, 401);
     }
 
-    const targetTenantId = context.req.param("tenantId");
+    const targetTenantId = parsedTenantId.value;
     const actorProfile = await getActorProfile(actor);
     const decision = canReadTenantUsers({
       actor,

@@ -25,7 +25,13 @@ import {
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput, ProjectRecord } from "./apiTypes";
+import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import {
+  parseProjectIdParam,
+  parseProjectTemplateIdParam,
+  parseTemplateImprovementActionIdParam
+} from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 type TemplateImprovementActionPersistenceInput = Omit<
@@ -44,6 +50,9 @@ type ClosureFailureResult = {
 
 export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/workspace/projects/:projectId/closure", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.getRetrospectiveReadModel || !deps.dataSource.listProjects) {
@@ -51,8 +60,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "closure.read_denied", { projectId }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
     const project = await findProject(deps.dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
 
@@ -64,6 +76,9 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/closure/preview", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -75,8 +90,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const profile = await deps.getActorProfile(actor);
     const decision = readDecision(actor, profile);
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "closure.preview_denied", { projectId }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
     const project = await findProject(deps.dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -102,6 +120,9 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/projects/:projectId/closure/close", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -123,11 +144,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const decision = closeDecision(actor, profile);
     if (!decision.allowed) {
       await appendDeniedAudit(deps, actor, "project.close_denied", {
-        projectId: context.req.param("projectId")
+        projectId: parsedProjectId.value
       }, decision);
       return context.json({ error: decision.reason }, 403);
     }
-    const projectId = context.req.param("projectId");
+    const projectId = parsedProjectId.value;
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (
@@ -142,6 +163,15 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const project = await findProject(transactionDataSource, actor.tenantId, projectId);
       if (!project) return { ok: false as const, status: 404, error: "project_not_found" };
       if (project.status !== "active" && project.status !== "paused") {
+        await appendClosureFailureAudit(deps, transactionDataSource, {
+          actor,
+          projectId,
+          project,
+          planVersion: null,
+          closeReason: parsed.value.closeReason,
+          permissionResult: decision,
+          error: "project_not_closable"
+        });
         return { ok: false as const, status: 409, error: "project_not_closable" };
       }
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -202,7 +232,18 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
         });
       } catch (error) {
         const mappedError = closurePersistenceErrorResult(error);
-        if (mappedError) return mappedError;
+        if (mappedError) {
+          await appendClosureFailureAudit(deps, transactionDataSource, {
+            actor,
+            projectId,
+            project,
+            planVersion: snapshot.planVersion,
+            closeReason: parsed.value.closeReason,
+            permissionResult: decision,
+            error: mappedError.error
+          });
+          return mappedError;
+        }
         throw error;
       }
       await deps.appendManagementAuditEvent(
@@ -237,10 +278,14 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (result.status === 409) return context.json({ error: result.error }, 409);
       return context.json({ error: result.error }, 400);
     }
+    invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json(result.body);
   });
 
   app.post("/api/workspace/projects/:projectId/closure/lessons", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
@@ -261,9 +306,14 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile,
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const projectId = parsedProjectId.value;
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "retrospective.lesson_create_denied", {
+        projectId
+      }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
 
-    const projectId = context.req.param("projectId");
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (
         !transactionDataSource.getRetrospectiveReadModel ||
@@ -316,6 +366,17 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post(
     "/api/workspace/projects/:projectId/closure/template-improvement-actions/:actionId/apply",
     async (context) => {
+      const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+      if (!parsedProjectId.ok) {
+        return context.json({ error: parsedProjectId.error }, 400);
+      }
+      const parsedActionId = parseTemplateImprovementActionIdParam(
+        context.req.param("actionId")
+      );
+      if (!parsedActionId.ok) {
+        return context.json({ error: parsedActionId.error }, 400);
+      }
+
       const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
       if (!actor) return context.json({ error: "session_required" }, 401);
       if (
@@ -328,9 +389,15 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       const profile = await deps.getActorProfile(actor);
       const decision = templateImprovementDecision(actor, profile);
-      if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-      const projectId = context.req.param("projectId");
-      const actionId = context.req.param("actionId");
+      const projectId = parsedProjectId.value;
+      const actionId = parsedActionId.value;
+      if (!decision.allowed) {
+        await appendDeniedAudit(deps, actor, "template_improvement.apply_denied", {
+          projectId,
+          actionId
+        }, decision);
+        return context.json({ error: decision.reason }, 403);
+      }
       const auditEventId = `audit-${randomUUID()}`;
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
@@ -357,6 +424,14 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             (candidate) => candidate.id === actionId
           );
           if (existingAction?.status === "applied") {
+            await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+              actor,
+              projectId,
+              actionId,
+              existingAction,
+              permissionResult: decision,
+              error: "template_improvement_action_already_applied"
+            });
             return {
               ok: false as const,
               status: 409,
@@ -364,12 +439,28 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             };
           }
           if (existingAction) {
+            await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+              actor,
+              projectId,
+              actionId,
+              existingAction,
+              permissionResult: decision,
+              error: "template_improvement_action_not_proposed"
+            });
             return {
               ok: false as const,
               status: 409,
               error: "template_improvement_action_not_proposed"
             };
           }
+          await appendTemplateImprovementApplyFailureAudit(deps, transactionDataSource, {
+            actor,
+            projectId,
+            actionId,
+            existingAction: null,
+            permissionResult: decision,
+            error: "template_improvement_action_not_found"
+          });
           return {
             ok: false as const,
             status: 404,
@@ -405,6 +496,13 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
   );
 
   app.get("/api/tenant/current/project-templates/:templateId/retrospective-insights", async (context) => {
+    const parsedTemplateId = parseProjectTemplateIdParam(
+      context.req.param("templateId")
+    );
+    if (!parsedTemplateId.ok) {
+      return context.json({ error: parsedTemplateId.error }, 400);
+    }
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.listTemplateImprovementActions) {
@@ -415,11 +513,11 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const actions = await deps.dataSource.listTemplateImprovementActions({
       tenantId: actor.tenantId,
-      templateId: context.req.param("templateId"),
+      templateId: parsedTemplateId.value,
       status: "applied"
     });
     return context.json({
-      templateId: context.req.param("templateId"),
+      templateId: parsedTemplateId.value,
       appliedImprovements: actions,
       estimationLearning: summarizeTemplateLearning(actions)
     });
@@ -441,6 +539,12 @@ function closeDecision(actor: TenantUser, profile: AccessProfile): PolicyDecisio
     targetTenantId: actor.tenantId
   });
   if (!manageProjectDecision.allowed) return manageProjectDecision;
+  const readPlanDecision = canReadProjectPlan({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!readPlanDecision.allowed) return readPlanDecision;
   const executeDecision = canExecuteManagementActions({
     actor,
     profile,
@@ -603,6 +707,77 @@ async function appendDeniedAudit(
     executionResult: { status: "denied" }
   };
   await deps.appendManagementAuditEvent(auditInput);
+}
+
+async function appendClosureFailureAudit(
+  deps: ApiRouteDeps,
+  auditDataSource: ApiTenantDataSource,
+  input: {
+    actor: TenantUser;
+    projectId: string;
+    project: ProjectRecord;
+    planVersion: number | null;
+    closeReason: string;
+    permissionResult: PolicyDecision;
+    error: "project_not_found" | "project_not_closable";
+  }
+) {
+  if (!auditDataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent(
+    {
+      tenantId: input.actor.tenantId,
+      actorUserId: input.actor.id,
+      actionType:
+        input.error === "project_not_closable" ? "project.close_conflict" : "project.close_failed",
+      sourceWorkflow: "closure",
+      sourceEntity: { type: "Project", id: input.projectId },
+      commandInput: { closeReason: input.closeReason },
+      beforeState: {
+        project: input.project,
+        planVersion: input.planVersion
+      },
+      afterState: null,
+      permissionResult: input.permissionResult,
+      executionResult: { status: "failed", reason: input.error }
+    },
+    auditDataSource
+  );
+}
+
+async function appendTemplateImprovementApplyFailureAudit(
+  deps: ApiRouteDeps,
+  auditDataSource: ApiTenantDataSource,
+  input: {
+    actor: TenantUser;
+    projectId: string;
+    actionId: string;
+    existingAction: TemplateImprovementAction | null;
+    permissionResult: PolicyDecision;
+    error:
+      | "template_improvement_action_already_applied"
+      | "template_improvement_action_not_proposed"
+      | "template_improvement_action_not_found";
+  }
+) {
+  if (!auditDataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent(
+    {
+      tenantId: input.actor.tenantId,
+      actorUserId: input.actor.id,
+      actionType:
+        input.error === "template_improvement_action_not_found"
+          ? "template_improvement.apply_failed"
+          : "template_improvement.apply_conflict",
+      sourceWorkflow: "closure",
+      sourceEntity: { type: "TemplateImprovementAction", id: input.actionId },
+      commandInput: { projectId: input.projectId, actionId: input.actionId },
+      beforeState: input.existingAction ? { action: input.existingAction } : null,
+      afterState: null,
+      permissionResult: input.permissionResult,
+      executionResult: { status: "failed", reason: input.error }
+    },
+    auditDataSource
+  );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   parseOpportunityFinalActionBody,
   parseOpportunityBody,
-  parseOpportunityUpdateBody
+  parseOpportunityUpdateBody,
+  parseProjectActivationBody
 } from "./projectIntakeParsers";
 
 describe("project intake parsers", () => {
@@ -245,5 +246,76 @@ describe("project intake parsers", () => {
         "tenant-alpha"
       )
     ).toEqual({ ok: false, error: "invalid_planned_dates" });
+  });
+
+  it("rejects control characters in opportunity metadata before persistence", () => {
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          title: "Внедрение\nскрытая строка"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_opportunity_title" });
+
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          clientName: "ООО Ромашка\u0000"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_client_name" });
+
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          description: "Описание\u0000"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_description" });
+
+    expect(
+      parseOpportunityFinalActionBody({
+        status: "lost_rejected",
+        reason: "Причина\u0000"
+      })
+    ).toEqual({ ok: false, error: "invalid_opportunity_final_reason" });
+
+    expect(
+      parseProjectActivationBody({
+        acceptedRiskReason: "Риск\u0000"
+      })
+    ).toEqual({ ok: false, error: "invalid_risk_reason" });
+  });
+
+  it("rejects unsafe custom field keys and control-bearing custom field values", () => {
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          customFieldValues: {
+            constructor: "pollution"
+          }
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_custom_field_key" });
+
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          customFieldValues: {
+            priority_model: "Высокий\nскрытая строка"
+          }
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_custom_field_value" });
   });
 });

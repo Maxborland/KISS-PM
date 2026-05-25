@@ -20,6 +20,9 @@
     "test:e2e:smoke": "pnpm db:migrate && pnpm db:seed:dev && playwright test --config playwright.config.ts",
     "typecheck": "tsc -b --pretty false",
     "build": "pnpm --filter @kiss-pm/web build && pnpm typecheck",
+    "security:audit": "node scripts/security-audit-backend.mjs",
+    "security:scan": "node scripts/security-scan.mjs",
+    "security:check": "pnpm security:audit && pnpm security:scan",
     "verify:storybook-contract": "pnpm --filter @kiss-pm/web verify:storybook-contract"
   },
   "devDependencies": {
@@ -41,6 +44,8 @@
   },
   "pnpm": {
     "overrides": {
+      "esbuild": "^0.25.12",
+      "uuid": "^11.1.1",
       "postcss": "^8.5.14"
     }
   }

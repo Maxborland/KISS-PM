@@ -50,6 +50,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
 
 export type AccessProfileRecord = AccessProfile & {
@@ -532,6 +533,7 @@ export type ApiTenantDataSource = {
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
+  deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
@@ -697,13 +699,20 @@ export type ApiTenantDataSource = {
     correlationId: string;
     createdAt: Date;
   }): Promise<void>;
-  listAuditEventsByTenantId?(tenantId: TenantId): Promise<AuditEventListItem[]>;
+  listAuditEventsByTenantId?(
+    tenantId: TenantId,
+    options?: {
+      limit?: number;
+      projectId?: string | null;
+    }
+  ): Promise<AuditEventListItem[]>;
 };
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   storageProvider?: StorageProvider;
   authRateLimiter?: AuthRateLimiter;
+  readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];
   trustForwardedAuthHeaders?: boolean;

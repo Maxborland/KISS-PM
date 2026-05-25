@@ -15,7 +15,8 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
     appendManagementAuditEvent,
     dataSource,
     getActorProfile,
-    getSessionActorFromHeaders
+    getSessionActorFromHeaders,
+    runDataSourceTransaction
   } = deps;
 
   app.patch("/api/profile", async (context) => {
@@ -23,7 +24,12 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
       context.req.header("cookie") ?? null
     );
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.updateWorkspaceUser || !dataSource.listWorkspaceUsers) {
+    if (
+      !dataSource.updateWorkspaceUser ||
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
@@ -41,32 +47,51 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     const body = await readLimitedJsonBody(context, {});
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const nameInput = getStringField(body.value, "name");
-    const phoneInput = getStringField(body.value, "phone");
-    const telegramInput = getStringField(body.value, "telegram");
-    const user = await dataSource.updateWorkspaceUser({
-      ...current,
-      name: nameInput === undefined || nameInput.length === 0 ? current.name : nameInput,
-      phone: phoneInput === undefined ? current.phone : phoneInput || null,
-      telegram: telegramInput === undefined ? current.telegram : telegramInput || null
-    });
-    await appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "profile.updated",
-      sourceWorkflow: "single_workspace_profile",
-      sourceEntity: {
-        type: "TenantUser",
-        id: actor.id
-      },
-      commandInput: {
-        name: nameInput,
-        phone: phoneInput,
-        telegram: telegramInput
-      },
-      beforeState: current,
-      afterState: user,
-      permissionResult: decision
+    const nameInput = parseProfileTextField(body.value, "name", 120);
+    const phoneInput = parseProfileTextField(body.value, "phone", 64);
+    const telegramInput = parseProfileTextField(body.value, "telegram", 64);
+    if (!nameInput.ok || !phoneInput.ok || !telegramInput.ok) {
+      return context.json({ error: "invalid_profile_payload" }, 400);
+    }
+
+    const user = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateWorkspaceUser) {
+        throw new Error("transactional_profile_update_not_configured");
+      }
+
+      const updatedUser = await transactionDataSource.updateWorkspaceUser({
+        ...current,
+        name:
+          nameInput.value === undefined || nameInput.value.length === 0
+            ? current.name
+            : nameInput.value,
+        phone: phoneInput.value === undefined ? current.phone : phoneInput.value || null,
+        telegram:
+          telegramInput.value === undefined ? current.telegram : telegramInput.value || null
+      });
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "profile.updated",
+          sourceWorkflow: "single_workspace_profile",
+          sourceEntity: {
+            type: "TenantUser",
+            id: actor.id
+          },
+          commandInput: {
+            name: nameInput.value,
+            phone: phoneInput.value,
+            telegram: telegramInput.value
+          },
+          beforeState: current,
+          afterState: updatedUser,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return updatedUser;
     });
 
     return context.json({ user });
@@ -77,7 +102,12 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
       context.req.header("cookie") ?? null
     );
     if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.updateWorkspaceUser || !dataSource.listWorkspaceUsers) {
+    if (
+      !dataSource.updateWorkspaceUser ||
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
@@ -105,29 +135,63 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "invalid_accent_color" }, 400);
     }
 
-    const user = await dataSource.updateWorkspaceUser({
-      ...current,
-      theme,
-      accentColor: accentColor.toLowerCase()
-    });
-    await appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "profile.theme.updated",
-      sourceWorkflow: "single_workspace_theme",
-      sourceEntity: {
-        type: "TenantUser",
-        id: actor.id
-      },
-      commandInput: {
+    const user = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateWorkspaceUser) {
+        throw new Error("transactional_profile_theme_update_not_configured");
+      }
+
+      const updatedUser = await transactionDataSource.updateWorkspaceUser({
+        ...current,
         theme,
         accentColor: accentColor.toLowerCase()
-      },
-      beforeState: current,
-      afterState: user,
-      permissionResult: decision
+      });
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "profile.theme.updated",
+          sourceWorkflow: "single_workspace_theme",
+          sourceEntity: {
+            type: "TenantUser",
+            id: actor.id
+          },
+          commandInput: {
+            theme,
+            accentColor: accentColor.toLowerCase()
+          },
+          beforeState: current,
+          afterState: updatedUser,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return updatedUser;
     });
 
     return context.json({ user });
   });
+}
+
+type ProfileTextFieldParseResult =
+  | { ok: true; value: string | undefined }
+  | { ok: false };
+
+function parseProfileTextField(
+  input: unknown,
+  key: string,
+  maxLength: number
+): ProfileTextFieldParseResult {
+  if (!input || typeof input !== "object" || !(key in input)) {
+    return { ok: true, value: undefined };
+  }
+
+  const value = (input as Record<string, unknown>)[key];
+  if (typeof value !== "string") return { ok: false };
+  if (/[\u0000-\u001f\u007f]/.test(value)) return { ok: false };
+
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) return { ok: false };
+
+  return { ok: true, value: trimmed };
 }

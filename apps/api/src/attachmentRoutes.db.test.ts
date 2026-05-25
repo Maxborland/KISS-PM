@@ -255,6 +255,82 @@ describe("attachment and unified search API", () => {
     );
   });
 
+  it("rejects malformed attachment identifiers before persistence", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+
+    const badEntityId = await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(cookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "../client-alpha",
+        title: "Документ",
+        url: "https://example.test/doc.pdf"
+      })
+    });
+    expect(badEntityId.status).toBe(400);
+    await expect(badEntityId.json()).resolves.toEqual({
+      error: "attachment_entity_id_invalid"
+    });
+
+    const badRelation = await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(cookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "client-alpha",
+        relationType: "bad/relation",
+        title: "Документ",
+        url: "https://example.test/doc.pdf"
+      })
+    });
+    expect(badRelation.status).toBe(400);
+    await expect(badRelation.json()).resolves.toEqual({
+      error: "attachment_relation_type_invalid"
+    });
+
+    const badExternalId = await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(cookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "client-alpha",
+        externalId: "ticket\u0000id",
+        title: "Документ",
+        url: "https://example.test/doc.pdf"
+      })
+    });
+    expect(badExternalId.status).toBe(400);
+    await expect(badExternalId.json()).resolves.toEqual({ error: "external_id_invalid" });
+
+    const form = new FormData();
+    form.set("entityType", "client");
+    form.set("entityId", new Blob(["client-alpha"], { type: "text/plain" }), "entity.txt");
+    form.set("file", new Blob(["hello"], { type: "text/plain" }), "brief.txt");
+    const badMultipartEntity = await app.request("/api/workspace/attachments/files", {
+      method: "POST",
+      headers: actionHeaders(cookie),
+      body: form
+    });
+    expect(badMultipartEntity.status).toBe(400);
+    await expect(badMultipartEntity.json()).resolves.toEqual({
+      error: "attachment_entity_id_required"
+    });
+
+    const badDownloadId = await app.request("/api/workspace/attachments/bad..id/download", {
+      headers: { cookie }
+    });
+    expect(badDownloadId.status).toBe(400);
+    await expect(badDownloadId.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+
+    const badDeleteId = await app.request("/api/workspace/attachments/external-ref-123", {
+      method: "DELETE",
+      headers: actionHeaders(cookie)
+    });
+    expect(badDeleteId.status).toBe(400);
+    await expect(badDeleteId.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+  });
+
   it("uploads, downloads and archives local file assets without leaking provider internals", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const form = new FormData();
@@ -270,7 +346,7 @@ describe("attachment and unified search API", () => {
     expect(upload.status).toBe(201);
     const uploadPayload = await upload.json() as { attachment: { id: string; fileAsset: { safeDisplayName: string; status: string; storageKey?: string } } };
     expect(uploadPayload.attachment.fileAsset).toMatchObject({
-      safeDisplayName: ".-brief.txt",
+      safeDisplayName: "brief.txt",
       status: "ready"
     });
     expect(uploadPayload.attachment.fileAsset.storageKey).toBeUndefined();
@@ -280,9 +356,30 @@ describe("attachment and unified search API", () => {
       { headers: { cookie } }
     );
     expect(download.status).toBe(200);
+    expect(download.headers.get("cache-control")).toBe("no-store, private");
     expect(download.headers.get("content-type")).toBe("text/plain");
-    expect(download.headers.get("content-disposition")).toContain(".-brief.txt");
+    expect(download.headers.get("content-disposition")).toContain("brief.txt");
     await expect(download.text()).resolves.toBe("hello");
+
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
+    const deniedDownload = await app.request(
+      `/api/workspace/attachments/${uploadPayload.attachment.id}/download`,
+      { headers: { cookie: deniedCookie } }
+    );
+    expect(deniedDownload.status).toBe(403);
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie }
+    });
+    const auditPayload = await audit.json() as { auditEvents: Array<{ actionType: string; executionResult: Record<string, unknown> }> };
+    expect(auditPayload.auditEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "attachment.denied",
+          executionResult: expect.objectContaining({ status: "denied" })
+        })
+      ])
+    );
 
     const remove = await app.request(
       `/api/workspace/attachments/${uploadPayload.attachment.id}`,
