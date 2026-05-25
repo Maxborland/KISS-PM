@@ -1314,6 +1314,118 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(readModelLoaded).toBe(false);
   });
 
+  it("writes denied audit before loading action candidates when execute permission is missing", async () => {
+    let listSignalsCalled = false;
+    let createExecutionCalled = false;
+    const auditEvents: Array<{
+      actionType: string;
+      input: unknown;
+      executionResult: unknown;
+    }> = [];
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Ольга Контроль",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: ["tenant.control_signals.read"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async listControlSignals() {
+        listSignalsCalled = true;
+        return [];
+      },
+      async createActionExecution(input) {
+        createExecutionCalled = true;
+        return {
+          ...input,
+          createdAt: new Date("2026-05-24T00:00:00.000Z")
+        };
+      },
+      async appendAuditEvent(input) {
+        auditEvents.push(input);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const previewResponse = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/preview",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=control-token"
+        }
+      }
+    );
+    const applyResponse = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/apply",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=control-token"
+        }
+      }
+    );
+
+    expect(previewResponse.status).toBe(403);
+    expect(applyResponse.status).toBe(403);
+    await expect(previewResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(applyResponse.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(listSignalsCalled).toBe(false);
+    expect(createExecutionCalled).toBe(false);
+    expect(auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "management_action.denied",
+        input: {
+          projectId: "project-control",
+          signalId: "signal-control-1",
+          actionId: "action-control-1"
+        },
+        executionResult: { status: "denied", stage: "preview" }
+      }),
+      expect.objectContaining({
+        actionType: "management_action.denied",
+        input: {
+          projectId: "project-control",
+          signalId: "signal-control-1",
+          actionId: "action-control-1"
+        },
+        executionResult: { status: "denied", stage: "apply" }
+      })
+    ]);
+  });
+
   it("rejects control action preview when action-specific permissions are missing", async () => {
     let createdExecutionStatus: string | null = null;
     let auditActionType: string | null = null;

@@ -29,6 +29,7 @@
 | Control surface published action exposure | Published control surface read-model returned actions even when the actor lacked action-specific permissions | Non-builder published read-model now filters actions by actor permissions while builder state remains complete | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | Control surface required-permission exposure | Published surfaces were visible to non-builder readers even when their definition-level required permissions were missing | Non-builder published read-model now hides surfaces unless definition `requiredPermissions` are all granted | `pnpm vitest run apps/api/src/controlSurfaceRoutes.test.ts`, `pnpm typecheck` |
 | KPI definition mutation denied audit | KPI definition upsert denied by missing manage permission returned 403 without an audit trail | Denied KPI definition upserts now write safe metadata-only control audit events before returning 403 | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
+| Management action route-level denied audit | Management action preview/apply route-level permission failures returned 403 before loading candidates without audit | Preview/apply now audit safe route metadata for execute/read permission denials before loading action candidates | `pnpm vitest run apps/api/src/app.test.ts`, `pnpm typecheck` |
 
 ## Broad verification
 
@@ -43,7 +44,7 @@
 |------|------------|
 | Planning / solver apply | Continue focused review for persisted proposal apply edge cases beyond conflict/precondition audit trace |
 | Capacity | Continue focused review for less common project lifecycle status transitions beyond closure |
-| KPI / action engine | Continue focused review for action execution denied/error audit consistency after KPI mutation denied audit |
+| KPI / action engine | Continue focused review for action execution persistence edge cases after route-level denied audit |
 | Control surfaces | Continue focused review for saved-view/audit mutation boundaries after published permission gates |
 | Closure / retrospectives | Continue focused review for immutable snapshot retry/conflict semantics after read-boundary hardening |
 | Release-like smoke | Keep smoke in the Phase 10 verification set and expand only when a new backend phase adds a mandatory loop step |

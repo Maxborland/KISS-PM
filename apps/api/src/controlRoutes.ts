@@ -246,17 +246,37 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
       const profile = await deps.getActorProfile(actor);
+      const projectId = context.req.param("projectId");
+      const signalId = context.req.param("signalId");
+      const actionId = context.req.param("actionId");
       const decision = canExecuteManagementActions({ actor, profile, targetTenantId: actor.tenantId });
-      if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+      if (!decision.allowed) {
+        await appendManagementActionDeniedAudit(deps, {
+          actor,
+          projectId,
+          signalId,
+          actionId,
+          permissionResult: decision,
+          stage: "preview"
+        });
+        return context.json({ error: decision.reason }, 403);
+      }
       const controlReadDecision = canReadControlSignals({
         actor,
         profile,
         targetTenantId: actor.tenantId
       });
-      if (!controlReadDecision.allowed) return context.json({ error: controlReadDecision.reason }, 403);
-      const projectId = context.req.param("projectId");
-      const signalId = context.req.param("signalId");
-      const actionId = context.req.param("actionId");
+      if (!controlReadDecision.allowed) {
+        await appendManagementActionDeniedAudit(deps, {
+          actor,
+          projectId,
+          signalId,
+          actionId,
+          permissionResult: controlReadDecision,
+          stage: "preview"
+        });
+        return context.json({ error: controlReadDecision.reason }, 403);
+      }
 
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
@@ -354,10 +374,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
 
-      const body = await readLimitedJsonBody(context);
-      if (!body.ok) return context.json({ error: body.error }, body.status);
-      const parsed = parseActionApplyBody(body.value);
-      if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+      const projectId = context.req.param("projectId");
+      const signalId = context.req.param("signalId");
+      const actionId = context.req.param("actionId");
 
       const profile = await deps.getActorProfile(actor);
       const executeDecision = canExecuteManagementActions({
@@ -365,17 +384,39 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         profile,
         targetTenantId: actor.tenantId
       });
-      if (!executeDecision.allowed) return context.json({ error: executeDecision.reason }, 403);
+      if (!executeDecision.allowed) {
+        await appendManagementActionDeniedAudit(deps, {
+          actor,
+          projectId,
+          signalId,
+          actionId,
+          permissionResult: executeDecision,
+          stage: "apply"
+        });
+        return context.json({ error: executeDecision.reason }, 403);
+      }
       const controlReadDecision = canReadControlSignals({
         actor,
         profile,
         targetTenantId: actor.tenantId
       });
-      if (!controlReadDecision.allowed) return context.json({ error: controlReadDecision.reason }, 403);
+      if (!controlReadDecision.allowed) {
+        await appendManagementActionDeniedAudit(deps, {
+          actor,
+          projectId,
+          signalId,
+          actionId,
+          permissionResult: controlReadDecision,
+          stage: "apply"
+        });
+        return context.json({ error: controlReadDecision.reason }, 403);
+      }
 
-      const projectId = context.req.param("projectId");
-      const signalId = context.req.param("signalId");
-      const actionId = context.req.param("actionId");
+      const body = await readLimitedJsonBody(context);
+      if (!body.ok) return context.json({ error: body.error }, body.status);
+      const parsed = parseActionApplyBody(body.value);
+      if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
       const signal = (await deps.dataSource.listControlSignals(actor.tenantId, projectId)).find(
         (candidate) => candidate.id === signalId
       );
@@ -1026,4 +1067,33 @@ async function appendControlAuditIfConfigured(
 ): Promise<string> {
   if (!auditDataSource.appendAuditEvent) throw new Error("audit_not_configured");
   return deps.appendManagementAuditEvent(input, auditDataSource);
+}
+
+async function appendManagementActionDeniedAudit(
+  deps: ApiRouteDeps,
+  input: {
+    actor: TenantUser;
+    projectId: string;
+    signalId: string;
+    actionId: string;
+    permissionResult: PolicyDecision;
+    stage: "preview" | "apply";
+  }
+): Promise<string> {
+  return appendControlAuditIfConfigured(deps, {
+    tenantId: input.actor.tenantId,
+    actorUserId: input.actor.id,
+    actionType: "management_action.denied",
+    sourceWorkflow: "control",
+    sourceEntity: { type: "ControlSignal", id: input.signalId },
+    commandInput: {
+      projectId: input.projectId,
+      signalId: input.signalId,
+      actionId: input.actionId
+    },
+    beforeState: null,
+    afterState: null,
+    permissionResult: input.permissionResult,
+    executionResult: { status: "denied", stage: input.stage }
+  });
 }
