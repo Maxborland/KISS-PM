@@ -114,6 +114,42 @@ describe("retrospective routes", () => {
     ]);
   });
 
+  it("maps closeProject project_not_closable throws to a stable conflict response", async () => {
+    const state = createRetrospectiveDataSource({ closeProjectError: "project_not_closable" });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Повторное закрытие" })
+      }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_closable" });
+    expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.closed");
+  });
+
+  it("maps closeProject project_not_found throws to a stable not found response", async () => {
+    const state = createRetrospectiveDataSource({ closeProjectError: "project_not_found" });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ closeReason: "Повторное закрытие" })
+      }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.closed");
+  });
+
   it("applies template improvement through governed action and exposes template insights", async () => {
     const state = createRetrospectiveDataSource();
     const app = createApp({ dataSource: state.dataSource });
@@ -163,7 +199,12 @@ describe("retrospective routes", () => {
   });
 });
 
-function createRetrospectiveDataSource(input: { permissions?: AccessProfile["permissions"] } = {}) {
+function createRetrospectiveDataSource(
+  input: {
+    permissions?: AccessProfile["permissions"];
+    closeProjectError?: "project_not_closable" | "project_not_found";
+  } = {}
+) {
   const actor: TenantUser = {
     id: "user-alpha-admin",
     tenantId: "tenant-alpha",
@@ -241,6 +282,7 @@ function createRetrospectiveDataSource(input: { permissions?: AccessProfile["per
       if (project.status !== "active" && project.status !== "paused") {
         throw new Error("project_not_closable");
       }
+      if (input.closeProjectError) throw new Error(input.closeProjectError);
       project.status = "closed";
       project.closedAt = snapshot.closedAt;
       readModel = {

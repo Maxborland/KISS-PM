@@ -18,6 +18,7 @@ import {
   type PlanSnapshot,
   type ProjectClosureSnapshot,
   type RetrospectiveLesson,
+  type RetrospectiveReadModel,
   type TemplateImprovementAction,
   type TenantUser
 } from "@kiss-pm/domain";
@@ -33,6 +34,12 @@ type TemplateImprovementActionPersistenceInput = Omit<
 > & {
   createdAt: Date;
   appliedAt: Date | null;
+};
+
+type ClosureFailureResult = {
+  ok: false;
+  status: 404 | 409;
+  error: "project_not_found" | "project_not_closable";
 };
 
 export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -180,11 +187,18 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
           ]
         : [];
 
-      const readModel = await transactionDataSource.closeProject({
-        snapshot: closureSnapshot,
-        lessons,
-        templateImprovementActions: improvementActions
-      });
+      let readModel: RetrospectiveReadModel;
+      try {
+        readModel = await transactionDataSource.closeProject({
+          snapshot: closureSnapshot,
+          lessons,
+          templateImprovementActions: improvementActions
+        });
+      } catch (error) {
+        const mappedError = closurePersistenceErrorResult(error);
+        if (mappedError) return mappedError;
+        throw error;
+      }
       await deps.appendManagementAuditEvent(
         {
           auditEventId,
@@ -539,6 +553,17 @@ async function appendDeniedAudit(
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function closurePersistenceErrorResult(error: unknown): ClosureFailureResult | null {
+  if (!(error instanceof Error)) return null;
+  if (error.message === "project_not_found") {
+    return { ok: false as const, status: 404, error: "project_not_found" };
+  }
+  if (error.message === "project_not_closable") {
+    return { ok: false as const, status: 409, error: "project_not_closable" };
+  }
+  return null;
 }
 
 function stringField(input: Record<string, unknown>, field: string): string | null {
