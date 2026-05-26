@@ -216,6 +216,109 @@ describe("communications realtime API", () => {
     expect(deniedStart.status).toBe(403);
   });
 
+  it("maps concurrent active session creation to a stable conflict", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const room = await createRoom(adminCookie);
+    await startSession(adminCookie, room.callRoom.roomId);
+
+    await client`
+      UPDATE call_rooms
+      SET status = 'open'
+      WHERE tenant_id = 'tenant-alpha' AND id = ${room.callRoom.roomId}
+    `;
+
+    const racedStart = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/start`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(racedStart.status).toBe(409);
+    await expect(racedStart.json()).resolves.toEqual({ error: "call_room_already_active" });
+  });
+
+  it("returns stable validation errors before recording and participant FK failures", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const sameEntityAttachment = await createProjectAttachment("attachment-project", "project-alpha");
+
+    const missingParticipant = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ state: "joined", userId: "user-missing" })
+      }
+    );
+    expect(missingParticipant.status).toBe(404);
+    await expect(missingParticipant.json()).resolves.toEqual({ error: "participant_user_not_found" });
+
+    const missingSessionRecording = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        attachmentId: sameEntityAttachment,
+        sessionId: "call-session-missing",
+        title: "Запись без сессии"
+      })
+    });
+    expect(missingSessionRecording.status).toBe(404);
+    await expect(missingSessionRecording.json()).resolves.toEqual({ error: "call_session_not_found" });
+  });
+
+  it("audits denied manage attempts before returning forbidden", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const deniedParticipant = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined", userId: "user-alpha-admin" })
+      }
+    );
+    expect(deniedParticipant.status).toBe(403);
+
+    const deniedEnd = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/end`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+    expect(deniedEnd.status).toBe(403);
+
+    const deniedRecording = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(readerCookie),
+      body: JSON.stringify({})
+    });
+    expect(deniedRecording.status).toBe(403);
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(audit.status).toBe(200);
+    const auditPayload = await audit.json() as { auditEvents: Array<{
+      actionType: string;
+      input?: { action?: string };
+      executionResult?: { status?: string };
+    }> };
+    const deniedActions = auditPayload.auditEvents
+      .filter((event) => event.actionType === "communications.denied")
+      .map((event) => event.input?.action);
+    expect(deniedActions).toEqual(
+      expect.arrayContaining(["participant-state.update", "session.end", "recording.attach"])
+    );
+    expect(auditPayload.auditEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "communications.denied",
+          executionResult: expect.objectContaining({ status: "denied" })
+        })
+      ])
+    );
+  });
+
   it("attaches recordings only through same-entity attachments", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
@@ -267,6 +370,15 @@ describe("communications realtime API", () => {
     });
     expect(response.status).toBe(201);
     return await response.json() as { callRoom: { roomId: string } };
+  }
+
+  async function startSession(cookie: string, roomId: string) {
+    const response = await app.request(`/api/workspace/call-rooms/${roomId}/sessions/start`, {
+      method: "POST",
+      headers: jsonHeaders(cookie)
+    });
+    expect(response.status).toBe(201);
+    return await response.json() as { session: { id: string; status: string } };
   }
 
   async function loginAs(email: string, password: string) {

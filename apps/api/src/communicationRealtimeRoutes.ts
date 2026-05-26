@@ -186,41 +186,57 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     }
     const sessionId = `call-session-${randomUUID()}`;
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      const session = await requireMethod(transactionDataSource.createCallSession).call(transactionDataSource, {
-        id: sessionId,
-        tenantId: actor.tenantId,
-        roomId: resolved.value.room.id,
-        providerSessionId: null,
-        status: "active",
-        startedByUserId: actor.id
-      });
-      const room = await requireMethod(transactionDataSource.updateCallRoomStatus).call(transactionDataSource, {
-        tenantId: actor.tenantId,
-        roomId: resolved.value.room.id,
-        status: "active"
-      });
-      const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
-        id: `call-event-${randomUUID()}`,
-        tenantId: actor.tenantId,
-        roomId: resolved.value.room.id,
-        sessionId: session.id,
-        actorUserId: actor.id,
-        eventType: "session_started",
-        payload: { provider: resolved.value.room.provider }
-      });
-      await deps.appendManagementAuditEvent(
-        communicationAudit({
-          actionType: "communications.call_session_started",
-          actor,
-          afterState: { roomId: resolved.value.room.id, sessionId: session.id },
-          commandInput: { roomId: resolved.value.room.id },
-          permissionResult: resolved.value.access.manageDecision,
-          sourceEntity: resolved.value.access.sourceEntity
-        }),
-        transactionDataSource
-      );
-      return { event, room: room ?? resolved.value.room, session };
+      try {
+        const session = await requireMethod(transactionDataSource.createCallSession).call(transactionDataSource, {
+          id: sessionId,
+          tenantId: actor.tenantId,
+          roomId: resolved.value.room.id,
+          providerSessionId: null,
+          status: "active",
+          startedByUserId: actor.id
+        });
+        const room = await requireMethod(transactionDataSource.updateCallRoomStatus).call(transactionDataSource, {
+          tenantId: actor.tenantId,
+          roomId: resolved.value.room.id,
+          status: "active"
+        });
+        const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
+          id: `call-event-${randomUUID()}`,
+          tenantId: actor.tenantId,
+          roomId: resolved.value.room.id,
+          sessionId: session.id,
+          actorUserId: actor.id,
+          eventType: "session_started",
+          payload: { provider: resolved.value.room.provider }
+        });
+        await deps.appendManagementAuditEvent(
+          communicationAudit({
+            actionType: "communications.call_session_started",
+            actor,
+            afterState: { roomId: resolved.value.room.id, sessionId: session.id },
+            commandInput: { roomId: resolved.value.room.id },
+            permissionResult: resolved.value.access.manageDecision,
+            sourceEntity: resolved.value.access.sourceEntity
+          }),
+          transactionDataSource
+        );
+        return { event, room: room ?? resolved.value.room, session };
+      } catch (error) {
+        if (isActiveSessionConflictError(error)) {
+          throw new CallRouteError(409, "call_room_already_active");
+        }
+        throw error;
+      }
+    }).catch((error: unknown) => {
+      if (error instanceof CallRouteError) return error;
+      if (isActiveSessionConflictError(error)) {
+        return new CallRouteError(409, "call_room_already_active");
+      }
+      throw error;
     });
+    if (result instanceof CallRouteError) {
+      return context.json({ error: result.error }, result.status);
+    }
     return context.json({
       callRoom: serializeCallRoom(result.room),
       session: serializeCallSession(result.session),
@@ -302,7 +318,27 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     const record = parseRecordBody(body.value);
     if (!record.ok) return context.json({ error: record.error }, 400);
     const parsed = parseParticipantStateBody(record.value, actor, resolved.value.access);
-    if (!parsed.ok) return context.json({ error: parsed.error }, parsed.status);
+    if (!parsed.ok) {
+      if (parsed.status === 403) {
+        await appendDeniedAudit(deps, {
+          actionType: "communications.denied",
+          actor,
+          commandInput: {
+            action: "participant-state.update",
+            roomId: resolved.value.room.id,
+            sessionId: resolved.value.session.id,
+            userId: typeof record.value.userId === "string" ? record.value.userId : null
+          },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: resolved.value.access.sourceEntity
+        });
+      }
+      return context.json({ error: parsed.error }, parsed.status);
+    }
+    if (parsed.value.userId !== actor.id) {
+      const participantExists = await tenantUserExists(deps.dataSource, actor.tenantId, parsed.value.userId);
+      if (!participantExists) return context.json({ error: "participant_user_not_found" }, 404);
+    }
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const participantState = await requireMethod(transactionDataSource.upsertCallParticipantState).call(transactionDataSource, {
         tenantId: actor.tenantId,
@@ -352,6 +388,17 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     const resolved = await resolveCallRoomAndSession(context.req.param("roomId"), context.req.param("sessionId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, {
+        actionType: "communications.denied",
+        actor,
+        commandInput: {
+          action: "session.end",
+          roomId: context.req.param("roomId"),
+          sessionId: context.req.param("sessionId")
+        },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
       return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
     }
     if (resolved.value.session.status !== "active") {
@@ -412,6 +459,13 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, {
+        actionType: "communications.denied",
+        actor,
+        commandInput: { action: "recording.attach", roomId: context.req.param("roomId") },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
       return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
     }
     if (!deps.dataSource.findAttachmentById || !deps.dataSource.createCallRecording || !deps.dataSource.createCallEvent) {
@@ -423,6 +477,12 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (!record.ok) return context.json({ error: record.error }, 400);
     const parsed = parseRecordingBody(record.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (parsed.value.sessionId) {
+      const session = await deps.dataSource.findCallSession?.(actor.tenantId, parsed.value.sessionId);
+      if (!session || session.roomId !== resolved.value.room.id) {
+        return context.json({ error: "call_session_not_found" }, 404);
+      }
+    }
     const attachment = await deps.dataSource.findAttachmentById(actor.tenantId, parsed.value.attachmentId);
     if (
       !attachment ||
@@ -716,6 +776,38 @@ function parseLimit(value: string | undefined): number {
 function requireMethod<T extends (...args: never[]) => unknown>(method: T | undefined): T {
   if (!method) throw new Error("communications_not_configured");
   return method;
+}
+
+class CallRouteError extends Error {
+  constructor(
+    readonly status: 409,
+    readonly error: string
+  ) {
+    super(error);
+  }
+}
+
+function isActiveSessionConflictError(error: unknown): boolean {
+  if (error instanceof Error && error.message === "call_room_already_active") return true;
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  return (
+    record.code === "23505" &&
+    (
+      record.constraint_name === "call_sessions_one_active_per_room_uidx" ||
+      record.constraint === "call_sessions_one_active_per_room_uidx" ||
+      String(record.message ?? "").includes("call_sessions_one_active_per_room_uidx")
+    )
+  ) || isActiveSessionConflictError(record.cause);
+}
+
+async function tenantUserExists(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  userId: string
+): Promise<boolean> {
+  const users = await dataSource.listUsersByTenantId(tenantId);
+  return users.some((user) => user.id === userId);
 }
 
 async function appendDeniedAudit(
