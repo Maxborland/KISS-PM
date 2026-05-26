@@ -1,743 +1,794 @@
-import { addDays, comparePlanDates, diffCalendarDays } from "./calendar";
+import { addDays, comparePlanDates, diffCalendarDays, maxPlanDate } from "./calendar";
+import { reducePlanningCommand } from "./commandReducer";
 import { createEmptyPlanDelta, type PlanDelta, type PlanningCommand } from "./planningCommands";
-import { getTopologicalTaskOrder } from "./dependencyGraph";
 import { buildResourceLoadMatrix, type ResourceLoadMatrix } from "./resourcePlanning";
 import { calculatePlan } from "./schedulingEngine";
-import { applyPlanDeltaToSnapshot } from "./scenarioPlanning";
-import type { CalculatedPlan, CalculatedTask, PlanAssignment, PlanDate, PlanDependency, PlanSnapshot } from "./types";
+import { workingMinutesForDate } from "./workingTime";
+import type {
+  CalculatedPlan,
+  CalculatedTask,
+  PlanAssignment,
+  PlanCalendar,
+  PlanCalendarException,
+  PlanDate,
+  PlanResource,
+  PlanSnapshot
+} from "./types";
 
 export type AutoPlanningSolverMode = "schedule" | "repair";
 
-export type AutoPlanningSolverProposal = {
-  id: string;
-  mode: AutoPlanningSolverMode;
-  label: string;
-  conflictEffect: "removed" | "accepted_overload";
-  planDelta: PlanDelta;
-  explainability: {
-    finishDate: PlanDate | null;
-    deadlineDeltaDays: number;
-    overloadMinutes: number;
-    changedTaskIds: string[];
-    changedAssignmentIds: string[];
-    acceptedRiskIds: string[];
-    riskScore: number;
-    cost: number;
-    reason: string;
-  };
-};
-
-export type AutoPlanningSolverRunResult = {
-  mode: AutoPlanningSolverMode;
-  planVersion: number;
-  engineVersion: string;
-  calculatedAt: string;
-  search: {
-    strategy: "bounded_beam";
-    beamWidth: number;
-    maxIterations: number;
-    maxProposals: number;
-  };
-  proposals: AutoPlanningSolverProposal[];
-};
-
-export type AutoPlanningSolverInput = {
-  mode: AutoPlanningSolverMode;
-  snapshot: PlanSnapshot;
-  calculatedPlan: CalculatedPlan;
-  resourceLoad: ResourceLoadMatrix;
-  calculatedAt: string;
+export type AutoPlanningSolverOptions = {
   beamWidth?: number;
   maxIterations?: number;
   maxProposals?: number;
 };
 
-export type ResourceCapacityProvider = (resourceId: string, date: PlanDate) => number | undefined;
-export type ResourceOccupationProvider = (resourceId: string, date: PlanDate) => number | undefined;
+export type AutoPlanningSolverInput = {
+  snapshot: PlanSnapshot;
+  mode: AutoPlanningSolverMode;
+  targetDeadline?: PlanDate | null;
+  calculatedAt?: string;
+  engineVersion?: string;
+  options?: AutoPlanningSolverOptions;
+};
+
+export type AutoPlanningSolverProposal = {
+  id: string;
+  mode: AutoPlanningSolverMode;
+  kind: "no_overlap" | "accepted_overload";
+  planDelta: PlanDelta;
+  explainability: {
+    finishDate: PlanDate | null;
+    deadlineDeltaDays: number;
+    overloadMinutes: number;
+    overloadedResourceIds: string[];
+    changedTaskIds: string[];
+    changedAssignmentIds: string[];
+    requiredApprovals: string[];
+    riskScore: number;
+    cost: AutoPlanningSolverCost;
+  };
+};
+
+export type AutoPlanningSolverCost = {
+  deadlineMissDays: number;
+  finishDateRank: number;
+  overloadMinutes: number;
+  changedTaskCount: number;
+  changedAssignmentCount: number;
+  riskScore: number;
+};
+
+export type AutoPlanningSolverRunResult = {
+  mode: AutoPlanningSolverMode;
+  engineVersion: string;
+  clientPlanVersion: number;
+  targetDeadline: PlanDate | null;
+  proposals: AutoPlanningSolverProposal[];
+  search: {
+    beamWidth: number;
+    maxIterations: number;
+    iterations: number;
+  };
+};
 
 type AssignmentPlan = {
   assignment: PlanAssignment;
-  sourceAssignmentId: string;
-  isNewAssignment: boolean;
-  workMinutes: number;
-  allocations: Array<{ date: PlanDate; workMinutes: number }>;
+  allocations: PlannedAllocation[];
+  acceptedOverloadMinutes: number;
 };
 
-type SolverAssignment = {
-  assignment: PlanAssignment;
-  task: CalculatedTask;
-  requiredWork: number;
+type PlannedAllocation = {
+  assignmentId: string;
+  taskId: string;
+  resourceId: string;
+  date: PlanDate;
+  workMinutes: number;
+  isSyntheticAssignment: boolean;
+};
+
+type UsageMap = Map<string, number>;
+
+type AssignmentPlanCandidate = {
+  plan: AssignmentPlan;
+  usage: UsageMap;
 };
 
 type SearchState = {
-  id: string;
-  nextIndex: number;
-  capacityByResourceDate: Map<string, number>;
   plans: AssignmentPlan[];
-  overloadedMinutes: number;
-  changedAssignmentIds: Set<string>;
-  operationKinds: string[];
-  lastAllocationDate: PlanDate | null;
+  usage: UsageMap;
+  cost: AutoPlanningSolverCost;
 };
 
-export function proposeAutoPlanningSolutions(input: AutoPlanningSolverInput): AutoPlanningSolverRunResult {
-  const beamWidth = input.beamWidth ?? 20;
-  const maxIterations = input.maxIterations ?? 200;
-  const maxProposals = input.maxProposals ?? 5;
-  const proposals = [
-    createAllocationProposal(input, "removed"),
-    createAllocationProposal(input, "accepted_overload")
-  ]
-    .filter((proposal): proposal is AutoPlanningSolverProposal => Boolean(proposal))
-    .sort((left, right) => left.explainability.cost - right.explainability.cost || left.id.localeCompare(right.id))
+type AssignmentUpsertDraft = Pick<
+  PlanAssignment,
+  "id" | "taskId" | "resourceId" | "role" | "unitsPermille"
+> & {
+  workMinutes: number;
+};
+
+const defaultEngineVersion = "planning-core-v1";
+
+export function proposeAutoPlanningSolutions(
+  input: AutoPlanningSolverInput
+): AutoPlanningSolverRunResult {
+  const beamWidth = clampPositiveInteger(input.options?.beamWidth, 20);
+  const maxIterations = clampPositiveInteger(input.options?.maxIterations, 200);
+  const maxProposals = clampPositiveInteger(input.options?.maxProposals, 5);
+  const engineVersion = input.engineVersion ?? defaultEngineVersion;
+  const calculatedPlan = calculatePlan(input.snapshot, {
+    calculatedAt: input.calculatedAt ?? input.snapshot.capturedAt,
+    engineVersion
+  });
+  const targetDeadline =
+    input.targetDeadline ??
+    input.snapshot.project.deadline ??
+    calculatedPlan.projectFinish ??
+    input.snapshot.project.plannedFinish;
+
+  const assignmentQueue = planEligibleAssignments(input.snapshot, calculatedPlan);
+  const baseUsage = buildBaseUsage(input.snapshot, assignmentQueue);
+  const noOverlapPlans = scheduleAssignments({
+    snapshot: input.snapshot,
+    calculatedPlan,
+    assignments: assignmentQueue,
+    targetDeadline,
+    baseUsage: cloneUsage(baseUsage),
+    allowOverload: false,
+    beamWidth,
+    maxIterations
+  });
+  const proposals: AutoPlanningSolverProposal[] = [];
+
+  appendNonEmptyProposal(
+    proposals,
+    noOverlapPlans &&
+      createSolverProposal({
+        snapshot: input.snapshot,
+        calculatedPlan,
+        mode: input.mode,
+        kind: "no_overlap",
+        targetDeadline,
+        assignmentPlans: noOverlapPlans.assignmentPlans,
+        engineVersion
+      })
+  );
+
+  const overloadPlans = scheduleAssignments({
+    snapshot: input.snapshot,
+    calculatedPlan,
+    assignments: assignmentQueue,
+    targetDeadline,
+    baseUsage: cloneUsage(baseUsage),
+    allowOverload: true,
+    beamWidth,
+    maxIterations
+  });
+  appendNonEmptyProposal(
+    proposals,
+    overloadPlans &&
+      createSolverProposal({
+        snapshot: input.snapshot,
+        calculatedPlan,
+        mode: input.mode,
+        kind: overloadPlans.assignmentPlans.some((plan) => plan.acceptedOverloadMinutes > 0)
+          ? "accepted_overload"
+          : "no_overlap",
+        targetDeadline,
+        assignmentPlans: overloadPlans.assignmentPlans,
+        engineVersion
+      })
+  );
+
+  const unique = uniqueProposals(proposals)
+    .sort(compareSolverProposals)
     .slice(0, maxProposals);
 
   return {
     mode: input.mode,
-    planVersion: input.snapshot.planVersion,
-    engineVersion: input.calculatedPlan.engineVersion,
-    calculatedAt: input.calculatedAt,
+    engineVersion,
+    clientPlanVersion: input.snapshot.planVersion,
+    targetDeadline,
+    proposals: unique,
     search: {
-      strategy: "bounded_beam",
       beamWidth,
       maxIterations,
-      maxProposals
-    },
-    proposals
+      iterations: Math.max(noOverlapPlans?.iterations ?? 0, overloadPlans?.iterations ?? 0)
+    }
   };
 }
 
-function createAllocationProposal(
-  input: AutoPlanningSolverInput,
-  conflictEffect: AutoPlanningSolverProposal["conflictEffect"]
-): AutoPlanningSolverProposal | null {
-  const plans = planAssignmentAllocations(input, conflictEffect === "accepted_overload");
-  if (!plans) return null;
-  const commands = commandsForAssignmentPlans(input, plans);
-  if (conflictEffect === "accepted_overload") {
-    commands.push({
-      type: "risk.accept_overload",
-      payload: {
-        overloadId: `auto-solver:${input.snapshot.projectId}:${input.snapshot.planVersion}`,
-        acceptedRiskReason: "Auto-solver could not meet the deadline without controlled overload"
+function scheduleAssignments(input: {
+  snapshot: PlanSnapshot;
+  calculatedPlan: CalculatedPlan;
+  assignments: PlanAssignment[];
+  targetDeadline: PlanDate;
+  baseUsage: UsageMap;
+  allowOverload: boolean;
+  beamWidth: number;
+  maxIterations: number;
+}): { assignmentPlans: AssignmentPlan[]; iterations: number } | null {
+  let states: SearchState[] = [
+    {
+      plans: [],
+      usage: input.baseUsage,
+      cost: emptySearchCost()
+    }
+  ];
+  let iterations = 0;
+
+  for (const assignment of input.assignments) {
+    const task = input.calculatedPlan.tasks.find((candidate) => candidate.id === assignment.taskId);
+    if (!task?.calculatedStart) continue;
+    const workMinutes = resolveAssignmentWork(input.snapshot.assignments, assignment, task.workMinutes);
+    if (workMinutes <= 0) {
+      states = states.map((state) => {
+        const plans = [...state.plans, { assignment, allocations: [], acceptedOverloadMinutes: 0 }];
+        return {
+          plans,
+          usage: state.usage,
+          cost: costForAssignmentPlans(plans, input.snapshot, input.targetDeadline)
+        };
+      });
+      continue;
+    }
+
+    const nextStates: SearchState[] = [];
+    const activeStates = iterations >= input.maxIterations ? states.slice(0, 1) : states;
+    for (const state of activeStates) {
+      const candidates = allocateAssignmentCandidates({
+        snapshot: input.snapshot,
+        task,
+        assignment,
+        workMinutes,
+        targetDeadline: input.targetDeadline,
+        usage: state.usage,
+        allowOverload: input.allowOverload
+      });
+      const activeCandidates = iterations >= input.maxIterations ? candidates.slice(0, 1) : candidates;
+      for (const candidate of activeCandidates) {
+        if (iterations < input.maxIterations) iterations += 1;
+        const plans = [...state.plans, candidate.plan];
+        nextStates.push({
+          plans,
+          usage: candidate.usage,
+          cost: costForAssignmentPlans(plans, input.snapshot, input.targetDeadline)
+        });
+        if (iterations >= input.maxIterations) break;
       }
-    });
+      if (iterations >= input.maxIterations && nextStates.length > 0) break;
+    }
+
+    states = dedupeSearchStates(nextStates)
+      .sort(compareSearchStates)
+      .slice(0, iterations >= input.maxIterations ? 1 : input.beamWidth);
+    if (states.length === 0) return null;
   }
-  if (commands.length === 0) return null;
-  const planDelta = planDeltaFor(commands);
-  const evaluated = evaluateDelta(input, planDelta);
-  const overloadMinutes = evaluated.resourceLoad.overloads
-    .filter((overload) => overload.granularity === "day")
-    .reduce((total, overload) => total + overload.overloadMinutes, 0);
-  if (conflictEffect === "removed" && overloadMinutes > 0) return null;
-  if (conflictEffect === "accepted_overload" && overloadMinutes === 0) return null;
-  const finishDate = latestPlanDate([
-    evaluated.calculatedPlan.projectFinish,
-    latestPlanDate(plans.flatMap((plan) => plan.allocations.map((allocation) => allocation.date)))
-  ]);
-  const deadlineDeltaDays = deadlineMissDays(input.snapshot.project.deadline, finishDate);
-  const acceptedRiskIds = planDelta.acceptedRiskIds;
-  const riskScore = conflictEffect === "accepted_overload" ? 90 : 20;
-  const changedTaskIds = planDelta.changedTaskIds;
-  const changedAssignmentIds = planDelta.changedAssignmentIds;
+
+  return { assignmentPlans: states[0]?.plans ?? [], iterations };
+}
+
+function allocateAssignmentCandidates(input: {
+  snapshot: PlanSnapshot;
+  task: CalculatedTask;
+  assignment: PlanAssignment;
+  workMinutes: number;
+  targetDeadline: PlanDate;
+  usage: UsageMap;
+  allowOverload: boolean;
+}): AssignmentPlanCandidate[] {
+  const candidates = resourceOrders(input.snapshot, input.assignment.resourceId).flatMap((resourceOrder) => {
+    const candidate = allocateAssignmentForResourceOrder({
+      ...input,
+      resourceOrder
+    });
+    return candidate ? [candidate] : [];
+  });
+  return dedupeAssignmentCandidates(candidates).sort((left, right) =>
+    compareAssignmentPlans(left.plan, right.plan, input.snapshot, input.targetDeadline)
+  );
+}
+
+function allocateAssignmentForResourceOrder(input: {
+  snapshot: PlanSnapshot;
+  task: CalculatedTask;
+  assignment: PlanAssignment;
+  workMinutes: number;
+  targetDeadline: PlanDate;
+  usage: UsageMap;
+  allowOverload: boolean;
+  resourceOrder: string[];
+}): AssignmentPlanCandidate | null {
+  const usage = cloneUsage(input.usage);
+  const start = input.task.calculatedStart ?? input.snapshot.project.plannedStart;
+  const finish = maxPlanDate(start, input.targetDeadline);
+  const dates = enumerateDates(start, finish);
+  let remaining = input.workMinutes;
+  const allocations: PlannedAllocation[] = [];
+
+  for (const resourceId of input.resourceOrder) {
+    for (const date of dates) {
+      if (remaining <= 0) break;
+      const free = freeCapacityFor(input.snapshot, usage, resourceId, date);
+      if (free <= 0) continue;
+      const workMinutes = Math.min(free, remaining);
+      allocations.push({
+        assignmentId: assignmentIdForResource(input.snapshot.assignments, input.assignment, resourceId),
+        taskId: input.assignment.taskId,
+        resourceId,
+        date,
+        workMinutes,
+        isSyntheticAssignment: resourceId !== input.assignment.resourceId
+      });
+      addUsage(usage, resourceId, date, workMinutes);
+      remaining -= workMinutes;
+    }
+  }
+
+  let acceptedOverloadMinutes = 0;
+  if (remaining > 0) {
+    if (!input.allowOverload) return null;
+    const overloadDate = dates[dates.length - 1] ?? input.targetDeadline;
+    allocations.push({
+      assignmentId: input.assignment.id,
+      taskId: input.assignment.taskId,
+      resourceId: input.assignment.resourceId,
+      date: overloadDate,
+      workMinutes: remaining,
+      isSyntheticAssignment: false
+    });
+    addUsage(usage, input.assignment.resourceId, overloadDate, remaining);
+    acceptedOverloadMinutes = remaining;
+  }
 
   return {
-    id: `auto-solver-${input.mode}-${conflictEffect}-${input.snapshot.projectId}-${input.snapshot.planVersion}`,
+    plan: {
+      assignment: input.assignment,
+      allocations,
+      acceptedOverloadMinutes
+    },
+    usage
+  };
+}
+
+function createSolverProposal(input: {
+  snapshot: PlanSnapshot;
+  calculatedPlan: CalculatedPlan;
+  mode: AutoPlanningSolverMode;
+  kind: AutoPlanningSolverProposal["kind"];
+  targetDeadline: PlanDate;
+  assignmentPlans: AssignmentPlan[];
+  engineVersion: string;
+}): AutoPlanningSolverProposal {
+  const commands = commandsForAssignmentPlans(input.assignmentPlans, input.snapshot);
+  const planDelta = createPlanDelta(commands);
+  const nextSnapshot = commands.reduce(
+    (snapshot, command) => reducePlanningCommand(snapshot, command).nextSnapshot,
+    input.snapshot
+  );
+  const nextPlan = calculatePlan(nextSnapshot, {
+    calculatedAt: input.snapshot.capturedAt,
+    engineVersion: input.engineVersion
+  });
+  const resourceLoad = buildResourceLoadMatrix({
+    plan: nextPlan,
+    resources: nextSnapshot.resources,
+    assignments: nextSnapshot.assignments,
+    assignmentAllocations: nextSnapshot.assignmentAllocations ?? [],
+    calendars: nextSnapshot.calendars,
+    calendarExceptions: nextSnapshot.calendarExceptions,
+    reservations: nextSnapshot.reservations,
+    rangeStart: nextSnapshot.project.plannedStart,
+    rangeFinish: maxPlanDate(input.targetDeadline, nextPlan.projectFinish ?? input.targetDeadline),
+    granularities: ["day"]
+  });
+  const finishDate = nextPlan.projectFinish ?? latestAllocationDate(input.assignmentPlans);
+  const overloadMinutes = resourceLoad.overloads.reduce(
+    (total, overload) => total + overload.overloadMinutes,
+    0
+  );
+  const riskScore =
+    input.kind === "accepted_overload"
+      ? Math.min(100, 70 + Math.ceil(overloadMinutes / 60))
+      : overloadMinutes > 0
+        ? 40
+        : 10;
+  const deadlineMissDays =
+    finishDate && comparePlanDates(finishDate, input.targetDeadline) > 0
+      ? diffCalendarDays(input.targetDeadline, finishDate)
+      : 0;
+  const cost: AutoPlanningSolverCost = {
+    deadlineMissDays,
+    finishDateRank: finishDate ? diffCalendarDays(input.snapshot.project.plannedStart, finishDate) : 0,
+    overloadMinutes,
+    changedTaskCount: planDelta.changedTaskIds.length,
+    changedAssignmentCount: planDelta.changedAssignmentIds.length,
+    riskScore
+  };
+
+  return {
+    id: `auto-${input.mode}-${input.kind}-${input.targetDeadline}`,
     mode: input.mode,
-    label:
-      conflictEffect === "removed"
-        ? "Перераспределить работу без перегрузов"
-        : "Уложиться в срок с управляемым перегрузом",
-    conflictEffect,
+    kind: input.kind,
     planDelta,
     explainability: {
       finishDate,
-      deadlineDeltaDays,
+      deadlineDeltaDays: deadlineMissDays,
       overloadMinutes,
-      changedTaskIds,
-      changedAssignmentIds,
-      acceptedRiskIds,
+      overloadedResourceIds: [
+        ...new Set(resourceLoad.overloads.map((overload) => overload.resourceId))
+      ].sort(),
+      changedTaskIds: planDelta.changedTaskIds,
+      changedAssignmentIds: planDelta.changedAssignmentIds,
+      requiredApprovals:
+        input.kind === "accepted_overload" ? ["tenant.project_plan.manage"] : [],
       riskScore,
-      cost: proposalCost({
-        deadlineDeltaDays,
-        finishDate,
-        projectStart: input.snapshot.project.plannedStart,
-        overloadMinutes,
-        changedCount: changedTaskIds.length + changedAssignmentIds.length,
-        riskScore
-      }),
-      reason:
-        conflictEffect === "removed"
-          ? "Solver allocates assignment work into daily free capacity before accepting overload"
-          : "Solver preserves deadline priority and exposes remaining overload as an explicit risk"
+      cost
     }
   };
 }
 
-function planAssignmentAllocations(
-  input: AutoPlanningSolverInput,
-  allowOverload: boolean
-): AssignmentPlan[] | null {
-  const solverAssignments = buildSolverAssignments(input);
-  const solvableAssignmentIds = new Set(solverAssignments.map((solverAssignment) => solverAssignment.assignment.id));
-  const lockedOccupation = buildLockedOccupationProvider(input, solvableAssignmentIds);
-  const initialState: SearchState = {
-    id: "root",
-    nextIndex: 0,
-    capacityByResourceDate: buildAvailableCapacityMap(input, lockedOccupation),
-    plans: [],
-    overloadedMinutes: 0,
-    changedAssignmentIds: new Set(),
-    operationKinds: [],
-    lastAllocationDate: null
-  };
-  let beam: SearchState[] = [initialState];
-  const beamWidth = Math.max(1, input.beamWidth ?? 20);
-  const maxIterations = Math.max(1, input.maxIterations ?? 200);
-  let iterations = 0;
+function commandsForAssignmentPlans(
+  plans: AssignmentPlan[],
+  snapshot: PlanSnapshot
+): PlanningCommand[] {
+  const commands: PlanningCommand[] = taskScheduleCommandsForPlans(plans, snapshot);
+  const upsertsByAssignmentId = new Map<string, AssignmentUpsertDraft>();
+  const allocationsByAssignmentId = new Map<string, PlannedAllocation[]>();
+  const existingAssignments = snapshot.assignments;
+  const existingAssignmentById = new Map(existingAssignments.map((assignment) => [assignment.id, assignment]));
+  const riskCommands: PlanningCommand[] = [];
 
-  while (beam.some((state) => state.nextIndex < solverAssignments.length) && iterations < maxIterations) {
-    const expanded: SearchState[] = [];
-    for (const state of beam) {
-      if (state.nextIndex >= solverAssignments.length) {
-        expanded.push(state);
-        continue;
-      }
-      iterations += 1;
-      expanded.push(
-        ...expandAssignmentState(input, state, solverAssignments[state.nextIndex], allowOverload)
-      );
-      if (iterations >= maxIterations) break;
-    }
-    if (expanded.length === 0) return null;
-    beam = pruneEquivalentStates(expanded)
-      .sort((left, right) => compareSearchStates(input, left, right))
-      .slice(0, beamWidth);
-  }
+  for (const plan of plans) {
+    const planAllocationsByAssignmentId = groupAllocationsByAssignmentId(plan.allocations);
+    const originalAllocations = planAllocationsByAssignmentId.get(plan.assignment.id) ?? [];
+    const syntheticAssignmentIds = [...planAllocationsByAssignmentId.keys()]
+      .filter((assignmentId) => assignmentId !== plan.assignment.id)
+      .sort();
 
-  const completed = beam
-    .filter((state) => state.nextIndex >= solverAssignments.length)
-    .sort((left, right) => compareSearchStates(input, left, right));
-  return completed[0]?.plans ?? null;
-}
-
-function commandsForAssignmentPlans(input: AutoPlanningSolverInput, plans: AssignmentPlan[]): PlanningCommand[] {
-  const commands: PlanningCommand[] = [];
-  for (const taskPatch of taskSchedulePatchesForPlans(input, plans)) {
-    commands.push({
-      type: "task.update_schedule",
-      payload: taskPatch
+    appendAllocationBucket(allocationsByAssignmentId, plan.assignment.id, originalAllocations);
+    mergeAssignmentUpsert(upsertsByAssignmentId, {
+      id: plan.assignment.id,
+      taskId: plan.assignment.taskId,
+      resourceId: plan.assignment.resourceId,
+      role: plan.assignment.role,
+      unitsPermille: plan.assignment.unitsPermille,
+      workMinutes: sumAllocationMinutes(originalAllocations)
     });
-  }
-  const sourceAssignmentIds = new Set(plans.map((plan) => plan.sourceAssignmentId));
-  for (const sourceAssignmentId of sourceAssignmentIds) {
-    if (!plans.some((plan) => plan.assignment.id === sourceAssignmentId)) {
-      commands.push({
-        type: "assignment.delete",
-        payload: { assignmentId: sourceAssignmentId }
+
+    for (const assignmentId of syntheticAssignmentIds) {
+      const allocations = planAllocationsByAssignmentId.get(assignmentId) ?? [];
+      const first = allocations[0];
+      if (!first) continue;
+      const existingAssignment = existingAssignmentById.get(assignmentId);
+      appendAllocationBucket(allocationsByAssignmentId, assignmentId, allocations);
+      mergeAssignmentUpsert(upsertsByAssignmentId, {
+        id: assignmentId,
+        taskId: plan.assignment.taskId,
+        resourceId: first.resourceId,
+        role: existingAssignment?.role ?? "co_executor",
+        unitsPermille: existingAssignment?.unitsPermille ?? 1000,
+        workMinutes: sumAllocationMinutes(allocations)
+      });
+    }
+
+    if (plan.acceptedOverloadMinutes > 0) {
+      riskCommands.push({
+        type: "risk.accept_overload",
+        payload: {
+          overloadId: `${plan.assignment.resourceId}:${plan.assignment.taskId}`,
+          acceptedRiskReason: "Auto-solver could not find a no-overlap allocation before the deadline"
+        }
       });
     }
   }
-  for (const plan of plans) {
+
+  const normalizedUpserts = [...upsertsByAssignmentId.values()].map((draft) => ({
+    ...draft,
+    workMinutes: sumAllocationMinutes(allocationsByAssignmentId.get(draft.id) ?? [])
+  }));
+  for (const draft of normalizedUpserts.sort((left, right) => left.id.localeCompare(right.id))) {
     commands.push({
       type: "assignment.upsert",
-      payload: {
-        id: plan.assignment.id,
-        taskId: plan.assignment.taskId,
-        resourceId: plan.assignment.resourceId,
-        role: plan.assignment.role,
-        unitsPermille: plan.assignment.unitsPermille,
-        workMinutes: plan.workMinutes
-      }
+      payload: draft
     });
+  }
+
+  for (const [assignmentId, allocations] of [...allocationsByAssignmentId.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))) {
     commands.push({
       type: "assignment.allocations.replace",
       payload: {
-        assignmentId: plan.assignment.id,
-        allocations: mergeAllocations(plan.allocations)
+        assignmentId,
+        allocations: compactAllocationsByDate(allocations).map(toAllocationPayload)
       }
     });
   }
-  return commands;
+
+  return [...commands, ...riskCommands];
 }
 
-function buildSolverAssignments(input: AutoPlanningSolverInput): SolverAssignment[] {
-  const taskOrder = new Map(
-    getTopologicalTaskOrder(
-      input.snapshot.tasks.map((task) => task.id),
-      input.snapshot.dependencies
-    ).map((taskId, index) => [taskId, index])
-  );
-  return input.snapshot.assignments
-    .filter(isWorkAssignment)
-    .flatMap((assignment) => {
-      const task = input.calculatedPlan.tasks.find((candidate) => candidate.id === assignment.taskId);
-      if (!task || !shouldSolveTask(input.mode, task)) return [];
-      const requiredWork = resolveAssignmentWork(input.snapshot.assignments, assignment, task.workMinutes);
-      if (requiredWork <= 0) return [];
-      return [{ assignment, task, requiredWork }];
-    })
-    .sort((left, right) =>
-      (taskOrder.get(left.task.id) ?? Number.MAX_SAFE_INTEGER) -
-        (taskOrder.get(right.task.id) ?? Number.MAX_SAFE_INTEGER) ||
-      comparePlanDates(
-        left.task.calculatedStart ?? input.snapshot.project.plannedStart,
-        right.task.calculatedStart ?? input.snapshot.project.plannedStart
-      ) ||
-      comparePlanDates(
-        left.task.calculatedFinish ?? input.snapshot.project.plannedFinish,
-        right.task.calculatedFinish ?? input.snapshot.project.plannedFinish
-      ) ||
-      left.task.wbsCode.localeCompare(right.task.wbsCode, undefined, { numeric: true }) ||
-      left.assignment.id.localeCompare(right.assignment.id)
-    );
-}
-
-function buildAvailableCapacityMap(
-  input: AutoPlanningSolverInput,
-  lockedOccupation: ResourceOccupationProvider
-): Map<string, number> {
-  const capacityByResourceDate = new Map<string, number>();
-  for (const bucket of input.resourceLoad.buckets.filter((item) => item.granularity === "day")) {
-    capacityByResourceDate.set(
-      resourceDateKey(bucket.resourceId, bucket.date),
-      Math.max(
-        0,
-        bucket.capacityMinutes -
-          bucket.reservedMinutes -
-          (lockedOccupation(bucket.resourceId, bucket.date) ?? 0)
-      )
-    );
-  }
-  return capacityByResourceDate;
-}
-
-function expandAssignmentState(
-  input: AutoPlanningSolverInput,
-  state: SearchState,
-  solverAssignment: SolverAssignment | undefined,
-  allowOverload: boolean
-): SearchState[] {
-  if (!solverAssignment) return [{ ...state, nextIndex: state.nextIndex + 1 }];
-  const candidateResources = orderedCandidateResources(input, solverAssignment.assignment);
-  const dates = allocationDatesForTask(
-    input,
-    state,
-    solverAssignment,
-    solverAssignment.task.calculatedStart ?? input.snapshot.project.plannedStart
-  );
-  const candidates: SearchState[] = [];
-
-  for (const resourceId of candidateResources) {
-    const singleResource = allocateAcrossResources({
-      source: solverAssignment,
-      resourceIds: [resourceId],
-      dates,
-      capacityByResourceDate: state.capacityByResourceDate,
-      allowOverload: false
-    });
-    if (singleResource) {
-      candidates.push(appendAllocationCandidate(state, solverAssignment, singleResource, "single"));
-    }
-  }
-
-  const split = allocateAcrossResources({
-    source: solverAssignment,
-    resourceIds: candidateResources,
-    dates,
-    capacityByResourceDate: state.capacityByResourceDate,
-    allowOverload: false
-  });
-  if (split && split.plans.length > 1) {
-    candidates.push(appendAllocationCandidate(state, solverAssignment, split, "split"));
-  }
-
-  if (allowOverload) {
-    const overload = allocateAcrossResources({
-      source: solverAssignment,
-      resourceIds: [solverAssignment.assignment.resourceId, ...candidateResources.filter((id) => id !== solverAssignment.assignment.resourceId)],
-      dates,
-      capacityByResourceDate: state.capacityByResourceDate,
-      allowOverload: true
-    });
-    if (overload) {
-      candidates.push(appendAllocationCandidate(state, solverAssignment, overload, "overload"));
-    }
-  }
-
-  return pruneEquivalentStates(candidates).sort((left, right) => compareSearchStates(input, left, right));
-}
-
-function allocateAcrossResources(input: {
-  source: SolverAssignment;
-  resourceIds: string[];
-  dates: PlanDate[];
-  capacityByResourceDate: Map<string, number>;
-  allowOverload: boolean;
-}): {
-  capacityByResourceDate: Map<string, number>;
-  plans: AssignmentPlan[];
-  overloadedMinutes: number;
-  lastAllocationDate: PlanDate | null;
-} | null {
-  const nextCapacity = new Map(input.capacityByResourceDate);
-  const plans: AssignmentPlan[] = [];
-  let remainingWork = input.source.requiredWork;
-  let overloadedMinutes = 0;
-  let lastAllocationDate: PlanDate | null = null;
-
-  for (const resourceId of input.resourceIds) {
-    if (remainingWork <= 0) break;
-    const allocations: Array<{ date: PlanDate; workMinutes: number }> = [];
-    for (const date of input.dates) {
-      if (remainingWork <= 0) break;
-      const key = resourceDateKey(resourceId, date);
-      const available = nextCapacity.get(key) ?? 0;
-      if (available <= 0) continue;
-      const workMinutes = Math.min(remainingWork, available);
-      nextCapacity.set(key, available - workMinutes);
-      remainingWork -= workMinutes;
-      allocations.push({ date, workMinutes });
-      lastAllocationDate = latestPlanDate([lastAllocationDate, date]);
-    }
-    const workMinutes = allocations.reduce((total, allocation) => total + allocation.workMinutes, 0);
-    if (workMinutes > 0) {
-      plans.push(toAssignmentPlan(input.source.assignment, resourceId, workMinutes, allocations));
-    }
-  }
-
-  if (remainingWork > 0) {
-    if (!input.allowOverload) return null;
-    const overloadDate = input.dates[0];
-    const overloadResourceId = input.source.assignment.resourceId;
-    if (!overloadDate) return null;
-    overloadedMinutes += remainingWork;
-    const existingPlan = plans.find((plan) => plan.assignment.resourceId === overloadResourceId);
-    if (existingPlan) {
-      existingPlan.allocations.push({ date: overloadDate, workMinutes: remainingWork });
-      existingPlan.workMinutes += remainingWork;
-      existingPlan.assignment.workMinutes = existingPlan.workMinutes;
-    } else {
-      plans.push(
-        toAssignmentPlan(input.source.assignment, overloadResourceId, remainingWork, [
-          { date: overloadDate, workMinutes: remainingWork }
-        ])
-      );
-    }
-    const key = resourceDateKey(overloadResourceId, overloadDate);
-    nextCapacity.set(key, (nextCapacity.get(key) ?? 0) - remainingWork);
-    lastAllocationDate = latestPlanDate([lastAllocationDate, overloadDate]);
-  }
-
-  return {
-    capacityByResourceDate: nextCapacity,
-    plans,
-    overloadedMinutes,
-    lastAllocationDate
-  };
-}
-
-function appendAllocationCandidate(
-  state: SearchState,
-  solverAssignment: SolverAssignment,
-  candidate: {
-    capacityByResourceDate: Map<string, number>;
-    plans: AssignmentPlan[];
-    overloadedMinutes: number;
-    lastAllocationDate: PlanDate | null;
-  },
-  operationKind: string
-): SearchState {
-  const changedAssignmentIds = new Set(state.changedAssignmentIds);
-  for (const plan of candidate.plans) {
-    if (
-      plan.assignment.id !== solverAssignment.assignment.id ||
-      plan.assignment.resourceId !== solverAssignment.assignment.resourceId ||
-      plan.workMinutes !== (solverAssignment.assignment.workMinutes ?? solverAssignment.requiredWork)
-    ) {
-      changedAssignmentIds.add(solverAssignment.assignment.id);
-      changedAssignmentIds.add(plan.assignment.id);
-    }
-  }
-  if (!candidate.plans.some((plan) => plan.assignment.id === solverAssignment.assignment.id)) {
-    changedAssignmentIds.add(solverAssignment.assignment.id);
-  }
-
-  return {
-    id: [
-      state.id,
-      operationKind,
-      candidate.plans
-        .map((plan) => `${plan.assignment.id}:${plan.assignment.resourceId}:${plan.workMinutes}`)
-        .join(",")
-    ].join(">"),
-    nextIndex: state.nextIndex + 1,
-    capacityByResourceDate: candidate.capacityByResourceDate,
-    plans: [...state.plans, ...candidate.plans],
-    overloadedMinutes: state.overloadedMinutes + candidate.overloadedMinutes,
-    changedAssignmentIds,
-    operationKinds: [...state.operationKinds, operationKind],
-    lastAllocationDate: latestPlanDate([state.lastAllocationDate, candidate.lastAllocationDate])
-  };
-}
-
-function toAssignmentPlan(
-  source: PlanAssignment,
-  resourceId: string,
-  workMinutes: number,
-  allocations: Array<{ date: PlanDate; workMinutes: number }>
-): AssignmentPlan {
-  return {
-    assignment: {
-      ...source,
-      id: resourceId === source.resourceId ? source.id : `${source.id}-solver-${resourceId}`,
-      resourceId,
-      role: resourceId === source.resourceId ? source.role : "co_executor",
-      workMinutes
-    },
-    sourceAssignmentId: source.id,
-    isNewAssignment: resourceId !== source.resourceId,
-    workMinutes,
-    allocations
-  };
-}
-
-function pruneEquivalentStates(states: SearchState[]): SearchState[] {
-  const byKey = new Map<string, SearchState>();
-  for (const state of states) {
-    const key = [
-      state.nextIndex,
-      state.plans
-        .map((plan) => `${plan.assignment.id}:${plan.assignment.resourceId}:${mergeAllocations(plan.allocations).map((allocation) => `${allocation.date}:${allocation.workMinutes}`).join(",")}`)
-        .sort()
-        .join("|")
-    ].join("::");
-    const existing = byKey.get(key);
-    if (!existing || state.overloadedMinutes < existing.overloadedMinutes || state.id.localeCompare(existing.id) < 0) {
-      byKey.set(key, state);
-    }
-  }
-  return [...byKey.values()];
-}
-
-function compareSearchStates(input: AutoPlanningSolverInput, left: SearchState, right: SearchState): number {
-  return (
-    deadlineMissDays(input.snapshot.project.deadline, left.lastAllocationDate) -
-      deadlineMissDays(input.snapshot.project.deadline, right.lastAllocationDate) ||
-    compareNullableDates(left.lastAllocationDate, right.lastAllocationDate) ||
-    left.overloadedMinutes - right.overloadedMinutes ||
-    left.changedAssignmentIds.size - right.changedAssignmentIds.size ||
-    operationRisk(left.operationKinds) - operationRisk(right.operationKinds) ||
-    left.id.localeCompare(right.id)
-  );
-}
-
-function taskSchedulePatchesForPlans(
-  input: AutoPlanningSolverInput,
-  plans: AssignmentPlan[]
-): Array<{ taskId: string; plannedStart: PlanDate | null; plannedFinish: PlanDate | null }> {
+function taskScheduleCommandsForPlans(
+  plans: AssignmentPlan[],
+  snapshot: PlanSnapshot
+): PlanningCommand[] {
   const datesByTaskId = new Map<string, PlanDate[]>();
   for (const plan of plans) {
-    datesByTaskId.set(plan.assignment.taskId, [
-      ...(datesByTaskId.get(plan.assignment.taskId) ?? []),
-      ...plan.allocations.map((allocation) => allocation.date)
-    ]);
+    const dates = datesByTaskId.get(plan.assignment.taskId) ?? [];
+    dates.push(...plan.allocations.map((allocation) => allocation.date));
+    datesByTaskId.set(plan.assignment.taskId, dates);
   }
 
-  return [...datesByTaskId.entries()].flatMap(([taskId, dates]) => {
-    const sortedDates = [...new Set(dates)].sort((left, right) => left.localeCompare(right));
-    const plannedStart = sortedDates[0];
-    const plannedFinish = sortedDates.at(-1);
-    const task = input.snapshot.tasks.find((candidate) => candidate.id === taskId);
-    if (!task || !plannedStart || !plannedFinish) return [];
-    if (task.plannedStart === plannedStart && task.plannedFinish === plannedFinish) return [];
-    return [{ taskId, plannedStart, plannedFinish }];
-  });
+  return [...datesByTaskId.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([taskId, dates]) => {
+      const task = snapshot.tasks.find((candidate) => candidate.id === taskId);
+      if (!task || dates.length === 0) return [];
+      const sortedDates = [...new Set(dates)].sort(comparePlanDates);
+      const plannedStart = sortedDates[0] ?? null;
+      const plannedFinish = sortedDates.at(-1) ?? null;
+      if (task.plannedStart === plannedStart && task.plannedFinish === plannedFinish) return [];
+      return [{
+        type: "task.update_schedule" as const,
+        payload: {
+          taskId,
+          plannedStart,
+          plannedFinish
+        }
+      }];
+    });
 }
 
-function evaluateDelta(input: AutoPlanningSolverInput, planDelta: PlanDelta) {
-  const snapshot = applyPlanDeltaToSnapshot(input.snapshot, planDelta);
-  const calculatedPlan = calculatePlan(snapshot, {
-    calculatedAt: input.calculatedAt,
-    engineVersion: input.calculatedPlan.engineVersion
-  });
-  const resourceLoad = buildResourceLoadMatrix({
-    plan: calculatedPlan,
-    resources: snapshot.resources,
-    assignments: snapshot.assignments,
-    assignmentAllocations: snapshot.assignmentAllocations,
-    calendars: snapshot.calendars,
-    calendarExceptions: snapshot.calendarExceptions,
-    reservations: snapshot.reservations,
-    rangeStart: snapshot.project.plannedStart,
-    rangeFinish:
-      latestPlanDate([
-        calculatedPlan.projectFinish,
-        snapshot.project.plannedFinish,
-        latestPlanDate((snapshot.assignmentAllocations ?? []).map((allocation) => allocation.date))
-      ]) ?? snapshot.project.plannedFinish,
-    granularities: ["day"]
-  });
-  return { calculatedPlan, resourceLoad };
-}
-
-function planDeltaFor(commands: PlanningCommand[]): PlanDelta {
+function createPlanDelta(commands: PlanningCommand[]): PlanDelta {
+  const changedTaskIds = [
+    ...new Set(
+      commands.flatMap((command) => {
+        if ("taskId" in command.payload) return [String(command.payload.taskId)];
+        return [];
+      })
+    )
+  ].sort();
+  const changedAssignmentIds = [
+    ...new Set(
+      commands.flatMap((command) => {
+        if (command.type === "assignment.upsert") return [command.payload.id];
+        if (command.type === "assignment.delete") return [command.payload.assignmentId];
+        if (command.type === "assignment.allocations.replace") return [command.payload.assignmentId];
+        return [];
+      })
+    )
+  ].sort();
   return {
     ...createEmptyPlanDelta(),
     commands,
-    changedTaskIds: [
-      ...new Set(commands.flatMap((command) => ("taskId" in command.payload ? [String(command.payload.taskId)] : [])))
-    ].sort(),
-    changedAssignmentIds: [
-      ...new Set(
-        commands.flatMap((command) => {
-          if (command.type === "assignment.upsert") return [command.payload.id];
-          if (command.type === "assignment.allocations.replace") return [command.payload.assignmentId];
-          if (command.type === "assignment.delete") return [command.payload.assignmentId];
-          return [];
-        })
-      )
-    ].sort(),
+    changedTaskIds,
+    changedAssignmentIds,
     acceptedRiskIds: commands.flatMap((command) =>
       command.type === "risk.accept_overload" ? [command.payload.overloadId] : []
     )
   };
 }
 
-function orderedCandidateResources(input: AutoPlanningSolverInput, assignment: PlanAssignment): string[] {
-  const assignedResource = input.snapshot.resources.find((resource) => resource.id === assignment.resourceId);
-  return input.snapshot.resources
-    .filter(
-      (resource) =>
-        resource.id === assignment.resourceId ||
-        !assignedResource ||
-        resource.positionId === assignedResource.positionId ||
-        resource.teamId === assignedResource.teamId
-    )
-    .sort((left, right) =>
-      Number(right.id === assignment.resourceId) - Number(left.id === assignment.resourceId) ||
-      left.name.localeCompare(right.name) ||
-      left.id.localeCompare(right.id)
-    )
-    .map((resource) => resource.id);
+function resourceOrders(snapshot: PlanSnapshot, primaryResourceId: string): string[][] {
+  const sortedResourceIds = snapshot.resources.map((resource) => resource.id).sort();
+  const fallbackOrder = [
+    primaryResourceId,
+    ...sortedResourceIds.filter((resourceId) => resourceId !== primaryResourceId)
+  ];
+  const alternateOrders = sortedResourceIds
+    .filter((resourceId) => resourceId !== primaryResourceId)
+    .map((resourceId) => [
+      resourceId,
+      primaryResourceId,
+      ...sortedResourceIds.filter(
+        (candidate) => candidate !== resourceId && candidate !== primaryResourceId
+      )
+    ]);
+  return dedupeResourceOrders([fallbackOrder, ...alternateOrders]);
 }
 
-function buildLockedOccupationProvider(
-  input: AutoPlanningSolverInput,
-  solvableAssignmentIds: Set<string>
-): ResourceOccupationProvider {
-  const lockedAssignments = input.snapshot.assignments.filter(
-    (assignment) => isWorkAssignment(assignment) && !solvableAssignmentIds.has(assignment.id)
-  );
-  if (lockedAssignments.length === 0) return () => 0;
-
-  const lockedAssignmentIds = new Set(lockedAssignments.map((assignment) => assignment.id));
-  const lockedLoad = buildResourceLoadMatrix({
-    plan: input.calculatedPlan,
-    resources: input.snapshot.resources,
-    assignments: lockedAssignments,
-    assignmentAllocations: (input.snapshot.assignmentAllocations ?? []).filter((allocation) =>
-      lockedAssignmentIds.has(allocation.assignmentId)
-    ),
-    calendars: input.snapshot.calendars,
-    calendarExceptions: input.snapshot.calendarExceptions,
-    reservations: [],
-    rangeStart: input.snapshot.project.plannedStart,
-    rangeFinish: input.snapshot.project.deadline ?? input.snapshot.project.plannedFinish,
-    granularities: ["day"]
-  });
-  const occupationByResourceDate = new Map<string, number>();
-  for (const bucket of lockedLoad.buckets.filter((item) => item.granularity === "day")) {
-    occupationByResourceDate.set(
-      resourceDateKey(bucket.resourceId, bucket.date),
-      (occupationByResourceDate.get(resourceDateKey(bucket.resourceId, bucket.date)) ?? 0) +
-        bucket.assignedMinutes
-    );
+function dedupeResourceOrders(orders: string[][]): string[][] {
+  const seen = new Set<string>();
+  const unique: string[][] = [];
+  for (const order of orders) {
+    const signature = order.join("|");
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(order);
   }
-  return (resourceId, date) => occupationByResourceDate.get(resourceDateKey(resourceId, date)) ?? 0;
+  return unique;
 }
 
-function shouldSolveTask(mode: AutoPlanningSolverMode, task: CalculatedTask): boolean {
-  if (mode === "repair" && task.percentComplete >= 100) return false;
-  return true;
+function emptySearchCost(): AutoPlanningSolverCost {
+  return {
+    deadlineMissDays: 0,
+    finishDateRank: 0,
+    overloadMinutes: 0,
+    changedTaskCount: 0,
+    changedAssignmentCount: 0,
+    riskScore: 0
+  };
 }
 
-function allocationDatesForTask(
-  input: AutoPlanningSolverInput,
-  state: SearchState,
-  solverAssignment: SolverAssignment,
-  authoredStart: PlanDate
-): PlanDate[] {
-  const start = latestPlanDate([
-    authoredStart,
-    dependencyConstrainedAllocationStart(input, state.plans, solverAssignment)
-  ]) ?? authoredStart;
-  const finish = input.snapshot.project.deadline ?? input.snapshot.project.plannedFinish;
-  const dayCount = Math.max(0, diffCalendarDays(start, finish));
-  return Array.from({ length: dayCount + 1 }, (_, offset) => addDays(start, offset));
-}
-
-function dependencyConstrainedAllocationStart(
-  input: AutoPlanningSolverInput,
+function costForAssignmentPlans(
   plans: AssignmentPlan[],
-  solverAssignment: SolverAssignment
-): PlanDate | null {
-  const starts = input.snapshot.dependencies
-    .filter((dependency) => dependency.successorTaskId === solverAssignment.assignment.taskId)
-    .map((dependency) => dependencyStartFromSpan(input, plans, solverAssignment, dependency))
-    .filter((date): date is PlanDate => Boolean(date));
-  return latestPlanDate(starts);
+  snapshot: PlanSnapshot,
+  targetDeadline: PlanDate
+): AutoPlanningSolverCost {
+  const finishDate = latestAllocationDate(plans);
+  const overloadMinutes = plans.reduce((total, plan) => total + plan.acceptedOverloadMinutes, 0);
+  const changedTaskCount = new Set(plans.map((plan) => plan.assignment.taskId)).size;
+  const changedAssignmentCount = new Set(
+    plans.flatMap((plan) => plan.allocations.map((allocation) => allocation.assignmentId))
+  ).size;
+  return {
+    deadlineMissDays:
+      finishDate && comparePlanDates(finishDate, targetDeadline) > 0
+        ? diffCalendarDays(targetDeadline, finishDate)
+        : 0,
+    finishDateRank: finishDate ? diffCalendarDays(snapshot.project.plannedStart, finishDate) : 0,
+    overloadMinutes,
+    changedTaskCount,
+    changedAssignmentCount,
+    riskScore: overloadMinutes > 0 ? Math.min(100, 70 + Math.ceil(overloadMinutes / 60)) : 0
+  };
 }
 
-function dependencyStartFromSpan(
-  input: AutoPlanningSolverInput,
-  plans: AssignmentPlan[],
-  solverAssignment: SolverAssignment,
-  dependency: PlanDependency
-): PlanDate | null {
-  const predecessor = taskSpanFromPlans(plans, dependency.predecessorTaskId) ??
-    taskSpanFromCalculatedPlan(input, dependency.predecessorTaskId);
-  if (!predecessor) return null;
+function compareSearchStates(left: SearchState, right: SearchState): number {
+  return compareSolverCosts(left.cost, right.cost) || searchStateSignature(left).localeCompare(searchStateSignature(right));
+}
 
-  const lagDays = Math.floor(dependency.lagMinutes / 480);
-  const successorSpanDays = Math.max(
-    0,
-    diffCalendarDays(
-      solverAssignment.task.calculatedStart ?? input.snapshot.project.plannedStart,
-      solverAssignment.task.calculatedFinish ?? solverAssignment.task.calculatedStart ?? input.snapshot.project.plannedStart
-    )
+function compareAssignmentPlans(
+  left: AssignmentPlan,
+  right: AssignmentPlan,
+  snapshot: PlanSnapshot,
+  targetDeadline: PlanDate
+): number {
+  return (
+    compareSolverCosts(
+      costForAssignmentPlans([left], snapshot, targetDeadline),
+      costForAssignmentPlans([right], snapshot, targetDeadline)
+    ) ||
+    assignmentPlanSignature(left).localeCompare(assignmentPlanSignature(right))
   );
-
-  if (dependency.type === "FS") return addDays(predecessor.finish, 1 + lagDays);
-  if (dependency.type === "SS") return addDays(predecessor.start, lagDays);
-  if (dependency.type === "FF") return addDays(predecessor.finish, lagDays - successorSpanDays);
-  return addDays(predecessor.start, lagDays - successorSpanDays);
 }
 
-function taskSpanFromPlans(
-  plans: AssignmentPlan[],
-  taskId: string
-): { start: PlanDate; finish: PlanDate } | null {
-  const dates = plans
-    .filter((plan) => plan.assignment.taskId === taskId)
-    .flatMap((plan) => plan.allocations.map((allocation) => allocation.date));
-  return dateSpan(dates);
+function compareSolverCosts(left: AutoPlanningSolverCost, right: AutoPlanningSolverCost): number {
+  return (
+    left.deadlineMissDays - right.deadlineMissDays ||
+    left.finishDateRank - right.finishDateRank ||
+    left.overloadMinutes - right.overloadMinutes ||
+    left.changedTaskCount - right.changedTaskCount ||
+    left.changedAssignmentCount - right.changedAssignmentCount ||
+    left.riskScore - right.riskScore
+  );
 }
 
-function taskSpanFromCalculatedPlan(
-  input: AutoPlanningSolverInput,
-  taskId: string
-): { start: PlanDate; finish: PlanDate } | null {
-  const task = input.calculatedPlan.tasks.find((candidate) => candidate.id === taskId);
-  if (!task?.calculatedStart || !task.calculatedFinish) return null;
-  return { start: task.calculatedStart, finish: task.calculatedFinish };
+function dedupeSearchStates(states: SearchState[]): SearchState[] {
+  const seen = new Set<string>();
+  const unique: SearchState[] = [];
+  for (const state of states) {
+    const signature = searchStateSignature(state);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(state);
+  }
+  return unique;
 }
 
-function dateSpan(dates: PlanDate[]): { start: PlanDate; finish: PlanDate } | null {
-  const sorted = [...dates].sort(comparePlanDates);
-  const start = sorted[0];
-  const finish = sorted.at(-1);
-  return start && finish ? { start, finish } : null;
+function dedupeAssignmentCandidates(candidates: AssignmentPlanCandidate[]): AssignmentPlanCandidate[] {
+  const seen = new Set<string>();
+  const unique: AssignmentPlanCandidate[] = [];
+  for (const candidate of candidates) {
+    const signature = assignmentPlanSignature(candidate.plan);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(candidate);
+  }
+  return unique;
+}
+
+function searchStateSignature(state: SearchState): string {
+  return state.plans.map(assignmentPlanSignature).join("\n");
+}
+
+function assignmentPlanSignature(plan: AssignmentPlan): string {
+  return plan.allocations
+    .map((allocation) =>
+      [
+        allocation.assignmentId,
+        allocation.taskId,
+        allocation.resourceId,
+        allocation.date,
+        allocation.workMinutes
+      ].join(":")
+    )
+    .sort()
+    .join("|");
+}
+
+function planEligibleAssignments(snapshot: PlanSnapshot, calculatedPlan: CalculatedPlan): PlanAssignment[] {
+  const calculatedTaskIds = new Set(
+    calculatedPlan.tasks
+      .filter((task) => task.calculatedStart && task.workMinutes > 0)
+      .map((task) => task.id)
+  );
+  return snapshot.assignments
+    .filter(
+      (assignment) =>
+        calculatedTaskIds.has(assignment.taskId) &&
+        (assignment.role === "executor" || assignment.role === "co_executor")
+    )
+    .sort((left, right) => {
+      const leftTask = calculatedPlan.tasks.find((task) => task.id === left.taskId);
+      const rightTask = calculatedPlan.tasks.find((task) => task.id === right.taskId);
+      return (
+        String(leftTask?.calculatedFinish ?? "").localeCompare(String(rightTask?.calculatedFinish ?? "")) ||
+        String(leftTask?.wbsCode ?? "").localeCompare(String(rightTask?.wbsCode ?? "")) ||
+        left.id.localeCompare(right.id)
+      );
+    });
+}
+
+function buildBaseUsage(snapshot: PlanSnapshot, plannedAssignments: PlanAssignment[]): UsageMap {
+  const usage: UsageMap = new Map();
+  const plannedAssignmentIds = new Set(plannedAssignments.map((assignment) => assignment.id));
+
+  for (const reservation of snapshot.reservations) {
+    const dates = enumerateDates(reservation.start, reservation.finish);
+    const resource = snapshot.resources.find((candidate) => candidate.id === reservation.resourceId);
+    if (!resource) continue;
+    const capacities = dates.map((date) => capacityFor(snapshot, resource, date));
+    const totalCapacity = capacities.reduce((total, capacity) => total + capacity, 0);
+    for (const [index, date] of dates.entries()) {
+      const capacity = capacities[index] ?? 0;
+      if (capacity <= 0 || totalCapacity <= 0) continue;
+      addUsage(usage, reservation.resourceId, date, Math.round((reservation.workMinutes * capacity) / totalCapacity));
+    }
+  }
+
+  for (const allocation of snapshot.assignmentAllocations ?? []) {
+    if (plannedAssignmentIds.has(allocation.assignmentId)) continue;
+    addUsage(usage, allocation.resourceId, allocation.date, allocation.workMinutes);
+  }
+
+  return usage;
+}
+
+function freeCapacityFor(
+  snapshot: PlanSnapshot,
+  usage: UsageMap,
+  resourceId: string,
+  date: PlanDate
+): number {
+  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
+  if (!resource) return 0;
+  return Math.max(0, capacityFor(snapshot, resource, date) - (usage.get(usageKey(resourceId, date)) ?? 0));
+}
+
+function capacityFor(snapshot: PlanSnapshot, resource: PlanResource, date: PlanDate): number {
+  const calendar = selectCalendar(snapshot.calendars, resource.calendarId);
+  return workingMinutesForDate(date, calendar, selectExceptions(snapshot, calendar, resource.id));
+}
+
+function selectCalendar(calendars: PlanCalendar[], calendarId: string | null): PlanCalendar {
+  return calendars.find((calendar) => calendar.id === calendarId) ?? calendars[0] ?? {
+    id: "default-calendar",
+    workingWeekdays: [1, 2, 3, 4, 5],
+    workingMinutesPerDay: 480
+  };
+}
+
+function selectExceptions(
+  snapshot: PlanSnapshot,
+  calendar: PlanCalendar,
+  resourceId: string
+): PlanCalendarException[] {
+  return snapshot.calendarExceptions.filter(
+    (exception) =>
+      exception.calendarId === calendar.id &&
+      (exception.resourceId === null || exception.resourceId === resourceId)
+  );
 }
 
 function resolveAssignmentWork(
@@ -746,76 +797,169 @@ function resolveAssignmentWork(
   taskWorkMinutes: number
 ): number {
   if (assignment.workMinutes !== null) return assignment.workMinutes;
-  const taskAssignments = assignments.filter((candidate) => candidate.taskId === assignment.taskId && isWorkAssignment(candidate));
-  const explicitWork = taskAssignments.reduce((total, candidate) => total + (candidate.workMinutes ?? 0), 0);
+  const taskAssignments = assignments.filter(
+    (candidate) =>
+      candidate.taskId === assignment.taskId &&
+      (candidate.role === "executor" || candidate.role === "co_executor")
+  );
+  const explicitWork = taskAssignments.reduce(
+    (total, candidate) => total + (candidate.workMinutes ?? 0),
+    0
+  );
   const implicitAssignments = taskAssignments.filter((candidate) => candidate.workMinutes === null);
-  const implicitUnits = implicitAssignments.reduce((total, candidate) => total + candidate.unitsPermille, 0);
+  const implicitUnits = implicitAssignments.reduce(
+    (total, candidate) => total + candidate.unitsPermille,
+    0
+  );
   if (implicitUnits <= 0) return 0;
   return Math.round((Math.max(0, taskWorkMinutes - explicitWork) * assignment.unitsPermille) / implicitUnits);
 }
 
-function mergeAllocations(allocations: Array<{ date: PlanDate; workMinutes: number }>) {
-  const byDate = new Map<PlanDate, number>();
+function groupAllocationsByAssignmentId(
+  allocations: PlannedAllocation[]
+): Map<string, PlannedAllocation[]> {
+  const groups = new Map<string, PlannedAllocation[]>();
   for (const allocation of allocations) {
-    byDate.set(allocation.date, (byDate.get(allocation.date) ?? 0) + allocation.workMinutes);
+    groups.set(allocation.assignmentId, [...(groups.get(allocation.assignmentId) ?? []), allocation]);
   }
-  return [...byDate.entries()]
-    .map(([date, workMinutes]) => ({ date, workMinutes }))
-    .filter((allocation) => allocation.workMinutes > 0)
-    .sort((left, right) => left.date.localeCompare(right.date));
+  return groups;
 }
 
-function isWorkAssignment(assignment: PlanAssignment): boolean {
-  return assignment.role === "executor" || assignment.role === "co_executor";
+function appendAllocationBucket(
+  groups: Map<string, PlannedAllocation[]>,
+  assignmentId: string,
+  allocations: PlannedAllocation[]
+): void {
+  const group = groups.get(assignmentId) ?? [];
+  group.push(...allocations);
+  groups.set(assignmentId, group);
 }
 
-function resourceDateKey(resourceId: string, date: PlanDate): string {
-  return `${resourceId}\u0000${date}`;
+function mergeAssignmentUpsert(
+  drafts: Map<string, AssignmentUpsertDraft>,
+  draft: AssignmentUpsertDraft
+): void {
+  const current = drafts.get(draft.id);
+  if (!current) {
+    drafts.set(draft.id, draft);
+    return;
+  }
+  drafts.set(draft.id, {
+    ...current,
+    workMinutes: current.workMinutes + draft.workMinutes
+  });
 }
 
-function deadlineMissDays(deadline: PlanDate | null, finishDate: PlanDate | null): number {
-  if (!deadline || !finishDate || comparePlanDates(finishDate, deadline) <= 0) return 0;
-  return diffCalendarDays(deadline, finishDate);
+function sumAllocationMinutes(allocations: PlannedAllocation[]): number {
+  return allocations.reduce((total, allocation) => total + allocation.workMinutes, 0);
 }
 
-function latestPlanDate(dates: Array<PlanDate | null | undefined>): PlanDate | null {
-  return dates.reduce<PlanDate | null>((latest, date) => {
-    if (!date) return latest;
-    if (!latest) return date;
-    return comparePlanDates(date, latest) > 0 ? date : latest;
-  }, null);
+function compactAllocationsByDate(allocations: PlannedAllocation[]): PlannedAllocation[] {
+  const byDate = new Map<PlanDate, PlannedAllocation>();
+  for (const allocation of allocations) {
+    const current = byDate.get(allocation.date);
+    byDate.set(allocation.date, {
+      ...allocation,
+      workMinutes: (current?.workMinutes ?? 0) + allocation.workMinutes
+    });
+  }
+  return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
 
-function compareNullableDates(left: PlanDate | null, right: PlanDate | null): number {
-  if (left === null && right === null) return 0;
-  if (left === null) return 1;
-  if (right === null) return -1;
-  return comparePlanDates(left, right);
+function toAllocationPayload(allocation: PlannedAllocation): { date: PlanDate; workMinutes: number } {
+  return {
+    date: allocation.date,
+    workMinutes: allocation.workMinutes
+  };
 }
 
-function operationRisk(operationKinds: string[]): number {
-  return operationKinds.reduce((total, kind) => {
-    if (kind === "overload") return total + 100;
-    if (kind === "split") return total + 20;
-    if (kind === "single") return total + 5;
-    return total + 10;
-  }, 0);
+function latestAllocationDate(plans: AssignmentPlan[]): PlanDate | null {
+  const dates = plans.flatMap((plan) => plan.allocations.map((allocation) => allocation.date));
+  if (dates.length === 0) return null;
+  return dates.sort(comparePlanDates).at(-1) ?? null;
 }
 
-function proposalCost(input: {
-  deadlineDeltaDays: number;
-  finishDate: PlanDate | null;
-  projectStart: PlanDate;
-  overloadMinutes: number;
-  changedCount: number;
-  riskScore: number;
-}): number {
-  const finishDistance = input.finishDate ? diffCalendarDays(input.projectStart, input.finishDate) : 100_000;
-  return (
-    input.deadlineDeltaDays * 1_000_000 +
-    finishDistance * 10_000 +
-    input.overloadMinutes * 100 +
-    input.changedCount * 10 +
-    input.riskScore
+function assignmentIdForResource(
+  assignments: PlanAssignment[],
+  assignment: PlanAssignment,
+  resourceId: string
+): string {
+  if (resourceId === assignment.resourceId) return assignment.id;
+
+  const reusableAssignment = assignments.find(
+    (candidate) =>
+      candidate.taskId === assignment.taskId &&
+      candidate.resourceId === resourceId &&
+      (candidate.role === "executor" || candidate.role === "co_executor")
   );
+  if (reusableAssignment) return reusableAssignment.id;
+
+  const existingIds = new Set(assignments.map((candidate) => candidate.id));
+  const baseId = `${assignment.id}__solver__${resourceId}`;
+  if (!existingIds.has(baseId)) return baseId;
+
+  let suffix = 1;
+  while (existingIds.has(`${baseId}__${suffix}`)) {
+    suffix += 1;
+  }
+  return `${baseId}__${suffix}`;
+}
+
+function enumerateDates(start: PlanDate, finish: PlanDate): PlanDate[] {
+  const days = diffCalendarDays(start, finish);
+  return Array.from({ length: Math.max(0, days) + 1 }, (_, offset) => addDays(start, offset));
+}
+
+function usageKey(resourceId: string, date: PlanDate): string {
+  return `${resourceId}:${date}`;
+}
+
+function addUsage(usage: UsageMap, resourceId: string, date: PlanDate, workMinutes: number): void {
+  const key = usageKey(resourceId, date);
+  usage.set(key, (usage.get(key) ?? 0) + workMinutes);
+}
+
+function cloneUsage(usage: UsageMap): UsageMap {
+  return new Map(usage);
+}
+
+function appendNonEmptyProposal(
+  proposals: AutoPlanningSolverProposal[],
+  proposal: AutoPlanningSolverProposal | false | null
+): void {
+  if (!proposal || proposal.planDelta.commands.length === 0) return;
+  proposals.push(proposal);
+}
+
+function uniqueProposals(proposals: AutoPlanningSolverProposal[]): AutoPlanningSolverProposal[] {
+  const seen = new Set<string>();
+  const unique: AutoPlanningSolverProposal[] = [];
+  for (const proposal of proposals) {
+    const signature = proposal.planDelta.commands
+      .map((command) => JSON.stringify(command))
+      .join("\n");
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(proposal);
+  }
+  return unique;
+}
+
+function compareSolverProposals(
+  left: AutoPlanningSolverProposal,
+  right: AutoPlanningSolverProposal
+): number {
+  return (
+    left.explainability.cost.deadlineMissDays - right.explainability.cost.deadlineMissDays ||
+    left.explainability.cost.finishDateRank - right.explainability.cost.finishDateRank ||
+    left.explainability.cost.overloadMinutes - right.explainability.cost.overloadMinutes ||
+    left.explainability.cost.changedTaskCount - right.explainability.cost.changedTaskCount ||
+    left.explainability.cost.changedAssignmentCount - right.explainability.cost.changedAssignmentCount ||
+    left.explainability.cost.riskScore - right.explainability.cost.riskScore ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function clampPositiveInteger(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
 }

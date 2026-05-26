@@ -8,6 +8,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import {
@@ -22,17 +23,38 @@ import {
 } from "./routeParamParsers";
 
 type WorkspaceConfigRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: WorkspaceConfigRouteDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: WorkspaceConfigMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
+
+type WorkspaceConfigRouteDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "createCustomFieldDefinition"
+  | "createProjectTemplate"
+  | "listCustomFieldDefinitions"
+  | "listProjectTemplates"
+  | "updateCustomFieldDefinition"
+  | "updateProjectTemplate"
+  | "withTransaction"
+>;
+
+type WorkspaceConfigMutationDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "createCustomFieldDefinition"
+  | "createProjectTemplate"
+  | "updateCustomFieldDefinition"
+  | "updateProjectTemplate"
+>;
 
 export function registerWorkspaceConfigRoutes(
   app: Hono,

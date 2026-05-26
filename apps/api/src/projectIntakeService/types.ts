@@ -8,6 +8,7 @@ import type {
 } from "@kiss-pm/domain";
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput,
   OpportunityInput,
   OpportunityFinalStatus,
@@ -17,15 +18,57 @@ import type {
   ProjectRecord
 } from "../apiTypes";
 
+export type ProjectIntakeServiceDataSource = Pick<
+  ApiTenantDataSource,
+  | "activateProjectDraft"
+  | "appendAuditEvent"
+  | "createOpportunity"
+  | "createProjectDraftFromOpportunity"
+  | "finalizeOpportunity"
+  | "findClientById"
+  | "findContactById"
+  | "findDealStageById"
+  | "findOpportunityById"
+  | "findProjectTypeById"
+  | "findUserById"
+  | "listCustomFieldDefinitions"
+  | "listOpportunities"
+  | "listPositions"
+  | "listProjects"
+  | "listWorkspaceUsers"
+  | "lockTenantResourcePlanning"
+  | "updateOpportunity"
+  | "updateOpportunityFeasibility"
+  | "updateOpportunityStage"
+  | "withTransaction"
+>;
+
+export type ProjectIntakeMutationDataSource = Pick<
+  ApiTenantDataSource,
+  | "activateProjectDraft"
+  | "appendAuditEvent"
+  | "createOpportunity"
+  | "createProjectDraftFromOpportunity"
+  | "finalizeOpportunity"
+  | "findOpportunityById"
+  | "listPositions"
+  | "listProjects"
+  | "listWorkspaceUsers"
+  | "lockTenantResourcePlanning"
+  | "updateOpportunity"
+  | "updateOpportunityFeasibility"
+  | "updateOpportunityStage"
+>;
+
 export type ProjectIntakeServiceDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: ProjectIntakeServiceDataSource;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: ProjectIntakeMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 

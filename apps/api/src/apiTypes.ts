@@ -348,6 +348,8 @@ export type ManagementAuditEventInput = {
   executionResult?: Record<string, unknown>;
 };
 
+export type ManagementAuditDataSource = Pick<ApiTenantDataSource, "appendAuditEvent">;
+
 export type ApiTenantDataSource = {
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;

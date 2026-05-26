@@ -1,9 +1,9 @@
 # Storybook — re-audit контракта §10 (batch 10)
 
-**Дата:** 2026-05-24  
-**Worktree:** `design-v3-rebuild`  
-**Индекс:** 106 entries, `design-v2` в индексе: **0**  
-**Машинный артефакт:** [`apps/web/.storybook-verify-tmp/batch10-contract-audit.json`](../../apps/web/.storybook-verify-tmp/batch10-contract-audit.json)  
+**Дата:** 2026-05-24
+**Worktree:** `design-v3-rebuild`
+**Индекс:** 106 entries, `design-v2` в индексе: **0**
+**Машинный артефакт:** [`apps/web/.storybook-verify-tmp/batch10-contract-audit.json`](../../apps/web/.storybook-verify-tmp/batch10-contract-audit.json)
 **Скрипт:** [`apps/web/scripts/run-contract-audit.mjs`](../../apps/web/scripts/run-contract-audit.mjs)
 
 ## Verification (batch 10)

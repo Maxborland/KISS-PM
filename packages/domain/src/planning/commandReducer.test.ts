@@ -61,6 +61,16 @@ describe("planning command reducer", () => {
           workMinutes: 480
         }
       },
+      {
+        type: "assignment.allocations.replace",
+        payload: {
+          assignmentId: "assignment-a",
+          allocations: [
+            { date: "2026-06-01", workMinutes: 240 },
+            { date: "2026-06-02", workMinutes: 240 }
+          ]
+        }
+      },
       { type: "assignment.delete", payload: { assignmentId: "assignment-a" } },
       { type: "baseline.capture", payload: { baselineId: "baseline-1", label: "Baseline" } },
       {
@@ -241,6 +251,58 @@ describe("planning command reducer", () => {
     });
   });
 
+  it("replaces explicit assignment allocations atomically", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      assignmentAllocations: [
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-01",
+          workMinutes: 240
+        },
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-02",
+          workMinutes: 240
+        }
+      ]
+    };
+
+    const result = reducePlanningCommand(snapshot, {
+      type: "assignment.allocations.replace",
+      payload: {
+        assignmentId: "assignment-a",
+        allocations: [
+          { date: "2026-06-03", workMinutes: 120 },
+          { date: "2026-06-04", workMinutes: 360 }
+        ]
+      }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.assignmentAllocations).toEqual([
+      {
+        assignmentId: "assignment-a",
+        taskId: "task-a",
+        resourceId: "resource-alpha",
+        date: "2026-06-03",
+        workMinutes: 120
+      },
+      {
+        assignmentId: "assignment-a",
+        taskId: "task-a",
+        resourceId: "resource-alpha",
+        date: "2026-06-04",
+        workMinutes: 360
+      }
+    ]);
+    expect(result.planDelta.changedAssignmentIds).toEqual(["assignment-a"]);
+  });
+
   it("rejects moving a task under one of its descendants", () => {
     const snapshot = {
       ...createSnapshot(),
@@ -391,6 +453,13 @@ describe("planning command reducer", () => {
         }
       },
       {
+        type: "assignment.allocations.replace",
+        payload: {
+          assignmentId: "assignment-missing",
+          allocations: [{ date: "2026-06-01", workMinutes: 240 }]
+        }
+      },
+      {
         type: "task.update_work_model",
         payload: {
           taskId: "task-a",
@@ -454,6 +523,7 @@ function createSnapshot(): PlanSnapshot {
         calendarId: null
       }
     ],
+    assignmentAllocations: [],
     dependencies: [
       {
         id: "dep-a-b",

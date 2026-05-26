@@ -352,6 +352,7 @@ function createSnapshot(overrides: Partial<PlanSnapshot> = {}): PlanSnapshot {
         calendarId: null
       }
     ],
+    assignmentAllocations: [],
     dependencies: [],
     baselines: [],
     calendars: [{ id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }],

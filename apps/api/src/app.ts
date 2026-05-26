@@ -17,6 +17,7 @@ import {
 import type {
   ApiTenantDataSource,
   CreateAppOptions,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
@@ -175,7 +176,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
   async function appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource: ApiTenantDataSource = dataSource
+    auditDataSource: ManagementAuditDataSource = dataSource
   ) {
     if (!auditDataSource.appendAuditEvent) {
       throw new Error("audit_not_configured");
