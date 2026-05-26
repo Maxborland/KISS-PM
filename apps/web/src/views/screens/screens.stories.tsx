@@ -15,6 +15,7 @@ import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { LoginScreenView } from "@/views/screens/login-screen-view";
 import {
   SCREEN_STORY_PARAMETERS,
+  screenScenarioStory,
   screenStoryArgs,
   type ScreenStory
 } from "@/views/screens/screen-story-helpers";
@@ -194,11 +195,61 @@ export const MyWorkKanbanDragging: Story = {
   }
 };
 
-export const DashboardEmptyState: Story = {
-  name: "01 Дашборд · пусто",
-  args: screenStoryArgs("01-dashboard"),
-  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "empty" }
-};
+export const DashboardEmptyState: Story = screenScenarioStory(
+  "01-dashboard",
+  "01 Дашборд · пусто",
+  "empty"
+);
+
+export const AdminLoading: Story = screenScenarioStory(
+  "09-admin",
+  "09 Администрирование · загрузка",
+  "loading"
+);
+
+export const AdminError: Story = screenScenarioStory("09-admin", "09 Администрирование · ошибка", "error");
+
+export const AdminForbidden: Story = screenScenarioStory(
+  "09-admin",
+  "09 Администрирование · нет доступа",
+  "forbidden"
+);
+
+export const DealsLoading: Story = screenScenarioStory("05-deals", "05 Сделки · загрузка", "loading");
+
+export const DealsError: Story = screenScenarioStory("05-deals", "05 Сделки · ошибка", "error");
+
+export const DealsForbidden: Story = screenScenarioStory("05-deals", "05 Сделки · нет доступа", "forbidden");
+
+export const ProjectsListLoading: Story = screenScenarioStory(
+  "07-projects-list",
+  "07 Список проектов · загрузка",
+  "loading"
+);
+
+export const ProjectsListError: Story = screenScenarioStory(
+  "07-projects-list",
+  "07 Список проектов · ошибка",
+  "error"
+);
+
+export const ProjectKpiLoading: Story = screenScenarioStory(
+  "16-project-kpi",
+  "16 KPI проекта · загрузка",
+  "loading"
+);
+
+export const ProjectResourcesLoading: Story = screenScenarioStory(
+  "13-project-resources",
+  "13 Ресурсы проекта · загрузка",
+  "loading"
+);
+
+export const EntitiesClientsLoading: Story = screenScenarioStory(
+  "08-entities-clients",
+  "08 Справочник клиентов · загрузка",
+  "loading"
+);
 
 export const DealsFunnelDragging: Story = {
   name: "05 Сделки · DnD",

@@ -388,8 +388,8 @@ function TaskAside({
   onChange: <K extends keyof UpdateTaskFormState>(key: K, value: UpdateTaskFormState[K]) => void;
 }) {
   return (
-    <CardPanel title="Параметры задачи" subtitle="UpdateTaskBody">
-      <FormSection title="Основное" lead="Поля API: PATCH /api/workspace/tasks/:taskId.">
+    <CardPanel title="Параметры задачи" subtitle="Сроки, участники и статус">
+      <FormSection title="Основное" lead="Изменения сохраняются в карточке задачи и попадают в аудит.">
         <FormGrid columns={1}>
           <Field
             label="Название"
