@@ -87,11 +87,18 @@
     "eslint": "^9.20.0",
     "eslint-config-next": "^16.2.6",
     "happy-dom": "^15.11.7",
+    "msw": "^2.14.6",
+    "msw-storybook-addon": "^2.0.7",
     "postcss": "^8.5.14",
     "serve": "^14.2.4",
     "shadcn": "^4.7.0",
     "storybook": "^8.6.18",
     "tailwindcss": "^4.3.0",
     "vitest": "^3.2.4"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

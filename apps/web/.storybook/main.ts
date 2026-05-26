@@ -6,6 +6,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 const webRoot = join(configDir, "..");
 
 const config: StorybookConfig = {
+  staticDirs: ["../public"],
   // Legacy design-v2 stories removed (batch 8); index is design-v3 only (DESIGN_CONTRACT §10).
   stories: [
     "../src/components/**/*.stories.@(ts|tsx)",
