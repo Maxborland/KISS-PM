@@ -138,6 +138,77 @@ describe("auto planning solver", () => {
     );
   });
 
+  it("uses a collision-safe synthetic assignment id when the default solver id already exists", () => {
+    const result = proposeAutoPlanningSolutions({
+      snapshot: createSnapshot({
+        tasks: [
+          { ...createTask("task-a", "1", "2026-06-01"), workMinutes: 960, durationMinutes: 960 },
+          createTask("task-unrelated", "2", "2026-06-10")
+        ],
+        assignments: [
+          {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 960,
+            calendarId: null
+          },
+          {
+            id: "assignment-a__solver__resource-beta",
+            taskId: "task-unrelated",
+            resourceId: "resource-beta",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480,
+            calendarId: null
+          }
+        ],
+        resources: [
+          {
+            id: "resource-alpha",
+            userId: "user-alpha",
+            positionId: "engineer",
+            teamId: null,
+            name: "Alpha",
+            calendarId: null
+          },
+          {
+            id: "resource-beta",
+            userId: "user-beta",
+            positionId: "engineer",
+            teamId: null,
+            name: "Beta",
+            calendarId: null
+          }
+        ]
+      }),
+      mode: "schedule",
+      targetDeadline: "2026-06-01"
+    });
+
+    expect(result.proposals[0]?.planDelta.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "assignment.upsert",
+          payload: expect.objectContaining({
+            id: "assignment-a__solver__resource-beta__1",
+            taskId: "task-a",
+            resourceId: "resource-beta"
+          })
+        }),
+        {
+          type: "assignment.allocations.replace",
+          payload: {
+            assignmentId: "assignment-a__solver__resource-beta__1",
+            allocations: [{ date: "2026-06-01", workMinutes: 480 }]
+          }
+        }
+      ])
+    );
+  });
+
   it("returns an explainable accepted-overload proposal when the deadline is impossible", () => {
     const result = proposeAutoPlanningSolutions({
       snapshot: createSnapshot({
