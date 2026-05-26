@@ -96,6 +96,22 @@ export async function resolveAttachmentEntityContext(input: {
       manageDecision: canManageProjects(policyInput)
     } };
   }
+  if (input.entityType === "document") {
+    const document = await input.dataSource.findKnowledgeDocumentById?.({
+      tenantId: input.actor.tenantId,
+      documentId: input.entityId
+    });
+    if (!document) return { ok: false, status: 404, error: "attachment_entity_not_found" };
+    const project = await findProject(input.dataSource, input.actor.tenantId, document.projectId);
+    if (!project) return { ok: false, status: 404, error: "attachment_entity_not_found" };
+    return { ok: true, value: {
+      entityType: "document",
+      entityId: document.id,
+      sourceEntity: { type: "KnowledgeDocument", id: document.id },
+      readDecision: canReadProjects(policyInput),
+      manageDecision: canManageProjects(policyInput)
+    } };
+  }
 
   const task = await input.dataSource.findTaskById?.(input.actor.tenantId, input.entityId);
   if (!task) return { ok: false, status: 404, error: "attachment_entity_not_found" };

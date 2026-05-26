@@ -7,6 +7,7 @@ export * from "./crmRepository";
 export * from "./crmActivityRepository";
 export * from "./controlRepository";
 export * from "./controlSurfaceRepository";
+export * from "./knowledgeRepository";
 export * from "./projectIntakeRepository";
 export * from "./planningRepository";
 export * from "./planningSavedViewsRepository";
