@@ -209,6 +209,107 @@ describe("auto planning solver", () => {
     );
   });
 
+  it("merges allocations before replacing a reused assignment", () => {
+    const result = proposeAutoPlanningSolutions({
+      snapshot: createSnapshot({
+        tasks: [
+          { ...createTask("task-a", "1", "2026-06-01"), workMinutes: 960, durationMinutes: 960 }
+        ],
+        assignments: [
+          {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480,
+            calendarId: null
+          },
+          {
+            id: "assignment-b",
+            taskId: "task-a",
+            resourceId: "resource-beta",
+            role: "co_executor",
+            unitsPermille: 1000,
+            workMinutes: 480,
+            calendarId: null
+          }
+        ],
+        resources: [
+          {
+            id: "resource-alpha",
+            userId: "user-alpha",
+            positionId: "engineer",
+            teamId: null,
+            name: "Alpha",
+            calendarId: null
+          },
+          {
+            id: "resource-beta",
+            userId: "user-beta",
+            positionId: "engineer",
+            teamId: null,
+            name: "Beta",
+            calendarId: null
+          }
+        ],
+        reservations: [
+          {
+            id: "reservation-alpha-1",
+            resourceId: "resource-alpha",
+            projectId: "other-project",
+            start: "2026-06-01",
+            finish: "2026-06-01",
+            workMinutes: 480,
+            reason: "busy"
+          },
+          {
+            id: "reservation-alpha-2",
+            resourceId: "resource-alpha",
+            projectId: "other-project",
+            start: "2026-06-02",
+            finish: "2026-06-02",
+            workMinutes: 480,
+            reason: "busy"
+          }
+        ]
+      }),
+      mode: "schedule",
+      targetDeadline: "2026-06-02"
+    });
+
+    const commands = result.proposals[0]?.planDelta.commands ?? [];
+    const assignmentBReplaceCommands = commands.filter(
+      (command) =>
+        command.type === "assignment.allocations.replace" &&
+        command.payload.assignmentId === "assignment-b"
+    );
+    expect(assignmentBReplaceCommands).toEqual([
+      {
+        type: "assignment.allocations.replace",
+        payload: {
+          assignmentId: "assignment-b",
+          allocations: [
+            { date: "2026-06-01", workMinutes: 480 },
+            { date: "2026-06-02", workMinutes: 480 }
+          ]
+        }
+      }
+    ]);
+    expect(commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "assignment.upsert",
+          payload: expect.objectContaining({
+            id: "assignment-b",
+            resourceId: "resource-beta",
+            workMinutes: 960
+          })
+        })
+      ])
+    );
+  });
+
   it("returns an explainable accepted-overload proposal when the deadline is impossible", () => {
     const result = proposeAutoPlanningSolutions({
       snapshot: createSnapshot({

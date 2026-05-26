@@ -100,6 +100,13 @@ type SearchState = {
   cost: AutoPlanningSolverCost;
 };
 
+type AssignmentUpsertDraft = Pick<
+  PlanAssignment,
+  "id" | "taskId" | "resourceId" | "role" | "unitsPermille"
+> & {
+  workMinutes: number;
+};
+
 const defaultEngineVersion = "planning-core-v1";
 
 export function proposeAutoPlanningSolutions(
@@ -423,67 +430,46 @@ function createSolverProposal(input: {
 
 function commandsForAssignmentPlans(plans: AssignmentPlan[]): PlanningCommand[] {
   const commands: PlanningCommand[] = [];
+  const upsertsByAssignmentId = new Map<string, AssignmentUpsertDraft>();
+  const allocationsByAssignmentId = new Map<string, PlannedAllocation[]>();
+  const riskCommands: PlanningCommand[] = [];
 
   for (const plan of plans) {
-    const allocationsByAssignmentId = groupAllocationsByAssignmentId(plan.allocations);
-    const originalAllocations = allocationsByAssignmentId.get(plan.assignment.id) ?? [];
-    const syntheticAssignmentIds = [...allocationsByAssignmentId.keys()]
+    const planAllocationsByAssignmentId = groupAllocationsByAssignmentId(plan.allocations);
+    const originalAllocations = planAllocationsByAssignmentId.get(plan.assignment.id) ?? [];
+    const syntheticAssignmentIds = [...planAllocationsByAssignmentId.keys()]
       .filter((assignmentId) => assignmentId !== plan.assignment.id)
       .sort();
 
+    appendAllocationBucket(allocationsByAssignmentId, plan.assignment.id, originalAllocations);
     if (syntheticAssignmentIds.length > 0) {
-      commands.push({
-        type: "assignment.upsert",
-        payload: {
-          id: plan.assignment.id,
-          taskId: plan.assignment.taskId,
-          resourceId: plan.assignment.resourceId,
-          role: plan.assignment.role,
-          unitsPermille: plan.assignment.unitsPermille,
-          workMinutes: sumAllocationMinutes(originalAllocations)
-        }
+      mergeAssignmentUpsert(upsertsByAssignmentId, {
+        id: plan.assignment.id,
+        taskId: plan.assignment.taskId,
+        resourceId: plan.assignment.resourceId,
+        role: plan.assignment.role,
+        unitsPermille: plan.assignment.unitsPermille,
+        workMinutes: sumAllocationMinutes(originalAllocations)
       });
     }
-    commands.push({
-      type: "assignment.allocations.replace",
-      payload: {
-        assignmentId: plan.assignment.id,
-        allocations: compactAllocationsByDate(originalAllocations).map((allocation) => ({
-          date: allocation.date,
-          workMinutes: allocation.workMinutes
-        }))
-      }
-    });
 
     for (const assignmentId of syntheticAssignmentIds) {
-      const allocations = allocationsByAssignmentId.get(assignmentId) ?? [];
+      const allocations = planAllocationsByAssignmentId.get(assignmentId) ?? [];
       const first = allocations[0];
       if (!first) continue;
-      commands.push({
-        type: "assignment.upsert",
-        payload: {
-          id: assignmentId,
-          taskId: plan.assignment.taskId,
-          resourceId: first.resourceId,
-          role: "co_executor",
-          unitsPermille: 1000,
-          workMinutes: sumAllocationMinutes(allocations)
-        }
-      });
-      commands.push({
-        type: "assignment.allocations.replace",
-        payload: {
-          assignmentId,
-          allocations: compactAllocationsByDate(allocations).map((allocation) => ({
-            date: allocation.date,
-            workMinutes: allocation.workMinutes
-          }))
-        }
+      appendAllocationBucket(allocationsByAssignmentId, assignmentId, allocations);
+      mergeAssignmentUpsert(upsertsByAssignmentId, {
+        id: assignmentId,
+        taskId: plan.assignment.taskId,
+        resourceId: first.resourceId,
+        role: "co_executor",
+        unitsPermille: 1000,
+        workMinutes: sumAllocationMinutes(allocations)
       });
     }
 
     if (plan.acceptedOverloadMinutes > 0) {
-      commands.push({
+      riskCommands.push({
         type: "risk.accept_overload",
         payload: {
           overloadId: `${plan.assignment.resourceId}:${plan.assignment.taskId}`,
@@ -493,7 +479,29 @@ function commandsForAssignmentPlans(plans: AssignmentPlan[]): PlanningCommand[] 
     }
   }
 
-  return commands;
+  const normalizedUpserts = [...upsertsByAssignmentId.values()].map((draft) => ({
+    ...draft,
+    workMinutes: sumAllocationMinutes(allocationsByAssignmentId.get(draft.id) ?? [])
+  }));
+  for (const draft of normalizedUpserts.sort((left, right) => left.id.localeCompare(right.id))) {
+    commands.push({
+      type: "assignment.upsert",
+      payload: draft
+    });
+  }
+
+  for (const [assignmentId, allocations] of [...allocationsByAssignmentId.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    commands.push({
+      type: "assignment.allocations.replace",
+      payload: {
+        assignmentId,
+        allocations: compactAllocationsByDate(allocations).map(toAllocationPayload)
+      }
+    });
+  }
+
+  return [...commands, ...riskCommands];
 }
 
 function createPlanDelta(commands: PlanningCommand[]): PlanDelta {
@@ -782,6 +790,31 @@ function groupAllocationsByAssignmentId(
   return groups;
 }
 
+function appendAllocationBucket(
+  groups: Map<string, PlannedAllocation[]>,
+  assignmentId: string,
+  allocations: PlannedAllocation[]
+): void {
+  const group = groups.get(assignmentId) ?? [];
+  group.push(...allocations);
+  groups.set(assignmentId, group);
+}
+
+function mergeAssignmentUpsert(
+  drafts: Map<string, AssignmentUpsertDraft>,
+  draft: AssignmentUpsertDraft
+): void {
+  const current = drafts.get(draft.id);
+  if (!current) {
+    drafts.set(draft.id, draft);
+    return;
+  }
+  drafts.set(draft.id, {
+    ...current,
+    workMinutes: current.workMinutes + draft.workMinutes
+  });
+}
+
 function sumAllocationMinutes(allocations: PlannedAllocation[]): number {
   return allocations.reduce((total, allocation) => total + allocation.workMinutes, 0);
 }
@@ -796,6 +829,13 @@ function compactAllocationsByDate(allocations: PlannedAllocation[]): PlannedAllo
     });
   }
   return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function toAllocationPayload(allocation: PlannedAllocation): { date: PlanDate; workMinutes: number } {
+  return {
+    date: allocation.date,
+    workMinutes: allocation.workMinutes
+  };
 }
 
 function latestAllocationDate(plans: AssignmentPlan[]): PlanDate | null {
