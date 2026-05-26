@@ -19,6 +19,7 @@ import {
   userSessions
 } from "./schema";
 import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
+import { createCollaborationRepository, type CollaborationRepository } from "./collaborationRepository";
 import { createCrmActivityRepository, type CrmActivityRepository } from "./crmActivityRepository";
 import { createControlRepository, type ControlRepository } from "./controlRepository";
 import { createControlSurfaceRepository, type ControlSurfaceRepository } from "./controlSurfaceRepository";
@@ -124,6 +125,7 @@ export type PostgresTenantDataSource = CrmRepository &
   ControlSurfaceRepository &
   RetrospectiveRepository &
   AttachmentRepository &
+  CollaborationRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
@@ -195,6 +197,7 @@ export function createPostgresTenantDataSource(
     ...createTenantProductionCalendarRepository(db),
     ...createResourceAbsencesRepository(db),
     ...createAttachmentRepository(db),
+    ...createCollaborationRepository(db),
     ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {

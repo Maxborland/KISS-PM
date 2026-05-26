@@ -7,6 +7,7 @@ import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { readLimitedJsonBody } from "../jsonBody";
+import { persistPlanningNotifications } from "../collaborationNotificationService";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
@@ -304,6 +305,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      await persistPlanningNotifications({
+        dataSource: transactionDataSource,
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        beforeSnapshot: snapshot,
+        afterSnapshot: appliedSnapshot,
+        commands: [parsed.value.command]
+      });
       const responseBody = {
         applied: preview.planDelta,
         newPlanVersion,
@@ -481,6 +490,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      await persistPlanningNotifications({
+        dataSource: transactionDataSource,
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        beforeSnapshot: snapshot,
+        afterSnapshot: appliedSnapshot,
+        commands: parsed.value.commands
+      });
       const responseBody = {
         applied: batchPreview.planDelta,
         newPlanVersion,
@@ -851,6 +868,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      await persistPlanningNotifications({
+        dataSource: transactionDataSource,
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        beforeSnapshot: snapshot,
+        afterSnapshot: appliedSnapshot,
+        commands: commandsToApply
+      });
       return {
         ok: true as const,
         body: {

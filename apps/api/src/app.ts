@@ -25,6 +25,8 @@ import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
+import { registerCollaborationRoutes } from "./collaborationRoutes";
+import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
@@ -43,6 +45,7 @@ import { registerRetrospectiveRoutes } from "./retrospectiveRoutes";
 import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
 import { registerSearchRoutes } from "./searchRoutes";
 import { createStorageProviderFromEnv } from "./storageProvider";
+import { createVideoProviderFromEnv } from "./videoProvider";
 import {
   isTrustedBrowserMutationRequest,
   setApiSecurityHeaders,
@@ -64,6 +67,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const trustedMutationOrigins =
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
   const storageProvider = options.storageProvider ?? createStorageProviderFromEnv();
+  const videoProvider = options.videoProvider ?? createVideoProviderFromEnv();
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
@@ -209,6 +213,7 @@ export function createApp(options: CreateAppOptions = {}) {
     runDataSourceTransaction,
     secureCookies,
     storageProvider,
+    videoProvider,
     trustForwardedAuthHeaders
   };
 
@@ -230,6 +235,8 @@ export function createApp(options: CreateAppOptions = {}) {
   registerAuditRoutes(app, routeDeps);
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
+  registerCollaborationRoutes(app, routeDeps);
+  registerCommunicationRealtimeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);

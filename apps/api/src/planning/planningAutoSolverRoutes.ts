@@ -10,6 +10,7 @@ import type { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { readLimitedJsonBody } from "../jsonBody";
+import { persistPlanningNotifications } from "../collaborationNotificationService";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { parsePlanningCommand, parseScenarioApplyEnvelope } from "../planningParsers";
@@ -515,6 +516,14 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         }, transactionDataSource);
         const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
         if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        await persistPlanningNotifications({
+          dataSource: transactionDataSource,
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          beforeSnapshot: snapshot,
+          afterSnapshot: appliedSnapshot,
+          commands
+        });
         return {
           ok: true as const,
           body: {

@@ -26,6 +26,7 @@ const dataSource = postgresClient
 const enableDevTenantRoutes = runtimeConfig.enableDevTenantRoutes;
 const storageProvider = createStorageProviderFromEnv();
 const readinessChecks = createServerReadinessChecks({
+  planningEventsBackend: runtimeConfig.planningEventsBackend,
   postgresClient,
   production: runtimeConfig.production,
   storageProvider

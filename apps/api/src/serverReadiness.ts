@@ -2,9 +2,11 @@ import {
   checkStorageProviderReadWrite,
   type ReadinessChecks
 } from "./healthRoutes";
+import { getPlanningRealtimeStatus } from "./planningRealtimeHealth";
+import type { PlanningEventsBackend } from "./serverConfig";
 import type { StorageProvider } from "./storageProvider";
 
-export const expectedDatabaseMigrationTag = "0033_phase_9_closure_retrospectives.sql";
+export const expectedDatabaseMigrationTag = "0036_phase_g2_participant_state_events.sql";
 
 type ReadinessPostgresClient = (
   strings: TemplateStringsArray,
@@ -13,6 +15,7 @@ type ReadinessPostgresClient = (
 
 export function createServerReadinessChecks(input: {
   postgresClient?: ReadinessPostgresClient | undefined;
+  planningEventsBackend?: PlanningEventsBackend | undefined;
   storageProvider: StorageProvider;
   production: boolean;
 }): ReadinessChecks {
@@ -37,6 +40,15 @@ export function createServerReadinessChecks(input: {
   } else if (input.production) {
     checks.database = async () => {
       throw new Error("database_not_configured");
+    };
+  }
+
+  if (input.planningEventsBackend === "redis") {
+    checks.realtime = () => {
+      const status = getPlanningRealtimeStatus();
+      if (status.backend !== "redis" || !status.connected || !status.redisConfigured) {
+        throw new Error("planning_realtime_not_ready");
+      }
     };
   }
 
