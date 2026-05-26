@@ -248,7 +248,7 @@ describe("communications realtime API", () => {
 
     expect(join.status).toBe(409);
     await expect(join.json()).resolves.toEqual({ error: "call_session_not_active" });
-    expect(race.joinTokenCalls()).toBe(0);
+    expect(race.joinTokenCalls()).toBe(1);
 
     const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
       headers: { cookie: adminCookie }

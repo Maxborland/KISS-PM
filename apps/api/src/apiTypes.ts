@@ -747,6 +747,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     conversationId: string;
     limit: number;
+    cursor?: string;
   }): Promise<DiscussionMessage[]>;
   findDiscussionMessage?(
     tenantId: TenantId,
