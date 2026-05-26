@@ -873,6 +873,11 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     sessionId: string
   ): Promise<CallSession | undefined>;
+  findActiveCallSessionForUpdate?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallSession | undefined>;
   endCallSession?(input: {
     tenantId: TenantId;
     sessionId: string;
