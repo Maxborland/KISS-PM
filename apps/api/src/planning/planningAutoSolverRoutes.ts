@@ -1,6 +1,7 @@
 import { canManageProjectPlan, canManageProjectResources } from "@kiss-pm/access-control";
 import {
   isBlockingValidationIssue,
+  maxPlanDate,
   proposeAutoPlanningSolutions,
   parsePlanDate,
   type AutoPlanningSolverMode,
@@ -104,15 +105,29 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
     }
 
+    const solverHorizonFinish = parsed.value.targetDeadline
+      ? maxPlanDate(
+          maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish),
+          parsed.value.targetDeadline
+        )
+      : maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish);
+    const solverOccupancyWindows = deps.dataSource.listOccupancyWindows
+      ? await deps.dataSource.listOccupancyWindows({
+          tenantId: actor.tenantId,
+          from: new Date(`${snapshot.project.plannedStart}T00:00:00.000Z`),
+          to: new Date(`${solverHorizonFinish}T23:59:59.999Z`)
+        })
+      : snapshot.occupancyWindows;
     const solverSnapshot = parsed.value.targetDeadline
       ? {
           ...snapshot,
+          occupancyWindows: solverOccupancyWindows,
           project: {
             ...snapshot.project,
             deadline: parsed.value.targetDeadline
           }
         }
-      : snapshot;
+      : { ...snapshot, occupancyWindows: solverOccupancyWindows };
     const runResult = proposeAutoPlanningSolutions({
       mode: parsed.value.mode,
       snapshot: solverSnapshot,
