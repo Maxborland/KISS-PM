@@ -522,6 +522,15 @@
   stroke-linejoin: round;
 }
 
+.gdep__path--selected .gdep__line {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.gdep__path--selected .gdep__arrow {
+  fill: var(--accent);
+}
+
 .gdep__arrow {
   fill: color-mix(in srgb, var(--muted) 70%, transparent);
   stroke: none;
@@ -1057,6 +1066,15 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+}
+
+.gantt-toolbar--grouped {
+  gap: 4px 6px;
+  padding: 6px 10px;
+}
+
+.gantt-toolbar--grouped .gantt-toolbar__section {
+  gap: 2px;
 }
 
 .gantt-toolbar__section {

@@ -73,7 +73,7 @@ function GanttToolbar({
 }) {
   return (
     <>
-      <div className="gantt-toolbar" role="toolbar" aria-label="Действия Ганта">
+      <div className="gantt-toolbar gantt-toolbar--grouped" role="toolbar" aria-label="Действия Ганта">
         <ToolbarSection label="Правка">
           <Button variant="ghost" size="icon-sm" aria-label="Добавить задачу" title="Добавить задачу" onClick={api.addTask}>
             <Plus className="size-4" />

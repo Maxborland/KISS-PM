@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { barEndpointX, barFinishX, barStartX, buildDependencyPaths } from "./gantt-dependency-paths";
+import {
+  GANTT_CHART_HEADER_PX,
+  GANTT_ROW_PX,
+  barEndpointX,
+  barFinishX,
+  barStartX,
+  buildDependencyPaths
+} from "./gantt-dependency-paths";
 import type { GanttRow } from "./types";
 
 const row = (id: string, startDay: number, durationDays: number, kind: GanttRow["kind"] = "task"): GanttRow => ({
@@ -43,6 +50,20 @@ describe("buildDependencyPaths", () => {
     const rows = [row("a", 5, 3), row("b", 0, 3)];
     const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "SF" }], 28);
     expect(p?.arrowDir).toBe("left");
+  });
+
+  it("FS path starts and ends at bar endpoint X in chart coordinate space", () => {
+    const rows = [row("a", 0, 3), row("b", 5, 2)];
+    const dayW = 28;
+    const [p] = buildDependencyPaths(rows, [{ id: "d", fromId: "a", toId: "b", type: "FS" }], dayW);
+    const x1 = barEndpointX(rows[0]!, "finish", dayW);
+    const x2 = barEndpointX(rows[1]!, "start", dayW);
+    const y1 = GANTT_CHART_HEADER_PX + 0 * GANTT_ROW_PX + GANTT_ROW_PX / 2;
+    const y2 = GANTT_CHART_HEADER_PX + 1 * GANTT_ROW_PX + GANTT_ROW_PX / 2;
+    expect(p?.d.startsWith(`M ${x1} ${y1}`)).toBe(true);
+    expect(p?.d.endsWith(`H ${x2}`)).toBe(true);
+    expect(p?.x2).toBe(x2);
+    expect(p?.y2).toBe(y2);
   });
 
   it("milestone endpoint: start=left edge, finish=left+12px", () => {
