@@ -38,6 +38,40 @@ describe("auto planning solver", () => {
     );
   });
 
+  it("does not return no-op proposals when no assignments are eligible", () => {
+    const result = proposeAutoPlanningSolutions({
+      snapshot: createSnapshot({
+        tasks: [createTask("task-a", "1", "2026-06-01")],
+        assignments: []
+      }),
+      mode: "schedule",
+      targetDeadline: "2026-06-02"
+    });
+
+    expect(result.proposals).toEqual([]);
+  });
+
+  it("keeps scheduling after the search iteration budget is exhausted", () => {
+    const result = proposeAutoPlanningSolutions({
+      snapshot: createSnapshot(),
+      mode: "schedule",
+      targetDeadline: "2026-06-02",
+      options: { maxIterations: 1 }
+    });
+
+    expect(result.proposals[0]?.planDelta.commands).toEqual(
+      expect.arrayContaining([
+        {
+          type: "assignment.allocations.replace",
+          payload: {
+            assignmentId: "assignment-b",
+            allocations: [{ date: "2026-06-02", workMinutes: 480 }]
+          }
+        }
+      ])
+    );
+  });
+
   it("splits work to another resource when the original employee cannot fit the deadline", () => {
     const result = proposeAutoPlanningSolutions({
       snapshot: createSnapshot({
@@ -139,6 +173,38 @@ describe("auto planning solver", () => {
         expect.objectContaining({ type: "risk.accept_overload" })
       ])
     );
+  });
+
+  it("scores deadline misses from the calculated project finish, not only solver allocations", () => {
+    const result = proposeAutoPlanningSolutions({
+      snapshot: createSnapshot({
+        tasks: [
+          createTask("task-a", "1", "2026-06-01"),
+          createTask("task-late", "2", "2026-06-05")
+        ],
+        assignments: [
+          {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480,
+            calendarId: null
+          }
+        ]
+      }),
+      mode: "schedule",
+      targetDeadline: "2026-06-02"
+    });
+
+    expect(result.proposals[0]).toMatchObject({
+      explainability: {
+        finishDate: "2026-06-05",
+        deadlineDeltaDays: 3,
+        cost: expect.objectContaining({ deadlineMissDays: 3 })
+      }
+    });
   });
 });
 

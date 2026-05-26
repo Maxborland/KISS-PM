@@ -757,6 +757,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
       const profile = await deps.getActorProfile(actor);
+      const readDecision = canReadPlanningReadModel({ actor, profile });
+      if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
       const planDecision = canManageProjectPlan({
         actor,
         profile,

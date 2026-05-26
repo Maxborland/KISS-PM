@@ -37,6 +37,23 @@ export const planningRouteTestDataset: SeedTenantDataset = {
       permissions: ["tenant.project_plan.manage"]
     },
     {
+      id: "access-profile-plan-resource-manager-no-read",
+      tenantId: "tenant-alpha",
+      name: "Менеджер плана и ресурсов без чтения",
+      permissions: ["tenant.project_plan.manage", "tenant.project_resources.manage"]
+    },
+    {
+      id: "access-profile-plan-manager-reader-no-resource-manage",
+      tenantId: "tenant-alpha",
+      name: "Менеджер плана без управления ресурсами",
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.project_plan.manage"
+      ]
+    },
+    {
       id: "access-profile-scenario-operator-no-read",
       tenantId: "tenant-alpha",
       name: "Оператор сценариев без чтения",
@@ -85,6 +102,24 @@ export const planningRouteTestDataset: SeedTenantDataset = {
       email: "plan-manager-no-read@kiss-pm.local",
       name: "Марина Без Чтения",
       accessProfileId: "access-profile-plan-manager-no-read",
+      positionId: "position-manager",
+      password: "manager12345"
+    },
+    {
+      id: "user-alpha-plan-resource-manager-no-read",
+      tenantId: "tenant-alpha",
+      email: "plan-resource-manager-no-read@kiss-pm.local",
+      name: "Марина Ресурсы Без Чтения",
+      accessProfileId: "access-profile-plan-resource-manager-no-read",
+      positionId: "position-manager",
+      password: "manager12345"
+    },
+    {
+      id: "user-alpha-plan-manager-reader-no-resource-manage",
+      tenantId: "tenant-alpha",
+      email: "plan-manager-reader-no-resource-manage@kiss-pm.local",
+      name: "Павел План Без Ресурсов",
+      accessProfileId: "access-profile-plan-manager-reader-no-resource-manage",
       positionId: "position-manager",
       password: "manager12345"
     },
