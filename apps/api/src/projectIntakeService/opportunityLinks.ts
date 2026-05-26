@@ -9,8 +9,17 @@ import type {
   ProjectTypeRecord
 } from "../apiTypes";
 
+type OpportunityLinkDataSource = Pick<
+  ApiTenantDataSource,
+  | "findClientById"
+  | "findContactById"
+  | "findDealStageById"
+  | "findProjectTypeById"
+  | "findUserById"
+>;
+
 export async function resolveOpportunityLinks(
-  dataSource: ApiTenantDataSource,
+  dataSource: OpportunityLinkDataSource,
   tenantId: string,
   input: OpportunityInput
 ): Promise<

@@ -3,6 +3,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import type { AuthRateLimiter } from "./authRateLimit";
@@ -29,7 +30,7 @@ export type ApiRouteDeps = {
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 

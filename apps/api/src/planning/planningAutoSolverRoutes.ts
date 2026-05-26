@@ -113,19 +113,20 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
           }
         }
       : snapshot;
-    const readModel = createPlanningReadModel(solverSnapshot);
     const runResult = proposeAutoPlanningSolutions({
       mode: parsed.value.mode,
       snapshot: solverSnapshot,
-      calculatedPlan: readModel.calculatedPlan,
-      resourceLoad: readModel.resourceLoad,
-      calculatedAt: solverSnapshot.capturedAt
+      targetDeadline: parsed.value.targetDeadline ?? null,
+      calculatedAt: solverSnapshot.capturedAt,
+      engineVersion: PLANNING_ENGINE_VERSION
     });
     const runId = `planning-auto-solver-${randomUUID()}`;
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     const proposals = runResult.proposals.map((proposal, index): Record<string, unknown> => ({
       ...proposal,
-      id: `proposal-${index + 1}`
+      id: `proposal-${index + 1}`,
+      conflictEffect: proposal.kind === "accepted_overload" ? "accepted_overload" : "removed",
+      label: proposal.kind === "accepted_overload" ? "Accept controlled overload" : "Resolve without overlap"
     }));
     const proposalPayloadHash = hashJson(proposals);
     const run = await deps.runDataSourceTransaction(async (transactionDataSource) => {
