@@ -482,10 +482,13 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       });
       return context.json({ error: access.value.manageDecision.reason }, 403);
     }
+    if (!deps.dataSource.createMeeting || !deps.dataSource.replaceMeetingParticipants) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.createMeeting || !transactionDataSource.replaceMeetingParticipants) {
-        throw new Error("collaboration_not_configured");
+        return { ok: false as const };
       }
       const meeting = await transactionDataSource.createMeeting({
         id: `meeting-${randomUUID()}`,
@@ -529,8 +532,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         }),
         transactionDataSource
       );
-      return { meeting, participants };
+      return { ok: true as const, meeting, participants };
     });
+    if (!result.ok) return context.json({ error: "collaboration_not_configured" }, 501);
     return context.json({
       meeting: serializeMeeting(result.meeting),
       participants: result.participants

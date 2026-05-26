@@ -18,10 +18,12 @@ import {
   parseCollaborationId,
   parseProviderRoomId,
   type CallEvent,
+  type CallEventType,
   type CallParticipantState,
   type CallRecording,
   type CallRoom,
   type CallSession,
+  type CallParticipantStateValue,
   type CollaborationEntityType,
   type TenantUser
 } from "@kiss-pm/domain";
@@ -364,9 +366,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         userId: parsed.value.userId,
         state: parsed.value.state
       });
-      const eventType = parsed.value.state === "left" || parsed.value.state === "removed"
-        ? "participant_left"
-        : "participant_joined";
+      const eventType = eventTypeForParticipantState(parsed.value.state);
       const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
         id: `call-event-${randomUUID()}`,
         tenantId: actor.tenantId,
@@ -658,6 +658,13 @@ function parseRecordingBody(record: Record<string, unknown>) {
       title: title.value
     }
   };
+}
+
+function eventTypeForParticipantState(state: CallParticipantStateValue): CallEventType {
+  if (state === "invited") return "participant_invited";
+  if (state === "joining") return "participant_joining";
+  if (state === "joined") return "participant_joined";
+  return "participant_left";
 }
 
 function parseEntityQuery(entityType: unknown, entityId: unknown) {

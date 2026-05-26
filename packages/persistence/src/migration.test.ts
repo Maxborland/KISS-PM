@@ -172,6 +172,13 @@ const phaseG2CommunicationsRealtimeMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseG2ParticipantStateEventsMigration = readFileSync(
+  new URL(
+    "../migrations/0036_phase_g2_participant_state_events.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -333,6 +340,17 @@ describe("Phase G.2 / 11.2 SQL migration", () => {
     );
     expect(phaseG2CommunicationsRealtimeMigration).toContain(
       "CONSTRAINT call_recordings_attachment_fk"
+    );
+  });
+
+  it("extends call event types for intermediate participant states", () => {
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS call_events_type_chk"
+    );
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_invited");
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_joining");
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "ADD CONSTRAINT call_events_type_chk"
     );
   });
 });
