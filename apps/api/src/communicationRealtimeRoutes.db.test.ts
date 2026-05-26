@@ -10,7 +10,9 @@ import {
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
+import type { ApiTenantDataSource } from "./apiTypes";
 import { createVideoProvider } from "./videoProvider";
+import type { VideoProvider } from "./videoProvider";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -230,6 +232,59 @@ describe("communications realtime API", () => {
       event: { eventType: "participant_joining" },
       participantState: { state: "joining" }
     });
+  });
+
+  it("rejects join tokens when the session ends after the route pre-check", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const race = createSessionEndedRaceApp(started.session.id);
+
+    const join = await race.app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+
+    expect(join.status).toBe(409);
+    await expect(join.json()).resolves.toEqual({ error: "call_session_not_active" });
+    expect(race.joinTokenCalls()).toBe(0);
+
+    const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
+      headers: { cookie: adminCookie }
+    });
+    const eventsPayload = await events.json() as { events: Array<{ eventType: string }> };
+    expect(eventsPayload.events).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ eventType: "join_token_issued" })])
+    );
+  });
+
+  it("rejects participant updates when the session ends after the route pre-check", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const race = createSessionEndedRaceApp(started.session.id);
+
+    const state = await race.app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined" })
+      }
+    );
+
+    expect(state.status).toBe(409);
+    await expect(state.json()).resolves.toEqual({ error: "call_session_not_active" });
+
+    const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
+      headers: { cookie: adminCookie }
+    });
+    const eventsPayload = await events.json() as { events: Array<{ eventType: string }> };
+    expect(eventsPayload.events).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ eventType: "participant_joined" })])
+    );
   });
 
   it("blocks users without parent entity access", async () => {
@@ -554,6 +609,50 @@ describe("communications realtime API", () => {
 
   async function truncateState() {
     await client`TRUNCATE call_recordings, call_participant_states, call_events, call_sessions, call_rooms, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+  }
+
+  function createSessionEndedRaceApp(sessionId: string) {
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    let endedAfterPrecheck = false;
+    let issuedJoinTokens = 0;
+    const dataSource: ApiTenantDataSource = {
+      ...baseDataSource,
+      async findCallSession(tenantId, requestedSessionId) {
+        const session = await baseDataSource.findCallSession(tenantId, requestedSessionId);
+        if (!endedAfterPrecheck && requestedSessionId === sessionId && session?.status === "active") {
+          endedAfterPrecheck = true;
+          await forceEndSession(tenantId, requestedSessionId);
+        }
+        return session;
+      }
+    };
+    const videoProvider: VideoProvider = {
+      kind: "livekit",
+      async issueJoinToken() {
+        issuedJoinTokens += 1;
+        return {
+          provider: "livekit",
+          joinUrl: "https://livekit.kiss.local",
+          token: "race-token",
+          expiresAt: "2026-05-25T00:10:00.000Z"
+        };
+      }
+    };
+    return {
+      app: createApp({ dataSource, videoProvider }),
+      joinTokenCalls: () => issuedJoinTokens
+    };
+  }
+
+  async function forceEndSession(tenantId: string, sessionId: string) {
+    await client`
+      UPDATE call_sessions
+      SET status = 'ended',
+        ended_by_user_id = 'user-alpha-admin',
+        ended_at = now()
+      WHERE tenant_id = ${tenantId}
+        AND id = ${sessionId}
+    `;
   }
 });
 

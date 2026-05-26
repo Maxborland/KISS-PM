@@ -280,41 +280,63 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (resolved.value.room.provider !== deps.videoProvider.kind) {
       return context.json({ error: "video_provider_misconfigured" }, 409);
     }
-    if (!deps.dataSource.createCallEvent) {
+    if (
+      !deps.dataSource.withTransaction ||
+      !deps.dataSource.findActiveCallSessionForUpdate ||
+      !deps.dataSource.createCallEvent
+    ) {
       return context.json({ error: "communications_not_configured" }, 501);
     }
-    const join = await deps.videoProvider.issueJoinToken({
-      providerRoomId: resolved.value.room.providerRoomId,
-      roomId: resolved.value.room.id,
-      tenantId: actor.tenantId,
-      userId: actor.id,
-      userName: actor.name
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const activeSession = await requireMethod(transactionDataSource.findActiveCallSessionForUpdate).call(
+        transactionDataSource,
+        {
+          tenantId: actor.tenantId,
+          roomId: resolved.value.room.id,
+          sessionId: resolved.value.session.id
+        }
+      );
+      if (!activeSession) return new CallRouteError(409, "call_session_not_active");
+      const join = await deps.videoProvider.issueJoinToken({
+        providerRoomId: resolved.value.room.providerRoomId,
+        roomId: resolved.value.room.id,
+        tenantId: actor.tenantId,
+        userId: actor.id,
+        userName: actor.name
+      });
+      const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
+        id: `call-event-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        roomId: resolved.value.room.id,
+        sessionId: activeSession.id,
+        actorUserId: actor.id,
+        eventType: "join_token_issued",
+        payload: { provider: join.provider, expiresAt: join.expiresAt }
+      });
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.call_join_token_issued",
+          actor,
+          afterState: { roomId: resolved.value.room.id, sessionId: activeSession.id },
+          commandInput: { roomId: resolved.value.room.id, sessionId: activeSession.id },
+          permissionResult: resolved.value.access.readDecision,
+          sourceEntity: resolved.value.access.sourceEntity
+        }),
+        transactionDataSource
+      );
+      return { event, join };
     });
-    const event = await deps.dataSource.createCallEvent({
-      id: `call-event-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      roomId: resolved.value.room.id,
-      sessionId: resolved.value.session.id,
-      actorUserId: actor.id,
-      eventType: "join_token_issued",
-      payload: { provider: join.provider, expiresAt: join.expiresAt }
-    });
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.call_join_token_issued",
-      actor,
-      afterState: { roomId: resolved.value.room.id, sessionId: resolved.value.session.id },
-      commandInput: { roomId: resolved.value.room.id, sessionId: resolved.value.session.id },
-      permissionResult: resolved.value.access.readDecision,
-      sourceEntity: resolved.value.access.sourceEntity
-    }));
+    if (result instanceof CallRouteError) {
+      return context.json({ error: result.error }, result.status);
+    }
     return context.json({
       join: {
-        provider: join.provider,
-        joinUrl: join.joinUrl,
-        token: join.token,
-        expiresAt: join.expiresAt
+        provider: result.join.provider,
+        joinUrl: result.join.joinUrl,
+        token: result.join.token,
+        expiresAt: result.join.expiresAt
       },
-      event: serializeCallEvent(event)
+      event: serializeCallEvent(result.event)
     });
   });
 
@@ -329,7 +351,12 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (resolved.value.session.status !== "active") {
       return context.json({ error: "call_session_not_active" }, 409);
     }
-    if (!deps.dataSource.upsertCallParticipantState || !deps.dataSource.createCallEvent) {
+    if (
+      !deps.dataSource.withTransaction ||
+      !deps.dataSource.findActiveCallSessionForUpdate ||
+      !deps.dataSource.upsertCallParticipantState ||
+      !deps.dataSource.createCallEvent
+    ) {
       return context.json({ error: "communications_not_configured" }, 501);
     }
     const body = await readLimitedJsonBody(context);
@@ -359,10 +386,19 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       if (!participantExists) return context.json({ error: "participant_user_not_found" }, 404);
     }
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const activeSession = await requireMethod(transactionDataSource.findActiveCallSessionForUpdate).call(
+        transactionDataSource,
+        {
+          tenantId: actor.tenantId,
+          roomId: resolved.value.room.id,
+          sessionId: resolved.value.session.id
+        }
+      );
+      if (!activeSession) return new CallRouteError(409, "call_session_not_active");
       const participantState = await requireMethod(transactionDataSource.upsertCallParticipantState).call(transactionDataSource, {
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id,
-        sessionId: resolved.value.session.id,
+        sessionId: activeSession.id,
         userId: parsed.value.userId,
         state: parsed.value.state
       });
@@ -371,7 +407,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         id: `call-event-${randomUUID()}`,
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id,
-        sessionId: resolved.value.session.id,
+        sessionId: activeSession.id,
         actorUserId: actor.id,
         eventType,
         payload: { userId: parsed.value.userId, state: parsed.value.state }
@@ -383,7 +419,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
           afterState: { userId: parsed.value.userId, state: parsed.value.state },
           commandInput: {
             roomId: resolved.value.room.id,
-            sessionId: resolved.value.session.id,
+            sessionId: activeSession.id,
             userId: parsed.value.userId
           },
           permissionResult: parsed.value.permissionResult,
@@ -393,6 +429,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       );
       return { event, participantState };
     });
+    if (result instanceof CallRouteError) {
+      return context.json({ error: result.error }, result.status);
+    }
     return context.json({
       participantState: serializeCallParticipantState(result.participantState),
       event: serializeCallEvent(result.event)

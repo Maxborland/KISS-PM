@@ -201,6 +201,11 @@ export type CollaborationRepository = {
     tenantId: TenantId,
     sessionId: string
   ): Promise<CallSession | undefined>;
+  findActiveCallSessionForUpdate(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallSession | undefined>;
   endCallSession(input: {
     tenantId: TenantId;
     sessionId: string;
@@ -831,6 +836,22 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .select()
         .from(callSessions)
         .where(and(eq(callSessions.tenantId, tenantId), eq(callSessions.id, sessionId)))
+        .limit(1);
+      return row ? mapCallSession(row) : undefined;
+    },
+    async findActiveCallSessionForUpdate(input) {
+      const [row] = await db
+        .select()
+        .from(callSessions)
+        .where(
+          and(
+            eq(callSessions.tenantId, input.tenantId),
+            eq(callSessions.roomId, input.roomId),
+            eq(callSessions.id, input.sessionId),
+            eq(callSessions.status, "active")
+          )
+        )
+        .for("update")
         .limit(1);
       return row ? mapCallSession(row) : undefined;
     },
