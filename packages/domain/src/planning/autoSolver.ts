@@ -133,8 +133,9 @@ export function proposeAutoPlanningSolutions(
   });
   const proposals: AutoPlanningSolverProposal[] = [];
 
-  if (noOverlapPlans) {
-    proposals.push(
+  appendNonEmptyProposal(
+    proposals,
+    noOverlapPlans &&
       createSolverProposal({
         snapshot: input.snapshot,
         calculatedPlan,
@@ -144,8 +145,7 @@ export function proposeAutoPlanningSolutions(
         assignmentPlans: noOverlapPlans.assignmentPlans,
         engineVersion
       })
-    );
-  }
+  );
 
   const overloadPlans = scheduleAssignments({
     snapshot: input.snapshot,
@@ -157,8 +157,9 @@ export function proposeAutoPlanningSolutions(
     beamWidth,
     maxIterations
   });
-  if (overloadPlans) {
-    proposals.push(
+  appendNonEmptyProposal(
+    proposals,
+    overloadPlans &&
       createSolverProposal({
         snapshot: input.snapshot,
         calculatedPlan,
@@ -170,8 +171,7 @@ export function proposeAutoPlanningSolutions(
         assignmentPlans: overloadPlans.assignmentPlans,
         engineVersion
       })
-    );
-  }
+  );
 
   const unique = uniqueProposals(proposals)
     .sort(compareSolverProposals)
@@ -211,8 +211,6 @@ function scheduleAssignments(input: {
   let iterations = 0;
 
   for (const assignment of input.assignments) {
-    iterations += 1;
-    if (iterations > input.maxIterations) return null;
     const task = input.calculatedPlan.tasks.find((candidate) => candidate.id === assignment.taskId);
     if (!task?.calculatedStart) continue;
     const workMinutes = resolveAssignmentWork(input.snapshot.assignments, assignment, task.workMinutes);
@@ -229,8 +227,9 @@ function scheduleAssignments(input: {
     }
 
     const nextStates: SearchState[] = [];
-    for (const state of states) {
-      for (const candidate of allocateAssignmentCandidates({
+    const activeStates = iterations >= input.maxIterations ? states.slice(0, 1) : states;
+    for (const state of activeStates) {
+      const candidates = allocateAssignmentCandidates({
         snapshot: input.snapshot,
         task,
         assignment,
@@ -238,19 +237,24 @@ function scheduleAssignments(input: {
         targetDeadline: input.targetDeadline,
         usage: state.usage,
         allowOverload: input.allowOverload
-      })) {
+      });
+      const activeCandidates = iterations >= input.maxIterations ? candidates.slice(0, 1) : candidates;
+      for (const candidate of activeCandidates) {
+        if (iterations < input.maxIterations) iterations += 1;
         const plans = [...state.plans, candidate.plan];
         nextStates.push({
           plans,
           usage: candidate.usage,
           cost: costForAssignmentPlans(plans, input.snapshot, input.targetDeadline)
         });
+        if (iterations >= input.maxIterations) break;
       }
+      if (iterations >= input.maxIterations && nextStates.length > 0) break;
     }
 
     states = dedupeSearchStates(nextStates)
       .sort(compareSearchStates)
-      .slice(0, input.beamWidth);
+      .slice(0, iterations >= input.maxIterations ? 1 : input.beamWidth);
     if (states.length === 0) return null;
   }
 
@@ -371,7 +375,7 @@ function createSolverProposal(input: {
     rangeFinish: maxPlanDate(input.targetDeadline, nextPlan.projectFinish ?? input.targetDeadline),
     granularities: ["day"]
   });
-  const finishDate = latestAllocationDate(input.assignmentPlans) ?? nextPlan.projectFinish;
+  const finishDate = nextPlan.projectFinish ?? latestAllocationDate(input.assignmentPlans);
   const overloadMinutes = resourceLoad.overloads.reduce(
     (total, overload) => total + overload.overloadMinutes,
     0
@@ -822,6 +826,14 @@ function addUsage(usage: UsageMap, resourceId: string, date: PlanDate, workMinut
 
 function cloneUsage(usage: UsageMap): UsageMap {
   return new Map(usage);
+}
+
+function appendNonEmptyProposal(
+  proposals: AutoPlanningSolverProposal[],
+  proposal: AutoPlanningSolverProposal | false | null
+): void {
+  if (!proposal || proposal.planDelta.commands.length === 0) return;
+  proposals.push(proposal);
 }
 
 function uniqueProposals(proposals: AutoPlanningSolverProposal[]): AutoPlanningSolverProposal[] {

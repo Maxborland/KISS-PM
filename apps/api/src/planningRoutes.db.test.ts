@@ -211,7 +211,10 @@ describe("planning API routes", () => {
 
   it("requires resource management permission for auto-solver allocation proposals", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const planManagerCookie = await loginAs("plan-manager-no-read@kiss-pm.local", "local-manager-password");
+    const planManagerCookie = await loginAs(
+      "plan-manager-reader-no-resource-manage@kiss-pm.local",
+      "local-manager-password"
+    );
     await createTask(adminCookie, {
       id: "task-resource-permission-a",
       title: "Первый слот",
@@ -266,6 +269,73 @@ describe("planning API routes", () => {
       error: "permission_missing"
     });
     expect(deniedApply.status).toBe(403);
+  });
+
+  it("requires plan read permission before returning auto-solver apply read models", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const managerNoReadCookie = await loginAs("plan-resource-manager-no-read@kiss-pm.local", "local-manager-password");
+    await createTask(adminCookie, {
+      id: "task-read-gate-a",
+      title: "Первый слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    await createTask(adminCookie, {
+      id: "task-read-gate-b",
+      title: "Второй слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialRead.json();
+    const runResponse = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: initialBody.planVersion,
+          targetDeadline: "2026-06-02"
+        })
+      }
+    );
+    const runBody = await runResponse.json();
+    expect(runResponse.status).toBe(200);
+
+    const deniedApply = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}/proposals/${runBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: managerNoReadCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    await expect(deniedApply.json()).resolves.toEqual({
+      error: "permission_missing"
+    });
+    expect(deniedApply.status).toBe(403);
+
+    const afterDeniedRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    await expect(afterDeniedRead.json()).resolves.toMatchObject({
+      planVersion: initialBody.planVersion
+    });
   });
 
   it("requires an accepted risk reason for auto-solver overload fallback proposals", async () => {
