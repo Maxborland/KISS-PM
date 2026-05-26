@@ -126,16 +126,55 @@ const phase56PlanningCommandIdempotencyMigration = readFileSync(
   ),
   "utf8"
 );
-const phase78AssignmentAllocationsMigration = readFileSync(
+const phase7KpiSignalActionEngineMigration = readFileSync(
   new URL(
-    "../migrations/0023_phase_7_8_assignment_allocations.sql",
+    "../migrations/0028_phase_7_kpi_signal_action_engine.sql",
     import.meta.url
   ),
   "utf8"
 );
-const phase78PlanningSolverRunsMigration = readFileSync(
+const phase7KpiEvaluationDecimalMigration = readFileSync(
   new URL(
-    "../migrations/0024_phase_7_8_planning_solver_runs.sql",
+    "../migrations/0029_phase_7_kpi_evaluation_decimal_value.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase78AutoSolverAllocationsMigration = readFileSync(
+  new URL(
+    "../migrations/0030_phase_7_8_auto_solver_allocations.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase8ControlSurfacesMigration = readFileSync(
+  new URL("../migrations/0032_phase_8_control_surfaces.sql", import.meta.url),
+  "utf8"
+);
+const phase9ClosureRetrospectivesMigration = readFileSync(
+  new URL(
+    "../migrations/0033_phase_9_closure_retrospectives.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phaseGCollaborationMigration = readFileSync(
+  new URL(
+    "../migrations/0034_phase_g_collaboration_communications.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phaseG2CommunicationsRealtimeMigration = readFileSync(
+  new URL(
+    "../migrations/0035_phase_g2_communications_realtime.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phaseG2ParticipantStateEventsMigration = readFileSync(
+  new URL(
+    "../migrations/0036_phase_g2_participant_state_events.sql",
     import.meta.url
   ),
   "utf8"
@@ -161,6 +200,158 @@ describe("Phase 1.2 SQL migration", () => {
     );
     expect(uniqueIndexPosition).toBeGreaterThanOrEqual(0);
     expect(sameTenantForeignKeyPosition).toBeGreaterThan(uniqueIndexPosition);
+  });
+});
+
+describe("Phase 7 SQL migration", () => {
+  it("creates tenant-scoped KPI, signal and action engine tables", () => {
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "kpi_definitions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "kpi_evaluations"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "control_signals"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "corrective_actions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain('CREATE TABLE "action_executions"');
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "kpi_definitions_pkey" PRIMARY KEY ("tenant_id","id")'
+    );
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "control_signals_pkey" PRIMARY KEY ("tenant_id","project_id","id")'
+    );
+    expect(phase7KpiSignalActionEngineMigration).toContain(
+      'CONSTRAINT "corrective_actions_signal_fk" FOREIGN KEY ("tenant_id","project_id","control_signal_id")'
+    );
+  });
+
+  it("keeps KPI evaluation values decimal-safe for expression formulas", () => {
+    expect(phase7KpiEvaluationDecimalMigration).toContain(
+      'ALTER COLUMN "calculated_value" TYPE double precision'
+    );
+  });
+
+  it("adds persisted auto-solver runs and explicit assignment allocations", () => {
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS task_assignment_allocations"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS planning_solver_runs"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "task_assignment_allocations_assignment_date_uidx"
+    );
+    expect(phase78AutoSolverAllocationsMigration).toContain(
+      "CONSTRAINT planning_solver_runs_mode_chk CHECK (mode IN ('schedule', 'repair'))"
+    );
+  });
+});
+
+describe("Phase 8 SQL migration", () => {
+  it("creates versioned tenant-scoped control surface tables", () => {
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS control_surface_definitions"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS control_surface_versions"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_definitions_pkey PRIMARY KEY (tenant_id, id)"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS control_surface_definitions_tenant_code_uidx"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_versions_pkey PRIMARY KEY (tenant_id, surface_id, version)"
+    );
+    expect(phase8ControlSurfacesMigration).toContain(
+      "CONSTRAINT control_surface_versions_surface_fk"
+    );
+  });
+});
+
+describe("Phase 9 SQL migration", () => {
+  it("creates immutable closure snapshots, lessons and template improvement actions", () => {
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS project_closure_snapshots"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS retrospective_lessons"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS template_improvement_actions"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "project_closure_snapshots_tenant_project_uidx"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "CONSTRAINT template_improvement_actions_template_fk"
+    );
+    expect(phase9ClosureRetrospectivesMigration).toContain(
+      "ALTER TABLE projects"
+    );
+  });
+});
+
+describe("Phase G / 11 SQL migration", () => {
+  it("creates tenant-scoped collaboration and meeting tables", () => {
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS conversations"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS discussion_messages"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS user_notifications"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meetings"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meeting_external_links"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "conversations_tenant_entity_type_uidx"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CONSTRAINT meeting_external_links_provider_chk"
+    );
+  });
+});
+
+describe("Phase G.2 / 11.2 SQL migration", () => {
+  it("creates tenant-scoped call room, session and event tables", () => {
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_rooms"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_sessions"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_participant_states"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_events"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_recordings"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_one_active_per_room_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_tenant_room_id_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CONSTRAINT call_recordings_attachment_fk"
+    );
+  });
+
+  it("extends call event types for intermediate participant states", () => {
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS call_events_type_chk"
+    );
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_invited");
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_joining");
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "ADD CONSTRAINT call_events_type_chk"
+    );
   });
 });
 
@@ -532,29 +723,6 @@ describe("Phase 5/6 planning core SQL migration", () => {
     );
     expect(phase56PlanningCommandIdempotencyMigration).toContain(
       'CONSTRAINT "planning_command_idempotency_keys_actor_fk"'
-    );
-  });
-
-  it("adds explicit assignment allocations for solver split work", () => {
-    expect(phase78AssignmentAllocationsMigration).toContain(
-      'CREATE TABLE IF NOT EXISTS "task_assignment_allocations"'
-    );
-    expect(phase78AssignmentAllocationsMigration).toContain(
-      '"assignment_id" text NOT NULL'
-    );
-    expect(phase78AssignmentAllocationsMigration).toContain(
-      'CREATE UNIQUE INDEX IF NOT EXISTS "task_assignment_allocations_assignment_date_uidx"'
-    );
-  });
-
-  it("adds persisted planning solver runs without overloading scenario runs", () => {
-    expect(phase78PlanningSolverRunsMigration).toContain(
-      'CREATE TABLE IF NOT EXISTS "planning_solver_runs"'
-    );
-    expect(phase78PlanningSolverRunsMigration).toContain('"proposals" jsonb NOT NULL');
-    expect(phase78PlanningSolverRunsMigration).toContain('"applied_proposal_id" text');
-    expect(phase78PlanningSolverRunsMigration).toContain(
-      'CONSTRAINT "planning_solver_runs_mode_chk"'
     );
   });
 });

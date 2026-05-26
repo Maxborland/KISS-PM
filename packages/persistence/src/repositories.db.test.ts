@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+﻿import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -22,11 +22,11 @@ describe("PostgreSQL tenant data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -104,6 +104,50 @@ describe("PostgreSQL tenant data source", () => {
         correlation_id: "corr-1"
       }
     ]);
+  });
+
+  it("does not cap audit reads unless the caller passes an explicit limit", async () => {
+    await client`
+      INSERT INTO tenants (id, name, created_at)
+      VALUES ('tenant-alpha', 'Альфа Проект', now())
+    `;
+
+    for (let index = 0; index < 105; index += 1) {
+      const id = `audit-${String(index).padStart(3, "0")}`;
+      await dataSource.appendAuditEvent({
+        id,
+        tenantId: "tenant-alpha",
+        actorUserId: "user-alpha-admin",
+        actionType: "tenant.audit.test",
+        sourceSurfaceId: null,
+        sourceWorkflow: "phase_10_review_fix",
+        sourceEntity: {
+          type: "Tenant",
+          id: "tenant-alpha"
+        },
+        input: {},
+        beforeState: null,
+        afterState: null,
+        permissionResult: {
+          allowed: true
+        },
+        executionResult: {
+          status: "succeeded"
+        },
+        correlationId: `corr-${index}`,
+        createdAt: new Date(Date.UTC(2026, 4, 18, 0, 0, index))
+      });
+    }
+
+    const unbounded = await dataSource.listAuditEventsByTenantId("tenant-alpha");
+    const bounded = await dataSource.listAuditEventsByTenantId("tenant-alpha", {
+      limit: 100
+    });
+
+    expect(unbounded).toHaveLength(105);
+    expect(unbounded.map((event) => event.id)).toContain("audit-000");
+    expect(bounded).toHaveLength(100);
+    expect(bounded.map((event) => event.id)).not.toContain("audit-000");
   });
 
   it("creates and reads access profiles inside one tenant", async () => {

@@ -4,26 +4,54 @@ import {
   createPostgresClient,
   createPostgresTenantDataSource
 } from "@kiss-pm/persistence";
-import { createApp } from "./app";
+import { createApp, type CreateAppOptions } from "./app";
+import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
+import { readServerRuntimeConfig } from "./serverConfig";
+import { createServerReadinessChecks } from "./serverReadiness";
+import {
+  configureHttpServerSecurity,
+  isConfigurableHttpServer
+} from "./serverSecurity";
+import { createStorageProviderFromEnv } from "./storageProvider";
 
-const port = Number.parseInt(process.env.PORT ?? "4000", 10);
-const hostname = process.env.HOST ?? "127.0.0.1";
-const databaseUrl = process.env.DATABASE_URL;
+const runtimeConfig = readServerRuntimeConfig();
+const { port, hostname } = runtimeConfig;
+const databaseUrl = runtimeConfig.databaseUrl;
 const postgresClient = databaseUrl
   ? createPostgresClient(databaseUrl)
   : undefined;
 const dataSource = postgresClient
   ? createPostgresTenantDataSource(createDatabase(postgresClient))
   : undefined;
-const enableDevTenantRoutes = process.env.KISS_PM_ENABLE_DEV_ROUTES === "true";
+const enableDevTenantRoutes = runtimeConfig.enableDevTenantRoutes;
+const storageProvider = createStorageProviderFromEnv();
+const readinessChecks = createServerReadinessChecks({
+  planningEventsBackend: runtimeConfig.planningEventsBackend,
+  postgresClient,
+  production: runtimeConfig.production,
+  storageProvider
+});
 
-serve({
-  fetch: (dataSource
-    ? createApp({ dataSource, enableDevTenantRoutes })
-    : createApp({ enableDevTenantRoutes })).fetch,
+const publisher = await bootstrapPlanningEventPublisher();
+setPlanningEventPublisher(publisher);
+
+const appOptions: CreateAppOptions = {
+  enableDevTenantRoutes,
+  readinessChecks,
+  storageProvider
+};
+if (dataSource) {
+  appOptions.dataSource = dataSource;
+}
+
+const server = serve({
+  fetch: createApp(appOptions).fetch,
   hostname,
   port
 });
+if (isConfigurableHttpServer(server)) {
+  configureHttpServerSecurity(server);
+}
 
 console.log(`KISS PM API listening on http://${hostname}:${port}`);
 

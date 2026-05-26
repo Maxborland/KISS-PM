@@ -39,6 +39,41 @@ describe("PostgreSQL persistence schema", () => {
       "planning_scenario_runs",
       "planning_solver_runs",
       "planning_command_idempotency_keys",
+      "kpi_definitions",
+      "kpi_evaluations",
+      "control_signals",
+      "corrective_actions",
+      "action_executions",
+      "project_closure_snapshots",
+      "retrospective_lessons",
+      "template_improvement_actions",
+      "control_surface_definitions",
+      "control_surface_versions",
+      "tenant_production_calendars",
+      "tenant_production_calendar_exceptions",
+      "planning_saved_views",
+      "resource_absences",
+      "tenant_org_nodes",
+      "tenant_user_org_placements",
+      "file_assets",
+      "external_references",
+      "entity_attachments",
+      "conversations",
+      "discussion_messages",
+      "message_mentions",
+      "conversation_read_states",
+      "user_notifications",
+      "notification_preferences",
+      "meetings",
+      "meeting_participants",
+      "meeting_external_links",
+      "meeting_notes",
+      "meeting_action_items",
+      "call_rooms",
+      "call_sessions",
+      "call_participant_states",
+      "call_events",
+      "call_recordings",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -80,6 +115,41 @@ describe("PostgreSQL persistence schema", () => {
       "planning_scenario_runs",
       "planning_solver_runs",
       "planning_command_idempotency_keys",
+      "kpi_definitions",
+      "kpi_evaluations",
+      "control_signals",
+      "corrective_actions",
+      "action_executions",
+      "project_closure_snapshots",
+      "retrospective_lessons",
+      "template_improvement_actions",
+      "control_surface_definitions",
+      "control_surface_versions",
+      "tenant_production_calendars",
+      "tenant_production_calendar_exceptions",
+      "planning_saved_views",
+      "resource_absences",
+      "tenant_org_nodes",
+      "tenant_user_org_placements",
+      "file_assets",
+      "external_references",
+      "entity_attachments",
+      "conversations",
+      "discussion_messages",
+      "message_mentions",
+      "conversation_read_states",
+      "user_notifications",
+      "notification_preferences",
+      "meetings",
+      "meeting_participants",
+      "meeting_external_links",
+      "meeting_notes",
+      "meeting_action_items",
+      "call_rooms",
+      "call_sessions",
+      "call_participant_states",
+      "call_events",
+      "call_recordings",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -92,6 +162,118 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores Phase 7 KPI, signal and action engine records", () => {
+    expect(getPersistenceTableColumns("kpi_definitions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "entity_type",
+        "formula",
+        "threshold_rules",
+        "allowed_actions",
+        "version"
+      ])
+    );
+    expect(getPersistenceTableColumns("kpi_evaluations")).toEqual(
+      expect.arrayContaining([
+        "project_id",
+        "definition_id",
+        "source_data",
+        "calculated_value",
+        "severity",
+        "evaluated_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("control_signals")).toEqual(
+      expect.arrayContaining([
+        "project_id",
+        "evaluation_id",
+        "source_metric",
+        "allowed_actions",
+        "scenario_proposals",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("corrective_actions")).toEqual(
+      expect.arrayContaining(["control_signal_id", "responsible_user_id", "status", "result"])
+    );
+    expect(getPersistenceTableColumns("action_executions")).toEqual(
+      expect.arrayContaining(["action_type", "target_entity", "preview_payload", "result_payload"])
+    );
+  });
+
+  it("stores Phase 8 control surface definitions and immutable versions", () => {
+    expect(getPersistenceTableColumns("control_surface_definitions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "code",
+        "status",
+        "current_version",
+        "draft_version",
+        "draft_definition",
+        "published_definition",
+        "published_at",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("control_surface_versions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "surface_id",
+        "version",
+        "definition",
+        "published_by_user_id",
+        "audit_event_id",
+        "created_at"
+      ])
+    );
+  });
+
+  it("stores Phase 9 closure snapshots, retrospectives and template improvement actions", () => {
+    expect(getPersistenceTableColumns("projects")).toEqual(
+      expect.arrayContaining(["closed_at"])
+    );
+    expect(getPersistenceTableColumns("project_closure_snapshots")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "project_status_before",
+        "plan_version",
+        "snapshot_payload",
+        "plan_fact_summary",
+        "closed_by_user_id",
+        "closed_at",
+        "close_reason",
+        "audit_event_id"
+      ])
+    );
+    expect(getPersistenceTableColumns("retrospective_lessons")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "snapshot_id",
+        "category",
+        "title",
+        "body",
+        "impact",
+        "created_by_user_id",
+        "created_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("template_improvement_actions")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "project_id",
+        "snapshot_id",
+        "template_id",
+        "status",
+        "impact",
+        "applied_by_user_id",
+        "applied_at",
+        "audit_event_id"
+      ])
+    );
   });
 
   it("keeps deals linked to tenant-scoped CRM entities", () => {
@@ -131,6 +313,123 @@ describe("PostgreSQL persistence schema", () => {
         "file_size_bytes",
         "mime_type"
       ])
+    );
+  });
+
+  it("stores the Phase F storage and connector reference contract", () => {
+    expect(getPersistenceTableColumns("file_assets")).toEqual(
+      expect.arrayContaining([
+        "provider",
+        "storage_key",
+        "safe_display_name",
+        "checksum_sha256",
+        "status",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("external_references")).toEqual(
+      expect.arrayContaining([
+        "connector_type",
+        "external_id",
+        "url",
+        "title",
+        "metadata",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("entity_attachments")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "asset_id",
+        "external_reference_id",
+        "relation_type",
+        "source_activity_type",
+        "source_activity_id",
+        "archived_at"
+      ])
+    );
+  });
+
+  it("stores the Phase G collaboration and communications contract", () => {
+    expect(getPersistenceTableColumns("conversations")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "entity_type",
+        "entity_id",
+        "conversation_type",
+        "created_by_user_id",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("discussion_messages")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "conversation_id",
+        "author_user_id",
+        "body",
+        "metadata",
+        "pinned_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("user_notifications")).toEqual(
+      expect.arrayContaining([
+        "user_id",
+        "notification_type",
+        "source_entity_type",
+        "source_entity_id",
+        "route",
+        "read_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("meetings")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "agenda",
+        "scheduled_start",
+        "scheduled_finish",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("meeting_external_links")).toEqual(
+      expect.arrayContaining(["meeting_id", "provider", "url", "title"])
+    );
+    expect(getPersistenceTableColumns("meeting_action_items")).toEqual(
+      expect.arrayContaining([
+        "meeting_id",
+        "owner_user_id",
+        "target_entity_type",
+        "target_entity_id",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("call_rooms")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "meeting_id",
+        "media_kind",
+        "provider",
+        "provider_room_id",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("call_sessions")).toEqual(
+      expect.arrayContaining([
+        "room_id",
+        "provider_session_id",
+        "status",
+        "started_by_user_id",
+        "ended_by_user_id",
+        "failure_reason"
+      ])
+    );
+    expect(getPersistenceTableColumns("call_events")).toEqual(
+      expect.arrayContaining(["room_id", "session_id", "event_type", "payload"])
+    );
+    expect(getPersistenceTableColumns("call_recordings")).toEqual(
+      expect.arrayContaining(["room_id", "session_id", "attachment_id", "title"])
     );
   });
 
@@ -181,7 +480,8 @@ describe("PostgreSQL persistence schema", () => {
         "duration_minutes",
         "work_minutes",
         "constraint_type",
-        "constraint_date"
+        "constraint_date",
+        "custom_fields"
       ])
     );
     expect(getPersistenceTableColumns("plan_versions")).toEqual(
@@ -191,13 +491,7 @@ describe("PostgreSQL persistence schema", () => {
       expect.arrayContaining(["task_id", "resource_id", "role", "units_permille", "work_minutes"])
     );
     expect(getPersistenceTableColumns("task_assignment_allocations")).toEqual(
-      expect.arrayContaining([
-        "assignment_id",
-        "task_id",
-        "resource_id",
-        "date",
-        "work_minutes"
-      ])
+      expect.arrayContaining(["assignment_id", "task_id", "resource_id", "date", "work_minutes"])
     );
     expect(getPersistenceTableColumns("task_dependencies")).toEqual(
       expect.arrayContaining([

@@ -33,7 +33,15 @@ import {
   parseCrmActivityEntityType,
   parseUpdateCrmTaskBody
 } from "./crmActivityParsers";
+import { serializeAttachment } from "./attachmentSerialization";
 import { isFinalOpportunityStatus } from "./projectIntakeService/opportunityStatus";
+import {
+  parseClientIdParam,
+  parseContactIdParam,
+  parseCrmActivityIdParam,
+  parseOpportunityIdParam,
+  parseProductIdParam
+} from "./routeParamParsers";
 
 type CrmActivityRouteDeps = {
   dataSource: CrmActivityRouteDataSource;
@@ -56,6 +64,7 @@ type CrmActivityRouteDataSource = Pick<
   | "findOpportunityById"
   | "findProductById"
   | "listAuditEventsByTenantId"
+  | "listAttachmentActivityItems"
   | "listCrmActivities"
   | "listWorkspaceUsers"
   | "transitionCrmActivityStatus"
@@ -95,19 +104,19 @@ type CrmEntityContext = {
 
 export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps) {
   app.get("/api/workspace/crm/:entityType/:entityId/activity", async (context) => {
+    const route = parseCrmEntityRouteParams(context);
+    if (!route.ok) return context.json({ error: route.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.listCrmActivities) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const entityType = parseEntityTypeParam(context.req.param("entityType"));
-    if (!entityType.ok) return context.json({ error: entityType.error }, 400);
-
     const profile = await deps.getActorProfile(actor);
     const readDecision = readDecisionForEntity({
       actor,
-      entityType: entityType.value,
+      entityType: route.value.entityType,
       profile
     });
     if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
@@ -115,8 +124,8 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const entity = await resolveCrmEntity({
       actor,
       dataSource: deps.dataSource,
-      entityId: context.req.param("entityId"),
-      entityType: entityType.value
+      entityId: route.value.entityId,
+      entityType: route.value.entityType
     });
     if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
 
@@ -136,8 +145,15 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       targetTenantId: actor.tenantId
     });
 
+    const attachmentItems = (await deps.dataSource.listAttachmentActivityItems?.({
+      tenantId: actor.tenantId,
+      entityType: entity.entityType,
+      entityId: entity.entityId
+    })) ?? [];
+
     return context.json({
       activities: activities.map(serializeCrmActivity),
+      attachmentItems: attachmentItems.map(serializeAttachment),
       systemEvents: visibleSystemEvents.map(redactCrmSystemEvent),
       canReadRawAudit: auditDecision.allowed,
       auditEvents: auditDecision.allowed
@@ -147,16 +163,19 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
   });
 
   app.post("/api/workspace/crm/:entityType/:entityId/comments", async (context) => {
+    const route = parseCrmEntityRouteParams(context);
+    if (!route.ok) return context.json({ error: route.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const routeContext = await resolveMutationContext(context.req.param("entityType"), {
+    const routeContext = await resolveMutationContext(route.value.entityType, {
       actor,
       deps,
-      entityId: context.req.param("entityId")
+      entityId: route.value.entityId
     });
     if ("response" in routeContext) return routeContext.response(context);
 
@@ -209,16 +228,19 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
   });
 
   app.post("/api/workspace/crm/:entityType/:entityId/tasks", async (context) => {
+    const route = parseCrmEntityRouteParams(context);
+    if (!route.ok) return context.json({ error: route.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const routeContext = await resolveMutationContext(context.req.param("entityType"), {
+    const routeContext = await resolveMutationContext(route.value.entityType, {
       actor,
       deps,
-      entityId: context.req.param("entityId")
+      entityId: route.value.entityId
     });
     if ("response" in routeContext) return routeContext.response(context);
 
@@ -282,16 +304,19 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
   });
 
   app.post("/api/workspace/crm/:entityType/:entityId/files", async (context) => {
+    const route = parseCrmEntityRouteParams(context);
+    if (!route.ok) return context.json({ error: route.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const routeContext = await resolveMutationContext(context.req.param("entityType"), {
+    const routeContext = await resolveMutationContext(route.value.entityType, {
       actor,
       deps,
-      entityId: context.req.param("entityId")
+      entityId: route.value.entityId
     });
     if ("response" in routeContext) return routeContext.response(context);
 
@@ -345,16 +370,21 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
   });
 
   app.patch("/api/workspace/crm/:entityType/:entityId/tasks/:activityId", async (context) => {
+    const route = parseCrmEntityRouteParams(context);
+    if (!route.ok) return context.json({ error: route.error }, 400);
+    const activityId = parseCrmActivityIdParam(context.req.param("activityId"));
+    if (!activityId.ok) return context.json({ error: activityId.error }, 400);
+
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (!deps.dataSource.transitionCrmActivityStatus || !deps.dataSource.withTransaction) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const routeContext = await resolveMutationContext(context.req.param("entityType"), {
+    const routeContext = await resolveMutationContext(route.value.entityType, {
       actor,
       deps,
-      entityId: context.req.param("entityId")
+      entityId: route.value.entityId
     });
     if ("response" in routeContext) return routeContext.response(context);
 
@@ -363,7 +393,6 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const parsed = parseUpdateCrmTaskBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const activityId = context.req.param("activityId");
     const transition = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.transitionCrmActivityStatus) {
         throw new Error("transactional_crm_activity_update_not_configured");
@@ -372,7 +401,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         tenantId: actor.tenantId,
         entityType: routeContext.entity.entityType,
         entityId: routeContext.entity.entityId,
-        activityId,
+        activityId: activityId.value,
         status: parsed.value.status
       });
       if ("locked" in transitionResult) return transitionResult;
@@ -384,7 +413,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         auditDataSource: transactionDataSource,
         beforeState: transitionResult.beforeState,
         commandInput: {
-          activityId,
+          activityId: activityId.value,
           entityId: routeContext.entity.entityId,
           entityType: routeContext.entity.entityType,
           status: parsed.value.status
@@ -406,12 +435,43 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
   });
 }
 
-function parseEntityTypeParam(value: string) {
+function parseEntityTypeParam(value: unknown) {
+  if (typeof value !== "string") {
+    return { ok: false as const, error: "crm_entity_type_invalid" };
+  }
   return parseCrmActivityEntityType(value);
 }
 
+function parseCrmEntityRouteParams(context: Context):
+  | {
+      ok: true;
+      value: { entityType: CrmActivityEntityType; entityId: string };
+    }
+  | { ok: false; error: string } {
+  const entityType = parseEntityTypeParam(context.req.param("entityType"));
+  if (!entityType.ok) return entityType;
+
+  const entityId =
+    entityType.value === "opportunity"
+      ? parseOpportunityIdParam(context.req.param("entityId"))
+      : entityType.value === "client"
+        ? parseClientIdParam(context.req.param("entityId"))
+        : entityType.value === "contact"
+          ? parseContactIdParam(context.req.param("entityId"))
+          : parseProductIdParam(context.req.param("entityId"));
+  if (!entityId.ok) return entityId;
+
+  return {
+    ok: true,
+    value: {
+      entityType: entityType.value,
+      entityId: entityId.value
+    }
+  };
+}
+
 async function resolveMutationContext(
-  entityTypeParam: string,
+  entityType: CrmActivityEntityType,
   input: {
     actor: TenantUser;
     deps: CrmActivityRouteDeps;
@@ -426,17 +486,10 @@ async function resolveMutationContext(
       response: (context: Context) => Response | Promise<Response>;
     }
 > {
-  const parsedEntityType = parseEntityTypeParam(entityTypeParam);
-  if (!parsedEntityType.ok) {
-    return {
-      response: (context) => context.json({ error: parsedEntityType.error }, 400)
-    };
-  }
-
   const profile = await input.deps.getActorProfile(input.actor);
   const decision = manageDecisionForEntity({
     actor: input.actor,
-    entityType: parsedEntityType.value,
+    entityType,
     profile
   });
   if (!decision.allowed) {
@@ -444,7 +497,7 @@ async function resolveMutationContext(
       actor: input.actor,
       deps: input.deps,
       entityId: input.entityId,
-      entityType: parsedEntityType.value,
+      entityType,
       error: decision.reason,
       permissionResult: decision
     });
@@ -457,7 +510,7 @@ async function resolveMutationContext(
     actor: input.actor,
     dataSource: input.deps.dataSource,
     entityId: input.entityId,
-    entityType: parsedEntityType.value
+    entityType
   });
   if (!entity) {
     return {

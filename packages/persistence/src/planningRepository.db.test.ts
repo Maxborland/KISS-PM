@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -19,6 +19,7 @@ import {
   resourceCalendars,
   resourceReservations,
   taskAssignmentAllocations,
+  taskAssignments,
   taskParticipants,
   tasks
 } from "./schema";
@@ -79,7 +80,7 @@ describe("planning repository", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       planningSeed,
@@ -88,7 +89,7 @@ describe("planning repository", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -131,21 +132,6 @@ describe("planning repository", () => {
       unitsPermille: 1000,
       workMinutes: 960,
       calendarId: null
-    });
-    await planningRepository.applyPlanningCommand({
-      tenantId: "tenant-alpha",
-      projectId,
-      actorUserId: "user-alpha-admin",
-      command: {
-        type: "assignment.allocations.replace",
-        payload: {
-          assignmentId: "assignment-alpha",
-          allocations: [
-            { date: "2026-06-10", workMinutes: 120 },
-            { date: "2026-06-11", workMinutes: 840 }
-          ]
-        }
-      }
     });
     await db.insert(taskParticipants).values({
       tenantId: "tenant-alpha",
@@ -216,25 +202,12 @@ describe("planning repository", () => {
         }),
         expect.objectContaining({ id: "task-beta-user-alpha-executor-executor" })
       ]),
-      assignmentAllocations: [
-        expect.objectContaining({
-          assignmentId: "assignment-alpha",
-          taskId: "task-alpha",
-          resourceId: "user-alpha-executor",
-          date: "2026-06-10",
-          workMinutes: 120
-        }),
-        expect.objectContaining({
-          assignmentId: "assignment-alpha",
-          taskId: "task-alpha",
-          resourceId: "user-alpha-executor",
-          date: "2026-06-11",
-          workMinutes: 840
-        })
-      ],
       dependencies: [expect.objectContaining({ id: "dep-alpha-beta", type: "FS" })],
       baselines: [expect.objectContaining({ id: "baseline-alpha" })],
-      calendars: [expect.objectContaining({ id: "calendar-project-alpha" })],
+      calendars: expect.arrayContaining([
+        expect.objectContaining({ id: "tenant-default" }),
+        expect.objectContaining({ id: "calendar-project-alpha" })
+      ]),
       calendarExceptions: [expect.objectContaining({ id: "calendar-exception-alpha" })],
       reservations: [expect.objectContaining({ id: "reservation-alpha" })]
     });
@@ -242,123 +215,6 @@ describe("planning repository", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: "user-alpha-executor", positionId: "position-engineer" })
       ])
-    );
-  });
-
-  it("replaces assignment allocations atomically through planning commands", async () => {
-    const db = createDatabase(client);
-    const intakeRepository = createProjectIntakeRepository(db);
-    const workRepository = createProjectWorkRepository(db);
-    const planningRepository = createPlanningRepository(db);
-    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
-
-    await planningRepository.upsertTaskAssignment({
-      id: "assignment-alpha",
-      tenantId: "tenant-alpha",
-      projectId,
-      taskId: "task-alpha",
-      resourceId: "user-alpha-executor",
-      role: "executor",
-      unitsPermille: 1000,
-      workMinutes: 960,
-      calendarId: null
-    });
-    await planningRepository.applyPlanningCommand({
-      tenantId: "tenant-alpha",
-      projectId,
-      actorUserId: "user-alpha-admin",
-      command: {
-        type: "assignment.allocations.replace",
-        payload: {
-          assignmentId: "assignment-alpha",
-          allocations: [
-            { date: "2026-06-10", workMinutes: 240 },
-            { date: "2026-06-11", workMinutes: 720 }
-          ]
-        }
-      }
-    });
-    await planningRepository.applyPlanningCommand({
-      tenantId: "tenant-alpha",
-      projectId,
-      actorUserId: "user-alpha-admin",
-      command: {
-        type: "assignment.allocations.replace",
-        payload: {
-          assignmentId: "assignment-alpha",
-          allocations: [{ date: "2026-06-12", workMinutes: 480 }]
-        }
-      }
-    });
-
-    const rows = await db
-      .select()
-      .from(taskAssignmentAllocations)
-      .where(
-        and(
-          eq(taskAssignmentAllocations.tenantId, "tenant-alpha"),
-          eq(taskAssignmentAllocations.projectId, projectId),
-          eq(taskAssignmentAllocations.assignmentId, "assignment-alpha")
-        )
-      );
-    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
-
-    expect(rows).toHaveLength(1);
-    expect(snapshot?.assignmentAllocations).toEqual([
-      expect.objectContaining({
-        assignmentId: "assignment-alpha",
-        date: "2026-06-12",
-        workMinutes: 480
-      })
-    ]);
-  });
-
-  it("persists planning solver runs and marks the selected proposal applied", async () => {
-    const db = createDatabase(client);
-    const intakeRepository = createProjectIntakeRepository(db);
-    const workRepository = createProjectWorkRepository(db);
-    const planningRepository = createPlanningRepository(db);
-    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
-    const expiresAt = new Date("2026-05-21T00:15:00.000Z");
-
-    const created = await planningRepository.createPlanningSolverRun({
-      id: "solver-run-alpha",
-      tenantId: "tenant-alpha",
-      projectId,
-      mode: "schedule",
-      clientPlanVersion: 1,
-      engineVersion: "planning-core-v1",
-      inputSnapshotMetadata: { planVersion: 1, taskCount: 2 },
-      targetDeadline: "2026-06-10",
-      proposals: [{ id: "proposal-a", planDelta: { commands: [] } }],
-      proposalPayloadHash: "hash-a",
-      actorUserId: "user-alpha-admin",
-      expiresAt
-    });
-    await planningRepository.markPlanningSolverRunApplied({
-      tenantId: "tenant-alpha",
-      projectId,
-      solverRunId: created.id,
-      proposalId: "proposal-a",
-      appliedAt: new Date("2026-05-21T00:05:00.000Z")
-    });
-
-    const found = await planningRepository.findPlanningSolverRun(
-      "tenant-alpha",
-      projectId,
-      "solver-run-alpha"
-    );
-
-    expect(found).toEqual(
-      expect.objectContaining({
-        id: "solver-run-alpha",
-        mode: "schedule",
-        clientPlanVersion: 1,
-        targetDeadline: "2026-06-10",
-        proposals: [{ id: "proposal-a", planDelta: { commands: [] } }],
-        proposalPayloadHash: "hash-a",
-        appliedProposalId: "proposal-a"
-      })
     );
   });
 
@@ -386,6 +242,203 @@ describe("planning repository", () => {
         lagMinutes: 0
       })
     ).rejects.toThrow();
+  });
+
+  it("persists explicit assignment allocations with assignment/date uniqueness", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-executor",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: 960
+        }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.allocations.replace",
+        payload: {
+          assignmentId: "assignment-alpha",
+          allocations: [
+            { date: "2026-06-02", workMinutes: 480 },
+            { date: "2026-06-03", workMinutes: 480 }
+          ]
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+
+    expect(snapshot?.assignmentAllocations).toEqual([
+      {
+        assignmentId: "assignment-alpha",
+        taskId: "task-alpha",
+        resourceId: "user-alpha-executor",
+        date: "2026-06-02",
+        workMinutes: 480
+      },
+      {
+        assignmentId: "assignment-alpha",
+        taskId: "task-alpha",
+        resourceId: "user-alpha-executor",
+        date: "2026-06-03",
+        workMinutes: 480
+      }
+    ]);
+    await expect(
+      db.insert(taskAssignmentAllocations).values({
+        id: "duplicate-allocation",
+        tenantId: "tenant-alpha",
+        projectId,
+        assignmentId: "assignment-alpha",
+        taskId: "task-alpha",
+        resourceId: "user-alpha-executor",
+        date: "2026-06-02",
+        workMinutes: 60,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+    ).rejects.toThrow();
+  });
+
+  it("cascades explicit allocations when their assignment is deleted", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-executor",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: 480
+        }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.allocations.replace",
+        payload: {
+          assignmentId: "assignment-alpha",
+          allocations: [{ date: "2026-06-02", workMinutes: 480 }]
+        }
+      }
+    });
+
+    await db
+      .delete(taskAssignments)
+      .where(
+        and(
+          eq(taskAssignments.tenantId, "tenant-alpha"),
+          eq(taskAssignments.projectId, projectId),
+          eq(taskAssignments.id, "assignment-alpha")
+        )
+      );
+
+    const rows = await db
+      .select({ id: taskAssignmentAllocations.id })
+      .from(taskAssignmentAllocations)
+      .where(
+        and(
+          eq(taskAssignmentAllocations.tenantId, "tenant-alpha"),
+          eq(taskAssignmentAllocations.projectId, projectId),
+          eq(taskAssignmentAllocations.assignmentId, "assignment-alpha")
+        )
+      );
+    expect(rows).toEqual([]);
+  });
+
+  it("persists solver runs without recomputing proposals during apply marking", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const proposals = [
+      {
+        id: "proposal-1",
+        planDelta: { commands: [] },
+        explainability: { reason: "stored result" }
+      }
+    ];
+
+    await planningRepository.createPlanningSolverRun({
+      id: "solver-run-alpha",
+      tenantId: "tenant-alpha",
+      projectId,
+      mode: "schedule",
+      clientPlanVersion: 1,
+      engineVersion: "planning-core-v1",
+      inputSnapshotMetadata: { projectId, planVersion: 1 },
+      targetDeadline: "2026-06-20",
+      proposals,
+      proposalPayloadHash: "hash-alpha",
+      actorUserId: "user-alpha-admin",
+      expiresAt: new Date("2026-05-21T00:30:00.000Z")
+    });
+    await planningRepository.markPlanningSolverRunApplied({
+      tenantId: "tenant-alpha",
+      projectId,
+      runId: "solver-run-alpha",
+      proposalId: "proposal-1",
+      appliedAt: new Date("2026-05-21T00:10:00.000Z")
+    });
+
+    const run = await planningRepository.findPlanningSolverRun(
+      "tenant-alpha",
+      projectId,
+      "solver-run-alpha"
+    );
+    const crossTenantRun = await planningRepository.findPlanningSolverRun(
+      "tenant-beta",
+      projectId,
+      "solver-run-alpha"
+    );
+    const crossProjectRun = await planningRepository.findPlanningSolverRun(
+      "tenant-alpha",
+      "project-other",
+      "solver-run-alpha"
+    );
+
+    expect(run).toMatchObject({
+      id: "solver-run-alpha",
+      mode: "schedule",
+      clientPlanVersion: 1,
+      targetDeadline: "2026-06-20",
+      proposals,
+      appliedProposalId: "proposal-1"
+    });
+    expect(run?.appliedAt?.toISOString()).toBe("2026-05-21T00:10:00.000Z");
+    expect(crossTenantRun).toBeUndefined();
+    expect(crossProjectRun).toBeUndefined();
   });
 
   it("excludes archived tasks and their planning edges from PlanSnapshot", async () => {

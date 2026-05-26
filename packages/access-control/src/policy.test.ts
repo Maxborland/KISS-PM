@@ -15,9 +15,17 @@ import {
   canManageProjectTypes,
   canManageProjects,
   canManageTaskStatuses,
+  canManageControlSignals,
+  canManageCorrectiveActions,
+  canManageControlSurfaces,
+  canManageRetrospectives,
+  canManageKpiDefinitions,
+  canPublishControlSurfaces,
+  canApplyTemplateImprovements,
   canCreateTasks,
   canDeleteTasks,
   canEditTasks,
+  canExecuteManagementActions,
   canManageTenantUsers,
   canManageWorkspaceConfig,
   canManageWorkspaceTheme,
@@ -32,6 +40,10 @@ import {
   canReadProjects,
   canReadProjectTypes,
   canReadResourceFeasibility,
+  canReadControlSignals,
+  canReadControlSurfaces,
+  canReadRetrospectives,
+  canReadKpiDefinitions,
   canReadTenantUsers,
   canReadWorkspaceConfig,
   canPreviewPlanningScenarios,
@@ -74,6 +86,18 @@ describe("access-control tenant policy", () => {
       "tenant.project_resources.manage",
       "tenant.planning_scenarios.preview",
       "tenant.planning_scenarios.apply",
+      "tenant.kpi_definitions.read",
+      "tenant.kpi_definitions.manage",
+      "tenant.control_signals.read",
+      "tenant.control_signals.manage",
+      "tenant.management_actions.execute",
+      "tenant.corrective_actions.manage",
+      "tenant.control_surfaces.read",
+      "tenant.control_surfaces.manage",
+      "tenant.control_surfaces.publish",
+      "tenant.retrospectives.read",
+      "tenant.retrospectives.manage",
+      "tenant.template_improvements.apply",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -586,6 +610,242 @@ describe("access-control tenant policy", () => {
       canApplyPlanningScenarios({
         actor,
         profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 7 KPI, signal and action engine access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const controlReader = createAccessProfile({
+      id: "control-reader",
+      permissions: ["tenant.kpi_definitions.read", "tenant.control_signals.read"]
+    });
+
+    expect(
+      canReadKpiDefinitions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadControlSignals({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageKpiDefinitions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canExecuteManagementActions({
+        actor,
+        profile: controlReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageKpiDefinitions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageControlSignals({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canExecuteManagementActions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageCorrectiveActions({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadControlSignals({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 8 control surface access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const surfaceReader = createAccessProfile({
+      id: "surface-reader",
+      permissions: ["tenant.control_surfaces.read"]
+    });
+    const surfacePublisher = createAccessProfile({
+      id: "surface-publisher",
+      permissions: [
+        "tenant.control_surfaces.read",
+        "tenant.control_surfaces.manage",
+        "tenant.control_surfaces.publish"
+      ]
+    });
+
+    expect(
+      canReadControlSurfaces({
+        actor,
+        profile: surfaceReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageControlSurfaces({
+        actor,
+        profile: surfaceReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canPublishControlSurfaces({
+        actor,
+        profile: surfacePublisher,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadControlSurfaces({
+        actor,
+        profile: surfacePublisher,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "cross_tenant_denied"
+    });
+  });
+
+  it("allows Phase 9 retrospective and template improvement access only with explicit permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const retrospectiveReader = createAccessProfile({
+      id: "retrospective-reader",
+      permissions: ["tenant.retrospectives.read"]
+    });
+    const retrospectiveManager = createAccessProfile({
+      id: "retrospective-manager",
+      permissions: [
+        "tenant.retrospectives.read",
+        "tenant.retrospectives.manage",
+        "tenant.template_improvements.apply"
+      ]
+    });
+
+    expect(
+      canReadRetrospectives({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canManageRetrospectives({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canApplyTemplateImprovements({
+        actor,
+        profile: retrospectiveReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "permission_missing"
+    });
+    expect(
+      canManageRetrospectives({
+        actor,
+        profile: retrospectiveManager,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canApplyTemplateImprovements({
+        actor,
+        profile: retrospectiveManager,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadRetrospectives({
+        actor,
+        profile: retrospectiveManager,
         targetTenantId: "tenant-beta"
       })
     ).toEqual({

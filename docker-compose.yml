@@ -41,6 +41,16 @@ services:
       - kiss_pm_test_fixtures_node_modules:/workspace/packages/test-fixtures/node_modules
     restart: "no"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${KISS_PM_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   api:
     image: node:22-alpine
     working_dir: /workspace
@@ -55,11 +65,15 @@ services:
       DATABASE_URL: postgres://${KISS_PM_POSTGRES_USER:-kiss_pm}:${KISS_PM_POSTGRES_PASSWORD:-change_me_local_dev_only}@postgres:5432/${KISS_PM_POSTGRES_DB:-kiss_pm}
       HOST: 0.0.0.0
       KISS_PM_ENABLE_DEV_ROUTES: "true"
+      PLANNING_EVENTS_BACKEND: redis
+      REDIS_URL: redis://redis:6379
       PORT: 4000
     ports:
       - "${KISS_PM_API_PORT:-4000}:4000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       dev-deps:
         condition: service_completed_successfully

@@ -2,6 +2,7 @@ import type {
   CrmActivityEntityType,
   CrmActivityStatus
 } from "@kiss-pm/persistence";
+import { parseExternalReferenceUrl } from "./attachmentValidation";
 
 type ParseResult<T> =
   | {
@@ -74,6 +75,9 @@ export function parseCreateCrmTaskBody(
 
   const title = parseRequiredString(value.title, 180);
   if (!title.ok) return { ok: false, error: "task_title_required" };
+  if (!isSafeSingleLineText(title.value)) {
+    return { ok: false, error: "task_title_required" };
+  }
 
   const body = parseOptionalString(value.body, 4000);
   if (!body.ok) return { ok: false, error: "task_body_invalid" };
@@ -83,6 +87,9 @@ export function parseCreateCrmTaskBody(
 
   const assigneeUserId = parseOptionalString(value.assigneeUserId, 120);
   if (!assigneeUserId.ok) {
+    return { ok: false, error: "task_assignee_invalid" };
+  }
+  if (assigneeUserId.value !== null && !isSafeUserId(assigneeUserId.value)) {
     return { ok: false, error: "task_assignee_invalid" };
   }
 
@@ -120,6 +127,9 @@ export function parseCreateCrmFileBody(
 
   const title = parseRequiredString(value.title, 240);
   if (!title.ok) return { ok: false, error: "file_title_required" };
+  if (!isSafeSingleLineText(title.value)) {
+    return { ok: false, error: "file_title_required" };
+  }
 
   const fileUrl = parseRequiredUrl(value.fileUrl, 1200);
   if (!fileUrl.ok) {
@@ -134,6 +144,9 @@ export function parseCreateCrmFileBody(
 
   const mimeType = parseOptionalString(value.mimeType, 160);
   if (!mimeType.ok) return { ok: false, error: "file_mime_type_invalid" };
+  if (mimeType.value !== null && !isSafeSingleLineText(mimeType.value)) {
+    return { ok: false, error: "file_mime_type_invalid" };
+  }
 
   const fileSizeBytes = parseOptionalNonNegativeInteger(value.fileSizeBytes);
   if (!fileSizeBytes.ok) return { ok: false, error: "file_size_invalid" };
@@ -159,6 +172,9 @@ function parseRequiredString(
   if (trimmed.length === 0 || trimmed.length > maxLength) {
     return { ok: false, error: "invalid_string" };
   }
+  if (!isSafeMultilineText(trimmed)) {
+    return { ok: false, error: "invalid_string" };
+  }
 
   return { ok: true, value: trimmed };
 }
@@ -167,19 +183,17 @@ function parseRequiredUrl(
   value: unknown,
   maxLength: number
 ): ParseResult<string> {
-  const parsed = parseRequiredString(value, maxLength);
-  if (!parsed.ok) return parsed;
-
-  try {
-    const url = new URL(parsed.value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return { ok: false, error: "invalid_url" };
-    }
-  } catch {
-    return { ok: false, error: "invalid_url" };
+  if (typeof value !== "string") return { ok: false, error: "invalid_string" };
+  if (value.trim().length > maxLength) return { ok: false, error: "invalid_url" };
+  const parsed = parseExternalReferenceUrl(value);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: parsed.error === "external_url_required" ? "invalid_string" : "invalid_url"
+    };
   }
 
-  return parsed;
+  return { ok: true, value: parsed.value };
 }
 
 function parseOptionalString(
@@ -191,6 +205,7 @@ function parseOptionalString(
   const trimmed = value.trim();
   if (trimmed.length === 0) return { ok: true, value: null };
   if (trimmed.length > maxLength) return { ok: false, error: "invalid_string" };
+  if (!isSafeMultilineText(trimmed)) return { ok: false, error: "invalid_string" };
 
   return { ok: true, value: trimmed };
 }
@@ -236,4 +251,16 @@ function parseOptionalNonNegativeInteger(
 
 function isObjectBody(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSafeUserId(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{2,119}$/.test(value);
+}
+
+function isSafeSingleLineText(value: string): boolean {
+  return !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isSafeMultilineText(value: string): boolean {
+  return !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }

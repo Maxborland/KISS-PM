@@ -360,7 +360,7 @@ function createSolverProposal(input: {
   assignmentPlans: AssignmentPlan[];
   engineVersion: string;
 }): AutoPlanningSolverProposal {
-  const commands = commandsForAssignmentPlans(input.assignmentPlans, input.snapshot.assignments);
+  const commands = commandsForAssignmentPlans(input.assignmentPlans, input.snapshot);
   const planDelta = createPlanDelta(commands);
   const nextSnapshot = commands.reduce(
     (snapshot, command) => reducePlanningCommand(snapshot, command).nextSnapshot,
@@ -374,7 +374,7 @@ function createSolverProposal(input: {
     plan: nextPlan,
     resources: nextSnapshot.resources,
     assignments: nextSnapshot.assignments,
-    assignmentAllocations: nextSnapshot.assignmentAllocations,
+    assignmentAllocations: nextSnapshot.assignmentAllocations ?? [],
     calendars: nextSnapshot.calendars,
     calendarExceptions: nextSnapshot.calendarExceptions,
     reservations: nextSnapshot.reservations,
@@ -430,11 +430,12 @@ function createSolverProposal(input: {
 
 function commandsForAssignmentPlans(
   plans: AssignmentPlan[],
-  existingAssignments: PlanAssignment[]
+  snapshot: PlanSnapshot
 ): PlanningCommand[] {
-  const commands: PlanningCommand[] = [];
+  const commands: PlanningCommand[] = taskScheduleCommandsForPlans(plans, snapshot);
   const upsertsByAssignmentId = new Map<string, AssignmentUpsertDraft>();
   const allocationsByAssignmentId = new Map<string, PlannedAllocation[]>();
+  const existingAssignments = snapshot.assignments;
   const existingAssignmentById = new Map(existingAssignments.map((assignment) => [assignment.id, assignment]));
   const riskCommands: PlanningCommand[] = [];
 
@@ -446,16 +447,14 @@ function commandsForAssignmentPlans(
       .sort();
 
     appendAllocationBucket(allocationsByAssignmentId, plan.assignment.id, originalAllocations);
-    if (syntheticAssignmentIds.length > 0) {
-      mergeAssignmentUpsert(upsertsByAssignmentId, {
-        id: plan.assignment.id,
-        taskId: plan.assignment.taskId,
-        resourceId: plan.assignment.resourceId,
-        role: plan.assignment.role,
-        unitsPermille: plan.assignment.unitsPermille,
-        workMinutes: sumAllocationMinutes(originalAllocations)
-      });
-    }
+    mergeAssignmentUpsert(upsertsByAssignmentId, {
+      id: plan.assignment.id,
+      taskId: plan.assignment.taskId,
+      resourceId: plan.assignment.resourceId,
+      role: plan.assignment.role,
+      unitsPermille: plan.assignment.unitsPermille,
+      workMinutes: sumAllocationMinutes(originalAllocations)
+    });
 
     for (const assignmentId of syntheticAssignmentIds) {
       const allocations = planAllocationsByAssignmentId.get(assignmentId) ?? [];
@@ -507,6 +506,37 @@ function commandsForAssignmentPlans(
   }
 
   return [...commands, ...riskCommands];
+}
+
+function taskScheduleCommandsForPlans(
+  plans: AssignmentPlan[],
+  snapshot: PlanSnapshot
+): PlanningCommand[] {
+  const datesByTaskId = new Map<string, PlanDate[]>();
+  for (const plan of plans) {
+    const dates = datesByTaskId.get(plan.assignment.taskId) ?? [];
+    dates.push(...plan.allocations.map((allocation) => allocation.date));
+    datesByTaskId.set(plan.assignment.taskId, dates);
+  }
+
+  return [...datesByTaskId.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([taskId, dates]) => {
+      const task = snapshot.tasks.find((candidate) => candidate.id === taskId);
+      if (!task || dates.length === 0) return [];
+      const sortedDates = [...new Set(dates)].sort(comparePlanDates);
+      const plannedStart = sortedDates[0] ?? null;
+      const plannedFinish = sortedDates.at(-1) ?? null;
+      if (task.plannedStart === plannedStart && task.plannedFinish === plannedFinish) return [];
+      return [{
+        type: "task.update_schedule" as const,
+        payload: {
+          taskId,
+          plannedStart,
+          plannedFinish
+        }
+      }];
+    });
 }
 
 function createPlanDelta(commands: PlanningCommand[]): PlanDelta {
@@ -717,7 +747,7 @@ function buildBaseUsage(snapshot: PlanSnapshot, plannedAssignments: PlanAssignme
     }
   }
 
-  for (const allocation of snapshot.assignmentAllocations) {
+  for (const allocation of snapshot.assignmentAllocations ?? []) {
     if (plannedAssignmentIds.has(allocation.assignmentId)) continue;
     addUsage(usage, allocation.resourceId, allocation.date, allocation.workMinutes);
   }

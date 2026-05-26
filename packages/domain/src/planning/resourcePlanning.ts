@@ -33,6 +33,15 @@ export type ResourceLoadBucket = {
   freeMinutes: number;
   taskIds: string[];
   assignmentIds: string[];
+  assignmentContributions: Array<{
+    taskId: string;
+    assignmentId: string;
+    workMinutes: number;
+  }>;
+  reservationContributions: Array<{
+    reservationId: string;
+    workMinutes: number;
+  }>;
   reservationIds: string[];
   calendarExceptionIds: string[];
 };
@@ -59,18 +68,13 @@ export type BuildResourceLoadMatrixInput = {
   plan: CalculatedPlan;
   resources: PlanResource[];
   assignments: PlanAssignment[];
-  assignmentAllocations?: PlanAssignmentAllocation[];
+  assignmentAllocations?: PlanAssignmentAllocation[] | undefined;
   calendars: PlanCalendar[];
   calendarExceptions: PlanCalendarException[];
   reservations: PlanReservation[];
   rangeStart: PlanDate;
   rangeFinish: PlanDate;
   granularities?: BucketGranularity[];
-};
-
-type AssignmentAllocationIndex = {
-  explicitAssignmentIds: Set<string>;
-  workMinutesByAssignmentDate: Map<string, number>;
 };
 
 const defaultCalendar: PlanCalendar = {
@@ -113,7 +117,6 @@ export function buildResourceLoadMatrix(
 function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucket[] {
   const dates = enumerateDates(input.rangeStart, input.rangeFinish);
   const buckets: ResourceLoadBucket[] = [];
-  const allocationIndex = indexAssignmentAllocations(input.assignmentAllocations ?? []);
 
   for (const resource of input.resources) {
     const calendar = selectCalendar(resource.calendarId, input.calendars);
@@ -124,8 +127,7 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         resource.id,
         date,
         calendar,
-        calendarExceptions,
-        allocationIndex
+        calendarExceptions
       );
       const reservationLoad = calculateReservationLoadForDate(
         input,
@@ -158,6 +160,8 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         freeMinutes: Math.max(0, capacityMinutes - committedMinutes),
         taskIds: taskLoad.taskIds,
         assignmentIds: taskLoad.assignmentIds,
+        assignmentContributions: taskLoad.assignmentContributions,
+        reservationContributions: reservationLoad.reservationContributions,
         reservationIds: reservationLoad.reservationIds,
         calendarExceptionIds
       });
@@ -172,25 +176,40 @@ function calculateTaskLoadForDate(
   resourceId: string,
   date: PlanDate,
   calendar: PlanCalendar,
-  calendarExceptions: PlanCalendarException[],
-  allocationIndex: AssignmentAllocationIndex
-): { assignedMinutes: number; taskIds: string[]; assignmentIds: string[] } {
+  calendarExceptions: PlanCalendarException[]
+): {
+  assignedMinutes: number;
+  taskIds: string[];
+  assignmentIds: string[];
+  assignmentContributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>;
+} {
   let assignedMinutes = 0;
   const taskIds: string[] = [];
   const assignmentIds: string[] = [];
+  const assignmentContributions: Array<{
+    taskId: string;
+    assignmentId: string;
+    workMinutes: number;
+  }> = [];
 
   for (const assignment of input.assignments.filter((item) => item.resourceId === resourceId)) {
     if (assignment.role !== "executor" && assignment.role !== "co_executor") continue;
-    const explicitAllocation = explicitAssignmentAllocationForDate(
-      allocationIndex,
-      assignment,
-      date
+    const explicitAllocations = (input.assignmentAllocations ?? []).filter(
+      (allocation) => allocation.assignmentId === assignment.id
     );
-    if (explicitAllocation !== null) {
-      if (explicitAllocation > 0) {
-        assignedMinutes += explicitAllocation;
+    if (explicitAllocations.length > 0) {
+      const allocatedMinutes = explicitAllocations
+        .filter((allocation) => allocation.date === date)
+        .reduce((total, allocation) => total + allocation.workMinutes, 0);
+      if (allocatedMinutes > 0) {
+        assignedMinutes += allocatedMinutes;
         taskIds.push(assignment.taskId);
         assignmentIds.push(assignment.id);
+        assignmentContributions.push({
+          taskId: assignment.taskId,
+          assignmentId: assignment.id,
+          workMinutes: allocatedMinutes
+        });
       }
       continue;
     }
@@ -213,6 +232,11 @@ function calculateTaskLoadForDate(
         assignedMinutes += assignmentWork;
         taskIds.push(task.id);
         assignmentIds.push(assignment.id);
+        assignmentContributions.push({
+          taskId: task.id,
+          assignmentId: assignment.id,
+          workMinutes: assignmentWork
+        });
       }
       continue;
     }
@@ -220,59 +244,43 @@ function calculateTaskLoadForDate(
     const currentCapacity = capacities.find((item) => item.date === date)?.capacityMinutes ?? 0;
     if (currentCapacity <= 0) continue;
 
-    assignedMinutes += Math.round((assignmentWork * currentCapacity) / totalCapacity);
+    const workMinutes = Math.round((assignmentWork * currentCapacity) / totalCapacity);
+    assignedMinutes += workMinutes;
     taskIds.push(task.id);
     assignmentIds.push(assignment.id);
+    assignmentContributions.push({
+      taskId: task.id,
+      assignmentId: assignment.id,
+      workMinutes
+    });
   }
 
   return {
     assignedMinutes,
     taskIds: [...new Set(taskIds)].sort(),
-    assignmentIds: [...new Set(assignmentIds)].sort()
+    assignmentIds: [...new Set(assignmentIds)].sort(),
+    assignmentContributions: aggregateAssignmentContributions(assignmentContributions)
   };
 }
 
-function explicitAssignmentAllocationForDate(
-  allocationIndex: AssignmentAllocationIndex,
-  assignment: PlanAssignment,
-  date: PlanDate
-): number | null {
-  if (!allocationIndex.explicitAssignmentIds.has(assignment.id)) return null;
-  return allocationIndex.workMinutesByAssignmentDate.get(
-    assignmentAllocationKey(assignment.id, assignment.taskId, assignment.resourceId, date)
-  ) ?? 0;
-}
-
-function indexAssignmentAllocations(
-  allocations: PlanAssignmentAllocation[]
-): AssignmentAllocationIndex {
-  const explicitAssignmentIds = new Set<string>();
-  const workMinutesByAssignmentDate = new Map<string, number>();
-
-  for (const allocation of allocations) {
-    explicitAssignmentIds.add(allocation.assignmentId);
-    const key = assignmentAllocationKey(
-      allocation.assignmentId,
-      allocation.taskId,
-      allocation.resourceId,
-      allocation.date
-    );
-    workMinutesByAssignmentDate.set(
-      key,
-      (workMinutesByAssignmentDate.get(key) ?? 0) + allocation.workMinutes
-    );
+function aggregateAssignmentContributions(
+  contributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>
+): Array<{ taskId: string; assignmentId: string; workMinutes: number }> {
+  const grouped = new Map<string, { taskId: string; assignmentId: string; workMinutes: number }>();
+  for (const contribution of contributions) {
+    const key = `${contribution.taskId}:${contribution.assignmentId}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.workMinutes += contribution.workMinutes;
+      continue;
+    }
+    grouped.set(key, { ...contribution });
   }
-
-  return { explicitAssignmentIds, workMinutesByAssignmentDate };
-}
-
-function assignmentAllocationKey(
-  assignmentId: string,
-  taskId: string,
-  resourceId: string,
-  date: PlanDate
-): string {
-  return `${assignmentId}:${taskId}:${resourceId}:${date}`;
+  return [...grouped.values()].sort(
+    (left, right) =>
+      left.taskId.localeCompare(right.taskId) ||
+      left.assignmentId.localeCompare(right.assignmentId)
+  );
 }
 
 function taskWorkingOverlapForDate(
@@ -333,9 +341,14 @@ function calculateReservationLoadForDate(
   date: PlanDate,
   calendar: PlanCalendar,
   calendarExceptions: PlanCalendarException[]
-): { reservedMinutes: number; reservationIds: string[] } {
+): {
+  reservedMinutes: number;
+  reservationIds: string[];
+  reservationContributions: Array<{ reservationId: string; workMinutes: number }>;
+} {
   let reservedMinutes = 0;
   const reservationIds: string[] = [];
+  const reservationContributions: Array<{ reservationId: string; workMinutes: number }> = [];
 
   for (const reservation of input.reservations.filter((item) => item.resourceId === resourceId)) {
     if (comparePlanDates(date, reservation.start) < 0 || comparePlanDates(date, reservation.finish) > 0) {
@@ -349,13 +362,16 @@ function calculateReservationLoadForDate(
     const currentCapacity = workingMinutesForDate(date, calendar, calendarExceptions);
     if (totalCapacity <= 0 || currentCapacity <= 0) continue;
 
-    reservedMinutes += Math.round((reservation.workMinutes * currentCapacity) / totalCapacity);
+    const workMinutes = Math.round((reservation.workMinutes * currentCapacity) / totalCapacity);
+    reservedMinutes += workMinutes;
     reservationIds.push(reservation.id);
+    reservationContributions.push({ reservationId: reservation.id, workMinutes });
   }
 
   return {
     reservedMinutes,
-    reservationIds: [...new Set(reservationIds)].sort()
+    reservationIds: [...new Set(reservationIds)].sort(),
+    reservationContributions: aggregateReservationContributions(reservationContributions)
   };
 }
 
@@ -383,6 +399,8 @@ function aggregateBuckets(
         granularity,
         taskIds: [...bucket.taskIds],
         assignmentIds: [...bucket.assignmentIds],
+        assignmentContributions: [...bucket.assignmentContributions],
+        reservationContributions: [...bucket.reservationContributions],
         reservationIds: [...bucket.reservationIds],
         calendarExceptionIds: [...bucket.calendarExceptionIds]
       });
@@ -398,6 +416,14 @@ function aggregateBuckets(
     );
     current.taskIds = [...new Set([...current.taskIds, ...bucket.taskIds])].sort();
     current.assignmentIds = [...new Set([...current.assignmentIds, ...bucket.assignmentIds])].sort();
+    current.assignmentContributions = aggregateAssignmentContributions([
+      ...current.assignmentContributions,
+      ...bucket.assignmentContributions
+    ]);
+    current.reservationContributions = aggregateReservationContributions([
+      ...current.reservationContributions,
+      ...bucket.reservationContributions
+    ]);
     current.reservationIds = [...new Set([...current.reservationIds, ...bucket.reservationIds])].sort();
     current.calendarExceptionIds = [
       ...new Set([...current.calendarExceptionIds, ...bucket.calendarExceptionIds])
@@ -405,6 +431,23 @@ function aggregateBuckets(
   }
 
   return [...grouped.values()];
+}
+
+function aggregateReservationContributions(
+  contributions: Array<{ reservationId: string; workMinutes: number }>
+): Array<{ reservationId: string; workMinutes: number }> {
+  const grouped = new Map<string, { reservationId: string; workMinutes: number }>();
+  for (const contribution of contributions) {
+    const existing = grouped.get(contribution.reservationId);
+    if (existing) {
+      existing.workMinutes += contribution.workMinutes;
+      continue;
+    }
+    grouped.set(contribution.reservationId, { ...contribution });
+  }
+  return [...grouped.values()].sort((left, right) =>
+    left.reservationId.localeCompare(right.reservationId)
+  );
 }
 
 function selectCalendar(calendarId: string | null, calendars: PlanCalendar[]): PlanCalendar {

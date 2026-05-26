@@ -1,4 +1,10 @@
 import { getOptionalString, getStringField } from "./parseHelpers";
+export type { RouteParamParseResult as ProjectWorkRouteIdParseResult } from "./routeParamParsers";
+export {
+  parseProjectIdParam,
+  parseTaskIdParam,
+  parseTaskStatusIdParam
+} from "./routeParamParsers";
 
 const taskPriorities = ["low", "normal", "high", "critical"] as const;
 const taskStatusCategories = [
@@ -16,6 +22,7 @@ const taskParticipantRoles = [
   "approver",
   "observer"
 ] as const;
+const maxTaskDescriptionLength = 4000;
 
 export type CreateTaskBody = {
   id: string | undefined;
@@ -78,8 +85,15 @@ export type TaskCommentParseResult =
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const id = getOptionalString(input, "id") ?? undefined;
   const title = getStringField(input, "title") ?? "";
-  if (title.length < 3 || title.length > 160) {
+  if (title.length < 3 || title.length > 160 || !isSafeSingleLineText(title)) {
     return { ok: false, error: "invalid_task_title" };
+  }
+  const description = getOptionalString(input, "description");
+  if (
+    description !== null &&
+    (description.length > maxTaskDescriptionLength || !isSafeMultilineText(description))
+  ) {
+    return { ok: false, error: "invalid_task_description" };
   }
 
   const plannedStart = parseDateField(input, "plannedStart");
@@ -114,7 +128,7 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
     value: {
       id,
       title,
-      description: getOptionalString(input, "description"),
+      description,
       priority,
       statusId: getOptionalString(input, "statusId") ?? undefined,
       plannedStart,
@@ -166,7 +180,7 @@ export function parseCreateTaskStatusBody(
     return { ok: false, error: "invalid_task_status_id" };
   }
   const name = getStringField(input, "name") ?? "";
-  if (name.length < 2 || name.length > 80) {
+  if (name.length < 2 || name.length > 80 || !isSafeSingleLineText(name)) {
     return { ok: false, error: "invalid_task_status_name" };
   }
   const category = getStringField(input, "category") ?? "";
@@ -196,7 +210,7 @@ export function parseCreateTaskStatusBody(
 
 export function parseTaskCommentBody(input: unknown): TaskCommentParseResult {
   const body = getStringField(input, "body") ?? "";
-  if (body.length < 1 || body.length > 4000) {
+  if (body.length < 1 || body.length > 4000 || !isSafeMultilineText(body)) {
     return { ok: false, error: "invalid_task_comment" };
   }
   return { ok: true, value: { body } };
@@ -227,7 +241,7 @@ function parseParticipants(
     }
     const userId = getStringField(rawParticipant, "userId") ?? "";
     const role = getStringField(rawParticipant, "role") ?? "";
-    if (userId.length < 3 || userId.length > 120) {
+    if (!isSafeIdentifier(userId)) {
       return { ok: false, error: "invalid_task_participant" };
     }
     if (!isTaskParticipantRole(role)) {
@@ -307,4 +321,12 @@ function isTaskStatusCategory(
 
 function isSafeIdentifier(value: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{2,119}$/.test(value);
+}
+
+function isSafeSingleLineText(value: string): boolean {
+  return !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isSafeMultilineText(value: string): boolean {
+  return !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }

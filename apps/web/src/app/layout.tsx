@@ -1,24 +1,21 @@
-import type { Metadata, Viewport } from "next";
-import "../styles.css";
-import "../crm.css";
-import "../task.css";
-import { AppQueryProvider } from "../queryClient";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+import { FONT_VARIABLES } from "./fonts";
+import { Providers } from "./providers";
+
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "KISS PM",
-  description: "Рабочий контур управления проектами, ролями и audit foundation"
+  description: "Управление проектами, ресурсами и контролем"
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="ru" className={FONT_VARIABLES} suppressHydrationWarning>
       <body>
-        <AppQueryProvider>{children}</AppQueryProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

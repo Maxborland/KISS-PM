@@ -7,11 +7,15 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { StorageProvider } from "./storageProvider";
+import type { VideoProvider } from "./videoProvider";
 
 export type ApiRouteDeps = {
   dataSource: ApiTenantDataSource;
   authRateLimiter: AuthRateLimiter;
   secureCookies: boolean;
+  storageProvider: StorageProvider;
+  videoProvider: VideoProvider;
   trustForwardedAuthHeaders: boolean;
   getActor(userId: string | null): Promise<TenantUser | undefined>;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;

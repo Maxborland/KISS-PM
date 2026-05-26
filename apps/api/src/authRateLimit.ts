@@ -22,6 +22,9 @@ type AuthRateLimitInput = {
 
 type AuthRateLimiterOptions = {
   maxFailures: number;
+  maxGlobalFailures: number;
+  maxTrackedEmails: number;
+  maxTrackedIps: number;
   windowMs: number;
   blockMs: number;
 };
@@ -32,6 +35,9 @@ type ClientIpOptions = {
 
 const defaultOptions: AuthRateLimiterOptions = {
   maxFailures: 5,
+  maxGlobalFailures: 200,
+  maxTrackedEmails: 5000,
+  maxTrackedIps: 5000,
   windowMs: 15 * 60 * 1000,
   blockMs: 15 * 60 * 1000
 };
@@ -42,11 +48,13 @@ export function createAuthRateLimiter(
   const resolvedOptions = { ...defaultOptions, ...options };
   const emailBuckets = new Map<string, AuthRateLimitBucket>();
   const ipBuckets = new Map<string, AuthRateLimitBucket>();
+  const globalBucket = new Map<string, AuthRateLimitBucket>();
 
   function check(input: AuthRateLimitInput): AuthRateLimitDecision {
     const now = input.now ?? Date.now();
     const ip = normalizeIp(input.ip);
     const retryAfterMs = Math.max(
+      getRetryAfterMs(globalBucket, "global", now),
       getRetryAfterMs(emailBuckets, normalizeEmail(input.email), now),
       ip ? getRetryAfterMs(ipBuckets, ip, now) : 0
     );
@@ -61,13 +69,26 @@ export function createAuthRateLimiter(
   function recordFailure(input: AuthRateLimitInput): void {
     const now = input.now ?? Date.now();
     const ip = normalizeIp(input.ip);
+    recordFailureInBucket(globalBucket, "global", now, {
+      ...resolvedOptions,
+      maxFailures: resolvedOptions.maxGlobalFailures,
+      maxTrackedBuckets: 1
+    });
     recordFailureInBucket(
       emailBuckets,
       normalizeEmail(input.email),
       now,
-      resolvedOptions
+      {
+        ...resolvedOptions,
+        maxTrackedBuckets: resolvedOptions.maxTrackedEmails
+      }
     );
-    if (ip) recordFailureInBucket(ipBuckets, ip, now, resolvedOptions);
+    if (ip) {
+      recordFailureInBucket(ipBuckets, ip, now, {
+        ...resolvedOptions,
+        maxTrackedBuckets: resolvedOptions.maxTrackedIps
+      });
+    }
   }
 
   function recordSuccess(input: AuthRateLimitInput): void {
@@ -118,8 +139,9 @@ function recordFailureInBucket(
   buckets: Map<string, AuthRateLimitBucket>,
   key: string,
   now: number,
-  options: AuthRateLimiterOptions
+  options: AuthRateLimiterOptions & { maxTrackedBuckets: number }
 ): void {
+  pruneExpiredBuckets(buckets, now);
   const existing = buckets.get(key);
   const bucket =
     existing && existing.windowExpiresAt > now
@@ -134,7 +156,26 @@ function recordFailureInBucket(
   if (bucket.attempts >= options.maxFailures) {
     bucket.blockedUntil = now + options.blockMs;
   }
+  if (!existing && buckets.size >= options.maxTrackedBuckets) {
+    deleteOldestBucket(buckets);
+  }
   buckets.set(key, bucket);
+}
+
+function pruneExpiredBuckets(
+  buckets: Map<string, AuthRateLimitBucket>,
+  now: number
+): void {
+  for (const [key, bucket] of buckets) {
+    if (bucket.windowExpiresAt <= now && bucket.blockedUntil <= now) {
+      buckets.delete(key);
+    }
+  }
+}
+
+function deleteOldestBucket(buckets: Map<string, AuthRateLimitBucket>): void {
+  const oldestKey = buckets.keys().next().value as string | undefined;
+  if (oldestKey) buckets.delete(oldestKey);
 }
 
 function normalizeEmail(email: string): string {

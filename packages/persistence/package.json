@@ -14,6 +14,7 @@
   "dependencies": {
     "@kiss-pm/access-control": "workspace:*",
     "@kiss-pm/domain": "workspace:*",
+    "@kiss-pm/tenant-org-structure": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9"
   }

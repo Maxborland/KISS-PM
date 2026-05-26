@@ -11,6 +11,15 @@ import type { TenantUser } from "@kiss-pm/domain";
 import { getClientIp } from "./authRateLimit";
 import { readLimitedJsonBody } from "./jsonBody";
 
+const dummyLoginPasswordRecord = {
+  passwordHash:
+    "8628f6260a2c5a566eb583da77de83c156308a75ce54f68d11c9383fc7ed0c4ecceb1d835be2c76353fe8c95060226b72eb8b5216f84411d607c343d0d061dec",
+  passwordSalt: "kiss-pm-dummy-login-salt"
+};
+const maxLoginEmailLength = 254;
+const maxLoginPasswordLength = 1024;
+const loginEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
     dataSource,
@@ -28,18 +37,9 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const email =
-      body.value &&
-      typeof body.value === "object" &&
-      typeof (body.value as { email?: unknown }).email === "string"
-        ? (body.value as { email: string }).email.toLowerCase()
-        : "";
-    const password =
-      body.value &&
-      typeof body.value === "object" &&
-      typeof (body.value as { password?: unknown }).password === "string"
-        ? (body.value as { password: string }).password
-        : "";
+    const credentials = parseLoginCredentials(body.value);
+    if (!credentials.ok) return context.json({ error: credentials.error }, 400);
+    const { email, password } = credentials.value;
     const rateLimitInput = {
       email,
       ip: getClientIp(context.req.raw.headers, {
@@ -53,14 +53,9 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     const credential = await dataSource.findCredentialByEmail(email);
 
-    if (
-      !credential ||
-      !verifyPassword({
-        password,
-        passwordHash: credential.passwordHash,
-        passwordSalt: credential.passwordSalt
-      })
-    ) {
+    const passwordMatches = verifyLoginPassword(password, credential);
+
+    if (!credential || !passwordMatches) {
       deps.authRateLimiter.recordFailure(rateLimitInput);
       return context.json({ error: "invalid_credentials" }, 401);
     }
@@ -134,6 +129,49 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
     });
   });
+}
+
+export function verifyLoginPassword(
+  password: string,
+  credential:
+    | {
+        passwordHash: string;
+        passwordSalt: string;
+      }
+    | undefined
+) {
+  return verifyPassword({
+    password,
+    passwordHash: credential?.passwordHash ?? dummyLoginPasswordRecord.passwordHash,
+    passwordSalt: credential?.passwordSalt ?? dummyLoginPasswordRecord.passwordSalt
+  });
+}
+
+function parseLoginCredentials(
+  value: unknown
+):
+  | { ok: true; value: { email: string; password: string } }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, error: "invalid_login_payload" };
+  }
+  const record = value as { email?: unknown; password?: unknown };
+  if (typeof record.email !== "string" || typeof record.password !== "string") {
+    return { ok: false, error: "invalid_login_payload" };
+  }
+  const email = record.email.trim().toLowerCase();
+  const password = record.password;
+  if (
+    email.length < 3 ||
+    email.length > maxLoginEmailLength ||
+    /[\u0000-\u001f\u007f]/.test(email) ||
+    !loginEmailPattern.test(email) ||
+    password.length < 1 ||
+    password.length > maxLoginPasswordLength
+  ) {
+    return { ok: false, error: "invalid_login_payload" };
+  }
+  return { ok: true, value: { email, password } };
 }
 
 function toPublicUser(user: TenantUser) {
