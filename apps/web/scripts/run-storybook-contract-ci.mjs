@@ -3,7 +3,7 @@
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const webRoot = process.cwd();
@@ -68,6 +68,10 @@ function startStaticServe(listenPort) {
 }
 
 mkdirSync(outDir, { recursive: true });
+const phase9EvidencePath = join(outDir, "phase9-ci-evidence.json");
+if (existsSync(phase9EvidencePath)) {
+  unlinkSync(phase9EvidencePath);
+}
 const startedAt = new Date().toISOString();
 const steps = [];
 
@@ -109,18 +113,26 @@ if (!httpReady) {
   process.exit(1);
 }
 
-const playwrightEnv = {
-  STORYBOOK_STATIC: "1",
-  STORYBOOK_CONTRACT_SKIP_SERVE: "1",
-  STORYBOOK_CONTRACT_PORT: String(port),
-  CI: process.env.CI ?? "1"
-};
+function storybookContractEnv(extra = {}) {
+  const env = {
+    ...process.env,
+    STORYBOOK_STATIC: "1",
+    STORYBOOK_CONTRACT_SKIP_SERVE: "1",
+    STORYBOOK_CONTRACT_PORT: String(port),
+    CI: process.env.CI ?? "1",
+    ...extra
+  };
+  delete env.STORYBOOK_VRT_ONLY;
+  return env;
+}
+
+const playwrightEnv = storybookContractEnv();
 
 const copyResult = spawnSync("node", ["scripts/run-copy-scan-all-stories.mjs"], {
   cwd: webRoot,
   encoding: "utf8",
   shell: true,
-  env: { ...process.env, STORYBOOK_STATIC: "1", STORYBOOK_CONTRACT_PORT: String(port) },
+  env: storybookContractEnv(),
   stdio: ["ignore", "pipe", "pipe"]
 });
 steps.push({

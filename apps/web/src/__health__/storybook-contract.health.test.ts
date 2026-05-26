@@ -363,7 +363,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
   it("Phase 8: DnD play uses kanban item slots (storybook-kanban-play)", () => {
     const screens = read("src/views/screens/screens.stories.tsx");
     expect(screens).toContain("playKanbanPointerDrag");
-    expect(screens).toContain('playKanbanPointerDrag(canvasElement, "DEAL-103", "КП"');
+    expect(screens).toContain('playKanbanPointerDrag(board, "DEAL-103", "КП"');
     const kanban = read("src/widgets/kanban/kanban.stories.tsx");
     expect(kanban).toContain("playKanbanPointerDrag");
   });
