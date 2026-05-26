@@ -21,7 +21,8 @@ import { SpaceDisciplineBlock } from "@/views/blocks/space-discipline-block";
 import { StateScreenBlock } from "@/views/blocks/state-screen-block";
 import { TaskCreateModalBlock } from "@/views/blocks/task-create-modal-block";
 import { LoginScreenView } from "@/views/screens/login-screen-view";
-import { MOCK_PROJECT_CRM, mockTaskProjectRef, type ScreenId, SCREEN_META } from "@/views/catalog";
+import { MOCK_PROJECT_CRM, mockTaskProjectRef, type ScreenId } from "@/views/catalog";
+import { getScreenRoute } from "@/views/screens/screen-route";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 
 const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
@@ -76,7 +77,7 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
 };
 
 export function ScreenView({ id }: { id: ScreenId }) {
-  const meta = SCREEN_META[id];
+  const meta = getScreenRoute(id);
   const Block = BLOCK_BY_ID[id] ?? (() => <ScreenPlaceholderBlock title={meta.pageTitle} lead={meta.lead} />);
 
   if (meta.variant === "login") {

@@ -9,7 +9,8 @@ import { MyWorkBlock } from "@/views/blocks/my-work-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import { StateScreenBlock } from "@/views/blocks/state-screen-block";
 import { TaskCreateModalBlock } from "@/views/blocks/task-create-modal-block";
-import { MOCK_PROJECT_CRM, SCREEN_META } from "@/views/catalog";
+import { MOCK_PROJECT_CRM } from "@/views/catalog";
+import { getScreenRoute } from "@/views/screens/screen-route";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { ScreenView } from "@/views/screens/screen-view";
 
@@ -66,7 +67,7 @@ export const StateLoading: Story = { name: "Состояние · загрузк
 export const MyWorkListMode: Story = {
   name: "02 Моя работа · список",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["02-my-work"]}>
+    <WorkspaceChrome meta={getScreenRoute("02-my-work")}>
       <MyWorkBlock initialMode="list" />
     </WorkspaceChrome>
   )
@@ -75,7 +76,7 @@ export const MyWorkListMode: Story = {
 export const MyWorkKanbanDragging: Story = {
   name: "02 Моя работа · DnD",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["02-my-work"]}>
+    <WorkspaceChrome meta={getScreenRoute("02-my-work")}>
       <MyWorkBlock initialMode="kanban" />
     </WorkspaceChrome>
   ),
@@ -127,7 +128,7 @@ export const MyWorkKanbanDragging: Story = {
 export const DashboardEmptyState: Story = {
   name: "01 Дашборд · пусто",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["01-dashboard"]}>
+    <WorkspaceChrome meta={getScreenRoute("01-dashboard")}>
       <DashboardBento empty />
     </WorkspaceChrome>
   )
@@ -136,7 +137,7 @@ export const DashboardEmptyState: Story = {
 export const DealsFunnelDragging: Story = {
   name: "05 Сделки · DnD",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["05-deals"]}>
+    <WorkspaceChrome meta={getScreenRoute("05-deals")}>
       <DealsBlock />
     </WorkspaceChrome>
   ),
@@ -178,7 +179,7 @@ export const DealsFunnelDragging: Story = {
 export const CreateTaskModalStep1: Story = {
   name: "04 Модалка · шаг 1 (Контекст)",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["04-create-task-modal"]}>
+    <WorkspaceChrome meta={getScreenRoute("04-create-task-modal")}>
       <TaskCreateModalBlock initialStep={1} />
     </WorkspaceChrome>
   )
@@ -187,7 +188,7 @@ export const CreateTaskModalStep1: Story = {
 export const CreateTaskModalValidation: Story = {
   name: "04 Модалка · валидация названия",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["04-create-task-modal"]}>
+    <WorkspaceChrome meta={getScreenRoute("04-create-task-modal")}>
       <TaskCreateModalBlock initialStep={2} />
     </WorkspaceChrome>
   ),
@@ -211,7 +212,7 @@ export const CreateTaskModalValidation: Story = {
 export const CreateTaskModalApiPayload: Story = {
   name: "04 Модалка · payload запроса",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["04-create-task-modal"]}>
+    <WorkspaceChrome meta={getScreenRoute("04-create-task-modal")}>
       <TaskCreateModalBlock initialStep={2} initialProjectId="PRJ-2026-014" />
     </WorkspaceChrome>
   ),
@@ -239,7 +240,7 @@ export const CreateTaskModalApiPayload: Story = {
 export const TaskCardApiFields: Story = {
   name: "03 Карточка задачи · UpdateTaskBody",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["03-task-card"]}>
+    <WorkspaceChrome meta={getScreenRoute("03-task-card")}>
       <EntityDetailBlock
         title="Согласовать ТЗ"
         subtitle="MDS-39 · Внедрение CRM"
@@ -269,7 +270,7 @@ export const TaskCardApiFields: Story = {
 export const EntityDetailDirty: Story = {
   name: "06 Карточка сделки · dirty save",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["06-deal-card"]}>
+    <WorkspaceChrome meta={getScreenRoute("06-deal-card")}>
       <EntityDetailBlock
         title="Сделка «Ромашка»"
         subtitle="DEAL-101 · ООО «Ромашка»"
@@ -296,7 +297,7 @@ export const EntityDetailDirty: Story = {
 export const ProjectsListFiltered: Story = {
   name: "07 Список проектов · архив и поиск",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["07-projects-list"]}>
+    <WorkspaceChrome meta={getScreenRoute("07-projects-list")}>
       <ProjectsListBlock />
     </WorkspaceChrome>
   ),
@@ -325,7 +326,7 @@ export const ProjectsListFiltered: Story = {
 export const StateErrorRetry: Story = {
   name: "Состояние · ошибка · повтор",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["state-error"]}>
+    <WorkspaceChrome meta={getScreenRoute("state-error")}>
       <StateScreenBlock kind="error" />
     </WorkspaceChrome>
   ),
@@ -341,7 +342,7 @@ export const StateErrorRetry: Story = {
 export const EntitiesClientsFiltered: Story = {
   name: "08 Справочник клиентов · поиск",
   render: () => (
-    <WorkspaceChrome meta={SCREEN_META["08-entities-clients"]}>
+    <WorkspaceChrome meta={getScreenRoute("08-entities-clients")}>
       <EntitiesBlock kind="clients" />
     </WorkspaceChrome>
   ),
