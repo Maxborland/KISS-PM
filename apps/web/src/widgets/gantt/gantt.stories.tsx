@@ -495,12 +495,15 @@ export const PlanningIssueStyling: Story = {
 };
 
 export const DrawerVisualCorrection: Story = {
-  name: "DrawerVisualCorrection",
+  name: "Коррекция drawer",
   render: () => (
-    <GanttInteractive
-      initialData={mockWith({ selectedRowId: "t-2-2" })}
-      showTaskDetailsDrawer
-      showApplyBar={false}
-    />
+    <div>
+      <p className="storybook-story-lead">Визуальная проверка правого drawer без reflow сетки</p>
+      <GanttInteractive
+        initialData={mockWith({ selectedRowId: "t-2-2" })}
+        showTaskDetailsDrawer
+        showApplyBar={false}
+      />
+    </div>
   )
 };

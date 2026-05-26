@@ -127,24 +127,23 @@ if (!httpReady || !previewReady) {
   writeEvidence({ startedAt, steps, pass: false, port });
   process.exit(1);
 }
+server.kill("SIGTERM");
 
 const copyResult = spawnSync("node", ["scripts/run-copy-scan-all-stories.mjs"], {
   cwd: webRoot,
   encoding: "utf8",
   shell: true,
-  env: { ...process.env, SB_PORT: String(port), STORYBOOK_STATIC: "1" },
+  env: { ...process.env, STORYBOOK_STATIC: "1" },
   stdio: ["ignore", "pipe", "pipe"]
 });
 steps.push({
-  name: "copy-scan-106",
-  command: `SB_PORT=${port} STORYBOOK_STATIC=1 node scripts/run-copy-scan-all-stories.mjs`,
+  name: "copy-scan-all-stories",
+  command: "STORYBOOK_STATIC=1 node scripts/run-copy-scan-all-stories.mjs (chunked serve)",
   exitCode: copyResult.status ?? 1,
   pass: copyResult.status === 0,
   stderrTail: (copyResult.stderr || "").slice(-2000),
   stdoutTail: (copyResult.stdout || "").slice(-2000)
 });
-
-server.kill("SIGTERM");
 
 const webBuild = steps.find((s) => s.name === "web-build");
 if (webBuild?.pass) {

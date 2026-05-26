@@ -134,7 +134,10 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       readFileSync(join(webRoot, ".storybook-verify-tmp/batch16-ci-evidence.json"), "utf8")
     ) as { pass: boolean; steps: { name: string; pass: boolean }[] };
     expect(evidence.pass).toBe(true);
-    expect(evidence.steps.find((s) => s.name === "copy-scan-106")?.pass).toBe(true);
+    const copyStep = evidence.steps.find(
+      (s) => s.name === "copy-scan-all-stories" || s.name === "copy-scan-106"
+    );
+    expect(copyStep?.pass).toBe(true);
   });
 
   it("interaction batch B1 evidence is green", () => {

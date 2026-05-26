@@ -1,8 +1,11 @@
 import { chromium } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { createServer } from "node:net";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
+const staticRoot = join(root, "storybook-static");
 const outDir = join(root, ".storybook-verify-tmp");
 mkdirSync(outDir, { recursive: true });
 
@@ -27,13 +30,46 @@ const storyIds = Object.values(index.entries)
   .map((e) => e.id)
   .sort();
 
-const port = process.env.SB_PORT ?? "6026";
 const isStatic = process.env.STORYBOOK_STATIC === "1";
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+/** Chunked serve avoids EMFILE on Windows when scanning 150+ stories. */
+const manageServe = isStatic && process.env.COPY_SCAN_EXTERNAL_SERVE !== "1";
+const chunkSize = Number(process.env.COPY_SCAN_CHUNK_SIZE ?? "40");
 
-async function readPreviewText(frame) {
-  if (!isStatic) {
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const addr = probe.address();
+      const free = typeof addr === "object" && addr ? addr.port : 0;
+      probe.close((err) => (err ? reject(err) : resolve(free)));
+    });
+    probe.on("error", reject);
+  });
+}
+
+function startStaticServe(listenPort) {
+  return spawn(
+    "pnpm",
+    ["exec", "serve", staticRoot, "-s", "-l", String(listenPort)],
+    { cwd: root, shell: true, stdio: "ignore" }
+  );
+}
+
+async function waitForHttpRoot(listenPort) {
+  for (let i = 0; i < 30; i += 1) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${listenPort}/`);
+      if (res.ok) return true;
+    } catch {
+      /* serve ещё не слушает */
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
+async function readPreviewText(frame, staticMode) {
+  if (!staticMode) {
     await frame.locator("body").waitFor({ timeout: 60000 });
     await frame.locator(".sb-preparing-story").waitFor({ state: "hidden", timeout: 120000 }).catch(() => undefined);
     return frame.locator("body").innerText();
@@ -48,21 +84,19 @@ async function readPreviewText(frame) {
   return frame.locator("body").innerText().catch(() => "");
 }
 
-const storyResults = [];
-
-for (const id of storyIds) {
+async function scanStory(page, id, port, staticMode) {
   const storyUrl = `http://127.0.0.1:${port}/?path=/story/${id}&viewMode=story`;
   let navigated = false;
   for (let attempt = 0; attempt < 3 && !navigated; attempt += 1) {
     try {
       await page.goto(storyUrl, {
-        waitUntil: isStatic ? "load" : "networkidle",
+        waitUntil: staticMode ? "load" : "networkidle",
         timeout: 120000
       });
       navigated = true;
     } catch (err) {
       if (attempt === 2) {
-        storyResults.push({
+        return {
           id,
           hasNoPreview: true,
           hasEnDev: false,
@@ -70,22 +104,20 @@ for (const id of storyIds) {
           hasScreenError: true,
           screenErrorMarkers: [String(err instanceof Error ? err.message : err)],
           pass: false
-        });
-      } else {
-        await new Promise((r) => setTimeout(r, 1500));
+        };
       }
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
-  if (!navigated) continue;
 
   await page.locator("#storybook-preview-iframe").waitFor({ state: "attached", timeout: 120000 });
   const frame = page.frameLocator("#storybook-preview-iframe");
 
   let text = "";
   try {
-    text = await readPreviewText(frame);
+    text = await readPreviewText(frame, staticMode);
   } catch (err) {
-    storyResults.push({
+    return {
       id,
       hasNoPreview: true,
       hasEnDev: false,
@@ -93,9 +125,9 @@ for (const id of storyIds) {
       hasScreenError: true,
       screenErrorMarkers: [String(err instanceof Error ? err.message : err)],
       pass: false
-    });
-    continue;
+    };
   }
+
   const hasNoPreview = text.includes("No Preview");
   const hasEnDev = EN_DEV.test(text);
   const hasCyrillic = CYRILLIC.test(text);
@@ -106,15 +138,53 @@ for (const id of storyIds) {
   const hasScreenError = screenErrorMarkers.length > 0;
   const pass = !hasNoPreview && hasCyrillic && !hasEnDev && !hasScreenError;
 
-  storyResults.push({
-    id,
-    hasNoPreview,
-    hasEnDev,
-    hasCyrillic,
-    hasScreenError,
-    screenErrorMarkers,
-    pass
-  });
+  return { id, hasNoPreview, hasEnDev, hasCyrillic, hasScreenError, screenErrorMarkers, pass };
+}
+
+async function scanIds(page, ids, port, staticMode) {
+  const chunkResults = [];
+  for (const id of ids) {
+    chunkResults.push(await scanStory(page, id, port, staticMode));
+  }
+  return chunkResults;
+}
+
+const storyResults = [];
+const browser = await chromium.launch();
+
+if (manageServe) {
+  for (let offset = 0; offset < storyIds.length; offset += chunkSize) {
+    const chunk = storyIds.slice(offset, offset + chunkSize);
+    const port = await getFreePort();
+    const server = startStaticServe(port);
+    const ready = await waitForHttpRoot(port);
+    if (!ready) {
+      server.kill("SIGTERM");
+      for (const id of chunk) {
+        storyResults.push({
+          id,
+          hasNoPreview: true,
+          hasEnDev: false,
+          hasCyrillic: false,
+          hasScreenError: true,
+          screenErrorMarkers: ["static-serve-not-ready"],
+          pass: false
+        });
+      }
+      continue;
+    }
+
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    storyResults.push(...(await scanIds(page, chunk, port, true)));
+    await page.close();
+    server.kill("SIGTERM");
+    await new Promise((r) => setTimeout(r, 800));
+  }
+} else {
+  const port = process.env.SB_PORT ?? "6026";
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  storyResults.push(...(await scanIds(page, storyIds, port, isStatic)));
+  await page.close();
 }
 
 await browser.close();
@@ -122,8 +192,10 @@ await browser.close();
 const failures = storyResults.filter((r) => !r.pass);
 const audit = {
   batch: "15c",
-  date: "2026-05-24",
+  date: "2026-05-26",
   storiesChecked: storyIds.length,
+  chunkedServe: manageServe,
+  chunkSize: manageServe ? chunkSize : null,
   enDevPattern: EN_DEV.source,
   passCount: storyResults.filter((r) => r.pass).length,
   failures,

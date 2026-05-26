@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { cn } from "@/lib/cn";
 
 export type CapacityBarProps = {
@@ -41,8 +43,9 @@ export function CapacityBar({ label, used, capacity, className }: CapacityBarPro
         aria-valuemin={0}
         aria-valuemax={capacity}
         aria-label={`${label}: ${pct}%`}
+        style={{ "--capacity-fill-pct": `${fill}%` } as CSSProperties}
       >
-        <span className="capacity-bar__fill" style={{ width: `${fill}%` }} />
+        <span className="capacity-bar__fill" aria-hidden />
       </div>
     </div>
   );

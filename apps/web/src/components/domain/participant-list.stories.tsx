@@ -19,7 +19,12 @@ const SAMPLE = [
   { id: "4", name: "Козлова Мария", initials: "КМ", role: "QA" }
 ];
 
-export const Default: Story = {
-  name: "Список",
-  render: () => <ParticipantList participants={SAMPLE} maxAvatars={3} />
+export const Detailed: Story = {
+  name: "Подробный",
+  render: () => <ParticipantList participants={SAMPLE} maxAvatars={3} layout="detailed" />
+};
+
+export const Compact: Story = {
+  name: "Компактный",
+  render: () => <ParticipantList participants={SAMPLE} maxAvatars={3} layout="compact" />
 };

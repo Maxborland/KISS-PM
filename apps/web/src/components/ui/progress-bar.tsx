@@ -1,4 +1,5 @@
 import * as ProgressPrimitive from "@radix-ui/react-progress";
+import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/cn";
 
@@ -27,11 +28,9 @@ export function ProgressBar({ value, max = 100, label, className }: ProgressBarP
         value={clamped}
         max={max}
         aria-label={label ?? `Прогресс ${pct} процентов`}
+        style={{ "--progress-pct": `${pct}%` } as CSSProperties}
       >
-        <ProgressPrimitive.Indicator
-          className="progress-bar__fill"
-          style={{ transform: `translateX(-${100 - pct}%)` }}
-        />
+        <ProgressPrimitive.Indicator className="progress-bar__fill" />
       </ProgressPrimitive.Root>
     </div>
   );

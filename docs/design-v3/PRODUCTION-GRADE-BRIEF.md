@@ -105,4 +105,6 @@ Storybook design-v3 — надёжный визуальный baseline прод�
 
 **Scope PR:** [`PHASE-0-1-SCOPE-BOUNDARY.md`](./PHASE-0-1-SCOPE-BOUNDARY.md) — API/task-contract вне Phase 0–1.
 
-**Следующий шаг:** Phase 2 — переиспользуемые primitives и domain components.
+**Phase 2 (2026-05-26):** primitives + domain composites; коррекции — [`PHASE-2-CORRECTIONS.md`](./PHASE-2-CORRECTIONS.md).
+
+**Следующий шаг:** Phase 3 — scenario fixtures, MSW, Storybook structure.

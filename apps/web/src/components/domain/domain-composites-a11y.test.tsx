@@ -43,12 +43,24 @@ describe("Domain composites a11y markup", () => {
     expect(html).toContain("3+2d");
   });
 
-  it("ParticipantList exposes list semantics", () => {
+  it("ParticipantList detailed exposes list semantics", () => {
     const html = renderToStaticMarkup(
       <ParticipantList
         participants={[{ id: "1", name: "Иванов", initials: "ИВ" }]}
+        layout="detailed"
       />
     );
     expect(html).toContain('aria-label="Участники"');
+  });
+
+  it("ParticipantList compact renders only avatar group", () => {
+    const html = renderToStaticMarkup(
+      <ParticipantList
+        participants={[{ id: "1", name: "Иванов", initials: "ИВ" }]}
+        layout="compact"
+      />
+    );
+    expect(html).toContain("participant-list--compact");
+    expect(html).not.toContain("participant-list__row");
   });
 });
