@@ -1957,3 +1957,221 @@ button.stepper__item:disabled {
   background: var(--panel-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
+
+/* ============================================
+   Shell v2 — icon rail + context sidebar
+   ============================================ */
+.app-icon-rail {
+  width: var(--icon-rail-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border-right: 1px solid var(--border-subtle);
+  background: var(--panel-strong);
+}
+
+.app-icon-rail__logo {
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.app-icon-rail__sections {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.app-icon-rail__btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--muted-strong);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.app-icon-rail__btn:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.app-icon-rail__btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.app-context-sidebar {
+  width: var(--context-sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  gap: var(--space-4);
+  background: var(--panel);
+  min-height: 0;
+}
+
+.app-context-sidebar__head {
+  padding: 0 var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tenant-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tenant-switcher:hover {
+  background: var(--panel-strong);
+}
+
+.tenant-switcher__mark {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tenant-switcher__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.tenant-switcher__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-switcher__slug {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-switcher__chevron {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.app-context-sidebar__group-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 10px var(--space-2);
+}
+
+.app-context-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted-strong);
+}
+
+.app-context-sidebar__item:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.app-context-sidebar__item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.app-context-sidebar__item--nested {
+  padding-left: 22px;
+  font-weight: 500;
+}
+
+.app-context-sidebar__item-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--panel-strong);
+  color: var(--muted-strong);
+}
+
+.app-context-sidebar__item-badge--alert {
+  background: var(--danger);
+  color: #fff;
+}
+
+.app-context-sidebar__footer {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.app-context-sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+}
+
+.app-context-sidebar__user:hover {
+  background: var(--panel-strong);
+}
+
+.app-context-sidebar__user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.app-context-sidebar__user-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-context-sidebar__user-mail {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

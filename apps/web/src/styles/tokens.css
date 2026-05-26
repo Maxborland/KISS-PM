@@ -137,8 +137,10 @@
   --ring-focus: 0 0 0 3px var(--accent-ring);
 
   /* Layout */
+  --icon-rail-width: 56px;
+  --context-sidebar-width: 232px;
   --sidebar-width: 232px;
-  --topbar-height: 60px;
+  --topbar-height: 56px;
   --page-header-height: 64px;
   --row-h: 30px;
   --row-h-ultra: 24px;

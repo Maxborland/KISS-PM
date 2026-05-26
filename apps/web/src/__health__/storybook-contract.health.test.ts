@@ -34,10 +34,11 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(kanban).toContain("<Badge");
   });
 
-  it("state screens use workspace shell in catalog (not bare canvas)", () => {
-    const source = read("src/views/catalog.ts");
+  it("state screens use workspace shell in route registry (not bare canvas)", () => {
+    const source = read("src/shell/navigation-registry.ts");
     expect(source).toContain('"state-empty"');
-    expect(source).toMatch(/"state-empty":[\s\S]*activeNav: "Моя работа"/);
+    expect(source).toMatch(/"state-empty":[\s\S]*contextActiveItem: "Моя работа"/);
+    expect(source).toMatch(/"state-empty":[\s\S]*railSection: "tasks"/);
     expect(source).not.toMatch(/"state-empty":[\s\S]*variant: "bare"/);
   });
 
@@ -65,8 +66,8 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     }
   });
 
-  it("WorkspaceChrome default topbar actions are disabled with reason (batch 13g)", () => {
-    const source = read("src/views/layout/workspace-chrome.tsx");
+  it("PageIntro demo actions are disabled with reason (batch 13g)", () => {
+    const source = read("src/shell/page-intro-actions.tsx");
     expect(source).toMatch(/disabled title="Демо Storybook: экспорт подключится к API"/);
     expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
   });

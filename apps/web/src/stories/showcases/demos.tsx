@@ -62,8 +62,9 @@ import { Skeleton, SkeletonRow, SkeletonText } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AppContextSidebar } from "@/shell/app-context-sidebar";
+import { AppIconRail } from "@/shell/app-icon-rail";
 import { AppShell } from "@/shell/app-shell";
-import { AppSidebar } from "@/shell/app-sidebar";
 import { AppTopbar } from "@/shell/app-topbar";
 import { TopbarBreadcrumbs } from "@/shell/topbar-breadcrumbs";
 import { Kanban, TaskKanbanCard, type KanbanColumnDef, type TaskKanbanItem } from "@/widgets/kanban";
@@ -448,15 +449,15 @@ export function ShellShowcase() {
   return (
     <div style={{ minHeight: 640 }}>
       <AppShell
-        sidebar={
-          <AppSidebar
+        iconRail={<AppIconRail activeSection="projects" />}
+        contextSidebar={
+          <AppContextSidebar
             groups={[
               {
-                title: "Обзор",
+                title: "Проекты",
                 items: [
-                  { label: "Дашборд" },
-                  { label: "Задачи", active: true },
-                  { label: "Бэклог", nested: true, badge: "24" }
+                  { label: "Все проекты", active: true },
+                  { label: "Гант", nested: true }
                 ]
               }
             ]}
