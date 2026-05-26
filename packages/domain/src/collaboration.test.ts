@@ -4,6 +4,12 @@ import {
   deriveControlSignalNotifications,
   derivePlanningNotifications,
   extractMentionedUserIds,
+  parseCallMediaKind,
+  parseCallParticipantState,
+  parseCallRoomProvider,
+  parseCallRoomStatus,
+  parseCallTitle,
+  parseProviderRoomId,
   parseCollaborationEntityType,
   parseMessageBody,
   parseMeetingAgenda
@@ -38,6 +44,33 @@ describe("collaboration domain contract", () => {
   it("keeps agenda optional but bounded plain text", () => {
     expect(parseMeetingAgenda(undefined)).toEqual({ ok: true, value: "" });
     expect(parseMeetingAgenda("  План встречи  ")).toEqual({ ok: true, value: "План встречи" });
+  });
+
+  it("validates call room provider, media kind and lifecycle statuses", () => {
+    expect(parseCallRoomProvider("livekit")).toEqual({ ok: true, value: "livekit" });
+    expect(parseCallRoomProvider("zoom")).toEqual({
+      ok: false,
+      error: "call_room_provider_invalid"
+    });
+    expect(parseCallMediaKind("video")).toEqual({ ok: true, value: "video" });
+    expect(parseCallRoomStatus("active")).toEqual({ ok: true, value: "active" });
+    expect(parseCallParticipantState("joined")).toEqual({ ok: true, value: "joined" });
+  });
+
+  it("validates call room display title and opaque provider room id", () => {
+    expect(parseCallTitle("  Проектный звонок  ")).toEqual({
+      ok: true,
+      value: "Проектный звонок"
+    });
+    expect(parseCallTitle("")).toEqual({ ok: false, error: "call_title_required" });
+    expect(parseProviderRoomId("project-alpha-room")).toEqual({
+      ok: true,
+      value: "project-alpha-room"
+    });
+    expect(parseProviderRoomId("../secret")).toEqual({
+      ok: false,
+      error: "provider_room_id_invalid"
+    });
   });
 
   it("derives assignment and deadline notifications from planning commands", () => {

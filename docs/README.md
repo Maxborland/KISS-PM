@@ -47,6 +47,7 @@
 41. `40_PHASE_8_CONTROL_SURFACES_BUILDER_BACKEND.md` — backend contract для configurable control surfaces, drafts, publish/archive, widgets and action bindings.
 42. `41_PHASE_10_BACKEND_HARDENING.md` — backend production hardening: security/privacy, DB/migrations, performance, operations readiness и release-like smoke.
 43. `42_PHASE_G_11_COLLABORATION_COMMUNICATIONS_BACKEND.md` — backend contract для chats/discussions, notifications, meetings, external video links, audit/security и storage integration.
+44. `43_PHASE_G_2_COMMUNICATIONS_REALTIME_BACKEND.md` — backend contract для call rooms, audio/video provider control-plane, join tokens, participant state, call events и recordings через Storage layer.
 
 ## Планы исправлений
 

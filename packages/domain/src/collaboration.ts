@@ -54,6 +54,44 @@ export const meetingActionTargetTypes = [
 ] as const;
 export type MeetingActionTargetType = (typeof meetingActionTargetTypes)[number];
 
+export const callRoomProviders = ["manual", "jitsi", "livekit"] as const;
+export type CallRoomProvider = (typeof callRoomProviders)[number];
+
+export const callMediaKinds = ["audio", "video"] as const;
+export type CallMediaKind = (typeof callMediaKinds)[number];
+
+export const callRoomStatuses = [
+  "scheduled",
+  "open",
+  "active",
+  "ended",
+  "cancelled"
+] as const;
+export type CallRoomStatus = (typeof callRoomStatuses)[number];
+
+export const callSessionStatuses = ["active", "ended", "failed"] as const;
+export type CallSessionStatus = (typeof callSessionStatuses)[number];
+
+export const callParticipantStates = [
+  "invited",
+  "joining",
+  "joined",
+  "left",
+  "removed"
+] as const;
+export type CallParticipantStateValue = (typeof callParticipantStates)[number];
+
+export const callEventTypes = [
+  "room_created",
+  "session_started",
+  "join_token_issued",
+  "participant_joined",
+  "participant_left",
+  "session_ended",
+  "recording_attached"
+] as const;
+export type CallEventType = (typeof callEventTypes)[number];
+
 export type Conversation = {
   id: string;
   tenantId: TenantId;
@@ -192,6 +230,70 @@ export type MeetingActionItem = {
   archivedAt: Date | null;
 };
 
+export type CallRoom = {
+  id: string;
+  tenantId: TenantId;
+  entityType: CollaborationEntityType;
+  entityId: string;
+  meetingId: string | null;
+  title: string;
+  mediaKind: CallMediaKind;
+  provider: CallRoomProvider;
+  providerRoomId: string;
+  status: CallRoomStatus;
+  createdByUserId: UserId;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt: Date | null;
+};
+
+export type CallSession = {
+  id: string;
+  tenantId: TenantId;
+  roomId: string;
+  providerSessionId: string | null;
+  status: CallSessionStatus;
+  startedByUserId: UserId;
+  startedAt: Date;
+  endedByUserId: UserId | null;
+  endedAt: Date | null;
+  failureReason: string | null;
+};
+
+export type CallParticipantState = {
+  tenantId: TenantId;
+  roomId: string;
+  sessionId: string;
+  userId: UserId;
+  state: CallParticipantStateValue;
+  joinedAt: Date | null;
+  leftAt: Date | null;
+  lastSeenAt: Date;
+};
+
+export type CallEvent = {
+  id: string;
+  tenantId: TenantId;
+  roomId: string;
+  sessionId: string | null;
+  eventType: CallEventType;
+  actorUserId: UserId;
+  payload: Record<string, unknown>;
+  createdAt: Date;
+};
+
+export type CallRecording = {
+  id: string;
+  tenantId: TenantId;
+  roomId: string;
+  sessionId: string | null;
+  attachmentId: string;
+  title: string;
+  createdByUserId: UserId;
+  createdAt: Date;
+  archivedAt: Date | null;
+};
+
 export type CollaborationParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
@@ -201,6 +303,7 @@ const maxTitleLength = 180;
 const maxMessageBodyLength = 8000;
 const maxNoteBodyLength = 12000;
 const maxAgendaLength = 12000;
+const maxProviderRoomIdLength = 200;
 const controlCharacterPattern = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const mentionPattern = /@([a-zA-Z0-9][a-zA-Z0-9._:-]{1,120})/g;
 
@@ -305,6 +408,70 @@ export function parseMeetingActionTargetType(
     return { ok: true, value: value as MeetingActionTargetType };
   }
   return { ok: false, error: "meeting_action_target_type_invalid" };
+}
+
+export function parseCallRoomProvider(
+  value: unknown
+): CollaborationParseResult<CallRoomProvider> {
+  if (typeof value === "string" && callRoomProviders.includes(value as CallRoomProvider)) {
+    return { ok: true, value: value as CallRoomProvider };
+  }
+  return { ok: false, error: "call_room_provider_invalid" };
+}
+
+export function parseCallMediaKind(value: unknown): CollaborationParseResult<CallMediaKind> {
+  if (typeof value === "string" && callMediaKinds.includes(value as CallMediaKind)) {
+    return { ok: true, value: value as CallMediaKind };
+  }
+  return { ok: false, error: "call_media_kind_invalid" };
+}
+
+export function parseCallRoomStatus(value: unknown): CollaborationParseResult<CallRoomStatus> {
+  if (typeof value === "string" && callRoomStatuses.includes(value as CallRoomStatus)) {
+    return { ok: true, value: value as CallRoomStatus };
+  }
+  return { ok: false, error: "call_room_status_invalid" };
+}
+
+export function parseCallSessionStatus(
+  value: unknown
+): CollaborationParseResult<CallSessionStatus> {
+  if (typeof value === "string" && callSessionStatuses.includes(value as CallSessionStatus)) {
+    return { ok: true, value: value as CallSessionStatus };
+  }
+  return { ok: false, error: "call_session_status_invalid" };
+}
+
+export function parseCallParticipantState(
+  value: unknown
+): CollaborationParseResult<CallParticipantStateValue> {
+  if (typeof value === "string" && callParticipantStates.includes(value as CallParticipantStateValue)) {
+    return { ok: true, value: value as CallParticipantStateValue };
+  }
+  return { ok: false, error: "call_participant_state_invalid" };
+}
+
+export function parseCallTitle(value: unknown): CollaborationParseResult<string> {
+  return parseBoundedText(value, {
+    emptyError: "call_title_required",
+    invalidError: "call_title_invalid",
+    maxLength: maxTitleLength
+  });
+}
+
+export function parseProviderRoomId(value: unknown): CollaborationParseResult<string> {
+  if (typeof value !== "string") return { ok: false, error: "provider_room_id_invalid" };
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    trimmed.length > maxProviderRoomIdLength ||
+    controlCharacterPattern.test(trimmed) ||
+    /[\\]/.test(trimmed) ||
+    trimmed.includes("..")
+  ) {
+    return { ok: false, error: "provider_room_id_invalid" };
+  }
+  return { ok: true, value: trimmed };
 }
 
 export function parseNotificationChannel(

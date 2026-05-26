@@ -165,6 +165,13 @@ const phaseGCollaborationMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseG2CommunicationsRealtimeMigration = readFileSync(
+  new URL(
+    "../migrations/0035_phase_g2_communications_realtime.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -297,6 +304,35 @@ describe("Phase G / 11 SQL migration", () => {
     );
     expect(phaseGCollaborationMigration).toContain(
       "CONSTRAINT meeting_external_links_provider_chk"
+    );
+  });
+});
+
+describe("Phase G.2 / 11.2 SQL migration", () => {
+  it("creates tenant-scoped call room, session and event tables", () => {
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_rooms"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_sessions"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_participant_states"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_events"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_recordings"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_one_active_per_room_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_tenant_room_id_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CONSTRAINT call_recordings_attachment_fk"
     );
   });
 });
