@@ -6,6 +6,7 @@ import { MoneyValue } from "@/components/domain/money-value";
 import { ParticipantList } from "@/components/domain/participant-list";
 import { Chip } from "@/components/ui/chip";
 import { ProbabilityRing } from "@/components/ui/probability-ring";
+import { TrendArrow, type TrendDirection } from "@/components/ui/trend-arrow";
 import { cn } from "@/lib/cn";
 
 import { DEAL_KANBAN_FIELD, parseDealAmount } from "@/widgets/kanban/deal-kanban-profiles";
@@ -22,6 +23,7 @@ export type DealKanbanItem<C extends string = string> = KanbanItem<C> & {
   contactName?: string;
   amount: string;
   probability?: number;
+  probabilityTrend?: TrendDirection;
   plannedFinish?: string;
   plannedHours?: number;
   feasibilityStatus?: string | null;
@@ -124,6 +126,18 @@ export function DealKanbanCard<C extends string = string>({
           <div className="kanban-card__foot-meta kanban-card__foot-meta--deal">
             {showAmount ? <MoneyValue amount={parseDealAmount(item.amount)} /> : null}
             {showProbability ? <ProbabilityRing value={item.probability ?? 0} /> : null}
+            {showProbability && item.probabilityTrend ? (
+              <TrendArrow
+                direction={item.probabilityTrend}
+                label={
+                  item.probabilityTrend === "up"
+                    ? "рост"
+                    : item.probabilityTrend === "down"
+                      ? "спад"
+                      : "без изм."
+                }
+              />
+            ) : null}
             {showFinish && item.plannedFinish ? (
               <span className="mono">
                 {new Intl.DateTimeFormat("ru-RU").format(new Date(item.plannedFinish))}

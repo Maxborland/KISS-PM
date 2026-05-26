@@ -33,7 +33,7 @@ export const DEAL_KANBAN_VIEW_PROFILE: KanbanCardViewProfile = {
     { id: DEAL_KANBAN_FIELD.probability, label: "Вероятность", defaultOn: true },
     { id: DEAL_KANBAN_FIELD.plannedFinish, label: "План-финиш", defaultOn: true },
     { id: DEAL_KANBAN_FIELD.plannedHours, label: "План-часы", defaultOn: false },
-    { id: DEAL_KANBAN_FIELD.feasibility, label: "Feasibility", defaultOn: true },
+    { id: DEAL_KANBAN_FIELD.feasibility, label: "Оценка осуществимости", defaultOn: true },
     { id: DEAL_KANBAN_FIELD.projectType, label: "Тип проекта", defaultOn: false },
     { id: DEAL_KANBAN_FIELD.stage, label: "Стадия", defaultOn: true },
     { id: DEAL_KANBAN_FIELD.owner, label: "Ответственный", defaultOn: true }

@@ -59,3 +59,5 @@ export {
   parseDealAmount,
   type DealKanbanFieldId
 } from "@/widgets/kanban/deal-kanban-profiles";
+
+export { ALL_DEAL_KANBAN_FIELDS, dealToKanbanItem } from "@/widgets/kanban/deal-kanban-map";
