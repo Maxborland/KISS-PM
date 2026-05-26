@@ -69,7 +69,7 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
   "16-project-kpi": () => <ProjectKpiBlock />,
   "17-project-audit": () => <ProjectAuditBlock />,
   "18-project-calendars": () => <ProjectCalendarsBlock />,
-  "19-login": () => <LoginScreenView />,
+  "19-login": () => <LoginScreenView variant="default" />,
   "state-empty": () => <StateScreenBlock kind="empty" />,
   "state-error": () => <StateScreenBlock kind="error" />,
   "state-forbidden": () => <StateScreenBlock kind="forbidden" />,

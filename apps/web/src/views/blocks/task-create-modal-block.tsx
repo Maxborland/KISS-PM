@@ -62,11 +62,14 @@ export type TaskCreateModalBlockProps = {
   initialStep?: 1 | 2 | 3;
   /** Storybook: пред-выбранный проект (id из MOCK_PROJECT_OPTIONS). */
   initialProjectId?: string;
+  /** Storybook API Contract: после «Создать» показать JSON превью запроса. */
+  showApiContractPreview?: boolean;
 };
 
 export function TaskCreateModalBlock({
   initialStep = 1,
-  initialProjectId = "inbox"
+  initialProjectId = "inbox",
+  showApiContractPreview = false
 }: TaskCreateModalBlockProps = {}) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [projectScopeId, setProjectScopeId] = useState(initialProjectId);
@@ -105,13 +108,18 @@ export function TaskCreateModalBlock({
         toast.error("Проверьте обязательные поля");
         return;
       }
-      const scope = MOCK_PROJECT_OPTIONS.find((p) => p.id === projectScopeId);
-      const built = buildCreateTaskPreview(
-        form,
-        scope?.scopeProjectId ? { projectId: scope.scopeProjectId } : {}
-      );
-      setPreview(built);
-      toast.success("Запрос подготовлен (демо)");
+      if (showApiContractPreview) {
+        const scope = MOCK_PROJECT_OPTIONS.find((p) => p.id === projectScopeId);
+        const built = buildCreateTaskPreview(
+          form,
+          scope?.scopeProjectId ? { projectId: scope.scopeProjectId } : {}
+        );
+        setPreview(built);
+        toast.success("Запрос подготовлен (демо)");
+      } else {
+        toast.success("Задача создана");
+        reset();
+      }
       return;
     }
     const blockingIssues = validateForStep(step, form);
@@ -183,7 +191,7 @@ export function TaskCreateModalBlock({
     <>
       <PageIntro
         title="Новая задача"
-        lead="Поля совпадают с контрактом POST /api/workspace/tasks (CreateTaskBody)."
+        lead="Пошаговое создание: контекст, план работ и участники."
       />
       <CardPanel className="modal-mock">
         <ol className="stepper">
@@ -368,9 +376,7 @@ export function TaskCreateModalBlock({
                       update("requiresAcceptance", value === true)
                     }
                   />
-                  <span className="u-text-body">
-                    Включить шаг приёмки (`requiresAcceptance: true`)
-                  </span>
+                  <span className="u-text-body">Требуется приёмка результата руководителем</span>
                 </label>
               </Field>
             </FormGrid>

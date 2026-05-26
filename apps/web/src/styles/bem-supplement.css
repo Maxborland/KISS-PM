@@ -525,6 +525,20 @@
   padding-top: var(--space-1);
 }
 
+.login-card__alert {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.login-screen__loading {
+  width: min(400px, 100%);
+  margin-bottom: var(--space-2);
+}
+
+.login-screen__main--state {
+  max-width: 480px;
+  margin-inline: auto;
+}
+
 .login-screen__footnote {
   margin: 0;
   font-size: var(--text-xs);
@@ -1768,25 +1782,6 @@ button.stepper__item:disabled {
   font-size: var(--text-sm);
   color: var(--muted-strong);
 }
-
-.heatmap-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 22px;
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-}
-
-.heatmap-cell--0 { background: var(--panel-strong); color: var(--muted); }
-.heatmap-cell--1 { background: var(--accent-soft); color: var(--accent); }
-.heatmap-cell--2 { background: color-mix(in srgb, var(--accent) 28%, var(--panel)); color: var(--text); }
-.heatmap-cell--3 { background: color-mix(in srgb, var(--warning) 35%, var(--panel)); color: var(--warning-text); }
-.heatmap-cell--4 { background: var(--danger-soft); color: var(--danger-text); }
 
 .gantt-bar-demo {
   position: relative;

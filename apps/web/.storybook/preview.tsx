@@ -22,10 +22,29 @@ const preview: Preview = {
     a11y: { test: "todo" },
     options: {
       storySort: {
-        order: ["Foundations", "Typography", "UI", "Domain", "Widgets", "Shell", "Views", "Catalog", "*"]
+        order: [
+          "Foundations",
+          "Typography",
+          "UI",
+          "Domain",
+          "Widgets",
+          "Shell",
+          "Views",
+          "API Contract",
+          "Catalog",
+          "*"
+        ]
       }
     },
-    layout: "padded"
+    layout: "padded",
+    viewport: {
+      viewports: {
+        desktop1440: {
+          name: "1440×900",
+          styles: { width: "1440px", height: "900px" }
+        }
+      }
+    }
   },
   decorators: [mswDecorator, withScenario, (Story, context) => {
       const fullscreen = context.parameters.layout === "fullscreen";

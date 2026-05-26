@@ -66,6 +66,8 @@ export type EntityDetailBlockProps = {
   variant?: EntityDetailVariant;
   /** Сид задачи для variant="task". По умолчанию MOCK_TASK_DETAIL. */
   taskDetail?: MockTaskDetail;
+  /** Storybook API Contract: показать JSON превью запроса после сохранения. */
+  showApiContractPreview?: boolean;
 };
 
 type FeedItem = {
@@ -109,7 +111,8 @@ export function EntityDetailBlock({
   initialStage = "qual",
   initialAmount = "890 000",
   variant = "deal",
-  taskDetail = MOCK_TASK_DETAIL
+  taskDetail = MOCK_TASK_DETAIL,
+  showApiContractPreview = false
 }: EntityDetailBlockProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -156,9 +159,13 @@ export function EntityDetailBlock({
         toast.error("Проверьте обязательные поля");
         return;
       }
-      const built = buildUpdateTaskPreview(taskForm, { taskId: taskDetail.id });
-      setTaskPreview(built);
-      toast.success("Запрос подготовлен (демо)");
+      if (showApiContractPreview) {
+        const built = buildUpdateTaskPreview(taskForm, { taskId: taskDetail.id });
+        setTaskPreview(built);
+        toast.success("Запрос подготовлен (демо)");
+      } else {
+        toast.success("Изменения сохранены");
+      }
       return;
     }
     setSavedStage(stageValue);
@@ -249,12 +256,12 @@ export function EntityDetailBlock({
             <CardPanel title="Описание" subtitle="Контекст для команды">
               <p className="u-text-body">
                 {variant === "task"
-                  ? "Контракт PATCH /api/workspace/tasks/:taskId — поля справа сохраняются в UpdateTaskBody."
+                  ? "Согласование технического задания с заказчиком: сроки, трудозатраты и участники фиксируются в карточке задачи."
                   : "Внедрение CRM в три этапа: аудит процессов, миграция данных, обучение команды. Срок — 6 недель. Заказчик — ООО «Ромашка», ответственный — Иванова М."}
               </p>
             </CardPanel>
           )}
-          {variant === "task" && taskPreview ? (
+          {variant === "task" && showApiContractPreview && taskPreview ? (
             <TaskPayloadPreview
               title="Payload запроса"
               endpointLabel={taskPreview.endpointLabel}
