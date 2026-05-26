@@ -30,6 +30,8 @@ export type AvatarColor = "c1" | "c2" | "c3" | "c4" | "c5" | "c6";
 export type MatrixRow = {
   id: string;
   kind: MatrixRowKind;
+  /** Родительская группа (`workshop` / `role`) для сворачивания. */
+  parentId?: string;
   /** Уровень вложенности (0 — toplevel; 1 — внутри роли; 2 — внутри подгруппы). */
   indent?: 0 | 1 | 2;
   name: string;
@@ -37,6 +39,8 @@ export type MatrixRow = {
   avatar?: { initials: string; color: AvatarColor };
   /** Загрузка % (только roles/persons). */
   percent?: MatrixPercent;
+  /** Норма часов в рабочий день (person) — для агрегатов роль/мастерская. */
+  dailyNormHours?: number;
   /** Можно ли свернуть (для group rows). */
   collapsible?: boolean;
   /** Ячейки за каждый день месяца, длина равна `days.length`. */

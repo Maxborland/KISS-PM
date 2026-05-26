@@ -1,5 +1,6 @@
 "use client";
 
+import { CapacityBar } from "@/components/domain/capacity-bar";
 import { cn } from "@/lib/cn";
 import type { ResourceMatrixData } from "./types";
 
@@ -28,10 +29,12 @@ export function ResourceMatrixStats({
       />
       <Item label="Свободно" value={`${fmt(stats.freeHours)} ч`} danger={stats.freeHours < 500} />
       <Item label="Сотрудников" value={String(stats.employees)} />
-      <div className="rmatrix-stats__bar" aria-hidden>
-        <div
-          className="rmatrix-stats__bar-fill"
-          style={{ width: `${Math.min(stats.loadPct, 100)}%` }}
+      <div className="rmatrix-stats__capacity">
+        <CapacityBar
+          label="Загрузка портфеля"
+          used={stats.assignedHours}
+          capacity={stats.capacityHours}
+          className="rmatrix-stats__capacity-bar"
         />
       </div>
     </div>

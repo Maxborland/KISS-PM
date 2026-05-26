@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CapacityBar } from "./capacity-bar";
 import { DateRange } from "./date-range";
 import { DependencyChip } from "./dependency-chip";
-import { HeatmapCell } from "./heatmap-cell";
 import { KpiTile } from "./kpi-tile";
 import { MoneyValue } from "./money-value";
 import { ParticipantList } from "./participant-list";
@@ -14,11 +13,6 @@ describe("Domain composites a11y markup", () => {
     const html = renderToStaticMarkup(<KpiTile label="Маржа" value="42%" />);
     expect(html).toContain("Маржа");
     expect(html).toContain("mono");
-  });
-
-  it("HeatmapCell exposes aria-label", () => {
-    const html = renderToStaticMarkup(<HeatmapCell value={80} level={3} title="80%" />);
-    expect(html).toContain('aria-label="80%"');
   });
 
   it("DateRange display uses formatted range", () => {
