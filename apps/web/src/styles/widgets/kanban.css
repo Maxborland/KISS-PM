@@ -4,6 +4,47 @@
    This file extends the generic widget with optional board variants.
    ============================================ */
 
+.kanban-col {
+  position: relative;
+}
+
+.kanban-col__accent {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--kanban-col-accent, var(--border-subtle));
+  pointer-events: none;
+}
+
+.kanban-col[data-col-tone="info"] { --kanban-col-accent: var(--accent); }
+.kanban-col[data-col-tone="success"] { --kanban-col-accent: var(--success); }
+.kanban-col[data-col-tone="warning"] { --kanban-col-accent: var(--warning); }
+.kanban-col[data-col-tone="danger"] { --kanban-col-accent: var(--danger); }
+.kanban-col[data-col-tone="violet"] { --kanban-col-accent: var(--violet, var(--accent)); }
+
+.kanban-card:hover:not([data-dragging="true"]) {
+  box-shadow: var(--shadow-panel, var(--shadow-md));
+  transform: translateY(-1px);
+}
+
+.kanban-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kanban-card__progress-bar {
+  width: 100%;
+}
+
+.kanban-card__foot-meta--deal {
+  align-items: center;
+  gap: 10px;
+}
+
 /* CRM-funnel variant: 5 panel-style columns, same DnD affordances. */
 .kanban--funnel {
   grid-template-columns: repeat(5, minmax(220px, 1fr));

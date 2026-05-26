@@ -2,11 +2,13 @@
 
 import type { KeyboardEvent, ReactNode } from "react";
 
-import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
+import { MoneyValue } from "@/components/domain/money-value";
+import { ParticipantList } from "@/components/domain/participant-list";
 import { Chip } from "@/components/ui/chip";
+import { ProbabilityRing } from "@/components/ui/probability-ring";
 import { cn } from "@/lib/cn";
 
-import { DEAL_KANBAN_FIELD } from "@/widgets/kanban/deal-kanban-profiles";
+import { DEAL_KANBAN_FIELD, parseDealAmount } from "@/widgets/kanban/deal-kanban-profiles";
 import type { KanbanItem } from "@/widgets/kanban/types";
 
 export type DealKanbanOwner = {
@@ -25,7 +27,6 @@ export type DealKanbanItem<C extends string = string> = KanbanItem<C> & {
   feasibilityStatus?: string | null;
   projectType?: string;
   owner: DealKanbanOwner;
-  /** Подпись стадии (без знания о columnId, чтобы карточка осталась presentation-only). */
   stageLabel: string;
   stageTone?: "info" | "success" | "warning" | "danger" | "violet";
   highlight?: boolean;
@@ -40,13 +41,6 @@ export type DealKanbanCardProps<C extends string = string> = {
   foot?: ReactNode;
 };
 
-/**
- * Карточка сделки для CRM-канбана. Использует тот же BEM-каркас
- * `.kanban-card`, что и `TaskKanbanCard`, — общий стиль, hover, focus,
- * drag-overlay-анимация и `kanban-card--highlight` живут в одном месте.
- * Доменные данные (клиент, сумма, стадия) рендерятся в стандартных
- * слотах `__head` / `__title` / `__meta` / `__foot`.
- */
 export function DealKanbanCard<C extends string = string>({
   item,
   draggable,
@@ -119,16 +113,22 @@ export function DealKanbanCard<C extends string = string>({
       {showFoot || showOwner ? (
         <div className="kanban-card__foot">
           {showOwner ? (
-            <BemAvatarStack>
-              <BemAvatar {...item.owner} />
-            </BemAvatarStack>
+            <ParticipantList
+              participants={[{ id: item.id, name: item.owner.initials, initials: item.owner.initials }]}
+              maxAvatars={1}
+              layout="compact"
+            />
           ) : (
             <span />
           )}
-          <div className="kanban-card__foot-meta">
-            {showAmount ? <span className="mono">{item.amount}</span> : null}
-            {showProbability ? <span>{item.probability ?? 0}%</span> : null}
-            {showFinish && item.plannedFinish ? <span className="mono">{new Intl.DateTimeFormat("ru-RU").format(new Date(item.plannedFinish))}</span> : null}
+          <div className="kanban-card__foot-meta kanban-card__foot-meta--deal">
+            {showAmount ? <MoneyValue amount={parseDealAmount(item.amount)} /> : null}
+            {showProbability ? <ProbabilityRing value={item.probability ?? 0} /> : null}
+            {showFinish && item.plannedFinish ? (
+              <span className="mono">
+                {new Intl.DateTimeFormat("ru-RU").format(new Date(item.plannedFinish))}
+              </span>
+            ) : null}
             {showHours ? <span>{item.plannedHours ?? 0} ч</span> : null}
             {showFeasibility && item.feasibilityStatus ? <span>{item.feasibilityStatus}</span> : null}
           </div>

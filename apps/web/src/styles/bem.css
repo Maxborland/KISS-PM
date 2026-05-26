@@ -1178,7 +1178,7 @@ a:hover { color: var(--accent-hover); }
   .task-drawer .entity-grid { grid-template-columns: 1fr; }
 }
 
-.kanban-card:hover {
+.kanban-card:hover:not([data-dragging="true"]) {
   box-shadow: var(--shadow-md);
   border-color: var(--border-strong);
 }

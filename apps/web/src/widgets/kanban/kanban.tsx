@@ -284,6 +284,8 @@ function KanbanColumnView<T extends KanbanItem<C>, C extends string>({
   const count = columnItems.length;
   const showOver = !disableDnd && isOverColumn;
 
+  const colTone = column.tone ?? "neutral";
+
   return (
     <div
       ref={drop.setNodeRef}
@@ -291,7 +293,9 @@ function KanbanColumnView<T extends KanbanItem<C>, C extends string>({
       data-droppable={disableDnd ? undefined : "true"}
       data-over={showOver ? "true" : undefined}
       data-col-id={column.id}
+      data-col-tone={colTone}
     >
+      <div className="kanban-col__accent" aria-hidden />
       <div className="kanban-col__head">
         {renderColumnHeader ? (
           renderColumnHeader(column, count)

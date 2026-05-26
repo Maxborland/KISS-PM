@@ -3,9 +3,11 @@
 import { MessageSquare } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 
-import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
+import { ParticipantList } from "@/components/domain/participant-list";
 import { PriorityFlag, type PriorityLevel } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/cn";
 
 import { TASK_KANBAN_FIELD } from "@/widgets/kanban/task-kanban-profiles";
@@ -39,6 +41,13 @@ export type TaskKanbanCardProps<C extends string = string> = {
   visibleFields?: ReadonlySet<string>;
 };
 
+function statusToneFromProgress(progress: number | undefined): "info" | "success" | "warning" {
+  if (progress == null) return "info";
+  if (progress >= 100) return "success";
+  if (progress >= 50) return "info";
+  return "warning";
+}
+
 export function TaskKanbanCard<C extends string = string>({
   item,
   draggable,
@@ -68,6 +77,12 @@ export function TaskKanbanCard<C extends string = string>({
   const showWork = show(TASK_KANBAN_FIELD.work);
   const showAcceptance = show(TASK_KANBAN_FIELD.acceptance);
   const showFoot = showAssignees || showComments || showDate || showWork || showAcceptance;
+
+  const participants = item.assignees.map((a, index) => ({
+    id: `${item.id}-${index}`,
+    name: a.initials,
+    initials: a.initials
+  }));
 
   return (
     <article
@@ -99,23 +114,17 @@ export function TaskKanbanCard<C extends string = string>({
           ))
         : null}
       {showProgress && item.progress != null ? (
-        <div className="kanban-card__meta">
-          <span>Прогресс {item.progress}%</span>
-          {item.statusName ? <span>{item.statusName}</span> : null}
+        <div className="kanban-card__progress">
+          {item.statusName ? (
+            <StatusDot tone={statusToneFromProgress(item.progress)} label={item.statusName} size="sm" />
+          ) : null}
+          <ProgressBar value={item.progress} className="kanban-card__progress-bar" />
         </div>
       ) : null}
       {showFoot ? (
         <div className="kanban-card__foot">
-          {showAssignees && item.assignees.length > 0 ? (
-            <BemAvatarStack>
-              {item.assignees.map((a) => (
-                <BemAvatar
-                  key={a.initials}
-                  initials={a.initials}
-                  {...(a.color ? { color: a.color } : {})}
-                />
-              ))}
-            </BemAvatarStack>
+          {showAssignees && participants.length > 0 ? (
+            <ParticipantList participants={participants} maxAvatars={3} layout="compact" />
           ) : null}
           <div className="kanban-card__foot-meta">
             {showComments && item.comments != null ? (
@@ -126,7 +135,9 @@ export function TaskKanbanCard<C extends string = string>({
             ) : null}
             {showDate && item.date ? <span className="mono">{item.date}</span> : null}
             {showWork && item.plannedWork != null ? (
-              <span>{Math.round(item.actualWork ?? 0)}/{Math.round(item.plannedWork)} мин</span>
+              <span>
+                {Math.round(item.actualWork ?? 0)}/{Math.round(item.plannedWork)} мин
+              </span>
             ) : null}
             {showAcceptance && item.requiresAcceptance ? <Chip variant="warning">Приемка</Chip> : null}
           </div>

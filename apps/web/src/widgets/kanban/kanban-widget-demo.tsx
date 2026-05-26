@@ -26,9 +26,9 @@ type DemoColumnId = "backlog" | "in-progress" | "done";
 export type DemoKanbanItem = TaskKanbanItem<DemoColumnId>;
 
 const DEMO_COLUMNS: KanbanColumnDef<DemoColumnId>[] = [
-  { id: "backlog", title: "Бэклог", emptyLabel: "Нет задач" },
-  { id: "in-progress", title: "В работе", emptyLabel: "Нет задач" },
-  { id: "done", title: "Готово", emptyLabel: "Нет задач за сегодня" }
+  { id: "backlog", title: "Бэклог", emptyLabel: "Нет задач", tone: "neutral" },
+  { id: "in-progress", title: "В работе", emptyLabel: "Нет задач", tone: "info" },
+  { id: "done", title: "Готово", emptyLabel: "Нет задач за сегодня", tone: "success" }
 ];
 
 const DEMO_LABEL: Record<DemoColumnId, string> = {
@@ -54,7 +54,7 @@ const DEMO_INITIAL: DemoKanbanItem[] = [
     columnId: "in-progress",
     title: "Презентация для клиента",
     priority: "low",
-    priorityLabel: "Low",
+    priorityLabel: "Низкий",
     highlight: true,
     assignees: [
       { initials: "КБ", color: "c4" },
@@ -68,7 +68,7 @@ const DEMO_INITIAL: DemoKanbanItem[] = [
     columnId: "backlog",
     title: "Подготовить смету этапа 2",
     priority: "normal",
-    priorityLabel: "Normal",
+    priorityLabel: "Обычный",
     assignees: [{ initials: "АП", color: "c2" }],
     comments: 2,
     date: "01.06.2024"
@@ -145,7 +145,7 @@ export function KanbanWidgetDemo() {
   };
 
   return (
-    <div className="u-flex u-flex-col u-gap-3">
+    <div className="u-flex u-flex-col u-gap-3" data-testid="kanban-widget-demo">
       <div className="view-toolbar">
         <KanbanCardViewMenu
           profile={TASK_KANBAN_VIEW_PROFILE}
