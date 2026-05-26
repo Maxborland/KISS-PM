@@ -179,6 +179,13 @@ const phaseG2ParticipantStateEventsMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseBackgroundJobsMigration = readFileSync(
+  new URL(
+    "../migrations/0038_phase_8_background_jobs_infrastructure.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -262,6 +269,32 @@ describe("Phase 8 SQL migration", () => {
     );
     expect(phase8ControlSurfacesMigration).toContain(
       "CONSTRAINT control_surface_versions_surface_fk"
+    );
+  });
+});
+
+describe("Background jobs infrastructure SQL migration", () => {
+  it("creates durable schedules, runs, events and file purge tracking", () => {
+    expect(phaseBackgroundJobsMigration).toContain(
+      'ALTER TABLE "file_assets"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "purged_at"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "background_job_schedules"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "background_job_runs"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "background_job_events"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'CONSTRAINT "background_job_runs_status_chk"'
+    );
+    expect(phaseBackgroundJobsMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "background_job_runs_claim_idx"'
     );
   });
 });
