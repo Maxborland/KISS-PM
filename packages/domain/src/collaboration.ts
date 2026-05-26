@@ -85,6 +85,8 @@ export const callEventTypes = [
   "room_created",
   "session_started",
   "join_token_issued",
+  "participant_invited",
+  "participant_joining",
   "participant_joined",
   "participant_left",
   "session_ended",

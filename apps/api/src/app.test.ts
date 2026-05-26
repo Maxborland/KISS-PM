@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { verifyLoginPassword } from "./authRoutes";
-import type { ApiTenantDataSource, WorkspaceUserRecord } from "./apiTypes";
+import type { ApiTenantDataSource, ProjectRecord, WorkspaceUserRecord } from "./apiTypes";
 import type { ControlSignal, KpiDefinition, PlanSnapshot, PlanningCommand } from "@kiss-pm/domain";
 import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { hashPassword } from "@kiss-pm/persistence";
@@ -113,6 +113,93 @@ describe("KISS PM API Phase 1 shell", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "internal_error" });
+  });
+
+  it("returns collaboration_not_configured for unconfigured meeting creation storage", async () => {
+    const now = new Date("2026-05-26T00:00:00.000Z");
+    const actor = {
+      id: "user-collab-admin",
+      tenantId: "tenant-collab",
+      name: "Кира Администратор",
+      accessProfileId: "collab-profile"
+    };
+    const project: ProjectRecord = {
+      id: "project-collab",
+      tenantId: "tenant-collab",
+      sourceType: "manual",
+      sourceOpportunityId: null,
+      clientId: null,
+      projectTypeId: null,
+      title: "Проект коммуникаций",
+      clientName: "ООО Связь",
+      status: "active",
+      plannedStart: now,
+      plannedFinish: now,
+      contractValue: 0,
+      plannedHours: 0,
+      templateId: null,
+      createdAt: now,
+      activatedAt: now,
+      closedAt: null,
+      demand: []
+    };
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-collab",
+          tenantId: actor.tenantId,
+          userId: actor.id,
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === actor.tenantId ? { id: tenantId, name: "Collab Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "collab-profile",
+          permissions: ["tenant.projects.read", "tenant.projects.manage"]
+        };
+      },
+      async listUsersByTenantId() {
+        return [actor];
+      },
+      async listProjects() {
+        return [project];
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/meetings", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: project.id,
+        title: "Планерка",
+        agenda: "",
+        scheduledStart: "2026-06-02T09:00:00.000Z",
+        scheduledFinish: "2026-06-02T09:30:00.000Z",
+        participants: [{ userId: actor.id, role: "required" }]
+      })
+    });
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "collaboration_not_configured" });
   });
 
   it("lists deterministic dev users for local Phase 1 login", async () => {

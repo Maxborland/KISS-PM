@@ -198,6 +198,40 @@ describe("communications realtime API", () => {
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain("livekit-secret");
   });
 
+  it("emits distinct events for invited and joining participant states", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const invited = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ state: "invited" })
+      }
+    );
+    expect(invited.status).toBe(200);
+    await expect(invited.json()).resolves.toMatchObject({
+      event: { eventType: "participant_invited" },
+      participantState: { state: "invited" }
+    });
+
+    const joining = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ state: "joining" })
+      }
+    );
+    expect(joining.status).toBe(200);
+    await expect(joining.json()).resolves.toMatchObject({
+      event: { eventType: "participant_joining" },
+      participantState: { state: "joining" }
+    });
+  });
+
   it("blocks users without parent entity access", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
