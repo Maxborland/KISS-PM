@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect } from "@storybook/test";
 import { useEffect } from "react";
 
 import { GanttApplyBar } from "./gantt-apply-bar";
@@ -395,6 +396,26 @@ export const DependencyTypesAndLag: Story = {
       showApplyBar={false}
     />
   )
+};
+
+/** Выбранная связь FS: подсветка пути и полос задач (контракт Phase 6). */
+export const DependencyGeometrySelected: Story = {
+  name: "DependencyGeometrySelected",
+  render: () => (
+    <GanttInteractive
+      initialData={mockWith({ selectedDependencyId: "d6", selectedRowId: "t-2-2" })}
+      initialFlags={{ showDependencies: true }}
+      showApplyBar={false}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const shell = canvasElement.querySelector(".gantt2");
+    expect(shell?.classList.contains("gantt2--dependency-selected")).toBe(true);
+    const selectedPath = canvasElement.querySelector(".gdep__path--selected");
+    expect(selectedPath).toBeTruthy();
+    const selectedBar = canvasElement.querySelector('[data-gantt-bar-selected="true"]');
+    expect(selectedBar).toBeTruthy();
+  }
 };
 
 export const DrawerOverlayNoReflow: Story = {

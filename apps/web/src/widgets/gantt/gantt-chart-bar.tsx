@@ -145,6 +145,8 @@ export function GanttChartBar({
         style={col}
         role="img"
         aria-label={row.name}
+        aria-selected={selected}
+        data-gantt-bar-selected={selected ? "true" : undefined}
         onPointerDown={interactive && row.kind === "task" ? onPointerDownMove : undefined}
       >
         {row.kind === "task" && progressPct > 0 ? (

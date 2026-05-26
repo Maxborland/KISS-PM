@@ -251,6 +251,7 @@ export function GanttView({
         interactive && "gantt2--interactive",
         link && "gantt2--link-mode gantt2__shell--link-mode",
         data.selectedRowId && "gantt2--has-selection",
+        data.selectedDependencyId && "gantt2--dependency-selected",
         className
       )}
       role="grid"

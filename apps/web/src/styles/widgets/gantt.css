@@ -605,6 +605,17 @@
   min-height: 28px;
 }
 
+.gantt2--dependency-selected .gdep__path--selected .gdep__line {
+  stroke-width: 2;
+}
+
+.gantt2--dependency-selected .gbar[data-gantt-bar-selected="true"] {
+  box-shadow:
+    0 0 0 2px var(--accent-ring),
+    0 0 0 1px var(--accent);
+  z-index: 4;
+}
+
 .gantt2__status-banner {
   padding: 6px 12px;
   font-size: 11px;
