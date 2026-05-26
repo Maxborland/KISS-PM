@@ -20,20 +20,10 @@ import {
   type ScreenStory
 } from "@/views/screens/screen-story-helpers";
 import { ScreenView } from "@/views/screens/screen-view";
-
-/** Колонка Kanban/Funnel: заголовок в `.kanban-col__title` (без глобального getByText). */
-function kanbanColumnByTitle(root: HTMLElement, title: string): HTMLElement {
-  const cols = root.querySelectorAll<HTMLElement>(".kanban-col");
-  for (const col of cols) {
-    const head = col.querySelector(".kanban-col__title");
-    const label = head?.textContent?.trim() ?? "";
-    if (label.startsWith(title)) return col;
-  }
-  throw new Error(`Kanban column "${title}" not found`);
-}
+import { kanbanPlayRoot, playKanbanPointerDrag } from "@/stories/storybook-kanban-play";
 
 const meta: Meta<typeof ScreenView> = {
-  title: "Views/Screens",
+  title: "Screens",
   component: ScreenView,
   parameters: {
     ...SCREEN_STORY_PARAMETERS,
@@ -152,39 +142,8 @@ export const MyWorkKanbanDragging: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const card = await canvas.findByLabelText(/Открыть карточку MDS-39/i);
-    const target = kanbanColumnByTitle(canvasElement, "В работе");
-    if (!card) return;
-
-    const cardRect = card.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-
-    fireEvent.pointerDown(card, {
-      pointerId: 1,
-      button: 0,
-      clientX: cardRect.left + 8,
-      clientY: cardRect.top + 8
-    });
-    fireEvent.pointerMove(card, {
-      pointerId: 1,
-      clientX: cardRect.left + 60,
-      clientY: cardRect.top + 60
-    });
-    fireEvent.pointerMove(target, {
-      pointerId: 1,
-      clientX: targetRect.left + targetRect.width / 2,
-      clientY: targetRect.top + targetRect.height / 2
-    });
-    fireEvent.pointerUp(target, {
-      pointerId: 1,
-      clientX: targetRect.left + targetRect.width / 2,
-      clientY: targetRect.top + targetRect.height / 2
-    });
-
-    await waitFor(() => {
-      const inProgressCol = kanbanColumnByTitle(canvasElement, "В работе");
-      expect(within(inProgressCol).queryByText("Новая страница продукта")).toBeTruthy();
-    });
+    const board = kanbanPlayRoot(canvasElement);
+    await playKanbanPointerDrag(board, "MDS-39", "В работе", "Новая страница продукта");
 
     const openCard = await canvas.findByLabelText(/Открыть карточку MDS-2/i);
     openCard.focus();
@@ -259,37 +218,8 @@ export const DealsFunnelDragging: Story = {
     </WorkspaceChrome>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const card = await canvas.findByLabelText(/Открыть сделку DEAL-103/i);
-    const target = kanbanColumnByTitle(canvasElement, "КП");
-    if (!card) return;
-    const cardRect = card.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    fireEvent.pointerDown(card, {
-      pointerId: 1,
-      button: 0,
-      clientX: cardRect.left + 8,
-      clientY: cardRect.top + 8
-    });
-    fireEvent.pointerMove(card, {
-      pointerId: 1,
-      clientX: cardRect.left + 60,
-      clientY: cardRect.top + 60
-    });
-    fireEvent.pointerMove(target, {
-      pointerId: 1,
-      clientX: targetRect.left + targetRect.width / 2,
-      clientY: targetRect.top + targetRect.height / 2
-    });
-    fireEvent.pointerUp(target, {
-      pointerId: 1,
-      clientX: targetRect.left + targetRect.width / 2,
-      clientY: targetRect.top + targetRect.height / 2
-    });
-    await waitFor(() => {
-      const proposalCol = kanbanColumnByTitle(canvasElement, "КП");
-      expect(within(proposalCol).queryByText("Аудит Salesforce")).toBeTruthy();
-    });
+    const board = kanbanPlayRoot(canvasElement);
+    await playKanbanPointerDrag(board, "DEAL-103", "КП", "Аудит Salesforce");
   }
 };
 
