@@ -1,6 +1,6 @@
 # Storybook — подготовка 8 секций (production-grade)
 
-**Статус:** подготовлено 2026-05-26. **Не внедрено в sidebar** — реализация по фазам плана (rename roots, новые каталоги, `storySort`) в **Phase 8** и смежных фазах.
+**Статус:** обновлено 2026-05-26. **Phase 7 (активно):** production pass экранов, сценарии, API Contract stories. **Phase 8:** rename sidebar roots (`UI`→`Primitives`, `Views/Screens`→`Screens`), Flows/Patterns stories, deprecate Catalog.
 
 **Canonical brief:** [`PRODUCTION-GRADE-BRIEF.md`](./PRODUCTION-GRADE-BRIEF.md) · **План:** [`docs/plans/2026-05-25-kiss-pm-design-v3-storybook-production-grade.md`](../plans/2026-05-25-kiss-pm-design-v3-storybook-production-grade.md)
 
@@ -235,5 +235,88 @@ order: [
 | 3 | API contract health + MSW (питает §8) |
 | 4 | Patterns content → позже §7 stories |
 | 5–7 | Screens polish (§5) |
-| **8** | **Flows + Patterns + API Contract stories + rename UI→Primitives, Views→Screens + deprecate Catalog** |
+| **7** | **Screens production pass** — §10: сценарии, плотность, RU copy, 1440px, commits по группам |
+| **8** | **Flows + Patterns stories + rename UI→Primitives, Views→Screens + deprecate Catalog** |
 | 9 | VRT baseline под финальными ids |
+
+---
+
+## 10. Phase 7 — Product Screens (inventory & ownership)
+
+**Цель:** каждый продуктовый экран в `default` выглядит как готовое приложение на **1440×900**; сценарии `default` / `empty` / `loading` / `error` / `forbidden` согласованы с `ScenarioName` и MSW (`apps/web/src/lib/mock-data/scenarios.ts`).
+
+**Источник маршрутов:** `apps/web/src/shell/navigation-registry.ts` (`SCREEN_ROUTE_BY_ID`).  
+**Рендер:** `ScreenView` + block в `apps/web/src/views/blocks/*`.  
+**Stories:** `apps/web/src/views/screens/screens.stories.tsx` (+ `screen-story-helpers.tsx`).  
+**API/debug:** только `apps/web/src/stories/api-contract/*` (не в product screen stories).
+
+### 10.1 Группы и ответственность (commits 7.2)
+
+| Группа | Owner (слой) | Экраны (`ScreenId`) | Сценарии в SB |
+|--------|----------------|---------------------|---------------|
+| **Auth / Login** | `login-screen-view.tsx` | `19-login` | default, loading, error, forbidden |
+| **Dashboard / My Work** | `dashboard-bento`, `my-work-block` | `01-dashboard`, `02-my-work` | default + empty/loading/error/forbidden; DnD/list — отдельные play |
+| **Planning** | `projects-list`, `entity-detail`, project blocks | `07-*`, `07b`, `12–18` | default + 4 state; Gantt widget отдельно |
+| **CRM / Funnel** | `deals-block`, `entities-block`, `entity-detail` | `05–06`, `08-*` | default + states; funnel DnD play |
+| **Analytics / Control** | `project-kpi`, audit, signals (future) | `16–17`, reports (future) | default + states |
+| **Admin / Settings** | `admin-block`, `settings-block`, `avatar-menu` | `09–11` | default + forbidden |
+| **Wizard** | `task-create-modal-block` | `04-create-task-modal` | default, steps, validation (product); payload → API Contract |
+| **States (shared)** | `state-screen-block` | `state-*` | empty, error, forbidden, loading |
+
+### 10.2 Инвентарь экранов
+
+| ID | Story (RU) | Block | Rail | Сценарии Phase 7 |
+|----|------------|-------|------|------------------|
+| `00-space-discipline` | 00 Дисциплина отступов | `SpaceDisciplineBlock` | overview | default |
+| `01-dashboard` | 01 Дашборд | `DashboardBento` | overview | default, empty, loading, error, forbidden |
+| `02-my-work` | 02 Моя работа | `MyWorkBlock` | tasks | default, empty, loading, error, forbidden, list, DnD |
+| `03-task-card` | 03 Карточка задачи | `EntityDetailBlock` task | tasks | default, dirty save play |
+| `04-create-task-modal` | 04 Модалка создания | `TaskCreateModalBlock` | tasks | default, step1, validation |
+| `05-deals` | 05 Сделки | `DealsBlock` | crm | default, DnD |
+| `06-deal-card` | 06 Карточка сделки | `EntityDetailBlock` deal | crm | default, dirty |
+| `07-projects-list` | 07 Список проектов | `ProjectsListBlock` | projects | default, filter play |
+| `07b-project-detail` | 07b Карточка проекта | `EntityDetailBlock` | projects | default |
+| `08-entities-*` | 08 Справочники | `EntitiesBlock` | directories | default, search play |
+| `09-admin` | 09 Администрирование | `AdminBlock` | settings | default, forbidden |
+| `10-settings` | 10 Настройки | `SettingsBlock` | settings | default |
+| `11-avatar-menu` | 11 Меню аватара | `AvatarMenuBlock` | overview | default |
+| `12-project-gantt` | 12 Гант | `GanttSliceBlock` + widget | projects | default (+ `Widgets/Gantt`) |
+| `13-project-resources` | 13 Ресурсы | `ProjectResourcesBlock` + widget | projects | default (+ `Widgets/ResourceMatrix`) |
+| `14-project-baseline` | 14 Базовый план | `ProjectBaselineBlock` | projects | default |
+| `15-project-scenarios` | 15 Сценарии | `ProjectScenariosBlock` | projects | default |
+| `16-project-kpi` | 16 KPI | `ProjectKpiBlock` | projects | default |
+| `17-project-audit` | 17 Аудит | `ProjectAuditBlock` | projects | default |
+| `18-project-calendars` | 18 Календари | `ProjectCalendarsBlock` | projects | default |
+| `19-login` | 19 Вход | `LoginScreenView` | login | default, loading, error, forbidden |
+| `state-*` | Состояния L3 | `StateScreenBlock` | tasks | empty, error, forbidden, loading |
+
+### 10.3 API Contract (вне product screens)
+
+| Story | Файл | Назначение |
+|-------|------|------------|
+| POST CreateTaskBody — превью | `stories/api-contract/task-api.stories.tsx` | JSON + play |
+| PATCH UpdateTaskBody — превью | то же | JSON + play |
+| Валидация CreateTaskBody | то же | field errors |
+
+Product blocks: `showApiContractPreview` только в API Contract stories.
+
+### 10.4 Верификация Phase 7
+
+```bash
+pnpm --filter @kiss-pm/web typecheck
+pnpm --filter @kiss-pm/web test
+pnpm --filter @kiss-pm/web verify:storybook-contract
+```
+
+Скриншоты 1440px: Storybook viewport `desktop1440` (`.storybook/preview.tsx`).
+
+### 10.5 Commits 7.2 (порядок)
+
+1. `docs: define storybook production structure` — этот файл §10  
+2. `feat: polish storybook screens auth-login`  
+3. `feat: polish storybook screens dashboard-my-work`  
+4. `feat: polish storybook screens planning`  
+5. `feat: polish storybook screens crm`  
+6. `feat: polish storybook screens analytics`  
+7. `feat: polish storybook screens admin-settings`  
+8. `feat: polish storybook screens project-wizard`  
