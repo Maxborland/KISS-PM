@@ -17,32 +17,38 @@ import {
   proposeAutoPlanningSolutions,
   proposePlanningScenarios,
   reducePlanningCommand,
-  type AutoPlanningSolverProposal,
   type PlanningCommand,
   type PlanSnapshot,
-  type ScenarioProposal,
   type ScenarioTarget,
   type ValidationIssue
 } from "@kiss-pm/domain";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { PlanningScenarioRunRecord, PlanningSolverRunRecord } from "@kiss-pm/persistence";
 import type { Handler, Hono } from "hono";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type {
   ApiTenantDataSource,
   ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import { applyGovernedPlanningDelta } from "./governedPlanningApply";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseAutoSolverApplyEnvelope,
   parseAutoSolverRunEnvelope,
-  parsePlanningCommand,
   parsePlanningCommandEnvelope,
   parseScenarioApplyEnvelope,
   parseScenarioPreviewEnvelope
 } from "./planningParsers";
+import {
+  hashJson,
+  parseAutoSolverProposal,
+  parseScenarioProposal,
+  proposalRequiresAcceptedRiskReason,
+  proposalRequiresResourceManage,
+  withAcceptedRiskReason
+} from "./planningProposalCodec";
 
 const planningEngineVersion = "planning-core-v1";
 
@@ -274,55 +280,52 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         };
       }
 
-      const preview = previewPlanningCommand(snapshot, parsed.value.command);
-      const validationIssues = [
-        ...preview.validationIssues,
-        ...(await validateCommandDataSourcePreconditions(
-          transactionDataSource,
-          actor.tenantId,
-          parsed.value.command
-        ))
-      ];
-      if (validationIssues.some(isBlockingValidationIssue)) {
-        return {
-          ok: false as const,
-          status: 409,
-          error: "planning_precondition_failed",
-          validationIssues
-        };
-      }
-
-      await transactionDataSource.applyPlanningCommand({
+      const planningApplyDataSource = {
+        applyPlanningCommand: (input: Parameters<NonNullable<typeof transactionDataSource.applyPlanningCommand>>[0]) =>
+          transactionDataSource.applyPlanningCommand!(input),
+        getPlanSnapshot: (tenantId: string, projectId: string) =>
+          transactionDataSource.getPlanSnapshot!(tenantId, projectId),
+        incrementPlanVersion: (tenantId: string, projectId: string) =>
+          transactionDataSource.incrementPlanVersion!(tenantId, projectId)
+      };
+      const applied = await applyGovernedPlanningDelta({
+        dataSource: planningApplyDataSource,
         tenantId: actor.tenantId,
         projectId,
         actorUserId: actor.id,
-        command: parsed.value.command
-      });
-      const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
-      const auditEventId = await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: auditActionForCommand(parsed.value.command),
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: projectId },
-        commandInput: { command: parsed.value.command, idempotencyKey: parsed.value.idempotencyKey ?? null },
-        beforeState: summarizeSnapshot(snapshot),
-        afterState: {
-          planVersion: newPlanVersion,
-          changedTaskIds: preview.planDelta.changedTaskIds,
-          changedAssignmentIds: preview.planDelta.changedAssignmentIds,
-          changedDependencyIds: preview.planDelta.changedDependencyIds
-        },
+        snapshot,
+        commands: [parsed.value.command],
         permissionResult: decision,
-        executionResult: { status: "succeeded", validationIssues }
-      }, transactionDataSource);
-      const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        previewCommand: previewPlanningCommand,
+        validateCommandPreconditions: (command) =>
+          validateCommandDataSourcePreconditions(transactionDataSource, actor.tenantId, command),
+        appendAuditEvent: deps.appendManagementAuditEvent,
+        auditDataSource: transactionDataSource,
+        createReadModel: createPlanningReadModel,
+        buildAuditInput: ({ newPlanVersion, validationIssues, preview }) => ({
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: auditActionForCommand(parsed.value.command),
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { command: parsed.value.command, idempotencyKey: parsed.value.idempotencyKey ?? null },
+          beforeState: summarizeSnapshot(snapshot),
+          afterState: {
+            planVersion: newPlanVersion,
+            changedTaskIds: preview.planDelta.changedTaskIds,
+            changedAssignmentIds: preview.planDelta.changedAssignmentIds,
+            changedDependencyIds: preview.planDelta.changedDependencyIds
+          },
+          permissionResult: decision,
+          executionResult: { status: "succeeded", validationIssues }
+        })
+      });
+      if (!applied.ok) return applied;
       const responseBody = {
-        applied: preview.planDelta,
-        newPlanVersion,
-        auditEventId,
-        readModel: createPlanningReadModel(appliedSnapshot)
+        applied: applied.body.preview.planDelta,
+        newPlanVersion: applied.body.newPlanVersion,
+        auditEventId: applied.body.auditEventId,
+        readModel: applied.body.readModel
       };
       if (idempotencyKey && requestHash) {
         await transactionDataSource.createPlanningCommandIdempotency?.({
@@ -550,7 +553,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       if (integrityError) {
         return { ok: false as const, status: 409, error: integrityError };
       }
-      if (scenarioRequiresAcceptedRiskReason(proposal) && !parsed.value.acceptedRiskReason) {
+      if (proposalRequiresAcceptedRiskReason(proposal) && !parsed.value.acceptedRiskReason) {
         return {
           ok: false as const,
           status: 400,
@@ -561,79 +564,68 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         proposal.planDelta.commands,
         parsed.value.acceptedRiskReason
       );
-      let preview = {
-        nextSnapshot: snapshot,
-        validationIssues: [] as ReturnType<typeof previewPlanningCommand>["validationIssues"]
+      const planningApplyDataSource = {
+        applyPlanningCommand: (input: Parameters<NonNullable<typeof transactionDataSource.applyPlanningCommand>>[0]) =>
+          transactionDataSource.applyPlanningCommand!(input),
+        getPlanSnapshot: (tenantId: string, projectId: string) =>
+          transactionDataSource.getPlanSnapshot!(tenantId, projectId),
+        incrementPlanVersion: (tenantId: string, projectId: string) =>
+          transactionDataSource.incrementPlanVersion!(tenantId, projectId)
       };
-      for (const command of commandsToApply) {
-        const next = previewPlanningCommand(preview.nextSnapshot, command);
-        preview = {
-          nextSnapshot: next.nextSnapshot,
-          validationIssues: [
-            ...preview.validationIssues,
-            ...next.validationIssues,
-            ...(await validateCommandDataSourcePreconditions(
-              transactionDataSource,
-              actor.tenantId,
-              command
-            ))
-          ]
-        };
-      }
-      if (preview.validationIssues.some(isBlockingValidationIssue)) {
-        return {
-          ok: false as const,
-          status: 409,
-          error: "planning_precondition_failed",
-          validationIssues: preview.validationIssues
-        };
-      }
+      const markPlanningScenarioRunApplied = transactionDataSource.markPlanningScenarioRunApplied;
 
-      for (const command of commandsToApply) {
-        await transactionDataSource.applyPlanningCommand({
-          tenantId: actor.tenantId,
-          projectId,
-          actorUserId: actor.id,
-          command
-        });
-      }
-      const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
-      await transactionDataSource.markPlanningScenarioRunApplied({
+      const applied = await applyGovernedPlanningDelta({
+        dataSource: planningApplyDataSource,
         tenantId: actor.tenantId,
         projectId,
-        scenarioRunId: scenarioRun.id,
-        appliedAt: new Date()
-      });
-      const auditEventId = await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
         actorUserId: actor.id,
-        actionType: "planning.scenario.applied",
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: projectId },
-        commandInput: {
-          scenarioRunId: scenarioRun.id,
-          acceptedRiskReason: parsed.value.acceptedRiskReason,
-          commands: commandsToApply
-        },
-        beforeState: { planVersion: snapshot.planVersion },
-        afterState: {
-          planVersion: newPlanVersion,
-          changedTaskIds: proposal.planDelta.changedTaskIds,
-          changedAssignmentIds: proposal.planDelta.changedAssignmentIds,
-          acceptedRiskIds: proposal.planDelta.acceptedRiskIds
-        },
+        snapshot,
+        commands: commandsToApply,
         permissionResult: decision,
-        executionResult: { status: "succeeded", validationIssues: preview.validationIssues }
-      }, transactionDataSource);
-      const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        previewCommand: previewPlanningCommand,
+        validateCommandPreconditions: (command) =>
+          validateCommandDataSourcePreconditions(transactionDataSource, actor.tenantId, command),
+        appendAuditEvent: deps.appendManagementAuditEvent,
+        auditDataSource: transactionDataSource,
+        createReadModel: createPlanningReadModel,
+        afterCommandsApplied: async () => {
+          await markPlanningScenarioRunApplied({
+            tenantId: actor.tenantId,
+            projectId,
+            scenarioRunId: scenarioRun.id,
+            appliedAt: new Date()
+          });
+        },
+        buildAuditInput: ({ newPlanVersion, validationIssues, preview }) => ({
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.scenario.applied",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: {
+            scenarioRunId: scenarioRun.id,
+            acceptedRiskReason: parsed.value.acceptedRiskReason,
+            commands: commandsToApply
+          },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: {
+            planVersion: newPlanVersion,
+            changedTaskIds: preview.planDelta.changedTaskIds,
+            changedAssignmentIds: preview.planDelta.changedAssignmentIds,
+            acceptedRiskIds: preview.planDelta.acceptedRiskIds
+          },
+          permissionResult: decision,
+          executionResult: { status: "succeeded", validationIssues }
+        })
+      });
+      if (!applied.ok) return applied;
       return {
         ok: true as const,
         body: {
           scenarioRunId: scenarioRun.id,
-          newPlanVersion,
-          auditEventId,
-          readModel: createPlanningReadModel(appliedSnapshot)
+          newPlanVersion: applied.body.newPlanVersion,
+          auditEventId: applied.body.auditEventId,
+          readModel: applied.body.readModel
         }
       };
     });
@@ -846,77 +838,66 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           proposal.planDelta.commands,
           parsed.value.acceptedRiskReason
         );
-        let preview = {
-          nextSnapshot: snapshot,
-          validationIssues: [] as ReturnType<typeof previewPlanningCommand>["validationIssues"]
+        const planningApplyDataSource = {
+          applyPlanningCommand: (input: Parameters<NonNullable<typeof transactionDataSource.applyPlanningCommand>>[0]) =>
+            transactionDataSource.applyPlanningCommand!(input),
+          getPlanSnapshot: (tenantId: string, projectId: string) =>
+            transactionDataSource.getPlanSnapshot!(tenantId, projectId),
+          incrementPlanVersion: (tenantId: string, projectId: string) =>
+            transactionDataSource.incrementPlanVersion!(tenantId, projectId)
         };
-        for (const command of commandsToApply) {
-          const next = previewPlanningCommand(preview.nextSnapshot, command);
-          preview = {
-            nextSnapshot: next.nextSnapshot,
-            validationIssues: [
-              ...preview.validationIssues,
-              ...next.validationIssues,
-              ...(await validateCommandDataSourcePreconditions(
-                transactionDataSource,
-                actor.tenantId,
-                command
-              ))
-            ]
-          };
-        }
-        if (preview.validationIssues.some(isBlockingValidationIssue)) {
-          return {
-            ok: false as const,
-            status: 409,
-            error: "planning_precondition_failed",
-            validationIssues: preview.validationIssues
-          };
-        }
+        const markPlanningSolverRunApplied = transactionDataSource.markPlanningSolverRunApplied;
 
-        for (const command of commandsToApply) {
-          await transactionDataSource.applyPlanningCommand({
-            tenantId: actor.tenantId,
-            projectId,
-            actorUserId: actor.id,
-            command
-          });
-        }
-        const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
-        await transactionDataSource.markPlanningSolverRunApplied({
+        const applied = await applyGovernedPlanningDelta({
+          dataSource: planningApplyDataSource,
           tenantId: actor.tenantId,
           projectId,
-          solverRunId: solverRun.id,
-          proposalId,
-          appliedAt: new Date()
-        });
-        const auditEventId = await appendPlanningAuditIfConfigured(deps, {
-          tenantId: actor.tenantId,
           actorUserId: actor.id,
-          actionType: "planning.auto_solver.proposal_applied",
-          sourceWorkflow: "planning",
-          sourceEntity: { type: "Project", id: projectId },
-          commandInput: { runId, proposalId, commands: commandsToApply },
-          beforeState: { planVersion: snapshot.planVersion },
-          afterState: {
-            planVersion: newPlanVersion,
-            changedTaskIds: proposal.planDelta.changedTaskIds,
-            changedAssignmentIds: proposal.planDelta.changedAssignmentIds,
-            acceptedRiskIds: proposal.planDelta.acceptedRiskIds
-          },
+          snapshot,
+          commands: commandsToApply,
           permissionResult: resourceDecision,
-          executionResult: { status: "succeeded", validationIssues: preview.validationIssues }
-        }, transactionDataSource);
-        const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-        if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+          previewCommand: previewPlanningCommand,
+          validateCommandPreconditions: (command) =>
+            validateCommandDataSourcePreconditions(transactionDataSource, actor.tenantId, command),
+          appendAuditEvent: deps.appendManagementAuditEvent,
+          auditDataSource: transactionDataSource,
+          createReadModel: createPlanningReadModel,
+          afterCommandsApplied: async () => {
+            await markPlanningSolverRunApplied({
+              tenantId: actor.tenantId,
+              projectId,
+              solverRunId: solverRun.id,
+              proposalId,
+              appliedAt: new Date()
+            });
+          },
+          buildAuditInput: ({ newPlanVersion, validationIssues, preview }) => ({
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.proposal_applied",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId, commands: commandsToApply },
+            beforeState: { planVersion: snapshot.planVersion },
+            afterState: {
+              planVersion: newPlanVersion,
+              changedTaskIds: preview.planDelta.changedTaskIds,
+              changedAssignmentIds: preview.planDelta.changedAssignmentIds,
+              acceptedRiskIds: preview.planDelta.acceptedRiskIds
+            },
+            permissionResult: resourceDecision,
+            executionResult: { status: "succeeded", validationIssues }
+          })
+        });
+        if (!applied.ok) return applied;
         return {
           ok: true as const,
           body: {
             solverRunId: solverRun.id,
             proposalId,
-            newPlanVersion,
-            auditEventId,
-            readModel: createPlanningReadModel(appliedSnapshot)
+            newPlanVersion: applied.body.newPlanVersion,
+            auditEventId: applied.body.auditEventId,
+            readModel: applied.body.readModel
           }
         };
       });
@@ -954,42 +935,6 @@ function getRequiredRouteParam(context: Parameters<Handler>[0], ...keys: string[
   throw new Error(`missing_route_param:${keys.join("|")}`);
 }
 
-function scenarioRequiresAcceptedRiskReason(proposal: ScenarioProposal): boolean {
-  return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
-}
-
-function proposalRequiresAcceptedRiskReason(proposal: AutoPlanningSolverProposal): boolean {
-  return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
-}
-
-function proposalRequiresResourceManage(proposal: AutoPlanningSolverProposal): boolean {
-  return proposal.planDelta.commands.some(
-    (command) =>
-      command.type === "assignment.upsert" ||
-      command.type === "assignment.delete" ||
-      command.type === "assignment.allocations.replace" ||
-      command.type === "resource.reserve"
-  );
-}
-
-function withAcceptedRiskReason(
-  commands: PlanningCommand[],
-  acceptedRiskReason: string | null
-): PlanningCommand[] {
-  if (!acceptedRiskReason) return commands;
-  return commands.map((command) =>
-    command.type === "risk.accept_overload"
-      ? {
-          ...command,
-          payload: {
-            ...command.payload,
-            acceptedRiskReason
-          }
-        }
-      : command
-  );
-}
-
 function formatSolverRunResponse(run: PlanningSolverRunRecord) {
   return {
     id: run.id,
@@ -1004,23 +949,6 @@ function formatSolverRunResponse(run: PlanningSolverRunRecord) {
     appliedProposalId: run.appliedProposalId,
     appliedAt: run.appliedAt?.toISOString() ?? null,
     createdAt: run.createdAt.toISOString()
-  };
-}
-
-function parseAutoSolverProposal(input: Record<string, unknown> | undefined): AutoPlanningSolverProposal | null {
-  if (!input || !Array.isArray((input as { planDelta?: { commands?: unknown[] } }).planDelta?.commands)) {
-    return null;
-  }
-  const commands = (input as { planDelta: { commands: unknown[] } }).planDelta.commands.map(
-    (command) => parsePlanningCommand(command)
-  );
-  if (commands.some((command) => !command.ok)) return null;
-  return {
-    ...(input as unknown as AutoPlanningSolverProposal),
-    planDelta: {
-      ...(input as unknown as AutoPlanningSolverProposal).planDelta,
-      commands: commands.map((command) => (command.ok ? command.value : neverCommand()))
-    }
   };
 }
 
@@ -1309,40 +1237,4 @@ async function appendPlanningAuditIfConfigured(
     throw new Error("audit_not_configured");
   }
   return deps.appendManagementAuditEvent(input, auditDataSource);
-}
-
-function hashJson(value: unknown): string {
-  return createHash("sha256").update(stableStringify(value)).digest("hex");
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function parseScenarioProposal(input: Record<string, unknown>): ScenarioProposal | null {
-  if (!Array.isArray((input as { planDelta?: { commands?: unknown[] } }).planDelta?.commands)) {
-    return null;
-  }
-  const commands = (input as { planDelta: { commands: unknown[] } }).planDelta.commands.map(
-    (command) => parsePlanningCommand(command)
-  );
-  if (commands.some((command) => !command.ok)) return null;
-  return {
-    ...(input as unknown as ScenarioProposal),
-    planDelta: {
-      ...(input as unknown as ScenarioProposal).planDelta,
-      commands: commands.map((command) => (command.ok ? command.value : neverCommand()))
-    }
-  };
-}
-
-function neverCommand(): PlanningCommand {
-  throw new Error("unreachable_invalid_planning_command");
 }

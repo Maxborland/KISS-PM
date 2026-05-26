@@ -4,167 +4,28 @@ import {
   createDatabase,
   createPostgresClient,
   createPostgresTenantDataSource,
-  createTenantAdminSeedProfile,
-  seedTenantDataset,
-  type PostgresClient,
-  type SeedTenantDataset
+  type PostgresClient
 } from "@kiss-pm/persistence";
 import { createHash } from "node:crypto";
 
 import { createApp } from "./app";
+import {
+  createPlanningTestTask,
+  loginPlanningTestUser,
+  resetPlanningRouteTestData,
+  seedPlanningRouteTestData
+} from "./planningTestFixture";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
   "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
-
-const dataset: SeedTenantDataset = {
-  tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
-  accessProfiles: [
-    createTenantAdminSeedProfile({
-      id: "access-profile-admin",
-      tenantId: "tenant-alpha"
-    }),
-    {
-      id: "access-profile-reader",
-      tenantId: "tenant-alpha",
-      name: "Наблюдатель планирования",
-      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.project_resources.read"]
-    },
-    {
-      id: "access-profile-plan-reader-no-resources",
-      tenantId: "tenant-alpha",
-      name: "Наблюдатель плана без ресурсов",
-      permissions: ["tenant.projects.read", "tenant.project_plan.read"]
-    },
-    {
-      id: "access-profile-plan-manager-no-read",
-      tenantId: "tenant-alpha",
-      name: "Менеджер плана без чтения",
-      permissions: ["tenant.project_plan.manage"]
-    },
-    {
-      id: "access-profile-scenario-operator-no-read",
-      tenantId: "tenant-alpha",
-      name: "Оператор сценариев без чтения",
-      permissions: ["tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply"]
-    }
-  ],
-  positions: [
-    { id: "position-manager", tenantId: "tenant-alpha", name: "Руководитель проекта" },
-    { id: "position-engineer", tenantId: "tenant-alpha", name: "Инженер" }
-  ],
-  clients: [{ id: "client-romashka", tenantId: "tenant-alpha", name: "ООО Ромашка" }],
-  projectTypes: [
-    { id: "project-type-implementation", tenantId: "tenant-alpha", name: "Внедрение" }
-  ],
-  users: [
-    {
-      id: "user-alpha-admin",
-      tenantId: "tenant-alpha",
-      email: "admin@kiss-pm.local",
-      name: "Анна Администратор",
-      accessProfileId: "access-profile-admin",
-      positionId: "position-manager",
-      password: "local-admin-password"
-    },
-    {
-      id: "user-alpha-executor",
-      tenantId: "tenant-alpha",
-      email: "executor@kiss-pm.local",
-      name: "Егор Исполнитель",
-      accessProfileId: "access-profile-reader",
-      positionId: "position-engineer",
-      password: "local-executor-password"
-    },
-    {
-      id: "user-alpha-plan-reader-no-resources",
-      tenantId: "tenant-alpha",
-      email: "plan-reader-no-resources@kiss-pm.local",
-      name: "Никита Без Ресурсов",
-      accessProfileId: "access-profile-plan-reader-no-resources",
-      positionId: "position-engineer",
-      password: "local-reader-password"
-    },
-    {
-      id: "user-alpha-plan-manager-no-read",
-      tenantId: "tenant-alpha",
-      email: "plan-manager-no-read@kiss-pm.local",
-      name: "Марина Без Чтения",
-      accessProfileId: "access-profile-plan-manager-no-read",
-      positionId: "position-manager",
-      password: "local-manager-password"
-    },
-    {
-      id: "user-alpha-scenario-no-read",
-      tenantId: "tenant-alpha",
-      email: "scenario-no-read@kiss-pm.local",
-      name: "Семен Без Чтения",
-      accessProfileId: "access-profile-scenario-operator-no-read",
-      positionId: "position-manager",
-      password: "scenario12345"
-    }
-  ]
-};
 
 describe("planning API routes", () => {
   let client: PostgresClient;
   let app: ReturnType<typeof createApp>;
 
   async function loginAs(email: string, password: string) {
-    const response = await app.request("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    expect(response.status).toBe(200);
-    return response.headers.get("set-cookie") ?? "";
-  }
-
-  async function createActiveProject() {
-    const dataSource = createPostgresTenantDataSource(createDatabase(client));
-    const opportunity = await dataSource.createOpportunity({
-      id: "opportunity-alpha",
-      tenantId: "tenant-alpha",
-      clientId: "client-romashka",
-      primaryContactId: null,
-      projectTypeId: "project-type-implementation",
-      stageId: null,
-      clientName: "ООО Ромашка",
-      contactName: "Ирина Клиент",
-      title: "Внедрение KISS PM",
-      projectType: "Внедрение",
-      description: null,
-      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
-      plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
-      contractValue: 1_000_000,
-      plannedHourlyRate: 5_000,
-      plannedHours: 200,
-      probability: 80,
-      status: "ready_to_activate",
-      templateId: null,
-      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
-    });
-    const draft = await dataSource.createProjectDraftFromOpportunity({
-      id: "project-alpha",
-      tenantId: "tenant-alpha",
-      sourceOpportunityId: opportunity.id,
-      clientId: opportunity.clientId,
-      projectTypeId: opportunity.projectTypeId,
-      title: opportunity.title,
-      clientName: opportunity.clientName,
-      status: "draft",
-      plannedStart: opportunity.plannedStart,
-      plannedFinish: opportunity.plannedFinish,
-      contractValue: opportunity.contractValue,
-      plannedHours: opportunity.plannedHours,
-      templateId: null,
-      demand: opportunity.demand
-    });
-    await dataSource.activateProjectDraft({
-      tenantId: "tenant-alpha",
-      projectId: draft.id
-    });
+    return loginPlanningTestUser(app, email, password);
   }
 
   async function createTask(cookie: string, input: {
@@ -174,23 +35,7 @@ describe("planning API routes", () => {
     finish: string;
     plannedWork?: number;
   }) {
-    const response = await app.request("/api/workspace/projects/project-alpha/tasks", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-kiss-pm-action": "same-origin",
-        cookie
-      },
-      body: JSON.stringify({
-        id: input.id,
-        title: input.title,
-        plannedStart: input.start,
-        plannedFinish: input.finish,
-        plannedWork: input.plannedWork ?? 16,
-        participants: [{ userId: "user-alpha-executor", role: "executor" }]
-      })
-    });
-    expect(response.status).toBe(201);
+    await createPlanningTestTask(app, cookie, input);
   }
 
   beforeAll(() => {
@@ -201,17 +46,12 @@ describe("planning API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
-    await seedTenantDataset(
-      createDatabase(client),
-      dataset,
-      new Date("2026-05-21T00:00:00.000Z")
-    );
-    await createActiveProject();
+    await resetPlanningRouteTestData(client);
+    await seedPlanningRouteTestData(client);
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await resetPlanningRouteTestData(client);
     await client.end();
   });
 
@@ -294,8 +134,8 @@ describe("planning API routes", () => {
       readModel: {
         authored: {
           assignmentAllocations: expect.arrayContaining([
-            expect.objectContaining({ date: "2026-06-01", workMinutes: 480 }),
-            expect.objectContaining({ date: "2026-06-02", workMinutes: 480 })
+            expect.objectContaining({ taskId: "task-solver-a", date: "2026-06-01", workMinutes: 480 }),
+            expect.objectContaining({ taskId: "task-solver-b", date: "2026-06-01", workMinutes: 480 })
           ])
         }
       }

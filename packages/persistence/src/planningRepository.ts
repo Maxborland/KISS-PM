@@ -31,8 +31,6 @@ import {
   projects,
   resourceCalendars,
   resourceReservations,
-  planningScenarioRuns,
-  planningSolverRuns,
   taskAssignmentAllocations,
   taskAssignments,
   taskDependencies,
@@ -41,6 +39,12 @@ import {
   tasks,
   tenantUsers
 } from "./schema";
+import { createPlanningProposalRunStore } from "./planningProposalRuns";
+import {
+  compareTaskRowsByWbs,
+  parseWbsPart,
+  reindexTaskRowsByWbs
+} from "./planningWbs";
 
 export type PlanningDependencyInput = {
   id: string;
@@ -179,9 +183,9 @@ export type PlanningCommandIdempotencyRecord = {
 const defaultWorkingWeekdays = [1, 2, 3, 4, 5];
 const defaultWorkingMinutesPerDay = 480;
 
-type WbsTaskRow = Pick<typeof tasks.$inferSelect, "id" | "parentTaskId" | "wbsCode" | "createdAt">;
-
 export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
+  const proposalRuns = createPlanningProposalRunStore(db);
+
   return {
     async getPlanSnapshot(tenantId, projectId) {
       const [project] = await db
@@ -394,139 +398,27 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     },
 
     async createPlanningScenarioRun(input) {
-      const [row] = await db
-        .insert(planningScenarioRuns)
-        .values({
-          id: input.id,
-          tenantId: input.tenantId,
-          projectId: input.projectId,
-          planVersion: input.planVersion,
-          engineVersion: input.engineVersion,
-          targetConflict: input.targetConflict,
-          proposalPayload: input.proposalPayload,
-          proposalPayloadHash: input.proposalPayloadHash,
-          actorUserId: input.actorUserId,
-          expiresAt: input.expiresAt,
-          appliedAt: input.appliedAt ?? null,
-          createdAt: input.createdAt ?? new Date()
-        })
-        .onConflictDoUpdate({
-          target: [
-            planningScenarioRuns.tenantId,
-            planningScenarioRuns.projectId,
-            planningScenarioRuns.id
-          ],
-          set: {
-            planVersion: input.planVersion,
-            engineVersion: input.engineVersion,
-            targetConflict: input.targetConflict,
-            proposalPayload: input.proposalPayload,
-            proposalPayloadHash: input.proposalPayloadHash,
-            actorUserId: input.actorUserId,
-            expiresAt: input.expiresAt,
-            appliedAt: input.appliedAt ?? null
-          }
-        })
-        .returning();
-      if (!row) throw new Error("Planning scenario insert returned no row");
-      return mapPlanningScenarioRun(row);
+      return proposalRuns.createPlanningScenarioRun(input);
     },
 
     async findPlanningScenarioRun(tenantId, projectId, scenarioRunId) {
-      const [row] = await db
-        .select()
-        .from(planningScenarioRuns)
-        .where(
-          and(
-            eq(planningScenarioRuns.tenantId, tenantId),
-            eq(planningScenarioRuns.projectId, projectId),
-            eq(planningScenarioRuns.id, scenarioRunId)
-          )
-        )
-        .limit(1);
-      return row ? mapPlanningScenarioRun(row) : undefined;
+      return proposalRuns.findPlanningScenarioRun(tenantId, projectId, scenarioRunId);
     },
 
     async markPlanningScenarioRunApplied(input) {
-      await db
-        .update(planningScenarioRuns)
-        .set({ appliedAt: input.appliedAt })
-        .where(
-          and(
-            eq(planningScenarioRuns.tenantId, input.tenantId),
-            eq(planningScenarioRuns.projectId, input.projectId),
-            eq(planningScenarioRuns.id, input.scenarioRunId)
-          )
-        );
+      await proposalRuns.markPlanningScenarioRunApplied(input);
     },
 
     async createPlanningSolverRun(input) {
-      const [row] = await db
-        .insert(planningSolverRuns)
-        .values({
-          id: input.id,
-          tenantId: input.tenantId,
-          projectId: input.projectId,
-          mode: input.mode,
-          clientPlanVersion: input.clientPlanVersion,
-          engineVersion: input.engineVersion,
-          inputSnapshotMetadata: input.inputSnapshotMetadata,
-          targetDeadline: input.targetDeadline,
-          proposals: input.proposals,
-          proposalPayloadHash: input.proposalPayloadHash,
-          actorUserId: input.actorUserId,
-          expiresAt: input.expiresAt,
-          appliedProposalId: input.appliedProposalId ?? null,
-          appliedAt: input.appliedAt ?? null,
-          createdAt: input.createdAt ?? new Date()
-        })
-        .onConflictDoUpdate({
-          target: [planningSolverRuns.tenantId, planningSolverRuns.projectId, planningSolverRuns.id],
-          set: {
-            mode: input.mode,
-            clientPlanVersion: input.clientPlanVersion,
-            engineVersion: input.engineVersion,
-            inputSnapshotMetadata: input.inputSnapshotMetadata,
-            targetDeadline: input.targetDeadline,
-            proposals: input.proposals,
-            proposalPayloadHash: input.proposalPayloadHash,
-            actorUserId: input.actorUserId,
-            expiresAt: input.expiresAt,
-            appliedProposalId: input.appliedProposalId ?? null,
-            appliedAt: input.appliedAt ?? null
-          }
-        })
-        .returning();
-      if (!row) throw new Error("Planning solver run insert returned no row");
-      return mapPlanningSolverRun(row);
+      return proposalRuns.createPlanningSolverRun(input);
     },
 
     async findPlanningSolverRun(tenantId, projectId, solverRunId) {
-      const [row] = await db
-        .select()
-        .from(planningSolverRuns)
-        .where(
-          and(
-            eq(planningSolverRuns.tenantId, tenantId),
-            eq(planningSolverRuns.projectId, projectId),
-            eq(planningSolverRuns.id, solverRunId)
-          )
-        )
-        .limit(1);
-      return row ? mapPlanningSolverRun(row) : undefined;
+      return proposalRuns.findPlanningSolverRun(tenantId, projectId, solverRunId);
     },
 
     async markPlanningSolverRunApplied(input) {
-      await db
-        .update(planningSolverRuns)
-        .set({ appliedProposalId: input.proposalId, appliedAt: input.appliedAt })
-        .where(
-          and(
-            eq(planningSolverRuns.tenantId, input.tenantId),
-            eq(planningSolverRuns.projectId, input.projectId),
-            eq(planningSolverRuns.id, input.solverRunId)
-          )
-        );
+      await proposalRuns.markPlanningSolverRunApplied(input);
     },
 
     async findPlanningCommandIdempotency(tenantId, projectId, idempotencyKey) {
@@ -1384,87 +1276,6 @@ function mapConstraint(task: typeof tasks.$inferSelect): PlanConstraint | null {
   };
 }
 
-function reindexTaskRowsByWbs<T extends WbsTaskRow>(
-  rows: T[],
-  siblingOrderOverrides: Map<string, number> = new Map()
-): T[] {
-  const taskIds = new Set(rows.map((task) => task.id));
-  const inputOrderById = new Map(rows.map((task, index) => [task.id, index]));
-  const rowsByParentId = new Map<string | null, T[]>();
-
-  for (const row of rows) {
-    const parentId = row.parentTaskId !== null && taskIds.has(row.parentTaskId) ? row.parentTaskId : null;
-    const normalizedRow = parentId === row.parentTaskId ? row : { ...row, parentTaskId: null };
-    rowsByParentId.set(parentId, [...(rowsByParentId.get(parentId) ?? []), normalizedRow]);
-  }
-
-  const result: T[] = [];
-  const emittedTaskIds = new Set<string>();
-
-  const appendChildren = (parentId: string | null, prefix: string): void => {
-    const siblings = [...(rowsByParentId.get(parentId) ?? [])].sort((left, right) => {
-      const leftOverride = siblingOrderOverrides.get(left.id);
-      const rightOverride = siblingOrderOverrides.get(right.id);
-      if (leftOverride !== undefined || rightOverride !== undefined) {
-        return (leftOverride ?? Number.MAX_SAFE_INTEGER) - (rightOverride ?? Number.MAX_SAFE_INTEGER);
-      }
-      return (
-        compareTaskRowsByWbs(left, right) ||
-        (inputOrderById.get(left.id) ?? 0) - (inputOrderById.get(right.id) ?? 0)
-      );
-    });
-
-    siblings.forEach((task, index) => {
-      if (emittedTaskIds.has(task.id)) return;
-      const wbsCode = prefix ? `${prefix}.${index + 1}` : String(index + 1);
-      emittedTaskIds.add(task.id);
-      result.push({ ...task, wbsCode });
-      appendChildren(task.id, wbsCode);
-    });
-  };
-
-  appendChildren(null, "");
-  return result;
-}
-
-function compareTaskRowsByWbs(
-  left: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">,
-  right: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">
-): number {
-  return (
-    compareWbsCodes(left.wbsCode, right.wbsCode) ||
-    left.createdAt.getTime() - right.createdAt.getTime() ||
-    left.id.localeCompare(right.id)
-  );
-}
-
-function compareWbsCodes(left: string, right: string): number {
-  const leftParts = left.split(".");
-  const rightParts = right.split(".");
-  const length = Math.max(leftParts.length, rightParts.length);
-
-  for (let index = 0; index < length; index += 1) {
-    const leftPart = leftParts[index];
-    const rightPart = rightParts[index];
-    if (leftPart === undefined) return -1;
-    if (rightPart === undefined) return 1;
-    if (leftPart === rightPart) continue;
-
-    const leftNumber = parseWbsPart(leftPart);
-    const rightNumber = parseWbsPart(rightPart);
-    if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) {
-      return leftNumber - rightNumber;
-    }
-    return leftPart.localeCompare(rightPart, undefined, { numeric: true });
-  }
-
-  return 0;
-}
-
-function parseWbsPart(value: string): number | null {
-  return /^\d+$/.test(value) ? Number(value) : null;
-}
-
 function mapAssignments(
   taskIds: string[],
   activeResourceIds: Set<string>,
@@ -1622,45 +1433,6 @@ function normalizeParticipantRows(input: {
     });
   }
   return [...participantRows.values()];
-}
-
-function mapPlanningScenarioRun(
-  row: typeof planningScenarioRuns.$inferSelect
-): PlanningScenarioRunRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    projectId: row.projectId,
-    planVersion: row.planVersion,
-    engineVersion: row.engineVersion,
-    targetConflict: row.targetConflict,
-    proposalPayload: row.proposalPayload,
-    proposalPayloadHash: row.proposalPayloadHash,
-    actorUserId: row.actorUserId,
-    expiresAt: row.expiresAt,
-    appliedAt: row.appliedAt,
-    createdAt: row.createdAt
-  };
-}
-
-function mapPlanningSolverRun(row: typeof planningSolverRuns.$inferSelect): PlanningSolverRunRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    projectId: row.projectId,
-    mode: row.mode as PlanningSolverRunRecord["mode"],
-    clientPlanVersion: row.clientPlanVersion,
-    engineVersion: row.engineVersion,
-    inputSnapshotMetadata: row.inputSnapshotMetadata,
-    targetDeadline: row.targetDeadline,
-    proposals: row.proposals,
-    proposalPayloadHash: row.proposalPayloadHash,
-    actorUserId: row.actorUserId,
-    expiresAt: row.expiresAt,
-    appliedProposalId: row.appliedProposalId,
-    appliedAt: row.appliedAt,
-    createdAt: row.createdAt
-  };
 }
 
 function mapPlanningCommandIdempotency(
