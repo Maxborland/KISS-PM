@@ -24,16 +24,13 @@ const preview: Preview = {
       storySort: {
         order: [
           "Foundations",
-          "Typography",
-          "UI",
-          "Domain",
+          "Primitives",
+          "Composites",
           "Widgets",
-          "Shell",
-          "Views",
+          "Screens",
           "Flows",
           "Patterns",
           "API Contract",
-          "Catalog",
           "*"
         ]
       }

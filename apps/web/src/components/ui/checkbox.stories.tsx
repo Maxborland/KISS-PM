@@ -6,7 +6,7 @@ import { CheckboxShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Checkbox",
+  title: "Primitives/Checkbox",
   component: Checkbox,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

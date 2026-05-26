@@ -18,7 +18,7 @@ BEM-модификатор: `state-empty--l3`, `state-illu--l3`, `loading-state-
 | Слой | Storybook | Shell |
 |------|-----------|-------|
 | Примитивы | `Catalog/All Components` — naked canvas | Нет |
-| Продукт | `Views/Screens` → «Состояние · …» | `WorkspaceChrome` + sidebar + topbar |
+| Продукт | `Screens` → «Состояние · …» | `WorkspaceChrome` + sidebar + topbar |
 
 Не использовать `variant: "bare"` для продуктовых state-экранов.
 

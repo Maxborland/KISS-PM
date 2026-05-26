@@ -4,7 +4,7 @@ import { ProgressRing } from "./progress-ring";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof ProgressRing> = {
-  title: "UI/ProgressRing",
+  title: "Primitives/ProgressRing",
   component: ProgressRing,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

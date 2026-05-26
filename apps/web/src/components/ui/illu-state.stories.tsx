@@ -7,7 +7,7 @@ import { IlluState } from "./illu-state";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof IlluState> = {
-  title: "UI/IlluState",
+  title: "Primitives/IlluState",
   component: IlluState,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -6,7 +6,7 @@ import { EmptyShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/EmptyState",
+  title: "Primitives/EmptyState",
   component: EmptyState,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

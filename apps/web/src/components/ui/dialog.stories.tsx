@@ -6,7 +6,7 @@ import { DialogShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Dialog",
+  title: "Primitives/Dialog",
   component: Dialog,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

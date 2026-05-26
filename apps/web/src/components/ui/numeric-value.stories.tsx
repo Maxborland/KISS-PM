@@ -4,7 +4,7 @@ import { NumericValue } from "./numeric-value";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof NumericValue> = {
-  title: "UI/NumericValue",
+  title: "Primitives/NumericValue",
   component: NumericValue,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

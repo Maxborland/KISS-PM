@@ -4,7 +4,7 @@ import { TrendArrow } from "./trend-arrow";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof TrendArrow> = {
-  title: "UI/TrendArrow",
+  title: "Primitives/TrendArrow",
   component: TrendArrow,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -5,7 +5,7 @@ import { IconPill } from "./icon-pill";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof IconPill> = {
-  title: "UI/IconPill",
+  title: "Primitives/IconPill",
   component: IconPill,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

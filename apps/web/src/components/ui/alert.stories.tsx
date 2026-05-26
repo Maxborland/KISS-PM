@@ -6,7 +6,7 @@ import { ToastShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Alert",
+  title: "Primitives/Alert",
   component: Alert,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -4,7 +4,7 @@ import { StatusDot } from "./status-dot";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof StatusDot> = {
-  title: "UI/StatusDot",
+  title: "Primitives/StatusDot",
   component: StatusDot,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -131,7 +131,7 @@ async function scanStory(page, id, port, staticMode) {
   const hasNoPreview = text.includes("No Preview");
   const hasEnDev = EN_DEV.test(text);
   const hasCyrillic = CYRILLIC.test(text);
-  const isProductScreen = id.startsWith("views-screens--");
+  const isProductScreen = id.startsWith("screens--");
   const screenErrorMarkers = isProductScreen
     ? SCREEN_ERROR_MARKERS.filter((re) => re.test(text)).map((re) => re.source)
     : [];
@@ -204,7 +204,7 @@ const audit = {
 
 writeFileSync(join(outDir, "batch15c-copy-scan-evidence.json"), `${JSON.stringify(audit, null, 2)}\n`, "utf8");
 
-const screenStories = storyResults.filter((r) => r.id.startsWith("views-screens--"));
+const screenStories = storyResults.filter((r) => r.id.startsWith("screens--"));
 const screenErrorFailures = screenStories.filter((r) => r.hasScreenError);
 writeFileSync(
   join(outDir, "phase0-screen-error-gate.json"),

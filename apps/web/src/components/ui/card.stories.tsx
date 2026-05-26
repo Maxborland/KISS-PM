@@ -6,7 +6,7 @@ import { CardShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Card",
+  title: "Primitives/Card",
   component: Card,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

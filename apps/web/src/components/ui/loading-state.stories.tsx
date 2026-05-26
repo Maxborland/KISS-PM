@@ -6,7 +6,7 @@ import { LoadingSkeletonShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/LoadingState",
+  title: "Primitives/LoadingState",
   component: LoadingState,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

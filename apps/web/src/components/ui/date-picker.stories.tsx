@@ -6,7 +6,7 @@ import { DatePickerShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof DatePicker> = {
-  title: "UI/DatePicker",
+  title: "Primitives/DatePicker",
   component: DatePicker,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

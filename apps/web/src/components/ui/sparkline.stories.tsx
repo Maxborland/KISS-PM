@@ -4,7 +4,7 @@ import { Sparkline } from "./sparkline";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Sparkline> = {
-  title: "UI/Sparkline",
+  title: "Primitives/Sparkline",
   component: Sparkline,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

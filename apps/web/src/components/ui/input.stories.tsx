@@ -6,7 +6,7 @@ import { InputShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Input",
+  title: "Primitives/Input",
   component: Input,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

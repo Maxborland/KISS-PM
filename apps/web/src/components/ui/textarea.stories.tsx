@@ -6,7 +6,7 @@ import { InputShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Textarea",
+  title: "Primitives/Textarea",
   component: Textarea,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

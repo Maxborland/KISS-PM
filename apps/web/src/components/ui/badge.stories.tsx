@@ -6,7 +6,7 @@ import { BadgeShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Badge",
+  title: "Primitives/Badge",
   component: Badge,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -302,7 +302,7 @@ function CatalogPage() {
 }
 
 const meta: Meta = {
-  title: "Catalog/All Components",
+  title: "Foundations/Каталог компонентов",
   parameters: {
     layout: "fullscreen",
     docs: {

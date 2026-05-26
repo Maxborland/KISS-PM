@@ -6,7 +6,7 @@ import { ChipShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Chip",
+  title: "Primitives/Chip",
   component: Chip,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

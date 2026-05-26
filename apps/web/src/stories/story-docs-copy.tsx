@@ -2,7 +2,7 @@
 export function CatalogCrossRefParagraph() {
   return (
     <p className="text-[var(--text-sm)] text-[var(--muted)] max-w-md text-center">
-      См. также раздел <strong>Каталог → Все компоненты</strong> для согласования в контексте.
+      См. также <strong>Foundations → Каталог компонентов</strong> для согласования в контексте.
     </p>
   );
 }

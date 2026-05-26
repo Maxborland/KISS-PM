@@ -6,7 +6,7 @@ import { ForbiddenStateShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/ForbiddenState",
+  title: "Primitives/ForbiddenState",
   component: ForbiddenState,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

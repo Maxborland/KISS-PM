@@ -4,7 +4,7 @@ import { ProgressBar } from "./progress-bar";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof ProgressBar> = {
-  title: "UI/ProgressBar",
+  title: "Primitives/ProgressBar",
   component: ProgressBar,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

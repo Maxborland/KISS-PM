@@ -13,11 +13,11 @@ const index = JSON.parse(readFileSync(join(root, "storybook-static/index.json"),
 const REFERENCE_STORIES = [
   { id: "foundations-colors--palette", ref: "foundations-colors" },
   { id: "foundations-typography--type-scale", ref: "foundations-typography" },
-  { id: "views-screens--dashboard", ref: "views-screens-dashboard" },
-  { id: "views-screens--deals", ref: "views-screens-deals" },
-  { id: "views-screens--task-card", ref: "views-screens-task-card" },
-  { id: "views-screens--project-gantt", ref: "views-screens-gantt" },
-  { id: "views-screens--project-resources", ref: "views-screens-resources" },
+  { id: "screens--dashboard", ref: "views-screens-dashboard" },
+  { id: "screens--deals", ref: "views-screens-deals" },
+  { id: "screens--task-card", ref: "views-screens-task-card" },
+  { id: "screens--project-gantt", ref: "views-screens-gantt" },
+  { id: "screens--project-resources", ref: "views-screens-resources" },
   { id: "catalog-all-components--for-approval", ref: "catalog-all-components" }
 ];
 

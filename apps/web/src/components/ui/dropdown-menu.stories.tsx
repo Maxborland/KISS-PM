@@ -6,7 +6,7 @@ import { DropdownShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/DropdownMenu",
+  title: "Primitives/DropdownMenu",
   component: DropdownMenu,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

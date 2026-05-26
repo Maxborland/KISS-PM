@@ -6,7 +6,7 @@ import { PaginationShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Pagination",
+  title: "Primitives/Pagination",
   component: Pagination,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

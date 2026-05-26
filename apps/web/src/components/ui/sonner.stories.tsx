@@ -6,7 +6,7 @@ import { ToastShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Sonner",
+  title: "Primitives/Sonner",
   component: Toaster,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -6,7 +6,7 @@ import { ButtonShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Button",
+  title: "Primitives/Button",
   component: Button,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

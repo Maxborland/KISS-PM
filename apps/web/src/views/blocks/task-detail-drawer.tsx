@@ -26,14 +26,14 @@ export type TaskDetailDrawerProps = {
   onOpenChange: (open: boolean) => void;
   /**
    * Маршрут на полноценную страницу карточки задачи. В Storybook ведёт на
-   * историю `views-screens--task-card`; в продукте подставляется реальный
+   * историю `screens--task-card`; в продукте подставляется реальный
    * URL задачи (например, `/tasks/MDS-39`).
    */
   taskHref?: string;
 };
 
 const DEFAULT_STORYBOOK_TASK_HREF =
-  "?path=/story/views-screens--task-card&viewMode=story";
+  "?path=/story/screens--task-card&viewMode=story";
 
 export function TaskDetailDrawer({
   task,

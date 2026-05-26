@@ -6,7 +6,7 @@ import { SelectShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Select",
+  title: "Primitives/Select",
   component: Select,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

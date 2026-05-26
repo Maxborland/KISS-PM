@@ -23,7 +23,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/opportunities",
     responseKey: "opportunities",
-    stories: ["views-screens--deals", "views-screens--deal-card"]
+    stories: ["screens--deals", "screens--deal-card"]
   },
   {
     entity: "Project",
@@ -33,7 +33,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects",
     responseKey: "projects",
-    stories: ["views-screens--projects-list", "views-screens--project-gantt"]
+    stories: ["screens--projects-list", "screens--project-gantt"]
   },
   {
     entity: "Task",
@@ -43,7 +43,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects/:projectId/tasks",
     responseKey: "tasks",
-    stories: ["views-screens--my-work", "views-screens--create-task-modal"]
+    stories: ["screens--my-work", "screens--create-task-modal"]
   },
   {
     entity: "ControlReadModel",
@@ -53,7 +53,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects/:projectId/control/read-model",
     responseKey: "signals",
-    stories: ["views-screens--project-kpi"]
+    stories: ["screens--project-kpi"]
   },
   {
     entity: "Client",
@@ -63,7 +63,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/clients",
     responseKey: "clients",
-    stories: ["views-screens--entities-clients"]
+    stories: ["screens--entities-clients"]
   },
   {
     entity: "Contact",
@@ -73,7 +73,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/contacts",
     responseKey: "contacts",
-    stories: ["views-screens--entities-contacts"]
+    stories: ["screens--entities-contacts"]
   },
   {
     entity: "Product",
@@ -83,7 +83,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/products",
     responseKey: "products",
-    stories: ["views-screens--entities-products"]
+    stories: ["screens--entities-products"]
   },
   {
     entity: "DealStage",
@@ -93,7 +93,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/deal-stages",
     responseKey: "dealStages",
-    stories: ["views-screens--deals"]
+    stories: ["screens--deals"]
   },
   {
     entity: "ProjectType",
@@ -103,7 +103,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/project-types",
     responseKey: "projectTypes",
-    stories: ["views-screens--projects-list"]
+    stories: ["screens--projects-list"]
   },
   {
     entity: "WorkspaceUser",
@@ -113,7 +113,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/users",
     responseKey: "users",
-    stories: ["views-screens--admin", "widgets-resource-matrix--default"]
+    stories: ["screens--admin", "widgets-resource-matrix--default"]
   },
   {
     entity: "Position",
@@ -123,7 +123,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/positions",
     responseKey: "positions",
-    stories: ["views-screens--admin"]
+    stories: ["screens--admin"]
   },
   {
     entity: "TaskStatus",
@@ -133,7 +133,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/task-statuses",
     responseKey: "taskStatuses",
-    stories: ["views-screens--my-work"]
+    stories: ["screens--my-work"]
   },
   {
     entity: "CustomFieldDefinition",
@@ -143,7 +143,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/config/custom-fields",
     responseKey: "customFields",
-    stories: ["views-screens--settings"]
+    stories: ["screens--settings"]
   },
   {
     entity: "ProjectTemplate",
@@ -153,7 +153,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/config/project-templates",
     responseKey: "projectTemplates",
-    stories: ["views-screens--settings"]
+    stories: ["screens--settings"]
   },
   {
     entity: "KpiDefinition",
@@ -163,7 +163,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/kpi-definitions",
     responseKey: "definitions",
-    stories: ["views-screens--project-kpi"]
+    stories: ["screens--project-kpi"]
   },
   {
     entity: "AccessProfile",
@@ -173,7 +173,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/access-profiles",
     responseKey: "accessProfiles",
-    stories: ["views-screens--admin"]
+    stories: ["screens--admin"]
   },
   {
     entity: "OrgStructureSnapshot",
@@ -183,7 +183,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/org-structure",
     responseKey: "orgStructure",
-    stories: ["views-screens--admin"]
+    stories: ["screens--admin"]
   },
   {
     entity: "AuditEvent",
@@ -193,7 +193,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/audit-events",
     responseKey: "auditEvents",
-    stories: ["views-screens--project-audit"]
+    stories: ["screens--project-audit"]
   },
   {
     entity: "ProductionCalendar",
@@ -223,7 +223,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/scheduled-tasks",
     responseKey: "tasks",
-    stories: ["views-screens--my-work-list-mode"]
+    stories: ["screens--my-work-list-mode"]
   }
 ];
 

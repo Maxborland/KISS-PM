@@ -6,7 +6,7 @@ import { ErrorStateShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/ErrorState",
+  title: "Primitives/ErrorState",
   component: ErrorState,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

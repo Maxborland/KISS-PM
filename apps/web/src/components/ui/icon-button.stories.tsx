@@ -7,7 +7,7 @@ import { IconButton } from "./icon-button";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof IconButton> = {
-  title: "UI/IconButton",
+  title: "Primitives/IconButton",
   component: IconButton,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

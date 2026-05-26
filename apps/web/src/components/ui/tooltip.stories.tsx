@@ -6,7 +6,7 @@ import { TooltipShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Tooltip",
+  title: "Primitives/Tooltip",
   component: Tooltip,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

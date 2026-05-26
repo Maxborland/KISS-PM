@@ -6,7 +6,7 @@ import { AvatarShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Avatar",
+  title: "Primitives/Avatar",
   component: Avatar,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -6,7 +6,7 @@ import { CommandPaletteShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/CommandDialog",
+  title: "Primitives/CommandDialog",
   component: CommandDialog,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

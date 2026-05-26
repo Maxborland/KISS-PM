@@ -6,7 +6,7 @@ import { TabsShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Segmented",
+  title: "Primitives/Segmented",
   component: Segmented,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

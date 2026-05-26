@@ -6,7 +6,7 @@ import { TableShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Table",
+  title: "Primitives/Table",
   component: Table,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

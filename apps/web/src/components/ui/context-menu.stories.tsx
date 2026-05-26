@@ -6,7 +6,7 @@ import { ContextMenuShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/ContextMenu",
+  title: "Primitives/ContextMenu",
   component: ContextMenu,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

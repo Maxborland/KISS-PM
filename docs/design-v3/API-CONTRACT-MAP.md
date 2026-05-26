@@ -14,7 +14,7 @@
 | Entity | Доменная сущность |
 | Fixture | Экспорт из `apps/web/src/lib/mock-data/*` |
 | MSW route | GET handler в `.storybook/msw-handlers.ts` |
-| Consuming story | Story id (`views-screens--*`, `widgets-*`, `flows-*`) |
+| Consuming story | Story id (`screens--*`, `widgets-*`, `flows-*`) |
 | Web type | `apps/web/src/lib/api-types.ts` или зеркало в `views/domain/*` |
 | Backend | `apps/api` parsers / routes (источник истины для мутаций) |
 
@@ -22,27 +22,27 @@
 
 | Entity | Fixture | MSW route | Consuming stories | Web type |
 |--------|---------|-----------|-------------------|----------|
-| Opportunity | `MOCK_OPPORTUNITIES` | `/api/workspace/opportunities` | `views-screens--deals`, `flows--crm-to-project` | `Opportunity` |
-| Project | `MOCK_PROJECTS` | `/api/workspace/projects` | `views-screens--projects-list`, `flows--crm-to-project` | `Project` |
-| Task | `MOCK_TASKS` | `/api/workspace/projects/:projectId/tasks` | `views-screens--my-work`, `flows--project-wizard` | `Task` |
-| ControlReadModel | `MOCK_CONTROL_SIGNALS` (+ KPI) | `/api/workspace/projects/:projectId/control/read-model` | `views-screens--project-kpi`, `flows--kpi-signal-corrective` | KPI / signals types |
-| Client | `MOCK_CLIENTS` | `/api/workspace/clients` | `views-screens--entities-clients` | `Client` |
-| Contact | `MOCK_CONTACTS` | `/api/workspace/contacts` | `views-screens--entities-contacts` | `Contact` |
-| Product | `MOCK_PRODUCTS` | `/api/workspace/products` | `views-screens--entities-products` | `Product` |
-| DealStage | `MOCK_DEAL_STAGES` | `/api/workspace/deal-stages` | `views-screens--deals` | `DealStage` |
-| ProjectType | `MOCK_PROJECT_TYPES` | `/api/workspace/project-types` | `views-screens--projects-list` | `ProjectType` |
-| WorkspaceUser | `MOCK_WORKSPACE_USERS` | `/api/workspace/users` | `views-screens--admin`, `flows--onboarding-tenant` | `WorkspaceUser` |
-| Position | `MOCK_POSITIONS` | `/api/workspace/positions` | `views-screens--admin` | `Position` |
-| TaskStatus | `MOCK_TASK_STATUSES` | `/api/workspace/task-statuses` | `views-screens--my-work` | `TaskStatus` |
-| CustomFieldDefinition | `MOCK_CUSTOM_FIELDS` | `/api/workspace/config/custom-fields` | `views-screens--settings` | `CustomFieldDefinition` |
-| ProjectTemplate | `MOCK_PROJECT_TEMPLATES` | `/api/workspace/config/project-templates` | `views-screens--settings`, `flows--onboarding-tenant` | `ProjectTemplate` |
-| KpiDefinition | `MOCK_KPI_DEFINITIONS` | `/api/tenant/current/kpi-definitions` | `views-screens--project-kpi` | `KpiDefinition` |
-| AccessProfile | `MOCK_ACCESS_PROFILES` | `/api/tenant/current/access-profiles` | `views-screens--admin` | `AccessProfile` |
-| OrgStructureSnapshot | `MOCK_ORG_STRUCTURE` | `/api/tenant/current/org-structure` | `views-screens--admin` | `OrgStructureSnapshot` |
-| AuditEvent | `MOCK_AUDIT_EVENTS` | `/api/tenant/current/audit-events` | `views-screens--project-audit`, `flows--audit-trail` | `AuditEvent` |
+| Opportunity | `MOCK_OPPORTUNITIES` | `/api/workspace/opportunities` | `screens--deals`, `flows--crm-to-project` | `Opportunity` |
+| Project | `MOCK_PROJECTS` | `/api/workspace/projects` | `screens--projects-list`, `flows--crm-to-project` | `Project` |
+| Task | `MOCK_TASKS` | `/api/workspace/projects/:projectId/tasks` | `screens--my-work`, `flows--project-wizard` | `Task` |
+| ControlReadModel | `MOCK_CONTROL_SIGNALS` (+ KPI) | `/api/workspace/projects/:projectId/control/read-model` | `screens--project-kpi`, `flows--kpi-signal-corrective` | KPI / signals types |
+| Client | `MOCK_CLIENTS` | `/api/workspace/clients` | `screens--entities-clients` | `Client` |
+| Contact | `MOCK_CONTACTS` | `/api/workspace/contacts` | `screens--entities-contacts` | `Contact` |
+| Product | `MOCK_PRODUCTS` | `/api/workspace/products` | `screens--entities-products` | `Product` |
+| DealStage | `MOCK_DEAL_STAGES` | `/api/workspace/deal-stages` | `screens--deals` | `DealStage` |
+| ProjectType | `MOCK_PROJECT_TYPES` | `/api/workspace/project-types` | `screens--projects-list` | `ProjectType` |
+| WorkspaceUser | `MOCK_WORKSPACE_USERS` | `/api/workspace/users` | `screens--admin`, `flows--onboarding-tenant` | `WorkspaceUser` |
+| Position | `MOCK_POSITIONS` | `/api/workspace/positions` | `screens--admin` | `Position` |
+| TaskStatus | `MOCK_TASK_STATUSES` | `/api/workspace/task-statuses` | `screens--my-work` | `TaskStatus` |
+| CustomFieldDefinition | `MOCK_CUSTOM_FIELDS` | `/api/workspace/config/custom-fields` | `screens--settings` | `CustomFieldDefinition` |
+| ProjectTemplate | `MOCK_PROJECT_TEMPLATES` | `/api/workspace/config/project-templates` | `screens--settings`, `flows--onboarding-tenant` | `ProjectTemplate` |
+| KpiDefinition | `MOCK_KPI_DEFINITIONS` | `/api/tenant/current/kpi-definitions` | `screens--project-kpi` | `KpiDefinition` |
+| AccessProfile | `MOCK_ACCESS_PROFILES` | `/api/tenant/current/access-profiles` | `screens--admin` | `AccessProfile` |
+| OrgStructureSnapshot | `MOCK_ORG_STRUCTURE` | `/api/tenant/current/org-structure` | `screens--admin` | `OrgStructureSnapshot` |
+| AuditEvent | `MOCK_AUDIT_EVENTS` | `/api/tenant/current/audit-events` | `screens--project-audit`, `flows--audit-trail` | `AuditEvent` |
 | ProductionCalendar | `MOCK_PRODUCTION_CALENDAR` | `/api/tenant/current/production-calendar` | `widgets-resource-matrix--default` | `ProductionCalendar` |
 | Absence | `MOCK_ABSENCES` | `/api/tenant/current/absences` | `widgets-resource-matrix--default` | `Absence` |
-| ScheduledTask | `MOCK_SCHEDULED_TASKS` | `/api/tenant/current/scheduled-tasks` | `views-screens--my-work-list-mode`, `flows--capacity-conflict` | `ScheduledTask` |
+| ScheduledTask | `MOCK_SCHEDULED_TASKS` | `/api/tenant/current/scheduled-tasks` | `screens--my-work-list-mode`, `flows--capacity-conflict` | `ScheduledTask` |
 
 Полный machine-readable список — `API_CONTRACT_ENTRIES` в коде (генерирует `.storybook-verify-tmp/api-contract-coverage.json` при тестах).
 

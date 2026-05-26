@@ -24,7 +24,7 @@ function exportNameToStoryId(exportName: string): string {
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
     .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
     .toLowerCase();
-  return `views-screens--${kebab}`;
+  return `screens--${kebab}`;
 }
 
 function collectViewsScreenStoryIds(source: string): Set<string> {
@@ -80,7 +80,7 @@ describe("api-contract fixtures", () => {
   it("maps registry stories to existing Views/Screens story ids", () => {
     for (const entry of API_CONTRACT_ENTRIES) {
       for (const storyId of entry.stories) {
-        if (!storyId.startsWith("views-screens--")) continue;
+        if (!storyId.startsWith("screens--")) continue;
         expect(VIEWS_SCREEN_STORY_IDS.has(storyId), `unknown story id ${storyId}`).toBe(true);
       }
     }

@@ -6,7 +6,7 @@ import { SheetShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Sheet",
+  title: "Primitives/Sheet",
   component: Sheet,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

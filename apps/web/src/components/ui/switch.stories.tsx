@@ -6,7 +6,7 @@ import { SwitchShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Switch",
+  title: "Primitives/Switch",
   component: Switch,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

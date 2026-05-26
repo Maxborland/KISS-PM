@@ -7,7 +7,7 @@ import { Kbd } from "./kbd";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Kbd> = {
-  title: "UI/Kbd",
+  title: "Primitives/Kbd",
   component: Kbd,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

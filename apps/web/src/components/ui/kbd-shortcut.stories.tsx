@@ -4,7 +4,7 @@ import { KbdShortcut } from "./kbd-shortcut";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof KbdShortcut> = {
-  title: "UI/KbdShortcut",
+  title: "Primitives/KbdShortcut",
   component: KbdShortcut,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

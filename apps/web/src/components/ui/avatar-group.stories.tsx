@@ -4,7 +4,7 @@ import { AvatarGroup } from "./avatar-group";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof AvatarGroup> = {
-  title: "UI/AvatarGroup",
+  title: "Primitives/AvatarGroup",
   component: AvatarGroup,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

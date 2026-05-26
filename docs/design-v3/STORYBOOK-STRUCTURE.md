@@ -1,6 +1,6 @@
 # Storybook — подготовка 8 секций (production-grade)
 
-**Статус:** обновлено 2026-05-26. **Phase 7 (активно):** production pass экранов, сценарии, API Contract stories. **Phase 8:** rename sidebar roots (`UI`→`Primitives`, `Views/Screens`→`Screens`), Flows/Patterns stories, deprecate Catalog.
+**Статус:** обновлено 2026-05-26. **Phase 8 (закрыто):** 8 корней sidebar, Flows/Patterns/API Contract, `UI`→`Primitives`, `Views/Screens`→`Screens`, Catalog → `Foundations/Каталог компонентов`. Health: `storybook-section-roots.health.test.ts`.
 
 **Canonical brief:** [`PRODUCTION-GRADE-BRIEF.md`](./PRODUCTION-GRADE-BRIEF.md) · **План:** [`docs/plans/2026-05-25-kiss-pm-design-v3-storybook-production-grade.md`](../plans/2026-05-25-kiss-pm-design-v3-storybook-production-grade.md)
 
@@ -25,13 +25,22 @@
 
 ## 2. Текущий индекс (до миграции)
 
-| Сейчас в sidebar | Файлы | Целевая секция |
-|------------------|-------|----------------|
-| `Foundations/*` | `src/stories/foundations/**` | §1 Foundations |
-| `UI/*` | `src/components/ui/**/*.stories.tsx` (~43 stems) | §2 Primitives |
-| `Catalog/All Components` | `src/stories/catalog/ComponentCatalog.stories.tsx` | Распределить → §2–§3, затем **удалить** root Catalog |
-| `Widgets/*` | `src/widgets/{gantt,kanban,funnel}/**` | §4 Widgets |
-| `Views/Screens` | `src/views/screens/screens.stories.tsx` | §5 Screens |
+| Sidebar root (факт) | Файлы |
+|---------------------|-------|
+| `Foundations/*` | `src/stories/foundations/**`, `src/stories/catalog/ComponentCatalog.stories.tsx` (`Foundations/Каталог компонентов`) |
+| `Primitives/*` | `src/components/ui/**/*.stories.tsx` |
+| `Composites/*` | `src/components/domain/**/*.stories.tsx` |
+| `Widgets/*` | `src/widgets/**` |
+| `Screens` | `src/views/screens/screens.stories.tsx` |
+| `Flows/*` | `src/stories/flows/**` |
+| `Patterns/*` | `src/stories/patterns/**` |
+| `API Contract/*` | `src/stories/api-contract/**` |
+
+| Было (legacy) | Стало |
+|---------------|-------|
+| `UI/*` | `Primitives/*` |
+| `Catalog/All Components` | `Foundations/Каталог компонентов` |
+| `Views/Screens` | `Screens` (story id: `screens--*`) |
 | — | — | §6 Flows (нет) |
 | — | — | §7 Patterns (нет) |
 | — | — | §8 API Contract (нет) |
@@ -126,7 +135,7 @@ order: [
 |--------|------|
 | `Views/Screens` (+ variants) | `Screens/*` — один meta root |
 
-**Инвентарь screens (из `screens.stories.tsx`):** 19 base + state + interaction variants (~39 story ids с префиксом `views-screens--`).
+**Инвентарь screens (из `screens.stories.tsx`):** 19 base + state + interaction variants (~39 story ids с префиксом `screens--`).
 
 **Сценарии (Phase 3+):** `default`, `empty`, `loading`, `error`, `forbidden` per screen group — см. план Phase 7.
 
@@ -213,16 +222,16 @@ order: [
 
 | Секция | Prepared (этот doc) | Implemented in Storybook |
 |--------|---------------------|---------------------------|
-| Foundations | ✅ | ✅ частично |
-| Primitives | ✅ (inventory) | ⚠️ как `UI/*` |
-| Composites | ✅ (список) | ❌ |
-| Widgets | ✅ | ✅ (без ResourceMatrix story) |
-| Screens | ✅ | ⚠️ как `Views/Screens` |
-| Flows | ✅ (6 flows) | ❌ |
-| Patterns | ✅ (группы) | ❌ |
-| API Contract | ✅ (структура) | ❌ |
+| Foundations | ✅ | ✅ |
+| Primitives | ✅ | ✅ |
+| Composites | ✅ | ✅ |
+| Widgets | ✅ | ✅ |
+| Screens | ✅ | ✅ (`screens--*` story ids) |
+| Flows | ✅ | ✅ |
+| Patterns | ✅ | ✅ |
+| API Contract | ✅ | ✅ |
 
-**Implemented** = целевые sidebar roots + globs + storySort — **Phase 8**.
+**Implemented** = ровно 8 roots; проверка — `storybook-section-roots.health.test.ts`.
 
 ---
 

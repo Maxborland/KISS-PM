@@ -6,7 +6,7 @@ import { PopoverShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Popover",
+  title: "Primitives/Popover",
   component: Popover,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

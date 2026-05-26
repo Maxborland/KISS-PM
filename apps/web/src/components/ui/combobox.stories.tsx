@@ -6,7 +6,7 @@ import { ComboboxShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Combobox",
+  title: "Primitives/Combobox",
   component: Combobox,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
