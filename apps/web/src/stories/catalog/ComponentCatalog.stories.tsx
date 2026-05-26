@@ -112,11 +112,13 @@ function CatalogPage() {
         </div>
       </Section>
 
-      <Section title="Состояния (примитивы, naked · L1–L4)">
+      <Section title="Состояния (примитивы · L1–L4)">
         <p className="text-[var(--text-sm)] text-[var(--muted)]">
-          Каталог без shell. Продуктовые экраны состояний — в Views/Screens с WorkspaceChrome.
+          Каталог без оболочки приложения. Продуктовые экраны состояний — в Views/Screens с WorkspaceChrome.
         </p>
-        <BannerInline variant="info">L1 inline · L2 panel · L3 section · L4 full screen</BannerInline>
+        <BannerInline variant="info">
+          L1 в строке · L2 в панели · L3 секция страницы · L4 на весь экран
+        </BannerInline>
         <Alert variant="warning">
           <AlertTitle>Внимание</AlertTitle>
           <AlertDescription>Перегруз ресурса на следующей неделе.</AlertDescription>
@@ -158,7 +160,7 @@ function CatalogPage() {
         />
       </Section>
 
-      <Section title="Скелетоны (shimmer)">
+      <Section title="Скелетоны (переливание)">
         <SkeletonTable />
         <SkeletonBento />
         <SkeletonGantt />
