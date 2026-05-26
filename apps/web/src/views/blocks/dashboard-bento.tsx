@@ -15,6 +15,7 @@ import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
+import { KpiAccentTile } from "@/components/domain/kpi-accent-tile";
 import { KpiTile } from "@/components/domain/kpi-tile";
 import { NumericValue } from "@/components/domain/numeric-value";
 import { Sparkline } from "@/components/domain/sparkline";
@@ -23,8 +24,11 @@ import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TrendArrow } from "@/components/ui/trend-arrow";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { DashboardBentoFetchIssue } from "@/views/blocks/dashboard-bento-fetch-issue";
+import { DashboardBentoSkeleton } from "@/views/blocks/dashboard-bento-skeleton";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -68,21 +72,64 @@ export type DashboardBentoProps = {
 };
 
 export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {}) {
-  const { scenario } = useScenarioFixtures();
+  const { scenario, state } = useScenarioFixtures();
   const [period, setPeriod] = useState<FocusPeriod>("month");
   const [openRowId, setOpenRowId] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const empty = emptyOverride ?? scenario === "empty";
   const rows = empty ? [] : ROWS;
   const openRow = useMemo(() => rows.find((r) => r.id === openRowId) ?? null, [rows, openRowId]);
 
+  const introActions =
+    state.fetchPhase === "loading" ? (
+      <Skeleton variant="circle" className="dashboard-intro__avatar-skeleton" />
+    ) : (
+      <BemAvatar initials="КБ" color="c4" size="xl" />
+    );
+
+  if (state.fetchPhase === "loading") {
+    return (
+      <>
+        <RoutePageIntro actions={introActions} />
+        <DashboardBentoSkeleton />
+      </>
+    );
+  }
+
+  if (state.fetchPhase === "error") {
+    return (
+      <>
+        <RoutePageIntro actions={introActions} />
+        <DashboardBentoFetchIssue
+          kind="error"
+          {...(state.errorMessage ? { message: state.errorMessage } : {})}
+          onRetry={() => setRetryCount((n) => n + 1)}
+        />
+        {retryCount > 0 ? (
+          <p className="dashboard-fetch-issue__retry-hint mono">Повтор {retryCount}</p>
+        ) : null}
+      </>
+    );
+  }
+
+  if (state.fetchPhase === "forbidden") {
+    return (
+      <>
+        <RoutePageIntro actions={introActions} />
+        <DashboardBentoFetchIssue kind="forbidden" />
+      </>
+    );
+  }
+
   return (
-    <ScenarioFetchGate loadingLabel="Загружаем дашборд…">
-      <RoutePageIntro actions={<BemAvatar initials="КБ" color="c4" size="xl" />} />
+    <>
+      <RoutePageIntro actions={introActions} />
 
       <div className="bento">
-        <div className="bento__cell tile tile--gradient-warm">
-          <KpiTile
+        <div className="bento__cell">
+          <KpiAccentTile
+            tone="warm"
             label="Приоритетные задачи"
             value={<NumericValue value={83} suffix="%" />}
             meta={
@@ -92,8 +139,9 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
             }
           />
         </div>
-        <div className="bento__cell tile tile--gradient-cool">
-          <KpiTile
+        <div className="bento__cell">
+          <KpiAccentTile
+            tone="cool"
             label="Доп. задачи"
             value={<NumericValue value={56} suffix="%" />}
             meta={
@@ -103,7 +151,7 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
             }
           />
         </div>
-        <div className="bento__cell tile">
+        <div className="bento__cell tile tile--metric">
           <KpiTile
             label="Сделки в работе"
             value={<NumericValue value={8} />}
@@ -115,7 +163,7 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
             }
           />
         </div>
-        <div className="bento__cell tile">
+        <div className="bento__cell tile tile--metric">
           <KpiTile
             label="Просрочено"
             value={<NumericValue value={2} />}
@@ -342,6 +390,6 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
             : null
         }
       />
-    </ScenarioFetchGate>
+    </>
   );
 }

@@ -5,17 +5,19 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
+import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { Task, TaskStatusCategory } from "@/lib/api-types";
+import type { ScheduledTask } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
-import { userName } from "@/lib/mock-data/users";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
+import { MyWorkFetchIssue, MyWorkListSkeleton } from "@/views/blocks/my-work-fetch-issue";
+import { MyWorkKanbanSkeleton } from "@/views/blocks/my-work-kanban-skeleton";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 import {
   Kanban,
@@ -39,10 +41,10 @@ type ColumnId = "new" | "in_progress" | "review" | "done";
 type CardModel = TaskKanbanItem<ColumnId>;
 
 const KANBAN_COLUMNS: KanbanColumnDef<ColumnId>[] = [
-  { id: "new", title: "Бэклог", emptyLabel: "Нет задач" },
-  { id: "in_progress", title: "В работе", emptyLabel: "Нет задач" },
-  { id: "review", title: "Приемка", emptyLabel: "Нет задач на приемке" },
-  { id: "done", title: "Готово", emptyLabel: "Нет задач за сегодня" }
+  { id: "new", title: "Бэклог", emptyLabel: "Нет задач", tone: "violet" },
+  { id: "in_progress", title: "В работе", emptyLabel: "Нет задач", tone: "info" },
+  { id: "review", title: "Приемка", emptyLabel: "Нет задач на приемке", tone: "warning" },
+  { id: "done", title: "Готово", emptyLabel: "Нет задач за сегодня", tone: "success" }
 ];
 
 const COLUMN_LABEL: Record<ColumnId, string> = {
@@ -109,15 +111,11 @@ export type MyWorkBlockProps = {
 
 export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   const { scenario } = useScenarioFixtures();
-  return (
-    <ScenarioFetchGate loadingLabel="Загрузка задач…">
-      <MyWorkBlockInner key={scenario} initialMode={initialMode} />
-    </ScenarioFetchGate>
-  );
+  return <MyWorkBlockInner key={scenario} initialMode={initialMode} />;
 }
 
 function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
-  const { fixtures } = useScenarioFixtures();
+  const { fixtures, state, scenario } = useScenarioFixtures();
   const initialCards = useMemo(
     () => buildTaskKanbanCards(fixtures.tasks),
     [fixtures.tasks]
@@ -127,8 +125,10 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [columnSort, setColumnSort] = useState<KanbanColumnSortState<ColumnId>>({});
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
+  const [retryCount, setRetryCount] = useState(0);
 
   const cardsOrdered = useMemo(() => flattenByColumns(cards), [cards]);
+  const isEmpty = scenario === "empty" || cardsOrdered.length === 0;
 
   const comparators = useMemo(() => buildTaskKanbanComparators<CardModel, ColumnId>(), []);
   const sortedCards = useKanbanOrderedItems(KANBAN_COLUMNS, cardsOrdered, columnSort, comparators);
@@ -167,76 +167,102 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
     setCards((prev) => handleItemReorder(prev, columnId, fromIndex, toIndex));
   };
 
+  const toolbar = (
+    <div className="view-toolbar my-work__toolbar">
+      <Segmented
+        name="my-work-mode"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "kanban", label: "Канбан" },
+          { value: "list", label: "Список" }
+        ]}
+      />
+      <div className="view-toolbar__filters">
+        {mode === "kanban" ? (
+          <KanbanCardViewMenu
+            profile={TASK_KANBAN_VIEW_PROFILE}
+            value={cardView}
+            onChange={setCardView}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (state.fetchPhase === "loading") {
+    return (
+      <div className="my-work">
+        <RoutePageIntro />
+        {toolbar}
+        {mode === "kanban" ? <MyWorkKanbanSkeleton /> : <MyWorkListSkeleton />}
+      </div>
+    );
+  }
+
+  if (state.fetchPhase === "error") {
+    return (
+      <div className="my-work">
+        <RoutePageIntro />
+        {toolbar}
+        <MyWorkFetchIssue
+          kind="error"
+          {...(state.errorMessage ? { message: state.errorMessage } : {})}
+          onRetry={() => setRetryCount((n) => n + 1)}
+        />
+        {retryCount > 0 ? (
+          <p className="my-work__retry-hint mono">Повтор {retryCount}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (state.fetchPhase === "forbidden") {
+    return (
+      <div className="my-work">
+        <RoutePageIntro />
+        {toolbar}
+        <MyWorkFetchIssue kind="forbidden" />
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="my-work">
       <RoutePageIntro />
-      <div className="view-toolbar">
-        <Segmented
-          name="my-work-mode"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "kanban", label: "Канбан" },
-            { value: "list", label: "Список" }
-          ]}
-        />
-        <div className="view-toolbar__filters">
-          {mode === "kanban" ? (
-            <KanbanCardViewMenu
-              profile={TASK_KANBAN_VIEW_PROFILE}
-              value={cardView}
-              onChange={setCardView}
-            />
-          ) : null}
-        </div>
-      </div>
-      <div className="u-mb-3">
-        <DataTable>
-          <thead>
-            <tr>
-              <th>План сегодня</th>
-              <th>Проект</th>
-              <th>Период</th>
-              <th>Работа</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fixtures.scheduledTasks.map((task) => (
-              <tr key={task.id}>
-                <td><CellStack title={task.title} subtitle={task.id} /></td>
-                <td>{task.projectTitle}</td>
-                <td className="mono">{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
-                <td className="mono">{Math.round(task.workMinutes / 60)} ч</td>
-              </tr>
-            ))}
-          </tbody>
-        </DataTable>
-      </div>
+      {toolbar}
+
+      {mode === "kanban" && fixtures.scheduledTasks.length > 0 ? (
+        <MyWorkTodayPlan tasks={fixtures.scheduledTasks} />
+      ) : null}
+
       {mode === "list" ? (
-        <MyWorkList cards={cardsOrdered} onOpen={setOpenCardId} />
+        <MyWorkList cards={cardsOrdered} onOpen={setOpenCardId} empty={isEmpty} />
       ) : (
-        <Kanban<CardModel, ColumnId>
-          columns={KANBAN_COLUMNS}
-          items={sortedCards}
-          visibleFields={visibleFields}
-          sortOptions={TASK_KANBAN_SORT_OPTIONS}
-          columnSort={columnSort}
-          onColumnSortChange={handleColumnSortChange}
-          renderCard={(item, ctx) => (
-            <TaskKanbanCard
-              item={item}
-              draggable={ctx.draggable}
-              isDragging={ctx.isDragging}
-              visibleFields={ctx.visibleFields}
-              onOpen={setOpenCardId}
-            />
-          )}
-          onItemMove={(id, toColumnId, toIndex) =>
-            setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex))
-          }
-          onItemReorder={handleReorder}
-          onColumnAction={handleColumnAction}
-        />
+        <div className="my-work__board">
+          <Kanban<CardModel, ColumnId>
+            columns={KANBAN_COLUMNS}
+            items={sortedCards}
+            visibleFields={visibleFields}
+            sortOptions={TASK_KANBAN_SORT_OPTIONS}
+            columnSort={columnSort}
+            onColumnSortChange={handleColumnSortChange}
+            renderCard={(item, ctx) => (
+              <TaskKanbanCard
+                item={item}
+                draggable={ctx.draggable}
+                isDragging={ctx.isDragging}
+                visibleFields={ctx.visibleFields}
+                onOpen={setOpenCardId}
+              />
+            )}
+            onItemMove={(id, toColumnId, toIndex) =>
+              setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex))
+            }
+            onItemReorder={handleReorder}
+            onColumnAction={handleColumnAction}
+          />
+        </div>
       )}
 
       <TaskDetailDrawer
@@ -262,17 +288,61 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
             : null
         }
       />
-    </>
+    </div>
+  );
+}
+
+function MyWorkTodayPlan({ tasks }: { tasks: ScheduledTask[] }) {
+  return (
+    <CardPanel
+      title="План на сегодня"
+      subtitle={`${tasks.length} слотов`}
+      flush
+      className="my-work__plan"
+    >
+      <DataTable>
+        <thead>
+          <tr>
+            <th>Задача</th>
+            <th>Проект</th>
+            <th>Период</th>
+            <th>Работа</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.id}>
+              <td>
+                <CellStack title={task.title} subtitle={task.id} />
+              </td>
+              <td>{task.projectTitle}</td>
+              <td className="mono">{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
+              <td className="mono">{Math.round(task.workMinutes / 60)} ч</td>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+    </CardPanel>
   );
 }
 
 function MyWorkList({
   cards,
-  onOpen
+  onOpen,
+  empty
 }: {
   cards: CardModel[];
   onOpen: (id: string) => void;
+  empty: boolean;
 }) {
+  if (empty) {
+    return (
+      <CardPanel title="Задачи" subtitle="Список пуст">
+        <p className="u-text-body u-text-muted">Нет задач в выбранном срезе. Создайте задачу или смените фильтр.</p>
+      </CardPanel>
+    );
+  }
+
   return (
     <DataTable>
       <thead>
