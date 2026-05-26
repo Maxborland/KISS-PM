@@ -229,8 +229,8 @@ describe("auto planning solver", () => {
             id: "assignment-b",
             taskId: "task-a",
             resourceId: "resource-beta",
-            role: "co_executor",
-            unitsPermille: 1000,
+            role: "executor",
+            unitsPermille: 500,
             workMinutes: 480,
             calendarId: null
           }
@@ -303,6 +303,8 @@ describe("auto planning solver", () => {
           payload: expect.objectContaining({
             id: "assignment-b",
             resourceId: "resource-beta",
+            role: "executor",
+            unitsPermille: 500,
             workMinutes: 960
           })
         })
