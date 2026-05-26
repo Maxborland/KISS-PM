@@ -95,19 +95,27 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     const roomId = `call-room-${randomUUID()}`;
     const providerRoomId = parsed.value.providerRoomId ?? roomId;
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      const room = await requireMethod(transactionDataSource.createCallRoom).call(transactionDataSource, {
-        id: roomId,
-        tenantId: actor.tenantId,
-        entityType: parsed.value.entityType,
-        entityId: parsed.value.entityId,
-        meetingId: parsed.value.meetingId,
-        title: parsed.value.title,
-        mediaKind: parsed.value.mediaKind,
-        provider: parsed.value.provider,
-        providerRoomId,
-        status: "open",
-        createdByUserId: actor.id
-      });
+      let room: CallRoom;
+      try {
+        room = await requireMethod(transactionDataSource.createCallRoom).call(transactionDataSource, {
+          id: roomId,
+          tenantId: actor.tenantId,
+          entityType: parsed.value.entityType,
+          entityId: parsed.value.entityId,
+          meetingId: parsed.value.meetingId,
+          title: parsed.value.title,
+          mediaKind: parsed.value.mediaKind,
+          provider: parsed.value.provider,
+          providerRoomId,
+          status: "open",
+          createdByUserId: actor.id
+        });
+      } catch (error) {
+        if (isProviderRoomConflictError(error)) {
+          throw new CallRouteError(409, "call_room_provider_room_conflict");
+        }
+        throw error;
+      }
       const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
         id: `call-event-${randomUUID()}`,
         tenantId: actor.tenantId,
@@ -129,7 +137,16 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         transactionDataSource
       );
       return { event, room };
+    }).catch((error: unknown) => {
+      if (error instanceof CallRouteError) return error;
+      if (isProviderRoomConflictError(error)) {
+        return new CallRouteError(409, "call_room_provider_room_conflict");
+      }
+      throw error;
     });
+    if (result instanceof CallRouteError) {
+      return context.json({ error: result.error }, result.status);
+    }
     return context.json({ callRoom: serializeCallRoom(result.room), event: serializeCallEvent(result.event) }, 201);
   });
 
@@ -418,7 +435,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         endedByUserId: actor.id,
         status: "ended"
       });
-      if (!session) throw new Error("call_session_not_found");
+      if (!session) throw new CallRouteError(409, "call_session_not_active");
       const room = await requireMethod(transactionDataSource.updateCallRoomStatus).call(transactionDataSource, {
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id,
@@ -445,7 +462,13 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         transactionDataSource
       );
       return { event, room: room ?? resolved.value.room, session };
+    }).catch((error: unknown) => {
+      if (error instanceof CallRouteError) return error;
+      throw error;
     });
+    if (result instanceof CallRouteError) {
+      return context.json({ error: result.error }, result.status);
+    }
     return context.json({
       callRoom: serializeCallRoom(result.room),
       session: serializeCallSession(result.session),
@@ -799,6 +822,20 @@ function isActiveSessionConflictError(error: unknown): boolean {
       String(record.message ?? "").includes("call_sessions_one_active_per_room_uidx")
     )
   ) || isActiveSessionConflictError(record.cause);
+}
+
+function isProviderRoomConflictError(error: unknown): boolean {
+  if (error instanceof Error && error.message === "call_room_provider_room_conflict") return true;
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  return (
+    record.code === "23505" &&
+    (
+      record.constraint_name === "call_rooms_tenant_provider_room_uidx" ||
+      record.constraint === "call_rooms_tenant_provider_room_uidx" ||
+      String(record.message ?? "").includes("call_rooms_tenant_provider_room_uidx")
+    )
+  ) || isProviderRoomConflictError(record.cause);
 }
 
 async function tenantUserExists(
