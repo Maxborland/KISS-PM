@@ -46,3 +46,16 @@ export function workspaceBlockStory<Props extends Record<string, unknown>>(
 }
 
 export type ScreenStory = StoryObj<typeof ScreenView>;
+
+/** Сценарий MSW для экрана (Phase 7: loading / empty / error / forbidden). */
+export function screenScenarioStory(
+  id: ScreenId,
+  name: string,
+  scenario: ScenarioName
+): ScreenStory {
+  return {
+    name,
+    args: screenStoryArgs(id),
+    parameters: { ...SCREEN_STORY_PARAMETERS, scenario }
+  };
+}

@@ -19,6 +19,7 @@ function listBlockFiles(): string[] {
 
 /** Blocks с entity mock-data обязаны читать fixtures из scenario context. */
 const SCENARIO_DATA_BLOCKS = new Set([
+  "dashboard-bento.tsx",
   "admin-block.tsx",
   "avatar-menu-block.tsx",
   "deals-block.tsx",

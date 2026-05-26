@@ -1,0 +1,140 @@
+/* Моя работа — канбан/список, скелетоны Phase 7 */
+
+.my-work__toolbar.view-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.my-work__toolbar .view-toolbar__filters {
+  margin-left: auto;
+}
+
+.my-work__board {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-gutter: stable;
+}
+
+.my-work__board .kanban {
+  width: max(100%, calc(4 * 260px + 3 * var(--space-4)));
+}
+
+.my-work .kanban-col {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  min-height: 360px;
+}
+
+.my-work__plan {
+  margin-bottom: var(--space-4);
+}
+
+.my-work__plan .data-table {
+  font-size: var(--text-sm);
+}
+
+/* ——— Skeleton ——— */
+.kanban--skeleton .kanban-col--skeleton {
+  pointer-events: none;
+}
+
+.kanban--muted {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.my-work-skeleton__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.my-work-skeleton__col-title {
+  min-width: 88px;
+  min-height: 14px;
+}
+
+.my-work-skeleton__menu {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+}
+
+.my-work-skeleton__card {
+  width: 100%;
+  min-height: 88px;
+  border-radius: var(--radius-lg);
+}
+
+.my-work-skeleton__card--short {
+  min-height: 64px;
+}
+
+.my-work__list-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.my-work-skeleton__table-head {
+  min-height: 32px;
+}
+
+.my-work-skeleton__table-row {
+  min-height: 44px;
+}
+
+/* ——— Fetch issue ——— */
+.my-work__issue-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.my-work__issue-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+.my-work__board--issue .banner-inline--warn .my-work__issue-icon {
+  color: var(--warning);
+}
+
+.my-work__issue-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.my-work__issue-desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--muted-strong);
+}
+
+.my-work__issue-actions {
+  margin-top: var(--space-3);
+}
+
+.my-work__retry-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted-soft);
+}
+
+@media (max-width: 1100px) {
+  .my-work__board .kanban {
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+  }
+}

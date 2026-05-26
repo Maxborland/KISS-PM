@@ -323,6 +323,25 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(evidence.verification.storybookContract).toBe("pass");
   });
 
+  it("Phase 7: product blocks use ScreenBlockGate instead of centered L3 ScenarioFetchGate", () => {
+    const blocksDir = join(webRoot, "src/views/blocks");
+    const violations: string[] = [];
+    for (const name of readdirSync(blocksDir)) {
+      if (!name.endsWith(".tsx")) continue;
+      const source = read(`src/views/blocks/${name}`);
+      if (source.includes("ScenarioFetchGate")) {
+        violations.push(name);
+      }
+    }
+    expect(violations, violations.join(", ")).toEqual([]);
+  });
+
+  it("Phase 7: entity detail product copy hides API paths", () => {
+    const source = read("src/views/blocks/entity-detail-block.tsx");
+    expect(source).not.toMatch(/PATCH \/api\//);
+    expect(source).not.toContain("UpdateTaskBody");
+  });
+
   it("field contract sync does not reintroduce known fake affordances", () => {
     const deals = read("src/views/blocks/deals-block.tsx");
     const entities = read("src/views/blocks/entities-block.tsx");

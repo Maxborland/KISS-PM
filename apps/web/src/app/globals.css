@@ -10,6 +10,7 @@
 @import "../styles/widgets/gantt.css" layer(components);
 @import "../styles/widgets/funnel.css" layer(components);
 @import "../styles/widgets/kanban.css" layer(components);
+@import "../styles/widgets/my-work.css" layer(components);
 
 @theme inline {
   --color-background: var(--canvas);
