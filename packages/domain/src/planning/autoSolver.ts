@@ -89,6 +89,17 @@ type PlannedAllocation = {
 
 type UsageMap = Map<string, number>;
 
+type AssignmentPlanCandidate = {
+  plan: AssignmentPlan;
+  usage: UsageMap;
+};
+
+type SearchState = {
+  plans: AssignmentPlan[];
+  usage: UsageMap;
+  cost: AutoPlanningSolverCost;
+};
+
 const defaultEngineVersion = "planning-core-v1";
 
 export function proposeAutoPlanningSolutions(
@@ -117,6 +128,7 @@ export function proposeAutoPlanningSolutions(
     targetDeadline,
     baseUsage: cloneUsage(baseUsage),
     allowOverload: false,
+    beamWidth,
     maxIterations
   });
   const proposals: AutoPlanningSolverProposal[] = [];
@@ -129,7 +141,7 @@ export function proposeAutoPlanningSolutions(
         mode: input.mode,
         kind: "no_overlap",
         targetDeadline,
-        assignmentPlans: noOverlapPlans,
+        assignmentPlans: noOverlapPlans.assignmentPlans,
         engineVersion
       })
     );
@@ -142,6 +154,7 @@ export function proposeAutoPlanningSolutions(
     targetDeadline,
     baseUsage: cloneUsage(baseUsage),
     allowOverload: true,
+    beamWidth,
     maxIterations
   });
   if (overloadPlans) {
@@ -150,11 +163,11 @@ export function proposeAutoPlanningSolutions(
         snapshot: input.snapshot,
         calculatedPlan,
         mode: input.mode,
-        kind: overloadPlans.some((plan) => plan.acceptedOverloadMinutes > 0)
+        kind: overloadPlans.assignmentPlans.some((plan) => plan.acceptedOverloadMinutes > 0)
           ? "accepted_overload"
           : "no_overlap",
         targetDeadline,
-        assignmentPlans: overloadPlans,
+        assignmentPlans: overloadPlans.assignmentPlans,
         engineVersion
       })
     );
@@ -173,7 +186,7 @@ export function proposeAutoPlanningSolutions(
     search: {
       beamWidth,
       maxIterations,
-      iterations: Math.min(maxIterations, assignmentQueue.length)
+      iterations: Math.max(noOverlapPlans?.iterations ?? 0, overloadPlans?.iterations ?? 0)
     }
   };
 }
@@ -185,9 +198,16 @@ function scheduleAssignments(input: {
   targetDeadline: PlanDate;
   baseUsage: UsageMap;
   allowOverload: boolean;
+  beamWidth: number;
   maxIterations: number;
-}): AssignmentPlan[] | null {
-  const plans: AssignmentPlan[] = [];
+}): { assignmentPlans: AssignmentPlan[]; iterations: number } | null {
+  let states: SearchState[] = [
+    {
+      plans: [],
+      usage: input.baseUsage,
+      cost: emptySearchCost()
+    }
+  ];
   let iterations = 0;
 
   for (const assignment of input.assignments) {
@@ -197,27 +217,47 @@ function scheduleAssignments(input: {
     if (!task?.calculatedStart) continue;
     const workMinutes = resolveAssignmentWork(input.snapshot.assignments, assignment, task.workMinutes);
     if (workMinutes <= 0) {
-      plans.push({ assignment, allocations: [], acceptedOverloadMinutes: 0 });
+      states = states.map((state) => {
+        const plans = [...state.plans, { assignment, allocations: [], acceptedOverloadMinutes: 0 }];
+        return {
+          plans,
+          usage: state.usage,
+          cost: costForAssignmentPlans(plans, input.snapshot, input.targetDeadline)
+        };
+      });
       continue;
     }
 
-    const assignmentPlan = allocateAssignment({
-      snapshot: input.snapshot,
-      task,
-      assignment,
-      workMinutes,
-      targetDeadline: input.targetDeadline,
-      usage: input.baseUsage,
-      allowOverload: input.allowOverload
-    });
-    if (!assignmentPlan) return null;
-    plans.push(assignmentPlan);
+    const nextStates: SearchState[] = [];
+    for (const state of states) {
+      for (const candidate of allocateAssignmentCandidates({
+        snapshot: input.snapshot,
+        task,
+        assignment,
+        workMinutes,
+        targetDeadline: input.targetDeadline,
+        usage: state.usage,
+        allowOverload: input.allowOverload
+      })) {
+        const plans = [...state.plans, candidate.plan];
+        nextStates.push({
+          plans,
+          usage: candidate.usage,
+          cost: costForAssignmentPlans(plans, input.snapshot, input.targetDeadline)
+        });
+      }
+    }
+
+    states = dedupeSearchStates(nextStates)
+      .sort(compareSearchStates)
+      .slice(0, input.beamWidth);
+    if (states.length === 0) return null;
   }
 
-  return plans;
+  return { assignmentPlans: states[0]?.plans ?? [], iterations };
 }
 
-function allocateAssignment(input: {
+function allocateAssignmentCandidates(input: {
   snapshot: PlanSnapshot;
   task: CalculatedTask;
   assignment: PlanAssignment;
@@ -225,24 +265,40 @@ function allocateAssignment(input: {
   targetDeadline: PlanDate;
   usage: UsageMap;
   allowOverload: boolean;
-}): AssignmentPlan | null {
-  const resourceOrder = [
-    input.assignment.resourceId,
-    ...input.snapshot.resources
-      .map((resource) => resource.id)
-      .filter((resourceId) => resourceId !== input.assignment.resourceId)
-      .sort()
-  ];
+}): AssignmentPlanCandidate[] {
+  const candidates = resourceOrders(input.snapshot, input.assignment.resourceId).flatMap((resourceOrder) => {
+    const candidate = allocateAssignmentForResourceOrder({
+      ...input,
+      resourceOrder
+    });
+    return candidate ? [candidate] : [];
+  });
+  return dedupeAssignmentCandidates(candidates).sort((left, right) =>
+    compareAssignmentPlans(left.plan, right.plan, input.snapshot, input.targetDeadline)
+  );
+}
+
+function allocateAssignmentForResourceOrder(input: {
+  snapshot: PlanSnapshot;
+  task: CalculatedTask;
+  assignment: PlanAssignment;
+  workMinutes: number;
+  targetDeadline: PlanDate;
+  usage: UsageMap;
+  allowOverload: boolean;
+  resourceOrder: string[];
+}): AssignmentPlanCandidate | null {
+  const usage = cloneUsage(input.usage);
   const start = input.task.calculatedStart ?? input.snapshot.project.plannedStart;
   const finish = maxPlanDate(start, input.targetDeadline);
   const dates = enumerateDates(start, finish);
   let remaining = input.workMinutes;
   const allocations: PlannedAllocation[] = [];
 
-  for (const resourceId of resourceOrder) {
+  for (const resourceId of input.resourceOrder) {
     for (const date of dates) {
       if (remaining <= 0) break;
-      const free = freeCapacityFor(input.snapshot, input.usage, resourceId, date);
+      const free = freeCapacityFor(input.snapshot, usage, resourceId, date);
       if (free <= 0) continue;
       const workMinutes = Math.min(free, remaining);
       allocations.push({
@@ -253,7 +309,7 @@ function allocateAssignment(input: {
         workMinutes,
         isSyntheticAssignment: resourceId !== input.assignment.resourceId
       });
-      addUsage(input.usage, resourceId, date, workMinutes);
+      addUsage(usage, resourceId, date, workMinutes);
       remaining -= workMinutes;
     }
   }
@@ -270,14 +326,17 @@ function allocateAssignment(input: {
       workMinutes: remaining,
       isSyntheticAssignment: false
     });
-    addUsage(input.usage, input.assignment.resourceId, overloadDate, remaining);
+    addUsage(usage, input.assignment.resourceId, overloadDate, remaining);
     acceptedOverloadMinutes = remaining;
   }
 
   return {
-    assignment: input.assignment,
-    allocations,
-    acceptedOverloadMinutes
+    plan: {
+      assignment: input.assignment,
+      allocations,
+      acceptedOverloadMinutes
+    },
+    usage
   };
 }
 
@@ -461,6 +520,144 @@ function createPlanDelta(commands: PlanningCommand[]): PlanDelta {
       command.type === "risk.accept_overload" ? [command.payload.overloadId] : []
     )
   };
+}
+
+function resourceOrders(snapshot: PlanSnapshot, primaryResourceId: string): string[][] {
+  const sortedResourceIds = snapshot.resources.map((resource) => resource.id).sort();
+  const fallbackOrder = [
+    primaryResourceId,
+    ...sortedResourceIds.filter((resourceId) => resourceId !== primaryResourceId)
+  ];
+  const alternateOrders = sortedResourceIds
+    .filter((resourceId) => resourceId !== primaryResourceId)
+    .map((resourceId) => [
+      resourceId,
+      primaryResourceId,
+      ...sortedResourceIds.filter(
+        (candidate) => candidate !== resourceId && candidate !== primaryResourceId
+      )
+    ]);
+  return dedupeResourceOrders([fallbackOrder, ...alternateOrders]);
+}
+
+function dedupeResourceOrders(orders: string[][]): string[][] {
+  const seen = new Set<string>();
+  const unique: string[][] = [];
+  for (const order of orders) {
+    const signature = order.join("|");
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(order);
+  }
+  return unique;
+}
+
+function emptySearchCost(): AutoPlanningSolverCost {
+  return {
+    deadlineMissDays: 0,
+    finishDateRank: 0,
+    overloadMinutes: 0,
+    changedTaskCount: 0,
+    changedAssignmentCount: 0,
+    riskScore: 0
+  };
+}
+
+function costForAssignmentPlans(
+  plans: AssignmentPlan[],
+  snapshot: PlanSnapshot,
+  targetDeadline: PlanDate
+): AutoPlanningSolverCost {
+  const finishDate = latestAllocationDate(plans);
+  const overloadMinutes = plans.reduce((total, plan) => total + plan.acceptedOverloadMinutes, 0);
+  const changedTaskCount = new Set(plans.map((plan) => plan.assignment.taskId)).size;
+  const changedAssignmentCount = new Set(
+    plans.flatMap((plan) => plan.allocations.map((allocation) => allocation.assignmentId))
+  ).size;
+  return {
+    deadlineMissDays:
+      finishDate && comparePlanDates(finishDate, targetDeadline) > 0
+        ? diffCalendarDays(targetDeadline, finishDate)
+        : 0,
+    finishDateRank: finishDate ? diffCalendarDays(snapshot.project.plannedStart, finishDate) : 0,
+    overloadMinutes,
+    changedTaskCount,
+    changedAssignmentCount,
+    riskScore: overloadMinutes > 0 ? Math.min(100, 70 + Math.ceil(overloadMinutes / 60)) : 0
+  };
+}
+
+function compareSearchStates(left: SearchState, right: SearchState): number {
+  return compareSolverCosts(left.cost, right.cost) || searchStateSignature(left).localeCompare(searchStateSignature(right));
+}
+
+function compareAssignmentPlans(
+  left: AssignmentPlan,
+  right: AssignmentPlan,
+  snapshot: PlanSnapshot,
+  targetDeadline: PlanDate
+): number {
+  return (
+    compareSolverCosts(
+      costForAssignmentPlans([left], snapshot, targetDeadline),
+      costForAssignmentPlans([right], snapshot, targetDeadline)
+    ) ||
+    assignmentPlanSignature(left).localeCompare(assignmentPlanSignature(right))
+  );
+}
+
+function compareSolverCosts(left: AutoPlanningSolverCost, right: AutoPlanningSolverCost): number {
+  return (
+    left.deadlineMissDays - right.deadlineMissDays ||
+    left.finishDateRank - right.finishDateRank ||
+    left.overloadMinutes - right.overloadMinutes ||
+    left.changedTaskCount - right.changedTaskCount ||
+    left.changedAssignmentCount - right.changedAssignmentCount ||
+    left.riskScore - right.riskScore
+  );
+}
+
+function dedupeSearchStates(states: SearchState[]): SearchState[] {
+  const seen = new Set<string>();
+  const unique: SearchState[] = [];
+  for (const state of states) {
+    const signature = searchStateSignature(state);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(state);
+  }
+  return unique;
+}
+
+function dedupeAssignmentCandidates(candidates: AssignmentPlanCandidate[]): AssignmentPlanCandidate[] {
+  const seen = new Set<string>();
+  const unique: AssignmentPlanCandidate[] = [];
+  for (const candidate of candidates) {
+    const signature = assignmentPlanSignature(candidate.plan);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(candidate);
+  }
+  return unique;
+}
+
+function searchStateSignature(state: SearchState): string {
+  return state.plans.map(assignmentPlanSignature).join("\n");
+}
+
+function assignmentPlanSignature(plan: AssignmentPlan): string {
+  return plan.allocations
+    .map((allocation) =>
+      [
+        allocation.assignmentId,
+        allocation.taskId,
+        allocation.resourceId,
+        allocation.date,
+        allocation.workMinutes
+      ].join(":")
+    )
+    .sort()
+    .join("|");
 }
 
 function planEligibleAssignments(snapshot: PlanSnapshot, calculatedPlan: CalculatedPlan): PlanAssignment[] {

@@ -81,6 +81,9 @@ Search:
 - deterministic bounded beam search;
 - defaults: beam width `20`, max iterations `200`, max proposals `5`;
 - first release uses day buckets;
+- beam state is a sequence of explicit assignment allocation plans plus resource usage;
+- `beamWidth` limits real competing states after each assignment expansion, not only telemetry;
+- candidate generation is deterministic: primary assignment resource first, then alternate first-resource orders for reassignment/split options;
 - candidate operations:
   - shift task within dependency-safe window;
   - reassign work;
