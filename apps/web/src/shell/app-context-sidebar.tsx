@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
-import type { SidebarGroup } from "@/shell/app-sidebar";
+import type { SidebarGroup } from "@/shell/sidebar-types";
 import { TenantSwitcher } from "@/shell/tenant-switcher";
 
 export type AppContextSidebarProps = {

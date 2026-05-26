@@ -9,7 +9,7 @@ import {
   SquareCheckBig
 } from "lucide-react";
 
-import type { SidebarGroup } from "@/shell/app-sidebar";
+import type { SidebarGroup } from "@/shell/sidebar-types";
 import type { Crumb } from "@/shell/topbar-breadcrumbs";
 import { MOCK_PROJECT_CRM, mockProjectScreenTitle, mockTaskProjectRef } from "@/views/project-mock";
 import type { ScreenId } from "@/views/screen-ids";
@@ -163,6 +163,7 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "Дашборд", current: true }],
     railSection: "overview",
     contextActiveItem: "Дашборд",
+    topbarMode: "team",
     pageIntroActions: "create-export"
   }),
   "02-my-work": route({

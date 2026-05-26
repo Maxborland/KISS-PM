@@ -35,7 +35,7 @@ import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-
 import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { projectTemplateName } from "@/lib/mock-data/workspace-config";
 import { positionName, userAvatar } from "@/lib/mock-data/users";
-import { PageIntro } from "@/views/layout/page-intro";
+import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 type ProjectRow = Project & {
   code: string;
@@ -137,9 +137,7 @@ export function ProjectsListBlock() {
   return (
     <ScenarioFetchGate loadingLabel="Загрузка проектов…">
       <>
-      <PageIntro
-        title="Проекты"
-        lead="14 активных проектов, 3 на ревью, 2 на финальной стадии."
+      <RoutePageIntro
         actions={
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" aria-hidden />

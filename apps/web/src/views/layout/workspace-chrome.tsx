@@ -5,13 +5,13 @@ import { AppContextSidebar } from "@/shell/app-context-sidebar";
 import { AppIconRail } from "@/shell/app-icon-rail";
 import { AppShell } from "@/shell/app-shell";
 import { AppTopbar } from "@/shell/app-topbar";
-import { contextNavForSection } from "@/shell/navigation-registry";
+import { contextNavForSection, type ScreenRouteMeta } from "@/shell/navigation-registry";
 import { TopbarBreadcrumbs } from "@/shell/topbar-breadcrumbs";
-import type { ScreenMeta } from "@/views/catalog";
+import { ScreenRouteProvider } from "@/views/layout/screen-route-context";
 import { DEFAULT_USER } from "@/views/config/sidebar-nav";
 
 export type WorkspaceChromeProps = {
-  meta: Pick<ScreenMeta, "breadcrumb" | "railSection" | "contextActiveItem" | "topbarMode">;
+  meta: ScreenRouteMeta;
   children: ReactNode;
   topbarActions?: ReactNode;
 };
@@ -28,22 +28,24 @@ export function WorkspaceChrome({ meta, children, topbarActions }: WorkspaceChro
     ) : null);
 
   return (
-    <AppShell
-      iconRail={<AppIconRail activeSection={meta.railSection} />}
-      contextSidebar={
-        <AppContextSidebar
-          groups={contextNavForSection(meta.railSection, meta.contextActiveItem)}
-          user={DEFAULT_USER}
-        />
-      }
-      topbar={
-        <AppTopbar
-          breadcrumbs={<TopbarBreadcrumbs items={meta.breadcrumb} />}
-          actions={topbarExtras}
-        />
-      }
-    >
-      {children}
-    </AppShell>
+    <ScreenRouteProvider meta={meta}>
+      <AppShell
+        iconRail={<AppIconRail activeSection={meta.railSection} />}
+        contextSidebar={
+          <AppContextSidebar
+            groups={contextNavForSection(meta.railSection, meta.contextActiveItem)}
+            user={DEFAULT_USER}
+          />
+        }
+        topbar={
+          <AppTopbar
+            breadcrumbs={<TopbarBreadcrumbs items={meta.breadcrumb} />}
+            actions={topbarExtras}
+          />
+        }
+      >
+        {children}
+      </AppShell>
+    </ScreenRouteProvider>
   );
 }

@@ -16,7 +16,7 @@ import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { userName } from "@/lib/mock-data/users";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
-import { PageIntro } from "@/views/layout/page-intro";
+import { RoutePageIntro } from "@/views/layout/route-page-intro";
 import {
   Kanban,
   KanbanCardViewMenu,
@@ -169,7 +169,7 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
 
   return (
     <>
-      <PageIntro title="Моя работа" lead="Канбан и список задач в одном рабочем контуре." />
+      <RoutePageIntro />
       <div className="view-toolbar">
         <Segmented
           name="my-work-mode"

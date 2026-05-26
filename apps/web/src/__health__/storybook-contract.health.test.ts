@@ -72,6 +72,24 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
   });
 
+  it("route metadata drives PageIntro actions via RoutePageIntro", () => {
+    const routeIntro = read("src/views/layout/route-page-intro.tsx");
+    expect(routeIntro).toContain("pageIntroActions");
+    expect(routeIntro).toContain("PageIntroActions");
+    expect(read("src/views/layout/workspace-chrome.tsx")).toContain("ScreenRouteProvider");
+    const blocksWithRegistryIntro = [
+      "src/views/blocks/dashboard-bento.tsx",
+      "src/views/blocks/deals-block.tsx",
+      "src/views/blocks/my-work-block.tsx",
+      "src/views/blocks/projects-list-block.tsx",
+      "src/views/blocks/gantt-slice-block.tsx"
+    ];
+    for (const rel of blocksWithRegistryIntro) {
+      expect(read(rel)).toContain("RoutePageIntro");
+    }
+    expect(read("src/views/config/sidebar-nav.ts")).not.toContain("sidebarGroupsForActive");
+  });
+
   it("views have no welcome-hero and blocks use PageIntro (batch 14)", () => {
     const viewsDir = join(webRoot, "src/views");
     const walk = (dir: string): string[] => {

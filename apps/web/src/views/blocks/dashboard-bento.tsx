@@ -25,7 +25,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
-import { PageIntro } from "@/views/layout/page-intro";
+import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 type FocusPeriod = "week" | "month";
 
@@ -70,11 +70,7 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
 
   return (
     <>
-      <PageIntro
-        title="Добро пожаловать, Камил"
-        lead="Ваш персональный дашборд: 12 задач, 8 сделок, 3 митинга на сегодня."
-        actions={<BemAvatar initials="КБ" color="c4" size="xl" />}
-      />
+      <RoutePageIntro actions={<BemAvatar initials="КБ" color="c4" size="xl" />} />
 
       <div className="bento">
         <div className="bento__cell tile tile--gradient-warm">

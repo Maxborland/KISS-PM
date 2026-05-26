@@ -2,19 +2,9 @@ import type { ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
+import type { SidebarGroup } from "@/shell/sidebar-types";
 
-export type SidebarItem = {
-  label: string;
-  active?: boolean;
-  nested?: boolean;
-  badge?: string;
-  alert?: boolean;
-};
-
-export type SidebarGroup = {
-  title: string;
-  items: SidebarItem[];
-};
+export type { SidebarGroup, SidebarItem } from "@/shell/sidebar-types";
 
 export type AppSidebarProps = {
   workspace?: string;

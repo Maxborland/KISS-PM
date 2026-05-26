@@ -43,7 +43,7 @@ import {
   type KanbanColumnSortKey,
   type KanbanColumnSortState
 } from "@/widgets/kanban";
-import { PageIntro } from "@/views/layout/page-intro";
+import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 type StageId = string;
 
@@ -264,9 +264,7 @@ function DealsBlockInner({
 
   return (
     <>
-      <PageIntro
-        title="Сделки"
-        lead="Воронка продаж и активные возможности."
+      <RoutePageIntro
         actions={
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" aria-hidden />

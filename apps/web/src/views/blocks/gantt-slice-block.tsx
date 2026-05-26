@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { cn } from "@/lib/cn";
-import { PageIntro } from "@/views/layout/page-intro";
+import { RoutePageIntro } from "@/views/layout/route-page-intro";
 import { GANTT_MOCK, GanttInteractive } from "@/widgets/gantt";
 import type { GanttToolbarApi } from "@/widgets/gantt";
 
@@ -258,7 +258,7 @@ export function GanttSliceBlock({ title, lead }: GanttSliceBlockProps) {
 
   return (
     <div className="gantt-workspace">
-      <PageIntro
+      <RoutePageIntro
         title={title}
         lead={lead}
         actions={

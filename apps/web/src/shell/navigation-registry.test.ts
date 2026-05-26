@@ -23,4 +23,10 @@ describe("navigation-registry", () => {
     expect(meta.breadcrumb.at(-1)?.label).toBe("Проекты");
     expect(meta.breadcrumb.at(-1)?.current).toBe(true);
   });
+
+  it("marks dashboard for team topbar and create-export intro actions", () => {
+    const dashboard = SCREEN_ROUTE_BY_ID["01-dashboard"];
+    expect(dashboard.topbarMode).toBe("team");
+    expect(dashboard.pageIntroActions).toBe("create-export");
+  });
 });
