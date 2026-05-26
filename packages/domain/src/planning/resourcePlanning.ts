@@ -68,6 +68,11 @@ export type BuildResourceLoadMatrixInput = {
   granularities?: BucketGranularity[];
 };
 
+type AssignmentAllocationIndex = {
+  explicitAssignmentIds: Set<string>;
+  workMinutesByAssignmentDate: Map<string, number>;
+};
+
 const defaultCalendar: PlanCalendar = {
   id: "default-calendar",
   workingWeekdays: [1, 2, 3, 4, 5],
@@ -108,6 +113,7 @@ export function buildResourceLoadMatrix(
 function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucket[] {
   const dates = enumerateDates(input.rangeStart, input.rangeFinish);
   const buckets: ResourceLoadBucket[] = [];
+  const allocationIndex = indexAssignmentAllocations(input.assignmentAllocations ?? []);
 
   for (const resource of input.resources) {
     const calendar = selectCalendar(resource.calendarId, input.calendars);
@@ -118,7 +124,8 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         resource.id,
         date,
         calendar,
-        calendarExceptions
+        calendarExceptions,
+        allocationIndex
       );
       const reservationLoad = calculateReservationLoadForDate(
         input,
@@ -165,7 +172,8 @@ function calculateTaskLoadForDate(
   resourceId: string,
   date: PlanDate,
   calendar: PlanCalendar,
-  calendarExceptions: PlanCalendarException[]
+  calendarExceptions: PlanCalendarException[],
+  allocationIndex: AssignmentAllocationIndex
 ): { assignedMinutes: number; taskIds: string[]; assignmentIds: string[] } {
   let assignedMinutes = 0;
   const taskIds: string[] = [];
@@ -174,7 +182,7 @@ function calculateTaskLoadForDate(
   for (const assignment of input.assignments.filter((item) => item.resourceId === resourceId)) {
     if (assignment.role !== "executor" && assignment.role !== "co_executor") continue;
     const explicitAllocation = explicitAssignmentAllocationForDate(
-      input.assignmentAllocations ?? [],
+      allocationIndex,
       assignment,
       date
     );
@@ -225,23 +233,46 @@ function calculateTaskLoadForDate(
 }
 
 function explicitAssignmentAllocationForDate(
-  allocations: PlanAssignmentAllocation[],
+  allocationIndex: AssignmentAllocationIndex,
   assignment: PlanAssignment,
   date: PlanDate
 ): number | null {
-  const assignmentAllocations = allocations.filter(
-    (allocation) => allocation.assignmentId === assignment.id
-  );
-  if (assignmentAllocations.length === 0) return null;
+  if (!allocationIndex.explicitAssignmentIds.has(assignment.id)) return null;
+  return allocationIndex.workMinutesByAssignmentDate.get(
+    assignmentAllocationKey(assignment.id, assignment.taskId, assignment.resourceId, date)
+  ) ?? 0;
+}
 
-  return assignmentAllocations
-    .filter(
-      (allocation) =>
-        allocation.date === date &&
-        allocation.taskId === assignment.taskId &&
-        allocation.resourceId === assignment.resourceId
-    )
-    .reduce((total, allocation) => total + allocation.workMinutes, 0);
+function indexAssignmentAllocations(
+  allocations: PlanAssignmentAllocation[]
+): AssignmentAllocationIndex {
+  const explicitAssignmentIds = new Set<string>();
+  const workMinutesByAssignmentDate = new Map<string, number>();
+
+  for (const allocation of allocations) {
+    explicitAssignmentIds.add(allocation.assignmentId);
+    const key = assignmentAllocationKey(
+      allocation.assignmentId,
+      allocation.taskId,
+      allocation.resourceId,
+      allocation.date
+    );
+    workMinutesByAssignmentDate.set(
+      key,
+      (workMinutesByAssignmentDate.get(key) ?? 0) + allocation.workMinutes
+    );
+  }
+
+  return { explicitAssignmentIds, workMinutesByAssignmentDate };
+}
+
+function assignmentAllocationKey(
+  assignmentId: string,
+  taskId: string,
+  resourceId: string,
+  date: PlanDate
+): string {
+  return `${assignmentId}:${taskId}:${resourceId}:${date}`;
 }
 
 function taskWorkingOverlapForDate(

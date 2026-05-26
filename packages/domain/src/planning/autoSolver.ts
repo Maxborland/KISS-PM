@@ -306,7 +306,7 @@ function allocateAssignmentForResourceOrder(input: {
       if (free <= 0) continue;
       const workMinutes = Math.min(free, remaining);
       allocations.push({
-        assignmentId: assignmentIdForResource(input.assignment, resourceId),
+        assignmentId: assignmentIdForResource(input.snapshot.assignments, input.assignment, resourceId),
         taskId: input.assignment.taskId,
         resourceId,
         date,
@@ -804,10 +804,30 @@ function latestAllocationDate(plans: AssignmentPlan[]): PlanDate | null {
   return dates.sort(comparePlanDates).at(-1) ?? null;
 }
 
-function assignmentIdForResource(assignment: PlanAssignment, resourceId: string): string {
-  return resourceId === assignment.resourceId
-    ? assignment.id
-    : `${assignment.id}__solver__${resourceId}`;
+function assignmentIdForResource(
+  assignments: PlanAssignment[],
+  assignment: PlanAssignment,
+  resourceId: string
+): string {
+  if (resourceId === assignment.resourceId) return assignment.id;
+
+  const reusableAssignment = assignments.find(
+    (candidate) =>
+      candidate.taskId === assignment.taskId &&
+      candidate.resourceId === resourceId &&
+      (candidate.role === "executor" || candidate.role === "co_executor")
+  );
+  if (reusableAssignment) return reusableAssignment.id;
+
+  const existingIds = new Set(assignments.map((candidate) => candidate.id));
+  const baseId = `${assignment.id}__solver__${resourceId}`;
+  if (!existingIds.has(baseId)) return baseId;
+
+  let suffix = 1;
+  while (existingIds.has(`${baseId}__${suffix}`)) {
+    suffix += 1;
+  }
+  return `${baseId}__${suffix}`;
 }
 
 function enumerateDates(start: PlanDate, finish: PlanDate): PlanDate[] {
