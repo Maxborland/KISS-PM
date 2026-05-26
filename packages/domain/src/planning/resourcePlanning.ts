@@ -19,6 +19,12 @@ import type {
   PlanReservation,
   PlanResource
 } from "./types";
+import {
+  aggregateOccupancyContributions,
+  occupancyMinutesForDate,
+  type OccupancyContribution,
+  type OccupancyWindow
+} from "./occupancy";
 
 export type ResourceLoadBucket = {
   resourceId: string;
@@ -29,6 +35,7 @@ export type ResourceLoadBucket = {
   granularity: BucketGranularity;
   assignedMinutes: number;
   reservedMinutes: number;
+  occupiedMinutes: number;
   capacityMinutes: number;
   freeMinutes: number;
   taskIds: string[];
@@ -42,14 +49,16 @@ export type ResourceLoadBucket = {
     reservationId: string;
     workMinutes: number;
   }>;
+  occupancyContributions: OccupancyContribution[];
   reservationIds: string[];
+  occupancyIds: string[];
   calendarExceptionIds: string[];
 };
 
 export type ResourceOverload = ResourceLoadBucket & {
   overloadMinutes: number;
   reasons: Array<{
-    type: "task" | "assignment" | "reservation" | "calendar_exception";
+    type: "task" | "assignment" | "reservation" | "occupancy" | "calendar_exception";
     id: string;
   }>;
 };
@@ -72,6 +81,7 @@ export type BuildResourceLoadMatrixInput = {
   calendars: PlanCalendar[];
   calendarExceptions: PlanCalendarException[];
   reservations: PlanReservation[];
+  occupancyWindows?: OccupancyWindow[] | undefined;
   rangeStart: PlanDate;
   rangeFinish: PlanDate;
   granularities?: BucketGranularity[];
@@ -97,14 +107,15 @@ export function buildResourceLoadMatrix(
   return {
     buckets,
     overloads: buckets
-      .filter((bucket) => bucket.assignedMinutes + bucket.reservedMinutes > bucket.capacityMinutes)
+      .filter((bucket) => committedMinutes(bucket) > bucket.capacityMinutes)
       .map((bucket) => ({
         ...bucket,
-        overloadMinutes: bucket.assignedMinutes + bucket.reservedMinutes - bucket.capacityMinutes,
+        overloadMinutes: committedMinutes(bucket) - bucket.capacityMinutes,
         reasons: [
           ...bucket.taskIds.map((id) => ({ type: "task" as const, id })),
           ...bucket.assignmentIds.map((id) => ({ type: "assignment" as const, id })),
           ...bucket.reservationIds.map((id) => ({ type: "reservation" as const, id })),
+          ...bucket.occupancyIds.map((id) => ({ type: "occupancy" as const, id })),
           ...bucket.calendarExceptionIds.map((id) => ({ type: "calendar_exception" as const, id }))
         ]
       })),
@@ -136,6 +147,7 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         calendar,
         calendarExceptions
       );
+      const occupancyLoad = calculateOccupancyLoadForDate(input, resource.id, date);
       const capacityMinutes = workingMinutesForDate(
         date,
         calendar,
@@ -145,7 +157,8 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         .filter((exception) => exception.date === date)
         .map((exception) => exception.id)
         .sort();
-      const committedMinutes = taskLoad.assignedMinutes + reservationLoad.reservedMinutes;
+      const totalCommittedMinutes =
+        taskLoad.assignedMinutes + reservationLoad.reservedMinutes + occupancyLoad.occupiedMinutes;
 
       buckets.push({
         resourceId: resource.id,
@@ -156,13 +169,16 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         granularity: "day",
         assignedMinutes: taskLoad.assignedMinutes,
         reservedMinutes: reservationLoad.reservedMinutes,
+        occupiedMinutes: occupancyLoad.occupiedMinutes,
         capacityMinutes,
-        freeMinutes: Math.max(0, capacityMinutes - committedMinutes),
+        freeMinutes: Math.max(0, capacityMinutes - totalCommittedMinutes),
         taskIds: taskLoad.taskIds,
         assignmentIds: taskLoad.assignmentIds,
         assignmentContributions: taskLoad.assignmentContributions,
         reservationContributions: reservationLoad.reservationContributions,
+        occupancyContributions: occupancyLoad.occupancyContributions,
         reservationIds: reservationLoad.reservationIds,
+        occupancyIds: occupancyLoad.occupancyIds,
         calendarExceptionIds
       });
     }
@@ -375,6 +391,37 @@ function calculateReservationLoadForDate(
   };
 }
 
+function calculateOccupancyLoadForDate(
+  input: BuildResourceLoadMatrixInput,
+  resourceId: string,
+  date: PlanDate
+): {
+  occupiedMinutes: number;
+  occupancyIds: string[];
+  occupancyContributions: OccupancyContribution[];
+} {
+  const occupancyContributions: OccupancyContribution[] = [];
+  for (const window of input.occupancyWindows ?? []) {
+    if (window.resourceId !== resourceId) continue;
+    if (window.capacityImpact === "tentative") continue;
+    const workMinutes = occupancyMinutesForDate(window, date);
+    if (workMinutes <= 0) continue;
+    occupancyContributions.push({
+      occupancyId: window.id,
+      sourceType: window.sourceType,
+      sourceId: window.sourceId,
+      workMinutes
+    });
+  }
+
+  const aggregated = aggregateOccupancyContributions(occupancyContributions);
+  return {
+    occupiedMinutes: aggregated.reduce((total, contribution) => total + contribution.workMinutes, 0),
+    occupancyIds: aggregated.map((contribution) => contribution.occupancyId),
+    occupancyContributions: aggregated
+  };
+}
+
 function aggregateBuckets(
   buckets: ResourceLoadBucket[],
   granularity: Exclude<BucketGranularity, "day">
@@ -401,7 +448,9 @@ function aggregateBuckets(
         assignmentIds: [...bucket.assignmentIds],
         assignmentContributions: [...bucket.assignmentContributions],
         reservationContributions: [...bucket.reservationContributions],
+        occupancyContributions: [...bucket.occupancyContributions],
         reservationIds: [...bucket.reservationIds],
+        occupancyIds: [...bucket.occupancyIds],
         calendarExceptionIds: [...bucket.calendarExceptionIds]
       });
       continue;
@@ -409,10 +458,11 @@ function aggregateBuckets(
 
     current.assignedMinutes += bucket.assignedMinutes;
     current.reservedMinutes += bucket.reservedMinutes;
+    current.occupiedMinutes += bucket.occupiedMinutes;
     current.capacityMinutes += bucket.capacityMinutes;
     current.freeMinutes = Math.max(
       0,
-      current.capacityMinutes - current.assignedMinutes - current.reservedMinutes
+      current.capacityMinutes - committedMinutes(current)
     );
     current.taskIds = [...new Set([...current.taskIds, ...bucket.taskIds])].sort();
     current.assignmentIds = [...new Set([...current.assignmentIds, ...bucket.assignmentIds])].sort();
@@ -424,13 +474,24 @@ function aggregateBuckets(
       ...current.reservationContributions,
       ...bucket.reservationContributions
     ]);
+    current.occupancyContributions = aggregateOccupancyContributions([
+      ...current.occupancyContributions,
+      ...bucket.occupancyContributions
+    ]);
     current.reservationIds = [...new Set([...current.reservationIds, ...bucket.reservationIds])].sort();
+    current.occupancyIds = [...new Set([...current.occupancyIds, ...bucket.occupancyIds])].sort();
     current.calendarExceptionIds = [
       ...new Set([...current.calendarExceptionIds, ...bucket.calendarExceptionIds])
     ].sort();
   }
 
   return [...grouped.values()];
+}
+
+function committedMinutes(
+  bucket: Pick<ResourceLoadBucket, "assignedMinutes" | "reservedMinutes" | "occupiedMinutes">
+): number {
+  return bucket.assignedMinutes + bucket.reservedMinutes + bucket.occupiedMinutes;
 }
 
 function aggregateReservationContributions(

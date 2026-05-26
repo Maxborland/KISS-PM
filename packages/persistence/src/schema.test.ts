@@ -53,6 +53,8 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
@@ -129,6 +131,8 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
@@ -162,6 +166,31 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores Phase 12 personal calendars and occupancy events", () => {
+    expect(getPersistenceTableColumns("resource_personal_calendars")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "user_id",
+        "source_provider",
+        "sync_status",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("resource_calendar_events")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "calendar_id",
+        "user_id",
+        "starts_at",
+        "finishes_at",
+        "work_minutes",
+        "capacity_impact",
+        "visibility",
+        "metadata"
+      ])
+    );
   });
 
   it("stores Phase 7 KPI, signal and action engine records", () => {

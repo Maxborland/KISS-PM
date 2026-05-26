@@ -19,6 +19,7 @@ import {
   buildCapacityDrilldown,
   buildWorkspaceCapacityAggregation,
   isCapacityCommittedProject,
+  OCCUPANCY_BUCKET_PROJECT_ID,
   parseCapacityDate,
   parseMonthIso,
   type WorkspaceCapacityAggregation
@@ -57,7 +58,7 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
     const aggregation = await getRawAggregation(deps, actor.tenantId, monthIso, effectiveProjectFilterId);
     if (!aggregation) return context.json({ error: "capacity_invalid_query" }, 400);
 
-    return context.json(maskOrgCapacityTreeProjects(aggregation.tree, access.readableProjectIds));
+    return context.json(maskOrgCapacityTreeProjects(aggregation.tree, capacityReadableProjectIds(access.readableProjectIds)));
   });
 
   app.get("/api/workspace/capacity/summary", async (context) => {
@@ -73,7 +74,7 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
 
     const aggregation = await getRawAggregation(deps, actor.tenantId, monthIso, null);
     if (!aggregation) return context.json({ error: "capacity_invalid_query" }, 400);
-    const tree = maskOrgCapacityTreeProjects(aggregation.tree, access.readableProjectIds);
+    const tree = maskOrgCapacityTreeProjects(aggregation.tree, capacityReadableProjectIds(access.readableProjectIds));
     const overloadProjectIds = collectProjectsWithOverloadedEmployees(listOrgCapacityRows(tree));
     return context.json(
       buildCapacitySummary({
@@ -106,12 +107,16 @@ export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
       aggregation,
       resourceId,
       date,
-      readableProjectIds: access.readableProjectIds
+      readableProjectIds: capacityReadableProjectIds(access.readableProjectIds)
     });
     if (!drilldown) return context.json({ error: "capacity_invalid_query" }, 400);
 
     return context.json(drilldown);
   });
+}
+
+function capacityReadableProjectIds(readableProjectIds: ReadonlySet<string>): ReadonlySet<string> {
+  return new Set([...readableProjectIds, OCCUPANCY_BUCKET_PROJECT_ID]);
 }
 
 function parseOptionalProjectFilter(value: string | undefined): string | null | false {
