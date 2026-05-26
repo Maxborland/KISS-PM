@@ -260,32 +260,32 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "Состояние · пусто",
     pageTitle: "Нет задач",
     lead: "Создайте первую задачу или импортируйте из CRM.",
-    breadcrumb: [],
-    variant: "bare"
+    breadcrumb: [{ label: "Моя работа" }, { label: "Задачи", current: true }],
+    activeNav: "Моя работа"
   },
   "state-error": {
     id: "state-error",
     storyTitle: "Состояние · ошибка",
     pageTitle: "Ошибка загрузки",
     lead: "Не удалось получить данные. Повторите позже.",
-    breadcrumb: [],
-    variant: "bare"
+    breadcrumb: [{ label: "Моя работа" }, { label: "Задачи", current: true }],
+    activeNav: "Моя работа"
   },
   "state-forbidden": {
     id: "state-forbidden",
     storyTitle: "Состояние · нет доступа",
     pageTitle: "Нет доступа",
     lead: "Обратитесь к администратору рабочей области.",
-    breadcrumb: [],
-    variant: "bare"
+    breadcrumb: [{ label: "Моя работа" }, { label: "Задачи", current: true }],
+    activeNav: "Моя работа"
   },
   "state-loading": {
     id: "state-loading",
     storyTitle: "Состояние · загрузка",
     pageTitle: "Загрузка",
     lead: "Подготавливаем рабочую область…",
-    breadcrumb: [],
-    variant: "bare"
+    breadcrumb: [{ label: "Моя работа" }, { label: "Задачи", current: true }],
+    activeNav: "Моя работа"
   }
 };
 

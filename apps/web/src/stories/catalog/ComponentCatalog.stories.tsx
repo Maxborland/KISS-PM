@@ -31,6 +31,12 @@ import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { PageIntro } from "@/components/ui/page-intro";
+import { SkeletonBento } from "@/components/ui/skeleton-bento";
+import { SkeletonDrawer } from "@/components/ui/skeleton-drawer";
+import { SkeletonGantt } from "@/components/ui/skeleton-gantt";
+import { SkeletonTable } from "@/components/ui/skeleton-table";
+import type { StateLevel } from "@/components/ui/state-level";
+import { STATE_LEVELS } from "@/components/ui/state-level";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SearchPill } from "@/components/ui/search-pill";
 import { Segmented } from "@/components/ui/segmented";
@@ -106,21 +112,61 @@ function CatalogPage() {
         </div>
       </Section>
 
-      <Section title="Состояния и обратная связь">
-        <BannerInline variant="info">Информационный баннер для согласования токенов.</BannerInline>
+      <Section title="Состояния (примитивы, naked · L1–L4)">
+        <p className="text-[var(--text-sm)] text-[var(--muted)]">
+          Каталог без shell. Продуктовые экраны состояний — в Views/Screens с WorkspaceChrome.
+        </p>
+        <BannerInline variant="info">L1 inline · L2 panel · L3 section · L4 full screen</BannerInline>
         <Alert variant="warning">
           <AlertTitle>Внимание</AlertTitle>
           <AlertDescription>Перегруз ресурса на следующей неделе.</AlertDescription>
         </Alert>
-        <div className="grid gap-4 md:grid-cols-2">
-          <EmptyState title="Нет проектов" description="Создайте первый проект из CRM." action={<Button size="sm"><Plus className="size-4" /> Создать</Button>} />
-          <LoadingState label="Загрузка портфеля…" />
-          <ErrorState title="Ошибка загрузки" description="Повторите позже." />
-          <ForbiddenState title="Нет доступа" description="Обратитесь к администратору рабочей области." />
+        {STATE_LEVELS.map((level: StateLevel) => (
+          <div key={level} className="catalog-state-level">
+            <h3 className="type-h3 u-mb-3">{level}</h3>
+            <div className="catalog-state-level__grid">
+              <EmptyState
+                level={level}
+                title="Нет проектов"
+                description="Создайте первый проект из CRM."
+                action={
+                  level === "L1" ? undefined : (
+                    <Button size="sm">
+                      <Plus className="size-4" /> Создать
+                    </Button>
+                  )
+                }
+              />
+              <LoadingState level={level} label={level === "L1" ? "" : "Загрузка…"} layout="generic" />
+              <ErrorState
+                level={level}
+                errorKey="network"
+                correlationId="kiss-catalog-demo"
+                onRetry={() => toast.info("Повтор (демо)")}
+              />
+              <ForbiddenState level={level} title="Нет доступа" description="Обратитесь к администратору." />
+            </div>
+          </div>
+        ))}
+        <IlluState level="L3" title="Портфель пуст" description="Подключите CRM или импортируйте шаблон." />
+        <ErrorState
+          level="L3"
+          errorKey="500"
+          correlationId="kiss-500-demo"
+          onRetry={() => toast.info("Повтор (демо)")}
+          onSupport={() => toast.info("Поддержка (демо)")}
+        />
+      </Section>
+
+      <Section title="Скелетоны (shimmer)">
+        <SkeletonTable />
+        <SkeletonBento />
+        <SkeletonGantt />
+        <div className="max-w-[380px] border border-[var(--border)] rounded-[var(--radius-lg)] p-4">
+          <SkeletonDrawer />
         </div>
-        <IlluState title="Портфель пуст" description="Подключите CRM или импортируйте шаблон." />
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-3/4" />
+        <div className="flex flex-wrap gap-2">
+          <Skeleton variant="text" width="md" />
           <Skeleton variant="row" />
           <Skeleton variant="avatar" className="size-10" />
         </div>

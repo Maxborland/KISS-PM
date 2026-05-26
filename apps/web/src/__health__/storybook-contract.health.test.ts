@@ -34,10 +34,11 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(kanban).toContain("<Badge");
   });
 
-  it("state screens use bare variant in catalog", () => {
+  it("state screens use workspace shell in catalog (not bare canvas)", () => {
     const source = read("src/views/catalog.ts");
     expect(source).toContain('"state-empty"');
-    expect(source).toMatch(/"state-empty":[\s\S]*variant: "bare"/);
+    expect(source).toMatch(/"state-empty":[\s\S]*activeNav: "Моя работа"/);
+    expect(source).not.toMatch(/"state-empty":[\s\S]*variant: "bare"/);
   });
 
   it("catalog story uses domain CardPanel and DataTable", () => {

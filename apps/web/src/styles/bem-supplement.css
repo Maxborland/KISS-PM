@@ -66,6 +66,230 @@
   margin-top: var(--space-4);
 }
 
+.state-illu__correlation {
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+  margin: var(--space-2) 0 0;
+}
+
+/* State levels L1–L4 (empty / illu / loading-state) */
+.state-empty--l1,
+.state-illu--l1,
+.loading-state--l1 {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  max-width: none;
+  margin: 0;
+}
+
+.state-empty--l1 .state-empty__title,
+.state-illu--l1 .state-illu__title {
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.state-empty--l1 .state-empty__desc,
+.state-illu--l1 .state-illu__text {
+  font-size: var(--text-xs);
+  margin-bottom: var(--space-2);
+}
+
+.state-empty--l2,
+.state-illu--l2,
+.loading-state--l2 {
+  max-width: none;
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.state-illu--l2 .state-illu__art {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-3);
+}
+
+.state-empty--l3,
+.state-illu--l3,
+.loading-state--l3 {
+  max-width: 420px;
+  margin-inline: auto;
+}
+
+.state-illu--l3 {
+  max-width: 480px;
+}
+
+.state-empty--l4,
+.state-illu--l4,
+.loading-state--l4 {
+  max-width: 520px;
+  margin: var(--space-6) auto;
+  padding: var(--space-10) var(--space-6);
+  min-height: min(52vh, 420px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.state-illu--l4 {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--panel-subtle);
+}
+
+.loading-state__label {
+  margin: 0 0 var(--space-3);
+}
+
+.loading-state--l1 .loading-state__label {
+  display: none;
+}
+
+.loading-state--l1 .loading-state__generic .skeleton--block {
+  display: none;
+}
+
+/* Layout skeletons (shimmer via .skeleton) */
+.skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.skeleton-table__head,
+.skeleton-table__row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.skeleton-table__head {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.skeleton-table--l1 .skeleton-table__head {
+  display: none;
+}
+
+.skeleton-table--l1 .skeleton-table__row {
+  grid-template-columns: 1fr 72px;
+}
+
+.skeleton-bento {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.skeleton-bento__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 360px;
+}
+
+.skeleton-bento__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.skeleton-bento__tile {
+  min-height: 120px;
+}
+
+.skeleton-bento__tile--wide {
+  grid-column: span 2;
+}
+
+.skeleton-bento__tile--tall {
+  grid-row: span 2;
+  min-height: 260px;
+}
+
+.skeleton-gantt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.skeleton-gantt__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--panel);
+}
+
+.skeleton-gantt__toolbar-spacer {
+  flex: 1;
+  height: 32px;
+  margin-bottom: 0;
+}
+
+.skeleton-gantt__body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 280px;
+}
+
+.skeleton-gantt__tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.skeleton-gantt__chart {
+  padding: var(--space-3);
+}
+
+.skeleton-gantt__chart-canvas {
+  height: 100%;
+  min-height: 240px;
+}
+
+.skeleton-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.skeleton-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-drawer__block {
+  height: 120px;
+}
+
+.catalog-state-level__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.catalog-state-level + .catalog-state-level {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* Form sections — секции в одной форме разделены тонкой линией. */
 .form-section {
   display: flex;
