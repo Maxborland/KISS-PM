@@ -360,7 +360,7 @@ function createSolverProposal(input: {
   assignmentPlans: AssignmentPlan[];
   engineVersion: string;
 }): AutoPlanningSolverProposal {
-  const commands = commandsForAssignmentPlans(input.assignmentPlans);
+  const commands = commandsForAssignmentPlans(input.assignmentPlans, input.snapshot.assignments);
   const planDelta = createPlanDelta(commands);
   const nextSnapshot = commands.reduce(
     (snapshot, command) => reducePlanningCommand(snapshot, command).nextSnapshot,
@@ -428,10 +428,14 @@ function createSolverProposal(input: {
   };
 }
 
-function commandsForAssignmentPlans(plans: AssignmentPlan[]): PlanningCommand[] {
+function commandsForAssignmentPlans(
+  plans: AssignmentPlan[],
+  existingAssignments: PlanAssignment[]
+): PlanningCommand[] {
   const commands: PlanningCommand[] = [];
   const upsertsByAssignmentId = new Map<string, AssignmentUpsertDraft>();
   const allocationsByAssignmentId = new Map<string, PlannedAllocation[]>();
+  const existingAssignmentById = new Map(existingAssignments.map((assignment) => [assignment.id, assignment]));
   const riskCommands: PlanningCommand[] = [];
 
   for (const plan of plans) {
@@ -457,13 +461,14 @@ function commandsForAssignmentPlans(plans: AssignmentPlan[]): PlanningCommand[] 
       const allocations = planAllocationsByAssignmentId.get(assignmentId) ?? [];
       const first = allocations[0];
       if (!first) continue;
+      const existingAssignment = existingAssignmentById.get(assignmentId);
       appendAllocationBucket(allocationsByAssignmentId, assignmentId, allocations);
       mergeAssignmentUpsert(upsertsByAssignmentId, {
         id: assignmentId,
         taskId: plan.assignment.taskId,
         resourceId: first.resourceId,
-        role: "co_executor",
-        unitsPermille: 1000,
+        role: existingAssignment?.role ?? "co_executor",
+        unitsPermille: existingAssignment?.unitsPermille ?? 1000,
         workMinutes: sumAllocationMinutes(allocations)
       });
     }
