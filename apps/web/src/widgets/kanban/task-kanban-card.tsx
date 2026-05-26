@@ -56,6 +56,8 @@ export function TaskKanbanCard<C extends string = string>({
   visibleFields
 }: TaskKanbanCardProps<C>) {
   const isInteractive = Boolean(onOpen);
+  /** DnD sortable slot уже role=button; не вкладывать вторую кнопку (axe nested-interactive). */
+  const useButtonSemantics = isInteractive && !draggable;
 
   const handleClick = onOpen ? () => onOpen(item.id) : undefined;
   const handleKey = onOpen
@@ -95,8 +97,8 @@ export function TaskKanbanCard<C extends string = string>({
       data-dnd-active={draggable ? "true" : undefined}
       data-dragging={isDragging ? "true" : undefined}
       data-card-id={item.id}
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
+      role={useButtonSemantics ? "button" : undefined}
+      tabIndex={useButtonSemantics ? 0 : undefined}
       onClick={handleClick}
       onKeyDown={handleKey}
       aria-label={isInteractive ? `Открыть карточку ${item.id}: ${item.title}` : undefined}

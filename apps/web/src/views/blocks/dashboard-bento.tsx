@@ -298,7 +298,6 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
                     <tr
                       key={row.id}
                       tabIndex={0}
-                      role="button"
                       aria-label={`Открыть карточку задачи ${row.id}`}
                       onClick={() => setOpenRowId(row.id)}
                       onKeyDown={(event) => {

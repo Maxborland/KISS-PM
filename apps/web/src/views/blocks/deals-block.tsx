@@ -582,7 +582,6 @@ function DealsList({
             <tr
               key={d.id}
               tabIndex={0}
-              role="button"
               aria-label={`Открыть сделку ${d.id}`}
               onClick={() => onOpen(d.id)}
               onKeyDown={(event) => {

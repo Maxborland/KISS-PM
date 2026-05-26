@@ -52,6 +52,7 @@ export function DealKanbanCard<C extends string = string>({
   foot
 }: DealKanbanCardProps<C>) {
   const isInteractive = Boolean(onOpen);
+  const useButtonSemantics = isInteractive && !draggable;
 
   const handleClick = onOpen ? () => onOpen(item.id) : undefined;
   const handleKey = onOpen
@@ -90,8 +91,8 @@ export function DealKanbanCard<C extends string = string>({
       data-deal-id={item.id}
       data-dnd-active={draggable ? "true" : undefined}
       data-dragging={isDragging ? "true" : undefined}
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
+      role={useButtonSemantics ? "button" : undefined}
+      tabIndex={useButtonSemantics ? 0 : undefined}
       onClick={handleClick}
       onKeyDown={handleKey}
       aria-label={isInteractive ? `Открыть сделку ${item.id}: ${item.title}` : undefined}

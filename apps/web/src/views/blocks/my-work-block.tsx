@@ -362,7 +362,6 @@ function MyWorkList({
           <tr
             key={card.id}
             tabIndex={0}
-            role="button"
             aria-label={`Открыть карточку ${card.id}`}
             onClick={() => onOpen(card.id)}
             onKeyDown={(event) => {

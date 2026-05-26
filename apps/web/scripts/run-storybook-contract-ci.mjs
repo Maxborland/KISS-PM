@@ -1,7 +1,6 @@
 /**
- * Batch 16 — CI gate: Storybook build + Next build + copy scan (106 stories).
+ * Phase 9 — CI gate: vitest, Storybook build, Next build, copy scan, VRT, axe.
  */
-import { chromium } from "@playwright/test";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -28,12 +27,13 @@ const port = process.env.STORYBOOK_CONTRACT_PORT
   ? Number(process.env.STORYBOOK_CONTRACT_PORT)
   : await getFreePort();
 
-function runStep(name, command, args, cwd = webRoot) {
+function runStep(name, command, args, cwd = webRoot, extraEnv = {}) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
     shell: true,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ...extraEnv }
   });
   const exitCode = result.status ?? 1;
   return {
@@ -59,45 +59,29 @@ async function waitForHttpRoot(listenPort) {
   return false;
 }
 
-async function waitForStorybookPreview(listenPort) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  const probeUrl = `http://127.0.0.1:${listenPort}/?path=/story/foundations-colors--palette&viewMode=story`;
-  const CYRILLIC = /[А-Яа-яЁё]/;
-  try {
-    for (let i = 0; i < 60; i += 1) {
-      try {
-        await page.goto(probeUrl, { waitUntil: "load", timeout: 20000 });
-        const frame = page.frameLocator("#storybook-preview-iframe");
-        await frame.locator("body").waitFor({ timeout: 15000 });
-        const text = await frame.locator("body").innerText();
-        if (text.length > 10 && !text.includes("No Preview") && CYRILLIC.test(text)) return true;
-      } catch {
-        /* serve / preview ещё не готов */
-      }
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-    return false;
-  } finally {
-    await browser.close();
-  }
-}
-
 function startStaticServe(listenPort) {
-  return spawn(
-    "pnpm",
-    ["exec", "serve", staticRoot, "-s", "-l", String(listenPort)],
-    {
-      cwd: webRoot,
-      shell: true,
-      stdio: "ignore"
-    }
-  );
+  return spawn("pnpm", ["exec", "serve", staticRoot, "-s", "-l", String(listenPort)], {
+    cwd: webRoot,
+    shell: true,
+    stdio: "ignore"
+  });
 }
 
 mkdirSync(outDir, { recursive: true });
 const startedAt = new Date().toISOString();
 const steps = [];
+
+steps.push(runStep("web-typecheck", "pnpm", ["typecheck"], webRoot));
+if (!steps.at(-1).pass) {
+  writeEvidence({ startedAt, steps, pass: false, port });
+  process.exit(1);
+}
+
+steps.push(runStep("web-test", "pnpm", ["test"], webRoot));
+if (!steps.at(-1).pass) {
+  writeEvidence({ startedAt, steps, pass: false, port });
+  process.exit(1);
+}
 
 steps.push(runStep("build-storybook", "pnpm", ["build-storybook"], webRoot));
 if (!steps.at(-1).pass) {
@@ -113,37 +97,62 @@ if (!steps.at(-1).pass) {
 
 const server = startStaticServe(port);
 const httpReady = await waitForHttpRoot(port);
-const previewReady = httpReady ? await waitForStorybookPreview(port) : false;
-if (!httpReady || !previewReady) {
+if (!httpReady) {
   server.kill("SIGTERM");
   steps.push({
     name: "static-serve-ready",
     command: `serve storybook-static -s -l ${port}`,
     exitCode: 1,
-    pass: false,
-    httpReady,
-    previewReady
+    pass: false
   });
   writeEvidence({ startedAt, steps, pass: false, port });
   process.exit(1);
 }
-server.kill("SIGTERM");
+
+const playwrightEnv = {
+  STORYBOOK_STATIC: "1",
+  STORYBOOK_CONTRACT_SKIP_SERVE: "1",
+  STORYBOOK_CONTRACT_PORT: String(port),
+  CI: process.env.CI ?? "1"
+};
 
 const copyResult = spawnSync("node", ["scripts/run-copy-scan-all-stories.mjs"], {
   cwd: webRoot,
   encoding: "utf8",
   shell: true,
-  env: { ...process.env, STORYBOOK_STATIC: "1" },
+  env: { ...process.env, STORYBOOK_STATIC: "1", STORYBOOK_CONTRACT_PORT: String(port) },
   stdio: ["ignore", "pipe", "pipe"]
 });
 steps.push({
   name: "copy-scan-all-stories",
-  command: "STORYBOOK_STATIC=1 node scripts/run-copy-scan-all-stories.mjs (chunked serve)",
+  command: "node scripts/run-copy-scan-all-stories.mjs",
   exitCode: copyResult.status ?? 1,
   pass: copyResult.status === 0,
   stderrTail: (copyResult.stderr || "").slice(-2000),
   stdoutTail: (copyResult.stdout || "").slice(-2000)
 });
+
+steps.push(
+  runStep(
+    "storybook-vrt",
+    "pnpm",
+    ["exec", "playwright", "test", "--grep", "@vrt"],
+    webRoot,
+    playwrightEnv
+  )
+);
+
+steps.push(
+  runStep(
+    "storybook-a11y",
+    "pnpm",
+    ["exec", "playwright", "test", "--grep", "@a11y"],
+    webRoot,
+    playwrightEnv
+  )
+);
+
+server.kill("SIGTERM");
 
 const webBuild = steps.find((s) => s.name === "web-build");
 if (webBuild?.pass) {
@@ -152,11 +161,11 @@ if (webBuild?.pass) {
     `${JSON.stringify(
       {
         batch: "15",
-        date: "2026-05-24",
+        date: "2026-05-26",
         command: "pnpm --filter @kiss-pm/web build",
         pass: true,
         exitCode: 0,
-        via: "batch16-ci"
+        via: "phase9-ci"
       },
       null,
       2
@@ -167,10 +176,16 @@ if (webBuild?.pass) {
 
 const pass = steps.every((s) => s.pass);
 writeEvidence({ startedAt, steps, pass, port });
-console.log(JSON.stringify({ batch: 16, pass, steps: steps.map((s) => ({ name: s.name, pass: s.pass })) }, null, 2));
+console.log(
+  JSON.stringify(
+    { phase: 9, pass, steps: steps.map((s) => ({ name: s.name, pass: s.pass })) },
+    null,
+    2
+  )
+);
 process.exit(pass ? 0 : 1);
 
 function writeEvidence(audit) {
   audit.finishedAt = new Date().toISOString();
-  writeFileSync(join(outDir, "batch16-ci-evidence.json"), `${JSON.stringify(audit, null, 2)}\n`, "utf8");
+  writeFileSync(join(outDir, "phase9-ci-evidence.json"), `${JSON.stringify(audit, null, 2)}\n`, "utf8");
 }

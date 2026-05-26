@@ -44,6 +44,19 @@ type ProjectRow = Project & {
   statusVariant: "info" | "success" | "warning";
 };
 
+function formatProjectSourceType(sourceType: Project["sourceType"]): string {
+  switch (sourceType) {
+    case "opportunity":
+      return "Из сделки CRM";
+    case "manual":
+      return "Создан вручную";
+    case "template":
+      return "Из шаблона";
+    default:
+      return sourceType;
+  }
+}
+
 function buildProjectRows(projects: Project[]): ProjectRow[] {
   return projects.map((project, index) => ({
   ...project,
@@ -213,7 +226,6 @@ export function ProjectsListBlock() {
               <tr
                 key={row.id}
                 tabIndex={0}
-                role="button"
                 aria-label={`Открыть ${row.title}`}
                 className={cn(
                   "row-clickable",
@@ -240,7 +252,7 @@ export function ProjectsListBlock() {
                 </td>
                 <td>
                   <Chip variant={row.statusVariant}>{row.status}</Chip>
-                  <div className="u-text-xs u-text-muted">{row.sourceType}</div>
+                  <div className="u-text-xs u-text-muted">{formatProjectSourceType(row.sourceType)}</div>
                 </td>
                 <td>
                   <CellStack
@@ -270,7 +282,10 @@ export function ProjectsListBlock() {
               <SheetBody>
                 <div className="u-flex u-flex-col u-gap-3">
                   <CellStack title="Ответственный" subtitle={openProject.owner.name} />
-                  <CellStack title="Источник" subtitle={`${openProject.sourceType} · ${openProject.sourceOpportunityId ?? "без сделки"}`} />
+                  <CellStack
+                    title="Источник"
+                    subtitle={`${formatProjectSourceType(openProject.sourceType)} · ${openProject.sourceOpportunityId ?? "без сделки"}`}
+                  />
                   <CellStack title="Период" subtitle={formatDateRange(openProject.plannedStart, openProject.plannedFinish)} />
                   <CellStack title="Экономика" subtitle={`${formatRub(openProject.contractValue)} · ${formatHours(openProject.plannedHours)}`} />
                   <CellStack title="Шаблон" subtitle={projectTemplateName(openProject.templateId)} />

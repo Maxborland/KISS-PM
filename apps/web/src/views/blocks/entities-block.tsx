@@ -110,7 +110,6 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
               <tr
                 key={r.code}
                 tabIndex={0}
-                role="button"
                 aria-label={`Открыть ${r.name}`}
                 className="row-clickable"
                 onClick={() => setOpenName(r.name)}

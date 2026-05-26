@@ -2052,7 +2052,7 @@ button.stepper__item:disabled {
   font-weight: 600;
 }
 
-.trend-arrow--up { color: var(--success); }
+.trend-arrow--up { color: var(--success-text); }
 .trend-arrow--down { color: var(--danger); }
 .trend-arrow--flat { color: var(--muted); }
 
@@ -2703,7 +2703,7 @@ button.stepper__item:disabled {
   font-weight: 600;
 }
 
-.trend-arrow--up { color: var(--success); }
+.trend-arrow--up { color: var(--success-text); }
 .trend-arrow--down { color: var(--danger-text); }
 .trend-arrow--flat { color: var(--muted); }
 

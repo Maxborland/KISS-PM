@@ -751,12 +751,12 @@ a:hover { color: var(--accent-hover); }
   background: currentColor;
 }
 
-.priority-flag--urgent { color: var(--prio-urgent); }
+.priority-flag--urgent { color: var(--prio-critical); }
 .priority-flag--critical { color: var(--prio-critical); }
-.priority-flag--high { color: var(--prio-high); }
-.priority-flag--normal { color: var(--prio-normal); }
-.priority-flag--med { color: var(--prio-med); }
-.priority-flag--low { color: var(--prio-low); }
+.priority-flag--high { color: var(--warning-text); }
+.priority-flag--normal { color: var(--warning-text); }
+.priority-flag--med { color: var(--warning-text); }
+.priority-flag--low { color: var(--success-text); }
 
 .avatar {
   width: 26px;
@@ -1039,7 +1039,7 @@ a:hover { color: var(--accent-hover); }
 .cell-stack__sub {
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
 .cell-stack--link {
@@ -1193,7 +1193,7 @@ a:hover { color: var(--accent-hover); }
   align-items: center;
   justify-content: space-between;
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--muted-strong);
   font-weight: 500;
 }
 
@@ -1201,7 +1201,7 @@ a:hover { color: var(--accent-hover); }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
 .kanban-card__title {
@@ -1216,10 +1216,10 @@ a:hover { color: var(--accent-hover); }
   align-items: center;
   gap: 8px;
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
-.kanban-card__meta .icon { color: var(--muted); }
+.kanban-card__meta .icon { color: var(--muted-strong); }
 
 .kanban-card__foot {
   display: flex;
@@ -1228,7 +1228,7 @@ a:hover { color: var(--accent-hover); }
   padding-top: 10px;
   border-top: 1px dashed var(--border-subtle);
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--muted-strong);
 }
 
 .kanban-card__foot-meta {
@@ -2143,6 +2143,7 @@ a:hover { color: var(--accent-hover); }
 .u-mb-3 { margin-bottom: 12px; }
 .u-mb-4 { margin-bottom: 16px; }
 .u-text-muted { color: var(--muted); }
+.u-text-xs.u-text-muted { color: var(--muted-strong); }
 .u-text-muted-strong { color: var(--muted-strong); }
 .u-text-strong { color: var(--text-strong); font-weight: 600; }
 .u-text-body { font-size: var(--text-md); line-height: var(--lh-md); }
