@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
 import { TrendArrow } from "@/components/ui/trend-arrow";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -66,15 +67,17 @@ export type DashboardBentoProps = {
   empty?: boolean;
 };
 
-export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
+export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {}) {
+  const { scenario } = useScenarioFixtures();
   const [period, setPeriod] = useState<FocusPeriod>("month");
   const [openRowId, setOpenRowId] = useState<string | null>(null);
 
+  const empty = emptyOverride ?? scenario === "empty";
   const rows = empty ? [] : ROWS;
   const openRow = useMemo(() => rows.find((r) => r.id === openRowId) ?? null, [rows, openRowId]);
 
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загружаем дашборд…">
       <RoutePageIntro actions={<BemAvatar initials="КБ" color="c4" size="xl" />} />
 
       <div className="bento">
@@ -339,6 +342,6 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
             : null
         }
       />
-    </>
+    </ScenarioFetchGate>
   );
 }

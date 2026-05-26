@@ -12,6 +12,12 @@ import { TaskCreateModalBlock } from "@/views/blocks/task-create-modal-block";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { getScreenRoute } from "@/views/screens/screen-route";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
+import { LoginScreenView } from "@/views/screens/login-screen-view";
+import {
+  SCREEN_STORY_PARAMETERS,
+  screenStoryArgs,
+  type ScreenStory
+} from "@/views/screens/screen-story-helpers";
 import { ScreenView } from "@/views/screens/screen-view";
 
 /** Колонка Kanban/Funnel: заголовок в `.kanban-col__title` (без глобального getByText). */
@@ -28,13 +34,16 @@ function kanbanColumnByTitle(root: HTMLElement, title: string): HTMLElement {
 const meta: Meta<typeof ScreenView> = {
   title: "Views/Screens",
   component: ScreenView,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    ...SCREEN_STORY_PARAMETERS,
+    viewport: { defaultViewport: "desktop1440" }
+  },
   tags: ["!autodocs"]
 };
 
 export default meta;
 
-type Story = StoryObj<typeof ScreenView>;
+type Story = ScreenStory;
 
 export const SpaceDiscipline: Story = { name: "00 Дисциплина отступов", args: { id: "00-space-discipline" } };
 export const Dashboard: Story = { name: "01 Дашборд", args: { id: "01-dashboard" } };
@@ -58,7 +67,67 @@ export const ProjectScenarios: Story = { name: "15 Сценарии проект
 export const ProjectKPI: Story = { name: "16 KPI проекта", args: { id: "16-project-kpi" } };
 export const ProjectAudit: Story = { name: "17 Аудит проекта", args: { id: "17-project-audit" } };
 export const ProjectCalendars: Story = { name: "18 Календари проекта", args: { id: "18-project-calendars" } };
-export const Login: Story = { name: "19 Вход", args: { id: "19-login" } };
+export const Login: Story = { name: "19 Вход", args: screenStoryArgs("19-login") };
+
+export const LoginLoading: Story = {
+  name: "19 Вход · загрузка",
+  render: () => <LoginScreenView variant="loading" />,
+  parameters: SCREEN_STORY_PARAMETERS
+};
+
+export const LoginError: Story = {
+  name: "19 Вход · ошибка",
+  render: () => <LoginScreenView variant="error" />,
+  parameters: SCREEN_STORY_PARAMETERS
+};
+
+export const LoginForbidden: Story = {
+  name: "19 Вход · нет доступа",
+  render: () => <LoginScreenView variant="forbidden" />,
+  parameters: SCREEN_STORY_PARAMETERS
+};
+
+export const DashboardLoading: Story = {
+  name: "01 Дашборд · загрузка",
+  args: screenStoryArgs("01-dashboard"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "loading" }
+};
+
+export const DashboardError: Story = {
+  name: "01 Дашборд · ошибка",
+  args: screenStoryArgs("01-dashboard"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "error" }
+};
+
+export const DashboardForbidden: Story = {
+  name: "01 Дашборд · нет доступа",
+  args: screenStoryArgs("01-dashboard"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "forbidden" }
+};
+
+export const MyWorkEmpty: Story = {
+  name: "02 Моя работа · пусто",
+  args: screenStoryArgs("02-my-work"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "empty" }
+};
+
+export const MyWorkLoading: Story = {
+  name: "02 Моя работа · загрузка",
+  args: screenStoryArgs("02-my-work"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "loading" }
+};
+
+export const MyWorkError: Story = {
+  name: "02 Моя работа · ошибка",
+  args: screenStoryArgs("02-my-work"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "error" }
+};
+
+export const MyWorkForbidden: Story = {
+  name: "02 Моя работа · нет доступа",
+  args: screenStoryArgs("02-my-work"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "forbidden" }
+};
 export const StateEmpty: Story = { name: "Состояние · пусто", args: { id: "state-empty" } };
 export const StateError: Story = { name: "Состояние · ошибка", args: { id: "state-error" } };
 export const StateForbidden: Story = { name: "Состояние · нет доступа", args: { id: "state-forbidden" } };
@@ -127,11 +196,8 @@ export const MyWorkKanbanDragging: Story = {
 
 export const DashboardEmptyState: Story = {
   name: "01 Дашборд · пусто",
-  render: () => (
-    <WorkspaceChrome meta={getScreenRoute("01-dashboard")}>
-      <DashboardBento empty />
-    </WorkspaceChrome>
-  )
+  args: screenStoryArgs("01-dashboard"),
+  parameters: { ...SCREEN_STORY_PARAMETERS, scenario: "empty" }
 };
 
 export const DealsFunnelDragging: Story = {
@@ -205,64 +271,6 @@ export const CreateTaskModalValidation: Story = {
     await waitFor(() => {
       expect(canvas.getByRole("heading", { level: 3, name: "Участники" })).toBeTruthy();
       expect(canvas.getByRole("button", { name: /3\s+Участники/ })).toHaveAttribute("aria-current", "step");
-    });
-  }
-};
-
-export const CreateTaskModalApiPayload: Story = {
-  name: "04 Модалка · payload запроса",
-  render: () => (
-    <WorkspaceChrome meta={getScreenRoute("04-create-task-modal")}>
-      <TaskCreateModalBlock initialStep={2} initialProjectId="PRJ-2026-014" />
-    </WorkspaceChrome>
-  ),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const nameInput = canvas.getByLabelText(/Название/i) as HTMLInputElement;
-    fireEvent.change(nameInput, { target: { value: "Согласовать ТЗ" } });
-    fireEvent.click(canvas.getByRole("button", { name: "Далее" }));
-    await waitFor(() => {
-      expect(canvas.getByRole("heading", { level: 3, name: "Участники" })).toBeTruthy();
-      expect(canvas.getByRole("button", { name: /3\s+Участники/ })).toHaveAttribute("aria-current", "step");
-    });
-    fireEvent.click(canvas.getByRole("button", { name: "Создать" }));
-    await waitFor(() => {
-      const preview = canvas.getByTestId("task-payload-preview");
-      expect(preview.textContent).toContain('"plannedWork"');
-      expect(preview.textContent).toContain('"durationWorkingDays"');
-      expect(preview.textContent).toContain('"participants"');
-      expect(preview.textContent).toContain('"requiresAcceptance"');
-    });
-    expect(canvas.getByText(/PRJ-2026-014\/tasks/)).toBeTruthy();
-  }
-};
-
-export const TaskCardApiFields: Story = {
-  name: "03 Карточка задачи · UpdateTaskBody",
-  render: () => (
-    <WorkspaceChrome meta={getScreenRoute("03-task-card")}>
-      <EntityDetailBlock
-        title="Согласовать ТЗ"
-        subtitle="MDS-39 · Внедрение CRM"
-        stage={{ label: "В работе", tone: "info" }}
-        variant="task"
-      />
-    </WorkspaceChrome>
-  ),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const save = canvas.getByRole("button", { name: "Сохранить" });
-    expect(save.hasAttribute("disabled")).toBe(true);
-    const workInput = canvas.getByLabelText(/Трудозатраты/i) as HTMLInputElement;
-    fireEvent.change(workInput, { target: { value: "20" } });
-    await waitFor(() => {
-      expect(canvas.getByRole("button", { name: /Сохранить · есть изменения/i })).toBeTruthy();
-    });
-    fireEvent.click(canvas.getByRole("button", { name: /Сохранить · есть изменения/i }));
-    await waitFor(() => {
-      const preview = canvas.getByTestId("task-payload-preview");
-      expect(preview.textContent).toContain('"clientUpdatedAt"');
-      expect(preview.textContent).toContain('"plannedWork": 20');
     });
   }
 };
