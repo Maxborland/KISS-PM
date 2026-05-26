@@ -19,9 +19,9 @@
 - Modify: `packages/domain/src/collaboration.ts`
 - Modify: `packages/domain/src/collaboration.test.ts`
 
-- [ ] Add Phase G.2 docs and phase-plan links.
-- [ ] Add call room/session/participant/event/recording types, status constants and parsers.
-- [ ] Add domain tests for valid/invalid providers, media kind, statuses and bounded room titles.
+- [x] Add Phase G.2 docs and phase-plan links.
+- [x] Add call room/session/participant/event/recording types, status constants and parsers.
+- [x] Add domain tests for valid/invalid providers, media kind, statuses and bounded room titles.
 
 ### Task 2: Persistence
 
@@ -33,10 +33,10 @@
 - Modify: `packages/persistence/src/migration.test.ts`
 - Modify: `packages/persistence/src/schema.test.ts`
 
-- [ ] Add tenant-scoped tables: `call_rooms`, `call_sessions`, `call_participant_states`, `call_events`, `call_recordings`.
-- [ ] Add schema exports, table registry entries and column inventory.
-- [ ] Add repository methods for room/session/event/participant/recording lifecycle.
-- [ ] Add migration/schema tests.
+- [x] Add tenant-scoped tables: `call_rooms`, `call_sessions`, `call_participant_states`, `call_events`, `call_recordings`.
+- [x] Add schema exports, table registry entries and column inventory.
+- [x] Add repository methods for room/session/event/participant/recording lifecycle.
+- [x] Add migration/schema tests.
 
 ### Task 3: Provider And API
 
@@ -47,11 +47,11 @@
 - Modify: `apps/api/src/app.ts`
 - Modify: `apps/api/src/serverReadiness.ts`
 
-- [ ] Add provider abstraction: disabled/manual/jitsi/livekit.
-- [ ] Generate short-lived LiveKit-compatible JWT without persisting token.
-- [ ] Register call-room API routes and stable errors.
-- [ ] Add permission and audit checks using parent entity access.
-- [ ] Update expected migration tag.
+- [x] Add provider abstraction: disabled/manual/jitsi/livekit.
+- [x] Generate short-lived LiveKit-compatible JWT without persisting token.
+- [x] Register call-room API routes and stable errors.
+- [x] Add permission and audit checks using parent entity access.
+- [x] Update expected migration tag.
 
 ### Task 4: Tests And Verification
 
@@ -60,6 +60,6 @@
 - Create: `apps/api/src/communicationRealtimeRoutes.db.test.ts`
 - Modify: existing targeted DB test truncate lists if needed.
 
-- [ ] Add provider tests for disabled/misconfigured/Jitsi/LiveKit behavior.
-- [ ] Add DB API tests for create/list room, session start/end, join token, participant state, recording validation, denied access and audit safety.
-- [ ] Run targeted tests, typecheck, full test set when feasible, `git diff --check`, CodeGraph sync.
+- [x] Add provider tests for disabled/misconfigured/Jitsi/LiveKit behavior.
+- [x] Add DB API tests for create/list room, session start/end, join token, participant state, recording validation, denied access and audit safety.
+- [x] Run targeted tests, typecheck, full test set when feasible, `git diff --check`, CodeGraph sync.
