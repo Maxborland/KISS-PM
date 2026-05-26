@@ -353,6 +353,47 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(read("src/lib/mock-data/tasks.ts")).toContain("satisfies Task[]");
   });
 
+  it("Phase 8: Storybook globs include Flows and Patterns", () => {
+    const main = read(".storybook/main.ts");
+    expect(main).toContain("../src/stories/flows/**/*.stories");
+    expect(main).toContain("../src/stories/patterns/**/*.stories");
+    const preview = read(".storybook/preview.tsx");
+    expect(preview).toMatch(/"Flows"/);
+    expect(preview).toMatch(/"Patterns"/);
+  });
+
+  it("Phase 8: six product flow stories exist", () => {
+    const flowFiles = [
+      "src/stories/flows/crm-to-project.stories.tsx",
+      "src/stories/flows/project-wizard.stories.tsx",
+      "src/stories/flows/kpi-signal-corrective.stories.tsx",
+      "src/stories/flows/capacity-conflict.stories.tsx",
+      "src/stories/flows/onboarding-tenant.stories.tsx",
+      "src/stories/flows/audit-trail.stories.tsx"
+    ];
+    for (const rel of flowFiles) {
+      const source = read(rel);
+      expect(source).toContain("flowParameters");
+      expect(source).toMatch(/[А-Яа-яЁё]/);
+    }
+  });
+
+  it("Phase 8: pattern catalog stories cover states, forms, drawer, toolbar, bulk, command", () => {
+    expect(read("src/stories/patterns/fetch-states.stories.tsx")).toContain("EmptyState");
+    expect(read("src/stories/patterns/forms.stories.tsx")).toContain("TaskCreateModalBlock");
+    expect(read("src/stories/patterns/drawer-detail.stories.tsx")).toContain("TaskDetailDrawer");
+    expect(read("src/stories/patterns/filters-toolbar.stories.tsx")).toContain("view-toolbar");
+    expect(read("src/stories/patterns/bulk-actions.stories.tsx")).toContain("bulk selection");
+    expect(read("src/stories/patterns/search-command.stories.tsx")).toContain("CommandDialog");
+    expect(read("src/stories/api-contract/index.stories.tsx")).toContain("API_CONTRACT_ENTRIES");
+  });
+
+  it("Phase 8: API contract map doc exists", () => {
+    const doc = readFileSync(join(webRoot, "../../docs/design-v3/API-CONTRACT-MAP.md"), "utf8");
+    expect(doc).toContain("API_CONTRACT_ENTRIES");
+    expect(doc).toContain("CreateTaskBody");
+  });
+
   it("Gantt production-grade evidence is green", () => {
     const evidence = JSON.parse(
       readFileSync(join(webRoot, ".storybook-verify-tmp/gantt-production-grade-evidence.json"), "utf8")
