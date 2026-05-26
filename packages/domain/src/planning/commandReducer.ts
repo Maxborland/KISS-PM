@@ -2,6 +2,7 @@ import { createEmptyPlanDelta, type PlanDelta, type PlanningCommand } from "./pl
 import { comparePlanDates } from "./calendar";
 import type {
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanBaseline,
   PlanConstraint,
   PlanSnapshot,
@@ -79,10 +80,15 @@ export function reducePlanningCommand(
       });
     case "assignment.upsert":
       return reduceAssignmentUpsert(snapshot, command);
+    case "assignment.allocations.replace":
+      return reduceAssignmentAllocationsReplace(snapshot, command);
     case "assignment.delete":
       return withSnapshot(snapshot, command, {
         assignments: snapshot.assignments.filter(
           (assignment) => assignment.id !== command.payload.assignmentId
+        ),
+        assignmentAllocations: snapshot.assignmentAllocations.filter(
+          (allocation) => allocation.assignmentId !== command.payload.assignmentId
         )
       });
     case "baseline.capture":
@@ -191,6 +197,9 @@ function reduceTaskDeleteOrArchive(
       assignments: snapshot.assignments.filter(
         (assignment) => assignment.taskId !== command.payload.taskId
       ),
+      assignmentAllocations: snapshot.assignmentAllocations.filter(
+        (allocation) => allocation.taskId !== command.payload.taskId
+      ),
       dependencies: snapshot.dependencies.filter(
         (dependency) =>
           dependency.predecessorTaskId !== command.payload.taskId &&
@@ -246,6 +255,49 @@ function reduceAssignmentUpsert(
       })
     },
     { changedAssignmentIds: [command.payload.id] }
+  );
+}
+
+function reduceAssignmentAllocationsReplace(
+  snapshot: PlanSnapshot,
+  command: Extract<PlanningCommand, { type: "assignment.allocations.replace" }>
+): CommandReductionResult {
+  const assignment = snapshot.assignments.find(
+    (candidate) => candidate.id === command.payload.assignmentId
+  );
+  if (!assignment) {
+    return {
+      nextSnapshot: snapshot,
+      planDelta: { ...createEmptyPlanDelta(), commands: [command] },
+      validationIssues: [
+        invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")
+      ]
+    };
+  }
+
+  const nextAllocations = command.payload.allocations
+    .filter((allocation) => allocation.workMinutes > 0)
+    .map<PlanAssignmentAllocation>((allocation) => ({
+      assignmentId: assignment.id,
+      taskId: assignment.taskId,
+      resourceId: assignment.resourceId,
+      date: allocation.date,
+      workMinutes: allocation.workMinutes
+    }))
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  return withSnapshot(
+    snapshot,
+    command,
+    {
+      assignmentAllocations: [
+        ...snapshot.assignmentAllocations.filter(
+          (allocation) => allocation.assignmentId !== assignment.id
+        ),
+        ...nextAllocations
+      ]
+    },
+    { changedAssignmentIds: [assignment.id] }
   );
 }
 
@@ -423,6 +475,22 @@ function validateCommandPreconditions(
       }
       if (command.payload.workMinutes !== null && command.payload.workMinutes < 0) {
         return [invalid("planning_command_invalid", "Трудоемкость назначения не может быть отрицательной")];
+      }
+      return [];
+    case "assignment.allocations.replace":
+      if (!assignmentIds.has(command.payload.assignmentId)) {
+        return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
+      }
+      if (
+        command.payload.allocations.some(
+          (allocation) =>
+            allocation.workMinutes < 0 || allocation.date.trim().length === 0
+        )
+      ) {
+        return [invalid("planning_command_invalid", "Команда содержит некорректное распределение назначения")];
+      }
+      if (new Set(command.payload.allocations.map((allocation) => allocation.date)).size !== command.payload.allocations.length) {
+        return [invalid("planning_command_invalid", "Распределение назначения содержит повторяющиеся даты")];
       }
       return [];
     case "assignment.delete":
@@ -662,6 +730,7 @@ function taskIdsFor(command: PlanningCommand): string[] {
 
 function assignmentIdsFor(command: PlanningCommand): string[] {
   if (command.type === "assignment.upsert") return [command.payload.id];
+  if (command.type === "assignment.allocations.replace") return [command.payload.assignmentId];
   if (command.type === "assignment.delete") return [command.payload.assignmentId];
   return [];
 }

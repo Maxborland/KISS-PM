@@ -205,6 +205,90 @@ describe("resource planning", () => {
     expect(matrix.overloads).toEqual([]);
   });
 
+  it("uses explicit assignment allocations instead of fallback distribution", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      tasks: [
+        {
+          ...createSnapshot().tasks[0]!,
+          plannedStart: "2026-06-01",
+          plannedFinish: "2026-06-02",
+          durationMinutes: 960,
+          workMinutes: 960
+        }
+      ],
+      assignments: [
+        {
+          id: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          role: "executor" as const,
+          unitsPermille: 1000,
+          workMinutes: 960,
+          calendarId: null
+        }
+      ],
+      assignmentAllocations: [
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-01",
+          workMinutes: 120
+        },
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          date: "2026-06-02",
+          workMinutes: 840
+        }
+      ],
+      reservations: []
+    };
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      assignmentAllocations: snapshot.assignmentAllocations,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-02",
+      granularities: ["day"]
+    });
+
+    expect(matrix.buckets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          resourceId: "resource-alpha",
+          date: "2026-06-01",
+          assignedMinutes: 120,
+          assignmentIds: ["assignment-a"]
+        }),
+        expect.objectContaining({
+          resourceId: "resource-alpha",
+          date: "2026-06-02",
+          assignedMinutes: 840,
+          assignmentIds: ["assignment-a"]
+        })
+      ])
+    );
+    expect(matrix.overloads).toEqual([
+      expect.objectContaining({
+        resourceId: "resource-alpha",
+        date: "2026-06-02",
+        overloadMinutes: 360
+      })
+    ]);
+  });
+
   it("allocates task load by working instants instead of date labels", () => {
     const baseTask = createSnapshot().tasks[0];
     if (!baseTask) throw new Error("missing base task");
@@ -522,6 +606,7 @@ function createSnapshot(): PlanSnapshot {
         calendarId: null
       }
     ],
+    assignmentAllocations: [],
     dependencies: [],
     baselines: [],
     calendars: [{ id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }],

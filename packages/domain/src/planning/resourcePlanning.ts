@@ -12,6 +12,7 @@ import type {
   BucketGranularity,
   CalculatedPlan,
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanCalendar,
   PlanCalendarException,
   PlanDate,
@@ -58,6 +59,7 @@ export type BuildResourceLoadMatrixInput = {
   plan: CalculatedPlan;
   resources: PlanResource[];
   assignments: PlanAssignment[];
+  assignmentAllocations?: PlanAssignmentAllocation[];
   calendars: PlanCalendar[];
   calendarExceptions: PlanCalendarException[];
   reservations: PlanReservation[];
@@ -171,6 +173,20 @@ function calculateTaskLoadForDate(
 
   for (const assignment of input.assignments.filter((item) => item.resourceId === resourceId)) {
     if (assignment.role !== "executor" && assignment.role !== "co_executor") continue;
+    const explicitAllocation = explicitAssignmentAllocationForDate(
+      input.assignmentAllocations ?? [],
+      assignment,
+      date
+    );
+    if (explicitAllocation !== null) {
+      if (explicitAllocation > 0) {
+        assignedMinutes += explicitAllocation;
+        taskIds.push(assignment.taskId);
+        assignmentIds.push(assignment.id);
+      }
+      continue;
+    }
+
     const task = input.plan.tasks.find((candidate) => candidate.id === assignment.taskId);
     if (!task?.calculatedStart || !task.calculatedFinish) continue;
     if (comparePlanDates(date, task.calculatedStart) < 0 || comparePlanDates(date, task.calculatedFinish) > 0) {
@@ -206,6 +222,26 @@ function calculateTaskLoadForDate(
     taskIds: [...new Set(taskIds)].sort(),
     assignmentIds: [...new Set(assignmentIds)].sort()
   };
+}
+
+function explicitAssignmentAllocationForDate(
+  allocations: PlanAssignmentAllocation[],
+  assignment: PlanAssignment,
+  date: PlanDate
+): number | null {
+  const assignmentAllocations = allocations.filter(
+    (allocation) => allocation.assignmentId === assignment.id
+  );
+  if (assignmentAllocations.length === 0) return null;
+
+  return assignmentAllocations
+    .filter(
+      (allocation) =>
+        allocation.date === date &&
+        allocation.taskId === assignment.taskId &&
+        allocation.resourceId === assignment.resourceId
+    )
+    .reduce((total, allocation) => total + allocation.workMinutes, 0);
 }
 
 function taskWorkingOverlapForDate(

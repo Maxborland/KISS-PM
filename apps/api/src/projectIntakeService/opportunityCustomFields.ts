@@ -4,12 +4,17 @@ import type {
 } from "../apiTypes";
 import type { ServiceError } from "./types";
 
+type OpportunityCustomFieldDataSource = Pick<
+  ApiTenantDataSource,
+  "listCustomFieldDefinitions"
+>;
+
 type ValidationResult =
   | { ok: true; values: OpportunityCustomFieldValues }
   | ServiceError;
 
 export async function validateOpportunityCustomFieldValues(
-  dataSource: ApiTenantDataSource,
+  dataSource: OpportunityCustomFieldDataSource,
   tenantId: string,
   values: OpportunityCustomFieldValues | undefined
 ): Promise<ValidationResult> {

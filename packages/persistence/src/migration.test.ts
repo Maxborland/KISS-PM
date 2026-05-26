@@ -126,6 +126,20 @@ const phase56PlanningCommandIdempotencyMigration = readFileSync(
   ),
   "utf8"
 );
+const phase78AssignmentAllocationsMigration = readFileSync(
+  new URL(
+    "../migrations/0023_phase_7_8_assignment_allocations.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phase78PlanningSolverRunsMigration = readFileSync(
+  new URL(
+    "../migrations/0024_phase_7_8_planning_solver_runs.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -518,6 +532,29 @@ describe("Phase 5/6 planning core SQL migration", () => {
     );
     expect(phase56PlanningCommandIdempotencyMigration).toContain(
       'CONSTRAINT "planning_command_idempotency_keys_actor_fk"'
+    );
+  });
+
+  it("adds explicit assignment allocations for solver split work", () => {
+    expect(phase78AssignmentAllocationsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "task_assignment_allocations"'
+    );
+    expect(phase78AssignmentAllocationsMigration).toContain(
+      '"assignment_id" text NOT NULL'
+    );
+    expect(phase78AssignmentAllocationsMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "task_assignment_allocations_assignment_date_uidx"'
+    );
+  });
+
+  it("adds persisted planning solver runs without overloading scenario runs", () => {
+    expect(phase78PlanningSolverRunsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "planning_solver_runs"'
+    );
+    expect(phase78PlanningSolverRunsMigration).toContain('"proposals" jsonb NOT NULL');
+    expect(phase78PlanningSolverRunsMigration).toContain('"applied_proposal_id" text');
+    expect(phase78PlanningSolverRunsMigration).toContain(
+      'CONSTRAINT "planning_solver_runs_mode_chk"'
     );
   });
 });

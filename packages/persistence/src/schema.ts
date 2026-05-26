@@ -793,6 +793,51 @@ export const taskAssignments = pgTable(
   ]
 );
 
+export const taskAssignmentAllocations = pgTable(
+  "task_assignment_allocations",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    assignmentId: text("assignment_id").notNull(),
+    taskId: text("task_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    date: text("date").notNull(),
+    workMinutes: integer("work_minutes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "task_assignment_allocations_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    uniqueIndex("task_assignment_allocations_assignment_date_uidx").on(
+      table.tenantId,
+      table.projectId,
+      table.assignmentId,
+      table.date
+    ),
+    foreignKey({
+      name: "task_assignment_allocations_assignment_fk",
+      columns: [table.tenantId, table.projectId, table.assignmentId],
+      foreignColumns: [taskAssignments.tenantId, taskAssignments.projectId, taskAssignments.id]
+    }).onDelete("cascade"),
+    index("task_assignment_allocations_tenant_project_task_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.taskId
+    ),
+    index("task_assignment_allocations_tenant_project_resource_date_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.resourceId,
+      table.date
+    ),
+    check("task_assignment_allocations_minutes_chk", sql`${table.workMinutes} >= 0`)
+  ]
+);
+
 export const taskDependencies = pgTable(
   "task_dependencies",
   {
@@ -977,6 +1022,49 @@ export const planningScenarioRuns = pgTable(
       table.projectId,
       table.expiresAt
     )
+  ]
+);
+
+export const planningSolverRuns = pgTable(
+  "planning_solver_runs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    mode: text("mode").notNull(),
+    clientPlanVersion: integer("client_plan_version").notNull(),
+    engineVersion: text("engine_version").notNull(),
+    inputSnapshotMetadata: jsonb("input_snapshot_metadata").$type<Record<string, unknown>>().notNull(),
+    targetDeadline: text("target_deadline"),
+    proposals: jsonb("proposals").$type<Record<string, unknown>[]>().notNull(),
+    proposalPayloadHash: text("proposal_payload_hash").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    appliedProposalId: text("applied_proposal_id"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_solver_runs_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "planning_solver_runs_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "planning_solver_runs_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("planning_solver_runs_tenant_project_expires_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.expiresAt
+    ),
+    check("planning_solver_runs_mode_chk", sql`${table.mode} in ('schedule', 'repair')`)
   ]
 );
 
@@ -1209,12 +1297,14 @@ export type PersistenceTableName =
   | "resource_calendars"
   | "calendar_exceptions"
   | "task_assignments"
+  | "task_assignment_allocations"
   | "task_dependencies"
   | "project_baselines"
   | "project_baseline_tasks"
   | "project_baseline_assignments"
   | "resource_reservations"
   | "planning_scenario_runs"
+  | "planning_solver_runs"
   | "planning_command_idempotency_keys"
   | "task_participants"
   | "task_activities"
@@ -1253,12 +1343,14 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "resource_calendars",
   "calendar_exceptions",
   "task_assignments",
+  "task_assignment_allocations",
   "task_dependencies",
   "project_baselines",
   "project_baseline_tasks",
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_solver_runs",
   "planning_command_idempotency_keys",
   "task_participants",
   "task_activities",
@@ -1290,12 +1382,14 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "resource_calendars",
   "calendar_exceptions",
   "task_assignments",
+  "task_assignment_allocations",
   "task_dependencies",
   "project_baselines",
   "project_baseline_tasks",
   "project_baseline_assignments",
   "resource_reservations",
   "planning_scenario_runs",
+  "planning_solver_runs",
   "planning_command_idempotency_keys",
   "task_participants",
   "task_activities",
@@ -1533,6 +1627,18 @@ const tableColumns = {
     "work_minutes",
     "calendar_id"
   ],
+  task_assignment_allocations: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "assignment_id",
+    "task_id",
+    "resource_id",
+    "date",
+    "work_minutes",
+    "created_at",
+    "updated_at"
+  ],
   task_dependencies: [
     "id",
     "tenant_id",
@@ -1582,6 +1688,23 @@ const tableColumns = {
     "proposal_payload_hash",
     "actor_user_id",
     "expires_at",
+    "applied_at",
+    "created_at"
+  ],
+  planning_solver_runs: [
+    "id",
+    "tenant_id",
+    "project_id",
+    "mode",
+    "client_plan_version",
+    "engine_version",
+    "input_snapshot_metadata",
+    "target_deadline",
+    "proposals",
+    "proposal_payload_hash",
+    "actor_user_id",
+    "expires_at",
+    "applied_proposal_id",
     "applied_at",
     "created_at"
   ],

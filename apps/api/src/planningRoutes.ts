@@ -14,8 +14,10 @@ import {
   calculatePlan,
   diffCalendarDays,
   isBlockingValidationIssue,
+  proposeAutoPlanningSolutions,
   proposePlanningScenarios,
   reducePlanningCommand,
+  type AutoPlanningSolverProposal,
   type PlanningCommand,
   type PlanSnapshot,
   type ScenarioProposal,
@@ -23,16 +25,19 @@ import {
   type ValidationIssue
 } from "@kiss-pm/domain";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { PlanningScenarioRunRecord } from "@kiss-pm/persistence";
+import type { PlanningScenarioRunRecord, PlanningSolverRunRecord } from "@kiss-pm/persistence";
 import type { Handler, Hono } from "hono";
 import { createHash, randomUUID } from "node:crypto";
 
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
+  parseAutoSolverApplyEnvelope,
+  parseAutoSolverRunEnvelope,
   parsePlanningCommand,
   parsePlanningCommandEnvelope,
   parseScenarioApplyEnvelope,
@@ -42,17 +47,42 @@ import {
 const planningEngineVersion = "planning-core-v1";
 
 type PlanningRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: PlanningRouteDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: PlanningMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
+
+type PlanningRouteDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "createPlanningScenarioRun"
+  | "createPlanningSolverRun"
+  | "findPlanningSolverRun"
+  | "getPlanSnapshot"
+  | "listTaskStatuses"
+  | "listWorkspaceUsers"
+>;
+
+type PlanningMutationDataSource = PlanningRouteDataSource &
+  Pick<
+    ApiTenantDataSource,
+    | "applyPlanningCommand"
+    | "createPlanningCommandIdempotency"
+    | "findPlanningCommandIdempotency"
+    | "findPlanningScenarioRun"
+    | "findPlanningSolverRun"
+    | "incrementPlanVersion"
+    | "lockTenantResourcePlanning"
+    | "markPlanningScenarioRunApplied"
+    | "markPlanningSolverRunApplied"
+  >;
 
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   app.get("/api/workspace/projects/:projectId/planning/read-model", async (context) => {
@@ -621,6 +651,288 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
   app.post("/api/workspace/projects/:projectId/planning/scenarios/:scenarioId/apply", applyScenarioProposal);
   app.post("/api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply", applyScenarioProposal);
+
+  app.post("/api/workspace/projects/:projectId/planning/auto-solver-runs", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !deps.dataSource.getPlanSnapshot ||
+      !deps.dataSource.createPlanningSolverRun ||
+      !deps.dataSource.appendAuditEvent
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseAutoSolverRunEnvelope(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const profile = await deps.getActorProfile(actor);
+    const readDecision = canReadPlanningReadModel({ actor, profile });
+    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    const decision = canPreviewPlanningScenarios({
+      actor,
+      profile,
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    const projectId = getRequiredRouteParam(context, "projectId");
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
+    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
+    if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+      return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
+    }
+
+    const solverResult = proposeAutoPlanningSolutions({
+      snapshot,
+      mode: parsed.value.mode,
+      targetDeadline: parsed.value.targetDeadline,
+      engineVersion: planningEngineVersion
+    });
+    const runId = `planning-solver-${randomUUID()}`;
+    const proposals = solverResult.proposals.map((proposal, index) => ({
+      ...proposal,
+      id: `${runId}-proposal-${index + 1}`
+    }));
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const solverRun = await deps.dataSource.createPlanningSolverRun({
+      id: runId,
+      tenantId: actor.tenantId,
+      projectId,
+      mode: parsed.value.mode,
+      clientPlanVersion: snapshot.planVersion,
+      engineVersion: planningEngineVersion,
+      inputSnapshotMetadata: {
+        planVersion: snapshot.planVersion,
+        capturedAt: snapshot.capturedAt,
+        taskCount: snapshot.tasks.length,
+        assignmentCount: snapshot.assignments.length
+      },
+      targetDeadline: solverResult.targetDeadline,
+      proposals: proposals as unknown as Record<string, unknown>[],
+      proposalPayloadHash: hashJson(proposals),
+      actorUserId: actor.id,
+      expiresAt
+    });
+    await appendPlanningAuditIfConfigured(deps, {
+      tenantId: actor.tenantId,
+      actorUserId: actor.id,
+      actionType: "planning.auto_solver_run.created",
+      sourceWorkflow: "planning",
+      sourceEntity: { type: "Project", id: projectId },
+      commandInput: parsed.value,
+      beforeState: { planVersion: snapshot.planVersion },
+      afterState: {
+        solverRunId: runId,
+        proposalIds: proposals.map((proposal) => proposal.id),
+        proposalCount: proposals.length,
+        expiresAt: expiresAt.toISOString()
+      },
+      permissionResult: decision
+    });
+
+    return context.json(formatSolverRunResponse(solverRun));
+  });
+
+  app.get("/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.findPlanningSolverRun) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+    const profile = await deps.getActorProfile(actor);
+    const readDecision = canReadPlanningReadModel({ actor, profile });
+    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    const solverRun = await deps.dataSource.findPlanningSolverRun(
+      actor.tenantId,
+      getRequiredRouteParam(context, "projectId"),
+      getRequiredRouteParam(context, "runId")
+    );
+    if (!solverRun) return context.json({ error: "planning_auto_solver_run_not_found" }, 404);
+    return context.json(formatSolverRunResponse(solverRun));
+  });
+
+  app.post(
+    "/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId/proposals/:proposalId/apply",
+    async (context) => {
+      const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+      const body = await readLimitedJsonBody(context);
+      if (!body.ok) return context.json({ error: body.error }, body.status);
+      const parsed = parseAutoSolverApplyEnvelope(body.value);
+      if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+      const profile = await deps.getActorProfile(actor);
+      const planDecision = canManageProjectPlan({
+        actor,
+        profile,
+        targetTenantId: actor.tenantId
+      });
+      if (!planDecision.allowed) return context.json({ error: planDecision.reason }, 403);
+
+      const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+        if (
+          !transactionDataSource.getPlanSnapshot ||
+          !transactionDataSource.findPlanningSolverRun ||
+          !transactionDataSource.applyPlanningCommand ||
+          !transactionDataSource.incrementPlanVersion ||
+          !transactionDataSource.markPlanningSolverRunApplied ||
+          !transactionDataSource.appendAuditEvent
+        ) {
+          return { ok: false as const, status: 501, error: "persistence_not_configured" };
+        }
+
+        const projectId = getRequiredRouteParam(context, "projectId");
+        const runId = getRequiredRouteParam(context, "runId");
+        const proposalId = getRequiredRouteParam(context, "proposalId");
+        await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+        const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+        if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+          return {
+            ok: false as const,
+            status: 409,
+            error: "plan_version_conflict",
+            currentPlanVersion: snapshot.planVersion
+          };
+        }
+
+        const solverRun = await transactionDataSource.findPlanningSolverRun(actor.tenantId, projectId, runId);
+        if (!solverRun) return { ok: false as const, status: 404, error: "planning_auto_solver_run_not_found" };
+        if (solverRun.appliedAt) return { ok: false as const, status: 409, error: "planning_auto_solver_already_applied" };
+        if (solverRun.expiresAt.getTime() <= Date.now()) {
+          return { ok: false as const, status: 409, error: "planning_auto_solver_expired" };
+        }
+        if (solverRun.clientPlanVersion !== snapshot.planVersion) {
+          return {
+            ok: false as const,
+            status: 409,
+            error: "plan_version_conflict",
+            currentPlanVersion: snapshot.planVersion
+          };
+        }
+        if (hashJson(solverRun.proposals) !== solverRun.proposalPayloadHash) {
+          return { ok: false as const, status: 409, error: "planning_auto_solver_hash_mismatch" };
+        }
+        const proposal = parseAutoSolverProposal(
+          solverRun.proposals.find((candidate) => candidate.id === proposalId)
+        );
+        if (!proposal) return { ok: false as const, status: 404, error: "planning_auto_solver_proposal_not_found" };
+        const resourceDecision = proposalRequiresResourceManage(proposal)
+          ? canManageProjectResources({ actor, profile, targetTenantId: actor.tenantId })
+          : planDecision;
+        if (!resourceDecision.allowed) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.denied",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: { planVersion: snapshot.planVersion },
+            afterState: null,
+            permissionResult: resourceDecision,
+            executionResult: { status: "denied" }
+          }, transactionDataSource);
+          return { ok: false as const, status: 403, error: resourceDecision.reason };
+        }
+        if (proposalRequiresAcceptedRiskReason(proposal) && !parsed.value.acceptedRiskReason) {
+          return { ok: false as const, status: 400, error: "accepted_risk_reason_required" };
+        }
+
+        const commandsToApply = withAcceptedRiskReason(
+          proposal.planDelta.commands,
+          parsed.value.acceptedRiskReason
+        );
+        let preview = {
+          nextSnapshot: snapshot,
+          validationIssues: [] as ReturnType<typeof previewPlanningCommand>["validationIssues"]
+        };
+        for (const command of commandsToApply) {
+          const next = previewPlanningCommand(preview.nextSnapshot, command);
+          preview = {
+            nextSnapshot: next.nextSnapshot,
+            validationIssues: [
+              ...preview.validationIssues,
+              ...next.validationIssues,
+              ...(await validateCommandDataSourcePreconditions(
+                transactionDataSource,
+                actor.tenantId,
+                command
+              ))
+            ]
+          };
+        }
+        if (preview.validationIssues.some(isBlockingValidationIssue)) {
+          return {
+            ok: false as const,
+            status: 409,
+            error: "planning_precondition_failed",
+            validationIssues: preview.validationIssues
+          };
+        }
+
+        for (const command of commandsToApply) {
+          await transactionDataSource.applyPlanningCommand({
+            tenantId: actor.tenantId,
+            projectId,
+            actorUserId: actor.id,
+            command
+          });
+        }
+        const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
+        await transactionDataSource.markPlanningSolverRunApplied({
+          tenantId: actor.tenantId,
+          projectId,
+          solverRunId: solverRun.id,
+          proposalId,
+          appliedAt: new Date()
+        });
+        const auditEventId = await appendPlanningAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.auto_solver.proposal_applied",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { runId, proposalId, commands: commandsToApply },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: {
+            planVersion: newPlanVersion,
+            changedTaskIds: proposal.planDelta.changedTaskIds,
+            changedAssignmentIds: proposal.planDelta.changedAssignmentIds,
+            acceptedRiskIds: proposal.planDelta.acceptedRiskIds
+          },
+          permissionResult: resourceDecision,
+          executionResult: { status: "succeeded", validationIssues: preview.validationIssues }
+        }, transactionDataSource);
+        const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+        if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        return {
+          ok: true as const,
+          body: {
+            solverRunId: solverRun.id,
+            proposalId,
+            newPlanVersion,
+            auditEventId,
+            readModel: createPlanningReadModel(appliedSnapshot)
+          }
+        };
+      });
+
+      if (!result.ok) {
+        if (result.status === 501) return context.json({ error: result.error }, 501);
+        if (result.status === 404) return context.json({ error: result.error }, 404);
+        if (result.status === 409) return context.json(errorResponseBody(result), 409);
+        if (result.status === 403) return context.json({ error: result.error }, 403);
+        if (result.status === 400) return context.json({ error: result.error }, 400);
+        return context.json({ error: result.error }, 400);
+      }
+
+      return context.json(result.body);
+    }
+  );
 }
 
 function getScenarioProposalId(context: Parameters<Handler>[0]): string {
@@ -646,6 +958,20 @@ function scenarioRequiresAcceptedRiskReason(proposal: ScenarioProposal): boolean
   return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
 }
 
+function proposalRequiresAcceptedRiskReason(proposal: AutoPlanningSolverProposal): boolean {
+  return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
+}
+
+function proposalRequiresResourceManage(proposal: AutoPlanningSolverProposal): boolean {
+  return proposal.planDelta.commands.some(
+    (command) =>
+      command.type === "assignment.upsert" ||
+      command.type === "assignment.delete" ||
+      command.type === "assignment.allocations.replace" ||
+      command.type === "resource.reserve"
+  );
+}
+
 function withAcceptedRiskReason(
   commands: PlanningCommand[],
   acceptedRiskReason: string | null
@@ -662,6 +988,40 @@ function withAcceptedRiskReason(
         }
       : command
   );
+}
+
+function formatSolverRunResponse(run: PlanningSolverRunRecord) {
+  return {
+    id: run.id,
+    projectId: run.projectId,
+    mode: run.mode,
+    clientPlanVersion: run.clientPlanVersion,
+    engineVersion: run.engineVersion,
+    inputSnapshotMetadata: run.inputSnapshotMetadata,
+    targetDeadline: run.targetDeadline,
+    proposals: run.proposals,
+    expiresAt: run.expiresAt.toISOString(),
+    appliedProposalId: run.appliedProposalId,
+    appliedAt: run.appliedAt?.toISOString() ?? null,
+    createdAt: run.createdAt.toISOString()
+  };
+}
+
+function parseAutoSolverProposal(input: Record<string, unknown> | undefined): AutoPlanningSolverProposal | null {
+  if (!input || !Array.isArray((input as { planDelta?: { commands?: unknown[] } }).planDelta?.commands)) {
+    return null;
+  }
+  const commands = (input as { planDelta: { commands: unknown[] } }).planDelta.commands.map(
+    (command) => parsePlanningCommand(command)
+  );
+  if (commands.some((command) => !command.ok)) return null;
+  return {
+    ...(input as unknown as AutoPlanningSolverProposal),
+    planDelta: {
+      ...(input as unknown as AutoPlanningSolverProposal).planDelta,
+      commands: commands.map((command) => (command.ok ? command.value : neverCommand()))
+    }
+  };
 }
 
 function validateScenarioRunIntegrity(
@@ -736,6 +1096,7 @@ function createPlanningReadModel(snapshot: PlanSnapshot) {
     plan: calculatedPlan,
     resources: snapshot.resources,
     assignments: snapshot.assignments,
+    assignmentAllocations: snapshot.assignmentAllocations,
     calendars: snapshot.calendars,
     calendarExceptions: snapshot.calendarExceptions,
     reservations: snapshot.reservations,
@@ -749,6 +1110,7 @@ function createPlanningReadModel(snapshot: PlanSnapshot) {
       tasks: snapshot.tasks,
       dependencies: snapshot.dependencies,
       assignments: snapshot.assignments,
+      assignmentAllocations: snapshot.assignmentAllocations,
       baselines: snapshot.baselines
     },
     calculatedPlan,
@@ -813,7 +1175,12 @@ function permissionForCommand(
 ): PolicyDecision {
   const input = { actor, profile, targetTenantId: actor.tenantId };
   if (command.type === "baseline.capture") return canManageProjectBaselines(input);
-  if (command.type === "assignment.upsert" || command.type === "assignment.delete" || command.type === "resource.reserve") {
+  if (
+    command.type === "assignment.upsert" ||
+    command.type === "assignment.delete" ||
+    command.type === "assignment.allocations.replace" ||
+    command.type === "resource.reserve"
+  ) {
     return canManageProjectResources(input);
   }
   return canManageProjectPlan(input);
@@ -834,7 +1201,7 @@ function canReadPlanningReadModel(input: {
 }
 
 async function validateCommandDataSourcePreconditions(
-  dataSource: ApiTenantDataSource,
+  dataSource: PlanningRouteDataSource,
   tenantId: string,
   command: PlanningCommand
 ): Promise<ValidationIssue[]> {
@@ -911,6 +1278,7 @@ function auditActionForCommand(command: PlanningCommand): string {
     "dependency.upsert": "planning.dependency.upserted",
     "dependency.delete": "planning.dependency.deleted",
     "assignment.upsert": "planning.assignment.upserted",
+    "assignment.allocations.replace": "planning.assignment_allocations.replaced",
     "assignment.delete": "planning.assignment.deleted",
     "baseline.capture": "planning.baseline.captured",
     "calendar.exception.upsert": "planning.calendar_exception.upserted",
@@ -935,7 +1303,7 @@ function summarizeSnapshot(snapshot: PlanSnapshot): Record<string, unknown> {
 async function appendPlanningAuditIfConfigured(
   deps: PlanningRouteDeps,
   input: ManagementAuditEventInput,
-  auditDataSource?: ApiTenantDataSource
+  auditDataSource?: ManagementAuditDataSource
 ): Promise<string> {
   if (!(auditDataSource ?? deps.dataSource).appendAuditEvent) {
     throw new Error("audit_not_configured");
