@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
 
 import type {
   CallEvent,
@@ -99,6 +99,7 @@ export type CollaborationRepository = {
     tenantId: TenantId;
     conversationId: string;
     limit: number;
+    cursor?: string;
   }): Promise<DiscussionMessage[]>;
   findDiscussionMessage(
     tenantId: TenantId,
@@ -310,6 +311,30 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
       return mapDiscussionMessage(row);
     },
     async listDiscussionMessages(input) {
+      const cursorRow = input.cursor
+        ? (await db
+            .select({ createdAt: discussionMessages.createdAt, id: discussionMessages.id })
+            .from(discussionMessages)
+            .where(
+              and(
+                eq(discussionMessages.tenantId, input.tenantId),
+                eq(discussionMessages.conversationId, input.conversationId),
+                eq(discussionMessages.id, input.cursor),
+                isNull(discussionMessages.archivedAt)
+              )
+            )
+            .limit(1))[0]
+        : undefined;
+      if (input.cursor && !cursorRow) return [];
+      const cursorCondition = cursorRow
+        ? or(
+            lt(discussionMessages.createdAt, cursorRow.createdAt),
+            and(
+              eq(discussionMessages.createdAt, cursorRow.createdAt),
+              lt(discussionMessages.id, cursorRow.id)
+            )
+          )
+        : undefined;
       const rows = await db
         .select()
         .from(discussionMessages)
@@ -317,12 +342,13 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           and(
             eq(discussionMessages.tenantId, input.tenantId),
             eq(discussionMessages.conversationId, input.conversationId),
-            isNull(discussionMessages.archivedAt)
+            isNull(discussionMessages.archivedAt),
+            cursorCondition
           )
         )
-        .orderBy(asc(discussionMessages.createdAt), asc(discussionMessages.id))
+        .orderBy(desc(discussionMessages.createdAt), desc(discussionMessages.id))
         .limit(input.limit);
-      return rows.map(mapDiscussionMessage);
+      return rows.reverse().map(mapDiscussionMessage);
     },
     async findDiscussionMessage(tenantId, messageId) {
       const [row] = await db

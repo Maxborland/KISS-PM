@@ -287,6 +287,13 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     ) {
       return context.json({ error: "communications_not_configured" }, 501);
     }
+    const join = await deps.videoProvider.issueJoinToken({
+      providerRoomId: resolved.value.room.providerRoomId,
+      roomId: resolved.value.room.id,
+      tenantId: actor.tenantId,
+      userId: actor.id,
+      userName: actor.name
+    });
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const activeSession = await requireMethod(transactionDataSource.findActiveCallSessionForUpdate).call(
         transactionDataSource,
@@ -297,13 +304,6 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         }
       );
       if (!activeSession) return new CallRouteError(409, "call_session_not_active");
-      const join = await deps.videoProvider.issueJoinToken({
-        providerRoomId: resolved.value.room.providerRoomId,
-        roomId: resolved.value.room.id,
-        tenantId: actor.tenantId,
-        userId: actor.id,
-        userName: actor.name
-      });
       const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
         id: `call-event-${randomUUID()}`,
         tenantId: actor.tenantId,
@@ -324,17 +324,17 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
         }),
         transactionDataSource
       );
-      return { event, join };
+      return { event };
     });
     if (result instanceof CallRouteError) {
       return context.json({ error: result.error }, result.status);
     }
     return context.json({
       join: {
-        provider: result.join.provider,
-        joinUrl: result.join.joinUrl,
-        token: result.join.token,
-        expiresAt: result.join.expiresAt
+        provider: join.provider,
+        joinUrl: join.joinUrl,
+        token: join.token,
+        expiresAt: join.expiresAt
       },
       event: serializeCallEvent(result.event)
     });

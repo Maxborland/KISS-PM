@@ -183,6 +183,67 @@ describe("collaboration and communications API", () => {
     expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
   });
 
+  it("lists the latest conversation messages and pages older history by cursor", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=project&entityId=project-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    const conversationsPayload = await conversations.json() as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+
+    const created: string[] = [];
+    for (const index of [1, 2, 3, 4]) {
+      const response = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ body: `Сообщение ${index}` })
+      });
+      expect(response.status).toBe(201);
+      const payload = await response.json() as { message: { id: string } };
+      await client`
+        UPDATE discussion_messages
+        SET created_at = ${`2026-05-25T09:0${index}:00.000Z`}::timestamptz
+        WHERE tenant_id = 'tenant-alpha'
+          AND id = ${payload.message.id}
+      `;
+      created.push(payload.message.id);
+    }
+
+    const latest = await app.request(
+      `/api/workspace/conversations/${conversationId}/messages?limit=2`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(latest.status).toBe(200);
+    const latestPayload = await latest.json() as {
+      messages: Array<{ id: string; body: string }>;
+      nextCursor: string | null;
+    };
+    expect(latestPayload.messages.map((message) => message.body)).toEqual([
+      "Сообщение 3",
+      "Сообщение 4"
+    ]);
+    expect(latestPayload.nextCursor).toBe(created[2]);
+
+    const older = await app.request(
+      `/api/workspace/conversations/${conversationId}/messages?limit=2&cursor=${encodeURIComponent(latestPayload.nextCursor ?? "")}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(older.status).toBe(200);
+    const olderPayload = await older.json() as {
+      messages: Array<{ body: string }>;
+      nextCursor: string | null;
+    };
+    expect(olderPayload.messages.map((message) => message.body)).toEqual([
+      "Сообщение 1",
+      "Сообщение 2"
+    ]);
+    expect(olderPayload.nextCursor).toBe(created[0]);
+  });
+
   it("blocks users without parent entity access and rejects unsafe meeting links", async () => {
     const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");

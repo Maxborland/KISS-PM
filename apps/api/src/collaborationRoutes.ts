@@ -122,13 +122,19 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const limit = parseLimit(context.req.query("limit"), 50);
+    const cursor = parseOptionalCursor(context.req.query("cursor"));
+    if (!cursor.ok) return context.json({ error: cursor.error }, 400);
     const messages = await deps.dataSource.listDiscussionMessages?.({
       tenantId: actor.tenantId,
       conversationId: conversation.value.conversation.id,
-      limit
+      limit,
+      ...(cursor.value ? { cursor: cursor.value } : {})
     });
     if (!messages) return context.json({ error: "collaboration_not_configured" }, 501);
-    return context.json({ messages: messages.map(serializeMessage) });
+    return context.json({
+      messages: messages.map(serializeMessage),
+      nextCursor: messages[0]?.id ?? null
+    });
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages", async (context) => {
@@ -1049,6 +1055,15 @@ function parseLimit(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, 100);
+}
+
+function parseOptionalCursor(value: string | undefined):
+  | { ok: true; value: string | undefined }
+  | { ok: false; error: string } {
+  if (value === undefined || value === "") return { ok: true as const, value: undefined };
+  const parsed = parseCollaborationId(value, "conversation_cursor_invalid");
+  if (!parsed.ok) return parsed;
+  return { ok: true as const, value: parsed.value };
 }
 
 function parseDateTime(value: unknown, error: string) {
