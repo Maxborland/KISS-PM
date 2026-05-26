@@ -40,13 +40,16 @@ export async function persistControlSignalNotifications(input: {
   actorUserId: string;
   snapshot: PlanSnapshot;
   signals: ControlSignal[];
+  previousSignals?: ControlSignal[];
 }): Promise<void> {
   if (!input.dataSource.createUserNotification) return;
-  const notifications = deriveControlSignalNotifications({
+  const notificationInput: Parameters<typeof deriveControlSignalNotifications>[0] = {
     actorUserId: input.actorUserId,
     snapshot: input.snapshot,
     signals: input.signals
-  });
+  };
+  if (input.previousSignals) notificationInput.previousSignals = input.previousSignals;
+  const notifications = deriveControlSignalNotifications(notificationInput);
   for (const notification of notifications) {
     await input.dataSource.createUserNotification({
       id: `notification-${randomUUID()}`,

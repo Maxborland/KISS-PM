@@ -574,10 +574,12 @@ export function deriveControlSignalNotifications(input: {
   actorUserId: UserId;
   snapshot: PlanSnapshot;
   signals: ControlSignal[];
+  previousSignals?: ControlSignal[];
 }): DerivedNotification[] {
   const notifications: DerivedNotification[] = [];
+  const previousById = new Map(input.previousSignals?.map((signal) => [signal.id, signal]));
   for (const signal of input.signals) {
-    if (signal.status !== "open") continue;
+    if (!isNewlyOpenSignal(signal, previousById.get(signal.id))) continue;
     const recipients = signal.ownerUserId
       ? [signal.ownerUserId]
       : projectParticipantUserIds(input.snapshot);
@@ -700,12 +702,16 @@ function isWorkAssignment(assignment: PlanAssignment): boolean {
   return assignment.role === "executor" || assignment.role === "co_executor";
 }
 
-function userIdForResource(snapshot: PlanSnapshot, resourceId: string): UserId {
-  return snapshot.resources.find((resource) => resource.id === resourceId)?.userId ?? resourceId;
+function userIdForResource(snapshot: PlanSnapshot, resourceId: string): UserId | null {
+  return snapshot.resources.find((resource) => resource.id === resourceId)?.userId ?? null;
 }
 
 function uniqueUserIds(values: Array<UserId | null | undefined>): UserId[] {
   return [...new Set(values.filter((value): value is UserId => typeof value === "string" && value.length > 0))];
+}
+
+function isNewlyOpenSignal(signal: ControlSignal, previous: ControlSignal | undefined): boolean {
+  return signal.status === "open" && previous?.status !== "open";
 }
 
 function pushUniqueNotification(

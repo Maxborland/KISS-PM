@@ -242,6 +242,8 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       ) {
         return { ok: false as const };
       }
+      const previousSignals =
+        await transactionDataSource.listControlSignals?.(actor.tenantId, projectId.value) ?? [];
       const persistedEvaluations = [];
       for (const evaluation of evaluations) {
         persistedEvaluations.push(await transactionDataSource.createKpiEvaluation(evaluation));
@@ -255,7 +257,8 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
         snapshot,
-        signals: persistedSignals
+        signals: persistedSignals,
+        previousSignals
       });
       const auditEventId = await appendControlAuditIfConfigured(
         deps,

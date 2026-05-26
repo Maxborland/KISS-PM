@@ -130,6 +130,33 @@ describe("collaboration domain contract", () => {
     ]);
   });
 
+  it("does not notify non-person planning resources", () => {
+    const base = planSnapshot();
+    const snapshot = {
+      ...base,
+      resources: [{ ...base.resources[0]!, userId: null }]
+    };
+
+    expect(derivePlanningNotifications({
+      actorUserId: "user-manager",
+      beforeSnapshot: snapshot,
+      afterSnapshot: snapshot,
+      commands: [
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-a",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: null
+          }
+        }
+      ]
+    })).toEqual([]);
+  });
+
   it("derives control signal notifications for signal owner or project participants", () => {
     const snapshot = planSnapshot();
     const signal: ControlSignal = {
@@ -158,6 +185,45 @@ describe("collaboration domain contract", () => {
         notificationType: "control_signal",
         sourceEntityType: "project",
         sourceEntityId: "project-a"
+      })
+    ]);
+  });
+
+  it("notifies only newly opened control signals", () => {
+    const snapshot = planSnapshot();
+    const signal: ControlSignal = {
+      id: "signal-a",
+      tenantId: "tenant-a",
+      projectId: "project-a",
+      sourceEntity: { type: "Project", id: "project-a" },
+      sourceMetric: "deadline_slip_days",
+      evaluationId: "evaluation-a",
+      severity: "critical",
+      explanation: "Deadline risk",
+      ownerUserId: null,
+      allowedActions: [],
+      scenarioProposals: [],
+      status: "open",
+      createdAt: "2026-05-26T00:00:00.000Z",
+      updatedAt: "2026-05-26T01:00:00.000Z"
+    };
+
+    expect(deriveControlSignalNotifications({
+      actorUserId: "user-manager",
+      snapshot,
+      signals: [signal],
+      previousSignals: [{ ...signal, updatedAt: "2026-05-26T00:30:00.000Z" }]
+    })).toEqual([]);
+
+    expect(deriveControlSignalNotifications({
+      actorUserId: "user-manager",
+      snapshot,
+      signals: [signal],
+      previousSignals: [{ ...signal, status: "acknowledged" }]
+    })).toEqual([
+      expect.objectContaining({
+        userId: "user-a",
+        notificationType: "control_signal"
       })
     ]);
   });
