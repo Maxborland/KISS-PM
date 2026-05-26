@@ -10,5 +10,8 @@ export const workspaceSearchTypes = new Set([
   "contact",
   "product",
   "file",
-  "external_reference"
+  "external_reference",
+  "document",
+  "decision",
+  "knowledge_action_item"
 ]);
