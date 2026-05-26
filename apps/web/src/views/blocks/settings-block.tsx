@@ -16,21 +16,29 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export function SettingsBlock() {
   const { fixtures } = useScenarioFixtures();
   const [tab, setTab] = useState<"profile" | "notifications" | "integrations" | "billing" | "workspace">("profile");
 
+  const intro = (
+    <PageIntro
+      title="Настройки рабочей области"
+      lead="Профиль, уведомления и интеграции."
+      actions={<Button variant="primary">Сохранить</Button>}
+    />
+  );
+
   return (
-    <ScenarioFetchGate loadingLabel="Загрузка настроек…">
-      <>
-      <PageIntro
-        title="Настройки рабочей области"
-        lead="Профиль, уведомления и интеграции."
-        actions={<Button variant="primary">Сохранить</Button>}
-      />
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={4} withToolbar={false} />}
+      errorTitle="Не удалось загрузить настройки"
+      forbiddenTitle="Нет доступа к настройкам"
+    >
       <div className="settings-tabs u-mb-3">
         <Segmented
           name="settings-tabs"
@@ -150,8 +158,7 @@ export function SettingsBlock() {
           </FormSection>
         ) : null}
       </CardPanel>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }
 

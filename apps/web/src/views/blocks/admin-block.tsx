@@ -8,28 +8,36 @@ import { SwitchRow, SwitchRowList } from "@/components/domain/switch-row";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { accessProfileName, userAvatar } from "@/lib/mock-data/users";
 import { formatDate } from "@/lib/mock-data/format";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export function AdminBlock() {
   const { fixtures } = useScenarioFixtures();
   const { workspaceUsers, accessProfiles, positions, orgStructure, absences } = fixtures;
 
+  const intro = (
+    <PageIntro
+      title="Администрирование"
+      lead="Пользователи, роли и политики рабочей области."
+      actions={
+        <Button variant="primary">
+          <UserPlus className="size-4" aria-hidden />
+          Пригласить
+        </Button>
+      }
+    />
+  );
+
   return (
-    <ScenarioFetchGate loadingLabel="Загрузка администрирования…">
-      <>
-      <PageIntro
-        title="Администрирование"
-        lead="Пользователи, роли и политики рабочей области."
-        actions={
-          <Button variant="primary">
-            <UserPlus className="size-4" aria-hidden />
-            Пригласить
-          </Button>
-        }
-      />
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={5} withToolbar={false} />}
+      errorTitle="Не удалось загрузить администрирование"
+      forbiddenTitle="Нет доступа к администрированию"
+    >
       <div className="grid-2">
         <CardPanel title="Пользователи" subtitle={`${workspaceUsers.length} записей WorkspaceUser`} flush>
           <DataTable>
@@ -168,7 +176,6 @@ export function AdminBlock() {
           </DataTable>
         </CardPanel>
       </div>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }
