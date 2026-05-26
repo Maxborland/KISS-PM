@@ -27,8 +27,9 @@ import {
 } from "@/components/ui/sheet";
 import { formatDate, formatRub } from "@/lib/mock-data/format";
 import { buildEntityCopy } from "@/lib/mock-data/scenario-presenters";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export type EntityKind = "clients" | "contacts" | "products";
 
@@ -50,14 +51,12 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
 
   const openRow = useMemo(() => c.rows.find((r) => r.name === openName) ?? null, [c.rows, openName]);
 
-  return (
-    <ScenarioFetchGate loadingLabel="Загрузка справочника…">
-      <>
-      <PageIntro
-        title={c.title}
-        lead={c.lead}
-        actions={
-          <>
+  const intro = (
+    <PageIntro
+      title={c.title}
+      lead={c.lead}
+      actions={
+        <>
             <Button variant="secondary" disabled title="Демо Storybook: импорт подключится к API">
               <Upload className="size-4" aria-hidden />
               Импорт
@@ -68,7 +67,16 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
             </Button>
           </>
         }
-      />
+    />
+  );
+
+  return (
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={5} />}
+      errorTitle="Не удалось загрузить справочник"
+      forbiddenTitle="Нет доступа к справочнику"
+    >
       <div className="view-toolbar">
         <SearchPill
           className="u-w-280"
@@ -185,8 +193,7 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
           ) : null}
         </SheetContent>
       </Sheet>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }
 

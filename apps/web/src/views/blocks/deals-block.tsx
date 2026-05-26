@@ -23,7 +23,11 @@ import {
 } from "@/components/ui/sheet";
 import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
 import { buildFunnelDeals, buildFunnelStages } from "@/lib/mock-data/scenario-presenters";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import {
+  ScreenBlockGate,
+  ScreenBlockKanbanSkeleton
+} from "@/views/blocks/screen-block-fetch";
 import { MOCK_TENANT_ID, positionName, userAvatar, userName } from "@/lib/mock-data/users";
 import { useFunnelState } from "@/widgets/funnel";
 import type { FunnelDeal, FunnelStage } from "@/widgets/funnel";
@@ -131,11 +135,7 @@ export type DealsBlockProps = {
 
 export function DealsBlock(props: DealsBlockProps = {}) {
   const { scenario } = useScenarioFixtures();
-  return (
-    <ScenarioFetchGate loadingLabel="Загрузка сделок…">
-      <DealsBlockInner key={scenario} {...props} />
-    </ScenarioFetchGate>
-  );
+  return <DealsBlockInner key={scenario} {...props} />;
 }
 
 function DealsBlockInner({
@@ -262,16 +262,26 @@ function DealsBlockInner({
     });
   };
 
+  const intro = (
+    <RoutePageIntro
+      actions={
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+          <Plus className="size-4" aria-hidden />
+          Сделка
+        </Button>
+      }
+    />
+  );
+
+  const skeleton = <ScreenBlockKanbanSkeleton columns={5} funnel />;
+
   return (
-    <>
-      <RoutePageIntro
-        actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" aria-hidden />
-            Сделка
-          </Button>
-        }
-      />
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={skeleton}
+      errorTitle="Не удалось загрузить сделки"
+      forbiddenTitle="Нет доступа к сделкам"
+    >
       <div className="view-toolbar">
         <Segmented
           name="deals-mode"
@@ -536,7 +546,7 @@ function DealsBlockInner({
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </>
+    </ScreenBlockGate>
   );
 }
 
