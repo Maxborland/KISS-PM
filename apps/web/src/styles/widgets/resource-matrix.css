@@ -98,6 +98,13 @@
   line-height: 1.2;
   max-height: 75vh;
   position: relative;
+  scrollbar-gutter: stable;
+  background-image: linear-gradient(
+    90deg,
+    transparent calc(100% - 20px),
+    color-mix(in srgb, var(--border) 40%, transparent) 100%
+  );
+  background-attachment: local, scroll;
 }
 
 .rmatrix__inner { min-width: max-content; }
@@ -245,30 +252,66 @@
 }
 
 .rmatrix__row--workshop {
-  background: #e0e7ff;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
   font-weight: 700;
   position: sticky;
   z-index: 1;
 }
 
-.rmatrix__row--workshop .rmatrix__cell { background: #e0e7ff; }
-.rmatrix__row--workshop .rmatrix__cell--name { color: #312e81; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; }
+.rmatrix__row--workshop .rmatrix__cell {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+.rmatrix__row--workshop .rmatrix__cell--name {
+  color: var(--text-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
 
 .rmatrix__row--role {
-  background: #eef2ff;
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
   font-weight: 600;
 }
 
-.rmatrix__row--role .rmatrix__cell { background: #eef2ff; }
-.rmatrix__row--role .rmatrix__cell--name { color: #3730a3; }
+.rmatrix__row--role .rmatrix__cell {
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
+}
+.rmatrix__row--role .rmatrix__cell--name {
+  color: var(--text);
+}
 
 .rmatrix__row--sub {
-  background: rgba(99, 102, 241, 0.03);
+  background: var(--panel-subtle);
   font-style: italic;
   color: var(--muted);
 }
 
-.rmatrix__row--sub .rmatrix__cell { background: rgba(99, 102, 241, 0.03); color: var(--muted); }
+.rmatrix__row--sub .rmatrix__cell {
+  background: var(--panel-subtle);
+  color: var(--muted);
+}
+
+.rmatrix__cell--heatmap {
+  padding: 1px;
+}
+
+.rmatrix__heatmap {
+  width: 100%;
+  min-height: 20px;
+  justify-content: center;
+}
+
+.rmatrix__cell--pct-bar {
+  padding: 2px 4px;
+}
+
+.rmatrix__capacity .capacity-bar__head {
+  display: none;
+}
+
+.rmatrix__capacity .capacity-bar__track {
+  height: 4px;
+}
 
 /* Zebra removed — too noisy with semantic tones */
 

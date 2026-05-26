@@ -2,12 +2,22 @@
 
 import { ChevronRight } from "lucide-react";
 
+import { CapacityBar } from "@/components/domain/capacity-bar";
+import { ParticipantList } from "@/components/domain/participant-list";
 import { cn } from "@/lib/cn";
 import { DayHeadCell, DayValueCell } from "./cells";
-import type { MatrixPercent, MatrixRow, ResourceMatrixData } from "./types";
+import type { MatrixRow, ResourceMatrixData } from "./types";
 
-function PercentCell({ p }: { p: MatrixPercent | undefined }) {
+function PercentCell({ row }: { row: MatrixRow }) {
+  const p = row.percent;
   if (!p) return <div className="rmatrix__cell rmatrix__cell--pct" />;
+  if (row.kind === "person" && row.avatar) {
+    return (
+      <div className={cn("rmatrix__cell", "rmatrix__cell--pct", "rmatrix__cell--pct-bar")}>
+        <CapacityBar label="" used={p.value} capacity={100} className="rmatrix__capacity" />
+      </div>
+    );
+  }
   const tone =
     p.level === "low"
       ? "rmatrix__cell--pct-low"
@@ -18,12 +28,12 @@ function PercentCell({ p }: { p: MatrixPercent | undefined }) {
           : p.level === "over"
             ? "rmatrix__cell--pct-over"
             : "rmatrix__cell--pct-norm";
-  return <div className={cn("rmatrix__cell rmatrix__cell--pct", tone)}>{p.value}%</div>;
+  return <div className={cn("rmatrix__cell", "rmatrix__cell--pct", tone)}>{p.value}%</div>;
 }
 
 function NameCell({ row }: { row: MatrixRow }) {
   return (
-    <div className={cn("rmatrix__cell rmatrix__cell--name")}>
+    <div className={cn("rmatrix__cell", "rmatrix__cell--name", `rmatrix__cell--name-${row.kind}`)}>
       {row.indent ? (
         <span className={cn("wbs-indent", `wbs-indent--${row.indent}`)} aria-hidden />
       ) : null}
@@ -36,10 +46,18 @@ function NameCell({ row }: { row: MatrixRow }) {
           <ChevronRight className="size-3" aria-hidden />
         </button>
       ) : null}
-      {row.avatar ? (
-        <span className={cn("rmatrix__avatar", `rmatrix__avatar--${row.avatar.color}`)}>
-          {row.avatar.initials}
-        </span>
+      {row.kind === "person" && row.avatar ? (
+        <ParticipantList
+          participants={[
+            {
+              id: row.id,
+              name: row.name,
+              initials: row.avatar.initials
+            }
+          ]}
+          maxAvatars={1}
+          layout="compact"
+        />
       ) : null}
       <span className="rmatrix__name-text">{row.name}</span>
     </div>
@@ -80,7 +98,7 @@ export function ResourceMatrix({ data, className }: ResourceMatrixProps) {
             style={{ gridTemplateColumns: gridCols }}
           >
             <NameCell row={row} />
-            <PercentCell p={row.percent} />
+            <PercentCell row={row} />
             {row.cells.map((cell, idx) => {
               const day = data.days[idx];
               return (
