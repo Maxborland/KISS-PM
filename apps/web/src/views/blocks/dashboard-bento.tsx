@@ -3,13 +3,10 @@
 import {
   AlertTriangle,
   ArrowUpRight,
-  Briefcase,
   Calendar,
   CheckCircle2,
   Clock,
   ExternalLink,
-  TrendingDown,
-  TrendingUp,
   Zap
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -18,11 +15,15 @@ import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
+import { KpiTile } from "@/components/domain/kpi-tile";
+import { NumericValue } from "@/components/domain/numeric-value";
+import { Sparkline } from "@/components/domain/sparkline";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
+import { TrendArrow } from "@/components/ui/trend-arrow";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -57,6 +58,10 @@ const ROWS: DashboardRow[] = [
   }
 ];
 
+const FOCUS_LINE =
+  "M0,140 C60,80 120,160 180,90 C240,30 300,130 360,80 C420,40 480,140 540,90 L600,110";
+const FOCUS_AREA = `${FOCUS_LINE} L600,200 L0,200 Z`;
+
 export type DashboardBentoProps = {
   empty?: boolean;
 };
@@ -74,56 +79,50 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
 
       <div className="bento">
         <div className="bento__cell tile tile--gradient-warm">
-          <div className="tile__head">
-            <span className="tile__label">Приоритетные задачи</span>
-            <span className="tile__icon">
-              <Clock className="size-4" aria-hidden />
-            </span>
-          </div>
-          <div className="tile__value tile__value--kpi">83%</div>
-          <div className="tile__sub">Среднее завершение</div>
+          <KpiTile
+            label="Приоритетные задачи"
+            value={<NumericValue value={83} suffix="%" />}
+            meta={
+              <span className="tile__sub">
+                <Clock className="size-3.5" aria-hidden /> Среднее завершение
+              </span>
+            }
+          />
         </div>
         <div className="bento__cell tile tile--gradient-cool">
-          <div className="tile__head">
-            <span className="tile__label">Доп. задачи</span>
-            <span className="tile__icon">
-              <CheckCircle2 className="size-4" aria-hidden />
-            </span>
-          </div>
-          <div className="tile__value tile__value--kpi">56%</div>
-          <div className="tile__sub">Среднее завершение</div>
+          <KpiTile
+            label="Доп. задачи"
+            value={<NumericValue value={56} suffix="%" />}
+            meta={
+              <span className="tile__sub">
+                <CheckCircle2 className="size-3.5" aria-hidden /> Среднее завершение
+              </span>
+            }
+          />
         </div>
         <div className="bento__cell tile">
-          <div className="tile__head">
-            <span className="tile__label">Сделки в работе</span>
-            <span className="tile__icon tile__icon--accent">
-              <Briefcase className="size-4" aria-hidden />
-            </span>
-          </div>
-          <div className="tile__value">8</div>
-          <div className="tile__foot">
-            <span className="delta delta--up">
-              <TrendingUp className="size-4" aria-hidden />
-              +2 неделя
-            </span>
-            <span className="u-text-xs u-text-muted">к прошлой</span>
-          </div>
+          <KpiTile
+            label="Сделки в работе"
+            value={<NumericValue value={8} />}
+            meta={
+              <span className="tile__foot">
+                <TrendArrow direction="up" label="+2 за неделю" />
+                <span className="u-text-xs u-text-muted">к прошлой</span>
+              </span>
+            }
+          />
         </div>
         <div className="bento__cell tile">
-          <div className="tile__head">
-            <span className="tile__label">Просрочено</span>
-            <span className="tile__icon tile__icon--danger">
-              <AlertTriangle className="size-4" aria-hidden />
-            </span>
-          </div>
-          <div className="tile__value">2</div>
-          <div className="tile__foot">
-            <span className="delta delta--down">
-              <TrendingDown className="size-4" aria-hidden />
-              +1
-            </span>
-            <span className="u-text-xs u-text-muted">требует внимания</span>
-          </div>
+          <KpiTile
+            label="Просрочено"
+            value={<NumericValue value={2} />}
+            meta={
+              <span className="tile__foot">
+                <TrendArrow direction="down" label="+1" />
+                <span className="u-text-xs u-text-muted">требует внимания</span>
+              </span>
+            }
+          />
         </div>
 
         <div className="bento__cell bento__cell--8">
@@ -142,24 +141,7 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
               />
             }
           >
-            <svg viewBox="0 0 600 200" width="100%" height={200} preserveAspectRatio="none" aria-hidden>
-              <defs>
-                <linearGradient id="g-warm" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--danger)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <path
-                d="M0,140 C60,80 120,160 180,90 C240,30 300,130 360,80 C420,40 480,140 540,90 L600,110 L600,200 L0,200 Z"
-                fill="url(#g-warm)"
-              />
-              <path
-                d="M0,140 C60,80 120,160 180,90 C240,30 300,130 360,80 C420,40 480,140 540,90 L600,110"
-                stroke="var(--danger)"
-                strokeWidth={2}
-                fill="none"
-              />
-            </svg>
+            <Sparkline linePath={FOCUS_LINE} areaPath={FOCUS_AREA} gradientId="dashboard-focus" />
             <div className="u-between u-mt-3">
               <span className="u-text-xs u-text-muted">
                 Средняя концентрация: <strong className="u-text-strong">41%</strong>
@@ -196,7 +178,7 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
                 08:15
               </span>
               <div>
-                <div className="meeting-item__title">Quick Daily</div>
+                <div className="meeting-item__title">Ежедневный синк</div>
                 <div className="meeting-item__source">Zoom</div>
               </div>
               <IconButton
@@ -213,7 +195,7 @@ export function DashboardBento({ empty = false }: DashboardBentoProps = {}) {
                 09:30
               </span>
               <div>
-                <div className="meeting-item__title">John Onboarding</div>
+                <div className="meeting-item__title">Онбординг · Иванов</div>
                 <div className="meeting-item__source">Google Meet</div>
               </div>
               <IconButton
