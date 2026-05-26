@@ -43,7 +43,7 @@ export function FunnelBoard({ stages, deals, onMoveDeal, onOpenDeal }: FunnelBoa
         client: d.client,
         contactName: d.contactName ?? "Контакт не указан",
         amount: d.amount,
-        probability: d.probability ?? 0,
+        probability: typeof d.probability === "number" ? d.probability : 0,
         plannedFinish: d.plannedFinish ?? new Date().toISOString(),
         plannedHours: d.plannedHours ?? 0,
         feasibilityStatus: d.feasibilityStatus ?? null,

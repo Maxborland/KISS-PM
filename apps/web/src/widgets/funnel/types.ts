@@ -13,4 +13,5 @@ export type FunnelDeal = Pick<Opportunity, "id" | "title"> &
   amount: string;
   stage: string;
   owner: FunnelDealOwner;
+  probabilityTrend?: "up" | "down" | "flat";
 };

@@ -34,18 +34,72 @@ const STAGE_LABEL = STAGES.reduce<Record<string, string>>((acc, s) => {
   return acc;
 }, {});
 
+const COLUMN_TONE: Record<StageId, KanbanColumnDef<StageId>["tone"]> = {
+  lead: "neutral",
+  qual: "info",
+  proposal: "violet",
+  deal: "warning",
+  won: "success"
+};
+
 const COLUMNS: KanbanColumnDef<StageId>[] = STAGES.map((s) => ({
   id: s.id as StageId,
   title: s.title,
-  emptyLabel: "Нет сделок"
+  emptyLabel: "Нет сделок",
+  tone: COLUMN_TONE[s.id as StageId] ?? "neutral"
 }));
 
 const DEALS: FunnelDeal[] = [
-  { id: "DEAL-101", title: "Внедрение CRM", client: "ООО «Ромашка»", amount: "890 000 ₽", stage: "qual", owner: { initials: "ИИ", color: "c1" } },
-  { id: "DEAL-102", title: "DataHub KPI", client: "АО «Техно»", amount: "1 240 000 ₽", stage: "proposal", owner: { initials: "АП", color: "c2" } },
-  { id: "DEAL-103", title: "Аудит Salesforce", client: "ACME Studio", amount: "320 000 ₽", stage: "lead", owner: { initials: "КБ", color: "c4" } },
-  { id: "DEAL-104", title: "Продление · 2027", client: "Фабрика #21", amount: "2 100 000 ₽", stage: "deal", owner: { initials: "МД", color: "c5" } },
-  { id: "DEAL-098", title: "Поддержка портала", client: "ООО «Север»", amount: "540 000 ₽", stage: "won", owner: { initials: "ВВ", color: "c3" } }
+  {
+    id: "DEAL-101",
+    title: "Внедрение CRM",
+    client: "ООО «Ромашка»",
+    amount: "890 000 ₽",
+    stage: "qual",
+    probability: 42,
+    probabilityTrend: "up",
+    owner: { initials: "ИИ", color: "c1" }
+  },
+  {
+    id: "DEAL-102",
+    title: "DataHub KPI",
+    client: "АО «Техно»",
+    amount: "1 240 000 ₽",
+    stage: "proposal",
+    probability: 68,
+    probabilityTrend: "up",
+    owner: { initials: "АП", color: "c2" }
+  },
+  {
+    id: "DEAL-103",
+    title: "Аудит Salesforce",
+    client: "ACME Studio",
+    amount: "320 000 ₽",
+    stage: "lead",
+    probability: 18,
+    probabilityTrend: "flat",
+    owner: { initials: "КБ", color: "c4" }
+  },
+  {
+    id: "DEAL-104",
+    title: "Продление · 2027",
+    client: "Фабрика #21",
+    amount: "2 100 000 ₽",
+    stage: "deal",
+    probability: 81,
+    probabilityTrend: "down",
+    owner: { initials: "МД", color: "c5" }
+  },
+  {
+    id: "DEAL-098",
+    title: "Поддержка портала",
+    client: "ООО «Север»",
+    amount: "540 000 ₽",
+    stage: "won",
+    probability: 100,
+    probabilityTrend: "flat",
+    owner: { initials: "ВВ", color: "c3" }
+  }
 ];
 
 function toItem(d: FunnelDeal): DealKanbanItem<StageId> {
@@ -56,6 +110,7 @@ function toItem(d: FunnelDeal): DealKanbanItem<StageId> {
     title: d.title,
     client: d.client,
     amount: d.amount,
+    probability: d.probability ?? 0,
     owner: d.owner,
     stageLabel: STAGE_LABEL[stageId] ?? stageId,
     stageTone: stageId === "won" ? "success" : "info"
