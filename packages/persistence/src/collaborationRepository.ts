@@ -753,7 +753,13 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           createdAt: now,
           updatedAt: now
         })
-        .returning();
+        .returning()
+        .catch((error: unknown) => {
+          if (isConstraintError(error, "call_rooms_tenant_provider_room_uidx")) {
+            throw new Error("call_room_provider_room_conflict");
+          }
+          throw error;
+        });
       if (!row) throw new Error("Call room insert returned no row");
       return mapCallRoom(row);
     },

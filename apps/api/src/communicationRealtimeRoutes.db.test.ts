@@ -235,6 +235,46 @@ describe("communications realtime API", () => {
     await expect(racedStart.json()).resolves.toEqual({ error: "call_room_already_active" });
   });
 
+  it("maps duplicate provider room ids to a stable conflict", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    await createRoom(adminCookie);
+
+    const duplicate = await app.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: "project-alpha",
+        title: "Повторная проектная комната",
+        mediaKind: "video",
+        provider: "livekit",
+        providerRoomId: "project-alpha-room"
+      })
+    });
+
+    expect(duplicate.status).toBe(409);
+    await expect(duplicate.json()).resolves.toEqual({ error: "call_room_provider_room_conflict" });
+  });
+
+  it("returns stable conflict when ending an already-ended session", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const ended = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/end`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(ended.status).toBe(200);
+
+    const alreadyEnded = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/end`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(alreadyEnded.status).toBe(409);
+    await expect(alreadyEnded.json()).resolves.toEqual({ error: "call_session_not_active" });
+  });
+
   it("returns stable validation errors before recording and participant FK failures", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const room = await createRoom(adminCookie);
