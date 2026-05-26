@@ -1,6 +1,17 @@
 import { and, asc, count, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
 
 import type {
+  CallEvent,
+  CallEventType,
+  CallMediaKind,
+  CallParticipantState,
+  CallParticipantStateValue,
+  CallRecording,
+  CallRoom,
+  CallRoomProvider,
+  CallRoomStatus,
+  CallSession,
+  CallSessionStatus,
   CollaborationEntityType,
   Conversation,
   ConversationReadState,
@@ -29,6 +40,11 @@ import type {
 
 import type { KissPmDatabase } from "./connection";
 import {
+  callEvents,
+  callParticipantStates,
+  callRecordings,
+  callRooms,
+  callSessions,
   conversationReadStates,
   conversations,
   discussionMessages,
@@ -58,6 +74,17 @@ export type MeetingExternalLinkInput = Omit<
 >;
 export type MeetingNoteInput = Omit<MeetingNote, "createdAt" | "editedAt" | "archivedAt">;
 export type MeetingActionItemInput = Omit<MeetingActionItem, "createdAt" | "archivedAt">;
+export type CallRoomInput = Omit<CallRoom, "createdAt" | "updatedAt" | "archivedAt">;
+export type CallSessionInput = Omit<
+  CallSession,
+  "startedAt" | "endedByUserId" | "endedAt" | "failureReason"
+>;
+export type CallParticipantStateInput = Omit<
+  CallParticipantState,
+  "joinedAt" | "leftAt" | "lastSeenAt"
+>;
+export type CallEventInput = Omit<CallEvent, "createdAt">;
+export type CallRecordingInput = Omit<CallRecording, "createdAt" | "archivedAt">;
 
 export type CollaborationRepository = {
   ensureConversation(input: ConversationInput): Promise<Conversation>;
@@ -157,6 +184,49 @@ export type CollaborationRepository = {
   listMeetingNotes(tenantId: TenantId, meetingId: string): Promise<MeetingNote[]>;
   createMeetingActionItem(input: MeetingActionItemInput): Promise<MeetingActionItem>;
   listMeetingActionItems(tenantId: TenantId, meetingId: string): Promise<MeetingActionItem[]>;
+  createCallRoom(input: CallRoomInput): Promise<CallRoom>;
+  findCallRoom(tenantId: TenantId, roomId: string): Promise<CallRoom | undefined>;
+  listCallRoomsByEntity(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<CallRoom[]>;
+  updateCallRoomStatus(input: {
+    tenantId: TenantId;
+    roomId: string;
+    status: CallRoomStatus;
+  }): Promise<CallRoom | undefined>;
+  createCallSession(input: CallSessionInput): Promise<CallSession>;
+  findCallSession(
+    tenantId: TenantId,
+    sessionId: string
+  ): Promise<CallSession | undefined>;
+  endCallSession(input: {
+    tenantId: TenantId;
+    sessionId: string;
+    endedByUserId: UserId;
+    status: Exclude<CallSessionStatus, "active">;
+    failureReason?: string | null;
+  }): Promise<CallSession | undefined>;
+  upsertCallParticipantState(
+    input: CallParticipantStateInput
+  ): Promise<CallParticipantState>;
+  listCallParticipantStates(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallParticipantState[]>;
+  createCallEvent(input: CallEventInput): Promise<CallEvent>;
+  listCallEvents(input: {
+    tenantId: TenantId;
+    roomId: string;
+    limit: number;
+  }): Promise<CallEvent[]>;
+  createCallRecording(input: CallRecordingInput): Promise<CallRecording>;
+  listCallRecordings(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallRecording[]>;
 };
 
 export function createCollaborationRepository(db: KissPmDatabase): CollaborationRepository {
@@ -673,6 +743,186 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .orderBy(asc(meetingActionItems.createdAt));
       return rows.map(mapMeetingActionItem);
+    },
+    async createCallRoom(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(callRooms)
+        .values({
+          ...input,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+      if (!row) throw new Error("Call room insert returned no row");
+      return mapCallRoom(row);
+    },
+    async findCallRoom(tenantId, roomId) {
+      const [row] = await db
+        .select()
+        .from(callRooms)
+        .where(
+          and(
+            eq(callRooms.tenantId, tenantId),
+            eq(callRooms.id, roomId),
+            isNull(callRooms.archivedAt)
+          )
+        )
+        .limit(1);
+      return row ? mapCallRoom(row) : undefined;
+    },
+    async listCallRoomsByEntity(input) {
+      const rows = await db
+        .select()
+        .from(callRooms)
+        .where(
+          and(
+            eq(callRooms.tenantId, input.tenantId),
+            eq(callRooms.entityType, input.entityType),
+            eq(callRooms.entityId, input.entityId),
+            isNull(callRooms.archivedAt)
+          )
+        )
+        .orderBy(desc(callRooms.createdAt), desc(callRooms.id));
+      return rows.map(mapCallRoom);
+    },
+    async updateCallRoomStatus(input) {
+      const [row] = await db
+        .update(callRooms)
+        .set({ status: input.status, updatedAt: new Date() })
+        .where(
+          and(
+            eq(callRooms.tenantId, input.tenantId),
+            eq(callRooms.id, input.roomId),
+            isNull(callRooms.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapCallRoom(row) : undefined;
+    },
+    async createCallSession(input) {
+      const [row] = await db
+        .insert(callSessions)
+        .values({
+          ...input,
+          endedByUserId: null,
+          endedAt: null,
+          failureReason: null,
+          startedAt: new Date()
+        })
+        .returning();
+      if (!row) throw new Error("Call session insert returned no row");
+      return mapCallSession(row);
+    },
+    async findCallSession(tenantId, sessionId) {
+      const [row] = await db
+        .select()
+        .from(callSessions)
+        .where(and(eq(callSessions.tenantId, tenantId), eq(callSessions.id, sessionId)))
+        .limit(1);
+      return row ? mapCallSession(row) : undefined;
+    },
+    async endCallSession(input) {
+      const [row] = await db
+        .update(callSessions)
+        .set({
+          endedAt: new Date(),
+          endedByUserId: input.endedByUserId,
+          failureReason: input.failureReason ?? null,
+          status: input.status
+        })
+        .where(
+          and(
+            eq(callSessions.tenantId, input.tenantId),
+            eq(callSessions.id, input.sessionId),
+            eq(callSessions.status, "active")
+          )
+        )
+        .returning();
+      return row ? mapCallSession(row) : undefined;
+    },
+    async upsertCallParticipantState(input) {
+      const now = new Date();
+      const joinedAt = input.state === "joined" ? now : null;
+      const leftAt = input.state === "left" || input.state === "removed" ? now : null;
+      const [row] = await db
+        .insert(callParticipantStates)
+        .values({
+          ...input,
+          joinedAt,
+          leftAt,
+          lastSeenAt: now
+        })
+        .onConflictDoUpdate({
+          target: [
+            callParticipantStates.tenantId,
+            callParticipantStates.roomId,
+            callParticipantStates.sessionId,
+            callParticipantStates.userId
+          ],
+          set: {
+            state: input.state,
+            joinedAt: sql`coalesce(${callParticipantStates.joinedAt}, excluded.joined_at)`,
+            leftAt,
+            lastSeenAt: now
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Call participant state upsert returned no row");
+      return mapCallParticipantState(row);
+    },
+    async listCallParticipantStates(input) {
+      const rows = await db
+        .select()
+        .from(callParticipantStates)
+        .where(
+          and(
+            eq(callParticipantStates.tenantId, input.tenantId),
+            eq(callParticipantStates.roomId, input.roomId),
+            eq(callParticipantStates.sessionId, input.sessionId)
+          )
+        )
+        .orderBy(asc(callParticipantStates.userId));
+      return rows.map(mapCallParticipantState);
+    },
+    async createCallEvent(input) {
+      const [row] = await db
+        .insert(callEvents)
+        .values({ ...input, createdAt: new Date() })
+        .returning();
+      if (!row) throw new Error("Call event insert returned no row");
+      return mapCallEvent(row);
+    },
+    async listCallEvents(input) {
+      const rows = await db
+        .select()
+        .from(callEvents)
+        .where(and(eq(callEvents.tenantId, input.tenantId), eq(callEvents.roomId, input.roomId)))
+        .orderBy(desc(callEvents.createdAt), desc(callEvents.id))
+        .limit(input.limit);
+      return rows.map(mapCallEvent);
+    },
+    async createCallRecording(input) {
+      const [row] = await db
+        .insert(callRecordings)
+        .values({ ...input, createdAt: new Date() })
+        .returning();
+      if (!row) throw new Error("Call recording insert returned no row");
+      return mapCallRecording(row);
+    },
+    async listCallRecordings(input) {
+      const rows = await db
+        .select()
+        .from(callRecordings)
+        .where(
+          and(
+            eq(callRecordings.tenantId, input.tenantId),
+            eq(callRecordings.roomId, input.roomId),
+            isNull(callRecordings.archivedAt)
+          )
+        )
+        .orderBy(desc(callRecordings.createdAt), desc(callRecordings.id));
+      return rows.map(mapCallRecording);
     }
   };
 }
@@ -825,6 +1075,82 @@ function mapMeetingActionItem(row: typeof meetingActionItems.$inferSelect): Meet
     targetEntityType: row.targetEntityType as MeetingActionTargetType,
     targetEntityId: row.targetEntityId,
     status: row.status as MeetingActionItemStatus,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function mapCallRoom(row: typeof callRooms.$inferSelect): CallRoom {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    entityType: row.entityType as CollaborationEntityType,
+    entityId: row.entityId,
+    meetingId: row.meetingId,
+    title: row.title,
+    mediaKind: row.mediaKind as CallMediaKind,
+    provider: row.provider as CallRoomProvider,
+    providerRoomId: row.providerRoomId,
+    status: row.status as CallRoomStatus,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function mapCallSession(row: typeof callSessions.$inferSelect): CallSession {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    roomId: row.roomId,
+    providerSessionId: row.providerSessionId,
+    status: row.status as CallSessionStatus,
+    startedByUserId: row.startedByUserId,
+    startedAt: row.startedAt,
+    endedByUserId: row.endedByUserId,
+    endedAt: row.endedAt,
+    failureReason: row.failureReason
+  };
+}
+
+function mapCallParticipantState(
+  row: typeof callParticipantStates.$inferSelect
+): CallParticipantState {
+  return {
+    tenantId: row.tenantId,
+    roomId: row.roomId,
+    sessionId: row.sessionId,
+    userId: row.userId,
+    state: row.state as CallParticipantStateValue,
+    joinedAt: row.joinedAt,
+    leftAt: row.leftAt,
+    lastSeenAt: row.lastSeenAt
+  };
+}
+
+function mapCallEvent(row: typeof callEvents.$inferSelect): CallEvent {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    roomId: row.roomId,
+    sessionId: row.sessionId,
+    eventType: row.eventType as CallEventType,
+    actorUserId: row.actorUserId,
+    payload: row.payload,
+    createdAt: row.createdAt
+  };
+}
+
+function mapCallRecording(row: typeof callRecordings.$inferSelect): CallRecording {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    roomId: row.roomId,
+    sessionId: row.sessionId,
+    attachmentId: row.attachmentId,
+    title: row.title,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
     archivedAt: row.archivedAt

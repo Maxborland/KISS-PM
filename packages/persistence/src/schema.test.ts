@@ -69,6 +69,11 @@ describe("PostgreSQL persistence schema", () => {
       "meeting_external_links",
       "meeting_notes",
       "meeting_action_items",
+      "call_rooms",
+      "call_sessions",
+      "call_participant_states",
+      "call_events",
+      "call_recordings",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -140,6 +145,11 @@ describe("PostgreSQL persistence schema", () => {
       "meeting_external_links",
       "meeting_notes",
       "meeting_action_items",
+      "call_rooms",
+      "call_sessions",
+      "call_participant_states",
+      "call_events",
+      "call_recordings",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -393,6 +403,33 @@ describe("PostgreSQL persistence schema", () => {
         "target_entity_id",
         "status"
       ])
+    );
+    expect(getPersistenceTableColumns("call_rooms")).toEqual(
+      expect.arrayContaining([
+        "entity_type",
+        "entity_id",
+        "meeting_id",
+        "media_kind",
+        "provider",
+        "provider_room_id",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("call_sessions")).toEqual(
+      expect.arrayContaining([
+        "room_id",
+        "provider_session_id",
+        "status",
+        "started_by_user_id",
+        "ended_by_user_id",
+        "failure_reason"
+      ])
+    );
+    expect(getPersistenceTableColumns("call_events")).toEqual(
+      expect.arrayContaining(["room_id", "session_id", "event_type", "payload"])
+    );
+    expect(getPersistenceTableColumns("call_recordings")).toEqual(
+      expect.arrayContaining(["room_id", "session_id", "attachment_id", "title"])
     );
   });
 

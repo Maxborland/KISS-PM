@@ -1,6 +1,13 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CallEvent,
+  CallParticipantState,
+  CallRecording,
+  CallRoom,
+  CallRoomStatus,
+  CallSession,
+  CallSessionStatus,
   CollaborationEntityType,
   ControlSignal,
   CorrectiveAction,
@@ -67,6 +74,7 @@ import type {
 import type { AuthRateLimiter } from "./authRateLimit";
 import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
+import type { VideoProvider } from "./videoProvider";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -842,11 +850,62 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     meetingId: string
   ): Promise<MeetingActionItem[]>;
+  createCallRoom?(input: Omit<
+    CallRoom,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<CallRoom>;
+  findCallRoom?(tenantId: TenantId, roomId: string): Promise<CallRoom | undefined>;
+  listCallRoomsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<CallRoom[]>;
+  updateCallRoomStatus?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    status: CallRoomStatus;
+  }): Promise<CallRoom | undefined>;
+  createCallSession?(input: Omit<
+    CallSession,
+    "startedAt" | "endedByUserId" | "endedAt" | "failureReason"
+  >): Promise<CallSession>;
+  findCallSession?(
+    tenantId: TenantId,
+    sessionId: string
+  ): Promise<CallSession | undefined>;
+  endCallSession?(input: {
+    tenantId: TenantId;
+    sessionId: string;
+    endedByUserId: UserId;
+    status: Exclude<CallSessionStatus, "active">;
+    failureReason?: string | null;
+  }): Promise<CallSession | undefined>;
+  upsertCallParticipantState?(input: Omit<
+    CallParticipantState,
+    "joinedAt" | "leftAt" | "lastSeenAt"
+  >): Promise<CallParticipantState>;
+  listCallParticipantStates?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallParticipantState[]>;
+  createCallEvent?(input: Omit<CallEvent, "createdAt">): Promise<CallEvent>;
+  listCallEvents?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    limit: number;
+  }): Promise<CallEvent[]>;
+  createCallRecording?(input: Omit<CallRecording, "createdAt" | "archivedAt">): Promise<CallRecording>;
+  listCallRecordings?(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallRecording[]>;
 };
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   storageProvider?: StorageProvider;
+  videoProvider?: VideoProvider;
   authRateLimiter?: AuthRateLimiter;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
