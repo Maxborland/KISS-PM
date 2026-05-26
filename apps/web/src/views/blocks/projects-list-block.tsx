@@ -32,7 +32,8 @@ import {
 import { cn } from "@/lib/cn";
 import type { Project, ProjectTemplate } from "@/lib/api-types";
 import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 import { projectTemplateName } from "@/lib/mock-data/workspace-config";
 import { positionName, userAvatar } from "@/lib/mock-data/users";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -134,17 +135,24 @@ export function ProjectsListBlock() {
     setCreateOpen(false);
   };
 
+  const intro = (
+    <RoutePageIntro
+      actions={
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+          <Plus className="size-4" aria-hidden />
+          Проект
+        </Button>
+      }
+    />
+  );
+
   return (
-    <ScenarioFetchGate loadingLabel="Загрузка проектов…">
-      <>
-      <RoutePageIntro
-        actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" aria-hidden />
-            Проект
-          </Button>
-        }
-      />
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={6} />}
+      errorTitle="Не удалось загрузить проекты"
+      forbiddenTitle="Нет доступа к проектам"
+    >
       <div className="view-toolbar">
         <Segmented
           name="projects-filter"
@@ -318,8 +326,7 @@ export function ProjectsListBlock() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }
 

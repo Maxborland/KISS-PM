@@ -7,9 +7,10 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { formatDate } from "@/lib/mock-data/format";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 function DeltaCell({ d }: { d: number }) {
   if (d === 0)
@@ -52,24 +53,35 @@ export function ProjectBaselineBlock() {
     [fixtures.planBaselines]
   );
 
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Базовый план")}
+      lead="Снимки плана и отклонения."
+      actions={
+        <>
+          <Button variant="secondary" disabled title="Демо Storybook: снимок подключится к API">
+            Создать снимок
+          </Button>
+          <Button variant="primary" disabled title="Демо Storybook: сравнение подключится к API">
+            Сравнить
+          </Button>
+        </>
+      }
+    />
+  );
+
   return (
-    <ScenarioFetchGate loadingLabel="Загрузка базового плана…">
-      <>
-        <PageIntro
-          title={mockProjectScreenTitle("Базовый план")}
-          lead="Снимки плана и отклонения."
-          actions={
-            <>
-              <Button variant="secondary">Создать снимок</Button>
-              <Button variant="primary">Сравнить</Button>
-            </>
-          }
-        />
-        <CardPanel
-          title={`Базовый план · ${formatDate(fixtures.planBaselines[0]?.capturedAt ?? null)}`}
-          subtitle="PlanSnapshot.baselines"
-          flush
-        >
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={5} withToolbar={false} />}
+      errorTitle="Не удалось загрузить базовый план"
+      forbiddenTitle="Нет доступа к базовому плану"
+    >
+      <CardPanel
+        title={`Базовый план · ${formatDate(fixtures.planBaselines[0]?.capturedAt ?? null)}`}
+        subtitle="Снимки плана проекта"
+        flush
+      >
           <DataTable>
             <thead>
               <tr>
@@ -105,7 +117,6 @@ export function ProjectBaselineBlock() {
             </tbody>
           </DataTable>
         </CardPanel>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }

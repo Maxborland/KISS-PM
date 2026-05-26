@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/select";
 import type { ProductionCalendar } from "@/lib/api-types";
 import { formatDate } from "@/lib/mock-data/format";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 type WeekdayDef = { label: string; hours: string; on: boolean };
 const WEEKDAYS: WeekdayDef[] = [
@@ -49,7 +50,9 @@ function ExceptionRow({
   return (
     <li className="exception-list__item">
       <span className="mono u-text-xs u-text-strong">{formatDate(item.date)}</span>
-      <span className="flex-1 u-text-body">{item.reason ?? "Без причины"} · resource {item.resourceId ?? "tenant"}</span>
+      <span className="flex-1 u-text-body">
+        {item.reason ?? "Без причины"} · ресурс {item.resourceId ?? "арендатор"}
+      </span>
       <Chip variant={tone}>{item.workingMinutes} мин</Chip>
       <Button
         variant="ghost"
@@ -69,24 +72,31 @@ export function ProjectCalendarsBlock() {
   const calendar = fixtures.productionCalendar;
   const [newExceptionDate, setNewExceptionDate] = useState<Date | undefined>();
 
-  return (
-    <ScenarioFetchGate loadingLabel="Загрузка календаря…">
-      <>
-      <PageIntro
-        title={mockProjectScreenTitle("Календари")}
-        lead="Рабочие часы и исключения календаря арендатора."
-        actions={
-          <>
-            <Button variant="ghost" size="sm">
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Календари")}
+      lead="Рабочие часы и исключения календаря арендатора."
+      actions={
+        <>
+          <Button variant="ghost" size="sm" disabled title="Демо Storybook: импорт подключится к API">
               <CalendarDays className="size-4" aria-hidden />
               Шаблоны
             </Button>
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" disabled title="Демо Storybook: сохранение подключится к API">
               Сохранить
             </Button>
           </>
         }
-      />
+    />
+  );
+
+  return (
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={4} withToolbar={false} />}
+      errorTitle="Не удалось загрузить календарь"
+      forbiddenTitle="Нет доступа к календарю"
+    >
       <div className="grid-2">
         <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь арендатора">
           <FormSection title="Шаблон" lead="Выберите базовый паттерн или настройте дни вручную.">
@@ -155,7 +165,6 @@ export function ProjectCalendarsBlock() {
           </FormSection>
         </CardPanel>
       </div>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }

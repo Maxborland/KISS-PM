@@ -4,23 +4,35 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { formatDate, formatRub } from "@/lib/mock-data/format";
-import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export function ProjectScenariosBlock() {
   const { fixtures } = useScenarioFixtures();
   const scenarios = fixtures.planningScenarios;
 
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Сценарии")}
+      lead="Сценарии «что если» и сравнение вариантов."
+      actions={
+        <Button variant="primary" disabled title="Демо Storybook: принятие сценария подключится к API">
+          Принять сценарий
+        </Button>
+      }
+    />
+  );
+
   return (
-    <ScenarioFetchGate loadingLabel="Загрузка сценариев плана…">
-      <>
-        <PageIntro
-          title={mockProjectScreenTitle("Сценарии")}
-          lead="Сценарии «что если» и сравнение вариантов."
-          actions={<Button variant="primary">Принять сценарий</Button>}
-        />
-        <CardPanel title="Сравнение" subtitle={`${scenarios.length} варианта`} flush>
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={4} withToolbar={false} />}
+      errorTitle="Не удалось загрузить сценарии плана"
+      forbiddenTitle="Нет доступа к сценариям плана"
+    >
+      <CardPanel title="Сравнение" subtitle={`${scenarios.length} варианта`} flush>
           <DataTable>
             <thead>
               <tr>
@@ -50,7 +62,6 @@ export function ProjectScenariosBlock() {
             </tbody>
           </DataTable>
         </CardPanel>
-      </>
-    </ScenarioFetchGate>
+    </ScreenBlockGate>
   );
 }
