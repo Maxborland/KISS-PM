@@ -41,6 +41,7 @@ describe("planning parsers", () => {
       { type: "dependency.upsert", payload: { id: "dep-a-b", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "FS", lagMinutes: 0 } },
       { type: "dependency.delete", payload: { dependencyId: "dep-a-b" } },
       { type: "assignment.upsert", payload: { id: "assignment-a", taskId: "task-a", resourceId: "user-alpha-executor", role: "executor", unitsPermille: 1000, workMinutes: null } },
+      { type: "assignment.allocations.replace", payload: { assignmentId: "assignment-a", allocations: [{ date: "2026-06-10", workMinutes: 240 }] } },
       { type: "assignment.delete", payload: { assignmentId: "assignment-a" } },
       { type: "baseline.capture", payload: { baselineId: "baseline-a", label: "Baseline" } },
       { type: "calendar.exception.upsert", payload: { id: "exception-a", calendarId: "calendar-a", resourceId: null, date: "2026-06-12", workingMinutes: 0, reason: "holiday" } },

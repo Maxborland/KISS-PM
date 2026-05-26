@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput,
   ProjectRecord
 } from "./apiTypes";
@@ -30,6 +31,7 @@ import {
   buildStatusTransitionPlanningCommand,
   buildUpdateTaskPlanningCommands
 } from "./planningTaskCompatibility";
+import { runGovernedMutation } from "./governedAction";
 import {
   parseCreateTaskBody,
   parseCreateTaskStatusBody,
@@ -39,17 +41,60 @@ import {
 } from "./projectWorkParsers";
 
 type ProjectWorkRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: ProjectWorkRouteDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: ProjectWorkMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
+
+type ProjectWorkRouteDataSource = Pick<
+  ApiTenantDataSource,
+  | "applyPlanningCommand"
+  | "archiveTaskStatus"
+  | "createTaskActivity"
+  | "createTaskStatus"
+  | "ensureWorkspaceInboxProject"
+  | "findTaskById"
+  | "getPlanSnapshot"
+  | "incrementPlanVersion"
+  | "listMyWorkTasks"
+  | "listProjectTasks"
+  | "listProjects"
+  | "listTaskActivities"
+  | "listTaskStatuses"
+  | "listWorkspaceUsers"
+  | "updateTaskMetadata"
+  | "updateTaskStatusDefinition"
+  | "withTransaction"
+>;
+
+type ProjectWorkProjectListDataSource = Pick<ApiTenantDataSource, "listProjects">;
+
+type ProjectWorkMutationDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "applyPlanningCommand"
+  | "archiveTaskStatus"
+  | "createTaskActivity"
+  | "createTaskStatus"
+  | "ensureWorkspaceInboxProject"
+  | "findTaskById"
+  | "getPlanSnapshot"
+  | "incrementPlanVersion"
+  | "listProjectTasks"
+  | "listProjects"
+  | "listTaskStatuses"
+  | "listWorkspaceUsers"
+  | "lockTenantResourcePlanning"
+  | "updateTaskMetadata"
+  | "updateTaskStatusDefinition"
+>;
 
 export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps) {
   const {
@@ -57,6 +102,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     getActorProfile,
     getSessionActorFromHeaders
   } = deps;
+  const sourceWorkflow = "project_work";
 
   app.get("/api/workspace/task-statuses", async (context) => {
     const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
@@ -94,27 +140,34 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
     const parsed = parseCreateTaskStatusBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const taskStatus = await dataSource.createTaskStatus({
-      ...parsed.value,
-      tenantId: actor.tenantId
+    const result = await runProjectWorkMutation({
+      actor,
+      deniedAudit: {
+        actionType: "task_status.create_denied",
+        sourceEntity: { type: "TaskStatus", id: parsed.value.id },
+        commandInput: parsed.value
+      },
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createTaskStatus) {
+          throw new Error("transactional_task_status_create_not_configured");
+        }
+        return transactionDataSource.createTaskStatus({
+          ...parsed.value,
+          tenantId: actor.tenantId
+        });
+      },
+      permissionResult: decision,
+      successAudit: (taskStatus) => ({
+        actionType: "task_status.created",
+        sourceEntity: { type: "TaskStatus", id: taskStatus.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: { id: taskStatus.id, category: taskStatus.category }
+      })
     });
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "task_status.created",
-      sourceWorkflow: "project_work",
-      sourceEntity: { type: "TaskStatus", id: taskStatus.id },
-      commandInput: parsed.value,
-      beforeState: null,
-      afterState: { id: taskStatus.id, category: taskStatus.category },
-      permissionResult: {
-        allowed: true,
-        reason: decision.reason,
-        permission: "tenant.task_statuses.manage"
-      }
-    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ taskStatus }, 201);
+    return context.json({ taskStatus: result.value }, 201);
   });
 
   app.patch("/api/workspace/task-statuses/:statusId", async (context) => {
@@ -151,39 +204,46 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       return context.json({ error: "system_task_status_category_locked" }, 409);
     }
 
-    const taskStatus = await dataSource.updateTaskStatusDefinition({
-      ...parsed.value,
-      tenantId: actor.tenantId
-    });
-    await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType: "task_status.updated",
-      sourceWorkflow: "project_work",
-      sourceEntity: { type: "TaskStatus", id: taskStatus.id },
-      commandInput: parsed.value,
-      beforeState: {
-        id: before.id,
-        name: before.name,
-        category: before.category,
-        sortOrder: before.sortOrder,
-        status: before.status
+    const result = await runProjectWorkMutation({
+      actor,
+      deniedAudit: {
+        actionType: "task_status.update_denied",
+        sourceEntity: { type: "TaskStatus", id: parsed.value.id },
+        commandInput: parsed.value
       },
-      afterState: {
-        id: taskStatus.id,
-        name: taskStatus.name,
-        category: taskStatus.category,
-        sortOrder: taskStatus.sortOrder,
-        status: taskStatus.status
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateTaskStatusDefinition) {
+          throw new Error("transactional_task_status_update_not_configured");
+        }
+        return transactionDataSource.updateTaskStatusDefinition({
+          ...parsed.value,
+          tenantId: actor.tenantId
+        });
       },
-      permissionResult: {
-        allowed: true,
-        reason: decision.reason,
-        permission: "tenant.task_statuses.manage"
-      }
+      permissionResult: decision,
+      successAudit: (taskStatus) => ({
+        actionType: "task_status.updated",
+        sourceEntity: { type: "TaskStatus", id: taskStatus.id },
+        commandInput: parsed.value,
+        beforeState: {
+          id: before.id,
+          name: before.name,
+          category: before.category,
+          sortOrder: before.sortOrder,
+          status: before.status
+        },
+        afterState: {
+          id: taskStatus.id,
+          name: taskStatus.name,
+          category: taskStatus.category,
+          sortOrder: taskStatus.sortOrder,
+          status: taskStatus.status
+        }
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ taskStatus });
+    return context.json({ taskStatus: result.value });
   });
 
   app.delete("/api/workspace/task-statuses/:statusId", async (context) => {
@@ -1205,10 +1265,39 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
 
     return context.json({ activity }, 201);
   });
+
+  async function runProjectWorkMutation<T>(input: {
+    actor: TenantUser;
+    permissionResult: PolicyDecision;
+    deniedAudit: {
+      actionType: string;
+      sourceEntity: { type: string; id: string };
+      commandInput: Record<string, unknown>;
+    };
+    execute(transactionDataSource: ProjectWorkMutationDataSource): Promise<T>;
+    successAudit(value: T): {
+      actionType: string;
+      sourceEntity: { type: string; id: string };
+      commandInput: Record<string, unknown>;
+      beforeState?: Record<string, unknown> | null;
+      afterState?: Record<string, unknown> | null;
+    };
+  }) {
+    return runGovernedMutation({
+      actor: input.actor,
+      appendManagementAuditEvent: deps.appendManagementAuditEvent,
+      deniedAudit: input.deniedAudit,
+      execute: input.execute,
+      permissionResult: input.permissionResult,
+      runDataSourceTransaction: deps.runDataSourceTransaction,
+      sourceWorkflow,
+      successAudit: input.successAudit
+    });
+  }
 }
 
 async function findActiveProject(
-  dataSource: ApiTenantDataSource,
+  dataSource: ProjectWorkProjectListDataSource,
   tenantId: string,
   projectId: string
 ): Promise<ProjectRecord | undefined> {
@@ -1365,7 +1454,7 @@ function summarizeTask(task: TaskRecord): Record<string, unknown> {
 }
 
 async function createTaskSystemActivity(
-  dataSource: ApiTenantDataSource,
+  dataSource: Pick<ApiTenantDataSource, "createTaskActivity">,
   input: {
     tenantId: string;
     taskId: string;

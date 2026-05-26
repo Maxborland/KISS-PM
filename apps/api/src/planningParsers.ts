@@ -8,6 +8,7 @@ import type {
   ScenarioTarget,
   TaskType
 } from "@kiss-pm/domain";
+import type { AutoPlanningSolverMode } from "@kiss-pm/domain";
 
 export type PlanningCommandEnvelope = {
   command: PlanningCommand;
@@ -22,6 +23,12 @@ export type PlanningCommandEnvelopeParseResult =
 export type ScenarioPreviewEnvelope = {
   target: ScenarioTarget;
   clientPlanVersion: number;
+};
+
+export type AutoSolverRunEnvelope = {
+  mode: AutoPlanningSolverMode;
+  clientPlanVersion: number;
+  targetDeadline: string | null;
 };
 
 const dependencyTypes = ["FS", "SS", "FF", "SF"] as const;
@@ -77,6 +84,41 @@ export function parseScenarioApplyEnvelope(input: unknown):
   const clientPlanVersion = getInteger(input, "clientPlanVersion");
   if (clientPlanVersion === null || clientPlanVersion < 1) {
     return { ok: false, error: "planning_scenario_invalid" };
+  }
+  return {
+    ok: true,
+    value: {
+      clientPlanVersion,
+      acceptedRiskReason: getOptionalString(input, "acceptedRiskReason")
+    }
+  };
+}
+
+export function parseAutoSolverRunEnvelope(input: unknown):
+  | { ok: true; value: AutoSolverRunEnvelope }
+  | { ok: false; error: string } {
+  if (!isObject(input)) return { ok: false, error: "planning_auto_solver_invalid" };
+  const mode = getString(input, "mode");
+  const clientPlanVersion = getInteger(input, "clientPlanVersion");
+  const targetDeadline = getNullableDate(input, "targetDeadline");
+  if (
+    (mode !== "schedule" && mode !== "repair") ||
+    clientPlanVersion === null ||
+    clientPlanVersion < 1 ||
+    targetDeadline === undefined
+  ) {
+    return { ok: false, error: "planning_auto_solver_invalid" };
+  }
+  return { ok: true, value: { mode, clientPlanVersion, targetDeadline } };
+}
+
+export function parseAutoSolverApplyEnvelope(input: unknown):
+  | { ok: true; value: { clientPlanVersion: number; acceptedRiskReason: string | null } }
+  | { ok: false; error: string } {
+  if (!isObject(input)) return { ok: false, error: "planning_auto_solver_invalid" };
+  const clientPlanVersion = getInteger(input, "clientPlanVersion");
+  if (clientPlanVersion === null || clientPlanVersion < 1) {
+    return { ok: false, error: "planning_auto_solver_invalid" };
   }
   return {
     ok: true,
@@ -204,6 +246,23 @@ export function parsePlanningCommand(input: unknown):
       const assignmentId = getString(payload, "assignmentId");
       if (!assignmentId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { assignmentId } } };
+    }
+    case "assignment.allocations.replace": {
+      const assignmentId = getString(payload, "assignmentId");
+      if (!assignmentId || !Array.isArray(payload.allocations)) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
+      const allocations = [];
+      for (const item of payload.allocations) {
+        if (!isObject(item)) return { ok: false, error: "planning_command_invalid" };
+        const date = getDate(item, "date");
+        const workMinutes = getInteger(item, "workMinutes");
+        if (!date || workMinutes === null || workMinutes < 0) {
+          return { ok: false, error: "planning_command_invalid" };
+        }
+        allocations.push({ date, workMinutes });
+      }
+      return { ok: true, value: { type, payload: { assignmentId, allocations } } };
     }
     case "baseline.capture": {
       const baselineId = getString(payload, "baselineId");

@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ApiTenantDataSource,
   AuditEventListItem,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import { readLimitedJsonBody } from "./jsonBody";
@@ -35,17 +36,46 @@ import {
 import { isFinalOpportunityStatus } from "./projectIntakeService/opportunityStatus";
 
 type CrmActivityRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: CrmActivityRouteDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: CrmActivityMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
+
+type CrmActivityRouteDataSource = Pick<
+  ApiTenantDataSource,
+  | "createCrmActivity"
+  | "findClientById"
+  | "findContactById"
+  | "findOpportunityById"
+  | "findProductById"
+  | "listAuditEventsByTenantId"
+  | "listCrmActivities"
+  | "listWorkspaceUsers"
+  | "transitionCrmActivityStatus"
+  | "withTransaction"
+>;
+
+type CrmActivityEntityDataSource = Pick<
+  ApiTenantDataSource,
+  | "findClientById"
+  | "findContactById"
+  | "findOpportunityById"
+  | "findProductById"
+>;
+
+type CrmActivityUserDataSource = Pick<ApiTenantDataSource, "listWorkspaceUsers">;
+
+type CrmActivityMutationDataSource = Pick<
+  ApiTenantDataSource,
+  "appendAuditEvent" | "createCrmActivity" | "transitionCrmActivityStatus"
+>;
 
 type RedactedCrmSystemEvent = {
   id: string;
@@ -445,7 +475,7 @@ async function resolveMutationContext(
 
 async function resolveCrmEntity(input: {
   actor: TenantUser;
-  dataSource: ApiTenantDataSource;
+  dataSource: CrmActivityEntityDataSource;
   entityId: string;
   entityType: CrmActivityEntityType;
 }): Promise<CrmEntityContext | undefined> {
@@ -539,7 +569,7 @@ function manageDecisionForEntity(input: {
 }
 
 async function isActiveTenantUser(
-  dataSource: ApiTenantDataSource,
+  dataSource: CrmActivityUserDataSource,
   tenantId: string,
   userId: string
 ): Promise<boolean> {
@@ -581,7 +611,7 @@ async function appendDeniedAudit(input: {
 async function appendActivityAudit(input: {
   actor: TenantUser;
   afterState: Record<string, unknown> | null;
-  auditDataSource: ApiTenantDataSource;
+  auditDataSource: ManagementAuditDataSource;
   beforeState: Record<string, unknown> | null;
   commandInput: Record<string, unknown>;
   deps: CrmActivityRouteDeps;

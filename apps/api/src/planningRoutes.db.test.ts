@@ -201,7 +201,7 @@ describe("planning API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -211,8 +211,282 @@ describe("planning API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
+  });
+
+  it("persists and applies auto-solver proposals through governed planning commands", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-solver-a",
+      title: "Первый слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    await createTask(adminCookie, {
+      id: "task-solver-b",
+      title: "Второй слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialRead.json();
+
+    const runResponse = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: initialBody.planVersion,
+          targetDeadline: "2026-06-02"
+        })
+      }
+    );
+    const runBody = await runResponse.json();
+    expect(runResponse.status).toBe(200);
+    expect(runBody).toMatchObject({
+      mode: "schedule",
+      clientPlanVersion: initialBody.planVersion,
+      proposals: [
+        expect.objectContaining({
+          kind: "no_overlap",
+          explainability: expect.objectContaining({ overloadMinutes: 0 })
+        })
+      ]
+    });
+
+    const fetchedRun = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(fetchedRun.status).toBe(200);
+
+    const applyResponse = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}/proposals/${runBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    const applyBody = await applyResponse.json();
+
+    expect(applyResponse.status).toBe(200);
+    expect(applyBody).toMatchObject({
+      solverRunId: runBody.id,
+      proposalId: runBody.proposals[0].id,
+      newPlanVersion: initialBody.planVersion + 1,
+      readModel: {
+        authored: {
+          assignmentAllocations: expect.arrayContaining([
+            expect.objectContaining({ date: "2026-06-01", workMinutes: 480 }),
+            expect.objectContaining({ date: "2026-06-02", workMinutes: 480 })
+          ])
+        }
+      }
+    });
+  });
+
+  it("rejects stale auto-solver apply after the project plan changes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-stale-solver-a",
+      title: "Первый слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    await createTask(adminCookie, {
+      id: "task-stale-solver-b",
+      title: "Второй слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialRead.json();
+    const runResponse = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: initialBody.planVersion,
+          targetDeadline: "2026-06-02"
+        })
+      }
+    );
+    const runBody = await runResponse.json();
+    expect(runResponse.status).toBe(200);
+
+    await createTask(adminCookie, {
+      id: "task-stale-solver-c",
+      title: "Новая задача после run",
+      start: "2026-06-03",
+      finish: "2026-06-03",
+      plannedWork: 8
+    });
+
+    const staleApply = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}/proposals/${runBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    await expect(staleApply.json()).resolves.toMatchObject({
+      error: "plan_version_conflict",
+      currentPlanVersion: initialBody.planVersion + 1
+    });
+    expect(staleApply.status).toBe(409);
+  });
+
+  it("requires resource management permission for auto-solver allocation proposals", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const planManagerCookie = await loginAs("plan-manager-no-read@kiss-pm.local", "manager12345");
+    await createTask(adminCookie, {
+      id: "task-resource-permission-a",
+      title: "Первый слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    await createTask(adminCookie, {
+      id: "task-resource-permission-b",
+      title: "Второй слот",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 8
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialRead.json();
+    const runResponse = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: initialBody.planVersion,
+          targetDeadline: "2026-06-02"
+        })
+      }
+    );
+    const runBody = await runResponse.json();
+    expect(runResponse.status).toBe(200);
+
+    const deniedApply = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}/proposals/${runBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: planManagerCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    await expect(deniedApply.json()).resolves.toEqual({
+      error: "permission_missing"
+    });
+    expect(deniedApply.status).toBe(403);
+  });
+
+  it("requires an accepted risk reason for auto-solver overload fallback proposals", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-overload-risk-a",
+      title: "Первый перегруз",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 80
+    });
+    await createTask(adminCookie, {
+      id: "task-overload-risk-b",
+      title: "Второй перегруз",
+      start: "2026-06-01",
+      finish: "2026-06-01",
+      plannedWork: 80
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialRead.json();
+    const runResponse = await app.request(
+      "/api/workspace/projects/project-alpha/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: initialBody.planVersion,
+          targetDeadline: "2026-06-01"
+        })
+      }
+    );
+    const runBody = await runResponse.json();
+    expect(runResponse.status).toBe(200);
+    expect(runBody.proposals[0]).toMatchObject({
+      kind: "accepted_overload"
+    });
+
+    const applyWithoutReason = await app.request(
+      `/api/workspace/projects/project-alpha/planning/auto-solver-runs/${runBody.id}/proposals/${runBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    await expect(applyWithoutReason.json()).resolves.toEqual({
+      error: "accepted_risk_reason_required"
+    });
+    expect(applyWithoutReason.status).toBe(400);
   });
 
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {

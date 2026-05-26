@@ -8,8 +8,13 @@ import type {
   ProjectRecord
 } from "../apiTypes";
 
+type FeasibilityAssessmentDataSource = Pick<
+  ApiTenantDataSource,
+  "listPositions" | "listProjects" | "listWorkspaceUsers"
+>;
+
 export async function buildFeasibilityAssessment(
-  dataSource: ApiTenantDataSource,
+  dataSource: FeasibilityAssessmentDataSource,
   tenantId: string,
   opportunity: OpportunityRecord
 ): Promise<OpportunityFeasibilityAssessment> {

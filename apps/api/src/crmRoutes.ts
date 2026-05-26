@@ -16,6 +16,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
   ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import {
@@ -25,29 +26,70 @@ import {
   parseProductBody,
   parseProjectTypeBody
 } from "./crmParsers";
+import { runGovernedMutation, writeGovernedDeniedAudit } from "./governedAction";
 import { readLimitedJsonBody } from "./jsonBody";
 
 type CrmRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: CrmRouteDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: CrmMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 
+type CrmRouteDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "createClient"
+  | "createContact"
+  | "createDealStage"
+  | "createProduct"
+  | "createProjectType"
+  | "findClientById"
+  | "findContactById"
+  | "findDealStageById"
+  | "findProductById"
+  | "findProjectTypeById"
+  | "listClients"
+  | "listContacts"
+  | "listDealStages"
+  | "listProducts"
+  | "listProjectTypes"
+  | "updateClient"
+  | "updateContact"
+  | "updateDealStage"
+  | "updateProduct"
+  | "updateProjectType"
+  | "withTransaction"
+>;
+
+type CrmMutationDataSource = Pick<
+  ApiTenantDataSource,
+  | "appendAuditEvent"
+  | "createClient"
+  | "createContact"
+  | "createDealStage"
+  | "createProduct"
+  | "createProjectType"
+  | "updateClient"
+  | "updateContact"
+  | "updateDealStage"
+  | "updateProduct"
+  | "updateProjectType"
+>;
+
 export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   const {
-    appendManagementAuditEvent,
     dataSource,
     getActorProfile,
-    getSessionActorFromHeaders,
-    runDataSourceTransaction
+    getSessionActorFromHeaders
   } = deps;
+  const sourceWorkflow = "crm_foundation";
 
   app.get("/api/workspace/clients", async (context) => {
     const actor = await getActor(context.req.header("cookie") ?? null);
@@ -78,16 +120,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
+    const deniedAudit = {
+      actionType: "client.create_denied",
+      sourceEntity: { type: "Client", id: "unknown" },
+      commandInput: { endpoint: "createClient" }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "client.create_denied",
-        sourceEntity: { type: "Client", id: "unknown" },
-        commandInput: { endpoint: "createClient" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -95,27 +135,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseClientBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const client = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createClient) {
-        throw new Error("transactional_client_create_not_configured");
-      }
-      const created = await transactionDataSource.createClient(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "client.created",
-          sourceEntity: { type: "Client", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createClient) {
+          throw new Error("transactional_client_create_not_configured");
+        }
+        return transactionDataSource.createClient(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (created) => ({
+        actionType: "client.created",
+        sourceEntity: { type: "Client", id: created.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: created
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ client }, 201);
+    return context.json({ client: result.value }, 201);
   });
 
   app.patch("/api/workspace/clients/:clientId", async (context) => {
@@ -136,16 +176,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       targetTenantId: actor.tenantId
     });
     const clientId = context.req.param("clientId");
+    const deniedAudit = {
+      actionType: "client.update_denied",
+      sourceEntity: { type: "Client", id: clientId },
+      commandInput: { endpoint: "updateClient", clientId }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "client.update_denied",
-        sourceEntity: { type: "Client", id: clientId },
-        commandInput: { endpoint: "updateClient", clientId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const beforeState = await dataSource.findClientById(actor.tenantId, clientId);
@@ -156,27 +194,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseClientBody({ ...body.value, id: clientId }, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const client = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateClient) {
-        throw new Error("transactional_client_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateClient(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "client.updated",
-          sourceEntity: { type: "Client", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateClient) {
+          throw new Error("transactional_client_update_not_configured");
+        }
+        return transactionDataSource.updateClient(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (updated) => ({
+        actionType: "client.updated",
+        sourceEntity: { type: "Client", id: updated.id },
+        commandInput: parsed.value,
+        beforeState,
+        afterState: updated
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ client });
+    return context.json({ client: result.value });
   });
 
   app.get("/api/workspace/contacts", async (context) => {
@@ -213,16 +251,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
+    const deniedAudit = {
+      actionType: "contact.create_denied",
+      sourceEntity: { type: "Contact", id: "unknown" },
+      commandInput: { endpoint: "createContact" }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "contact.create_denied",
-        sourceEntity: { type: "Contact", id: "unknown" },
-        commandInput: { endpoint: "createContact" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -234,27 +270,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: "client_not_found" }, 404);
     }
 
-    const contact = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createContact) {
-        throw new Error("transactional_contact_create_not_configured");
-      }
-      const created = await transactionDataSource.createContact(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "contact.created",
-          sourceEntity: { type: "Contact", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createContact) {
+          throw new Error("transactional_contact_create_not_configured");
+        }
+        return transactionDataSource.createContact(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (created) => ({
+        actionType: "contact.created",
+        sourceEntity: { type: "Contact", id: created.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: created
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ contact }, 201);
+    return context.json({ contact: result.value }, 201);
   });
 
   app.patch("/api/workspace/contacts/:contactId", async (context) => {
@@ -276,16 +312,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       targetTenantId: actor.tenantId
     });
     const contactId = context.req.param("contactId");
+    const deniedAudit = {
+      actionType: "contact.update_denied",
+      sourceEntity: { type: "Contact", id: contactId },
+      commandInput: { endpoint: "updateContact", contactId }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "contact.update_denied",
-        sourceEntity: { type: "Contact", id: contactId },
-        commandInput: { endpoint: "updateContact", contactId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const beforeState = await dataSource.findContactById(actor.tenantId, contactId);
@@ -301,27 +335,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: "client_not_found" }, 404);
     }
 
-    const contact = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateContact) {
-        throw new Error("transactional_contact_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateContact(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "contact.updated",
-          sourceEntity: { type: "Contact", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateContact) {
+          throw new Error("transactional_contact_update_not_configured");
+        }
+        return transactionDataSource.updateContact(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (updated) => ({
+        actionType: "contact.updated",
+        sourceEntity: { type: "Contact", id: updated.id },
+        commandInput: parsed.value,
+        beforeState,
+        afterState: updated
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ contact });
+    return context.json({ contact: result.value });
   });
 
   app.get("/api/workspace/products", async (context) => {
@@ -357,16 +391,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
+    const deniedAudit = {
+      actionType: "product.create_denied",
+      sourceEntity: { type: "Product", id: "unknown" },
+      commandInput: { endpoint: "createProduct" }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "product.create_denied",
-        sourceEntity: { type: "Product", id: "unknown" },
-        commandInput: { endpoint: "createProduct" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -374,27 +406,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProductBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const product = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createProduct) {
-        throw new Error("transactional_product_create_not_configured");
-      }
-      const created = await transactionDataSource.createProduct(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "product.created",
-          sourceEntity: { type: "Product", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createProduct) {
+          throw new Error("transactional_product_create_not_configured");
+        }
+        return transactionDataSource.createProduct(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (created) => ({
+        actionType: "product.created",
+        sourceEntity: { type: "Product", id: created.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: created
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ product }, 201);
+    return context.json({ product: result.value }, 201);
   });
 
   app.patch("/api/workspace/products/:productId", async (context) => {
@@ -415,16 +447,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       targetTenantId: actor.tenantId
     });
     const productId = context.req.param("productId");
+    const deniedAudit = {
+      actionType: "product.update_denied",
+      sourceEntity: { type: "Product", id: productId },
+      commandInput: { endpoint: "updateProduct", productId }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "product.update_denied",
-        sourceEntity: { type: "Product", id: productId },
-        commandInput: { endpoint: "updateProduct", productId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const beforeState = await dataSource.findProductById(actor.tenantId, productId);
@@ -435,27 +465,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProductBody({ ...body.value, id: productId }, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const product = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateProduct) {
-        throw new Error("transactional_product_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateProduct(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "product.updated",
-          sourceEntity: { type: "Product", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateProduct) {
+          throw new Error("transactional_product_update_not_configured");
+        }
+        return transactionDataSource.updateProduct(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (updated) => ({
+        actionType: "product.updated",
+        sourceEntity: { type: "Product", id: updated.id },
+        commandInput: parsed.value,
+        beforeState,
+        afterState: updated
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ product });
+    return context.json({ product: result.value });
   });
 
   app.get("/api/workspace/project-types", async (context) => {
@@ -493,16 +523,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
+    const deniedAudit = {
+      actionType: "project_type.create_denied",
+      sourceEntity: { type: "ProjectType", id: "unknown" },
+      commandInput: { endpoint: "createProjectType" }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "project_type.create_denied",
-        sourceEntity: { type: "ProjectType", id: "unknown" },
-        commandInput: { endpoint: "createProjectType" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -510,27 +538,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProjectTypeBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const projectType = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createProjectType) {
-        throw new Error("transactional_project_type_create_not_configured");
-      }
-      const created = await transactionDataSource.createProjectType(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "project_type.created",
-          sourceEntity: { type: "ProjectType", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createProjectType) {
+          throw new Error("transactional_project_type_create_not_configured");
+        }
+        return transactionDataSource.createProjectType(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (created) => ({
+        actionType: "project_type.created",
+        sourceEntity: { type: "ProjectType", id: created.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: created
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ projectType }, 201);
+    return context.json({ projectType: result.value }, 201);
   });
 
   app.patch("/api/workspace/project-types/:projectTypeId", async (context) => {
@@ -551,16 +579,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       targetTenantId: actor.tenantId
     });
     const projectTypeId = context.req.param("projectTypeId");
+    const deniedAudit = {
+      actionType: "project_type.update_denied",
+      sourceEntity: { type: "ProjectType", id: projectTypeId },
+      commandInput: { endpoint: "updateProjectType", projectTypeId }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "project_type.update_denied",
-        sourceEntity: { type: "ProjectType", id: projectTypeId },
-        commandInput: { endpoint: "updateProjectType", projectTypeId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const beforeState = await dataSource.findProjectTypeById(actor.tenantId, projectTypeId);
@@ -574,27 +600,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const projectType = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateProjectType) {
-        throw new Error("transactional_project_type_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateProjectType(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "project_type.updated",
-          sourceEntity: { type: "ProjectType", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateProjectType) {
+          throw new Error("transactional_project_type_update_not_configured");
+        }
+        return transactionDataSource.updateProjectType(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (updated) => ({
+        actionType: "project_type.updated",
+        sourceEntity: { type: "ProjectType", id: updated.id },
+        commandInput: parsed.value,
+        beforeState,
+        afterState: updated
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ projectType });
+    return context.json({ projectType: result.value });
   });
 
   app.get("/api/workspace/deal-stages", async (context) => {
@@ -630,16 +656,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
+    const deniedAudit = {
+      actionType: "deal_stage.create_denied",
+      sourceEntity: { type: "DealStage", id: "unknown" },
+      commandInput: { endpoint: "createDealStage" }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.create_denied",
-        sourceEntity: { type: "DealStage", id: "unknown" },
-        commandInput: { endpoint: "createDealStage" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -647,27 +671,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseDealStageBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createDealStage) {
-        throw new Error("transactional_deal_stage_create_not_configured");
-      }
-      const created = await transactionDataSource.createDealStage(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "deal_stage.created",
-          sourceEntity: { type: "DealStage", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.createDealStage) {
+          throw new Error("transactional_deal_stage_create_not_configured");
+        }
+        return transactionDataSource.createDealStage(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (created) => ({
+        actionType: "deal_stage.created",
+        sourceEntity: { type: "DealStage", id: created.id },
+        commandInput: parsed.value,
+        beforeState: null,
+        afterState: created
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ dealStage }, 201);
+    return context.json({ dealStage: result.value }, 201);
   });
 
   app.patch("/api/workspace/deal-stages/:stageId", async (context) => {
@@ -688,16 +712,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       targetTenantId: actor.tenantId
     });
     const stageId = context.req.param("stageId");
+    const deniedAudit = {
+      actionType: "deal_stage.update_denied",
+      sourceEntity: { type: "DealStage", id: stageId },
+      commandInput: { endpoint: "updateDealStage", stageId }
+    };
     if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.update_denied",
-        sourceEntity: { type: "DealStage", id: stageId },
-        commandInput: { endpoint: "updateDealStage", stageId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
+      const denied = await runDeniedCrmMutation({ actor, deniedAudit, permissionResult: decision });
+      return context.json({ error: denied.error }, denied.status);
     }
 
     const beforeState = await dataSource.findDealStageById(actor.tenantId, stageId);
@@ -708,87 +730,81 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseDealStageBody({ ...body.value, id: stageId }, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateDealStage) {
-        throw new Error("transactional_deal_stage_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateDealStage(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "deal_stage.updated",
-          sourceEntity: { type: "DealStage", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
+    const result = await runCrmMutation({
+      actor,
+      deniedAudit,
+      execute: async (transactionDataSource) => {
+        if (!transactionDataSource.updateDealStage) {
+          throw new Error("transactional_deal_stage_update_not_configured");
+        }
+        return transactionDataSource.updateDealStage(parsed.value);
+      },
+      permissionResult: decision,
+      successAudit: (updated) => ({
+        actionType: "deal_stage.updated",
+        sourceEntity: { type: "DealStage", id: updated.id },
+        commandInput: parsed.value,
+        beforeState,
+        afterState: updated
+      })
     });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
 
-    return context.json({ dealStage });
+    return context.json({ dealStage: result.value });
   });
 
   async function getActor(cookie: string | null): Promise<TenantUser | undefined> {
     return getSessionActorFromHeaders(cookie);
   }
 
-  async function appendDeniedAudit(input: {
+  async function runDeniedCrmMutation(input: {
     actor: TenantUser;
-    actionType: string;
-    sourceEntity: {
-      type: string;
-      id: string;
-    };
-    commandInput: Record<string, unknown>;
     permissionResult: PolicyDecision;
-    error: string;
+    deniedAudit: {
+      actionType: string;
+      sourceEntity: { type: string; id: string };
+      commandInput: Record<string, unknown>;
+    };
   }) {
-    await appendManagementAuditEvent({
-      tenantId: input.actor.tenantId,
-      actorUserId: input.actor.id,
-      actionType: input.actionType,
-      sourceWorkflow: "crm_foundation",
-      sourceEntity: input.sourceEntity,
-      commandInput: input.commandInput,
-      beforeState: null,
-      afterState: null,
+    return writeGovernedDeniedAudit({
+      actor: input.actor,
+      appendManagementAuditEvent: deps.appendManagementAuditEvent,
+      deniedAudit: input.deniedAudit,
       permissionResult: input.permissionResult,
-      executionResult: {
-        status: "denied",
-        error: input.error
-      }
+      sourceWorkflow
+    });
+  }
+
+  async function runCrmMutation<T>(input: {
+    actor: TenantUser;
+    permissionResult: PolicyDecision;
+    deniedAudit: {
+      actionType: string;
+      sourceEntity: { type: string; id: string };
+      commandInput: Record<string, unknown>;
+    };
+    execute(transactionDataSource: CrmMutationDataSource): Promise<T>;
+    successAudit(value: T): {
+      actionType: string;
+      sourceEntity: { type: string; id: string };
+      commandInput: Record<string, unknown>;
+      beforeState?: Record<string, unknown> | null;
+      afterState?: Record<string, unknown> | null;
+    };
+  }) {
+    return runGovernedMutation({
+      actor: input.actor,
+      appendManagementAuditEvent: deps.appendManagementAuditEvent,
+      deniedAudit: input.deniedAudit,
+      execute: input.execute,
+      permissionResult: input.permissionResult,
+      runDataSourceTransaction: deps.runDataSourceTransaction,
+      sourceWorkflow,
+      successAudit: input.successAudit
     });
   }
 }
 
 function isObjectBody(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function auditInput(input: {
-  actor: TenantUser;
-  actionType: string;
-  sourceEntity: {
-    type: string;
-    id: string;
-  };
-  commandInput: Record<string, unknown>;
-  beforeState: Record<string, unknown> | null;
-  afterState: Record<string, unknown> | null;
-  permissionResult: PolicyDecision;
-}): ManagementAuditEventInput {
-  return {
-    tenantId: input.actor.tenantId,
-    actorUserId: input.actor.id,
-    actionType: input.actionType,
-    sourceWorkflow: "crm_foundation",
-    sourceEntity: input.sourceEntity,
-    commandInput: input.commandInput,
-    beforeState: input.beforeState,
-    afterState: input.afterState,
-    permissionResult: input.permissionResult
-  };
 }

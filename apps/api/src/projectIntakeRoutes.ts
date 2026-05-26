@@ -6,7 +6,7 @@ import {
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
-  ApiTenantDataSource,
+  ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
 import { parseDealStageChangeBody } from "./crmParsers";
@@ -18,17 +18,21 @@ import {
   parseProjectActivationBody
 } from "./projectIntakeParsers";
 import { createProjectIntakeService } from "./projectIntakeService";
+import type {
+  ProjectIntakeMutationDataSource,
+  ProjectIntakeServiceDataSource
+} from "./projectIntakeService/types";
 
 type ProjectIntakeRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: ProjectIntakeServiceDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: ProjectIntakeMutationDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 

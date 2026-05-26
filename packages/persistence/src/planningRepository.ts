@@ -4,6 +4,7 @@ import type {
   DependencyType,
   PlanningCommand,
   PlanAssignment,
+  PlanAssignmentAllocation,
   PlanAssignmentRole,
   PlanBaseline,
   PlanCalendar,
@@ -31,6 +32,8 @@ import {
   resourceCalendars,
   resourceReservations,
   planningScenarioRuns,
+  planningSolverRuns,
+  taskAssignmentAllocations,
   taskAssignments,
   taskDependencies,
   taskStatuses,
@@ -77,6 +80,19 @@ export type PlanningRepository = {
     scenarioRunId: string;
     appliedAt: Date;
   }): Promise<void>;
+  createPlanningSolverRun(input: PlanningSolverRunInput): Promise<PlanningSolverRunRecord>;
+  findPlanningSolverRun(
+    tenantId: string,
+    projectId: string,
+    solverRunId: string
+  ): Promise<PlanningSolverRunRecord | undefined>;
+  markPlanningSolverRunApplied(input: {
+    tenantId: string;
+    projectId: string;
+    solverRunId: string;
+    proposalId: string;
+    appliedAt: Date;
+  }): Promise<void>;
   findPlanningCommandIdempotency(
     tenantId: string,
     projectId: string,
@@ -112,6 +128,33 @@ export type PlanningScenarioRunRecord = {
   proposalPayloadHash: string;
   actorUserId: string;
   expiresAt: Date;
+  appliedAt: Date | null;
+  createdAt: Date;
+};
+
+export type PlanningSolverRunInput = Omit<
+  PlanningSolverRunRecord,
+  "createdAt" | "appliedAt" | "appliedProposalId"
+> & {
+  appliedAt?: Date | null;
+  appliedProposalId?: string | null;
+  createdAt?: Date;
+};
+
+export type PlanningSolverRunRecord = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  mode: "schedule" | "repair";
+  clientPlanVersion: number;
+  engineVersion: string;
+  inputSnapshotMetadata: Record<string, unknown>;
+  targetDeadline: string | null;
+  proposals: Record<string, unknown>[];
+  proposalPayloadHash: string;
+  actorUserId: string;
+  expiresAt: Date;
+  appliedProposalId: string | null;
   appliedAt: Date | null;
   createdAt: Date;
 };
@@ -152,6 +195,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         planVersion,
         taskRows,
         assignmentRows,
+        assignmentAllocationRows,
         dependencyRows,
         projectCalendarRows,
         resourceCalendarRows,
@@ -172,6 +216,11 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           .from(taskAssignments)
           .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)))
           .orderBy(asc(taskAssignments.id)),
+        db
+          .select()
+          .from(taskAssignmentAllocations)
+          .where(and(eq(taskAssignmentAllocations.tenantId, tenantId), eq(taskAssignmentAllocations.projectId, projectId)))
+          .orderBy(asc(taskAssignmentAllocations.assignmentId), asc(taskAssignmentAllocations.date)),
         db
           .select()
           .from(taskDependencies)
@@ -229,6 +278,13 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
       const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
       const projectCalendarId = selectProjectCalendarId(project, projectCalendarRows);
+      const assignments = mapAssignments(
+        orderedTaskRows.map((task) => task.id),
+        activeResourceIds,
+        participantRows,
+        assignmentRows
+      );
+      const activeAssignmentIds = new Set(assignments.map((assignment) => assignment.id));
 
       return {
         tenantId,
@@ -244,12 +300,21 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           calendarId: projectCalendarId
         },
         tasks: orderedTaskRows.map((task) => mapPlanTask(task, projectCalendarId)),
-        assignments: mapAssignments(
-          orderedTaskRows.map((task) => task.id),
-          activeResourceIds,
-          participantRows,
-          assignmentRows
-        ),
+        assignments,
+        assignmentAllocations: assignmentAllocationRows
+          .filter(
+            (allocation) =>
+              activeAssignmentIds.has(allocation.assignmentId) &&
+              activeTaskIds.has(allocation.taskId) &&
+              activeResourceIds.has(allocation.resourceId)
+          )
+          .map<PlanAssignmentAllocation>((allocation) => ({
+            assignmentId: allocation.assignmentId,
+            taskId: allocation.taskId,
+            resourceId: allocation.resourceId,
+            date: allocation.date,
+            workMinutes: allocation.workMinutes
+          })),
         dependencies: dependencyRows
           .filter(
             (dependency) =>
@@ -391,6 +456,75 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             eq(planningScenarioRuns.tenantId, input.tenantId),
             eq(planningScenarioRuns.projectId, input.projectId),
             eq(planningScenarioRuns.id, input.scenarioRunId)
+          )
+        );
+    },
+
+    async createPlanningSolverRun(input) {
+      const [row] = await db
+        .insert(planningSolverRuns)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          mode: input.mode,
+          clientPlanVersion: input.clientPlanVersion,
+          engineVersion: input.engineVersion,
+          inputSnapshotMetadata: input.inputSnapshotMetadata,
+          targetDeadline: input.targetDeadline,
+          proposals: input.proposals,
+          proposalPayloadHash: input.proposalPayloadHash,
+          actorUserId: input.actorUserId,
+          expiresAt: input.expiresAt,
+          appliedProposalId: input.appliedProposalId ?? null,
+          appliedAt: input.appliedAt ?? null,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoUpdate({
+          target: [planningSolverRuns.tenantId, planningSolverRuns.projectId, planningSolverRuns.id],
+          set: {
+            mode: input.mode,
+            clientPlanVersion: input.clientPlanVersion,
+            engineVersion: input.engineVersion,
+            inputSnapshotMetadata: input.inputSnapshotMetadata,
+            targetDeadline: input.targetDeadline,
+            proposals: input.proposals,
+            proposalPayloadHash: input.proposalPayloadHash,
+            actorUserId: input.actorUserId,
+            expiresAt: input.expiresAt,
+            appliedProposalId: input.appliedProposalId ?? null,
+            appliedAt: input.appliedAt ?? null
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Planning solver run insert returned no row");
+      return mapPlanningSolverRun(row);
+    },
+
+    async findPlanningSolverRun(tenantId, projectId, solverRunId) {
+      const [row] = await db
+        .select()
+        .from(planningSolverRuns)
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, tenantId),
+            eq(planningSolverRuns.projectId, projectId),
+            eq(planningSolverRuns.id, solverRunId)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningSolverRun(row) : undefined;
+    },
+
+    async markPlanningSolverRunApplied(input) {
+      await db
+        .update(planningSolverRuns)
+        .set({ appliedProposalId: input.proposalId, appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.solverRunId)
           )
         );
     },
@@ -733,6 +867,15 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 existing.resourceId !== input.command.payload.resourceId ||
                 existing.role !== input.command.payload.role)
             ) {
+              await db
+                .delete(taskAssignmentAllocations)
+                .where(
+                  and(
+                    eq(taskAssignmentAllocations.tenantId, input.tenantId),
+                    eq(taskAssignmentAllocations.projectId, input.projectId),
+                    eq(taskAssignmentAllocations.assignmentId, existing.id)
+                  )
+                );
               await deleteParticipantIfNoSiblingAssignment({
                 tenantId: input.tenantId,
                 projectId: input.projectId,
@@ -761,6 +904,55 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               tenantId: input.tenantId,
               projectId: input.projectId,
               taskIds: [existing?.taskId, input.command.payload.taskId]
+            });
+          }
+          return;
+        case "assignment.allocations.replace":
+          {
+            const [assignment] = await db
+              .select()
+              .from(taskAssignments)
+              .where(
+                and(
+                  eq(taskAssignments.tenantId, input.tenantId),
+                  eq(taskAssignments.projectId, input.projectId),
+                  eq(taskAssignments.id, input.command.payload.assignmentId)
+                )
+              )
+              .limit(1);
+            if (!assignment) return;
+
+            await db
+              .delete(taskAssignmentAllocations)
+              .where(
+                and(
+                  eq(taskAssignmentAllocations.tenantId, input.tenantId),
+                  eq(taskAssignmentAllocations.projectId, input.projectId),
+                  eq(taskAssignmentAllocations.assignmentId, assignment.id)
+                )
+              );
+            const now = new Date();
+            const allocationRows = input.command.payload.allocations
+              .filter((allocation) => allocation.workMinutes > 0)
+              .map((allocation) => ({
+                id: `${assignment.id}:${allocation.date}`,
+                tenantId: input.tenantId,
+                projectId: input.projectId,
+                assignmentId: assignment.id,
+                taskId: assignment.taskId,
+                resourceId: assignment.resourceId,
+                date: allocation.date,
+                workMinutes: allocation.workMinutes,
+                createdAt: now,
+                updatedAt: now
+              }));
+            if (allocationRows.length > 0) {
+              await db.insert(taskAssignmentAllocations).values(allocationRows);
+            }
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [assignment.taskId]
             });
           }
           return;
@@ -1446,6 +1638,26 @@ function mapPlanningScenarioRun(
     proposalPayloadHash: row.proposalPayloadHash,
     actorUserId: row.actorUserId,
     expiresAt: row.expiresAt,
+    appliedAt: row.appliedAt,
+    createdAt: row.createdAt
+  };
+}
+
+function mapPlanningSolverRun(row: typeof planningSolverRuns.$inferSelect): PlanningSolverRunRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    mode: row.mode as PlanningSolverRunRecord["mode"],
+    clientPlanVersion: row.clientPlanVersion,
+    engineVersion: row.engineVersion,
+    inputSnapshotMetadata: row.inputSnapshotMetadata,
+    targetDeadline: row.targetDeadline,
+    proposals: row.proposals,
+    proposalPayloadHash: row.proposalPayloadHash,
+    actorUserId: row.actorUserId,
+    expiresAt: row.expiresAt,
+    appliedProposalId: row.appliedProposalId,
     appliedAt: row.appliedAt,
     createdAt: row.createdAt
   };

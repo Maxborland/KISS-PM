@@ -17,6 +17,8 @@ import type {
   PlanningCommandIdempotencyRecord,
   PlanningScenarioRunInput,
   PlanningScenarioRunRecord,
+  PlanningSolverRunInput,
+  PlanningSolverRunRecord,
   TaskActivityInput,
   TaskActivityRecord,
   TaskMetadataInput,
@@ -469,6 +471,21 @@ export type ApiTenantDataSource = {
     scenarioRunId: string;
     appliedAt: Date;
   }): Promise<void>;
+  createPlanningSolverRun?(
+    input: PlanningSolverRunInput
+  ): Promise<PlanningSolverRunRecord>;
+  findPlanningSolverRun?(
+    tenantId: TenantId,
+    projectId: string,
+    solverRunId: string
+  ): Promise<PlanningSolverRunRecord | undefined>;
+  markPlanningSolverRunApplied?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    solverRunId: string;
+    proposalId: string;
+    appliedAt: Date;
+  }): Promise<void>;
   findPlanningCommandIdempotency?(
     tenantId: TenantId,
     projectId: string,
@@ -504,6 +521,8 @@ export type ApiTenantDataSource = {
   }): Promise<void>;
   listAuditEventsByTenantId?(tenantId: TenantId): Promise<AuditEventListItem[]>;
 };
+
+export type ManagementAuditDataSource = Pick<ApiTenantDataSource, "appendAuditEvent">;
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;

@@ -47,6 +47,7 @@ describe("planning command contract", () => {
       "dependency.upsert",
       "dependency.delete",
       "assignment.upsert",
+      "assignment.allocations.replace",
       "assignment.delete",
       "baseline.capture",
       "calendar.exception.upsert",
@@ -56,7 +57,7 @@ describe("planning command contract", () => {
       "project.deadline.move"
     ];
 
-    expect(commandTypes).toHaveLength(17);
+    expect(commandTypes).toHaveLength(18);
     expect(commandTypes).toContain("task.create");
     expect(commandTypes).toContain("dependency.upsert");
     expect(commandTypes).toContain("assignment.upsert");
@@ -89,6 +90,7 @@ describe("planning command contract", () => {
       },
       tasks: [],
       assignments: [],
+      assignmentAllocations: [],
       dependencies: [],
       baselines: [],
       calendars: [],

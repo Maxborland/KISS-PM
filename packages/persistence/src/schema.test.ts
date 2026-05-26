@@ -30,12 +30,14 @@ describe("PostgreSQL persistence schema", () => {
       "resource_calendars",
       "calendar_exceptions",
       "task_assignments",
+      "task_assignment_allocations",
       "task_dependencies",
       "project_baselines",
       "project_baseline_tasks",
       "project_baseline_assignments",
       "resource_reservations",
       "planning_scenario_runs",
+      "planning_solver_runs",
       "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
@@ -69,12 +71,14 @@ describe("PostgreSQL persistence schema", () => {
       "resource_calendars",
       "calendar_exceptions",
       "task_assignments",
+      "task_assignment_allocations",
       "task_dependencies",
       "project_baselines",
       "project_baseline_tasks",
       "project_baseline_assignments",
       "resource_reservations",
       "planning_scenario_runs",
+      "planning_solver_runs",
       "planning_command_idempotency_keys",
       "task_participants",
       "task_activities",
@@ -186,6 +190,15 @@ describe("PostgreSQL persistence schema", () => {
     expect(getPersistenceTableColumns("task_assignments")).toEqual(
       expect.arrayContaining(["task_id", "resource_id", "role", "units_permille", "work_minutes"])
     );
+    expect(getPersistenceTableColumns("task_assignment_allocations")).toEqual(
+      expect.arrayContaining([
+        "assignment_id",
+        "task_id",
+        "resource_id",
+        "date",
+        "work_minutes"
+      ])
+    );
     expect(getPersistenceTableColumns("task_dependencies")).toEqual(
       expect.arrayContaining([
         "predecessor_task_id",
@@ -202,6 +215,17 @@ describe("PostgreSQL persistence schema", () => {
         "proposal_payload",
         "proposal_payload_hash",
         "expires_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("planning_solver_runs")).toEqual(
+      expect.arrayContaining([
+        "mode",
+        "client_plan_version",
+        "input_snapshot_metadata",
+        "target_deadline",
+        "proposals",
+        "proposal_payload_hash",
+        "applied_proposal_id"
       ])
     );
     expect(getPersistenceTableColumns("planning_command_idempotency_keys")).toEqual(
