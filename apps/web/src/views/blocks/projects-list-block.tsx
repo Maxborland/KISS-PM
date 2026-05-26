@@ -48,10 +48,10 @@ function formatProjectSourceType(sourceType: Project["sourceType"]): string {
   switch (sourceType) {
     case "opportunity":
       return "Из сделки CRM";
+    case "workspace_inbox":
+      return "Из входящих workspace";
     case "manual":
       return "Создан вручную";
-    case "template":
-      return "Из шаблона";
     default:
       return sourceType;
   }
@@ -252,7 +252,9 @@ export function ProjectsListBlock() {
                 </td>
                 <td>
                   <Chip variant={row.statusVariant}>{row.status}</Chip>
-                  <div className="u-text-xs u-text-muted">{formatProjectSourceType(row.sourceType)}</div>
+                  <div className="u-text-xs u-text-muted">
+                    {filter === "templates" ? "Из шаблона" : formatProjectSourceType(row.sourceType)}
+                  </div>
                 </td>
                 <td>
                   <CellStack
@@ -284,7 +286,7 @@ export function ProjectsListBlock() {
                   <CellStack title="Ответственный" subtitle={openProject.owner.name} />
                   <CellStack
                     title="Источник"
-                    subtitle={`${formatProjectSourceType(openProject.sourceType)} · ${openProject.sourceOpportunityId ?? "без сделки"}`}
+                    subtitle={`${filter === "templates" ? "Из шаблона" : formatProjectSourceType(openProject.sourceType)} · ${openProject.sourceOpportunityId ?? "без сделки"}`}
                   />
                   <CellStack title="Период" subtitle={formatDateRange(openProject.plannedStart, openProject.plannedFinish)} />
                   <CellStack title="Экономика" subtitle={`${formatRub(openProject.contractValue)} · ${formatHours(openProject.plannedHours)}`} />
