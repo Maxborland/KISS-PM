@@ -231,3 +231,33 @@ docs/design-v3/TOKENS.md → apps/web/src/styles/{tokens,tokens.planning,bem}.cs
 Референсы планирования: `docs/references/planning-ui-approved/` (один каталог `references`, без дублирования).
 
 Health-tests design-v3 (line-budgets, ban-list, bundle-budget) — Phase 16 в `apps/web/src/__health__/design-v3-enforcement.health.test.ts`.
+
+## Cursor Cloud specific instructions
+
+### Prerequisites
+
+Docker is required for PostgreSQL. The VM environment snapshot has Docker pre-installed with `fuse-overlayfs` storage driver and `iptables-legacy`. If Docker daemon is not running, start it with `sudo dockerd &>/tmp/dockerd.log &` and ensure socket permissions: `sudo chmod 666 /var/run/docker.sock`.
+
+### Starting services
+
+1. **PostgreSQL** (port 55432): `pnpm db:up` (starts `postgres:16-alpine` via docker compose).
+2. **Migrations + seed**: `pnpm db:migrate && pnpm db:seed:dev` (applies all SQL migrations and seeds demo data).
+3. **API** (port 4000): `DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm KISS_PM_ENABLE_DEV_ROUTES=true pnpm dev:api`
+4. **Web** (port 3000): `KISS_PM_API_ORIGIN=http://127.0.0.1:4000 pnpm dev:web`
+
+### Gotchas
+
+- The API requires `DATABASE_URL` env var to enable auth and persistence. Without it, login returns `auth_not_configured` (501).
+- Mutations (POST/PUT/PATCH/DELETE) require headers `x-kiss-pm-action: same-origin` and `Origin: http://127.0.0.1:3000`.
+- `.env` file is not auto-loaded by the API. Pass env vars explicitly or use `set -a && source .env && set +a` before starting.
+- pnpm blocks build scripts by default (esbuild, sharp). Run `pnpm rebuild esbuild` after install if tsx/next fail.
+- Redis is optional; the API falls back to in-memory event bus when `PLANNING_EVENTS_BACKEND` is unset.
+- Dev login credentials after seed: `admin@kiss-pm.local` / `admin12345`.
+
+### Standard commands (see `package.json` scripts)
+
+- `pnpm test` — unit tests (vitest)
+- `pnpm test:db` — DB integration tests (requires running Postgres)
+- `pnpm typecheck` — TypeScript project-wide check
+- `pnpm build` — Next.js build + typecheck
+- `pnpm --filter @kiss-pm/web storybook` — Storybook (port 6006)
