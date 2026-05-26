@@ -810,7 +810,13 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           failureReason: null,
           startedAt: new Date()
         })
-        .returning();
+        .returning()
+        .catch((error: unknown) => {
+          if (isConstraintError(error, "call_sessions_one_active_per_room_uidx")) {
+            throw new Error("call_room_already_active");
+          }
+          throw error;
+        });
       if (!row) throw new Error("Call session insert returned no row");
       return mapCallSession(row);
     },
@@ -1155,4 +1161,17 @@ function mapCallRecording(row: typeof callRecordings.$inferSelect): CallRecordin
     createdAt: row.createdAt,
     archivedAt: row.archivedAt
   };
+}
+
+function isConstraintError(error: unknown, constraintName: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  return (
+    record.code === "23505" &&
+    (
+      record.constraint_name === constraintName ||
+      record.constraint === constraintName ||
+      String(record.message ?? "").includes(constraintName)
+    )
+  ) || isConstraintError(record.cause, constraintName);
 }
