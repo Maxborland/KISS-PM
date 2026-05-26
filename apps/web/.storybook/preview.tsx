@@ -30,6 +30,8 @@ const preview: Preview = {
           "Widgets",
           "Shell",
           "Views",
+          "Flows",
+          "Patterns",
           "API Contract",
           "Catalog",
           "*"

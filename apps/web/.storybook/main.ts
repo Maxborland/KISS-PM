@@ -13,6 +13,8 @@ const config: StorybookConfig = {
     "../src/widgets/**/*.stories.@(ts|tsx)",
     "../src/views/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
+    "../src/stories/flows/**/*.stories.@(ts|tsx)",
+    "../src/stories/patterns/**/*.stories.@(ts|tsx)",
     "../src/stories/api-contract/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"
   ],
