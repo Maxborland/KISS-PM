@@ -10,6 +10,10 @@ export const permissions = [
   "tenant.audit_events.read",
   "tenant.workspace_config.read",
   "tenant.workspace_config.manage",
+  "tenant.absences.read",
+  "tenant.absences.manage",
+  "tenant.org_structure.read",
+  "tenant.org_structure.manage",
   "tenant.clients.read",
   "tenant.clients.manage",
   "tenant.contacts.read",
@@ -31,6 +35,18 @@ export const permissions = [
   "tenant.project_resources.manage",
   "tenant.planning_scenarios.preview",
   "tenant.planning_scenarios.apply",
+  "tenant.kpi_definitions.read",
+  "tenant.kpi_definitions.manage",
+  "tenant.control_signals.read",
+  "tenant.control_signals.manage",
+  "tenant.management_actions.execute",
+  "tenant.corrective_actions.manage",
+  "tenant.control_surfaces.read",
+  "tenant.control_surfaces.manage",
+  "tenant.control_surfaces.publish",
+  "tenant.retrospectives.read",
+  "tenant.retrospectives.manage",
+  "tenant.template_improvements.apply",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -155,6 +171,50 @@ export function canManageWorkspaceConfig(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.workspace_config.manage"
+  });
+}
+
+export function canReadAbsences(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.absences.read"
+  });
+}
+
+export function canManageAbsences(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.absences.manage"
+  });
+}
+
+export function canReadOrgStructure(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.org_structure.read"
+  });
+}
+
+export function canManageOrgStructure(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.org_structure.manage"
   });
 }
 
@@ -386,6 +446,138 @@ export function canApplyPlanningScenarios(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.planning_scenarios.apply"
+  });
+}
+
+export function canReadKpiDefinitions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.kpi_definitions.read"
+  });
+}
+
+export function canManageKpiDefinitions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.kpi_definitions.manage"
+  });
+}
+
+export function canReadControlSignals(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_signals.read"
+  });
+}
+
+export function canManageControlSignals(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_signals.manage"
+  });
+}
+
+export function canExecuteManagementActions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.management_actions.execute"
+  });
+}
+
+export function canManageCorrectiveActions(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.corrective_actions.manage"
+  });
+}
+
+export function canReadControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.read"
+  });
+}
+
+export function canManageControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.manage"
+  });
+}
+
+export function canPublishControlSurfaces(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.control_surfaces.publish"
+  });
+}
+
+export function canReadRetrospectives(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.retrospectives.read"
+  });
+}
+
+export function canManageRetrospectives(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.retrospectives.manage"
+  });
+}
+
+export function canApplyTemplateImprovements(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.template_improvements.apply"
   });
 }
 

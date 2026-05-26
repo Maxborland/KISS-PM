@@ -36,6 +36,7 @@ describe("planning parsers", () => {
       { type: "task.update_schedule", payload: { taskId: "task-a", plannedStart: "2026-06-02", plannedFinish: null } },
       { type: "task.update_work_model", payload: { taskId: "task-a", taskType: "fixed_work", effortDriven: true, durationMinutes: 480, workMinutes: 960 } },
       { type: "task.update_status", payload: { taskId: "task-a", statusId: "task-status-done" } },
+      { type: "task.update_progress", payload: { taskId: "task-a", percentComplete: 50 } },
       { type: "task.move_wbs", payload: { taskId: "task-a", parentTaskId: null, sortOrder: 0 } },
       { type: "task.delete_or_archive", payload: { taskId: "task-a", mode: "archive" } },
       { type: "dependency.upsert", payload: { id: "dep-a-b", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "FS", lagMinutes: 0 } },
@@ -110,6 +111,67 @@ describe("planning parsers", () => {
     ).toEqual({ ok: false, error: "planning_command_invalid" });
   });
 
+  it("rejects unsafe planning command strings before reducer/audit use", () => {
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "task.update_identity",
+          payload: { taskId: "task-a", title: "Renamed\nInjected" }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "project.deadline.move",
+          payload: { deadline: "2026-07-01", reason: "x".repeat(501) }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+
+    expect(
+      parseScenarioApplyEnvelope({
+        clientPlanVersion: 7,
+        acceptedRiskReason: "approved\u0000hidden"
+      })
+    ).toEqual({ ok: false, error: "planning_scenario_invalid" });
+  });
+
+  it("rejects unsafe task custom-field commands", () => {
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "task.update_custom_field",
+          payload: { taskId: "task-a", fieldKey: "constructor", value: "S1" }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "task.update_custom_field",
+          payload: { taskId: "task-a", fieldKey: "sprint", value: { nested: true } }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "task.update_custom_field",
+          payload: { taskId: "task-a", fieldKey: "sprint", value: "S1\nhidden" }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+  });
+
   it("rejects impossible calendar dates before they reach the scheduling engine", () => {
     expect(
       parsePlanningCommandEnvelope({
@@ -134,6 +196,19 @@ describe("planning parsers", () => {
           date: "2026-99-99",
           overloadMinutes: 480,
           taskIds: ["task-a"]
+        }
+      })
+    ).toEqual({ ok: false, error: "planning_scenario_invalid" });
+
+    expect(
+      parseScenarioPreviewEnvelope({
+        clientPlanVersion: 1,
+        target: {
+          type: "resource_overload",
+          resourceId: "user-alpha-executor",
+          date: "2026-06-08",
+          overloadMinutes: 480,
+          taskIds: ["task-a\nhidden"]
         }
       })
     ).toEqual({ ok: false, error: "planning_scenario_invalid" });

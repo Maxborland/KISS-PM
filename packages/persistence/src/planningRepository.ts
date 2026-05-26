@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 
 import type {
   DependencyType,
@@ -31,20 +31,23 @@ import {
   projects,
   resourceCalendars,
   resourceReservations,
-  taskAssignmentAllocations,
+  planningScenarioRuns,
+  planningSolverRuns,
   taskAssignments,
+  taskAssignmentAllocations,
   taskDependencies,
   taskStatuses,
   taskParticipants,
   tasks,
+  tenantProductionCalendarExceptions,
+  tenantProductionCalendars,
   tenantUsers
 } from "./schema";
-import { createPlanningProposalRunStore } from "./planningProposalRuns";
 import {
-  compareTaskRowsByWbs,
-  parseWbsPart,
-  reindexTaskRowsByWbs
-} from "./planningWbs";
+  createResourceAbsencesRepository,
+  expandAbsenceToCalendarExceptions
+} from "./resourceAbsencesRepository";
+import { TENANT_DEFAULT_CALENDAR_ID } from "./tenantProductionCalendarConstants";
 
 export type PlanningDependencyInput = {
   id: string;
@@ -88,12 +91,12 @@ export type PlanningRepository = {
   findPlanningSolverRun(
     tenantId: string,
     projectId: string,
-    solverRunId: string
+    runId: string
   ): Promise<PlanningSolverRunRecord | undefined>;
   markPlanningSolverRunApplied(input: {
     tenantId: string;
     projectId: string;
-    solverRunId: string;
+    runId: string;
     proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
@@ -183,9 +186,9 @@ export type PlanningCommandIdempotencyRecord = {
 const defaultWorkingWeekdays = [1, 2, 3, 4, 5];
 const defaultWorkingMinutesPerDay = 480;
 
-export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
-  const proposalRuns = createPlanningProposalRunStore(db);
+type WbsTaskRow = Pick<typeof tasks.$inferSelect, "id" | "parentTaskId" | "wbsCode" | "createdAt">;
 
+export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
   return {
     async getPlanSnapshot(tenantId, projectId) {
       const [project] = await db
@@ -194,12 +197,14 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         .where(and(eq(projects.tenantId, tenantId), eq(projects.id, projectId)))
         .limit(1);
       if (!project) return undefined;
+      const rangeStart = toPlanDate(project.plannedStart);
+      const rangeFinish = toPlanDate(project.plannedFinish);
 
       const [
         planVersion,
         taskRows,
         assignmentRows,
-        assignmentAllocationRows,
+        allocationRows,
         dependencyRows,
         projectCalendarRows,
         resourceCalendarRows,
@@ -253,7 +258,13 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         db
           .select()
           .from(resourceReservations)
-          .where(and(eq(resourceReservations.tenantId, tenantId), eq(resourceReservations.projectId, projectId)))
+          .where(
+            and(
+              eq(resourceReservations.tenantId, tenantId),
+              lte(resourceReservations.start, rangeFinish),
+              gte(resourceReservations.finish, rangeStart)
+            )
+          )
           .orderBy(asc(resourceReservations.start), asc(resourceReservations.id)),
         db
           .select()
@@ -280,15 +291,71 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               )
             );
       const activeResourceIds = new Set(resourceRows.map((resource) => resource.id));
-      const calendars = mapCalendars(projectCalendarRows, resourceCalendarRows, project.id);
+      const [tenantProductionCalendar] = await db
+        .select()
+        .from(tenantProductionCalendars)
+        .where(eq(tenantProductionCalendars.tenantId, tenantId))
+        .limit(1);
       const projectCalendarId = selectProjectCalendarId(project, projectCalendarRows);
-      const assignments = mapAssignments(
-        orderedTaskRows.map((task) => task.id),
-        activeResourceIds,
-        participantRows,
-        assignmentRows
+      const calendars = mapCalendars(
+        projectCalendarRows,
+        resourceCalendarRows,
+        project.id,
+        tenantProductionCalendar
       );
-      const activeAssignmentIds = new Set(assignments.map((assignment) => assignment.id));
+      const projectCalendarExceptions = exceptionRows.map((exception) => ({
+        id: exception.id,
+        calendarId: exception.calendarId,
+        resourceId: exception.resourceId,
+        date: exception.date,
+        workingMinutes: exception.workingMinutes,
+        reason: exception.reason
+      }));
+      const tenantCalendarExceptions =
+        projectCalendarId === TENANT_DEFAULT_CALENDAR_ID
+          ? await db
+              .select()
+              .from(tenantProductionCalendarExceptions)
+              .where(
+                and(
+                  eq(tenantProductionCalendarExceptions.tenantId, tenantId),
+                  gte(tenantProductionCalendarExceptions.date, rangeStart),
+                  lte(tenantProductionCalendarExceptions.date, rangeFinish)
+                )
+              )
+              .orderBy(
+                asc(tenantProductionCalendarExceptions.date),
+                asc(tenantProductionCalendarExceptions.id)
+              )
+          : [];
+      const absencesRepository = createResourceAbsencesRepository(db);
+      const approvedAbsences = await absencesRepository.listAbsences(
+        tenantId,
+        rangeStart,
+        rangeFinish
+      );
+      const absenceExceptions = approvedAbsences.flatMap((absence) =>
+        expandAbsenceToCalendarExceptions(absence).map((exception) => ({
+          id: exception.id,
+          calendarId: TENANT_DEFAULT_CALENDAR_ID,
+          resourceId: exception.resourceId,
+          date: exception.date,
+          workingMinutes: exception.workingMinutes,
+          reason: exception.reason
+        }))
+      );
+      const calendarExceptionsMerged = [
+        ...projectCalendarExceptions,
+        ...tenantCalendarExceptions.map((exception) => ({
+          id: `tenant-${exception.id}`,
+          calendarId: TENANT_DEFAULT_CALENDAR_ID,
+          resourceId: exception.resourceId,
+          date: exception.date,
+          workingMinutes: exception.workingMinutes,
+          reason: exception.reason
+        })),
+        ...absenceExceptions
+      ];
 
       return {
         tenantId,
@@ -304,21 +371,18 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           calendarId: projectCalendarId
         },
         tasks: orderedTaskRows.map((task) => mapPlanTask(task, projectCalendarId)),
-        assignments,
-        assignmentAllocations: assignmentAllocationRows
-          .filter(
-            (allocation) =>
-              activeAssignmentIds.has(allocation.assignmentId) &&
-              activeTaskIds.has(allocation.taskId) &&
-              activeResourceIds.has(allocation.resourceId)
-          )
-          .map<PlanAssignmentAllocation>((allocation) => ({
-            assignmentId: allocation.assignmentId,
-            taskId: allocation.taskId,
-            resourceId: allocation.resourceId,
-            date: allocation.date,
-            workMinutes: allocation.workMinutes
-          })),
+        assignments: mapAssignments(
+          orderedTaskRows.map((task) => task.id),
+          activeResourceIds,
+          participantRows,
+          assignmentRows
+        ),
+        assignmentAllocations: mapAssignmentAllocations(
+          activeTaskIds,
+          activeResourceIds,
+          assignmentRows,
+          allocationRows
+        ),
         dependencies: dependencyRows
           .filter(
             (dependency) =>
@@ -334,14 +398,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           })),
         baselines: mapBaselines(baselineRows, baselineTaskRows),
         calendars,
-        calendarExceptions: exceptionRows.map((exception) => ({
-          id: exception.id,
-          calendarId: exception.calendarId,
-          resourceId: exception.resourceId,
-          date: exception.date,
-          workingMinutes: exception.workingMinutes,
-          reason: exception.reason
-        })),
+        calendarExceptions: calendarExceptionsMerged,
         resources: resourceRows.map<PlanResource>((resource) => ({
           id: resource.id,
           userId: resource.id,
@@ -398,27 +455,139 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     },
 
     async createPlanningScenarioRun(input) {
-      return proposalRuns.createPlanningScenarioRun(input);
+      const [row] = await db
+        .insert(planningScenarioRuns)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          planVersion: input.planVersion,
+          engineVersion: input.engineVersion,
+          targetConflict: input.targetConflict,
+          proposalPayload: input.proposalPayload,
+          proposalPayloadHash: input.proposalPayloadHash,
+          actorUserId: input.actorUserId,
+          expiresAt: input.expiresAt,
+          appliedAt: input.appliedAt ?? null,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoUpdate({
+          target: [
+            planningScenarioRuns.tenantId,
+            planningScenarioRuns.projectId,
+            planningScenarioRuns.id
+          ],
+          set: {
+            planVersion: input.planVersion,
+            engineVersion: input.engineVersion,
+            targetConflict: input.targetConflict,
+            proposalPayload: input.proposalPayload,
+            proposalPayloadHash: input.proposalPayloadHash,
+            actorUserId: input.actorUserId,
+            expiresAt: input.expiresAt,
+            appliedAt: input.appliedAt ?? null
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Planning scenario insert returned no row");
+      return mapPlanningScenarioRun(row);
     },
 
     async findPlanningScenarioRun(tenantId, projectId, scenarioRunId) {
-      return proposalRuns.findPlanningScenarioRun(tenantId, projectId, scenarioRunId);
+      const [row] = await db
+        .select()
+        .from(planningScenarioRuns)
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, tenantId),
+            eq(planningScenarioRuns.projectId, projectId),
+            eq(planningScenarioRuns.id, scenarioRunId)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningScenarioRun(row) : undefined;
     },
 
     async markPlanningScenarioRunApplied(input) {
-      await proposalRuns.markPlanningScenarioRunApplied(input);
+      await db
+        .update(planningScenarioRuns)
+        .set({ appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, input.tenantId),
+            eq(planningScenarioRuns.projectId, input.projectId),
+            eq(planningScenarioRuns.id, input.scenarioRunId)
+          )
+        );
     },
 
     async createPlanningSolverRun(input) {
-      return proposalRuns.createPlanningSolverRun(input);
+      const [row] = await db
+        .insert(planningSolverRuns)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          mode: input.mode,
+          clientPlanVersion: input.clientPlanVersion,
+          engineVersion: input.engineVersion,
+          inputSnapshotMetadata: input.inputSnapshotMetadata,
+          targetDeadline: input.targetDeadline,
+          proposals: input.proposals,
+          proposalPayloadHash: input.proposalPayloadHash,
+          actorUserId: input.actorUserId,
+          expiresAt: input.expiresAt,
+          appliedProposalId: input.appliedProposalId ?? null,
+          appliedAt: input.appliedAt ?? null,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoUpdate({
+          target: [planningSolverRuns.tenantId, planningSolverRuns.projectId, planningSolverRuns.id],
+          set: {
+            mode: input.mode,
+            clientPlanVersion: input.clientPlanVersion,
+            engineVersion: input.engineVersion,
+            inputSnapshotMetadata: input.inputSnapshotMetadata,
+            targetDeadline: input.targetDeadline,
+            proposals: input.proposals,
+            proposalPayloadHash: input.proposalPayloadHash,
+            actorUserId: input.actorUserId,
+            expiresAt: input.expiresAt,
+            appliedProposalId: input.appliedProposalId ?? null,
+            appliedAt: input.appliedAt ?? null
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Planning solver run insert returned no row");
+      return mapPlanningSolverRun(row);
     },
 
-    async findPlanningSolverRun(tenantId, projectId, solverRunId) {
-      return proposalRuns.findPlanningSolverRun(tenantId, projectId, solverRunId);
+    async findPlanningSolverRun(tenantId, projectId, runId) {
+      const [row] = await db
+        .select()
+        .from(planningSolverRuns)
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, tenantId),
+            eq(planningSolverRuns.projectId, projectId),
+            eq(planningSolverRuns.id, runId)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningSolverRun(row) : undefined;
     },
 
     async markPlanningSolverRunApplied(input) {
-      await proposalRuns.markPlanningSolverRunApplied(input);
+      await db
+        .update(planningSolverRuns)
+        .set({ appliedProposalId: input.proposalId, appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.runId)
+          )
+        );
     },
 
     async findPlanningCommandIdempotency(tenantId, projectId, idempotencyKey) {
@@ -759,15 +928,6 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
                 existing.resourceId !== input.command.payload.resourceId ||
                 existing.role !== input.command.payload.role)
             ) {
-              await db
-                .delete(taskAssignmentAllocations)
-                .where(
-                  and(
-                    eq(taskAssignmentAllocations.tenantId, input.tenantId),
-                    eq(taskAssignmentAllocations.projectId, input.projectId),
-                    eq(taskAssignmentAllocations.assignmentId, existing.id)
-                  )
-                );
               await deleteParticipantIfNoSiblingAssignment({
                 tenantId: input.tenantId,
                 projectId: input.projectId,
@@ -796,55 +956,6 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               tenantId: input.tenantId,
               projectId: input.projectId,
               taskIds: [existing?.taskId, input.command.payload.taskId]
-            });
-          }
-          return;
-        case "assignment.allocations.replace":
-          {
-            const [assignment] = await db
-              .select()
-              .from(taskAssignments)
-              .where(
-                and(
-                  eq(taskAssignments.tenantId, input.tenantId),
-                  eq(taskAssignments.projectId, input.projectId),
-                  eq(taskAssignments.id, input.command.payload.assignmentId)
-                )
-              )
-              .limit(1);
-            if (!assignment) return;
-
-            await db
-              .delete(taskAssignmentAllocations)
-              .where(
-                and(
-                  eq(taskAssignmentAllocations.tenantId, input.tenantId),
-                  eq(taskAssignmentAllocations.projectId, input.projectId),
-                  eq(taskAssignmentAllocations.assignmentId, assignment.id)
-                )
-              );
-            const now = new Date();
-            const allocationRows = input.command.payload.allocations
-              .filter((allocation) => allocation.workMinutes > 0)
-              .map((allocation) => ({
-                id: `${assignment.id}:${allocation.date}`,
-                tenantId: input.tenantId,
-                projectId: input.projectId,
-                assignmentId: assignment.id,
-                taskId: assignment.taskId,
-                resourceId: assignment.resourceId,
-                date: allocation.date,
-                workMinutes: allocation.workMinutes,
-                createdAt: now,
-                updatedAt: now
-              }));
-            if (allocationRows.length > 0) {
-              await db.insert(taskAssignmentAllocations).values(allocationRows);
-            }
-            await touchTasksUpdatedAt({
-              tenantId: input.tenantId,
-              projectId: input.projectId,
-              taskIds: [assignment.taskId]
             });
           }
           return;
@@ -884,6 +995,54 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               tenantId: input.tenantId,
               projectId: input.projectId,
               taskIds: [existing?.taskId]
+            });
+          }
+          return;
+        case "assignment.allocations.replace":
+          {
+            const payload = input.command.payload;
+            const [assignment] = await db
+              .select()
+              .from(taskAssignments)
+              .where(
+                and(
+                  eq(taskAssignments.tenantId, input.tenantId),
+                  eq(taskAssignments.projectId, input.projectId),
+                  eq(taskAssignments.id, payload.assignmentId)
+                )
+              )
+              .limit(1);
+            if (!assignment) return;
+            const now = new Date();
+            await db
+              .delete(taskAssignmentAllocations)
+              .where(
+                and(
+                  eq(taskAssignmentAllocations.tenantId, input.tenantId),
+                  eq(taskAssignmentAllocations.projectId, input.projectId),
+                  eq(taskAssignmentAllocations.assignmentId, payload.assignmentId)
+                )
+              );
+            if (payload.allocations.length > 0) {
+              await db.insert(taskAssignmentAllocations).values(
+                payload.allocations.map((allocation) => ({
+                  id: allocationId(payload.assignmentId, allocation.date),
+                  tenantId: input.tenantId,
+                  projectId: input.projectId,
+                  assignmentId: payload.assignmentId,
+                  taskId: assignment.taskId,
+                  resourceId: assignment.resourceId,
+                  date: allocation.date,
+                  workMinutes: allocation.workMinutes,
+                  createdAt: now,
+                  updatedAt: now
+                }))
+              );
+            }
+            await touchTasksUpdatedAt({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              taskIds: [assignment.taskId]
             });
           }
           return;
@@ -955,6 +1114,41 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             .set({ deadline: fromPlanDate(input.command.payload.deadline) })
             .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)));
           return;
+        case "project.settings.update":
+          await db
+            .update(projects)
+            .set({ calendarId: input.command.payload.calendarId })
+            .where(and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId)));
+          return;
+        case "task.update_custom_field": {
+          const [existing] = await db
+            .select({ customFields: tasks.customFields })
+            .from(tasks)
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            )
+            .limit(1);
+          if (!existing) throw new Error("task_not_found");
+          const nextCustomFields = {
+            ...(existing.customFields ?? {}),
+            [input.command.payload.fieldKey]: input.command.payload.value
+          };
+          await db
+            .update(tasks)
+            .set({ customFields: nextCustomFields, updatedAt: new Date() })
+            .where(
+              and(
+                eq(tasks.tenantId, input.tenantId),
+                eq(tasks.projectId, input.projectId),
+                eq(tasks.id, input.command.payload.taskId)
+              )
+            );
+          return;
+        }
       }
     },
 
@@ -1262,6 +1456,7 @@ function mapPlanTask(
     workMinutes: task.workMinutes ?? Math.max(0, task.plannedWork) * 60,
     percentComplete: task.progress,
     calendarId: projectCalendarId,
+    customFields: task.customFields ?? {},
     constraint
   };
 }
@@ -1274,6 +1469,87 @@ function mapConstraint(task: typeof tasks.$inferSelect): PlanConstraint | null {
     type: task.constraintType as PlanConstraintType,
     date: task.constraintDate ? toPlanDate(task.constraintDate) : null
   };
+}
+
+function reindexTaskRowsByWbs<T extends WbsTaskRow>(
+  rows: T[],
+  siblingOrderOverrides: Map<string, number> = new Map()
+): T[] {
+  const taskIds = new Set(rows.map((task) => task.id));
+  const inputOrderById = new Map(rows.map((task, index) => [task.id, index]));
+  const rowsByParentId = new Map<string | null, T[]>();
+
+  for (const row of rows) {
+    const parentId = row.parentTaskId !== null && taskIds.has(row.parentTaskId) ? row.parentTaskId : null;
+    const normalizedRow = parentId === row.parentTaskId ? row : { ...row, parentTaskId: null };
+    rowsByParentId.set(parentId, [...(rowsByParentId.get(parentId) ?? []), normalizedRow]);
+  }
+
+  const result: T[] = [];
+  const emittedTaskIds = new Set<string>();
+
+  const appendChildren = (parentId: string | null, prefix: string): void => {
+    const siblings = [...(rowsByParentId.get(parentId) ?? [])].sort((left, right) => {
+      const leftOverride = siblingOrderOverrides.get(left.id);
+      const rightOverride = siblingOrderOverrides.get(right.id);
+      if (leftOverride !== undefined || rightOverride !== undefined) {
+        return (leftOverride ?? Number.MAX_SAFE_INTEGER) - (rightOverride ?? Number.MAX_SAFE_INTEGER);
+      }
+      return (
+        compareTaskRowsByWbs(left, right) ||
+        (inputOrderById.get(left.id) ?? 0) - (inputOrderById.get(right.id) ?? 0)
+      );
+    });
+
+    siblings.forEach((task, index) => {
+      if (emittedTaskIds.has(task.id)) return;
+      const wbsCode = prefix ? `${prefix}.${index + 1}` : String(index + 1);
+      emittedTaskIds.add(task.id);
+      result.push({ ...task, wbsCode });
+      appendChildren(task.id, wbsCode);
+    });
+  };
+
+  appendChildren(null, "");
+  return result;
+}
+
+function compareTaskRowsByWbs(
+  left: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">,
+  right: Pick<typeof tasks.$inferSelect, "wbsCode" | "createdAt" | "id">
+): number {
+  return (
+    compareWbsCodes(left.wbsCode, right.wbsCode) ||
+    left.createdAt.getTime() - right.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function compareWbsCodes(left: string, right: string): number {
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+    if (leftPart === rightPart) continue;
+
+    const leftNumber = parseWbsPart(leftPart);
+    const rightNumber = parseWbsPart(rightPart);
+    if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) {
+      return leftNumber - rightNumber;
+    }
+    return leftPart.localeCompare(rightPart, undefined, { numeric: true });
+  }
+
+  return 0;
+}
+
+function parseWbsPart(value: string): number | null {
+  return /^\d+$/.test(value) ? Number(value) : null;
 }
 
 function mapAssignments(
@@ -1327,6 +1603,36 @@ function mapAssignments(
   );
 }
 
+function mapAssignmentAllocations(
+  activeTaskIds: Set<string>,
+  activeResourceIds: Set<string>,
+  assignmentRows: Array<typeof taskAssignments.$inferSelect>,
+  allocationRows: Array<typeof taskAssignmentAllocations.$inferSelect>
+): PlanAssignmentAllocation[] {
+  const activeAssignmentIds = new Set(
+    assignmentRows
+      .filter(
+        (assignment) =>
+          activeTaskIds.has(assignment.taskId) && activeResourceIds.has(assignment.resourceId)
+      )
+      .map((assignment) => assignment.id)
+  );
+  return allocationRows
+    .filter(
+      (allocation) =>
+        activeAssignmentIds.has(allocation.assignmentId) &&
+        activeTaskIds.has(allocation.taskId) &&
+        activeResourceIds.has(allocation.resourceId)
+    )
+    .map((allocation) => ({
+      assignmentId: allocation.assignmentId,
+      taskId: allocation.taskId,
+      resourceId: allocation.resourceId,
+      date: allocation.date,
+      workMinutes: allocation.workMinutes
+    }));
+}
+
 function assignmentFallbackKey(taskId: string, resourceId: string, role: string): string {
   return `${taskId}\u0000${resourceId}\u0000${role}`;
 }
@@ -1334,7 +1640,8 @@ function assignmentFallbackKey(taskId: string, resourceId: string, role: string)
 function mapCalendars(
   projectCalendarRows: Array<typeof projectCalendars.$inferSelect>,
   resourceCalendarRows: Array<typeof resourceCalendars.$inferSelect>,
-  projectId: string
+  projectId: string,
+  tenantProductionCalendar?: typeof tenantProductionCalendars.$inferSelect
 ): PlanCalendar[] {
   const projectPlanCalendars = projectCalendarRows.length > 0
     ? projectCalendarRows.map<PlanCalendar>((calendar) => ({
@@ -1350,7 +1657,14 @@ function mapCalendars(
         }
       ];
 
-  const calendars = [
+  const calendars: PlanCalendar[] = [
+    {
+      id: TENANT_DEFAULT_CALENDAR_ID,
+      workingWeekdays:
+        tenantProductionCalendar?.workingWeekdays ?? defaultWorkingWeekdays,
+      workingMinutesPerDay:
+        tenantProductionCalendar?.workingMinutesPerDay ?? defaultWorkingMinutesPerDay
+    },
     ...projectPlanCalendars,
     ...resourceCalendarRows.map<PlanCalendar>((calendar) => ({
       id: calendar.id,
@@ -1359,7 +1673,8 @@ function mapCalendars(
     }))
   ];
 
-  return calendars;
+  const unique = new Map(calendars.map((calendar) => [calendar.id, calendar]));
+  return [...unique.values()];
 }
 
 function selectProjectCalendarId(
@@ -1435,6 +1750,47 @@ function normalizeParticipantRows(input: {
   return [...participantRows.values()];
 }
 
+function mapPlanningScenarioRun(
+  row: typeof planningScenarioRuns.$inferSelect
+): PlanningScenarioRunRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    planVersion: row.planVersion,
+    engineVersion: row.engineVersion,
+    targetConflict: row.targetConflict,
+    proposalPayload: row.proposalPayload,
+    proposalPayloadHash: row.proposalPayloadHash,
+    actorUserId: row.actorUserId,
+    expiresAt: row.expiresAt,
+    appliedAt: row.appliedAt,
+    createdAt: row.createdAt
+  };
+}
+
+function mapPlanningSolverRun(
+  row: typeof planningSolverRuns.$inferSelect
+): PlanningSolverRunRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    mode: row.mode as "schedule" | "repair",
+    clientPlanVersion: row.clientPlanVersion,
+    engineVersion: row.engineVersion,
+    inputSnapshotMetadata: row.inputSnapshotMetadata,
+    targetDeadline: row.targetDeadline,
+    proposals: row.proposals,
+    proposalPayloadHash: row.proposalPayloadHash,
+    actorUserId: row.actorUserId,
+    expiresAt: row.expiresAt,
+    appliedProposalId: row.appliedProposalId,
+    appliedAt: row.appliedAt,
+    createdAt: row.createdAt
+  };
+}
+
 function mapPlanningCommandIdempotency(
   row: typeof planningCommandIdempotencyKeys.$inferSelect
 ): PlanningCommandIdempotencyRecord {
@@ -1447,4 +1803,8 @@ function mapPlanningCommandIdempotency(
     actorUserId: row.actorUserId,
     createdAt: row.createdAt
   };
+}
+
+function allocationId(assignmentId: string, date: PlanDate): string {
+  return `${assignmentId}:${date}`;
 }

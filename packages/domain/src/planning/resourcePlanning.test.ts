@@ -36,6 +36,12 @@ describe("resource planning", () => {
           capacityMinutes: 480,
           taskIds: ["task-a"],
           assignmentIds: ["assignment-a"],
+          assignmentContributions: [
+            { taskId: "task-a", assignmentId: "assignment-a", workMinutes: 960 }
+          ],
+          reservationContributions: [
+            { reservationId: "reservation-a", workMinutes: 120 }
+          ],
           reservationIds: ["reservation-a"]
         }),
         expect.objectContaining({
@@ -205,14 +211,14 @@ describe("resource planning", () => {
     expect(matrix.overloads).toEqual([]);
   });
 
-  it("uses explicit assignment allocations instead of fallback distribution", () => {
+  it("uses explicit assignment allocations instead of even distribution", () => {
+    const baseTask = createSnapshot().tasks[0];
+    if (!baseTask) throw new Error("missing base task");
     const snapshot = {
       ...createSnapshot(),
       tasks: [
         {
-          ...createSnapshot().tasks[0]!,
-          plannedStart: "2026-06-01",
-          plannedFinish: "2026-06-02",
+          ...baseTask,
           durationMinutes: 960,
           workMinutes: 960
         }
@@ -234,14 +240,14 @@ describe("resource planning", () => {
           taskId: "task-a",
           resourceId: "resource-alpha",
           date: "2026-06-01",
-          workMinutes: 120
+          workMinutes: 240
         },
         {
           assignmentId: "assignment-a",
           taskId: "task-a",
           resourceId: "resource-alpha",
           date: "2026-06-02",
-          workMinutes: 840
+          workMinutes: 720
         }
       ],
       reservations: []
@@ -267,24 +273,19 @@ describe("resource planning", () => {
     expect(matrix.buckets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          resourceId: "resource-alpha",
           date: "2026-06-01",
-          assignedMinutes: 120,
-          assignmentIds: ["assignment-a"]
+          assignedMinutes: 240
         }),
         expect.objectContaining({
-          resourceId: "resource-alpha",
           date: "2026-06-02",
-          assignedMinutes: 840,
-          assignmentIds: ["assignment-a"]
+          assignedMinutes: 720
         })
       ])
     );
     expect(matrix.overloads).toEqual([
       expect.objectContaining({
-        resourceId: "resource-alpha",
         date: "2026-06-02",
-        overloadMinutes: 360
+        overloadMinutes: 240
       })
     ]);
   });
@@ -606,7 +607,6 @@ function createSnapshot(): PlanSnapshot {
         calendarId: null
       }
     ],
-    assignmentAllocations: [],
     dependencies: [],
     baselines: [],
     calendars: [{ id: "calendar-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 }],

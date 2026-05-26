@@ -1,11 +1,14 @@
 node_modules/
 .next/
+storybook-static/
 dist/
 build/
 coverage/
 playwright-report/
 test-results/
 .playwright-mcp/
+.codegraph/
+.cursor/
 .env
 .env.*
 !.env.example
@@ -16,3 +19,4 @@ Thumbs.db
 .tmp/
 tmp/
 .worktrees/
+apps/web/.storybook-verify-tmp/*.png

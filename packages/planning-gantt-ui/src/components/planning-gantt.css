@@ -1,0 +1,144 @@
+.planningGanttSurface {
+  display: grid;
+  gap: 12px;
+  color: var(--kiss-text-primary, #111827);
+  background: var(--kiss-surface, #ffffff);
+}
+
+.planningGanttSplit {
+  display: grid;
+  grid-template-columns: minmax(320px, 38%) minmax(420px, 1fr);
+  border: 1px solid var(--kiss-border, #d1d5db);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 360px;
+}
+
+.planningGanttPane {
+  min-width: 0;
+  overflow: auto;
+}
+
+.planningGanttPane + .planningGanttPane {
+  border-left: 1px solid var(--kiss-border, #d1d5db);
+}
+
+.planningGanttTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.planningGanttTable th,
+.planningGanttTable td {
+  border-bottom: 1px solid var(--kiss-border-muted, #e5e7eb);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.planningGanttTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--kiss-surface-subtle, #f9fafb);
+  font-weight: 600;
+}
+
+.planningGanttIssueMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--kiss-warning-surface, #fef3c7);
+  color: var(--kiss-warning-text, #92400e);
+  font-size: 11px;
+}
+
+.planningGanttTimeline {
+  min-width: 720px;
+}
+
+.planningGanttSvg {
+  display: block;
+  background: var(--kiss-surface, #ffffff);
+}
+
+.planningGanttHeaderText {
+  fill: var(--kiss-text-secondary, #4b5563);
+  font-size: 11px;
+}
+
+.planningGanttGridLine {
+  stroke: var(--kiss-border-muted, #e5e7eb);
+  stroke-width: 1;
+}
+
+.planningGanttWeekend {
+  fill: var(--kiss-surface-subtle, #f9fafb);
+}
+
+.planningGanttBar {
+  fill: var(--kiss-accent, #0f766e);
+}
+
+.planningGanttBarCritical {
+  fill: var(--kiss-danger, #b91c1c);
+}
+
+.planningGanttProgress {
+  fill: rgba(255, 255, 255, 0.42);
+}
+
+.planningGanttBaseline {
+  fill: var(--kiss-baseline, #6b7280);
+}
+
+.planningGanttSummary {
+  fill: var(--kiss-text-primary, #111827);
+}
+
+.planningGanttDependency {
+  fill: none;
+  stroke: var(--kiss-text-secondary, #4b5563);
+  stroke-width: 1.5;
+}
+
+.planningGanttDependencyInvalid {
+  stroke: var(--kiss-danger, #b91c1c);
+  stroke-dasharray: 4 3;
+}
+
+.planningGanttLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--kiss-text-secondary, #4b5563);
+}
+
+.planningGanttLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.planningGanttLegendSwatch {
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--kiss-accent, #0f766e);
+}
+
+@media (max-width: 860px) {
+  .planningGanttSplit {
+    grid-template-columns: 1fr;
+  }
+
+  .planningGanttPane + .planningGanttPane {
+    border-left: 0;
+    border-top: 1px solid var(--kiss-border, #d1d5db);
+  }
+}

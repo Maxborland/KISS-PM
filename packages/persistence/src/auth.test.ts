@@ -20,10 +20,12 @@ describe("auth password and session primitives", () => {
     ).toBe(false);
   });
 
-  it("hashes session tokens deterministically without storing the raw token", () => {
-    expect(hashSessionToken("session-token")).toBe(
-      hashSessionToken("session-token")
-    );
-    expect(hashSessionToken("session-token")).not.toBe("session-token");
+  it("hashes random session tokens deterministically without expensive password KDF work", () => {
+    const tokenHash = hashSessionToken("session-token");
+
+    expect(tokenHash).toBe(hashSessionToken("session-token"));
+    expect(tokenHash).not.toBe("session-token");
+    expect(tokenHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hashSessionToken("other-session-token")).not.toBe(tokenHash);
   });
 });

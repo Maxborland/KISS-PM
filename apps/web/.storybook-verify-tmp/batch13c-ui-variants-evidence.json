@@ -1,0 +1,9 @@
+{
+  "batch": "13c",
+  "date": "2026-05-24",
+  "uiGroups": 43,
+  "passCount": 43,
+  "fail": [],
+  "pass": true,
+  "sampleVariantsId": "ui-button--variants"
+}

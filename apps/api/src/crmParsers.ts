@@ -23,7 +23,7 @@ const maxPostgresInteger = 2_147_483_647;
 const maxLengths = {
   name: 160,
   description: 1_000,
-  email: 160,
+  email: 254,
   phone: 80,
   sku: 80,
   unit: 40,
@@ -43,10 +43,10 @@ export function parseClientBody(
   const status = parseStatus(getOptionalString(input, "status") ?? "active");
 
   if (!isId(id)) return { ok: false, error: "invalid_client_id" };
-  if (!name || name.length > maxLengths.name) {
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
     return { ok: false, error: "invalid_client_name" };
   }
-  if (description !== null && description.length > maxLengths.description) {
+  if (description !== null && !isSafeMultilineText(description, maxLengths.description)) {
     return { ok: false, error: "invalid_description" };
   }
   if (!status) return { ok: false, error: "invalid_status" };
@@ -72,7 +72,7 @@ export function parseContactBody(
   const id = getOptionalString(input, "id") ?? `contact-${crypto.randomUUID()}`;
   const clientId = getOptionalString(input, "clientId");
   const name = getOptionalString(input, "name");
-  const email = getOptionalString(input, "email") ?? null;
+  const email = getOptionalString(input, "email")?.toLowerCase() ?? null;
   const phone = getOptionalString(input, "phone") ?? null;
   const telegram = getOptionalString(input, "telegram") ?? null;
   const role = getOptionalString(input, "role") ?? null;
@@ -80,19 +80,19 @@ export function parseContactBody(
 
   if (!isId(id)) return { ok: false, error: "invalid_contact_id" };
   if (!clientId || !isId(clientId)) return { ok: false, error: "invalid_client_id" };
-  if (!name || name.length > maxLengths.name) {
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
     return { ok: false, error: "invalid_contact_name" };
   }
-  if (email !== null && (email.length > maxLengths.email || !emailPattern.test(email))) {
+  if (email !== null && (!isSafeSingleLineText(email, maxLengths.email) || !emailPattern.test(email))) {
     return { ok: false, error: "invalid_contact_email" };
   }
-  if (phone !== null && phone.length > maxLengths.phone) {
+  if (phone !== null && !isSafeSingleLineText(phone, maxLengths.phone)) {
     return { ok: false, error: "invalid_contact_phone" };
   }
-  if (telegram !== null && telegram.length > maxLengths.telegram) {
+  if (telegram !== null && !isSafeSingleLineText(telegram, maxLengths.telegram)) {
     return { ok: false, error: "invalid_contact_telegram" };
   }
-  if (role !== null && role.length > maxLengths.role) {
+  if (role !== null && !isSafeSingleLineText(role, maxLengths.role)) {
     return { ok: false, error: "invalid_contact_role" };
   }
   if (!status) return { ok: false, error: "invalid_status" };
@@ -129,18 +129,18 @@ export function parseProductBody(
   const status = parseStatus(getOptionalString(input, "status") ?? "active");
 
   if (!isId(id)) return { ok: false, error: "invalid_product_id" };
-  if (!name || name.length > maxLengths.name) {
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
     return { ok: false, error: "invalid_product_name" };
   }
-  if (sku !== null && sku.length > maxLengths.sku) {
+  if (sku !== null && !isSafeSingleLineText(sku, maxLengths.sku)) {
     return { ok: false, error: "invalid_product_sku" };
   }
   if (!type) return { ok: false, error: "invalid_product_type" };
-  if (!unit || unit.length > maxLengths.unit) {
+  if (!unit || !isSafeSingleLineText(unit, maxLengths.unit)) {
     return { ok: false, error: "invalid_product_unit" };
   }
   if (price === null) return { ok: false, error: "invalid_product_price" };
-  if (description !== null && description.length > maxLengths.description) {
+  if (description !== null && !isSafeMultilineText(description, maxLengths.description)) {
     return { ok: false, error: "invalid_description" };
   }
   if (!status) return { ok: false, error: "invalid_status" };
@@ -173,10 +173,10 @@ export function parseProjectTypeBody(
   const status = parseStatus(getOptionalString(input, "status") ?? "active");
 
   if (!isId(id)) return { ok: false, error: "invalid_project_type_id" };
-  if (!name || name.length > maxLengths.name) {
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
     return { ok: false, error: "invalid_project_type_name" };
   }
-  if (description !== null && description.length > maxLengths.description) {
+  if (description !== null && !isSafeMultilineText(description, maxLengths.description)) {
     return { ok: false, error: "invalid_description" };
   }
   if (!status) return { ok: false, error: "invalid_status" };
@@ -196,7 +196,7 @@ export function parseDealStageBody(
   const status = parseStatus(getOptionalString(input, "status") ?? "active");
 
   if (!isId(id)) return { ok: false, error: "invalid_deal_stage_id" };
-  if (!name || name.length > maxLengths.name) {
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
     return { ok: false, error: "invalid_deal_stage_name" };
   }
   if (sortOrder === null) return { ok: false, error: "invalid_sort_order" };
@@ -235,4 +235,12 @@ function parsePositiveInteger(value: unknown): number | null {
     return null;
   }
   return value;
+}
+
+function isSafeSingleLineText(value: string, maxLength: number): boolean {
+  return value.length <= maxLength && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isSafeMultilineText(value: string, maxLength: number): boolean {
+  return value.length <= maxLength && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 }

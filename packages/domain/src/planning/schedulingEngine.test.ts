@@ -118,6 +118,62 @@ describe("scheduling engine", () => {
     });
   });
 
+  it("uses explicit assignment allocations as the calculated task span", () => {
+    const result = calculatePlan(
+      createSnapshot({
+        tasks: [
+          {
+            ...createTask("task-a", "1", "2026-06-01"),
+            workMinutes: 960,
+            durationMinutes: 480,
+            taskType: "fixed_work",
+            effortDriven: true,
+            plannedFinish: "2026-06-03"
+          }
+        ],
+        assignments: [
+          {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 2000,
+            workMinutes: 960,
+            calendarId: null
+          }
+        ],
+        assignmentAllocations: [
+          {
+            assignmentId: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            date: "2026-06-01",
+            workMinutes: 480
+          },
+          {
+            assignmentId: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            date: "2026-06-03",
+            workMinutes: 480
+          }
+        ]
+      }),
+      {
+        calculatedAt: "2026-05-21T00:00:00.000Z",
+        engineVersion: "planning-core-v1"
+      }
+    );
+
+    expect(task(result, "task-a")).toMatchObject({
+      durationMinutes: 1440,
+      calculatedStartInstant: { date: "2026-06-01", minuteOfDay: 0 },
+      calculatedFinishInstant: { date: "2026-06-03", minuteOfDay: 480 },
+      calculatedFinish: "2026-06-03"
+    });
+    expect(result.projectFinish).toBe("2026-06-03");
+  });
+
   it("reports cycles, impossible constraints and missing resource warnings", () => {
     const result = calculatePlan(
       createSnapshot({

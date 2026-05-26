@@ -1,10 +1,23 @@
 import { canReadAuditEvents } from "@kiss-pm/access-control";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
+import { parseProjectIdParam } from "./routeParamParsers";
+
+const defaultAuditReadLimit = 100;
+const maxAuditReadLimit = 100;
 
 export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const { dataSource, getActorProfile, getSessionActorFromHeaders } = deps;
 
   app.get("/api/tenant/current/audit-events", async (context) => {
+    const projectId = parseAuditProjectFilter(context.req.query("projectId"));
+    if (projectId === false) {
+      return context.json({ error: "invalid_project_id" }, 400);
+    }
+    const limit = parseAuditLimit(context.req.query("limit"));
+    if (limit === null) {
+      return context.json({ error: "invalid_audit_limit" }, 400);
+    }
+
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -28,13 +41,34 @@ export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: decision.reason }, 403);
     }
 
-    const auditEvents = await dataSource.listAuditEventsByTenantId(actor.tenantId);
+    const filtered = await dataSource.listAuditEventsByTenantId(actor.tenantId, {
+      limit,
+      projectId
+    });
 
     return context.json({
-      auditEvents: auditEvents.map((event) => ({
+      auditEvents: filtered.map((event) => ({
         ...event,
         createdAt: event.createdAt.toISOString()
       }))
     });
   });
+}
+
+function parseAuditProjectFilter(value: string | undefined): string | null | false {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  const parsed = parseProjectIdParam(normalized);
+  return parsed.ok ? parsed.value : false;
+}
+
+function parseAuditLimit(value: string | undefined): number | null {
+  const normalized = value?.trim();
+  if (!normalized) return defaultAuditReadLimit;
+  if (!/^(0|[1-9]\d*)$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maxAuditReadLimit) {
+    return null;
+  }
+  return parsed;
 }

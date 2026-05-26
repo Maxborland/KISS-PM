@@ -1,10 +1,40 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CallEvent,
+  CallParticipantState,
+  CallRecording,
+  CallRoom,
+  CallRoomStatus,
+  CallSession,
+  CallSessionStatus,
+  CollaborationEntityType,
+  ControlSignal,
+  CorrectiveAction,
+  Conversation,
+  ConversationReadState,
+  DiscussionMessage,
+  KpiDefinition,
+  KpiEvaluation,
+  Meeting,
+  MeetingActionItem,
+  MeetingExternalLink,
+  MeetingNote,
+  MeetingParticipant,
+  MeetingParticipantResponse,
+  MeetingParticipantRole,
+  MeetingStatus,
+  MessageMention,
+  NotificationPreference,
   PlanSnapshot,
+  ProjectClosureSnapshot,
+  RetrospectiveLesson,
+  RetrospectiveReadModel,
   Tenant,
   TenantId,
   TenantUser,
+  TemplateImprovementAction,
+  UserNotification,
   UserId
 } from "@kiss-pm/domain";
 import type {
@@ -19,6 +49,21 @@ import type {
   PlanningScenarioRunRecord,
   PlanningSolverRunInput,
   PlanningSolverRunRecord,
+  ControlSurfaceArchiveInput,
+  ControlSurfaceDraftInput,
+  ControlSurfacePublishInput,
+  ControlSurfaceRecord,
+  ControlSurfaceRollbackInput,
+  ControlSurfaceVersionRecord,
+  AttachmentEntityType,
+  AttachmentReadModel,
+  EntityAttachmentInput,
+  ExternalReferenceInput,
+  ExternalReferenceRecord,
+  FileAssetInput,
+  FileAssetRecord,
+  ActionExecutionInput,
+  ActionExecutionRecord,
   TaskActivityInput,
   TaskActivityRecord,
   TaskMetadataInput,
@@ -27,6 +72,9 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { ReadinessChecks } from "./healthRoutes";
+import type { StorageProvider } from "./storageProvider";
+import type { VideoProvider } from "./videoProvider";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -247,12 +295,13 @@ export type ProjectRecord = {
   templateId: string | null;
   createdAt: Date;
   activatedAt: Date | null;
+  closedAt: Date | null;
   demand: PositionDemandRecord[];
 };
 
 export type ProjectInput = Omit<
   ProjectRecord,
-  "createdAt" | "activatedAt" | "sourceType" | "sourceOpportunityId"
+  "createdAt" | "activatedAt" | "closedAt" | "sourceType" | "sourceOpportunityId"
 > & {
   sourceOpportunityId: string;
 };
@@ -283,6 +332,7 @@ export type UserSessionRecord = {
 };
 
 export type ManagementAuditEventInput = {
+  auditEventId?: string;
   tenantId: TenantId;
   actorUserId: UserId;
   actionType: string;
@@ -297,6 +347,8 @@ export type ManagementAuditEventInput = {
   permissionResult: Record<string, unknown>;
   executionResult?: Record<string, unknown>;
 };
+
+export type ManagementAuditDataSource = Pick<ApiTenantDataSource, "appendAuditEvent">;
 
 export type ApiTenantDataSource = {
   listDevUsers(): Promise<TenantUser[]>;
@@ -423,6 +475,25 @@ export type ApiTenantDataSource = {
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
+  listScheduledTasks?(input: {
+    tenantId: TenantId;
+    assigneeUserId: UserId;
+    fromDate: string;
+    toDate: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      title: string;
+      projectId: string;
+      projectTitle: string;
+      plannedStart: Date;
+      plannedFinish: Date;
+      workMinutes: number;
+      createdAt: Date;
+      statusId: string;
+    }>
+  >;
   findTaskById?(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   listTaskStatuses?(tenantId: TenantId): Promise<TaskStatusRecord[]>;
   createTaskStatus?(input: TaskStatusInput): Promise<TaskStatusRecord>;
@@ -436,6 +507,43 @@ export type ApiTenantDataSource = {
   updateTaskMetadata?(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
   listTaskActivities?(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
   createTaskActivity?(input: TaskActivityInput): Promise<TaskActivityRecord>;
+  createPendingFileAsset?(input: FileAssetInput): Promise<FileAssetRecord>;
+  markFileAssetReady?(input: {
+    tenantId: TenantId;
+    assetId: string;
+    sizeBytes: number;
+    checksumSha256: string;
+  }): Promise<FileAssetRecord | undefined>;
+  markFileAssetFailed?(input: {
+    tenantId: TenantId;
+    assetId: string;
+  }): Promise<FileAssetRecord | undefined>;
+  createExternalReference?(input: ExternalReferenceInput): Promise<ExternalReferenceRecord>;
+  createEntityAttachment?(input: EntityAttachmentInput): Promise<AttachmentReadModel>;
+  listEntityAttachments?(input: {
+    tenantId: TenantId;
+    entityType: AttachmentEntityType;
+    entityId: string;
+  }): Promise<AttachmentReadModel[]>;
+  listAttachmentActivityItems?(input: {
+    tenantId: TenantId;
+    entityType: AttachmentEntityType;
+    entityId: string;
+  }): Promise<AttachmentReadModel[]>;
+  findAttachmentById?(
+    tenantId: TenantId,
+    attachmentId: string
+  ): Promise<AttachmentReadModel | undefined>;
+  archiveAttachment?(input: {
+    tenantId: TenantId;
+    attachmentId: string;
+  }): Promise<AttachmentReadModel | undefined>;
+  searchAttachments?(input: {
+    tenantId: TenantId;
+    query: string;
+    limit: number;
+    offset?: number;
+  }): Promise<AttachmentReadModel[]>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;
@@ -450,10 +558,107 @@ export type ApiTenantDataSource = {
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
+  deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning?(tenantId: TenantId): Promise<void>;
+  listSavedViews?(
+    tenantId: TenantId,
+    projectId: string,
+    actorUserId: UserId
+  ): Promise<
+    Array<{
+      id: string;
+      tenantId: TenantId;
+      projectId: string;
+      ownerUserId: UserId;
+      scope: "user" | "project";
+      name: string;
+      payload: Record<string, unknown>;
+      createdAt: Date;
+    }>
+  >;
+  createSavedView?(input: {
+    id: string;
+    tenantId: TenantId;
+    projectId: string;
+    ownerUserId: UserId;
+    scope: "user" | "project";
+    name: string;
+    payload: Record<string, unknown>;
+  }): Promise<{
+    id: string;
+    name: string;
+    scope: "user" | "project";
+    payload: Record<string, unknown>;
+  }>;
+  deleteSavedView?(
+    tenantId: TenantId,
+    projectId: string,
+    viewId: string,
+    actorUserId: UserId
+  ): Promise<boolean>;
+  listKpiDefinitions?(tenantId: TenantId): Promise<KpiDefinition[]>;
+  upsertKpiDefinition?(input: KpiDefinition): Promise<KpiDefinition>;
+  createKpiEvaluation?(input: KpiEvaluation): Promise<KpiEvaluation>;
+  listKpiEvaluations?(tenantId: TenantId, projectId: string): Promise<KpiEvaluation[]>;
+  upsertControlSignal?(input: ControlSignal): Promise<ControlSignal>;
+  listControlSignals?(tenantId: TenantId, projectId: string): Promise<ControlSignal[]>;
+  createCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
+  updateCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
+  listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
+  createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
+  listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
+  getRetrospectiveReadModel?(
+    tenantId: TenantId,
+    projectId: string
+  ): Promise<RetrospectiveReadModel>;
+  closeProject?(input: {
+    snapshot: Omit<ProjectClosureSnapshot, "closedAt"> & { closedAt: Date };
+    lessons: Array<Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }>;
+    templateImprovementActions: Array<
+      Omit<TemplateImprovementAction, "createdAt" | "appliedAt"> & {
+        createdAt?: Date;
+        appliedAt?: Date | null;
+      }
+    >;
+  }): Promise<RetrospectiveReadModel>;
+  addRetrospectiveLesson?(
+    input: Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }
+  ): Promise<RetrospectiveLesson>;
+  applyTemplateImprovementAction?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionId: string;
+    actorUserId: UserId;
+    auditEventId: string;
+    appliedAt: Date;
+  }): Promise<TemplateImprovementAction | undefined>;
+  listTemplateImprovementActions?(input: {
+    tenantId: TenantId;
+    templateId: string;
+    status?: TemplateImprovementAction["status"];
+  }): Promise<TemplateImprovementAction[]>;
+  listControlSurfaces?(tenantId: TenantId): Promise<ControlSurfaceRecord[]>;
+  findControlSurface?(tenantId: TenantId, surfaceId: string): Promise<ControlSurfaceRecord | undefined>;
+  upsertControlSurfaceDraft?(input: ControlSurfaceDraftInput): Promise<ControlSurfaceRecord>;
+  publishControlSurface?(input: ControlSurfacePublishInput): Promise<{
+    surface: ControlSurfaceRecord;
+    version: ControlSurfaceVersionRecord;
+  }>;
+  archiveControlSurface?(input: ControlSurfaceArchiveInput): Promise<ControlSurfaceRecord | undefined>;
+  listControlSurfaceVersions?(
+    tenantId: TenantId,
+    surfaceId: string
+  ): Promise<ControlSurfaceVersionRecord[]>;
+  rollbackControlSurfaceToVersion?(input: ControlSurfaceRollbackInput): Promise<
+    | {
+        surface: ControlSurfaceRecord;
+        version: ControlSurfaceVersionRecord;
+      }
+    | undefined
+  >;
   getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
   ensurePlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
   incrementPlanVersion?(tenantId: TenantId, projectId: string): Promise<number>;
@@ -477,12 +682,12 @@ export type ApiTenantDataSource = {
   findPlanningSolverRun?(
     tenantId: TenantId,
     projectId: string,
-    solverRunId: string
+    runId: string
   ): Promise<PlanningSolverRunRecord | undefined>;
   markPlanningSolverRunApplied?(input: {
     tenantId: TenantId;
     projectId: string;
-    solverRunId: string;
+    runId: string;
     proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
@@ -519,14 +724,198 @@ export type ApiTenantDataSource = {
     correlationId: string;
     createdAt: Date;
   }): Promise<void>;
-  listAuditEventsByTenantId?(tenantId: TenantId): Promise<AuditEventListItem[]>;
+  listAuditEventsByTenantId?(
+    tenantId: TenantId,
+    options?: {
+      limit?: number;
+      projectId?: string | null;
+    }
+  ): Promise<AuditEventListItem[]>;
+  ensureConversation?(input: Omit<Conversation, "createdAt" | "archivedAt">): Promise<Conversation>;
+  findConversation?(
+    tenantId: TenantId,
+    conversationId: string
+  ): Promise<Conversation | undefined>;
+  listConversationsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<Conversation[]>;
+  createDiscussionMessage?(input: Omit<
+    DiscussionMessage,
+    "createdAt" | "editedAt" | "archivedAt" | "pinnedAt" | "pinnedByUserId"
+  >): Promise<DiscussionMessage>;
+  listDiscussionMessages?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<DiscussionMessage[]>;
+  findDiscussionMessage?(
+    tenantId: TenantId,
+    messageId: string
+  ): Promise<DiscussionMessage | undefined>;
+  updateDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    body: string;
+    metadata: Record<string, unknown>;
+  }): Promise<DiscussionMessage | undefined>;
+  archiveDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+  }): Promise<DiscussionMessage | undefined>;
+  pinDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    pinnedByUserId: UserId;
+  }): Promise<DiscussionMessage | undefined>;
+  replaceMessageMentions?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    mentionedUserIds: UserId[];
+  }): Promise<MessageMention[]>;
+  listMessageMentions?(tenantId: TenantId, messageId: string): Promise<MessageMention[]>;
+  getConversationReadState?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    userId: UserId;
+  }): Promise<ConversationReadState>;
+  markConversationRead?(input: {
+    tenantId: TenantId;
+    conversationId: string;
+    userId: UserId;
+  }): Promise<ConversationReadState>;
+  createUserNotification?(input: Omit<
+    UserNotification,
+    "createdAt" | "readAt" | "archivedAt"
+  >): Promise<UserNotification>;
+  listUserNotifications?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    status?: "unread" | "read";
+    limit: number;
+  }): Promise<UserNotification[]>;
+  markUserNotificationRead?(input: {
+    tenantId: TenantId;
+    notificationId: string;
+    userId: UserId;
+  }): Promise<UserNotification | undefined>;
+  listNotificationPreferences?(
+    tenantId: TenantId,
+    userId: UserId
+  ): Promise<NotificationPreference[]>;
+  upsertNotificationPreferences?(input: NotificationPreference[]): Promise<NotificationPreference[]>;
+  createMeeting?(input: Omit<Meeting, "createdAt" | "archivedAt">): Promise<Meeting>;
+  updateMeeting?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    title: string;
+    agenda: string;
+    scheduledStart: Date;
+    scheduledFinish: Date;
+    status: MeetingStatus;
+  }): Promise<Meeting | undefined>;
+  findMeeting?(tenantId: TenantId, meetingId: string): Promise<Meeting | undefined>;
+  listMeetingsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<Meeting[]>;
+  replaceMeetingParticipants?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    participants: Array<{
+      userId: UserId;
+      role: MeetingParticipantRole;
+      response: MeetingParticipantResponse;
+    }>;
+  }): Promise<MeetingParticipant[]>;
+  listMeetingParticipants?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingParticipant[]>;
+  createMeetingExternalLink?(input: Omit<
+    MeetingExternalLink,
+    "createdAt" | "archivedAt"
+  >): Promise<MeetingExternalLink>;
+  listMeetingExternalLinks?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingExternalLink[]>;
+  createMeetingNote?(input: Omit<MeetingNote, "createdAt" | "editedAt" | "archivedAt">): Promise<MeetingNote>;
+  listMeetingNotes?(tenantId: TenantId, meetingId: string): Promise<MeetingNote[]>;
+  createMeetingActionItem?(input: Omit<
+    MeetingActionItem,
+    "createdAt" | "archivedAt"
+  >): Promise<MeetingActionItem>;
+  listMeetingActionItems?(
+    tenantId: TenantId,
+    meetingId: string
+  ): Promise<MeetingActionItem[]>;
+  createCallRoom?(input: Omit<
+    CallRoom,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<CallRoom>;
+  findCallRoom?(tenantId: TenantId, roomId: string): Promise<CallRoom | undefined>;
+  listCallRoomsByEntity?(input: {
+    tenantId: TenantId;
+    entityType: CollaborationEntityType;
+    entityId: string;
+  }): Promise<CallRoom[]>;
+  updateCallRoomStatus?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    status: CallRoomStatus;
+  }): Promise<CallRoom | undefined>;
+  createCallSession?(input: Omit<
+    CallSession,
+    "startedAt" | "endedByUserId" | "endedAt" | "failureReason"
+  >): Promise<CallSession>;
+  findCallSession?(
+    tenantId: TenantId,
+    sessionId: string
+  ): Promise<CallSession | undefined>;
+  findActiveCallSessionForUpdate?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallSession | undefined>;
+  endCallSession?(input: {
+    tenantId: TenantId;
+    sessionId: string;
+    endedByUserId: UserId;
+    status: Exclude<CallSessionStatus, "active">;
+    failureReason?: string | null;
+  }): Promise<CallSession | undefined>;
+  upsertCallParticipantState?(input: Omit<
+    CallParticipantState,
+    "joinedAt" | "leftAt" | "lastSeenAt"
+  >): Promise<CallParticipantState>;
+  listCallParticipantStates?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    sessionId: string;
+  }): Promise<CallParticipantState[]>;
+  createCallEvent?(input: Omit<CallEvent, "createdAt">): Promise<CallEvent>;
+  listCallEvents?(input: {
+    tenantId: TenantId;
+    roomId: string;
+    limit: number;
+  }): Promise<CallEvent[]>;
+  createCallRecording?(input: Omit<CallRecording, "createdAt" | "archivedAt">): Promise<CallRecording>;
+  listCallRecordings?(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallRecording[]>;
 };
-
-export type ManagementAuditDataSource = Pick<ApiTenantDataSource, "appendAuditEvent">;
 
 export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
+  storageProvider?: StorageProvider;
+  videoProvider?: VideoProvider;
   authRateLimiter?: AuthRateLimiter;
+  readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];
   trustForwardedAuthHeaders?: boolean;

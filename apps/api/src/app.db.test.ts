@@ -1,9 +1,10 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
   createPostgresClient,
   createPostgresTenantDataSource,
+  hashSessionToken,
   seedTenantDataset,
   type PostgresClient,
   type SeedTenantDataset
@@ -197,6 +198,12 @@ describe("API with PostgreSQL data source", () => {
     return response.headers.get("set-cookie") ?? "";
   }
 
+  function sessionTokenFromCookie(cookie: string): string {
+    const token = /(?:^|;\s*)kiss_pm_session=([^;]+)/.exec(cookie)?.[1];
+    expect(token).toBeDefined();
+    return token ?? "";
+  }
+
   beforeAll(() => {
     client = createPostgresClient(databaseUrl);
     const db = createDatabase(client);
@@ -207,7 +214,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       apiSeedDataset,
@@ -216,7 +223,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -324,6 +331,34 @@ describe("API with PostgreSQL data source", () => {
         })
       ])
     });
+  });
+
+  it("bounds audit event reads with a validated limit", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    for (const suffix of ["one", "two"]) {
+      const response = await app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: `access-profile-alpha-audit-${suffix}`,
+          name: `Audit ${suffix}`,
+          permissions: ["tenant.users.read"]
+        })
+      });
+      expect(response.status).toBe(201);
+    }
+
+    const audit = await app.request("/api/tenant/current/audit-events?limit=1", {
+      headers: { cookie }
+    });
+
+    expect(audit.status).toBe(200);
+    const body = (await audit.json()) as { auditEvents: Array<unknown> };
+    expect(body.auditEvents).toHaveLength(1);
   });
 
   it("denies access-profile creation when the actor lacks management permission", async () => {
@@ -2036,6 +2071,13 @@ describe("API with PostgreSQL data source", () => {
         password: "product12345"
       })
     });
+    const newEmailCookie = newEmailLogin.headers.get("set-cookie") ?? "";
+    const productSessionToken = sessionTokenFromCookie(newEmailCookie);
+    const sessionRepository = createPostgresTenantDataSource(createDatabase(client));
+    const productSessionBeforeDisable =
+      await sessionRepository.findSessionByTokenHash(
+        hashSessionToken(productSessionToken)
+      );
     const disabledUser = await app.request("/api/workspace/users/user-product-lead", {
       method: "PATCH",
       headers: {
@@ -2051,6 +2093,10 @@ describe("API with PostgreSQL data source", () => {
         status: "inactive"
       })
     });
+    const productSessionAfterDisable =
+      await sessionRepository.findSessionByTokenHash(
+        hashSessionToken(productSessionToken)
+      );
     const updatedPosition = await app.request("/api/workspace/positions/position-product-lead", {
       method: "PATCH",
       headers: {
@@ -2244,7 +2290,12 @@ describe("API with PostgreSQL data source", () => {
       error: "invalid_credentials"
     });
     expect(newEmailLogin.status).toBe(200);
+    expect(productSessionBeforeDisable).toMatchObject({
+      tenantId: "tenant-alpha",
+      userId: "user-product-lead"
+    });
     expect(disabledUser.status).toBe(200);
+    expect(productSessionAfterDisable).toBeUndefined();
     expect(updatedPosition.status).toBe(200);
     await expect(updatedPosition.json()).resolves.toMatchObject({
       position: {

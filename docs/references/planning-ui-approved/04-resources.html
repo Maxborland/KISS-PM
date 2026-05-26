@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Ресурсы проекта</title>
+  <link rel="stylesheet" href="_partials.css" />
+  <style>
+    .load-bar { display: inline-block; width: 100px; height: 8px; background: var(--panel-strong); border-radius: 999px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+    .load-bar > span { display: block; height: 100%; background: var(--success); }
+    .load-bar.warn > span { background: var(--warning); }
+    .load-bar.over > span { background: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><span class="sidebar__brand-mark"></span> KISS PM</div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item"><span>Мои задачи</span><span class="sidebar__item-badge">12</span></div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span><span class="sidebar__item-badge">8</span></div>
+      <div class="sidebar__item"><span>Сделки</span></div>
+      <div class="sidebar__item"><span>Ресурсы</span></div>
+      <div class="sidebar__footer">v0.1 dev</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2</div>
+            <div class="topbar__meta">
+              <span class="chip chip--info">В работе</span>
+              <span>план v17</span>
+              <span>Финиш 14.06.2026</span>
+            </div>
+          </div>
+        </div>
+        <label class="topbar__search"><span class="muted">⌕</span><input placeholder="Найти ресурс"></label>
+        <div class="topbar__actions"><button class="icon-btn">●</button><button class="icon-btn">И</button></div>
+      </header>
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item">График</span>
+        <span class="tabs__item tabs__item--active">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+        <span class="tabs__status"><span class="tabs__status-dot"></span> Сохранено</span>
+      </nav>
+      <section class="content">
+        <div class="page-title">
+          <div>
+            <h1>Ресурсы проекта</h1>
+            <div class="subtitle">12 ресурсов · 2 перегружены в ближайшие 14 дней</div>
+          </div>
+          <div class="row">
+            <button class="btn btn--sm">Фильтр: Все роли ▾</button>
+            <button class="btn btn--sm">Только перегруженные</button>
+            <button class="btn btn--sm btn--primary">Открыть Назначения</button>
+          </div>
+        </div>
+
+        <div class="list" style="--cols: 28px 1.4fr 1fr 1.4fr 1fr 1fr 130px;">
+          <div class="list__row head">
+            <span></span>
+            <span>Ресурс</span>
+            <span>Роль</span>
+            <span>Загрузка (14 дн)</span>
+            <span>Overload</span>
+            <span>Назначено</span>
+            <span>Действия</span>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">ИВ</span>
+            <div><strong>Иванов И.</strong><div class="muted" style="font-size:11px;">ivanov@example.com</div></div>
+            <div><span class="chip chip--outline">Аналитик</span></div>
+            <div><span class="load-bar"><span style="width:84%"></span></span><span class="mono">84%</span></div>
+            <div class="muted">—</div>
+            <div class="mono">3 задачи · 96 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">СП</span>
+            <div><strong>Сергей П.</strong><div class="muted" style="font-size:11px;">sergey@example.com</div></div>
+            <div><span class="chip chip--outline">Архитектор</span></div>
+            <div><span class="load-bar"><span style="width:72%"></span></span><span class="mono">72%</span></div>
+            <div class="muted">—</div>
+            <div class="mono">2 задачи · 84 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">МК</span>
+            <div><strong>Михаил К.</strong><div class="muted" style="font-size:11px;">mikhail@example.com</div></div>
+            <div><span class="chip chip--outline">Разработчик FE</span></div>
+            <div><span class="load-bar over"><span style="width:100%"></span></span><span class="mono">142%</span></div>
+            <div><span class="chip chip--danger">+14 ч/нед</span></div>
+            <div class="mono">7 задач · 264 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">ДК</span>
+            <div><strong>Дмитрий К.</strong><div class="muted" style="font-size:11px;">dmitry@example.com</div></div>
+            <div><span class="chip chip--outline">Разработчик BE</span></div>
+            <div><span class="load-bar warn"><span style="width:118%"></span></span><span class="mono">118%</span></div>
+            <div><span class="chip chip--warning">+8 ч/нед</span></div>
+            <div class="mono">5 задач · 220 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">КН</span>
+            <div><strong>Кирилл Н.</strong><div class="muted" style="font-size:11px;">kirill@example.com</div></div>
+            <div><span class="chip chip--outline">QA</span></div>
+            <div><span class="load-bar"><span style="width:48%"></span></span><span class="mono">48%</span></div>
+            <div class="muted">—</div>
+            <div class="mono">2 задачи · 60 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">ЕЛ</span>
+            <div><strong>Екатерина Л.</strong><div class="muted" style="font-size:11px;">ekaterina@example.com</div></div>
+            <div><span class="chip chip--outline">Разработчик FE</span></div>
+            <div><span class="load-bar"><span style="width:55%"></span></span><span class="mono">55%</span></div>
+            <div class="muted">—</div>
+            <div class="mono">1 задача · 80 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+          <div class="list__row">
+            <span class="chip chip--outline mono">АП</span>
+            <div><strong>Анна П.</strong><div class="muted" style="font-size:11px;">anna@example.com</div></div>
+            <div><span class="chip chip--outline">PM</span></div>
+            <div><span class="load-bar"><span style="width:30%"></span></span><span class="mono">30%</span></div>
+            <div class="muted">—</div>
+            <div class="mono">4 задачи · 40 ч</div>
+            <div class="row" style="gap:6px;"><button class="btn btn--sm">Открыть</button></div>
+          </div>
+        </div>
+
+        <div class="banner banner--muted" style="margin-top:12px;">
+          Чтобы добавить ресурс в проект, откройте «Назначения» и привяжите его к задаче. Управление пулом ресурсов tenant'а — в «Ресурсах» бокового меню.
+        </div>
+      </section>
+      <footer class="bottom-bar bottom-bar--hidden"></footer>
+    </main>
+  </div>
+</body>
+</html>

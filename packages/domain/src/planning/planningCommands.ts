@@ -50,6 +50,10 @@ export type PlanningCommand =
     }
   | { type: "task.update_status"; payload: { taskId: string; statusId: string } }
   | {
+      type: "task.update_progress";
+      payload: { taskId: string; percentComplete: number };
+    }
+  | {
       type: "task.move_wbs";
       payload: { taskId: string; parentTaskId: string | null; sortOrder: number };
     }
@@ -123,7 +127,15 @@ export type PlanningCommand =
       type: "risk.accept_overload";
       payload: { overloadId: string; acceptedRiskReason: string };
     }
-  | { type: "project.deadline.move"; payload: { deadline: PlanDate; reason: string } };
+  | { type: "project.deadline.move"; payload: { deadline: PlanDate; reason: string } }
+  | {
+      type: "project.settings.update";
+      payload: { calendarId: string | null };
+    }
+  | {
+      type: "task.update_custom_field";
+      payload: { taskId: string; fieldKey: string; value: unknown };
+    };
 
 export type PlanDelta = {
   commands: PlanningCommand[];

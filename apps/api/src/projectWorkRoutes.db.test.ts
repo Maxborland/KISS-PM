@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -202,7 +202,7 @@ describe("project work API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       projectWorkApiSeed,
@@ -212,8 +212,61 @@ describe("project work API routes", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
+  });
+
+  it("rejects malformed project work route identifiers before persistence lookup", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const badProjectDetail = await app.request("/api/workspace/projects/bad..project", {
+      headers: { cookie: adminCookie }
+    });
+    const badTaskDetail = await app.request("/api/workspace/tasks/bad..task", {
+      headers: { cookie: adminCookie }
+    });
+    const badStatusPatch = await app.request("/api/workspace/task-statuses/bad..status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        name: "Новый статус",
+        category: "waiting",
+        sortOrder: 30
+      })
+    });
+    const badTransitionTask = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/bad..task/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+
+    expect(badProjectDetail.status).toBe(400);
+    await expect(badProjectDetail.json()).resolves.toEqual({
+      error: "invalid_project_id"
+    });
+    expect(badTaskDetail.status).toBe(400);
+    await expect(badTaskDetail.json()).resolves.toEqual({
+      error: "invalid_task_id"
+    });
+    expect(badStatusPatch.status).toBe(400);
+    await expect(badStatusPatch.json()).resolves.toEqual({
+      error: "invalid_task_status_id"
+    });
+    expect(badTransitionTask.status).toBe(400);
+    await expect(badTransitionTask.json()).resolves.toEqual({
+      error: "invalid_task_id"
+    });
   });
 
   it("creates a project task, returns it in project detail and My Work, and writes audit", async () => {

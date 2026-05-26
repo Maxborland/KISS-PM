@@ -22,21 +22,37 @@ import type {
 } from "./apiTypes";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
+import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
+import { registerCollaborationRoutes } from "./collaborationRoutes";
+import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
+import { registerControlRoutes } from "./controlRoutes";
+import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
+import { registerHealthRoutes } from "./healthRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
+import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
+import { registerAbsencesRoutes } from "./absencesRoutes";
+import { registerOrgStructureRoutes } from "./orgStructureRoutes";
+import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import { registerRetrospectiveRoutes } from "./retrospectiveRoutes";
+import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
+import { registerSearchRoutes } from "./searchRoutes";
+import { createStorageProviderFromEnv } from "./storageProvider";
+import { createVideoProviderFromEnv } from "./videoProvider";
 import {
   isTrustedBrowserMutationRequest,
   setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
+import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
@@ -51,6 +67,8 @@ export function createApp(options: CreateAppOptions = {}) {
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
   const trustedMutationOrigins =
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
+  const storageProvider = options.storageProvider ?? createStorageProviderFromEnv();
+  const videoProvider = options.videoProvider ?? createVideoProviderFromEnv();
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
@@ -60,7 +78,7 @@ export function createApp(options: CreateAppOptions = {}) {
     return context.json(response.body, response.status);
   });
 
-  app.use("/api/*", async (context, next) => {
+  app.use("*", async (context, next) => {
     context.header("Cache-Control", "no-store, private");
     setApiSecurityHeaders(context);
     await next();
@@ -82,7 +100,9 @@ export function createApp(options: CreateAppOptions = {}) {
 
   async function getActor(userId: string | null) {
     if (!userId) return undefined;
-    const actor = await dataSource.findUserById(userId);
+    const parsedUserId = parseUserIdParam(userId);
+    if (!parsedUserId.ok) return undefined;
+    const actor = await dataSource.findUserById(parsedUserId.value);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }
@@ -162,7 +182,7 @@ export function createApp(options: CreateAppOptions = {}) {
       throw new Error("audit_not_configured");
     }
 
-    const auditEventId = `audit-${randomUUID()}`;
+    const auditEventId = input.auditEventId ?? `audit-${randomUUID()}`;
     await auditDataSource.appendAuditEvent({
       id: auditEventId,
       tenantId: input.tenantId,
@@ -193,11 +213,19 @@ export function createApp(options: CreateAppOptions = {}) {
     isWorkspaceUserActive,
     runDataSourceTransaction,
     secureCookies,
+    storageProvider,
+    videoProvider,
     trustForwardedAuthHeaders
   };
 
-  app.get("/health", (context) => {
-    return context.json({ status: "ok", product: "KISS PM" });
+  registerHealthRoutes(app, {
+    readinessChecks: options.readinessChecks,
+    storageProvider
+  });
+
+  app.get("/api/health/realtime", async (context) => {
+    const { getPlanningRealtimeStatus } = await import("./planningRealtimeHealth.js");
+    return context.json(getPlanningRealtimeStatus());
   });
 
   registerAuthRoutes(app, routeDeps);
@@ -206,11 +234,23 @@ export function createApp(options: CreateAppOptions = {}) {
   }
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
+  registerControlRoutes(app, routeDeps);
+  registerControlSurfaceRoutes(app, routeDeps);
+  registerCollaborationRoutes(app, routeDeps);
+  registerCommunicationRealtimeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
+  registerAttachmentRoutes(app, routeDeps);
+  registerSearchRoutes(app, routeDeps);
   registerPlanningRoutes(app, routeDeps);
+  registerCapacityRoutes(app, routeDeps);
+  registerProductionCalendarRoutes(app, routeDeps);
+  registerAbsencesRoutes(app, routeDeps);
+  registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
+  registerRetrospectiveRoutes(app, routeDeps);
+  registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

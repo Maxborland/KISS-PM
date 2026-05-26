@@ -31,7 +31,7 @@ CRM opportunity -> intake / feasibility -> project draft -> active project
 1. Draft хранится в таблице `projects` с `status = "draft"` и `activatedAt = null`.
 2. Active project хранится в той же таблице с `status = "active"` и заполненным `activatedAt`.
 3. `/api/workspace/projects` возвращает только `active` проекты, то есть draft не попадает в боевую рабочую зону.
-4. Draft не участвует в расчете занятых часов ресурсной проверки. Резерв capacity в Phase 3 дает только `active` project.
+4. Draft не участвует в расчете занятых часов ресурсной проверки Phase 3. Начиная с Phase E tenant-wide capacity может учитывать `draft` как capacity-committed planning container, если в нем уже есть реальные assignments/reservations.
 5. Activation является governed action: backend permissions, final capacity recheck, tenant resource lock, audit.
 6. Activation переводит draft в active, закрывает source opportunity как `won_closed` и сохраняет single-use правило: одна opportunity не может породить несколько проектов.
 7. Старый endpoint `POST /api/workspace/opportunities/:id/activate` остается совместимым для Phase 3 UI, но внутри проходит через draft lifecycle: create draft -> activate draft.
@@ -44,7 +44,7 @@ CRM opportunity -> intake / feasibility -> project draft -> active project
 
 - Project lifecycle можно расширять без миграции из `project_drafts` в `projects`.
 - Будущая проектная зона может добавить отдельный экран `Черновики проектов`, не меняя storage model.
-- Нужно внимательно держать фильтры: active working zone, capacity reservations и dashboards не должны случайно считать draft как активный проект.
+- Нужно внимательно держать фильтры: active working zone и dashboards не должны случайно считать draft как активный проект. Tenant-wide capacity Phase E считает только явную плановую занятость capacity-committed draft/active/paused containers.
 - Если в будущем draft получит принципиально другую модель данных, решение можно пересмотреть отдельным ADR.
 
 ## Acceptance evidence

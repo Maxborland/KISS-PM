@@ -2,9 +2,12 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/tenant-org-structure" },
+    { "path": "./packages/planning-client" },
     { "path": "./packages/access-control" },
     { "path": "./packages/persistence" },
     { "path": "./packages/test-fixtures" },
+    { "path": "./packages/planning-gantt-ui" },
     { "path": "./apps/api" },
     { "path": "./apps/web" }
   ]

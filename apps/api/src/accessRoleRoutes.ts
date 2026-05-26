@@ -1,8 +1,11 @@
 import {
   canManageAccessProfiles,
-  canReadAccessProfiles
+  canReadAccessProfiles,
+  type PolicyDecision
 } from "@kiss-pm/access-control";
+import type { TenantUser } from "@kiss-pm/domain";
 import { readLimitedJsonBody } from "./jsonBody";
+import { parseAccessRoleIdParam } from "./routeParamParsers";
 import { parseAccessProfileCreateBody } from "./workspaceParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
@@ -36,6 +39,12 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     if (!decision.allowed) {
+      await appendAccessRoleDeniedAudit(deps, actor, {
+        actionType: "tenant.access_profile.read_denied",
+        entityId: "access-profiles",
+        commandInput: { resource: "access-profiles" },
+        decision
+      });
       return context.json({ error: decision.reason }, 403);
     }
 
@@ -72,6 +81,12 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     if (!decision.allowed) {
+      await appendAccessRoleDeniedAudit(deps, actor, {
+        actionType: "tenant.access_profile.create_denied",
+        entityId: "new",
+        commandInput: { operation: "create_access_profile" },
+        decision
+      });
       return context.json({ error: decision.reason }, 403);
     }
 
@@ -139,7 +154,15 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       profile: await getActorProfile(actor),
       targetTenantId: actor.tenantId
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!decision.allowed) {
+      await appendAccessRoleDeniedAudit(deps, actor, {
+        actionType: "tenant.access_profile.read_denied",
+        entityId: "access-roles",
+        commandInput: { resource: "access-roles" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
 
     return context.json({
       accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
@@ -147,6 +170,9 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.patch("/api/workspace/access-roles/:roleId", async (context) => {
+    const parsedRoleId = parseAccessRoleIdParam(context.req.param("roleId"));
+    if (!parsedRoleId.ok) return context.json({ error: parsedRoleId.error }, 400);
+    const roleId = parsedRoleId.value;
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -172,10 +198,15 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     if (!decision.allowed) {
+      await appendAccessRoleDeniedAudit(deps, actor, {
+        actionType: "tenant.access_profile.update_denied",
+        entityId: roleId,
+        commandInput: { roleId },
+        decision
+      });
       return context.json({ error: decision.reason }, 403);
     }
 
-    const roleId = context.req.param("roleId");
     const beforeState =
       (await dataSource.listAccessProfilesByTenantId(actor.tenantId)).find(
         (profile) => profile.id === roleId
@@ -242,6 +273,9 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.delete("/api/workspace/access-roles/:roleId", async (context) => {
+    const parsedRoleId = parseAccessRoleIdParam(context.req.param("roleId"));
+    if (!parsedRoleId.ok) return context.json({ error: parsedRoleId.error }, 400);
+    const roleId = parsedRoleId.value;
     const actor = await getSessionActorFromHeaders(
       context.req.header("cookie") ?? null
     );
@@ -260,7 +294,7 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    if (actor.accessProfileId === context.req.param("roleId")) {
+    if (actor.accessProfileId === roleId) {
       return context.json({ error: "self_access_role_delete_forbidden" }, 400);
     }
 
@@ -272,10 +306,15 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     if (!decision.allowed) {
+      await appendAccessRoleDeniedAudit(deps, actor, {
+        actionType: "tenant.access_profile.delete_denied",
+        entityId: roleId,
+        commandInput: { roleId },
+        decision
+      });
       return context.json({ error: decision.reason }, 403);
     }
 
-    const roleId = context.req.param("roleId");
     const beforeState =
       (await dataSource.listAccessProfilesByTenantId(actor.tenantId)).find(
         (profile) => profile.id === roleId
@@ -318,5 +357,33 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     return context.json({ status: "deleted" });
+  });
+}
+
+async function appendAccessRoleDeniedAudit(
+  deps: ApiRouteDeps,
+  actor: TenantUser,
+  input: {
+    actionType: string;
+    entityId: string;
+    commandInput: Record<string, unknown>;
+    decision: PolicyDecision;
+  }
+) {
+  if (!deps.dataSource.appendAuditEvent) return;
+  await deps.appendManagementAuditEvent({
+    tenantId: actor.tenantId,
+    actorUserId: actor.id,
+    actionType: input.actionType,
+    sourceWorkflow: "single_workspace_access_roles",
+    sourceEntity: {
+      type: "AccessProfile",
+      id: input.entityId
+    },
+    commandInput: input.commandInput,
+    beforeState: null,
+    afterState: null,
+    permissionResult: input.decision,
+    executionResult: { status: "denied" }
   });
 }

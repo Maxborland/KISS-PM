@@ -18,13 +18,18 @@ import {
   userCredentials,
   userSessions
 } from "./schema";
-import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
+import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
+import { createCollaborationRepository, type CollaborationRepository } from "./collaborationRepository";
+import { createCrmActivityRepository, type CrmActivityRepository } from "./crmActivityRepository";
+import { createControlRepository, type ControlRepository } from "./controlRepository";
+import { createControlSurfaceRepository, type ControlSurfaceRepository } from "./controlSurfaceRepository";
 import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
+import { createPlanningSavedViewsRepository, type PlanningSavedViewsRepository } from "./planningSavedViewsRepository";
+import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
 import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
-import {
-  createCrmActivityRepository,
-  type CrmActivityRepository
-} from "./crmActivityRepository";
+import { createResourceAbsencesRepository, type ResourceAbsencesRepository } from "./resourceAbsencesRepository";
+import { createRetrospectiveRepository, type RetrospectiveRepository } from "./retrospectiveRepository";
+import { createTenantProductionCalendarRepository, type TenantProductionCalendarRepository } from "./tenantProductionCalendarRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -109,7 +114,19 @@ export type UserSessionRecord = {
   tokenHash: string;
   expiresAt: Date;
 };
-export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository & PlanningRepository & ProjectWorkRepository & CrmActivityRepository & {
+export type PostgresTenantDataSource = CrmRepository &
+  ProjectIntakeRepository &
+  PlanningRepository &
+  PlanningSavedViewsRepository &
+  ProjectWorkRepository &
+  TenantProductionCalendarRepository &
+  ResourceAbsencesRepository &
+  ControlRepository &
+  ControlSurfaceRepository &
+  RetrospectiveRepository &
+  AttachmentRepository &
+  CollaborationRepository &
+  CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
@@ -149,12 +166,19 @@ export type PostgresTenantDataSource = CrmRepository & ProjectIntakeRepository &
   createSession(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash(tokenHash: string): Promise<void>;
+  deleteSessionsByUserId(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
-  listAuditEventsByTenantId(tenantId: TenantId): Promise<AuditEventListItem[]>;
+  listAuditEventsByTenantId(
+    tenantId: TenantId,
+    options?: {
+      limit?: number;
+      projectId?: string | null;
+    }
+  ): Promise<AuditEventListItem[]>;
 };
 
 export function createPostgresTenantDataSource(
@@ -163,9 +187,17 @@ export function createPostgresTenantDataSource(
   return {
     db,
     ...createCrmRepository(db),
+    ...createControlRepository(db),
+    ...createControlSurfaceRepository(db),
+    ...createRetrospectiveRepository(db),
     ...createProjectIntakeRepository(db),
     ...createPlanningRepository(db),
+    ...createPlanningSavedViewsRepository(db),
     ...createProjectWorkRepository(db),
+    ...createTenantProductionCalendarRepository(db),
+    ...createResourceAbsencesRepository(db),
+    ...createAttachmentRepository(db),
+    ...createCollaborationRepository(db),
     ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
@@ -488,6 +520,11 @@ export function createPostgresTenantDataSource(
     async deleteSessionByTokenHash(tokenHash) {
       await db.delete(userSessions).where(eq(userSessions.tokenHash, tokenHash));
     },
+    async deleteSessionsByUserId(tenantId, userId) {
+      await db
+        .delete(userSessions)
+        .where(and(eq(userSessions.tenantId, tenantId), eq(userSessions.userId, userId)));
+    },
     async withTransaction(operation) {
       return db.transaction((transaction) =>
         operation(
@@ -525,12 +562,24 @@ export function createPostgresTenantDataSource(
         createdAt: event.createdAt
       });
     },
-    async listAuditEventsByTenantId(tenantId) {
-      const rows = await db
-        .select()
-        .from(auditEvents)
-        .where(eq(auditEvents.tenantId, tenantId))
-        .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+    async listAuditEventsByTenantId(tenantId, options) {
+      const filters = [eq(auditEvents.tenantId, tenantId)];
+      if (options?.projectId) {
+        filters.push(
+          sql`${auditEvents.sourceEntity} ->> 'type' = 'Project'`,
+          sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
+        );
+      }
+      const buildQuery = () =>
+        db
+          .select()
+          .from(auditEvents)
+          .where(and(...filters))
+          .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+      const rows =
+        options?.limit === undefined
+          ? await buildQuery()
+          : await buildQuery().limit(options.limit);
 
       return rows.map((row) => ({
         id: row.id,

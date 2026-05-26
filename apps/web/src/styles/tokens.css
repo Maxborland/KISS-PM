@@ -1,0 +1,155 @@
+﻿/* KISS PM Design v2 — Soft UI Evolution + Bento, 2026 */
+:root {
+  /* Surface */
+  --canvas: #eef0f4;
+  --canvas-tint: #f4f5f8;
+  --panel: #ffffff;
+  --panel-subtle: #fafbfc;
+  --panel-strong: #f3f5f8;
+  --panel-elevated: #ffffff;
+  --border: #e6e8ee;
+  --border-strong: #d4d8e0;
+  --border-subtle: #eef0f4;
+
+  /* Text */
+  --text: #0f172a;
+  --text-strong: #020617;
+  --muted: #64748b;
+  --muted-strong: #475569;
+  --muted-soft: #94a3b8;
+
+  /* Brand & accents */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eef4ff;
+  --accent-muted: #dbeafe;
+  --accent-ring: rgba(37, 99, 235, 0.18);
+
+  /* Semantic */
+  --success: #10b981;
+  --success-text: #047857;
+  --success-soft: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-text: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #ef4444;
+  --danger-text: #b91c1c;
+  --danger-soft: #fef2f2;
+  --info: #0ea5e9;
+  --info-soft: #f0f9ff;
+  --violet: #8b5cf6;
+  --violet-soft: #f5f3ff;
+
+  /* Priority chips (kanban) */
+  --prio-urgent: #ef4444;
+  --prio-urgent-soft: #fef2f2;
+  --prio-critical: #b91c1c;
+  --prio-critical-soft: #fee2e2;
+  --prio-high: #f97316;
+  --prio-high-soft: #fff7ed;
+  --prio-normal: #f59e0b;
+  --prio-normal-soft: #fffbeb;
+  --prio-med: #f59e0b;
+  --prio-med-soft: #fffbeb;
+  --prio-low: #10b981;
+  --prio-low-soft: #ecfdf5;
+
+  /* Gradient tiles (dashboard accent cards) */
+  --grad-warm: linear-gradient(135deg, #fda4af 0%, #fdba74 50%, #fcd34d 100%);
+  --grad-warm-overlay: rgba(255, 255, 255, 0.18);
+  --grad-cool: linear-gradient(135deg, #a5f3fc 0%, #93c5fd 60%, #c4b5fd 100%);
+  --grad-cool-overlay: rgba(255, 255, 255, 0.22);
+  --grad-mono: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Typography — pair: Plus Jakarta Sans (display) + Inter (body) + JetBrains Mono (code).
+     next/font подставляет --next-font-*; fallback в var() обеспечивает корректный стек в Storybook. */
+  --font-ui: var(--next-font-ui, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--next-font-display, "Plus Jakarta Sans"), "Inter", system-ui, sans-serif;
+  --font-mono: var(--next-font-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
+
+  /* Type scale: body 14 · h3 18 · h2 24 · h1 32 */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-h3: 18px;
+  --text-h2: 24px;
+  --text-h1: 32px;
+  --text-xl: var(--text-h3);
+  --text-2xl: var(--text-h2);
+  --text-3xl: var(--text-h1);
+  --text-4xl: 40px;
+
+  --lh-xs: 16px;
+  --lh-sm: 18px;
+  --lh-base: 22px;
+  --lh-md: 22px;
+  --lh-lg: 24px;
+  --lh-h3: 24px;
+  --lh-h2: 32px;
+  --lh-h1: 38px;
+  --lh-xl: var(--lh-h3);
+  --lh-2xl: var(--lh-h2);
+  --lh-3xl: var(--lh-h1);
+  --lh-4xl: 44px;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 28px;
+  --radius-full: 999px;
+
+  /* Shadows — soft UI evolution, multi-layer */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 24px -8px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.05);
+  --shadow-xl: 0 24px 48px -12px rgba(15, 23, 42, 0.18);
+  --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.04), 0 24px 48px -16px rgba(15, 23, 42, 0.12);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  --ring-focus: 0 0 0 3px var(--accent-ring);
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --topbar-height: 60px;
+  --page-header-height: 64px;
+  --row-h: 30px;
+  --toolbar-h: 36px;
+  --content-max: 1480px;
+  --canvas-pad: 16px;
+  --canvas-radius: var(--radius-2xl);
+  --modal-sm: 480px;
+  --modal-md: 640px;
+  --modal-lg: 880px;
+
+  /* Z */
+  --z-sticky: 10;
+  --z-dropdown: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Motion — design-v3 Phase 1 */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, .2, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+}

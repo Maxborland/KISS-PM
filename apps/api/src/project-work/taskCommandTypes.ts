@@ -1,0 +1,62 @@
+import type { AccessProfile } from "@kiss-pm/access-control";
+import type { TenantUser } from "@kiss-pm/domain";
+import type { TaskActivityRecord, TaskRecord } from "@kiss-pm/persistence";
+
+import type {
+  ApiTenantDataSource,
+  ManagementAuditEventInput,
+  ProjectRecord
+} from "../apiTypes";
+import type {
+  CreateTaskBody,
+  TaskCommentBody,
+  UpdateTaskBody,
+  UpdateTaskStatusBody
+} from "../projectWorkParsers";
+
+export type TaskCommandWorkspaceDeps = {
+  dataSource: ApiTenantDataSource;
+  runDataSourceTransaction<T>(
+    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+  ): Promise<T>;
+  appendManagementAuditEvent(
+    input: ManagementAuditEventInput,
+    auditDataSource?: ApiTenantDataSource
+  ): Promise<string>;
+};
+
+export type WorkspaceInput = {
+  actor: TenantUser;
+  profile: AccessProfile;
+};
+
+export type WorkspaceError = {
+  ok: false;
+  status: 400 | 403 | 404 | 409 | 501;
+  error: string;
+};
+
+export type PreflightResult = { ok: true } | WorkspaceError;
+
+export type TaskResult =
+  | { ok: true; task: TaskRecord; project?: ProjectRecord; planVersion?: number | null }
+  | WorkspaceError;
+
+export type CommentResult = { ok: true; activity: TaskActivityRecord } | WorkspaceError;
+
+export type CreateWorkspaceInboxTaskInput = WorkspaceInput & { body: CreateTaskBody };
+export type CreateProjectTaskInput = WorkspaceInput & {
+  projectId: string;
+  body: CreateTaskBody;
+};
+export type UpdateTaskInput = WorkspaceInput & { taskId: string; body: UpdateTaskBody };
+export type ArchiveTaskInput = WorkspaceInput & { taskId: string };
+export type TransitionTaskStatusInput = WorkspaceInput & {
+  projectId: string;
+  taskId: string;
+  body: UpdateTaskStatusBody;
+};
+export type CreateTaskCommentInput = WorkspaceInput & {
+  taskId: string;
+  body: TaskCommentBody;
+};

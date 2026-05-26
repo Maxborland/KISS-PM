@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const keyLength = 64;
 
@@ -35,5 +35,8 @@ export function verifyPassword(input: {
 }
 
 export function hashSessionToken(token: string): string {
-  return scryptSync(token, "kiss-pm-session", keyLength).toString("hex");
+  return `sha256:${createHash("sha256")
+    .update("kiss-pm-session-token\0")
+    .update(token)
+    .digest("hex")}`;
 }

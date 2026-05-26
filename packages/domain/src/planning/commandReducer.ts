@@ -64,6 +64,17 @@ export function reducePlanningCommand(
           task.id === command.payload.taskId ? { ...task, statusId: command.payload.statusId } : task
         )
       });
+    case "task.update_progress":
+      return withSnapshot(snapshot, command, {
+        tasks: snapshot.tasks.map((task) =>
+          task.id === command.payload.taskId
+            ? {
+                ...task,
+                percentComplete: clampPercentComplete(command.payload.percentComplete)
+              }
+            : task
+        )
+      });
     case "task.move_wbs":
       return withSnapshot(snapshot, command, {
         tasks: moveTask(snapshot.tasks, command.payload.taskId, command.payload.parentTaskId, command.payload.sortOrder)
@@ -87,7 +98,7 @@ export function reducePlanningCommand(
         assignments: snapshot.assignments.filter(
           (assignment) => assignment.id !== command.payload.assignmentId
         ),
-        assignmentAllocations: snapshot.assignmentAllocations.filter(
+        assignmentAllocations: snapshot.assignmentAllocations?.filter(
           (allocation) => allocation.assignmentId !== command.payload.assignmentId
         )
       });
@@ -123,6 +134,28 @@ export function reducePlanningCommand(
     case "project.deadline.move":
       return withSnapshot(snapshot, command, {
         project: { ...snapshot.project, deadline: command.payload.deadline }
+      });
+    case "project.settings.update":
+      return withSnapshot(snapshot, command, {
+        project: { ...snapshot.project, calendarId: command.payload.calendarId },
+        tasks: snapshot.tasks.map((task) => ({
+          ...task,
+          calendarId: command.payload.calendarId
+        }))
+      });
+    case "task.update_custom_field":
+      return withSnapshot(snapshot, command, {
+        tasks: snapshot.tasks.map((task) =>
+          task.id === command.payload.taskId
+            ? {
+                ...task,
+                customFields: {
+                  ...(task.customFields ?? {}),
+                  [command.payload.fieldKey]: command.payload.value
+                }
+              }
+            : task
+        )
       });
   }
 }
@@ -197,7 +230,7 @@ function reduceTaskDeleteOrArchive(
       assignments: snapshot.assignments.filter(
         (assignment) => assignment.taskId !== command.payload.taskId
       ),
-      assignmentAllocations: snapshot.assignmentAllocations.filter(
+      assignmentAllocations: snapshot.assignmentAllocations?.filter(
         (allocation) => allocation.taskId !== command.payload.taskId
       ),
       dependencies: snapshot.dependencies.filter(
@@ -252,7 +285,10 @@ function reduceAssignmentUpsert(
         unitsPermille: command.payload.unitsPermille,
         workMinutes: command.payload.workMinutes,
         calendarId: null
-      })
+      }),
+      assignmentAllocations: snapshot.assignmentAllocations?.filter(
+        (allocation) => allocation.assignmentId !== command.payload.id
+      )
     },
     { changedAssignmentIds: [command.payload.id] }
   );
@@ -262,42 +298,27 @@ function reduceAssignmentAllocationsReplace(
   snapshot: PlanSnapshot,
   command: Extract<PlanningCommand, { type: "assignment.allocations.replace" }>
 ): CommandReductionResult {
-  const assignment = snapshot.assignments.find(
-    (candidate) => candidate.id === command.payload.assignmentId
-  );
-  if (!assignment) {
-    return {
-      nextSnapshot: snapshot,
-      planDelta: { ...createEmptyPlanDelta(), commands: [command] },
-      validationIssues: [
-        invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")
-      ]
-    };
-  }
-
-  const nextAllocations = command.payload.allocations
-    .filter((allocation) => allocation.workMinutes > 0)
-    .map<PlanAssignmentAllocation>((allocation) => ({
-      assignmentId: assignment.id,
-      taskId: assignment.taskId,
-      resourceId: assignment.resourceId,
-      date: allocation.date,
-      workMinutes: allocation.workMinutes
-    }))
-    .sort((left, right) => left.date.localeCompare(right.date));
-
+  const assignment = snapshot.assignments.find((candidate) => candidate.id === command.payload.assignmentId);
+  if (!assignment) return withSnapshot(snapshot, command, {});
+  const allocations = command.payload.allocations.map<PlanAssignmentAllocation>((allocation) => ({
+    assignmentId: assignment.id,
+    taskId: assignment.taskId,
+    resourceId: assignment.resourceId,
+    date: allocation.date,
+    workMinutes: allocation.workMinutes
+  }));
   return withSnapshot(
     snapshot,
     command,
     {
       assignmentAllocations: [
-        ...snapshot.assignmentAllocations.filter(
-          (allocation) => allocation.assignmentId !== assignment.id
+        ...(snapshot.assignmentAllocations ?? []).filter(
+          (allocation) => allocation.assignmentId !== command.payload.assignmentId
         ),
-        ...nextAllocations
-      ]
+        ...allocations
+      ].sort((left, right) => left.assignmentId.localeCompare(right.assignmentId) || left.date.localeCompare(right.date))
     },
-    { changedAssignmentIds: [assignment.id] }
+    { changedAssignmentIds: [command.payload.assignmentId] }
   );
 }
 
@@ -400,6 +421,12 @@ function validateCommandPreconditions(
       ) {
         return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
       }
+      {
+        const plannedStart = command.payload.plannedStart ?? snapshot.project.plannedStart;
+        const plannedFinish = command.payload.plannedFinish ?? plannedStart;
+        const dateOrderIssues = validateTaskDateOrder(plannedStart, plannedFinish);
+        if (dateOrderIssues.length > 0) return dateOrderIssues;
+      }
       if (
         command.payload.assignments.some(
           (assignment) =>
@@ -414,9 +441,29 @@ function validateCommandPreconditions(
       }
       return [];
     case "task.update_identity":
-    case "task.update_schedule":
+      return requireTask(taskIds, command.payload.taskId);
+    case "task.update_schedule": {
+      return [
+        ...requireTask(taskIds, command.payload.taskId),
+        ...validateTaskScheduleUpdate(snapshot.tasks, command.payload)
+      ];
+    }
     case "task.update_status":
       return requireTask(taskIds, command.payload.taskId);
+    case "task.update_progress": {
+      const issues = requireTask(taskIds, command.payload.taskId);
+      if (
+        !Number.isFinite(command.payload.percentComplete) ||
+        command.payload.percentComplete < 0 ||
+        command.payload.percentComplete > 100
+      ) {
+        return [
+          ...issues,
+          invalid("planning_command_invalid", "Прогресс задачи должен быть от 0 до 100")
+        ];
+      }
+      return issues;
+    }
     case "task.update_work_model":
       return [
         ...requireTask(taskIds, command.payload.taskId),
@@ -477,22 +524,42 @@ function validateCommandPreconditions(
         return [invalid("planning_command_invalid", "Трудоемкость назначения не может быть отрицательной")];
       }
       return [];
-    case "assignment.allocations.replace":
-      if (!assignmentIds.has(command.payload.assignmentId)) {
+    case "assignment.allocations.replace": {
+      const assignment = snapshot.assignments.find((candidate) => candidate.id === command.payload.assignmentId);
+      if (!assignment) {
         return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
       }
+      const duplicateDates = new Set<string>();
+      const seenDates = new Set<string>();
+      for (const allocation of command.payload.allocations) {
+        if (seenDates.has(allocation.date)) duplicateDates.add(allocation.date);
+        seenDates.add(allocation.date);
+      }
       if (
+        duplicateDates.size > 0 ||
         command.payload.allocations.some(
-          (allocation) =>
-            allocation.workMinutes < 0 || allocation.date.trim().length === 0
+          (allocation) => allocation.workMinutes <= 0 || !Number.isFinite(allocation.workMinutes)
         )
       ) {
-        return [invalid("planning_command_invalid", "Команда содержит некорректное распределение назначения")];
+        return [invalid("planning_command_invalid", "Allocation назначения содержит некорректные даты или минуты")];
       }
-      if (new Set(command.payload.allocations.map((allocation) => allocation.date)).size !== command.payload.allocations.length) {
-        return [invalid("planning_command_invalid", "Распределение назначения содержит повторяющиеся даты")];
+      if (command.payload.allocations.length > 0) {
+        const allocatedWork = command.payload.allocations.reduce(
+          (total, allocation) => total + allocation.workMinutes,
+          0
+        );
+        const expectedWork = resolveAssignmentWork(snapshot, assignment);
+        if (allocatedWork !== expectedWork) {
+          return [
+            invalid(
+              "planning_command_invalid",
+              "Сумма allocation назначения должна совпадать с трудоемкостью назначения"
+            )
+          ];
+        }
       }
       return [];
+    }
     case "assignment.delete":
       if (!assignmentIds.has(command.payload.assignmentId)) {
         return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
@@ -540,6 +607,19 @@ function validateCommandPreconditions(
         return [invalid("planning_command_invalid", "Перенос deadline требует причины")];
       }
       return [];
+    case "project.settings.update":
+      if (
+        command.payload.calendarId !== null &&
+        !calendarIds.has(command.payload.calendarId)
+      ) {
+        return [invalid("planning_command_invalid", "Календарь проекта не найден в плане")];
+      }
+      return [];
+    case "task.update_custom_field":
+      if (command.payload.fieldKey.trim().length === 0) {
+        return [invalid("planning_command_invalid", "Ключ пользовательского поля обязателен")];
+      }
+      return requireTask(taskIds, command.payload.taskId);
   }
 
   return [];
@@ -561,6 +641,47 @@ function validateWorkModelPayload(
     return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
   }
   return [];
+}
+
+function validateTaskScheduleUpdate(
+  tasks: PlanTask[],
+  payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
+): ValidationIssue[] {
+  const task = tasks.find((candidate) => candidate.id === payload.taskId);
+  if (!task) return [];
+  return validateTaskDateOrder(
+    payload.plannedStart ?? task.plannedStart,
+    payload.plannedFinish ?? task.plannedFinish
+  );
+}
+
+function validateTaskDateOrder(
+  plannedStart: PlanTask["plannedStart"],
+  plannedFinish: PlanTask["plannedFinish"]
+): ValidationIssue[] {
+  if (plannedStart !== null && plannedFinish !== null && comparePlanDates(plannedStart, plannedFinish) > 0) {
+    return [invalid("planning_command_invalid", "Дата начала задачи не может быть позже завершения")];
+  }
+  return [];
+}
+
+function resolveAssignmentWork(snapshot: PlanSnapshot, assignment: PlanAssignment): number {
+  if (assignment.workMinutes !== null) return assignment.workMinutes;
+  const task = snapshot.tasks.find((candidate) => candidate.id === assignment.taskId);
+  if (!task) return 0;
+  const taskWorkAssignments = snapshot.assignments.filter(
+    (candidate) =>
+      candidate.taskId === assignment.taskId &&
+      (candidate.role === "executor" || candidate.role === "co_executor")
+  );
+  const explicitWork = taskWorkAssignments.reduce(
+    (total, candidate) => total + (candidate.workMinutes ?? 0),
+    0
+  );
+  const implicitAssignments = taskWorkAssignments.filter((candidate) => candidate.workMinutes === null);
+  const implicitUnits = implicitAssignments.reduce((total, candidate) => total + candidate.unitsPermille, 0);
+  if (implicitUnits <= 0) return 0;
+  return Math.round((Math.max(0, task.workMinutes - explicitWork) * assignment.unitsPermille) / implicitUnits);
 }
 
 function isDescendantTask(tasks: PlanTask[], ancestorTaskId: string, candidateTaskId: string): boolean {
@@ -592,16 +713,22 @@ function updateTaskSchedule(
   payload: Extract<PlanningCommand, { type: "task.update_schedule" }>["payload"]
 ): PlanTask {
   const plannedStart = payload.plannedStart ?? task.plannedStart;
+  const plannedFinish = payload.plannedFinish ?? task.plannedFinish;
   const plannedStartInstant =
     payload.plannedStart !== null && task.plannedStartInstant
       ? { ...task.plannedStartInstant, date: payload.plannedStart }
       : task.plannedStartInstant;
+  const plannedFinishInstant =
+    payload.plannedFinish !== null && task.plannedFinishInstant
+      ? { ...task.plannedFinishInstant, date: payload.plannedFinish }
+      : task.plannedFinishInstant;
 
   return {
     ...task,
     plannedStart,
-    plannedFinish: payload.plannedFinish ?? task.plannedFinish,
-    ...(plannedStartInstant !== undefined ? { plannedStartInstant } : {})
+    plannedFinish,
+    ...(plannedStartInstant !== undefined ? { plannedStartInstant } : {}),
+    ...(plannedFinishInstant !== undefined ? { plannedFinishInstant } : {})
   };
 }
 
@@ -739,4 +866,9 @@ function dependencyIdsFor(command: PlanningCommand): string[] {
   if (command.type === "dependency.upsert") return [command.payload.id];
   if (command.type === "dependency.delete") return [command.payload.dependencyId];
   return [];
+}
+
+function clampPercentComplete(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
 }
