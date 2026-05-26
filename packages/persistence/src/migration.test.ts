@@ -158,6 +158,27 @@ const phase9ClosureRetrospectivesMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseGCollaborationMigration = readFileSync(
+  new URL(
+    "../migrations/0034_phase_g_collaboration_communications.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phaseG2CommunicationsRealtimeMigration = readFileSync(
+  new URL(
+    "../migrations/0035_phase_g2_communications_realtime.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const phaseG2ParticipantStateEventsMigration = readFileSync(
+  new URL(
+    "../migrations/0036_phase_g2_participant_state_events.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -264,6 +285,72 @@ describe("Phase 9 SQL migration", () => {
     );
     expect(phase9ClosureRetrospectivesMigration).toContain(
       "ALTER TABLE projects"
+    );
+  });
+});
+
+describe("Phase G / 11 SQL migration", () => {
+  it("creates tenant-scoped collaboration and meeting tables", () => {
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS conversations"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS discussion_messages"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS user_notifications"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meetings"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS meeting_external_links"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "conversations_tenant_entity_type_uidx"
+    );
+    expect(phaseGCollaborationMigration).toContain(
+      "CONSTRAINT meeting_external_links_provider_chk"
+    );
+  });
+});
+
+describe("Phase G.2 / 11.2 SQL migration", () => {
+  it("creates tenant-scoped call room, session and event tables", () => {
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_rooms"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_sessions"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_participant_states"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_events"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS call_recordings"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_one_active_per_room_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "call_sessions_tenant_room_id_uidx"
+    );
+    expect(phaseG2CommunicationsRealtimeMigration).toContain(
+      "CONSTRAINT call_recordings_attachment_fk"
+    );
+  });
+
+  it("extends call event types for intermediate participant states", () => {
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS call_events_type_chk"
+    );
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_invited");
+    expect(phaseG2ParticipantStateEventsMigration).toContain("participant_joining");
+    expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "ADD CONSTRAINT call_events_type_chk"
     );
   });
 });

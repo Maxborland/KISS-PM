@@ -1944,6 +1944,679 @@ export const entityAttachments = pgTable(
   ]
 );
 
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    conversationType: text("conversation_type").notNull(),
+    title: text("title").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "conversations_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "conversations_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    uniqueIndex("conversations_tenant_entity_type_uidx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId,
+      table.conversationType
+    ),
+    index("conversations_tenant_entity_idx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId
+    ),
+    check("conversations_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup')`)
+  ]
+);
+
+export const discussionMessages = pgTable(
+  "discussion_messages",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").notNull(),
+    authorUserId: text("author_user_id").notNull(),
+    body: text("body").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    pinnedByUserId: text("pinned_by_user_id")
+  },
+  (table) => [
+    primaryKey({
+      name: "discussion_messages_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "discussion_messages_conversation_fk",
+      columns: [table.tenantId, table.conversationId],
+      foreignColumns: [conversations.tenantId, conversations.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "discussion_messages_author_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "discussion_messages_pinned_by_fk",
+      columns: [table.tenantId, table.pinnedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("discussion_messages_tenant_conversation_created_idx").on(
+      table.tenantId,
+      table.conversationId,
+      table.createdAt,
+      table.id
+    )
+  ]
+);
+
+export const messageMentions = pgTable(
+  "message_mentions",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    messageId: text("message_id").notNull(),
+    mentionedUserId: text("mentioned_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "message_mentions_pkey",
+      columns: [table.tenantId, table.messageId, table.mentionedUserId]
+    }),
+    foreignKey({
+      name: "message_mentions_message_fk",
+      columns: [table.tenantId, table.messageId],
+      foreignColumns: [discussionMessages.tenantId, discussionMessages.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "message_mentions_user_fk",
+      columns: [table.tenantId, table.mentionedUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("message_mentions_tenant_user_created_idx").on(
+      table.tenantId,
+      table.mentionedUserId,
+      table.createdAt
+    )
+  ]
+);
+
+export const conversationReadStates = pgTable(
+  "conversation_read_states",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").notNull(),
+    userId: text("user_id").notNull(),
+    lastReadMessageId: text("last_read_message_id"),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+    unreadCount: integer("unread_count").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "conversation_read_states_pkey",
+      columns: [table.tenantId, table.conversationId, table.userId]
+    }),
+    foreignKey({
+      name: "conversation_read_states_conversation_fk",
+      columns: [table.tenantId, table.conversationId],
+      foreignColumns: [conversations.tenantId, conversations.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "conversation_read_states_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    check("conversation_read_states_unread_chk", sql`${table.unreadCount} >= 0`)
+  ]
+);
+
+export const userNotifications = pgTable(
+  "user_notifications",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    notificationType: text("notification_type").notNull(),
+    sourceEntityType: text("source_entity_type").notNull(),
+    sourceEntityId: text("source_entity_id").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    route: text("route").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "user_notifications_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "user_notifications_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    index("user_notifications_tenant_user_created_idx").on(
+      table.tenantId,
+      table.userId,
+      table.createdAt
+    ),
+    index("user_notifications_tenant_user_unread_idx").on(
+      table.tenantId,
+      table.userId,
+      table.readAt
+    ),
+    check(
+      "user_notifications_type_chk",
+      sql`${table.notificationType} in ('mention', 'assignment_changed', 'deadline_risk', 'control_signal', 'meeting_invite', 'meeting_action_item')`
+    )
+  ]
+);
+
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    channel: text("channel").notNull(),
+    notificationType: text("notification_type").notNull(),
+    enabled: boolean("enabled").notNull(),
+    digestFrequency: text("digest_frequency").notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "notification_preferences_pkey",
+      columns: [table.tenantId, table.userId, table.channel, table.notificationType]
+    }),
+    foreignKey({
+      name: "notification_preferences_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    check("notification_preferences_channel_chk", sql`${table.channel} in ('in_app', 'email', 'digest')`),
+    check(
+      "notification_preferences_type_chk",
+      sql`${table.notificationType} in ('mention', 'assignment_changed', 'deadline_risk', 'control_signal', 'meeting_invite', 'meeting_action_item')`
+    ),
+    check("notification_preferences_digest_chk", sql`${table.digestFrequency} in ('none', 'daily', 'weekly')`)
+  ]
+);
+
+export const meetings = pgTable(
+  "meetings",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    title: text("title").notNull(),
+    agenda: text("agenda").notNull(),
+    scheduledStart: timestamp("scheduled_start", { withTimezone: true }).notNull(),
+    scheduledFinish: timestamp("scheduled_finish", { withTimezone: true }).notNull(),
+    status: text("status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "meetings_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "meetings_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("meetings_tenant_entity_start_idx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId,
+      table.scheduledStart
+    ),
+    check("meetings_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check("meetings_status_chk", sql`${table.status} in ('scheduled', 'completed', 'cancelled')`),
+    check("meetings_schedule_chk", sql`${table.scheduledFinish} > ${table.scheduledStart}`)
+  ]
+);
+
+export const meetingParticipants = pgTable(
+  "meeting_participants",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    meetingId: text("meeting_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    response: text("response").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "meeting_participants_pkey",
+      columns: [table.tenantId, table.meetingId, table.userId]
+    }),
+    foreignKey({
+      name: "meeting_participants_meeting_fk",
+      columns: [table.tenantId, table.meetingId],
+      foreignColumns: [meetings.tenantId, meetings.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "meeting_participants_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    check("meeting_participants_role_chk", sql`${table.role} in ('organizer', 'required', 'optional')`),
+    check("meeting_participants_response_chk", sql`${table.response} in ('pending', 'accepted', 'declined')`)
+  ]
+);
+
+export const meetingExternalLinks = pgTable(
+  "meeting_external_links",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    meetingId: text("meeting_id").notNull(),
+    provider: text("provider").notNull(),
+    url: text("url").notNull(),
+    title: text("title").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "meeting_external_links_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "meeting_external_links_meeting_fk",
+      columns: [table.tenantId, table.meetingId],
+      foreignColumns: [meetings.tenantId, meetings.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "meeting_external_links_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("meeting_external_links_tenant_meeting_idx").on(table.tenantId, table.meetingId),
+    check(
+      "meeting_external_links_provider_chk",
+      sql`${table.provider} in ('zoom', 'teams', 'google_meet', 'manual_link', 'other')`
+    )
+  ]
+);
+
+export const meetingNotes = pgTable(
+  "meeting_notes",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    meetingId: text("meeting_id").notNull(),
+    authorUserId: text("author_user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "meeting_notes_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "meeting_notes_meeting_fk",
+      columns: [table.tenantId, table.meetingId],
+      foreignColumns: [meetings.tenantId, meetings.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "meeting_notes_author_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("meeting_notes_tenant_meeting_created_idx").on(
+      table.tenantId,
+      table.meetingId,
+      table.createdAt
+    )
+  ]
+);
+
+export const meetingActionItems = pgTable(
+  "meeting_action_items",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    meetingId: text("meeting_id").notNull(),
+    title: text("title").notNull(),
+    ownerUserId: text("owner_user_id").notNull(),
+    dueDate: text("due_date"),
+    targetEntityType: text("target_entity_type").notNull(),
+    targetEntityId: text("target_entity_id").notNull(),
+    status: text("status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "meeting_action_items_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "meeting_action_items_meeting_fk",
+      columns: [table.tenantId, table.meetingId],
+      foreignColumns: [meetings.tenantId, meetings.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "meeting_action_items_owner_fk",
+      columns: [table.tenantId, table.ownerUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "meeting_action_items_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("meeting_action_items_tenant_meeting_created_idx").on(
+      table.tenantId,
+      table.meetingId,
+      table.createdAt
+    ),
+    check(
+      "meeting_action_items_target_type_chk",
+      sql`${table.targetEntityType} in ('task', 'corrective_action', 'project', 'opportunity')`
+    ),
+    check("meeting_action_items_status_chk", sql`${table.status} in ('open', 'done', 'cancelled')`)
+  ]
+);
+
+export const callRooms = pgTable(
+  "call_rooms",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    meetingId: text("meeting_id"),
+    title: text("title").notNull(),
+    mediaKind: text("media_kind").notNull(),
+    provider: text("provider").notNull(),
+    providerRoomId: text("provider_room_id").notNull(),
+    status: text("status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "call_rooms_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "call_rooms_meeting_fk",
+      columns: [table.tenantId, table.meetingId],
+      foreignColumns: [meetings.tenantId, meetings.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "call_rooms_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("call_rooms_tenant_entity_idx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId,
+      table.createdAt
+    ),
+    uniqueIndex("call_rooms_tenant_provider_room_uidx").on(
+      table.tenantId,
+      table.provider,
+      table.providerRoomId
+    ),
+    check("call_rooms_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check("call_rooms_media_kind_chk", sql`${table.mediaKind} in ('audio', 'video')`),
+    check("call_rooms_provider_chk", sql`${table.provider} in ('manual', 'jitsi', 'livekit')`),
+    check(
+      "call_rooms_status_chk",
+      sql`${table.status} in ('scheduled', 'open', 'active', 'ended', 'cancelled')`
+    )
+  ]
+);
+
+export const callSessions = pgTable(
+  "call_sessions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    roomId: text("room_id").notNull(),
+    providerSessionId: text("provider_session_id"),
+    status: text("status").notNull(),
+    startedByUserId: text("started_by_user_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedByUserId: text("ended_by_user_id"),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    failureReason: text("failure_reason")
+  },
+  (table) => [
+    primaryKey({
+      name: "call_sessions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "call_sessions_room_fk",
+      columns: [table.tenantId, table.roomId],
+      foreignColumns: [callRooms.tenantId, callRooms.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_sessions_started_by_fk",
+      columns: [table.tenantId, table.startedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "call_sessions_ended_by_fk",
+      columns: [table.tenantId, table.endedByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("call_sessions_tenant_room_started_idx").on(
+      table.tenantId,
+      table.roomId,
+      table.startedAt
+    ),
+    uniqueIndex("call_sessions_tenant_room_id_uidx").on(
+      table.tenantId,
+      table.roomId,
+      table.id
+    ),
+    uniqueIndex("call_sessions_one_active_per_room_uidx")
+      .on(table.tenantId, table.roomId)
+      .where(sql`${table.status} = 'active'`),
+    check("call_sessions_status_chk", sql`${table.status} in ('active', 'ended', 'failed')`),
+    check(
+      "call_sessions_end_chk",
+      sql`(
+        (${table.status} = 'active' and ${table.endedAt} is null)
+        or
+        (${table.status} <> 'active' and ${table.endedAt} is not null)
+      )`
+    )
+  ]
+);
+
+export const callParticipantStates = pgTable(
+  "call_participant_states",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    roomId: text("room_id").notNull(),
+    sessionId: text("session_id").notNull(),
+    userId: text("user_id").notNull(),
+    state: text("state").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "call_participant_states_pkey",
+      columns: [table.tenantId, table.roomId, table.sessionId, table.userId]
+    }),
+    foreignKey({
+      name: "call_participant_states_session_fk",
+      columns: [table.tenantId, table.roomId, table.sessionId],
+      foreignColumns: [callSessions.tenantId, callSessions.roomId, callSessions.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_participant_states_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    check(
+      "call_participant_states_state_chk",
+      sql`${table.state} in ('invited', 'joining', 'joined', 'left', 'removed')`
+    )
+  ]
+);
+
+export const callEvents = pgTable(
+  "call_events",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    roomId: text("room_id").notNull(),
+    sessionId: text("session_id"),
+    eventType: text("event_type").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "call_events_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "call_events_room_fk",
+      columns: [table.tenantId, table.roomId],
+      foreignColumns: [callRooms.tenantId, callRooms.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_events_session_fk",
+      columns: [table.tenantId, table.roomId, table.sessionId],
+      foreignColumns: [callSessions.tenantId, callSessions.roomId, callSessions.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_events_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("call_events_tenant_room_created_idx").on(
+      table.tenantId,
+      table.roomId,
+      table.createdAt,
+      table.id
+    ),
+    check(
+      "call_events_type_chk",
+      sql`${table.eventType} in ('room_created', 'session_started', 'join_token_issued', 'participant_invited', 'participant_joining', 'participant_joined', 'participant_left', 'session_ended', 'recording_attached')`
+    )
+  ]
+);
+
+export const callRecordings = pgTable(
+  "call_recordings",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    roomId: text("room_id").notNull(),
+    sessionId: text("session_id"),
+    attachmentId: text("attachment_id").notNull(),
+    title: text("title").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "call_recordings_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "call_recordings_room_fk",
+      columns: [table.tenantId, table.roomId],
+      foreignColumns: [callRooms.tenantId, callRooms.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_recordings_session_fk",
+      columns: [table.tenantId, table.roomId, table.sessionId],
+      foreignColumns: [callSessions.tenantId, callSessions.roomId, callSessions.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "call_recordings_attachment_fk",
+      columns: [table.tenantId, table.attachmentId],
+      foreignColumns: [entityAttachments.tenantId, entityAttachments.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "call_recordings_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("call_recordings_tenant_room_created_idx").on(
+      table.tenantId,
+      table.roomId,
+      table.createdAt
+    )
+  ]
+);
+
 export const taskActivities = pgTable(
   "task_activities",
   {
@@ -2140,6 +2813,22 @@ export type PersistenceTableName =
   | "file_assets"
   | "external_references"
   | "entity_attachments"
+  | "conversations"
+  | "discussion_messages"
+  | "message_mentions"
+  | "conversation_read_states"
+  | "user_notifications"
+  | "notification_preferences"
+  | "meetings"
+  | "meeting_participants"
+  | "meeting_external_links"
+  | "meeting_notes"
+  | "meeting_action_items"
+  | "call_rooms"
+  | "call_sessions"
+  | "call_participant_states"
+  | "call_events"
+  | "call_recordings"
   | "task_participants"
   | "task_activities"
   | "crm_activities"
@@ -2205,6 +2894,22 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "file_assets",
   "external_references",
   "entity_attachments",
+  "conversations",
+  "discussion_messages",
+  "message_mentions",
+  "conversation_read_states",
+  "user_notifications",
+  "notification_preferences",
+  "meetings",
+  "meeting_participants",
+  "meeting_external_links",
+  "meeting_notes",
+  "meeting_action_items",
+  "call_rooms",
+  "call_sessions",
+  "call_participant_states",
+  "call_events",
+  "call_recordings",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -2263,6 +2968,22 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "file_assets",
   "external_references",
   "entity_attachments",
+  "conversations",
+  "discussion_messages",
+  "message_mentions",
+  "conversation_read_states",
+  "user_notifications",
+  "notification_preferences",
+  "meetings",
+  "meeting_participants",
+  "meeting_external_links",
+  "meeting_notes",
+  "meeting_action_items",
+  "call_rooms",
+  "call_sessions",
+  "call_participant_states",
+  "call_events",
+  "call_recordings",
   "task_participants",
   "task_activities",
   "crm_activities",
@@ -2834,6 +3555,182 @@ const tableColumns = {
     "relation_type",
     "source_activity_type",
     "source_activity_id",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  conversations: [
+    "id",
+    "tenant_id",
+    "entity_type",
+    "entity_id",
+    "conversation_type",
+    "title",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  discussion_messages: [
+    "id",
+    "tenant_id",
+    "conversation_id",
+    "author_user_id",
+    "body",
+    "metadata",
+    "created_at",
+    "edited_at",
+    "archived_at",
+    "pinned_at",
+    "pinned_by_user_id"
+  ],
+  message_mentions: [
+    "tenant_id",
+    "message_id",
+    "mentioned_user_id",
+    "created_at"
+  ],
+  conversation_read_states: [
+    "tenant_id",
+    "conversation_id",
+    "user_id",
+    "last_read_message_id",
+    "last_read_at",
+    "unread_count"
+  ],
+  user_notifications: [
+    "id",
+    "tenant_id",
+    "user_id",
+    "notification_type",
+    "source_entity_type",
+    "source_entity_id",
+    "title",
+    "body",
+    "route",
+    "created_at",
+    "read_at",
+    "archived_at"
+  ],
+  notification_preferences: [
+    "tenant_id",
+    "user_id",
+    "channel",
+    "notification_type",
+    "enabled",
+    "digest_frequency"
+  ],
+  meetings: [
+    "id",
+    "tenant_id",
+    "entity_type",
+    "entity_id",
+    "title",
+    "agenda",
+    "scheduled_start",
+    "scheduled_finish",
+    "status",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  meeting_participants: [
+    "tenant_id",
+    "meeting_id",
+    "user_id",
+    "role",
+    "response",
+    "created_at"
+  ],
+  meeting_external_links: [
+    "id",
+    "tenant_id",
+    "meeting_id",
+    "provider",
+    "url",
+    "title",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  meeting_notes: [
+    "id",
+    "tenant_id",
+    "meeting_id",
+    "author_user_id",
+    "body",
+    "created_at",
+    "edited_at",
+    "archived_at"
+  ],
+  meeting_action_items: [
+    "id",
+    "tenant_id",
+    "meeting_id",
+    "title",
+    "owner_user_id",
+    "due_date",
+    "target_entity_type",
+    "target_entity_id",
+    "status",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  call_rooms: [
+    "id",
+    "tenant_id",
+    "entity_type",
+    "entity_id",
+    "meeting_id",
+    "title",
+    "media_kind",
+    "provider",
+    "provider_room_id",
+    "status",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
+  call_sessions: [
+    "id",
+    "tenant_id",
+    "room_id",
+    "provider_session_id",
+    "status",
+    "started_by_user_id",
+    "started_at",
+    "ended_by_user_id",
+    "ended_at",
+    "failure_reason"
+  ],
+  call_participant_states: [
+    "tenant_id",
+    "room_id",
+    "session_id",
+    "user_id",
+    "state",
+    "joined_at",
+    "left_at",
+    "last_seen_at"
+  ],
+  call_events: [
+    "id",
+    "tenant_id",
+    "room_id",
+    "session_id",
+    "event_type",
+    "actor_user_id",
+    "payload",
+    "created_at"
+  ],
+  call_recordings: [
+    "id",
+    "tenant_id",
+    "room_id",
+    "session_id",
+    "attachment_id",
+    "title",
     "created_by_user_id",
     "created_at",
     "archived_at"

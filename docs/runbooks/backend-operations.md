@@ -19,6 +19,8 @@
 | `KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY` | S3 secret key | yes when provider is `s3` |
 | `KISS_PM_STORAGE_S3_REGION` | S3 region, default `us-east-1` | no |
 | `KISS_PM_ENABLE_DEV_ROUTES` | dev-only tenant routes | must be `false`/unset in production |
+| `PLANNING_EVENTS_BACKEND` | planning realtime event backend: `memory` or `redis`, default `memory` | no |
+| `PLANNING_EVENTS_REDIS_URL` / `REDIS_URL` | Redis URL for planning realtime events | yes when `PLANNING_EVENTS_BACKEND=redis` |
 
 Secrets must not be logged, stored in audit metadata, or exposed through health/readiness responses.
 
@@ -29,8 +31,9 @@ Secrets must not be logged, stored in audit metadata, or exposed through health/
 3. Verify storage provider env:
    - local: root directory exists or can be created by the API user;
    - s3: endpoint, bucket and credentials are valid.
-4. Start API.
-5. Check liveness:
+4. If `PLANNING_EVENTS_BACKEND=redis`, verify Redis connectivity and credentials before routing traffic.
+5. Start API.
+6. Check liveness:
 
 ```bash
 curl http://127.0.0.1:4000/health/live
@@ -42,7 +45,7 @@ Expected response:
 { "status": "live", "product": "KISS PM" }
 ```
 
-6. Check readiness:
+7. Check readiness:
 
 ```bash
 curl http://127.0.0.1:4000/health/ready
@@ -62,6 +65,8 @@ Expected success:
 ```
 
 If readiness returns `503`, do not send user traffic to the instance.
+
+When Redis planning events are enabled, readiness includes a `realtime` check. A disconnected Redis backend must keep the instance out of rotation until Redis is reachable or the deployment is intentionally switched back to `PLANNING_EVENTS_BACKEND=memory`.
 
 ## Update checklist
 

@@ -1,22 +1,30 @@
 const defaultPort = 4000;
 const defaultHostname = "127.0.0.1";
 
+export type PlanningEventsBackend = "memory" | "redis";
+
 export type ServerRuntimeConfig = {
   port: number;
   hostname: string;
   databaseUrl: string | undefined;
   enableDevTenantRoutes: boolean;
+  planningEventsBackend: PlanningEventsBackend;
+  planningEventsRedisUrl: string | undefined;
   production: boolean;
 };
 
 export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) {
   parseServerPort(env.PORT);
   parseServerHostname(env.HOST);
+  const planningEventsBackend = parsePlanningEventsBackend(env.PLANNING_EVENTS_BACKEND);
   if (env.NODE_ENV === "production" && !env.DATABASE_URL) {
     throw new Error("database_url_required_in_production");
   }
   if (env.NODE_ENV === "production" && env.KISS_PM_ENABLE_DEV_ROUTES === "true") {
     throw new Error("dev_routes_forbidden_in_production");
+  }
+  if (planningEventsBackend === "redis" && !planningEventsRedisUrlFromEnv(env)) {
+    throw new Error("planning_events_redis_url_required");
   }
 }
 
@@ -29,6 +37,8 @@ export function readServerRuntimeConfig(
     hostname: parseServerHostname(env.HOST),
     databaseUrl: env.DATABASE_URL,
     enableDevTenantRoutes: env.KISS_PM_ENABLE_DEV_ROUTES === "true",
+    planningEventsBackend: parsePlanningEventsBackend(env.PLANNING_EVENTS_BACKEND),
+    planningEventsRedisUrl: planningEventsRedisUrlFromEnv(env),
     production: env.NODE_ENV === "production"
   };
 }
@@ -57,4 +67,14 @@ export function parseServerHostname(value: string | undefined): string {
     throw new Error("invalid_server_host");
   }
   return value;
+}
+
+export function parsePlanningEventsBackend(value: string | undefined): PlanningEventsBackend {
+  if (value === undefined || value === "") return "memory";
+  if (value === "memory" || value === "redis") return value;
+  throw new Error("invalid_planning_events_backend");
+}
+
+function planningEventsRedisUrlFromEnv(env: NodeJS.ProcessEnv): string | undefined {
+  return env.PLANNING_EVENTS_REDIS_URL ?? env.REDIS_URL;
 }

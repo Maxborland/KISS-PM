@@ -30,6 +30,10 @@ import {
 import { randomUUID } from "node:crypto";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
+import {
+  persistControlSignalNotifications,
+  persistPlanningNotifications
+} from "./collaborationNotificationService";
 import { readLimitedJsonBody } from "./jsonBody";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "./planningEventBus";
@@ -238,6 +242,8 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       ) {
         return { ok: false as const };
       }
+      const previousSignals =
+        await transactionDataSource.listControlSignals?.(actor.tenantId, projectId.value) ?? [];
       const persistedEvaluations = [];
       for (const evaluation of evaluations) {
         persistedEvaluations.push(await transactionDataSource.createKpiEvaluation(evaluation));
@@ -246,6 +252,14 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       for (const signal of signals) {
         persistedSignals.push(await transactionDataSource.upsertControlSignal(signal));
       }
+      await persistControlSignalNotifications({
+        dataSource: transactionDataSource,
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        snapshot,
+        signals: persistedSignals,
+        previousSignals
+      });
       const auditEventId = await appendControlAuditIfConfigured(
         deps,
         {
@@ -684,6 +698,14 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
         });
         const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
         if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+        await persistPlanningNotifications({
+          dataSource: transactionDataSource,
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          beforeSnapshot: snapshot,
+          afterSnapshot: appliedSnapshot,
+          commands: lockedAction.planDelta.commands
+        });
 
         return {
           ok: true as const,
