@@ -16,19 +16,16 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import {
-  MOCK_CUSTOM_FIELDS,
-  MOCK_PROJECT_TEMPLATES,
-  MOCK_TASK_STATUSES
-} from "@/lib/mock-data/workspace-config";
-import { MOCK_DEAL_STAGES } from "@/lib/mock-data/crm";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export function SettingsBlock() {
+  const { fixtures } = useScenarioFixtures();
   const [tab, setTab] = useState<"profile" | "notifications" | "integrations" | "billing" | "workspace">("profile");
 
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка настроек…">
+      <>
       <PageIntro
         title="Настройки рабочей области"
         lead="Профиль, уведомления и интеграции."
@@ -119,7 +116,7 @@ export function SettingsBlock() {
             <div className="grid-2">
               <ConfigList
                 title="Шаблоны проектов"
-                rows={MOCK_PROJECT_TEMPLATES.map((template) => ({
+                rows={fixtures.projectTemplates.map((template) => ({
                   title: template.tenantLabel,
                   subtitle: template.systemKey,
                   meta: template.status
@@ -127,7 +124,7 @@ export function SettingsBlock() {
               />
               <ConfigList
                 title="Кастомные поля"
-                rows={MOCK_CUSTOM_FIELDS.map((field) => ({
+                rows={fixtures.customFields.map((field) => ({
                   title: field.tenantLabel,
                   subtitle: `${field.systemKey} · ${field.targetEntity} · ${field.fieldType}`,
                   meta: field.required ? "required" : field.status
@@ -135,7 +132,7 @@ export function SettingsBlock() {
               />
               <ConfigList
                 title="Стадии сделок"
-                rows={MOCK_DEAL_STAGES.map((stage) => ({
+                rows={fixtures.dealStages.map((stage) => ({
                   title: stage.name,
                   subtitle: `${stage.id} · sortOrder ${stage.sortOrder}`,
                   meta: stage.status
@@ -143,7 +140,7 @@ export function SettingsBlock() {
               />
               <ConfigList
                 title="Статусы задач"
-                rows={MOCK_TASK_STATUSES.map((status) => ({
+                rows={fixtures.taskStatuses.map((status) => ({
                   title: status.name,
                   subtitle: `${status.id} · ${status.category} · order ${status.sortOrder}`,
                   meta: status.isSystem ? "system" : status.status
@@ -153,7 +150,8 @@ export function SettingsBlock() {
           </FormSection>
         ) : null}
       </CardPanel>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }
 

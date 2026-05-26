@@ -3,16 +3,21 @@
 import { Button } from "@/components/ui/button";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import {
-  RESOURCE_MATRIX_MOCK,
+  getResourceMatrixMock,
   ResourceMatrix,
   ResourceMatrixLegend,
   ResourceMatrixStats
 } from "@/widgets/resource-matrix";
 
 export function ProjectResourcesBlock() {
+  const { scenario } = useScenarioFixtures();
+  const matrix = getResourceMatrixMock(scenario);
+
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка матрицы ресурсов…">
+      <>
       <PageIntro
         title={mockProjectScreenTitle("Ресурсы")}
         lead="Дневная матрица загрузки на месяц."
@@ -33,11 +38,12 @@ export function ProjectResourcesBlock() {
           </>
         }
       />
-      <ResourceMatrixStats stats={RESOURCE_MATRIX_MOCK.stats} />
+      <ResourceMatrixStats stats={matrix.stats} />
       <div className="u-flex u-items-center u-justify-between u-gap-3 u-mb-3">
         <ResourceMatrixLegend />
       </div>
-      <ResourceMatrix data={RESOURCE_MATRIX_MOCK} />
-    </>
+      <ResourceMatrix data={matrix} />
+      </>
+    </ScenarioFetchGate>
   );
 }

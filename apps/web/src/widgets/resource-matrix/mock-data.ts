@@ -1,3 +1,5 @@
+import type { ScenarioName } from "@/lib/mock-data/scenarios";
+
 import type { DayCell, DayHeader, MatrixRow, ResourceMatrixData } from "./types";
 
 const WEEKDAY_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
@@ -200,7 +202,7 @@ const workshop: MatrixRow = {
   cells: groupCells(allPersons, days)
 };
 
-export const RESOURCE_MATRIX_MOCK: ResourceMatrixData = {
+const RESOURCE_MATRIX_DEFAULT: ResourceMatrixData = {
   days,
   rows: [workshop, archGroup, ...archPersons, visualGroup, ...visualPersons],
   stats: {
@@ -211,3 +213,33 @@ export const RESOURCE_MATRIX_MOCK: ResourceMatrixData = {
     employees: 53
   }
 };
+
+export const RESOURCE_MATRIX_MOCK = RESOURCE_MATRIX_DEFAULT;
+
+/** Матрица ресурсов с учётом Storybook-сценария (empty / overload). */
+export function getResourceMatrixMock(scenario: ScenarioName = "default"): ResourceMatrixData {
+  if (scenario === "empty") {
+    return {
+      days: RESOURCE_MATRIX_DEFAULT.days,
+      rows: [],
+      stats: {
+        capacityHours: 0,
+        assignedHours: 0,
+        loadPct: 0,
+        freeHours: 0,
+        employees: 0
+      }
+    };
+  }
+  if (scenario === "overload") {
+    return {
+      ...RESOURCE_MATRIX_DEFAULT,
+      stats: {
+        ...RESOURCE_MATRIX_DEFAULT.stats,
+        loadPct: 112,
+        freeHours: 0
+      }
+    };
+  }
+  return RESOURCE_MATRIX_DEFAULT;
+}

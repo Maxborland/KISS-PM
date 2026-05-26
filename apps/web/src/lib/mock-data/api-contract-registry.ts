@@ -23,7 +23,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/opportunities",
     responseKey: "opportunities",
-    stories: ["views-screens--deals-funnel", "views-screens--deal-card"]
+    stories: ["views-screens--deals", "views-screens--deal-card"]
   },
   {
     entity: "Project",
@@ -33,7 +33,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects",
     responseKey: "projects",
-    stories: ["views-screens--projects-list", "views-screens--gantt-project"]
+    stories: ["views-screens--projects-list", "views-screens--project-gantt"]
   },
   {
     entity: "Task",
@@ -43,7 +43,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects/:projectId/tasks",
     responseKey: "tasks",
-    stories: ["views-screens--my-work-kanban", "views-screens--create-task-modal"]
+    stories: ["views-screens--my-work", "views-screens--create-task-modal"]
   },
   {
     entity: "ControlReadModel",
@@ -53,7 +53,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/projects/:projectId/control/read-model",
     responseKey: "signals",
-    stories: ["views-screens--control-signals"]
+    stories: ["views-screens--project-kpi"]
   },
   {
     entity: "Client",
@@ -63,7 +63,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/clients",
     responseKey: "clients",
-    stories: ["views-screens--crm-clients"]
+    stories: ["views-screens--entities-clients"]
   },
   {
     entity: "Contact",
@@ -73,7 +73,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/contacts",
     responseKey: "contacts",
-    stories: ["views-screens--crm-contacts"]
+    stories: ["views-screens--entities-contacts"]
   },
   {
     entity: "Product",
@@ -83,7 +83,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/products",
     responseKey: "products",
-    stories: ["views-screens--crm-products"]
+    stories: ["views-screens--entities-products"]
   },
   {
     entity: "DealStage",
@@ -93,7 +93,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/deal-stages",
     responseKey: "dealStages",
-    stories: ["views-screens--deals-funnel"]
+    stories: ["views-screens--deals"]
   },
   {
     entity: "ProjectType",
@@ -113,7 +113,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/users",
     responseKey: "users",
-    stories: ["views-screens--team-directory", "widgets-resource-matrix--default"]
+    stories: ["views-screens--admin", "widgets-resource-matrix--default"]
   },
   {
     entity: "Position",
@@ -123,7 +123,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/positions",
     responseKey: "positions",
-    stories: ["views-screens--team-directory"]
+    stories: ["views-screens--admin"]
   },
   {
     entity: "TaskStatus",
@@ -133,7 +133,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/task-statuses",
     responseKey: "taskStatuses",
-    stories: ["views-screens--my-work-kanban"]
+    stories: ["views-screens--my-work"]
   },
   {
     entity: "CustomFieldDefinition",
@@ -143,7 +143,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/config/custom-fields",
     responseKey: "customFields",
-    stories: ["views-screens--workspace-config"]
+    stories: ["views-screens--settings"]
   },
   {
     entity: "ProjectTemplate",
@@ -153,7 +153,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/workspace/config/project-templates",
     responseKey: "projectTemplates",
-    stories: ["views-screens--workspace-config"]
+    stories: ["views-screens--settings"]
   },
   {
     entity: "KpiDefinition",
@@ -163,7 +163,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/kpi-definitions",
     responseKey: "definitions",
-    stories: ["views-screens--control-signals"]
+    stories: ["views-screens--project-kpi"]
   },
   {
     entity: "AccessProfile",
@@ -173,7 +173,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/access-profiles",
     responseKey: "accessProfiles",
-    stories: ["views-screens--access-profiles"]
+    stories: ["views-screens--admin"]
   },
   {
     entity: "OrgStructureSnapshot",
@@ -183,7 +183,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/org-structure",
     responseKey: "orgStructure",
-    stories: ["views-screens--org-structure"]
+    stories: ["views-screens--admin"]
   },
   {
     entity: "AuditEvent",
@@ -193,7 +193,7 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/audit-events",
     responseKey: "auditEvents",
-    stories: ["views-screens--audit-log"]
+    stories: ["views-screens--project-audit"]
   },
   {
     entity: "ProductionCalendar",
@@ -223,12 +223,8 @@ export const API_CONTRACT_ENTRIES: ApiContractEntry[] = [
     method: "GET",
     route: "/api/tenant/current/scheduled-tasks",
     responseKey: "tasks",
-    stories: ["views-screens--my-work-calendar"]
+    stories: ["views-screens--my-work-list-mode"]
   }
 ];
 
-/** GET-маршруты, покрытые MSW в Storybook (синхрон с handlers). */
-export const API_CONTRACT_GET_ROUTES = [
-  ...API_CONTRACT_ENTRIES.map((entry) => entry.route),
-  "/api/workspace/projects/PRJ-2026-014"
-] as const;
+export { STORYBOOK_MSW_HANDLER_PATHS as API_CONTRACT_MSW_ROUTES } from "./storybook-msw-routes";

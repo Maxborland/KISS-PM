@@ -14,9 +14,10 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { mockProjectScreenTitle } from "@/views/catalog";
-import { MOCK_PRODUCTION_CALENDAR } from "@/lib/mock-data/capacity";
+import type { ProductionCalendar } from "@/lib/api-types";
 import { formatDate } from "@/lib/mock-data/format";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
 type WeekdayDef = { label: string; hours: string; on: boolean };
@@ -32,12 +33,19 @@ const WEEKDAYS: WeekdayDef[] = [
 
 function ExceptionRow({
   item,
+  workingMinutesPerDay,
   onRemove
 }: {
-  item: (typeof MOCK_PRODUCTION_CALENDAR.exceptions)[number];
+  item: ProductionCalendar["exceptions"][number];
+  workingMinutesPerDay: number;
   onRemove?: () => void;
 }) {
-  const tone = item.workingMinutes === 0 ? "warning" : item.workingMinutes < MOCK_PRODUCTION_CALENDAR.workingMinutesPerDay ? "info" : "violet";
+  const tone =
+    item.workingMinutes === 0
+      ? "warning"
+      : item.workingMinutes < workingMinutesPerDay
+        ? "info"
+        : "violet";
   return (
     <li className="exception-list__item">
       <span className="mono u-text-xs u-text-strong">{formatDate(item.date)}</span>
@@ -57,10 +65,13 @@ function ExceptionRow({
 }
 
 export function ProjectCalendarsBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const calendar = fixtures.productionCalendar;
   const [newExceptionDate, setNewExceptionDate] = useState<Date | undefined>();
 
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка календаря…">
+      <>
       <PageIntro
         title={mockProjectScreenTitle("Календари")}
         lead="Рабочие часы и исключения календаря арендатора."
@@ -94,7 +105,7 @@ export function ProjectCalendarsBlock() {
               </Field>
             </FormGrid>
           </FormSection>
-          <FormSection title="Дни недели" lead={`${MOCK_PRODUCTION_CALENDAR.workingMinutesPerDay} минут в рабочем дне.`}>
+          <FormSection title="Дни недели" lead={`${calendar.workingMinutesPerDay} минут в рабочем дне.`}>
             <SwitchRowList>
               {WEEKDAYS.map((d) => (
                 <SwitchRow key={d.label} label={d.label} description={d.hours} defaultChecked={d.on} />
@@ -104,7 +115,7 @@ export function ProjectCalendarsBlock() {
         </CardPanel>
         <CardPanel
           title="Исключения"
-          subtitle={`${MOCK_PRODUCTION_CALENDAR.exceptions.length} даты`}
+          subtitle={`${calendar.exceptions.length} даты`}
           actions={
             <Button variant="ghost" size="sm">
               <Plus className="size-4" aria-hidden />
@@ -133,13 +144,18 @@ export function ProjectCalendarsBlock() {
           </FormSection>
           <FormSection title="Список исключений">
             <ul className="exception-list">
-              {MOCK_PRODUCTION_CALENDAR.exceptions.map((e) => (
-                <ExceptionRow key={e.id} item={e} />
+              {calendar.exceptions.map((exception) => (
+                <ExceptionRow
+                  key={exception.id}
+                  item={exception}
+                  workingMinutesPerDay={calendar.workingMinutesPerDay}
+                />
               ))}
             </ul>
           </FormSection>
         </CardPanel>
       </div>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }

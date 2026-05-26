@@ -1,29 +1,15 @@
 ﻿import { ArrowDown, ArrowRight, ArrowUp } from "lucide-react";
+import { useMemo } from "react";
 
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { MOCK_PLAN_BASELINES } from "@/lib/mock-data/capacity";
 import { formatDate } from "@/lib/mock-data/format";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
-
-const ROWS = MOCK_PLAN_BASELINES.flatMap((baseline) =>
-  baseline.tasks.map((task, index) => {
-    const delta = index === 0 ? 2 : 0;
-    return {
-      task: task.taskId,
-      code: baseline.id,
-      base: task.plannedFinish,
-      actual: task.plannedFinish,
-      delta,
-      workMinutes: task.workMinutes,
-      capturedAt: baseline.capturedAt
-    };
-  })
-);
 
 function DeltaCell({ d }: { d: number }) {
   if (d === 0)
@@ -46,54 +32,80 @@ function DeltaCell({ d }: { d: number }) {
 }
 
 export function ProjectBaselineBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const rows = useMemo(
+    () =>
+      fixtures.planBaselines.flatMap((baseline) =>
+        baseline.tasks.map((task, index) => {
+          const delta = index === 0 ? 2 : 0;
+          return {
+            task: task.taskId,
+            code: baseline.id,
+            base: task.plannedFinish,
+            actual: task.plannedFinish,
+            delta,
+            workMinutes: task.workMinutes,
+            capturedAt: baseline.capturedAt
+          };
+        })
+      ),
+    [fixtures.planBaselines]
+  );
+
   return (
-    <>
-      <PageIntro
-        title={mockProjectScreenTitle("Базовый план")}
-        lead="Снимки плана и отклонения."
-        actions={
-          <>
-            <Button variant="secondary">Создать снимок</Button>
-            <Button variant="primary">Сравнить</Button>
-          </>
-        }
-      />
-      <CardPanel title={`Базовый план · ${formatDate(MOCK_PLAN_BASELINES[0]?.capturedAt ?? null)}`} subtitle="PlanSnapshot.baselines" flush>
-        <DataTable>
-          <thead>
-            <tr>
-              <th>Задача</th>
-              <th>План</th>
-              <th>Факт</th>
-              <th>Δ</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((r) => (
-              <tr key={r.code}>
-                <td>
-                  <CellStack title={r.task} subtitle={r.code} />
-                </td>
-                <td className="mono">{formatDate(r.base)}</td>
-                <td className="mono">{formatDate(r.actual)}</td>
-                <td>
-                  <DeltaCell d={r.delta} />
-                </td>
-                <td>
-                  {r.delta === 0 ? (
-                    <Chip variant="success">В графике</Chip>
-                  ) : r.delta < 0 ? (
-                    <Chip variant="info">Опережение</Chip>
-                  ) : (
-                    <Chip variant="warning">Отклонение</Chip>
-                  )}
-                </td>
+    <ScenarioFetchGate loadingLabel="Загрузка базового плана…">
+      <>
+        <PageIntro
+          title={mockProjectScreenTitle("Базовый план")}
+          lead="Снимки плана и отклонения."
+          actions={
+            <>
+              <Button variant="secondary">Создать снимок</Button>
+              <Button variant="primary">Сравнить</Button>
+            </>
+          }
+        />
+        <CardPanel
+          title={`Базовый план · ${formatDate(fixtures.planBaselines[0]?.capturedAt ?? null)}`}
+          subtitle="PlanSnapshot.baselines"
+          flush
+        >
+          <DataTable>
+            <thead>
+              <tr>
+                <th>Задача</th>
+                <th>План</th>
+                <th>Факт</th>
+                <th>Δ</th>
+                <th>Статус</th>
               </tr>
-            ))}
-          </tbody>
-        </DataTable>
-      </CardPanel>
-    </>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.code}>
+                  <td>
+                    <CellStack title={row.task} subtitle={row.code} />
+                  </td>
+                  <td className="mono">{formatDate(row.base)}</td>
+                  <td className="mono">{formatDate(row.actual)}</td>
+                  <td>
+                    <DeltaCell d={row.delta} />
+                  </td>
+                  <td>
+                    {row.delta === 0 ? (
+                      <Chip variant="success">В графике</Chip>
+                    ) : row.delta < 0 ? (
+                      <Chip variant="info">Опережение</Chip>
+                    ) : (
+                      <Chip variant="warning">Отклонение</Chip>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </CardPanel>
+      </>
+    </ScenarioFetchGate>
   );
 }

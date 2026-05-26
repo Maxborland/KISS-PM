@@ -11,9 +11,10 @@ import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import type { Task, TaskStatusCategory } from "@/lib/api-types";
-import { formatDate, formatDateRange } from "@/lib/mock-data/format";
-import { MOCK_SCHEDULED_TASKS, MOCK_TASKS } from "@/lib/mock-data/tasks";
-import { userAvatar, userName } from "@/lib/mock-data/users";
+import { formatDateRange } from "@/lib/mock-data/format";
+import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { userName } from "@/lib/mock-data/users";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { PageIntro } from "@/views/layout/page-intro";
 import {
@@ -43,41 +44,6 @@ const KANBAN_COLUMNS: KanbanColumnDef<ColumnId>[] = [
   { id: "review", title: "Приемка", emptyLabel: "Нет задач на приемке" },
   { id: "done", title: "Готово", emptyLabel: "Нет задач за сегодня" }
 ];
-
-const PRIORITY_LABEL: Record<Task["priority"], string> = {
-  low: "Низкий",
-  normal: "Обычный",
-  high: "Высокий",
-  critical: "Критичный"
-};
-
-function taskCategoryToColumnId(category: TaskStatusCategory): ColumnId {
-  return category === "waiting" ? "new" : category;
-}
-
-const INITIAL_CARDS: CardModel[] = MOCK_TASKS.map((task) => ({
-  id: task.id,
-  columnId: taskCategoryToColumnId(task.statusCategory),
-  title: task.title,
-  priority: task.priority,
-  priorityLabel: PRIORITY_LABEL[task.priority],
-  meta: [
-    { label: task.statusName },
-    { label: `Проект: ${task.projectId}` },
-    { label: `Постановщик: ${userName(task.requesterUserId)}` }
-  ],
-  assignees: task.participants.map((participant) => userAvatar(participant.userId)),
-  comments: task.id === "MDS-39" ? 13 : task.id === "MDS-2" ? 7 : 2,
-  date: formatDate(task.plannedFinish),
-  progress: task.progress,
-  plannedWork: task.plannedWork,
-  actualWork: task.actualWork,
-  requiresAcceptance: task.requiresAcceptance,
-  ownerName: userName(task.ownerUserId),
-  requesterName: userName(task.requesterUserId),
-  statusName: task.statusName,
-  highlight: task.priority === "critical"
-}));
 
 const COLUMN_LABEL: Record<ColumnId, string> = {
   new: "Бэклог",
@@ -142,8 +108,22 @@ export type MyWorkBlockProps = {
 };
 
 export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
+  const { scenario } = useScenarioFixtures();
+  return (
+    <ScenarioFetchGate loadingLabel="Загрузка задач…">
+      <MyWorkBlockInner key={scenario} initialMode={initialMode} />
+    </ScenarioFetchGate>
+  );
+}
+
+function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
+  const { fixtures } = useScenarioFixtures();
+  const initialCards = useMemo(
+    () => buildTaskKanbanCards(fixtures.tasks),
+    [fixtures.tasks]
+  );
   const [mode, setMode] = useState<"kanban" | "list">(initialMode);
-  const [cards, setCards] = useState<CardModel[]>(INITIAL_CARDS);
+  const [cards, setCards] = useState<CardModel[]>(initialCards);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [columnSort, setColumnSort] = useState<KanbanColumnSortState<ColumnId>>({});
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
@@ -221,7 +201,7 @@ export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
             </tr>
           </thead>
           <tbody>
-            {MOCK_SCHEDULED_TASKS.map((task) => (
+            {fixtures.scheduledTasks.map((task) => (
               <tr key={task.id}>
                 <td><CellStack title={task.title} subtitle={task.id} /></td>
                 <td>{task.projectTitle}</td>

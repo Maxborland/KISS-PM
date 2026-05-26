@@ -12,7 +12,7 @@ async function respond<T extends Record<string, unknown>>(
   const behavior = scenarioHttpBehavior(getActiveStorybookScenario());
   switch (behavior.kind) {
     case "loading":
-      await delay(behavior.delayMs);
+      await delay("infinite");
       return HttpResponse.json(body);
     case "error":
       return HttpResponse.json(
@@ -29,6 +29,8 @@ async function respond<T extends Record<string, unknown>>(
 function bundle() {
   return getFixtureBundle(getActiveStorybookScenario());
 }
+
+export { STORYBOOK_MSW_HANDLER_PATHS } from "../src/lib/mock-data/storybook-msw-routes";
 
 export function createStorybookMswHandlers(): HttpHandler[] {
   return [

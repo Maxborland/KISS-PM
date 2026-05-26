@@ -26,46 +26,13 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { formatDate, formatRub } from "@/lib/mock-data/format";
-import { MOCK_CLIENTS, MOCK_CONTACTS, MOCK_PRODUCTS, clientName } from "@/lib/mock-data/crm";
+import { buildEntityCopy } from "@/lib/mock-data/scenario-presenters";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export type EntityKind = "clients" | "contacts" | "products";
 
 type EntityRow = Record<string, unknown> & { name: string; code: string };
-
-const COPY: Record<EntityKind, { title: string; lead: string; cols: string[]; rows: EntityRow[] }> = {
-  clients: {
-    title: "Клиенты",
-    lead: "Справочник клиентов арендатора.",
-    cols: ["Клиент", "Статус", "Описание", "Создан", "Обновлён"],
-    rows: MOCK_CLIENTS.map((client) => ({
-      ...client,
-      name: client.name,
-      code: client.id
-    }))
-  },
-  contacts: {
-    title: "Контакты",
-    lead: "Контактные лица и связи с CRM.",
-    cols: ["Контакт", "Компания", "Должность", "Контакты", "Статус"],
-    rows: MOCK_CONTACTS.map((contact) => ({
-      ...contact,
-      name: contact.name,
-      code: contact.id,
-      company: clientName(contact.clientId)
-    }))
-  },
-  products: {
-    title: "Продукты",
-    lead: "Каталог продуктов для сделок и проектов.",
-    cols: ["Продукт", "SKU / тип", "Ед.", "Цена", "Статус"],
-    rows: MOCK_PRODUCTS.map((product) => ({
-      ...product,
-      name: product.name,
-      code: product.sku ?? product.id
-    }))
-  }
-};
 
 function matchesQuery(row: EntityRow, query: string): boolean {
   if (!query.trim()) return true;
@@ -74,7 +41,8 @@ function matchesQuery(row: EntityRow, query: string): boolean {
 }
 
 export function EntitiesBlock({ kind }: { kind: EntityKind }) {
-  const c = COPY[kind];
+  const { fixtures } = useScenarioFixtures();
+  const c = useMemo(() => buildEntityCopy(kind, fixtures), [kind, fixtures]);
   const [query, setQuery] = useState("");
   const [openName, setOpenName] = useState<string | null>(null);
 
@@ -83,7 +51,8 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
   const openRow = useMemo(() => c.rows.find((r) => r.name === openName) ?? null, [c.rows, openName]);
 
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка справочника…">
+      <>
       <PageIntro
         title={c.title}
         lead={c.lead}
@@ -216,7 +185,8 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
           ) : null}
         </SheetContent>
       </Sheet>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }
 

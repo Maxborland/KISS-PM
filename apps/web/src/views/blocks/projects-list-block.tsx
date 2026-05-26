@@ -30,10 +30,10 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
-import type { Project } from "@/lib/api-types";
+import type { Project, ProjectTemplate } from "@/lib/api-types";
 import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
-import { MOCK_PROJECTS } from "@/lib/mock-data/projects";
-import { MOCK_PROJECT_TEMPLATES, projectTemplateName } from "@/lib/mock-data/workspace-config";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { projectTemplateName } from "@/lib/mock-data/workspace-config";
 import { positionName, userAvatar } from "@/lib/mock-data/users";
 import { PageIntro } from "@/views/layout/page-intro";
 
@@ -43,17 +43,17 @@ type ProjectRow = Project & {
   statusVariant: "info" | "success" | "warning";
 };
 
-const PROJECT_ROWS: ProjectRow[] = MOCK_PROJECTS.map((project, index) => ({
+function buildProjectRows(projects: Project[]): ProjectRow[] {
+  return projects.map((project, index) => ({
   ...project,
   code: project.id,
   owner: { ...userAvatar(index === 1 ? "usr-petrov" : "usr-ivanova"), name: index === 1 ? "Петров А." : "Иванова М." },
   statusVariant: project.status === "closed" ? "success" : "info"
 }));
+}
 
-const ACTIVE_PROJECTS = PROJECT_ROWS.filter((project) => project.status === "active");
-const ARCHIVED_PROJECTS = PROJECT_ROWS.filter((project) => project.status === "closed");
-
-const TEMPLATE_PROJECTS: ProjectRow[] = MOCK_PROJECT_TEMPLATES.map((template, index) => ({
+function buildTemplateProjects(templates: ProjectTemplate[]): ProjectRow[] {
+  return templates.map((template, index) => ({
   id: template.id,
   tenantId: template.tenantId,
   sourceType: "manual",
@@ -75,6 +75,7 @@ const TEMPLATE_PROJECTS: ProjectRow[] = MOCK_PROJECT_TEMPLATES.map((template, in
   owner: { ...userAvatar(index === 0 ? "usr-kozlova" : "usr-petrov"), name: index === 0 ? "Козлова Е." : "Петров А." },
   statusVariant: "warning"
 }));
+}
 
 function matchesQuery(row: ProjectRow, query: string): boolean {
   if (!query.trim()) return true;
@@ -86,20 +87,40 @@ function matchesQuery(row: ProjectRow, query: string): boolean {
   );
 }
 
-function projectsForFilter(filter: "active" | "archive" | "templates"): ProjectRow[] {
-  if (filter === "archive") return ARCHIVED_PROJECTS;
-  if (filter === "templates") return TEMPLATE_PROJECTS;
-  return ACTIVE_PROJECTS;
+function projectsForFilter(
+  filter: "active" | "archive" | "templates",
+  active: ProjectRow[],
+  archived: ProjectRow[],
+  templates: ProjectRow[]
+): ProjectRow[] {
+  if (filter === "archive") return archived;
+  if (filter === "templates") return templates;
+  return active;
 }
 
 export function ProjectsListBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const projectRows = useMemo(() => buildProjectRows(fixtures.projects), [fixtures.projects]);
+  const activeProjects = useMemo(
+    () => projectRows.filter((project) => project.status === "active"),
+    [projectRows]
+  );
+  const archivedProjects = useMemo(
+    () => projectRows.filter((project) => project.status === "closed"),
+    [projectRows]
+  );
+  const templateProjects = useMemo(
+    () => buildTemplateProjects(fixtures.projectTemplates),
+    [fixtures.projectTemplates]
+  );
+
   const [filter, setFilter] = useState<"active" | "archive" | "templates">("active");
   const [query, setQuery] = useState("");
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
 
-  const source = projectsForFilter(filter);
+  const source = projectsForFilter(filter, activeProjects, archivedProjects, templateProjects);
   const filtered = useMemo(() => source.filter((r) => matchesQuery(r, query)), [source, query]);
   const openProject = useMemo(
     () => source.find((r) => r.id === openProjectId) ?? null,
@@ -114,7 +135,8 @@ export function ProjectsListBlock() {
   };
 
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка проектов…">
+      <>
       <PageIntro
         title="Проекты"
         lead="14 активных проектов, 3 на ревью, 2 на финальной стадии."
@@ -298,7 +320,8 @@ export function ProjectsListBlock() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }
 

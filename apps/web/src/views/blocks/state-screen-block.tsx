@@ -8,11 +8,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { LoadingState } from "@/components/ui/loading-state";
+import {
+  resolveStateScreenKind,
+  useScenarioFixtures
+} from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export type StateKind = "empty" | "error" | "forbidden" | "loading";
 
 export function StateScreenBlock({ kind }: { kind: StateKind }) {
+  const { scenario, state } = useScenarioFixtures();
+  const effectiveKind = resolveStateScreenKind(kind, scenario);
   const [retryCount, setRetryCount] = useState(0);
 
   const copy = {
@@ -33,14 +39,14 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
     },
     error: {
       title: "Ошибка загрузки",
-      lead: "Не удалось получить данные. Повторите позже.",
+      lead: state.errorMessage ?? "Не удалось получить данные. Повторите позже.",
       body: (
         <ErrorState
           title="Что-то пошло не так"
           description={
             retryCount > 0
-              ? `Повтор ${retryCount}: проверьте соединение и повторите запрос.`
-              : "Проверьте соединение и повторите запрос."
+              ? `Повтор ${retryCount}: ${state.errorMessage ?? "Проверьте соединение и повторите запрос."}`
+              : state.errorMessage ?? "Проверьте соединение и повторите запрос."
           }
           onRetry={() => {
             setRetryCount((n) => n + 1);
@@ -59,7 +65,7 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
       lead: "Подготавливаем рабочую область…",
       body: <LoadingState label="Загрузка задач…" />
     }
-  }[kind];
+  }[effectiveKind];
 
   return (
     <>

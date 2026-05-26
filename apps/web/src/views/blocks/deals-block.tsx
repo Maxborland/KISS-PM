@@ -22,8 +22,8 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
-import { MOCK_OPPORTUNITIES } from "@/lib/mock-data/deals";
-import { MOCK_DEAL_STAGES } from "@/lib/mock-data/crm";
+import { buildFunnelDeals, buildFunnelStages } from "@/lib/mock-data/scenario-presenters";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { MOCK_TENANT_ID, positionName, userAvatar, userName } from "@/lib/mock-data/users";
 import { useFunnelState } from "@/widgets/funnel";
 import type { FunnelDeal, FunnelStage } from "@/widgets/funnel";
@@ -45,12 +45,7 @@ import {
 } from "@/widgets/kanban";
 import { PageIntro } from "@/views/layout/page-intro";
 
-const STAGES: FunnelStage[] = MOCK_DEAL_STAGES
-  .filter((stage) => stage.status === "active")
-  .sort((a, b) => a.sortOrder - b.sortOrder)
-  .map((stage) => ({ id: stage.id, title: stage.name }));
-
-type StageId = (typeof STAGES)[number]["id"];
+type StageId = string;
 
 const STAGE_TONE: Record<string, "info" | "success" | "warning" | "violet"> = {
   lead: "violet",
@@ -59,19 +54,6 @@ const STAGE_TONE: Record<string, "info" | "success" | "warning" | "violet"> = {
   deal: "warning",
   won: "success"
 };
-
-const STAGE_LABEL = STAGES.reduce<Record<string, string>>((acc, s) => {
-  acc[s.id] = s.title;
-  return acc;
-}, {});
-
-const INITIAL_DEALS: FunnelDeal[] = MOCK_OPPORTUNITIES.map((opportunity) => ({
-  ...opportunity,
-  client: opportunity.clientName,
-  amount: formatRub(opportunity.contractValue),
-  stage: opportunity.stageId ?? "lead",
-  owner: userAvatar(opportunity.ownerUserId)
-}));
 
 type DealDraft = {
   title: string;
@@ -98,7 +80,7 @@ const EMPTY_DEAL_DRAFT: DealDraft = {
   probability: "50",
   projectType: "CRM внедрение",
   description: "",
-  stage: STAGES[0]!.id
+  stage: "lead"
 };
 
 const RUB_FORMATTER = new Intl.NumberFormat("ru-RU");
@@ -113,7 +95,10 @@ function matchesQuery(deal: FunnelDeal, query: string): boolean {
   );
 }
 
-function toKanbanItem(deal: FunnelDeal): DealKanbanItem<StageId> {
+function toKanbanItem(
+  deal: FunnelDeal,
+  stageLabelById: Record<string, string>
+): DealKanbanItem<StageId> {
   const stageId = deal.stage as StageId;
   return {
     id: deal.id,
@@ -128,16 +113,10 @@ function toKanbanItem(deal: FunnelDeal): DealKanbanItem<StageId> {
     feasibilityStatus: deal.feasibilityStatus ?? null,
     projectType: deal.projectType ?? "Тип не указан",
     owner: deal.owner,
-    stageLabel: STAGE_LABEL[stageId] ?? stageId,
+    stageLabel: stageLabelById[stageId] ?? stageId,
     stageTone: STAGE_TONE[stageId] ?? "info"
   };
 }
-
-const DEAL_COLUMNS: KanbanColumnDef<StageId>[] = STAGES.map((s) => ({
-  id: s.id as StageId,
-  title: s.title,
-  emptyLabel: "Нет сделок"
-}));
 
 const STAGE_ACTION_LABEL: Record<KanbanColumnAction, string> = {
   rename: "Переименовать стадию",
@@ -150,7 +129,44 @@ export type DealsBlockProps = {
   initialDeals?: FunnelDeal[];
 };
 
-export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEALS }: DealsBlockProps = {}) {
+export function DealsBlock(props: DealsBlockProps = {}) {
+  const { scenario } = useScenarioFixtures();
+  return (
+    <ScenarioFetchGate loadingLabel="Загрузка сделок…">
+      <DealsBlockInner key={scenario} {...props} />
+    </ScenarioFetchGate>
+  );
+}
+
+function DealsBlockInner({
+  initialMode = "kanban",
+  initialDeals: initialDealsOverride
+}: DealsBlockProps = {}) {
+  const { fixtures } = useScenarioFixtures();
+  const stages = useMemo(() => buildFunnelStages(fixtures), [fixtures.dealStages]);
+  const stageLabel = useMemo(
+    () =>
+      stages.reduce<Record<string, string>>((acc, stage) => {
+        acc[stage.id] = stage.title;
+        return acc;
+      }, {}),
+    [stages]
+  );
+  const derivedDeals = useMemo(
+    () => buildFunnelDeals(fixtures.opportunities),
+    [fixtures.opportunities]
+  );
+  const initialDeals = initialDealsOverride ?? derivedDeals;
+  const dealColumns = useMemo<KanbanColumnDef<StageId>[]>(
+    () =>
+      stages.map((stage) => ({
+        id: stage.id,
+        title: stage.title,
+        emptyLabel: "Нет сделок"
+      })),
+    [stages]
+  );
+
   const [mode, setMode] = useState<"kanban" | "list" | "forecast">(initialMode);
   const [query, setQuery] = useState("");
   const [openDealId, setOpenDealId] = useState<string | null>(null);
@@ -161,14 +177,17 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
 
   const { deals, moveDeal, reorderDeal, addDeal, countByStage, amountByStage } = useFunnelState(
     initialDeals,
-    STAGES
+    stages
   );
 
   const filtered = useMemo(() => deals.filter((d) => matchesQuery(d, query)), [deals, query]);
-  const kanbanItems = useMemo(() => filtered.map(toKanbanItem), [filtered]);
+  const kanbanItems = useMemo(
+    () => filtered.map((deal) => toKanbanItem(deal, stageLabel)),
+    [filtered, stageLabel]
+  );
 
   const comparators = useMemo(() => buildDealKanbanComparators<DealKanbanItem<StageId>, StageId>(), []);
-  const sortedItems = useKanbanOrderedItems(DEAL_COLUMNS, kanbanItems, columnSort, comparators);
+  const sortedItems = useKanbanOrderedItems(dealColumns, kanbanItems, columnSort, comparators);
   const visibleFields = useMemo(
     () => resolveVisibleFields(DEAL_KANBAN_VIEW_PROFILE, cardView),
     [cardView]
@@ -227,7 +246,7 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
       toast.info("Ручной порядок", {
-        description: `Стадия «${STAGE_LABEL[columnId]}» переключена на ручную сортировку.`
+        description: `Стадия «${stageLabel[columnId]}» переключена на ручную сортировку.`
       });
     }
     reorderDeal(columnId, fromIndex, toIndex);
@@ -238,7 +257,7 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
   };
 
   const handleColumnAction = (columnId: StageId, action: KanbanColumnAction) => {
-    toast.info(`${STAGE_ACTION_LABEL[action]} — ${STAGE_LABEL[columnId]}`, {
+    toast.info(`${STAGE_ACTION_LABEL[action]} — ${stageLabel[columnId]}`, {
       description: "Демо Storybook: действие зафиксировано локально."
     });
   };
@@ -290,7 +309,7 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
       {mode === "kanban" ? (
         <Kanban<DealKanbanItem<StageId>, StageId>
           boardVariant="funnel"
-          columns={DEAL_COLUMNS}
+          columns={dealColumns}
           items={sortedItems}
           visibleFields={visibleFields}
           sortOptions={DEAL_KANBAN_SORT_OPTIONS}
@@ -312,11 +331,11 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
       ) : null}
 
       {mode === "list" ? (
-        <DealsList deals={filtered} onOpen={setOpenDealId} />
+        <DealsList deals={filtered} stages={stages} onOpen={setOpenDealId} />
       ) : null}
 
       {mode === "forecast" ? (
-        <DealsForecast stages={STAGES} countByStage={countByStage} amountByStage={amountByStage} />
+        <DealsForecast stages={stages} countByStage={countByStage} amountByStage={amountByStage} />
       ) : null}
 
       <Sheet open={openDeal != null} onOpenChange={(open) => !open && setOpenDealId(null)}>
@@ -333,7 +352,7 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
                 <div className="u-flex u-flex-col u-gap-3">
                   <div className="u-flex u-items-center u-gap-2">
                     <Chip variant={openDeal.stage === "won" ? "success" : "info"}>
-                      {STAGES.find((s) => s.id === openDeal.stage)?.title ?? openDeal.stage}
+                      {stages.find((s) => s.id === openDeal.stage)?.title ?? openDeal.stage}
                     </Chip>
                     <Chip variant={openDeal.feasibilityStatus === "feasible" ? "success" : "warning"}>
                       {openDeal.feasibilityStatus ?? "feasibility не проверен"}
@@ -499,7 +518,7 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
                   value={draft.stage}
                   onChange={(event) => setDraft({ ...draft, stage: event.currentTarget.value })}
                 >
-                  {STAGES.map((s) => (
+                  {stages.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title}
                     </option>
@@ -523,7 +542,15 @@ export function DealsBlock({ initialMode = "kanban", initialDeals = INITIAL_DEAL
   );
 }
 
-function DealsList({ deals, onOpen }: { deals: FunnelDeal[]; onOpen: (id: string) => void }) {
+function DealsList({
+  deals,
+  stages,
+  onOpen
+}: {
+  deals: FunnelDeal[];
+  stages: FunnelStage[];
+  onOpen: (id: string) => void;
+}) {
   if (deals.length === 0) {
     return <p className="u-text-sm u-text-muted">Ничего не найдено.</p>;
   }
@@ -542,7 +569,7 @@ function DealsList({ deals, onOpen }: { deals: FunnelDeal[]; onOpen: (id: string
       </thead>
       <tbody>
         {deals.map((d) => {
-          const stage = STAGES.find((s) => s.id === d.stage);
+          const stage = stages.find((s) => s.id === d.stage);
           return (
             <tr
               key={d.id}

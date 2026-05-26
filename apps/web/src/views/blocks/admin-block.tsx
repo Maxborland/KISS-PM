@@ -8,21 +8,18 @@ import { SwitchRow, SwitchRowList } from "@/components/domain/switch-row";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
-import { MOCK_ORG_STRUCTURE } from "@/lib/mock-data/org-structure";
-import {
-  MOCK_ACCESS_PROFILES,
-  MOCK_POSITIONS,
-  MOCK_WORKSPACE_USERS,
-  accessProfileName,
-  userAvatar
-} from "@/lib/mock-data/users";
-import { MOCK_ABSENCES } from "@/lib/mock-data/capacity";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { accessProfileName, userAvatar } from "@/lib/mock-data/users";
 import { formatDate } from "@/lib/mock-data/format";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export function AdminBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const { workspaceUsers, accessProfiles, positions, orgStructure, absences } = fixtures;
+
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка администрирования…">
+      <>
       <PageIntro
         title="Администрирование"
         lead="Пользователи, роли и политики рабочей области."
@@ -34,7 +31,7 @@ export function AdminBlock() {
         }
       />
       <div className="grid-2">
-        <CardPanel title="Пользователи" subtitle={`${MOCK_WORKSPACE_USERS.length} записей WorkspaceUser`} flush>
+        <CardPanel title="Пользователи" subtitle={`${workspaceUsers.length} записей WorkspaceUser`} flush>
           <DataTable>
             <thead>
               <tr>
@@ -46,7 +43,7 @@ export function AdminBlock() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_WORKSPACE_USERS.map((u) => {
+              {workspaceUsers.map((u) => {
                 const avatar = userAvatar(u.id);
                 return (
                 <tr key={u.email}>
@@ -105,11 +102,11 @@ export function AdminBlock() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_POSITIONS.map((position) => (
+              {positions.map((position) => (
                 <tr key={position.id}>
                   <td><CellStack title={position.name} subtitle={position.id} /></td>
                   <td>{position.description}</td>
-                  <td>{MOCK_WORKSPACE_USERS.filter((user) => user.positionId === position.id).length}</td>
+                  <td>{workspaceUsers.filter((user) => user.positionId === position.id).length}</td>
                 </tr>
               ))}
             </tbody>
@@ -125,11 +122,11 @@ export function AdminBlock() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_ACCESS_PROFILES.map((profile) => (
+              {accessProfiles.map((profile) => (
                 <tr key={profile.id}>
                   <td><CellStack title={profile.name} subtitle={profile.id} /></td>
                   <td>{profile.permissions.length}</td>
-                  <td>{MOCK_WORKSPACE_USERS.filter((user) => user.accessProfileId === profile.id).length}</td>
+                  <td>{workspaceUsers.filter((user) => user.accessProfileId === profile.id).length}</td>
                 </tr>
               ))}
             </tbody>
@@ -139,11 +136,11 @@ export function AdminBlock() {
           <div className="u-flex u-flex-col u-gap-2">
             <CellStack
               title="Functional track"
-              subtitle={`${MOCK_ORG_STRUCTURE.functional.nodes.length} узла · ${MOCK_ORG_STRUCTURE.functional.placements.length} назначений`}
+              subtitle={`${orgStructure.functional.nodes.length} узла · ${orgStructure.functional.placements.length} назначений`}
             />
             <CellStack
               title="Project track"
-              subtitle={`${MOCK_ORG_STRUCTURE.project.nodes.length} узла · ${MOCK_ORG_STRUCTURE.project.placements.length} назначений`}
+              subtitle={`${orgStructure.project.nodes.length} узла · ${orgStructure.project.placements.length} назначений`}
             />
             <span className="u-text-xs u-text-muted">Последняя сверка: {formatDate("2026-05-25T00:00:00.000Z")}</span>
           </div>
@@ -159,9 +156,9 @@ export function AdminBlock() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_ABSENCES.map((absence) => (
+              {absences.map((absence) => (
                 <tr key={absence.id}>
-                  <td>{MOCK_WORKSPACE_USERS.find((user) => user.id === absence.userId)?.name ?? absence.userId}</td>
+                  <td>{workspaceUsers.find((user) => user.id === absence.userId)?.name ?? absence.userId}</td>
                   <td>{absence.type}</td>
                   <td className="mono">{formatDate(absence.dateFrom)} — {formatDate(absence.dateTo)}</td>
                   <td><Chip variant={absence.status === "approved" ? "success" : "warning"}>{absence.status}</Chip></td>
@@ -171,6 +168,7 @@ export function AdminBlock() {
           </DataTable>
         </CardPanel>
       </div>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }

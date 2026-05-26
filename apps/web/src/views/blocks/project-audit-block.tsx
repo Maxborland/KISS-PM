@@ -5,15 +5,19 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { SearchPill } from "@/components/ui/search-pill";
-import { MOCK_AUDIT_EVENTS } from "@/lib/mock-data/control";
 import { formatDate } from "@/lib/mock-data/format";
+import { ScenarioFetchGate, useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { userAvatar, userName } from "@/lib/mock-data/users";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export function ProjectAuditBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const auditEvents = fixtures.auditEvents;
+
   return (
-    <>
+    <ScenarioFetchGate loadingLabel="Загрузка аудита…">
+      <>
       <PageIntro title={mockProjectScreenTitle("Аудит")} lead="Журнал управленческих действий." />
       <div className="view-toolbar">
         <SearchPill className="u-w-280" placeholder="Поиск по аудиту" />
@@ -22,9 +26,9 @@ export function ProjectAuditBlock() {
           Фильтр
         </Button>
       </div>
-      <CardPanel title="Журнал событий" subtitle={`${MOCK_AUDIT_EVENTS.length} записей`} flush>
+      <CardPanel title="Журнал событий" subtitle={`${auditEvents.length} записей`} flush>
         <ul className="audit-list">
-          {MOCK_AUDIT_EVENTS.map((event) => {
+          {auditEvents.map((event) => {
             const avatar = userAvatar(event.actorUserId);
             const allowed = Boolean(event.permissionResult.allowed);
             return (
@@ -48,6 +52,7 @@ export function ProjectAuditBlock() {
           })}
         </ul>
       </CardPanel>
-    </>
+      </>
+    </ScenarioFetchGate>
   );
 }

@@ -210,8 +210,9 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
 
   it("interaction batch B3: projects list switches datasets and opens Sheet", () => {
     const source = read("src/views/blocks/projects-list-block.tsx");
-    expect(source).toContain("ARCHIVED_PROJECTS");
-    expect(source).toContain("TEMPLATE_PROJECTS");
+    expect(source).toContain("archivedProjects");
+    expect(source).toContain("templateProjects");
+    expect(source).toContain("useScenarioFixtures");
     expect(source).toContain("SheetContent");
     expect(source).toMatch(/value=\{query\}/);
   });

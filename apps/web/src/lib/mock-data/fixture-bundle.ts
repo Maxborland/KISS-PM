@@ -30,6 +30,7 @@ import type {
 import {
   MOCK_ABSENCES,
   MOCK_PLAN_BASELINES,
+  MOCK_PLANNING_SCENARIOS,
   MOCK_PRODUCTION_CALENDAR
 } from "./capacity";
 import {
@@ -82,6 +83,7 @@ export type FixtureBundle = {
   productionCalendar: ProductionCalendar;
   absences: Absence[];
   planBaselines: PlanBaseline[];
+  planningScenarios: typeof MOCK_PLANNING_SCENARIOS;
   accessProfiles: AccessProfile[];
 };
 
@@ -112,6 +114,7 @@ function baseBundle(): FixtureBundle {
     productionCalendar: MOCK_PRODUCTION_CALENDAR,
     absences: MOCK_ABSENCES,
     planBaselines: MOCK_PLAN_BASELINES,
+    planningScenarios: MOCK_PLANNING_SCENARIOS,
     accessProfiles: MOCK_ACCESS_PROFILES
   };
 }
@@ -174,7 +177,8 @@ export function getFixtureBundle(scenario: ScenarioName): FixtureBundle {
         controlSignals: [],
         correctiveActions: [],
         kpiEvaluations: [],
-        auditEvents: []
+        auditEvents: [],
+        planningScenarios: []
       };
     case "overload":
       return withOverloadSignals(bundle);
