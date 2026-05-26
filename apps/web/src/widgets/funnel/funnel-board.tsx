@@ -6,6 +6,7 @@ import type { FunnelDeal, FunnelStage } from "@/widgets/funnel/types";
 import {
   DealKanbanCard,
   Kanban,
+  dealToKanbanItem,
   type DealKanbanItem,
   type KanbanColumnDef
 } from "@/widgets/kanban";
@@ -36,22 +37,9 @@ export function FunnelBoard({ stages, deals, onMoveDeal, onOpenDeal }: FunnelBoa
 
   const items = useMemo<DealKanbanItem<string>[]>(
     () =>
-      deals.map((d) => ({
-        id: d.id,
-        columnId: d.stage,
-        title: d.title,
-        client: d.client,
-        contactName: d.contactName ?? "Контакт не указан",
-        amount: d.amount,
-        probability: typeof d.probability === "number" ? d.probability : 0,
-        plannedFinish: d.plannedFinish ?? new Date().toISOString(),
-        plannedHours: d.plannedHours ?? 0,
-        feasibilityStatus: d.feasibilityStatus ?? null,
-        projectType: d.projectType ?? "Тип не указан",
-        owner: d.owner,
-        stageLabel: stageLabel[d.stage] ?? d.stage,
-        stageTone: d.stage === "won" ? "success" : "info"
-      })),
+      deals.map((d) =>
+        dealToKanbanItem(d, { id: d.stage, title: stageLabel[d.stage] ?? d.stage })
+      ),
     [deals, stageLabel]
   );
 

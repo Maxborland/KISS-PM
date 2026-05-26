@@ -10,6 +10,7 @@ import {
   Kanban,
   KanbanCardViewMenu,
   buildDealKanbanComparators,
+  dealToKanbanItem,
   defaultDealKanbanViewState,
   resolveVisibleFields,
   useKanbanOrderedItems,
@@ -104,17 +105,7 @@ const DEALS: FunnelDeal[] = [
 
 function toItem(d: FunnelDeal): DealKanbanItem<StageId> {
   const stageId = d.stage as StageId;
-  return {
-    id: d.id,
-    columnId: stageId,
-    title: d.title,
-    client: d.client,
-    amount: d.amount,
-    probability: d.probability ?? 0,
-    owner: d.owner,
-    stageLabel: STAGE_LABEL[stageId] ?? stageId,
-    stageTone: stageId === "won" ? "success" : "info"
-  };
+  return dealToKanbanItem(d, { id: stageId, title: STAGE_LABEL[stageId] ?? stageId });
 }
 
 function FunnelHarness({
