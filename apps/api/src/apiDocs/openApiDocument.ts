@@ -212,7 +212,7 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/workspace/projects/:projectId/closure/lessons", tag: "Closure", summary: "Create retrospective lesson", requestSchema: "RetrospectiveLessonCreateRequest", successSchema: "RetrospectiveLessonResponse", successStatus: 201 },
   { method: "post", path: "/api/workspace/projects/:projectId/closure/template-improvement-actions/:actionId/apply", tag: "Closure", summary: "Apply template improvement action", successSchema: "TemplateImprovementActionResponse" },
   { method: "get", path: "/api/tenant/current/project-templates/:templateId/retrospective-insights", tag: "Closure", summary: "Read template retrospective insights", successSchema: "RetrospectiveInsightsResponse" },
-  { method: "get", path: "/api/tenant/current/scheduled-tasks", tag: "Scheduled tasks", summary: "List scheduled tasks", successSchema: "ScheduledTasksResponse", queryParameters: [{ name: "assigneeUserId", in: "query", required: false, schema: { type: "string", minLength: 1 } }, { name: "fromDate", in: "query", required: true, schema: { type: "string", format: "date" } }, { name: "toDate", in: "query", required: true, schema: { type: "string", format: "date" } }] },
+  { method: "get", path: "/api/tenant/current/scheduled-tasks", tag: "Scheduled tasks", summary: "List scheduled tasks", successSchema: "ScheduledTasksResponse", queryParameters: [{ name: "assigneeUserId", in: "query", required: true, schema: { type: "string", minLength: 1 } }, { name: "fromDate", in: "query", required: true, schema: { type: "string", format: "date" } }, { name: "toDate", in: "query", required: true, schema: { type: "string", format: "date" } }] },
   { method: "get", path: "/api/workspace/background-jobs/runs", tag: "Background jobs", summary: "List background job runs", successSchema: "BackgroundJobRunsResponse", queryParameters: [{ name: "status", in: "query", required: false, schema: { $ref: "#/components/schemas/BackgroundJobStatus" } }, { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } }] },
   { method: "get", path: "/api/workspace/background-jobs/runs/:runId/events", tag: "Background jobs", summary: "List background job run events", successSchema: "BackgroundJobEventsResponse" },
   { method: "post", path: "/api/workspace/background-jobs/runs", tag: "Background jobs", summary: "Enqueue background job run", requestSchema: "BackgroundJobEnqueueRequest", successSchema: "BackgroundJobRunResponse", successStatus: 201 }
@@ -265,7 +265,7 @@ export function listAllKnownApiRoutes() {
 }
 
 function publicDocumentRoutes() {
-  return routeDocs.filter((route) => route.availability !== "test-hooks");
+  return routeDocs.filter((route) => route.availability !== "test-hooks" && route.auth !== "dev");
 }
 
 function buildPaths(routes: RouteDoc[]) {

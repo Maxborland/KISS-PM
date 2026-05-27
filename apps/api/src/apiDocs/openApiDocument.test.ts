@@ -31,6 +31,25 @@ describe("OpenAPI route inventory", () => {
     ).toBe(false);
   });
 
+  it("omits dev-only routes from the public OpenAPI document", () => {
+    const document = createTestDocument();
+
+    expect(document.paths["/api/session/dev-users"]).toBeUndefined();
+    expect(document.paths["/api/session/dev-login"]).toBeUndefined();
+    expect(document.paths["/api/tenant/current"]?.get).toBeUndefined();
+    expect(listDocumentedApiRoutes().some((route) => route.auth === "dev")).toBe(false);
+  });
+
+  it("documents scheduled task assignee as a required query parameter", () => {
+    const document = createTestDocument();
+    const scheduledTasksOperation = document.paths["/api/tenant/current/scheduled-tasks"]?.get;
+    const assigneeParam = scheduledTasksOperation?.parameters?.find(
+      (parameter) => parameter.name === "assigneeUserId"
+    );
+
+    expect(assigneeParam?.required).toBe(true);
+  });
+
   it("keeps operation IDs unique", () => {
     const document = createTestDocument();
     const operationIds = Object.values(document.paths).flatMap((pathItem) =>
@@ -54,7 +73,17 @@ describe("OpenAPI route inventory", () => {
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
-  paths: Record<string, Record<string, { operationId: string; requestBody?: unknown }>>;
+  paths: Record<
+    string,
+    Record<
+      string,
+      {
+        operationId: string;
+        requestBody?: unknown;
+        parameters?: Array<{ name: string; required?: boolean }>;
+      }
+    >
+  >;
 };
 
 function createTestDocument(): TestOpenApiDocument {
