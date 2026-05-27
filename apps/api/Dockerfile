@@ -17,15 +17,20 @@ RUN pnpm --filter @kiss-pm/api... install --prod=false --frozen-lockfile
 COPY apps/api apps/api
 COPY packages packages
 
-RUN pnpm --filter @kiss-pm/api exec esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js
+RUN pnpm --filter @kiss-pm/api exec esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --external:redis --outfile=dist/server.js
+RUN CI=true pnpm prune --prod
+RUN pnpm --filter @kiss-pm/api install --prod --frozen-lockfile --offline
 
 FROM node:22-alpine
 
 WORKDIR /workspace
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 COPY --from=builder /workspace/apps/api/package.json apps/api/package.json
+COPY --from=builder /workspace/node_modules node_modules
+COPY --from=builder /workspace/apps/api/node_modules apps/api/node_modules
 COPY --from=builder /workspace/apps/api/dist apps/api/dist
 
 EXPOSE 4000

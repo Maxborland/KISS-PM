@@ -117,6 +117,34 @@ describe("auth rate limiter", () => {
     expect(limiter.check({ ...input, now: 32_000 })).toEqual({ allowed: true });
   });
 
+  it("does not persist an IP block from pending reservations that later succeed", () => {
+    const limiter = createAuthRateLimiter({
+      maxFailures: 2,
+      maxGlobalFailures: 100,
+      windowMs: 60_000,
+      blockMs: 30_000
+    });
+    const ip = "203.0.113.77";
+    const first = { email: "first@kiss-pm.local", ip, now: 1_000 };
+    const second = { email: "second@kiss-pm.local", ip, now: 1_001 };
+    const third = { email: "third@kiss-pm.local", ip, now: 1_002 };
+
+    expect(limiter.reserveAttempt?.(first)).toEqual({ allowed: true });
+    expect(limiter.reserveAttempt?.(second)).toEqual({ allowed: true });
+    expect(limiter.reserveAttempt?.(third)).toEqual({
+      allowed: false,
+      retryAfterSeconds: 30
+    });
+
+    limiter.recordSuccess(first, { reserved: true });
+    limiter.recordSuccess(second, { reserved: true });
+
+    expect(limiter.check({ ...third, now: 2_000 })).toEqual({ allowed: true });
+    expect(limiter.reserveAttempt?.({ ...third, now: 2_000 })).toEqual({
+      allowed: true
+    });
+  });
+
   it("bounds tracked email buckets to avoid unbounded memory growth", () => {
     const limiter = createAuthRateLimiter({
       maxFailures: 2,
