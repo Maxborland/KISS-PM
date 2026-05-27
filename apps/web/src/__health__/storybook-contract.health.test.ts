@@ -161,6 +161,28 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(pkg.scripts["verify:storybook-contract"]).toBe("node scripts/run-storybook-contract-ci.mjs");
   });
 
+  it("Phase 9 CI runner always reaches static server cleanup before exit", () => {
+    const source = read("scripts/run-storybook-contract-ci.mjs");
+    expect(source).not.toContain("process.exit(");
+    expect(source).toContain("finally");
+    expect(source).toContain("await stopChildProcess(staticServer)");
+    expect(source).toContain("process.exitCode = exitCode");
+  });
+
+  it("local Storybook Playwright gates do not force missing static builds", () => {
+    const source = read("playwright.config.ts");
+    expect(source).toContain("staticStorybookExists");
+    expect(source).toContain('storybook-static/index.json');
+    expect(source).toMatch(/process\.env\.STORYBOOK_STATIC === "1" \|\| staticStorybookExists/);
+  });
+
+  it("copy scan treats renamed Screens story ids as product screens", () => {
+    const source = read("scripts/run-copy-scan-all-stories.mjs");
+    expect(source).toContain("function isScreenStoryId");
+    expect(source).toContain('id.startsWith("screens-")');
+    expect(source).not.toContain('id.startsWith("screens--")');
+  });
+
   it("Phase 9 CI evidence records successful pipeline when present", () => {
     const evidencePath = join(webRoot, ".storybook-verify-tmp/phase9-ci-evidence.json");
     const legacyPath = join(webRoot, ".storybook-verify-tmp/batch16-ci-evidence.json");
@@ -309,7 +331,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).toContain("EntityDetailBlock");
     expect(source).toContain('size="xl"');
     expect(source).toContain("Открыть как страницу");
-    expect(source).toContain("screens--task-card");
+    expect(source).toContain("screens-задачи--task-card");
   });
 
   it("interaction batch B1: dashboard rows open TaskDetailDrawer", () => {
@@ -423,7 +445,10 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
   });
 
   it("Phase 8: pattern catalog stories cover states, forms, drawer, toolbar, bulk, command", () => {
-    expect(read("src/stories/patterns/fetch-states.stories.tsx")).toContain("EmptyState");
+    const fetchStates = read("src/stories/patterns/fetch-states.stories.tsx");
+    expect(fetchStates).toContain("EmptyState");
+    expect(fetchStates).toContain("ActionFeedback");
+    expect(fetchStates).not.toContain("onClick={() => undefined}");
     expect(read("src/stories/patterns/forms.stories.tsx")).toContain("TaskCreateModalBlock");
     expect(read("src/stories/patterns/drawer-detail.stories.tsx")).toContain("TaskDetailDrawer");
     expect(read("src/stories/patterns/filters-toolbar.stories.tsx")).toContain("view-toolbar");

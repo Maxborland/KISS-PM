@@ -1,9 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 const storybookGateArgv = process.argv.some(
   (arg) => arg.includes("@vrt") || arg.includes("@a11y") || arg.includes("@harness")
 );
-if (storybookGateArgv && process.env.STORYBOOK_STATIC !== "0") {
+const staticStorybookExists = existsSync(join(process.cwd(), "storybook-static/index.json"));
+if (
+  storybookGateArgv &&
+  process.env.STORYBOOK_STATIC !== "0" &&
+  (process.env.STORYBOOK_STATIC === "1" || staticStorybookExists)
+) {
   process.env.STORYBOOK_STATIC = "1";
 }
 

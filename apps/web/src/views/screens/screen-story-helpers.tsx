@@ -17,7 +17,7 @@ export function screenStoryArgs(id: ScreenId): { id: ScreenId } {
   return { id };
 }
 
-/** Суффикс story id относительно meta.id `screens` (итог: `screens--*` для VRT). */
+/** Суффикс story id внутри root `Screens/*` (итог: `screens-<группа>--*` для VRT). */
 export function screenStoryId(exportName: string): string {
   const kebab = exportName
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")

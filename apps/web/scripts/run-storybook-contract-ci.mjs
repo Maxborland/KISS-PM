@@ -186,31 +186,35 @@ const startedAt = new Date().toISOString();
 const steps = [];
 /** @type {import("node:child_process").ChildProcess | null} */
 let staticServer = null;
+let exitCode = 1;
+
+class ContractGateStop extends Error {}
+
+function failAndStop() {
+  writeEvidence({ startedAt, steps, pass: false, port });
+  throw new ContractGateStop();
+}
 
 try {
   steps.push(runPnpmStep("web-typecheck", ["typecheck"], webRoot));
   if (!steps.at(-1).pass) {
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
+    failAndStop();
   }
 
   steps.push(runPnpmStep("build-storybook", ["build-storybook"], webRoot));
   if (!steps.at(-1).pass) {
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
+    failAndStop();
   }
 
   steps.push(runPnpmStep("web-build", ["--filter", "@kiss-pm/web", "build"], repoRoot));
   if (!steps.at(-1).pass) {
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
+    failAndStop();
   }
   writeBuildEvidence();
 
   steps.push(runPnpmStep("web-test", ["test"], webRoot));
   if (!steps.at(-1).pass) {
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
+    failAndStop();
   }
 
   staticServer = startStaticServe(port);
@@ -222,8 +226,7 @@ try {
       exitCode: 1,
       pass: false
     });
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
+    failAndStop();
   }
 
   function storybookContractEnv(extra = {}) {
@@ -305,9 +308,24 @@ try {
       2
     )
   );
-  process.exit(pass ? 0 : 1);
+  exitCode = pass ? 0 : 1;
+} catch (err) {
+  if (!(err instanceof ContractGateStop)) {
+    const message = err instanceof Error ? err.stack ?? err.message : String(err);
+    steps.push({
+      name: "storybook-contract-runner",
+      command: "node scripts/run-storybook-contract-ci.mjs",
+      exitCode: 1,
+      pass: false,
+      stderrTail: message.slice(-2000)
+    });
+    writeEvidence({ startedAt, steps, pass: false, port });
+    console.error(message);
+  }
 } finally {
   if (staticServer) {
     await stopChildProcess(staticServer);
   }
 }
+
+process.exitCode = exitCode;
