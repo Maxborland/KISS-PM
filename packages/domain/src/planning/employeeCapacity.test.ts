@@ -16,6 +16,7 @@ function dayBucket(input: {
   date: string;
   assignedMinutes: number;
   reservedMinutes?: number;
+  occupiedMinutes?: number;
   capacityMinutes?: number;
 }): ResourceLoadBucket {
   return {
@@ -27,6 +28,7 @@ function dayBucket(input: {
     granularity: "day",
     assignedMinutes: input.assignedMinutes,
     reservedMinutes: input.reservedMinutes ?? 0,
+    occupiedMinutes: input.occupiedMinutes ?? 0,
     capacityMinutes: input.capacityMinutes ?? 480,
     freeMinutes: 0,
     taskIds: [],
@@ -36,7 +38,9 @@ function dayBucket(input: {
       input.reservedMinutes && input.reservedMinutes > 0
         ? [{ reservationId: `reservation-${input.projectId}`, workMinutes: input.reservedMinutes }]
         : [],
+    occupancyContributions: [],
     reservationIds: [],
+    occupancyIds: [],
     calendarExceptionIds: []
   };
 }
@@ -205,6 +209,45 @@ describe("employeeCapacity", () => {
     expect(cell?.workMinutes).toBe(240);
     expect(cell?.freeMinutes).toBe(240);
     expect(rows[0]?.projectsMixByDate?.[date]).toEqual([{ projectId: "p-a", workMinutes: 240 }]);
+  });
+
+  it("counts occupancy as committed capacity load", () => {
+    const monthIso = "2026-06-01".slice(0, 7);
+    const monthDates = monthDateSet(monthIso);
+    const date = "2026-06-02";
+    const merged = mergeWorkspaceDayBuckets({
+      monthDates,
+      readableProjectIds: new Set(["__occupancy__"]),
+      projects: [
+        {
+          projectId: "__occupancy__",
+          buckets: [
+            dayBucket({
+              resourceId: "u1",
+              projectId: "__occupancy__",
+              date,
+              assignedMinutes: 0,
+              occupiedMinutes: 60
+            })
+          ]
+        }
+      ]
+    });
+
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [
+        { id: "u1", name: "User", positionId: null, positionName: null }
+      ],
+      mergedByUserDate: merged
+    });
+
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.workMinutes).toBe(60);
+    expect(cell?.freeMinutes).toBe(420);
+    expect(rows[0]?.projectsMixByDate?.[date]).toEqual([
+      { projectId: "__occupancy__", workMinutes: 60 }
+    ]);
   });
 
   it("omits zero-minute buckets from workload and project mix", () => {

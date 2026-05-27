@@ -971,6 +971,124 @@ export const resourceAbsences = pgTable(
   ]
 );
 
+export const resourcePersonalCalendars = pgTable(
+  "resource_personal_calendars",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    timezone: text("timezone").notNull(),
+    sourceProvider: text("source_provider").notNull(),
+    syncStatus: text("sync_status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_personal_calendars_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "resource_personal_calendars_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_personal_calendars_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("resource_personal_calendars_tenant_user_idx").on(table.tenantId, table.userId),
+    uniqueIndex("resource_personal_calendars_tenant_user_provider_uidx")
+      .on(table.tenantId, table.userId, table.sourceProvider)
+      .where(sql`${table.archivedAt} is null`),
+    check(
+      "resource_personal_calendars_provider_chk",
+      sql`${table.sourceProvider} in ('manual', 'google', 'microsoft', 'caldav')`
+    ),
+    check(
+      "resource_personal_calendars_sync_status_chk",
+      sql`${table.syncStatus} in ('manual', 'connected', 'sync_failed', 'disabled')`
+    )
+  ]
+);
+
+export const resourceCalendarEvents = pgTable(
+  "resource_calendar_events",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    calendarId: text("calendar_id").notNull(),
+    userId: text("user_id").notNull(),
+    sourceProvider: text("source_provider").notNull(),
+    externalId: text("external_id"),
+    title: text("title"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    finishesAt: timestamp("finishes_at", { withTimezone: true }).notNull(),
+    workMinutes: integer("work_minutes"),
+    capacityImpact: text("capacity_impact").notNull(),
+    visibility: text("visibility").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_calendar_events_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "resource_calendar_events_calendar_fk",
+      columns: [table.tenantId, table.calendarId],
+      foreignColumns: [resourcePersonalCalendars.tenantId, resourcePersonalCalendars.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_calendar_events_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_calendar_events_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("resource_calendar_events_tenant_user_start_idx").on(
+      table.tenantId,
+      table.userId,
+      table.startsAt
+    ),
+    uniqueIndex("resource_calendar_events_external_uidx")
+      .on(table.tenantId, table.calendarId, table.sourceProvider, table.externalId)
+      .where(sql`${table.externalId} is not null and ${table.archivedAt} is null`),
+    check(
+      "resource_calendar_events_provider_chk",
+      sql`${table.sourceProvider} in ('manual', 'google', 'microsoft', 'caldav')`
+    ),
+    check(
+      "resource_calendar_events_capacity_impact_chk",
+      sql`${table.capacityImpact} in ('busy', 'unavailable', 'tentative')`
+    ),
+    check(
+      "resource_calendar_events_visibility_chk",
+      sql`${table.visibility} in ('public', 'busy_only', 'private')`
+    ),
+    check("resource_calendar_events_time_range_chk", sql`${table.finishesAt} > ${table.startsAt}`),
+    check(
+      "resource_calendar_events_work_minutes_chk",
+      sql`${table.workMinutes} is null or ${table.workMinutes} >= 0`
+    )
+  ]
+);
+
 export const taskAssignments = pgTable(
   "task_assignments",
   {
@@ -2943,6 +3061,8 @@ export type PersistenceTableName =
   | "tenant_production_calendar_exceptions"
   | "planning_saved_views"
   | "resource_absences"
+  | "resource_personal_calendars"
+  | "resource_calendar_events"
   | "tenant_org_nodes"
   | "tenant_user_org_placements"
   | "file_assets"
@@ -3027,6 +3147,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "resource_personal_calendars",
+  "resource_calendar_events",
   "tenant_org_nodes",
   "tenant_user_org_placements",
   "file_assets",
@@ -3104,6 +3226,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "resource_personal_calendars",
+  "resource_calendar_events",
   "tenant_org_nodes",
   "tenant_user_org_placements",
   "file_assets",
@@ -3643,6 +3767,38 @@ const tableColumns = {
     "approved_by",
     "created_at",
     "updated_at"
+  ],
+  resource_personal_calendars: [
+    "id",
+    "tenant_id",
+    "user_id",
+    "name",
+    "timezone",
+    "source_provider",
+    "sync_status",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
+  resource_calendar_events: [
+    "id",
+    "tenant_id",
+    "calendar_id",
+    "user_id",
+    "source_provider",
+    "external_id",
+    "title",
+    "starts_at",
+    "finishes_at",
+    "work_minutes",
+    "capacity_impact",
+    "visibility",
+    "metadata",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
   ],
   tenant_org_nodes: [
     "id",

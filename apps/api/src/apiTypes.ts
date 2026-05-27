@@ -31,8 +31,11 @@ import type {
   MeetingStatus,
   MessageMention,
   NotificationPreference,
+  OccupancyWindow,
   PlanSnapshot,
   ProjectClosureSnapshot,
+  ResourceCalendarEvent,
+  ResourcePersonalCalendar,
   RetrospectiveLesson,
   RetrospectiveReadModel,
   Tenant,
@@ -67,6 +70,7 @@ import type {
   ExternalReferenceRecord,
   FileAssetInput,
   FileAssetRecord,
+  PersonalCalendarEventInput,
   ActionExecutionInput,
   ActionExecutionRecord,
   TaskActivityInput,
@@ -984,6 +988,45 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     roomId: string;
   }): Promise<CallRecording[]>;
+  ensureManualPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    createdByUserId: UserId;
+  }): Promise<ResourcePersonalCalendar>;
+  findPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+  }): Promise<ResourcePersonalCalendar | undefined>;
+  createPersonalCalendarEvent?(input: PersonalCalendarEventInput): Promise<ResourceCalendarEvent>;
+  updatePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+    title?: string | null;
+    startsAt: Date;
+    finishesAt: Date;
+    workMinutes?: number | null;
+    capacityImpact: "busy" | "unavailable" | "tentative";
+    visibility: "public" | "busy_only" | "private";
+    metadata?: Record<string, unknown>;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  archivePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  listPersonalCalendarEvents?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    from: Date;
+    to: Date;
+  }): Promise<ResourceCalendarEvent[]>;
+  listOccupancyWindows?(input: {
+    tenantId: TenantId;
+    resourceId?: UserId | undefined;
+    from: Date;
+    to: Date;
+  }): Promise<OccupancyWindow[]>;
 };
 
 export type CreateAppOptions = {

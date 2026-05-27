@@ -179,6 +179,13 @@ const phaseG2ParticipantStateEventsMigration = readFileSync(
   ),
   "utf8"
 );
+const phase12CalendarOccupancyMigration = readFileSync(
+  new URL(
+    "../migrations/0037_phase_12_calendar_occupancy_v2.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 const phaseBackgroundJobsMigration = readFileSync(
   new URL(
     "../migrations/0038_phase_8_background_jobs_infrastructure.sql",
@@ -384,6 +391,44 @@ describe("Phase G.2 / 11.2 SQL migration", () => {
     expect(phaseG2ParticipantStateEventsMigration).toContain("participant_joining");
     expect(phaseG2ParticipantStateEventsMigration).toContain(
       "ADD CONSTRAINT call_events_type_chk"
+    );
+  });
+});
+
+describe("Phase 12 Calendar & Occupancy V2 SQL migration", () => {
+  it("creates tenant-scoped personal calendar and occupancy event tables", () => {
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CREATE TABLE "resource_personal_calendars"'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CREATE TABLE "resource_calendar_events"'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CONSTRAINT "resource_personal_calendars_pkey" PRIMARY KEY ("tenant_id","id")'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CONSTRAINT "resource_calendar_events_calendar_fk"'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      "resource_personal_calendars_tenant_user_provider_uidx"
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      "resource_calendar_events_external_uidx"
+    );
+  });
+
+  it("guards event ranges, work minutes, providers and privacy visibility", () => {
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CONSTRAINT "resource_calendar_events_time_range_chk" CHECK ("finishes_at" > "starts_at")'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      'CONSTRAINT "resource_calendar_events_work_minutes_chk"'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      '"capacity_impact" IN (\'busy\', \'unavailable\', \'tentative\')'
+    );
+    expect(phase12CalendarOccupancyMigration).toContain(
+      '"visibility" IN (\'public\', \'busy_only\', \'private\')'
     );
   });
 });
