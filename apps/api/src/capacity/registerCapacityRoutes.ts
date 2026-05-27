@@ -12,6 +12,7 @@ import {
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 
+import type { ApiTenantDataSource } from "../apiTypes";
 import type { ApiRouteDeps } from "../routeTypes";
 import { parseProjectIdParam, parseUserIdParam } from "../routeParamParsers";
 import { createCapacityCache } from "./capacityCache";
@@ -28,6 +29,24 @@ const aggregationCache = createCapacityCache<WorkspaceCapacityAggregation>(60_00
 
 export function invalidateCapacityCacheForTenant(tenantId: string) {
   aggregationCache.invalidateTenant(tenantId);
+}
+
+export async function warmCapacityCacheForTenantMonth(
+  dataSource: ApiTenantDataSource,
+  input: { tenantId: string; monthIso: string; projectFilterId?: string | null }
+) {
+  const aggregation = await buildWorkspaceCapacityAggregation(dataSource, {
+    tenantId: input.tenantId,
+    monthIso: input.monthIso,
+    projectFilterId: input.projectFilterId ?? null
+  });
+  if (aggregation) {
+    aggregationCache.set(
+      `${input.tenantId}:raw:${input.monthIso}:${input.projectFilterId ?? ""}`,
+      aggregation
+    );
+  }
+  return aggregation;
 }
 
 export function registerCapacityRoutes(app: Hono, deps: ApiRouteDeps) {
