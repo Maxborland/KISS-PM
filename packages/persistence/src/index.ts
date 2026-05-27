@@ -2,6 +2,7 @@ export * from "./auditEvent";
 export * from "./attachmentRepository";
 export * from "./backgroundJobRepository";
 export * from "./collaborationRepository";
+export * from "./collaborationRepositoryAdapters";
 export * from "./auth";
 export * from "./connection";
 export * from "./crmRepository";
