@@ -286,7 +286,7 @@ describe("capacity API routes", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, resource_calendar_events, resource_personal_calendars, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -395,6 +395,24 @@ describe("capacity API routes", () => {
       title: "Черновая работа",
       workMinutes: 240
     });
+    const occupancy = await app.request(
+      "/api/workspace/resources/user-alpha-resource-reader/personal-calendar/events",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          title: "Личная занятость",
+          startsAt: "2026-06-02T09:00:00.000Z",
+          finishesAt: "2026-06-02T10:00:00.000Z",
+          visibility: "busy_only"
+        })
+      }
+    );
+    expect(occupancy.status).toBe(201);
 
     const response = await app.request("/api/workspace/capacity/tree?monthIso=2026-06", {
       headers: { cookie: adminCookie }
@@ -405,12 +423,13 @@ describe("capacity API routes", () => {
       (candidate) => candidate.user.id === "user-alpha-resource-reader"
     );
     const cell = row?.days.find((day) => day.date === "2026-06-02");
-    expect(cell?.workMinutes).toBe(540);
-    expect(cell?.overloadMinutes).toBe(60);
+    expect(cell?.workMinutes).toBe(600);
+    expect(cell?.overloadMinutes).toBe(120);
     expect(row?.projectsMixByDate?.["2026-06-02"]).toEqual(
       expect.arrayContaining([
         { projectId: "project-active", workMinutes: 300 },
-        { projectId: "project-draft", workMinutes: 240 }
+        { projectId: "project-draft", workMinutes: 240 },
+        { projectId: "__occupancy__", workMinutes: 60 }
       ])
     );
     expect(JSON.stringify(row?.projectsMixByDate ?? {})).not.toContain("project-draft-empty");
@@ -422,7 +441,7 @@ describe("capacity API routes", () => {
     expect(projectFiltered.status).toBe(200);
     const projectFilteredBody = await projectFiltered.json();
     expect(findResourceDay(projectFilteredBody, "user-alpha-resource-reader", "2026-06-02")).toEqual(
-      expect.objectContaining({ workMinutes: 300, overloadMinutes: 60 })
+      expect.objectContaining({ workMinutes: 300, overloadMinutes: 120 })
     );
   });
 

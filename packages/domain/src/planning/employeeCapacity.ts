@@ -168,7 +168,7 @@ export function mergeWorkspaceDayBuckets(input: {
     for (const bucket of project.buckets) {
       if (bucket.granularity !== "day") continue;
       if (!input.monthDates.has(bucket.date)) continue;
-      const committedMinutes = bucket.assignedMinutes + bucket.reservedMinutes;
+      const committedMinutes = bucket.assignedMinutes + bucket.reservedMinutes + bucket.occupiedMinutes;
       if (committedMinutes <= 0) continue;
 
       let userMap = byUserDate.get(bucket.resourceId);

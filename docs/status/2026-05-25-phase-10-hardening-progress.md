@@ -120,18 +120,21 @@
 | Planning proposal audit atomicity | Auto-solver run creation and scenario preview persistence could store proposals before the corresponding audit event succeeded | Solver run and scenario proposal creation now require transaction support and persist proposals plus audit in one data-source transaction | `pnpm vitest run apps/api/src/planningAutoSolverRoutes.test.ts`, `pnpm vitest run apps/api/src/app.test.ts -t planning`, `pnpm typecheck` |
 | Org structure audit atomicity | Org-structure replace could commit a tenant hierarchy change before the audit event succeeded | Org-structure replace now runs through the data-source transaction and writes the replacement plus audit through the transactional data source | `pnpm vitest run --config vitest.db.config.ts apps/api/src/orgStructureRoutes.db.test.ts`, `pnpm typecheck` |
 | Task comment audit atomicity | Task comments could create an activity row before the corresponding project-work audit event succeeded | Task comment creation now requires transaction plus audit support and writes the activity/audit through the transactional data source | `pnpm vitest run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts`, `pnpm typecheck` |
+| Collaboration mutation audit atomicity | Collaboration/message and meeting auxiliary mutations could persist before the corresponding success audit event, after Phase G added new backend write surfaces | Message edit/pin/remove, notification preferences, meeting update, external meeting links, notes and action items now write mutation plus audit inside one data-source transaction; DB regressions prove rollback on audit failure for representative message/link paths | `pnpm vitest run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts`, `pnpm typecheck` |
 | Realtime dependency readiness | `PLANNING_EVENTS_BACKEND` could be mistyped or Redis mode could be enabled without a Redis URL, while `/health/ready` still reported only DB/storage | Startup config validates planning event backend values and Redis URL requirements; readiness now includes `realtime` when Redis planning events are configured | `pnpm vitest run apps/api/src/serverReadiness.test.ts apps/api/src/app.test.ts`, `pnpm typecheck` |
+| Video provider env validation | `KISS_PM_VIDEO_PROVIDER` typos silently disabled calls, and malformed LiveKit token TTL values could be partially parsed | Video provider startup now fails closed for unknown provider values, strict-bounds LiveKit TTL, and whitespace-wrapped LiveKit secrets; operator runbooks document video env invariants | `pnpm vitest run apps/api/src/videoProvider.test.ts`, `pnpm typecheck` |
 | Self-hosted deployment contract | Backend operations runbook existed, but self-hosted deployment invariants were not separated into a reusable operator contract | Added `docs/runbooks/self-hosted-deployment.md` and linked it from docs README; backend operations runbook now documents Redis planning events and readiness behavior | Docs review plus targeted readiness tests |
 | Read-model performance smoke | Release-like DB smoke verified behavior but did not guard key read surfaces against obvious unbounded-read regressions | Backend management loop now seeds a batch of planning tasks and checks p95 smoke thresholds for planning read-model, tenant capacity tree, metadata search and audit list | `pnpm vitest run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts` |
 
 ## Broad verification
 
-- `pnpm test`: passed, 60 files, 432 tests, 1 skipped.
-- `pnpm test:db`: passed.
+- `pnpm test`: passed, 63 files, 466 tests, 1 skipped.
+- `pnpm test:db`: passed, 22 files, 167 tests.
 - `pnpm typecheck`: passed for every code slice.
+- `pnpm build`: passed for web production build plus repository typecheck.
 - `git diff --check`: passed for every code slice.
 - `pnpm security:check`: passed for backend-scoped audit/scan.
 
-## Remaining Phase 10 audit queue
+## Accepted non-blocking boundaries
 
-Open hardening work remains for a later backend security slice: session rotation for future password-reset workflows, deployment-level TLS/reverse-proxy controls that cannot be proven from app code alone, and continued route-by-route validation review for new backend phases. Frontend dependency/CSP work is intentionally outside this backend-only branch. Future backend phases should add their own rows and expand the release-like DB smoke when they introduce a mandatory loop step.
+The Phase 10 backend release gate has no unresolved `gap` rows in the capability inventory. Non-blocking boundaries remain explicit: session rotation belongs with the future password-reset workflow, TLS/reverse-proxy enforcement is a deployment concern documented in runbooks, and frontend dependency/CSP work is outside this backend-only branch. Future backend phases must add their own hardening rows and expand the release-like DB smoke when they introduce a mandatory loop step.

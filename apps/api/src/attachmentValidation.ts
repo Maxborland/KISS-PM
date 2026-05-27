@@ -52,7 +52,8 @@ export const attachmentEntityTypes = [
   "product",
   "project",
   "task",
-  "communication_channel"
+  "communication_channel",
+  "document"
 ] as const satisfies readonly AttachmentEntityType[];
 
 export const externalReferenceConnectorTypes = [

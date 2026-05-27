@@ -9,6 +9,74 @@ describe("video provider", () => {
     await expect(provider.issueJoinToken(joinInput())).rejects.toThrow("video_provider_disabled");
   });
 
+  it("accepts explicit disabled provider env", async () => {
+    const provider = createVideoProviderFromEnv({
+      KISS_PM_VIDEO_PROVIDER: "disabled"
+    } as NodeJS.ProcessEnv);
+
+    expect(provider.kind).toBe("disabled");
+    await expect(provider.issueJoinToken(joinInput())).rejects.toThrow("video_provider_disabled");
+  });
+
+  it("fails closed for malformed video provider env", () => {
+    expect(() =>
+      createVideoProviderFromEnv({
+        KISS_PM_VIDEO_PROVIDER: "livekit-preview"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+    expect(() =>
+      createVideoProviderFromEnv({
+        KISS_PM_VIDEO_JITSI_BASE_URL: "https://meet.kiss.local",
+        KISS_PM_VIDEO_PROVIDER: "jitsi "
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+  });
+
+  it("requires strict bounded LiveKit token TTL env", () => {
+    const baseEnv = {
+      KISS_PM_VIDEO_LIVEKIT_API_KEY: "livekit-key",
+      KISS_PM_VIDEO_LIVEKIT_API_SECRET: "livekit-secret",
+      KISS_PM_VIDEO_LIVEKIT_URL: "https://livekit.kiss.local",
+      KISS_PM_VIDEO_PROVIDER: "livekit"
+    } as NodeJS.ProcessEnv;
+
+    expect(() =>
+      createVideoProviderFromEnv({
+        ...baseEnv,
+        KISS_PM_VIDEO_TOKEN_TTL_SECONDS: "120abc"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+    expect(() =>
+      createVideoProviderFromEnv({
+        ...baseEnv,
+        KISS_PM_VIDEO_TOKEN_TTL_SECONDS: "59"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+    expect(() =>
+      createVideoProviderFromEnv({
+        ...baseEnv,
+        KISS_PM_VIDEO_TOKEN_TTL_SECONDS: "3601"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+    expect(
+      createVideoProviderFromEnv({
+        ...baseEnv,
+        KISS_PM_VIDEO_TOKEN_TTL_SECONDS: "120"
+      } as NodeJS.ProcessEnv).kind
+    ).toBe("livekit");
+  });
+
+  it("rejects LiveKit secrets with surrounding whitespace", () => {
+    expect(() =>
+      createVideoProviderFromEnv({
+        KISS_PM_VIDEO_LIVEKIT_API_KEY: " livekit-key",
+        KISS_PM_VIDEO_LIVEKIT_API_SECRET: "livekit-secret",
+        KISS_PM_VIDEO_LIVEKIT_URL: "https://livekit.kiss.local",
+        KISS_PM_VIDEO_PROVIDER: "livekit"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_misconfigured");
+  });
+
   it("builds safe Jitsi join URLs without token", async () => {
     const provider = createVideoProvider({ kind: "jitsi", baseUrl: "https://meet.kiss.local/" });
     await expect(provider.issueJoinToken(joinInput())).resolves.toEqual({
