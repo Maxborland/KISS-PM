@@ -43,15 +43,15 @@ export interface DemoStepMeta {
 export const STEP_META: Record<DemoStep, DemoStepMeta> = {
   "crm-list": {
     id: "crm-list",
-    badge: "Шаг 1 · Портфель",
+    badge: "Шаг 1 · CRM",
     title: "147 проектов в работе",
-    hint: "Откройте новый проектный спрос",
+    hint: "Откройте сделку DEAL-204 в списке",
   },
   "crm-deal": {
     id: "crm-deal",
-    badge: "Шаг 2 · Спрос",
-    title: "Новая работа входит в портфель",
-    hint: "Запустите оценку ёмкости до обещания сроков",
+    badge: "Шаг 2 · Сделка",
+    title: "ГК Север · ₽ 8.4 млн",
+    hint: "Запустите проверку ёмкости по сделке ГК Север · ₽ 8.4 млн",
   },
   intake: {
     id: "intake",

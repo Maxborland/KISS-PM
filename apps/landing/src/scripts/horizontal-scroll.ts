@@ -2,7 +2,7 @@
  * Horizontal scroll rails:
  *  - edge fade hints (data-hscroll-left / data-hscroll-right)
  *  - dot indicators that reflect snap position
- *  - desktop wheel-to-horizontal remap on opt-in (data-hscroll-wheel)
+ *  - native horizontal overflow for touch/trackpad without wheel hijacking
  */
 
 const HSCROLL_SELECTOR = "[data-hscroll]";
@@ -73,27 +73,39 @@ function bindDots(refs: RailRefs): void {
   });
 }
 
-function bindWheelRemap(refs: RailRefs): void {
-  if (refs.wrap.dataset.hscrollWheel !== "true") {
-    return;
+/** Подключает fade-hints и dots для одной пары wrap/rail. */
+export function bindHorizontalRail(
+  wrap: HTMLElement,
+  rail: HTMLElement
+): () => void {
+  const refs: RailRefs = {
+    wrap,
+    rail,
+    dots: collectDots(wrap),
+  };
+
+  const update = (): void => {
+    updateFades(refs);
+    updateDots(refs);
+  };
+
+  update();
+  rail.addEventListener("scroll", update, { passive: true });
+  const onResize = (): void => update();
+  window.addEventListener("resize", onResize);
+  bindDots(refs);
+
+  let ro: ResizeObserver | undefined;
+  if ("ResizeObserver" in window) {
+    ro = new ResizeObserver(update);
+    ro.observe(rail);
   }
-  refs.rail.addEventListener(
-    "wheel",
-    (event) => {
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
-        return;
-      }
-      const canScroll =
-        refs.rail.scrollWidth - refs.rail.clientWidth - refs.rail.scrollLeft > 1 ||
-        refs.rail.scrollLeft > 1;
-      if (!canScroll) {
-        return;
-      }
-      event.preventDefault();
-      refs.rail.scrollLeft += event.deltaY;
-    },
-    { passive: false }
-  );
+
+  return () => {
+    rail.removeEventListener("scroll", update);
+    window.removeEventListener("resize", onResize);
+    ro?.disconnect();
+  };
 }
 
 export function initHorizontalScroll(): void {
@@ -107,26 +119,6 @@ export function initHorizontalScroll(): void {
     if (!rail) {
       return;
     }
-    const refs: RailRefs = {
-      wrap,
-      rail,
-      dots: collectDots(wrap),
-    };
-
-    const update = (): void => {
-      updateFades(refs);
-      updateDots(refs);
-    };
-
-    update();
-    rail.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    bindDots(refs);
-    bindWheelRemap(refs);
-
-    if ("ResizeObserver" in window) {
-      const ro = new ResizeObserver(update);
-      ro.observe(rail);
-    }
+    bindHorizontalRail(wrap, rail);
   });
 }

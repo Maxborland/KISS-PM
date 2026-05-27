@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { sanitizeText } from "./sanitize";
+import { isConsumerEmailDomain, isWorkEmail } from "./work-email";
 import { WaitlistSubmission } from "./schema";
+
+describe("sanitizeText", () => {
+  it("removes control chars and tags", () => {
+    expect(sanitizeText("  Анна\x00 <b>Каренина</b>  ")).toBe("Анна Каренина");
+  });
+});
+
+describe("work email", () => {
+  it("rejects consumer domains", () => {
+    expect(isConsumerEmailDomain("a@gmail.com")).toBe(true);
+    expect(isConsumerEmailDomain("a@mail.ru")).toBe(true);
+    expect(isWorkEmail("anna@sver.ru")).toBe(true);
+  });
+});
 
 describe("WaitlistSubmission", () => {
   const base = {
@@ -17,6 +33,14 @@ describe("WaitlistSubmission", () => {
     expect(parsed.email).toBe("anna@example.com");
     expect(parsed.company).toBe("Север Девелопмент");
     expect(parsed.consent).toBe(true);
+  });
+
+  it("rejects consumer email", () => {
+    const result = WaitlistSubmission.safeParse({
+      ...base,
+      email: "anna@gmail.com",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects missing consent", () => {
