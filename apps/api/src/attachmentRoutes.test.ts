@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createUploadConcurrencyLimiter,
   parseContentLength,
   parseMultipartContentType,
   readBoundedMultipartRequest
@@ -64,6 +65,20 @@ describe("attachment route request bounds", () => {
       ok: false,
       error: "unsupported_media_type"
     });
+  });
+
+  it("limits concurrent uploads per actor key and releases capacity", () => {
+    const limiter = createUploadConcurrencyLimiter(2);
+    const first = limiter.tryAcquire("tenant:user");
+    const second = limiter.tryAcquire("tenant:user");
+    const third = limiter.tryAcquire("tenant:user");
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(third).toEqual({ ok: false });
+    if (first.ok) first.release();
+
+    expect(limiter.tryAcquire("tenant:user").ok).toBe(true);
   });
 });
 

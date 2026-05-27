@@ -1,3 +1,5 @@
+import { readRuntimeSecurityConfig } from "./runtimeSecurityConfig";
+
 const defaultPort = 4000;
 const defaultHostname = "127.0.0.1";
 
@@ -27,6 +29,9 @@ export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) 
   }
   if (planningEventsBackend === "redis" && !planningEventsRedisUrlFromEnv(env)) {
     throw new Error("planning_events_redis_url_required");
+  }
+  if (planningEventsBackend === "redis") {
+    readRuntimeSecurityConfig(env);
   }
   parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS);
 }

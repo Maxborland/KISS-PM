@@ -50,10 +50,16 @@ describe("auth session helpers", () => {
     );
   });
 
-  it("defaults production deployments to HTTPS-only cookies with explicit override", () => {
+  it("defaults production deployments to HTTPS-only cookies and rejects prod downgrade", () => {
     expect(shouldUseSecureCookies({ KISS_PM_SECURE_COOKIES: "true" })).toBe(true);
     expect(shouldUseSecureCookies({ KISS_PM_SECURE_COOKIES: "false" })).toBe(false);
     expect(shouldUseSecureCookies({ NODE_ENV: "production" })).toBe(true);
+    expect(() =>
+      shouldUseSecureCookies({
+        KISS_PM_SECURE_COOKIES: "false",
+        NODE_ENV: "production"
+      })
+    ).toThrow("secure_cookies_required_in_production");
     expect(shouldUseSecureCookies({ NODE_ENV: "development" })).toBe(false);
     expect(shouldUseSecureCookies({})).toBe(false);
   });
