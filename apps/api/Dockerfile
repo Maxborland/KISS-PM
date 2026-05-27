@@ -26,6 +26,7 @@ FROM node:22-alpine
 WORKDIR /workspace
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 COPY --from=builder /workspace/apps/api/package.json apps/api/package.json
 COPY --from=builder /workspace/node_modules node_modules

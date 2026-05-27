@@ -56,6 +56,7 @@ const defaultOptions: AuthRateLimiterOptions = {
   windowMs: 15 * 60 * 1000,
   blockMs: 15 * 60 * 1000
 };
+const maxReservationMs = 30_000;
 
 export function createAuthRateLimiter(
   options: Partial<AuthRateLimiterOptions> = {}
@@ -274,9 +275,7 @@ function retryAfterForReservationOverflow(
           blockedUntil: 0
         };
   if (bucket.attempts + bucket.pendingAttempts < options.maxFailures) return 0;
-  bucket.blockedUntil = now + options.blockMs;
-  buckets.set(key, bucket);
-  return options.blockMs;
+  return Math.min(options.windowMs, maxReservationMs);
 }
 
 function reserveInBucket(
@@ -413,7 +412,7 @@ async function createRedisAuthRateLimiter(input: {
       [
         String(options.windowMs),
         String(options.blockMs),
-        String(Math.min(options.windowMs, 30_000)),
+        String(Math.min(options.windowMs, maxReservationMs)),
         String(buckets.length),
         ...buckets.map((bucket) => String(bucket.maxFailures))
       ]
@@ -591,10 +590,18 @@ for i = 1, bucketCount do
   end
   local attempts = tonumber(redis.call("GET", attemptsKey) or "0")
   local pending = tonumber(redis.call("GET", pendingKey) or "0")
-  if attempts + pending >= maxFailures then
+  if attempts >= maxFailures then
     redis.call("SET", blockKey, "1", "PX", blockMs)
     if blockMs > retryAfter then
       retryAfter = blockMs
+    end
+  elseif attempts + pending >= maxFailures then
+    local pendingTtl = redis.call("PTTL", pendingKey)
+    if pendingTtl < 0 then
+      pendingTtl = reservationMs
+    end
+    if pendingTtl > retryAfter then
+      retryAfter = pendingTtl
     end
   end
 end
