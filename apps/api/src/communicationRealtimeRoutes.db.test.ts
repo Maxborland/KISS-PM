@@ -4,115 +4,37 @@ import {
   createDatabase,
   createPostgresClient,
   createPostgresTenantDataSource,
-  seedTenantDataset,
-  type PostgresClient,
-  type SeedTenantDataset
+  type PostgresClient
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
-import { createVideoProvider } from "./videoProvider";
+import {
+  communicationJsonHeaders as jsonHeaders,
+  communicationRealtimeDatabaseUrl,
+  createCommunicationExternalReferenceAttachment,
+  createCommunicationRealtimeTestApp,
+  loginCommunicationRealtimeUser,
+  seedCommunicationRealtimeScenario,
+  truncateCommunicationRealtimeState
+} from "./communicationRealtimeTestFixture";
 import type { VideoProvider } from "./videoProvider";
-
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
-
-const seed: SeedTenantDataset = {
-  tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
-  accessProfiles: [
-    {
-      id: "access-profile-admin",
-      tenantId: "tenant-alpha",
-      name: "Администратор",
-      permissions: [
-        "tenant.projects.read",
-        "tenant.projects.manage",
-        "tenant.opportunities.read",
-        "tenant.opportunities.manage",
-        "tenant.project_activation.manage",
-        "tenant.tasks.create",
-        "tenant.tasks.edit",
-        "tenant.audit_events.read"
-      ]
-    },
-    {
-      id: "access-profile-reader",
-      tenantId: "tenant-alpha",
-      name: "Участник",
-      permissions: ["tenant.projects.read"]
-    },
-    {
-      id: "access-profile-denied",
-      tenantId: "tenant-alpha",
-      name: "Без доступа",
-      permissions: []
-    }
-  ],
-  positions: [
-    { id: "position-manager", tenantId: "tenant-alpha", name: "Руководитель" },
-    { id: "position-engineer", tenantId: "tenant-alpha", name: "Инженер" }
-  ],
-  clients: [{ id: "client-romashka", tenantId: "tenant-alpha", name: "ООО Ромашка" }],
-  projectTypes: [
-    { id: "project-type-implementation", tenantId: "tenant-alpha", name: "Внедрение" }
-  ],
-  users: [
-    {
-      id: "user-alpha-admin",
-      tenantId: "tenant-alpha",
-      email: "admin@kiss-pm.local",
-      name: "Анна Администратор",
-      accessProfileId: "access-profile-admin",
-      positionId: "position-manager",
-      password: "local-admin-password"
-    },
-    {
-      id: "user-alpha-reader",
-      tenantId: "tenant-alpha",
-      email: "reader@kiss-pm.local",
-      name: "Роман Участник",
-      accessProfileId: "access-profile-reader",
-      positionId: "position-engineer",
-      password: "local-reader-password"
-    },
-    {
-      id: "user-alpha-denied",
-      tenantId: "tenant-alpha",
-      email: "denied@kiss-pm.local",
-      name: "Дина Без Прав",
-      accessProfileId: "access-profile-denied",
-      password: "local-denied-password"
-    }
-  ]
-};
 
 describe("communications realtime API", () => {
   let client: PostgresClient;
   let app: ReturnType<typeof createApp>;
 
   beforeAll(() => {
-    client = createPostgresClient(databaseUrl);
-    app = createApp({
-      dataSource: createPostgresTenantDataSource(createDatabase(client)),
-      videoProvider: createVideoProvider({
-        kind: "livekit",
-        url: "https://livekit.kiss.local",
-        apiKey: "livekit-key",
-        apiSecret: "livekit-secret",
-        tokenTtlSeconds: 120
-      })
-    });
+    client = createPostgresClient(communicationRealtimeDatabaseUrl);
+    app = createCommunicationRealtimeTestApp(client);
   });
 
   beforeEach(async () => {
-    await truncateState();
-    await seedTenantDataset(createDatabase(client), seed, new Date("2026-05-25T00:00:00.000Z"));
-    await createActiveProject();
+    await seedCommunicationRealtimeScenario(client);
   });
 
   afterAll(async () => {
-    await truncateState();
+    await truncateCommunicationRealtimeState(client);
     await client.end();
   });
 
@@ -198,6 +120,72 @@ describe("communications realtime API", () => {
     );
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain(joinPayload.join.token);
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain("livekit-secret");
+  });
+
+  it("supports call rooms scoped to the workspace general communication channel", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+
+    const channels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie: adminCookie }
+    });
+    expect(channels.status).toBe(200);
+    const channelsPayload = await channels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    const generalChannel = channelsPayload.channels.find(
+      (channel) => channel.channelType === "workspace_general"
+    );
+    expect(generalChannel?.id).toBe("channel-workspace-general");
+
+    const roomResponse = await app.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "communication_channel",
+        entityId: generalChannel?.id,
+        title: "Общий созвон",
+        mediaKind: "audio",
+        provider: "livekit",
+        providerRoomId: "workspace-general-room"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const room = await roomResponse.json() as { callRoom: { roomId: string } };
+
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const join = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+    expect(join.status).toBe(200);
+    await expect(join.json()).resolves.toMatchObject({
+      join: {
+        provider: "livekit",
+        joinUrl: "https://livekit.kiss.local"
+      }
+    });
+
+    const channelAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-channel-recording",
+      entityType: "communication_channel",
+      entityId: generalChannel?.id ?? "channel-workspace-general"
+    });
+    const recording = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        attachmentId: channelAttachment,
+        title: "Запись общего созвона"
+      })
+    });
+    expect(recording.status).toBe(201);
+    await expect(recording.json()).resolves.toMatchObject({
+      recording: {
+        attachmentId: channelAttachment,
+        title: "Запись общего созвона"
+      }
+    });
   });
 
   it("emits distinct events for invited and joining participant states", async () => {
@@ -368,7 +356,11 @@ describe("communications realtime API", () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
-    const sameEntityAttachment = await createProjectAttachment("attachment-project", "project-alpha");
+    const sameEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-project",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
 
     const missingParticipant = await app.request(
       `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
@@ -451,8 +443,21 @@ describe("communications realtime API", () => {
   it("attaches recordings only through same-entity attachments", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
     const room = await createRoom(adminCookie);
-    const sameEntityAttachment = await createProjectAttachment("attachment-project", "project-alpha");
-    const otherEntityAttachment = await createProjectAttachment("attachment-other", "project-other");
+    const sameEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-project",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
+    const otherEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-other",
+      entityType: "project",
+      entityId: "project-other"
+    });
+    const archivedAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-archived",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
 
     const accepted = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
       method: "POST",
@@ -480,6 +485,24 @@ describe("communications realtime API", () => {
     });
     expect(rejected.status).toBe(400);
     await expect(rejected.json()).resolves.toEqual({
+      error: "call_recording_attachment_invalid"
+    });
+
+    const archived = await app.request(`/api/workspace/attachments/${archivedAttachment}`, {
+      method: "DELETE",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(archived.status).toBe(200);
+    const rejectedArchived = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        attachmentId: archivedAttachment,
+        title: "Удаленная запись"
+      })
+    });
+    expect(rejectedArchived.status).toBe(400);
+    await expect(rejectedArchived.json()).resolves.toEqual({
       error: "call_recording_attachment_invalid"
     });
   });
@@ -511,104 +534,15 @@ describe("communications realtime API", () => {
   }
 
   async function loginAs(email: string, password: string) {
-    const response = await app.request("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    expect(response.status).toBe(200);
-    return response.headers.get("set-cookie") ?? "";
+    return loginCommunicationRealtimeUser(app, email, password);
   }
 
-  async function createActiveProject() {
-    const dataSource = createPostgresTenantDataSource(createDatabase(client));
-    const opportunity = await dataSource.createOpportunity({
-      id: "opportunity-alpha",
-      tenantId: "tenant-alpha",
-      clientId: "client-romashka",
-      primaryContactId: null,
-      projectTypeId: "project-type-implementation",
-      stageId: null,
-      clientName: "ООО Ромашка",
-      contactName: "Ирина Клиент",
-      title: "Внедрение KISS PM",
-      projectType: "Внедрение",
-      description: null,
-      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
-      plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
-      contractValue: 1000000,
-      plannedHourlyRate: 5000,
-      plannedHours: 200,
-      probability: 80,
-      status: "ready_to_activate",
-      templateId: null,
-      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
-    });
-    const draft = await dataSource.createProjectDraftFromOpportunity({
-      id: "project-alpha",
-      tenantId: "tenant-alpha",
-      sourceOpportunityId: opportunity.id,
-      clientId: opportunity.clientId,
-      projectTypeId: opportunity.projectTypeId,
-      title: opportunity.title,
-      clientName: opportunity.clientName,
-      status: "draft",
-      plannedStart: opportunity.plannedStart,
-      plannedFinish: opportunity.plannedFinish,
-      contractValue: opportunity.contractValue,
-      plannedHours: opportunity.plannedHours,
-      templateId: null,
-      demand: opportunity.demand
-    });
-    await dataSource.activateProjectDraft({ tenantId: "tenant-alpha", projectId: draft.id });
-    await dataSource.createProjectDraftFromOpportunity({
-      id: "project-other",
-      tenantId: "tenant-alpha",
-      sourceOpportunityId: "opportunity-alpha",
-      clientId: opportunity.clientId,
-      projectTypeId: opportunity.projectTypeId,
-      title: "Другой проект",
-      clientName: opportunity.clientName,
-      status: "draft",
-      plannedStart: opportunity.plannedStart,
-      plannedFinish: opportunity.plannedFinish,
-      contractValue: opportunity.contractValue,
-      plannedHours: opportunity.plannedHours,
-      templateId: null,
-      demand: opportunity.demand
-    }).catch(() => undefined);
-  }
-
-  async function createProjectAttachment(attachmentId: string, projectId: string) {
-    const dataSource = createPostgresTenantDataSource(createDatabase(client));
-    const referenceId = `reference-${attachmentId}`;
-    await dataSource.createExternalReference({
-      id: referenceId,
-      tenantId: "tenant-alpha",
-      connectorType: "manual_link",
-      externalId: null,
-      url: `https://files.kiss.local/${attachmentId}`,
-      title: attachmentId,
-      metadata: {},
-      createdByUserId: "user-alpha-admin"
-    });
-    const attachment = await dataSource.createEntityAttachment({
-      id: attachmentId,
-      tenantId: "tenant-alpha",
-      entityType: "project",
-      entityId: projectId,
-      assetId: null,
-      externalReferenceId: referenceId,
-      relationType: "recording",
-      sourceActivityType: null,
-      sourceActivityId: null,
-      createdByUserId: "user-alpha-admin"
-    });
-    return attachment.id;
-  }
-
-  async function truncateState() {
-    await client`TRUNCATE call_recordings, call_participant_states, call_events, call_sessions, call_rooms, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+  async function createExternalReferenceAttachment(input: {
+    attachmentId: string;
+    entityType: "project" | "communication_channel";
+    entityId: string;
+  }) {
+    return createCommunicationExternalReferenceAttachment(client, input);
   }
 
   function createSessionEndedRaceApp(sessionId: string) {
@@ -655,11 +589,3 @@ describe("communications realtime API", () => {
     `;
   }
 });
-
-function jsonHeaders(cookie: string) {
-  return {
-    "content-type": "application/json",
-    "x-kiss-pm-action": "same-origin",
-    cookie
-  };
-}

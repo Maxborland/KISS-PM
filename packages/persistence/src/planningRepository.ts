@@ -47,6 +47,7 @@ import {
   createResourceAbsencesRepository,
   expandAbsenceToCalendarExceptions
 } from "./resourceAbsencesRepository";
+import { createOccupancyRepository } from "./occupancyRepository";
 import { TENANT_DEFAULT_CALENDAR_ID } from "./tenantProductionCalendarConstants";
 
 export type PlanningDependencyInput = {
@@ -334,6 +335,12 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         rangeStart,
         rangeFinish
       );
+      const occupancyRepository = createOccupancyRepository(db);
+      const occupancyWindows = await occupancyRepository.listOccupancyWindows({
+        tenantId,
+        from: new Date(`${rangeStart}T00:00:00.000Z`),
+        to: new Date(`${rangeFinish}T23:59:59.999Z`)
+      });
       const absenceExceptions = approvedAbsences.flatMap((absence) =>
         expandAbsenceToCalendarExceptions(absence).map((exception) => ({
           id: exception.id,
@@ -416,6 +423,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           workMinutes: reservation.workMinutes,
           reason: reservation.reason
         })),
+        occupancyWindows,
         constraints: orderedTaskRows.flatMap((task) => {
           const constraint = mapConstraint(task);
           return constraint ? [constraint] : [];

@@ -36,6 +36,7 @@ export type VideoProvider = {
 };
 
 const defaultTokenTtlSeconds = 10 * 60;
+const minTokenTtlSeconds = 60;
 const maxTokenTtlSeconds = 60 * 60;
 
 export function createVideoProviderFromEnv(env: NodeJS.ProcessEnv = process.env): VideoProvider {
@@ -57,7 +58,7 @@ export function createVideoProviderFromEnv(env: NodeJS.ProcessEnv = process.env)
     });
   }
   if (kind === "livekit") {
-    const tokenTtlSeconds = parsePositiveInt(env.KISS_PM_VIDEO_TOKEN_TTL_SECONDS);
+    const tokenTtlSeconds = parseEnvTokenTtlSeconds(env.KISS_PM_VIDEO_TOKEN_TTL_SECONDS);
     return createVideoProvider({
       kind,
       allowInsecureHttp,
@@ -142,18 +143,27 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
 }
 
 function parseProviderKind(value: string | undefined): VideoProviderKind {
-  if (value === "manual" || value === "jitsi" || value === "livekit") return value;
-  return "disabled";
+  if (value === undefined || value.trim() === "") return "disabled";
+  if (value === "disabled" || value === "manual" || value === "jitsi" || value === "livekit") return value;
+  throw new Error("video_provider_misconfigured");
 }
 
-function parsePositiveInt(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+function parseEnvTokenTtlSeconds(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  if (!/^[1-9][0-9]*$/.test(value)) throw new Error("video_provider_misconfigured");
+  const parsed = Number(value);
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed < minTokenTtlSeconds ||
+    parsed > maxTokenTtlSeconds
+  ) {
+    throw new Error("video_provider_misconfigured");
+  }
+  return parsed;
 }
 
 function boundedTtl(value: number | undefined): number {
-  return Math.min(Math.max(value ?? defaultTokenTtlSeconds, 60), maxTokenTtlSeconds);
+  return Math.min(Math.max(value ?? defaultTokenTtlSeconds, minTokenTtlSeconds), maxTokenTtlSeconds);
 }
 
 function requiredEnvUrl(value: string | undefined, allowInsecureHttp: boolean): string {
@@ -162,7 +172,9 @@ function requiredEnvUrl(value: string | undefined, allowInsecureHttp: boolean): 
 }
 
 function requiredSecret(value: string | undefined): string {
-  if (!value || value.length < 8) throw new Error("video_provider_misconfigured");
+  if (!value || value.trim() !== value || value.length < 8) {
+    throw new Error("video_provider_misconfigured");
+  }
   return value;
 }
 

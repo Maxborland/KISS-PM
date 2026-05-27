@@ -21,6 +21,7 @@ export function createPlanningReadModel(snapshot: PlanSnapshot) {
     calendars: snapshot.calendars,
     calendarExceptions: snapshot.calendarExceptions,
     reservations: snapshot.reservations,
+    occupancyWindows: snapshot.occupancyWindows,
     rangeStart: snapshot.project.plannedStart,
     rangeFinish: latestDate([
       calculatedPlan.projectFinish,

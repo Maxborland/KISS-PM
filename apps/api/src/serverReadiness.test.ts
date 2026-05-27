@@ -90,6 +90,8 @@ describe("server readiness checks", () => {
         PORT: "4100"
       } as NodeJS.ProcessEnv)
     ).toEqual({
+      backgroundJobsEnabled: false,
+      backgroundJobsPollMs: 10_000,
       databaseUrl: undefined,
       enableDevTenantRoutes: true,
       hostname: "0.0.0.0",
@@ -99,6 +101,8 @@ describe("server readiness checks", () => {
       production: false
     });
     expect(readServerRuntimeConfig({} as NodeJS.ProcessEnv)).toEqual({
+      backgroundJobsEnabled: false,
+      backgroundJobsPollMs: 10_000,
       databaseUrl: undefined,
       enableDevTenantRoutes: false,
       hostname: "127.0.0.1",
@@ -107,6 +111,21 @@ describe("server readiness checks", () => {
       port: 4000,
       production: false
     });
+  });
+
+  it("normalizes and bounds background job worker runtime configuration", () => {
+    expect(readServerRuntimeConfig({
+      KISS_PM_BACKGROUND_JOBS_ENABLED: "true",
+      KISS_PM_BACKGROUND_JOBS_POLL_MS: "15000"
+    } as NodeJS.ProcessEnv)).toMatchObject({
+      backgroundJobsEnabled: true,
+      backgroundJobsPollMs: 15_000
+    });
+    expect(() =>
+      readServerRuntimeConfig({
+        KISS_PM_BACKGROUND_JOBS_POLL_MS: "50"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("invalid_background_jobs_poll_ms");
   });
 
   it("fails database readiness in production when DATABASE_URL is not configured", async () => {

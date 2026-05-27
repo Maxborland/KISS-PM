@@ -14,6 +14,7 @@ import {
   MissingAccessProfileError,
   resolveAppErrorResponse
 } from "./appErrors";
+import { registerApiDocsRoutes } from "./apiDocs/apiDocsRoutes";
 import type {
   ApiTenantDataSource,
   CreateAppOptions,
@@ -26,20 +27,24 @@ import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
+import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerHealthRoutes } from "./healthRoutes";
+import { registerKnowledgeRoutes } from "./knowledgeRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
 import { registerAbsencesRoutes } from "./absencesRoutes";
 import { registerOrgStructureRoutes } from "./orgStructureRoutes";
+import { registerOccupancyRoutes } from "./occupancyRoutes";
 import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
@@ -228,6 +233,7 @@ export function createApp(options: CreateAppOptions = {}) {
     readinessChecks: options.readinessChecks,
     storageProvider
   });
+  registerApiDocsRoutes(app);
 
   app.get("/api/health/realtime", async (context) => {
     const { getPlanningRealtimeStatus } = await import("./planningRealtimeHealth.js");
@@ -235,6 +241,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
+  registerBackgroundJobRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
   }
@@ -243,7 +250,9 @@ export function createApp(options: CreateAppOptions = {}) {
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
+  registerCommunicationUpgradeRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
+  registerKnowledgeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
@@ -253,6 +262,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCapacityRoutes(app, routeDeps);
   registerProductionCalendarRoutes(app, routeDeps);
   registerAbsencesRoutes(app, routeDeps);
+  registerOccupancyRoutes(app, routeDeps);
   registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerRetrospectiveRoutes(app, routeDeps);

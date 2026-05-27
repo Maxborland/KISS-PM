@@ -12,6 +12,7 @@ import { resolveAttachmentEntityContext } from "../attachmentEntityAccess";
 import { matches, rankAndLimit, score } from "./searchScoring";
 import { routeForEntity } from "./searchRouting";
 import type { SearchResult, WorkspaceSearchInput, WorkspaceSearchSource } from "./searchTypes";
+import { searchKnowledge } from "./workspaceKnowledgeSearchSource";
 
 const ATTACHMENT_ACL_SCAN_MULTIPLIER = 10;
 const MAX_ATTACHMENT_ACL_SCAN_CANDIDATES = 200;
@@ -44,6 +45,10 @@ export const workspaceSearchSources: WorkspaceSearchSource[] = [
   {
     sourceTypes: ["file", "external_reference"],
     search: (input, limit) => searchAttachments(input, limit)
+  },
+  {
+    sourceTypes: ["document", "decision", "knowledge_action_item"],
+    search: (input, limit) => searchKnowledge(input, limit)
   }
 ];
 
@@ -215,7 +220,7 @@ async function searchAttachments(input: WorkspaceSearchInput, limit: number): Pr
     if (attachments.length < pageLimit) break;
   }
 
-  return rankAndLimit(visible.map((attachment) => {
+  const results = await Promise.all(visible.map(async (attachment) => {
     const title = attachment.fileAsset?.safeDisplayName ?? attachment.externalReference?.title ?? "Вложение";
     const subtitle = attachment.fileAsset?.mimeType ?? attachment.externalReference?.connectorType ?? "Ссылка";
     const kind = attachment.fileAsset ? "file" : "external_reference";
@@ -227,12 +232,14 @@ async function searchAttachments(input: WorkspaceSearchInput, limit: number): Pr
       snippet: attachment.externalReference?.url ?? attachment.fileAsset?.mimeType ?? "",
       entityType: attachment.entityType,
       entityId: attachment.entityId,
-      route: routeForEntity(attachment.entityType, attachment.entityId),
+      route: await routeForAttachment(input, attachment),
       updatedAt: attachment.createdAt.toISOString(),
       score: score(input.query, title, subtitle, attachment.externalReference?.url ?? ""),
       source: "attachments"
     };
-  }), limit);
+  }));
+
+  return rankAndLimit(results, limit);
 }
 
 function matchesRequestedAttachmentKind(
@@ -242,4 +249,19 @@ function matchesRequestedAttachmentKind(
   if (!input.requestedTypes) return true;
   const kind = attachment.fileAsset ? "file" : "external_reference";
   return input.requestedTypes.has(kind);
+}
+
+async function routeForAttachment(
+  input: WorkspaceSearchInput,
+  attachment: AttachmentReadModel
+): Promise<string> {
+  if (attachment.entityType !== "document") {
+    return routeForEntity(attachment.entityType, attachment.entityId);
+  }
+  const document = await input.dataSource.findKnowledgeDocumentById?.({
+    tenantId: input.actor.tenantId,
+    documentId: attachment.entityId
+  });
+  if (!document) return routeForEntity(attachment.entityType, attachment.entityId);
+  return `/projects/${document.projectId}/knowledge/documents/${document.id}`;
 }

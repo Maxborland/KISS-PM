@@ -4,6 +4,7 @@ import { createEmptyPlanDelta, type PlanDelta, type PlanningCommand } from "./pl
 import { buildResourceLoadMatrix, type ResourceLoadMatrix } from "./resourcePlanning";
 import { calculatePlan } from "./schedulingEngine";
 import { workingMinutesForDate } from "./workingTime";
+import { occupancyMinutesForDate } from "./occupancy";
 import type {
   CalculatedPlan,
   CalculatedTask,
@@ -378,6 +379,7 @@ function createSolverProposal(input: {
     calendars: nextSnapshot.calendars,
     calendarExceptions: nextSnapshot.calendarExceptions,
     reservations: nextSnapshot.reservations,
+    occupancyWindows: nextSnapshot.occupancyWindows,
     rangeStart: nextSnapshot.project.plannedStart,
     rangeFinish: maxPlanDate(input.targetDeadline, nextPlan.projectFinish ?? input.targetDeadline),
     granularities: ["day"]
@@ -750,6 +752,14 @@ function buildBaseUsage(snapshot: PlanSnapshot, plannedAssignments: PlanAssignme
   for (const allocation of snapshot.assignmentAllocations ?? []) {
     if (plannedAssignmentIds.has(allocation.assignmentId)) continue;
     addUsage(usage, allocation.resourceId, allocation.date, allocation.workMinutes);
+  }
+
+  for (const window of snapshot.occupancyWindows ?? []) {
+    if (window.capacityImpact === "tentative") continue;
+    for (const date of enumerateDates(window.startsAt.slice(0, 10), window.finishesAt.slice(0, 10))) {
+      const workMinutes = occupancyMinutesForDate(window, date);
+      if (workMinutes > 0) addUsage(usage, window.resourceId, date, workMinutes);
+    }
   }
 
   return usage;

@@ -1,16 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import type { AccessProfile } from "@kiss-pm/access-control";
 import {
-  canEditTasks,
-  canManageOpportunities,
-  canManageProjects,
-  canReadOpportunities,
-  canReadProjects,
-  type AccessProfile,
-  type PolicyDecision
-} from "@kiss-pm/access-control";
-import {
-  extractMentionedUserIds,
   meetingActionTargetTypes,
   meetingParticipantRoles,
   parseCollaborationEntityType,
@@ -23,6 +14,7 @@ import {
   parseMeetingNoteBody,
   parseMeetingStatus,
   parseMeetingTitle,
+  parseMessageReactionEmoji,
   parseMessageBody,
   parseNotificationChannel,
   parseNotificationType,
@@ -35,10 +27,14 @@ import type { Hono } from "hono";
 
 import type {
   ApiTenantDataSource,
-  ManagementAuditEventInput,
-  ProjectRecord
+  ManagementAuditEventInput
 } from "./apiTypes";
 import { parseExternalReferenceUrl, parseReferenceTitle } from "./attachmentValidation";
+import {
+  filterCollaborationMentionRecipients,
+  resolveCollaborationEntityAccess,
+  type CollaborationEntityAccessContext
+} from "./collaboration/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
 
 export type CollaborationRouteDeps = {
@@ -54,15 +50,6 @@ export type CollaborationRouteDeps = {
   ): Promise<string>;
 };
 
-type EntityAccessContext = {
-  entityType: CollaborationEntityType;
-  entityId: string;
-  sourceEntity: { type: string; id: string };
-  readDecision: PolicyDecision;
-  manageDecision: PolicyDecision;
-  title: string;
-};
-
 export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteDeps) {
   app.get("/api/workspace/conversations", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
@@ -70,7 +57,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: entity.value.entityId,
@@ -131,8 +118,20 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       ...(cursor.value ? { cursor: cursor.value } : {})
     });
     if (!messages) return context.json({ error: "collaboration_not_configured" }, 501);
+    const messageIds = messages.map((message) => message.id);
+    const reactions = await deps.dataSource.listMessageReactionsByMessageIds?.({
+      tenantId: actor.tenantId,
+      messageIds
+    }) ?? [];
+    const stickers = await deps.dataSource.listMessageStickersByMessageIds?.({
+      tenantId: actor.tenantId,
+      messageIds
+    }) ?? [];
     return context.json({
-      messages: messages.map(serializeMessage),
+      messages: messages.map((message) => serializeMessageWithExtras(message, {
+        reactions: reactions.filter((reaction) => reaction.messageId === message.id),
+        stickers: stickers.filter((sticker) => sticker.messageId === message.id)
+      })),
       nextCursor: messages[0]?.id ?? null
     });
   });
@@ -144,7 +143,18 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsedBody = parseMessageBody(readRecord(body.value).body);
+    const record = readRecord(body.value);
+    const stickerAssetId = parseOptionalCollaborationId(record.stickerAssetId, "sticker_asset_id_invalid");
+    if (!stickerAssetId.ok) return context.json({ error: stickerAssetId.error }, 400);
+    let stickerAsset: import("@kiss-pm/domain").StickerAsset | undefined;
+    if (stickerAssetId.value) {
+      if (!deps.dataSource.findStickerAsset || !deps.dataSource.createMessageSticker) {
+        return context.json({ error: "collaboration_not_configured" }, 501);
+      }
+      stickerAsset = await deps.dataSource.findStickerAsset(actor.tenantId, stickerAssetId.value);
+      if (!stickerAsset) return context.json({ error: "sticker_asset_not_found" }, 404);
+    }
+    const parsedBody = parseMessageBody(record.body ?? stickerAsset?.emoji);
     if (!parsedBody.ok) return context.json({ error: parsedBody.error }, 400);
     if (!deps.dataSource.createDiscussionMessage || !deps.dataSource.replaceMessageMentions) {
       return context.json({ error: "collaboration_not_configured" }, 501);
@@ -157,9 +167,17 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         conversationId: conversation.value.conversation.id,
         authorUserId: actor.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(readRecord(body.value).metadata)
+        metadata: parseMessageMetadata(record.metadata)
       });
-      const mentionUserIds = await filterMentionRecipients({
+      const sticker = stickerAsset
+        ? await requireMethod(transactionDataSource.createMessageSticker).call(transactionDataSource, {
+            tenantId: actor.tenantId,
+            messageId: message.id,
+            stickerAssetId: stickerAsset.id,
+            createdByUserId: actor.id
+          })
+        : null;
+      const mentionUserIds = await filterCollaborationMentionRecipients({
         actor,
         body: parsedBody.value,
         dataSource: transactionDataSource,
@@ -193,17 +211,91 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
           sourceEntity: conversation.value.access.sourceEntity,
           commandInput: { conversationId: conversation.value.conversation.id },
           permissionResult: conversation.value.access.readDecision,
-          afterState: { messageId: message.id, mentionedUserIds: mentionUserIds }
+          afterState: { messageId: message.id, mentionedUserIds: mentionUserIds, stickerAssetId: sticker?.stickerAssetId ?? null }
         }),
         transactionDataSource
       );
-      return { message, mentions };
+      return { message, mentions, sticker };
     });
 
     return context.json({
-      message: serializeMessage(result.message),
+      message: serializeMessageWithExtras(result.message, {
+        reactions: [],
+        stickers: result.sticker ? [result.sticker] : []
+      }),
       mentions: result.mentions
     }, 201);
+  });
+
+  app.post("/api/workspace/conversations/:conversationId/messages/:messageId/reactions", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
+    const message = await deps.dataSource.findDiscussionMessage?.(
+      actor.tenantId,
+      context.req.param("messageId")
+    );
+    if (!message || message.conversationId !== conversation.value.conversation.id || message.archivedAt) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const emoji = parseMessageReactionEmoji(readRecord(body.value).emoji);
+    if (!emoji.ok) return context.json({ error: emoji.error }, 400);
+    if (!deps.dataSource.upsertMessageReaction) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const reaction = await deps.dataSource.upsertMessageReaction({
+      id: `reaction-${randomUUID()}`,
+      tenantId: actor.tenantId,
+      messageId: message.id,
+      userId: actor.id,
+      emoji: emoji.value
+    });
+    await deps.appendManagementAuditEvent(collaborationAudit({
+      actionType: "communications.message_reaction_added",
+      actor,
+      sourceEntity: conversation.value.access.sourceEntity,
+      commandInput: { messageId: message.id, emoji: emoji.value },
+      permissionResult: conversation.value.access.readDecision,
+      afterState: { reactionId: reaction.id }
+    }));
+    return context.json({ reaction: serializeReaction(reaction) }, 201);
+  });
+
+  app.delete("/api/workspace/conversations/:conversationId/messages/:messageId/reactions/:reactionId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
+    const message = await deps.dataSource.findDiscussionMessage?.(
+      actor.tenantId,
+      context.req.param("messageId")
+    );
+    if (!message || message.conversationId !== conversation.value.conversation.id) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    const reactionId = parseCollaborationId(context.req.param("reactionId"), "reaction_id_invalid");
+    if (!reactionId.ok) return context.json({ error: reactionId.error }, 400);
+    const reaction = await deps.dataSource.archiveMessageReaction?.({
+      tenantId: actor.tenantId,
+      messageId: message.id,
+      reactionId: reactionId.value,
+      userId: actor.id
+    });
+    if (!reaction) {
+      return context.json({ error: "reaction_not_found" }, 404);
+    }
+    await deps.appendManagementAuditEvent(collaborationAudit({
+      actionType: "communications.message_reaction_removed",
+      actor,
+      sourceEntity: conversation.value.access.sourceEntity,
+      commandInput: { messageId: message.id, reactionId: reaction.id },
+      permissionResult: conversation.value.access.readDecision,
+      afterState: { archivedAt: reaction.archivedAt?.toISOString() ?? null }
+    }));
+    return context.json({ reaction: serializeReaction(reaction) });
   });
 
   app.patch("/api/workspace/conversations/:conversationId/messages/:messageId", async (context) => {
@@ -232,24 +324,31 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsedBody = parseMessageBody(readRecord(body.value).body);
     if (!parsedBody.ok) return context.json({ error: parsedBody.error }, 400);
-    const updated = await deps.dataSource.updateDiscussionMessage?.({
-      tenantId: actor.tenantId,
-      messageId: message.id,
-      body: parsedBody.value,
-      metadata: parseMessageMetadata(readRecord(body.value).metadata)
+    if (!deps.dataSource.updateDiscussionMessage) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const updatedMessage = await requireMethod(transactionDataSource.updateDiscussionMessage).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        messageId: message.id,
+        body: parsedBody.value,
+        metadata: parseMessageMetadata(readRecord(body.value).metadata)
+      });
+      if (!updatedMessage) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.message_edited",
+        actor,
+        sourceEntity: conversation.value.access.sourceEntity,
+        commandInput: { messageId: message.id },
+        permissionResult: message.authorUserId === actor.id
+          ? { allowed: true, reason: "same_tenant_permission_granted" }
+          : conversation.value.access.manageDecision,
+        beforeState: { body: message.body },
+        afterState: { body: updatedMessage.body }
+      }), transactionDataSource);
+      return updatedMessage;
     });
     if (!updated) return context.json({ error: "message_not_found" }, 404);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.message_edited",
-      actor,
-      sourceEntity: conversation.value.access.sourceEntity,
-      commandInput: { messageId: message.id },
-      permissionResult: message.authorUserId === actor.id
-        ? { allowed: true, reason: "same_tenant_permission_granted" }
-        : conversation.value.access.manageDecision,
-      beforeState: { body: message.body },
-      afterState: { body: updated.body }
-    }));
     return context.json({ message: serializeMessage(updated) });
   });
 
@@ -275,22 +374,29 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!message || message.conversationId !== conversation.value.conversation.id) {
       return context.json({ error: "message_not_found" }, 404);
     }
-    const pinned = await deps.dataSource.pinDiscussionMessage?.({
-      tenantId: actor.tenantId,
-      messageId: message.id,
-      pinnedByUserId: actor.id
+    if (!deps.dataSource.pinDiscussionMessage) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const pinned = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const pinnedMessage = await requireMethod(transactionDataSource.pinDiscussionMessage).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        messageId: message.id,
+        pinnedByUserId: actor.id
+      });
+      if (!pinnedMessage) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.message_pinned",
+        actor,
+        sourceEntity: conversation.value.access.sourceEntity,
+        commandInput: { messageId: pinnedMessage.id },
+        permissionResult: conversation.value.access.manageDecision,
+        afterState: { pinnedAt: pinnedMessage.pinnedAt?.toISOString() ?? null }
+      }), transactionDataSource);
+      return pinnedMessage;
     });
     if (!pinned) {
       return context.json({ error: "message_not_found" }, 404);
     }
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.message_pinned",
-      actor,
-      sourceEntity: conversation.value.access.sourceEntity,
-      commandInput: { messageId: pinned.id },
-      permissionResult: conversation.value.access.manageDecision,
-      afterState: { pinnedAt: pinned.pinnedAt?.toISOString() ?? null }
-    }));
     return context.json({ message: serializeMessage(pinned) });
   });
 
@@ -316,22 +422,29 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       });
       return context.json({ error: conversation.value.access.manageDecision.reason }, 403);
     }
-    const archived = await deps.dataSource.archiveDiscussionMessage?.({
-      tenantId: actor.tenantId,
-      messageId: message.id
+    if (!deps.dataSource.archiveDiscussionMessage) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const archived = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const archivedMessage = await requireMethod(transactionDataSource.archiveDiscussionMessage).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        messageId: message.id
+      });
+      if (!archivedMessage) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.message_removed",
+        actor,
+        sourceEntity: conversation.value.access.sourceEntity,
+        commandInput: { messageId: message.id },
+        permissionResult: message.authorUserId === actor.id
+          ? { allowed: true, reason: "same_tenant_permission_granted" }
+          : conversation.value.access.manageDecision,
+        beforeState: { messageId: message.id },
+        afterState: { archivedAt: archivedMessage.archivedAt?.toISOString() ?? null }
+      }), transactionDataSource);
+      return archivedMessage;
     });
     if (!archived) return context.json({ error: "message_not_found" }, 404);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.message_removed",
-      actor,
-      sourceEntity: conversation.value.access.sourceEntity,
-      commandInput: { messageId: message.id },
-      permissionResult: message.authorUserId === actor.id
-        ? { allowed: true, reason: "same_tenant_permission_granted" }
-        : conversation.value.access.manageDecision,
-      beforeState: { messageId: message.id },
-      afterState: { archivedAt: archived.archivedAt?.toISOString() ?? null }
-    }));
     return context.json({ message: serializeMessage(archived) });
   });
 
@@ -370,7 +483,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     for (const notification of notifications) {
       const entityType = parseCollaborationEntityType(notification.sourceEntityType);
       if (!entityType.ok) continue;
-      const access = await resolveEntityAccess({
+      const access = await resolveCollaborationEntityAccess({
         actor,
         dataSource: deps.dataSource,
         entityId: notification.sourceEntityId,
@@ -419,16 +532,21 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parsePreferences(readRecord(body.value).preferences, actor);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const preferences = await deps.dataSource.upsertNotificationPreferences?.(parsed.value);
-    if (!preferences) return context.json({ error: "collaboration_not_configured" }, 501);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "notification.preference_updated",
-      actor,
-      sourceEntity: { type: "User", id: actor.id },
-      commandInput: { count: parsed.value.length },
-      permissionResult: { allowed: true, reason: "same_tenant_permission_granted" },
-      afterState: { count: preferences.length }
-    }));
+    if (!deps.dataSource.upsertNotificationPreferences) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const preferences = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const savedPreferences = await requireMethod(transactionDataSource.upsertNotificationPreferences).call(transactionDataSource, parsed.value);
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "notification.preference_updated",
+        actor,
+        sourceEntity: { type: "User", id: actor.id },
+        commandInput: { count: parsed.value.length },
+        permissionResult: { allowed: true, reason: "same_tenant_permission_granted" },
+        afterState: { count: savedPreferences.length }
+      }), transactionDataSource);
+      return savedPreferences;
+    });
     return context.json({ preferences });
   });
 
@@ -438,7 +556,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: entity.value.entityId,
@@ -470,7 +588,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       parsed.value.participants.map((participant) => participant.userId)
     );
     if (!validParticipants.ok) return context.json({ error: validParticipants.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: parsed.value.entityId,
@@ -566,23 +684,30 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseMeetingUpdateBody(readRecord(body.value), meeting.value.meeting);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const updated = await deps.dataSource.updateMeeting?.({
-      tenantId: actor.tenantId,
-      meetingId: meeting.value.meeting.id,
-      ...parsed.value
+    if (!deps.dataSource.updateMeeting) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const updatedMeeting = await requireMethod(transactionDataSource.updateMeeting).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        ...parsed.value
+      });
+      if (!updatedMeeting) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: updatedMeeting.status === "completed" && meeting.value.meeting.status !== "completed"
+          ? "collaboration.meeting_completed"
+          : "collaboration.meeting_updated",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: updatedMeeting.id },
+        permissionResult: meeting.value.access.manageDecision,
+        beforeState: { status: meeting.value.meeting.status },
+        afterState: { status: updatedMeeting.status }
+      }), transactionDataSource);
+      return updatedMeeting;
     });
     if (!updated) return context.json({ error: "meeting_not_found" }, 404);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: updated.status === "completed" && meeting.value.meeting.status !== "completed"
-        ? "collaboration.meeting_completed"
-        : "collaboration.meeting_updated",
-      actor,
-      sourceEntity: meeting.value.access.sourceEntity,
-      commandInput: { meetingId: updated.id },
-      permissionResult: meeting.value.access.manageDecision,
-      beforeState: { status: meeting.value.meeting.status },
-      afterState: { status: updated.status }
-    }));
     return context.json({ meeting: serializeMeeting(updated) });
   });
 
@@ -610,24 +735,29 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!url.ok) return context.json({ error: url.error }, 400);
     const title = parseReferenceTitle(record.title);
     if (!title.ok) return context.json({ error: title.error }, 400);
-    const link = await deps.dataSource.createMeetingExternalLink?.({
-      id: `meeting-link-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      meetingId: meeting.value.meeting.id,
-      provider: provider.value,
-      url: url.value,
-      title: title.value,
-      createdByUserId: actor.id
+    if (!deps.dataSource.createMeetingExternalLink) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const link = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const createdLink = await requireMethod(transactionDataSource.createMeetingExternalLink).call(transactionDataSource, {
+        id: `meeting-link-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        provider: provider.value,
+        url: url.value,
+        title: title.value,
+        createdByUserId: actor.id
+      });
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.external_meeting_link_added",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id, provider: provider.value },
+        permissionResult: meeting.value.access.manageDecision,
+        afterState: { linkId: createdLink.id, provider: createdLink.provider }
+      }), transactionDataSource);
+      return createdLink;
     });
-    if (!link) return context.json({ error: "collaboration_not_configured" }, 501);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.external_meeting_link_added",
-      actor,
-      sourceEntity: meeting.value.access.sourceEntity,
-      commandInput: { meetingId: meeting.value.meeting.id, provider: provider.value },
-      permissionResult: meeting.value.access.manageDecision,
-      afterState: { linkId: link.id, provider: link.provider }
-    }));
     return context.json({ externalLink: serializeMeetingExternalLink(link) }, 201);
   });
 
@@ -655,24 +785,29 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsedBody = parseMeetingNoteBody(readRecord(body.value).body);
     if (!parsedBody.ok) return context.json({ error: parsedBody.error }, 400);
-    const note = await deps.dataSource.createMeetingNote?.({
-      id: `meeting-note-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      meetingId: meeting.value.meeting.id,
-      authorUserId: actor.id,
-      body: parsedBody.value
+    if (!deps.dataSource.createMeetingNote) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const note = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const createdNote = await requireMethod(transactionDataSource.createMeetingNote).call(transactionDataSource, {
+        id: `meeting-note-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        authorUserId: actor.id,
+        body: parsedBody.value
+      });
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.meeting_note_created",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id },
+        permissionResult: participant
+          ? { allowed: true, reason: "same_tenant_permission_granted" }
+          : meeting.value.access.manageDecision,
+        afterState: { noteId: createdNote.id }
+      }), transactionDataSource);
+      return createdNote;
     });
-    if (!note) return context.json({ error: "collaboration_not_configured" }, 501);
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.meeting_note_created",
-      actor,
-      sourceEntity: meeting.value.access.sourceEntity,
-      commandInput: { meetingId: meeting.value.meeting.id },
-      permissionResult: participant
-        ? { allowed: true, reason: "same_tenant_permission_granted" }
-        : meeting.value.access.manageDecision,
-      afterState: { noteId: note.id }
-    }));
     return context.json({ note: serializeMeetingNote(note) }, 201);
   });
 
@@ -701,40 +836,45 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       [parsed.value.ownerUserId]
     );
     if (!ownerExists.ok) return context.json({ error: ownerExists.error }, 400);
-    const actionItem = await deps.dataSource.createMeetingActionItem?.({
-      id: `meeting-action-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      meetingId: meeting.value.meeting.id,
-      title: parsed.value.title,
-      ownerUserId: parsed.value.ownerUserId,
-      dueDate: parsed.value.dueDate,
-      targetEntityType: parsed.value.targetEntityType,
-      targetEntityId: parsed.value.targetEntityId,
-      status: "open",
-      createdByUserId: actor.id
-    });
-    if (!actionItem) return context.json({ error: "collaboration_not_configured" }, 501);
-    if (actionItem.ownerUserId !== actor.id) {
-      await deps.dataSource.createUserNotification?.({
-        id: `notification-${randomUUID()}`,
-        tenantId: actor.tenantId,
-        userId: actionItem.ownerUserId,
-        notificationType: "meeting_action_item",
-        sourceEntityType: meeting.value.access.entityType,
-        sourceEntityId: meeting.value.access.entityId,
-        title: "Action item после встречи",
-        body: actionItem.title,
-        route: routeForEntity(meeting.value.access)
-      });
+    if (!deps.dataSource.createMeetingActionItem) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
     }
-    await deps.appendManagementAuditEvent(collaborationAudit({
-      actionType: "collaboration.meeting_action_item_created",
-      actor,
-      sourceEntity: meeting.value.access.sourceEntity,
-      commandInput: { meetingId: meeting.value.meeting.id },
-      permissionResult: meeting.value.access.manageDecision,
-      afterState: { actionItemId: actionItem.id, ownerUserId: actionItem.ownerUserId }
-    }));
+    const actionItem = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const createdActionItem = await requireMethod(transactionDataSource.createMeetingActionItem).call(transactionDataSource, {
+        id: `meeting-action-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        title: parsed.value.title,
+        ownerUserId: parsed.value.ownerUserId,
+        dueDate: parsed.value.dueDate,
+        targetEntityType: parsed.value.targetEntityType,
+        targetEntityId: parsed.value.targetEntityId,
+        status: "open",
+        createdByUserId: actor.id
+      });
+      if (createdActionItem.ownerUserId !== actor.id) {
+        await transactionDataSource.createUserNotification?.({
+          id: `notification-${randomUUID()}`,
+          tenantId: actor.tenantId,
+          userId: createdActionItem.ownerUserId,
+          notificationType: "meeting_action_item",
+          sourceEntityType: meeting.value.access.entityType,
+          sourceEntityId: meeting.value.access.entityId,
+          title: "Action item после встречи",
+          body: createdActionItem.title,
+          route: routeForEntity(meeting.value.access)
+        });
+      }
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.meeting_action_item_created",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id },
+        permissionResult: meeting.value.access.manageDecision,
+        afterState: { actionItemId: createdActionItem.id, ownerUserId: createdActionItem.ownerUserId }
+      }), transactionDataSource);
+      return createdActionItem;
+    });
     return context.json({ actionItem: serializeMeetingActionItem(actionItem) }, 201);
   });
 }
@@ -756,7 +896,7 @@ async function resolveConversationForActor(
   actor: TenantUser,
   deps: CollaborationRouteDeps
 ): Promise<
-  | { ok: true; value: { conversation: Conversation; access: EntityAccessContext } }
+  | { ok: true; value: { conversation: Conversation; access: CollaborationEntityAccessContext } }
   | { ok: false; status: 400 | 403 | 404 | 501; error: string }
 > {
   const conversationId = parseCollaborationId(conversationIdRaw, "conversation_id_invalid");
@@ -764,7 +904,7 @@ async function resolveConversationForActor(
   const conversation = await deps.dataSource.findConversation?.(actor.tenantId, conversationId.value);
   if (!conversation) return { ok: false, status: 404, error: "conversation_not_found" };
   const profile = await deps.getActorProfile(actor);
-  const access = await resolveEntityAccess({
+  const access = await resolveCollaborationEntityAccess({
     actor,
     dataSource: deps.dataSource,
     entityId: conversation.entityId,
@@ -783,7 +923,7 @@ async function resolveMeetingForActor(
   actor: TenantUser,
   deps: CollaborationRouteDeps
 ): Promise<
-  | { ok: true; value: { meeting: Meeting; access: EntityAccessContext } }
+  | { ok: true; value: { meeting: Meeting; access: CollaborationEntityAccessContext } }
   | { ok: false; status: 400 | 403 | 404 | 501; error: string }
 > {
   const meetingId = parseCollaborationId(meetingIdRaw, "meeting_id_invalid");
@@ -791,7 +931,7 @@ async function resolveMeetingForActor(
   const meeting = await deps.dataSource.findMeeting?.(actor.tenantId, meetingId.value);
   if (!meeting) return { ok: false, status: 404, error: "meeting_not_found" };
   const profile = await deps.getActorProfile(actor);
-  const access = await resolveEntityAccess({
+  const access = await resolveCollaborationEntityAccess({
     actor,
     dataSource: deps.dataSource,
     entityId: meeting.entityId,
@@ -803,105 +943,6 @@ async function resolveMeetingForActor(
     return { ok: false, status: 403, error: access.value.readDecision.reason };
   }
   return { ok: true, value: { meeting, access: access.value } };
-}
-
-async function resolveEntityAccess(input: {
-  actor: TenantUser;
-  dataSource: ApiTenantDataSource;
-  entityId: string;
-  entityType: CollaborationEntityType;
-  profile: AccessProfile;
-}): Promise<
-  | { ok: true; value: EntityAccessContext }
-  | { ok: false; status: 404 | 501; error: string }
-> {
-  const policyInput = {
-    actor: input.actor,
-    profile: input.profile,
-    targetTenantId: input.actor.tenantId
-  };
-  if (input.entityType === "opportunity") {
-    const opportunity = await input.dataSource.findOpportunityById?.(
-      input.actor.tenantId,
-      input.entityId
-    );
-    if (!opportunity) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "opportunity",
-      entityId: opportunity.id,
-      sourceEntity: { type: "Opportunity", id: opportunity.id },
-      readDecision: canReadOpportunities(policyInput),
-      manageDecision: canManageOpportunities(policyInput),
-      title: opportunity.title
-    } };
-  }
-  if (input.entityType === "project") {
-    const project = await findProject(input.dataSource, input.actor.tenantId, input.entityId);
-    if (!project) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "project",
-      entityId: project.id,
-      sourceEntity: { type: "Project", id: project.id },
-      readDecision: canReadProjects(policyInput),
-      manageDecision: canManageProjects(policyInput),
-      title: project.title
-    } };
-  }
-  const task = await input.dataSource.findTaskById?.(input.actor.tenantId, input.entityId);
-  if (!task) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-  const projectRead = canReadProjects(policyInput);
-  const directTaskRead =
-    task.ownerUserId === input.actor.id ||
-    task.requesterUserId === input.actor.id ||
-    task.participants.some((participant) => participant.userId === input.actor.id);
-  return { ok: true, value: {
-    entityType: "task",
-    entityId: task.id,
-    sourceEntity: { type: "Task", id: task.id },
-    readDecision: projectRead.allowed || directTaskRead
-      ? { allowed: true, reason: "same_tenant_permission_granted" }
-      : projectRead,
-    manageDecision: canEditTasks(policyInput),
-    title: task.title
-  } };
-}
-
-async function findProject(
-  dataSource: ApiTenantDataSource,
-  tenantId: string,
-  projectId: string
-): Promise<ProjectRecord | undefined> {
-  return (await dataSource.listProjects?.(tenantId))?.find((project) => project.id === projectId);
-}
-
-async function filterMentionRecipients(input: {
-  actor: TenantUser;
-  body: string;
-  dataSource: ApiTenantDataSource;
-  entity: EntityAccessContext;
-}): Promise<string[]> {
-  const rawIds = extractMentionedUserIds(input.body).filter((id) => id !== input.actor.id);
-  if (rawIds.length === 0) return [];
-  const tenantUsers = await input.dataSource.listUsersByTenantId(input.actor.tenantId);
-  const usersById = new Map(tenantUsers.map((user) => [user.id, user]));
-  const allowed: string[] = [];
-  for (const userId of rawIds) {
-    const user = usersById.get(userId);
-    if (!user) continue;
-    const profile = input.dataSource.findAccessProfileById
-      ? await input.dataSource.findAccessProfileById(user.tenantId, user.accessProfileId)
-      : undefined;
-    if (!profile) continue;
-    const access = await resolveEntityAccess({
-      actor: user,
-      dataSource: input.dataSource,
-      entityId: input.entity.entityId,
-      entityType: input.entity.entityType,
-      profile
-    });
-    if (access.ok && access.value.readDecision.allowed) allowed.push(userId);
-  }
-  return allowed;
 }
 
 function parseMeetingCreateBody(record: Record<string, unknown>) {
@@ -987,7 +1028,7 @@ function ensureOrganizer(
 
 function parseMeetingActionItemBody(
   record: Record<string, unknown>,
-  entity: EntityAccessContext
+  entity: CollaborationEntityAccessContext
 ) {
   const title = parseConversationTitle(record.title);
   if (!title.ok) return title;
@@ -995,6 +1036,12 @@ function parseMeetingActionItemBody(
   if (!ownerUserId.ok) return ownerUserId;
   const dueDate = parseOptionalDate(record.dueDate);
   if (!dueDate.ok) return dueDate;
+  const canDefaultTarget = isMeetingActionTargetType(entity.entityType);
+  const hasTargetEntityType = record.targetEntityType !== undefined;
+  const hasTargetEntityId = record.targetEntityId !== undefined;
+  if ((!canDefaultTarget || hasTargetEntityType !== hasTargetEntityId) && (!hasTargetEntityType || !hasTargetEntityId)) {
+    return { ok: false as const, error: "meeting_action_target_required" };
+  }
   const targetEntityType = record.targetEntityType === undefined
     ? { ok: true as const, value: defaultTargetType(entity.entityType) }
     : parseMeetingActionTargetType(record.targetEntityType);
@@ -1013,9 +1060,13 @@ function parseMeetingActionItemBody(
 }
 
 function defaultTargetType(entityType: CollaborationEntityType) {
-  return meetingActionTargetTypes.includes(entityType as never)
+  return isMeetingActionTargetType(entityType)
     ? entityType as "task" | "project" | "opportunity"
     : "project";
+}
+
+function isMeetingActionTargetType(entityType: CollaborationEntityType) {
+  return meetingActionTargetTypes.includes(entityType as never);
 }
 
 function parsePreferences(value: unknown, actor: TenantUser) {
@@ -1062,6 +1113,17 @@ function parseOptionalCursor(value: string | undefined):
   | { ok: false; error: string } {
   if (value === undefined || value === "") return { ok: true as const, value: undefined };
   const parsed = parseCollaborationId(value, "conversation_cursor_invalid");
+  if (!parsed.ok) return parsed;
+  return { ok: true as const, value: parsed.value };
+}
+
+function parseOptionalCollaborationId(value: unknown, error: string):
+  | { ok: true; value: string | undefined }
+  | { ok: false; error: string } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true as const, value: undefined };
+  }
+  const parsed = parseCollaborationId(value, error);
   if (!parsed.ok) return parsed;
   return { ok: true as const, value: parsed.value };
 }
@@ -1150,10 +1212,14 @@ function trimNotificationBody(body: string) {
   return body.length > 180 ? `${body.slice(0, 177)}...` : body;
 }
 
-function routeForEntity(entity: EntityAccessContext) {
+function routeForEntity(entity: CollaborationEntityAccessContext) {
   if (entity.entityType === "project") return `/projects/${entity.entityId}`;
   if (entity.entityType === "task") return `/tasks/${entity.entityId}`;
-  return `/crm/opportunities/${entity.entityId}`;
+  if (entity.entityType === "opportunity") return `/crm/opportunities/${entity.entityId}`;
+  if (entity.entityType === "client") return `/clients/${entity.entityId}`;
+  if (entity.entityType === "contact") return `/contacts/${entity.entityId}`;
+  if (entity.entityType === "product") return `/products/${entity.entityId}`;
+  return `/communication-channels/${entity.entityId}`;
 }
 
 async function appendDeniedAudit(
@@ -1217,12 +1283,41 @@ function serializeMessage(message: import("@kiss-pm/domain").DiscussionMessage) 
   };
 }
 
+function serializeMessageWithExtras(
+  message: import("@kiss-pm/domain").DiscussionMessage,
+  extras: {
+    reactions: import("@kiss-pm/domain").MessageReaction[];
+    stickers: import("@kiss-pm/domain").MessageSticker[];
+  }
+) {
+  return {
+    ...serializeMessage(message),
+    reactions: extras.reactions.map(serializeReaction),
+    stickers: extras.stickers.map(serializeMessageSticker)
+  };
+}
+
 function serializeNotification(notification: import("@kiss-pm/domain").UserNotification) {
   return {
     ...notification,
     createdAt: notification.createdAt.toISOString(),
     readAt: notification.readAt?.toISOString() ?? null,
     archivedAt: notification.archivedAt?.toISOString() ?? null
+  };
+}
+
+function serializeReaction(reaction: import("@kiss-pm/domain").MessageReaction) {
+  return {
+    ...reaction,
+    createdAt: reaction.createdAt.toISOString(),
+    archivedAt: reaction.archivedAt?.toISOString() ?? null
+  };
+}
+
+function serializeMessageSticker(sticker: import("@kiss-pm/domain").MessageSticker) {
+  return {
+    ...sticker,
+    createdAt: sticker.createdAt.toISOString()
   };
 }
 
