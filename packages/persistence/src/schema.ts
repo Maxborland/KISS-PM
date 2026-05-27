@@ -1977,9 +1977,9 @@ export const backgroundJobSchedules = pgTable(
       table.scheduleKey
     ),
     index("background_job_schedules_due_idx").on(
-      table.tenantId,
       table.enabled,
-      table.nextRunAt
+      table.nextRunAt,
+      table.tenantId
     ),
     check(
       "background_job_schedules_kind_chk",

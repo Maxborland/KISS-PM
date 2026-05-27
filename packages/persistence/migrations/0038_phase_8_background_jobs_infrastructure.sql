@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS "background_job_schedules" (
 CREATE UNIQUE INDEX IF NOT EXISTS "background_job_schedules_tenant_key_uidx"
   ON "background_job_schedules" ("tenant_id", "schedule_key");
 CREATE INDEX IF NOT EXISTS "background_job_schedules_due_idx"
-  ON "background_job_schedules" ("tenant_id", "enabled", "next_run_at");
+  ON "background_job_schedules" ("enabled", "next_run_at", "tenant_id");
 
 CREATE TABLE IF NOT EXISTS "background_job_runs" (
   "id" text NOT NULL,
