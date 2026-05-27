@@ -7,7 +7,7 @@ import type {
   Meeting,
   TenantUser
 } from "@kiss-pm/domain";
-import type { ProjectRecord } from "@kiss-pm/persistence";
+import type { ProjectRecord, TaskRecord } from "@kiss-pm/persistence";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -278,6 +278,32 @@ describe("knowledge routes", () => {
     });
   });
 
+  it("rejects action item targets outside the current project scope", async () => {
+    const fixture = createKnowledgeFixture();
+    fixture.tasks.push(task("task-other", "project-other"));
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/action-items`,
+      {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          title: "Проверить задачу",
+          ownerUserId: fixture.actor.id,
+          targetEntityType: "task",
+          targetEntityId: "task-other"
+        })
+      }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "knowledge_action_target_not_found"
+    });
+    expect(fixture.actionItems).toHaveLength(0);
+  });
+
   it("rolls back decision creation when audit persistence fails", async () => {
     const fixture = createKnowledgeFixture();
     fixture.auditFailureActionType = "knowledge.decision_recorded";
@@ -306,6 +332,7 @@ type KnowledgeFixture = {
   actor: TenantUser;
   profile: AccessProfile;
   project: ProjectRecord;
+  tasks: TaskRecord[];
   meetings: Meeting[];
   documents: KnowledgeDocument[];
   versions: KnowledgeDocumentVersion[];
@@ -335,6 +362,7 @@ function createKnowledgeFixture(input: {
       permissions: input.permissions ?? ["tenant.projects.read", "tenant.projects.manage"]
     } as AccessProfile,
     project: project("project-alpha"),
+    tasks: [],
     meetings: [],
     documents: [],
     versions: [],
@@ -387,6 +415,12 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
     findUserById: async () => fixture.actor,
     listUsersByTenantId: async () => [fixture.actor],
     listProjects: async () => [fixture.project],
+    findTaskById: async (tenantId, taskId) =>
+      fixture.tasks.find((task) =>
+        task.tenantId === tenantId &&
+        task.id === taskId &&
+        !task.archivedAt
+      ),
     createKnowledgeDocument: async (input) => {
       const now = new Date("2026-05-26T06:00:00.000Z");
       const document: KnowledgeDocument = {
@@ -585,6 +619,37 @@ function project(id: string): ProjectRecord {
     activatedAt: new Date("2026-05-26T00:00:00.000Z"),
     closedAt: null,
     demand: []
+  };
+}
+
+function task(id: string, projectId: string): TaskRecord {
+  const now = new Date("2026-05-26T00:00:00.000Z");
+  return {
+    id,
+    tenantId: "tenant-alpha",
+    projectId,
+    stageId: null,
+    title: "Задача",
+    description: null,
+    status: "new",
+    statusId: "task-status-new",
+    statusName: "Новая",
+    statusCategory: "new",
+    priority: "normal",
+    requesterUserId: "user-alpha",
+    ownerUserId: "user-alpha",
+    plannedStart: now,
+    plannedFinish: now,
+    durationWorkingDays: 1,
+    plannedWork: 60,
+    actualWork: 0,
+    progress: 0,
+    requiresAcceptance: false,
+    source: "manual",
+    createdAt: now,
+    updatedAt: now,
+    archivedAt: null,
+    participants: []
   };
 }
 
