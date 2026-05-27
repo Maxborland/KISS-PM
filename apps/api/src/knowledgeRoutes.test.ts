@@ -153,6 +153,57 @@ describe("knowledge routes", () => {
     expect(fixture.documents).toHaveLength(0);
   });
 
+  it("returns 501 when document lookup is not configured for document reads", async () => {
+    const fixture = createKnowledgeFixture({ omittedMethods: ["findKnowledgeDocument"] });
+    fixture.documents.push({
+      id: "knowledge-doc-existing",
+      tenantId: fixture.actor.tenantId,
+      projectId: fixture.project.id,
+      title: "Документ",
+      summary: null,
+      documentType: "general",
+      status: "active",
+      currentVersionId: null,
+      sourceMeetingId: null,
+      approvalStatus: "none",
+      approvalRequestedByUserId: null,
+      createdByUserId: fixture.actor.id,
+      createdAt: new Date("2026-05-26T06:00:00.000Z"),
+      updatedAt: new Date("2026-05-26T06:00:00.000Z"),
+      archivedAt: null
+    });
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/documents/knowledge-doc-existing`,
+      { headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_not_configured" });
+  });
+
+  it("returns 501 when link validators need unavailable knowledge methods", async () => {
+    const fixture = createKnowledgeFixture({ omittedMethods: ["findKnowledgeDocument"] });
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/decisions`,
+      {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          title: "Решение",
+          decision: "Опираемся на документ",
+          documentId: "knowledge-doc-missing-method"
+        })
+      }
+    );
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_not_configured" });
+  });
+
   it("writes denied audit when actor cannot manage project knowledge", async () => {
     const fixture = createKnowledgeFixture({ permissions: ["tenant.projects.read"] });
     const app = createKnowledgeApp(fixture);
@@ -263,17 +314,21 @@ type KnowledgeFixture = {
   auditEvents: ManagementAuditEventInput[];
   transactionCount: number;
   auditFailureActionType?: string;
+  omittedMethods?: Array<keyof ApiTenantDataSource>;
   versionConflict?: boolean;
 };
 
-function createKnowledgeFixture(input: { permissions?: string[] } = {}): KnowledgeFixture {
+function createKnowledgeFixture(input: {
+  omittedMethods?: Array<keyof ApiTenantDataSource>;
+  permissions?: string[];
+} = {}): KnowledgeFixture {
   const actor = {
     id: "user-alpha",
     tenantId: "tenant-alpha",
     name: "Анна",
     accessProfileId: "profile-alpha"
   };
-  return {
+  const fixture: KnowledgeFixture = {
     actor,
     profile: {
       id: "profile-alpha",
@@ -288,6 +343,8 @@ function createKnowledgeFixture(input: { permissions?: string[] } = {}): Knowled
     auditEvents: [],
     transactionCount: 0
   };
+  if (input.omittedMethods) fixture.omittedMethods = input.omittedMethods;
+  return fixture;
 }
 
 function createKnowledgeApp(fixture: KnowledgeFixture) {
@@ -324,7 +381,7 @@ function fixtureDataSource(fixture: KnowledgeFixture): ApiTenantDataSource {
 }
 
 function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSource {
-  return {
+  const dataSource: ApiTenantDataSource = {
     listDevUsers: async () => [fixture.actor],
     findTenantById: async () => ({ id: fixture.actor.tenantId, name: "Tenant" }),
     findUserById: async () => fixture.actor,
@@ -482,6 +539,12 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
         ? { id: input.meetingId }
         : undefined
   } as ApiTenantDataSource;
+
+  for (const method of fixture.omittedMethods ?? []) {
+    delete (dataSource as Record<string, unknown>)[method];
+  }
+
+  return dataSource;
 }
 
 function cloneFixtureState(fixture: KnowledgeFixture) {
