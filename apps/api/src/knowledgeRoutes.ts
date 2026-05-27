@@ -64,7 +64,7 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = await parseDocumentCreate(readRecord(body.value), actor, access.value.project.id, deps.dataSource);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!parsed.ok) return context.json({ error: parsed.error }, knowledgeErrorStatus(parsed));
     if (!deps.dataSource.createKnowledgeDocument || !deps.dataSource.createKnowledgeDocumentVersion) {
       return context.json({ error: "knowledge_not_configured" }, 501);
     }
@@ -115,7 +115,10 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     }
     const documentId = parseKnowledgeId(context.req.param("documentId"), "knowledge_document_id_invalid");
     if (!documentId.ok) return context.json({ error: documentId.error }, 400);
-    const document = await deps.dataSource.findKnowledgeDocument?.({
+    if (!deps.dataSource.findKnowledgeDocument) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const document = await deps.dataSource.findKnowledgeDocument({
       tenantId: actor.tenantId,
       projectId: access.value.project.id,
       documentId: documentId.value
@@ -142,7 +145,10 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
       commandInput: { documentId: documentId.value }
     });
     if (!access.ok) return context.json({ error: access.error }, access.status);
-    const document = await deps.dataSource.findKnowledgeDocument?.({
+    if (!deps.dataSource.findKnowledgeDocument || !deps.dataSource.createKnowledgeDocumentVersion) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const document = await deps.dataSource.findKnowledgeDocument({
       tenantId: actor.tenantId,
       projectId: access.value.project.id,
       documentId: documentId.value
@@ -152,9 +158,6 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseDocumentVersionBody(readRecord(body.value), actor, document.id);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    if (!deps.dataSource.createKnowledgeDocumentVersion) {
-      return context.json({ error: "knowledge_not_configured" }, 501);
-    }
     let result: Awaited<ReturnType<NonNullable<ApiTenantDataSource["createKnowledgeDocumentVersion"]>>>;
     try {
       result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
@@ -251,7 +254,7 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = await parseDecisionCreate(readRecord(body.value), actor, access.value.project.id, deps.dataSource);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!parsed.ok) return context.json({ error: parsed.error }, knowledgeErrorStatus(parsed));
     if (!deps.dataSource.createDecisionLogEntry) {
       return context.json({ error: "knowledge_not_configured" }, 501);
     }
@@ -283,7 +286,10 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
       commandInput: { decisionId: decisionId.value }
     });
     if (!access.ok) return context.json({ error: access.error }, access.status);
-    const existing = await deps.dataSource.findDecisionLogEntry?.({
+    if (!deps.dataSource.findDecisionLogEntry) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const existing = await deps.dataSource.findDecisionLogEntry({
       tenantId: actor.tenantId,
       projectId: access.value.project.id,
       decisionId: decisionId.value
@@ -292,7 +298,7 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseDecisionUpdate(readRecord(body.value), existing);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!parsed.ok) return context.json({ error: parsed.error }, knowledgeErrorStatus(parsed));
     if (!deps.dataSource.updateDecisionLogEntry) {
       return context.json({ error: "knowledge_not_configured" }, 501);
     }
@@ -381,7 +387,10 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
       commandInput: { actionItemId: actionItemId.value }
     });
     if (!access.ok) return context.json({ error: access.error }, access.status);
-    const existing = await deps.dataSource.findKnowledgeActionItem?.({
+    if (!deps.dataSource.findKnowledgeActionItem) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const existing = await deps.dataSource.findKnowledgeActionItem({
       tenantId: actor.tenantId,
       projectId: access.value.project.id,
       actionItemId: actionItemId.value
@@ -390,7 +399,7 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = await parseActionItemUpdate(readRecord(body.value), existing, deps.dataSource, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (!parsed.ok) return context.json({ error: parsed.error }, knowledgeErrorStatus(parsed));
     if (!deps.dataSource.updateKnowledgeActionItem) {
       return context.json({ error: "knowledge_not_configured" }, 501);
     }
@@ -723,7 +732,10 @@ async function validateKnowledgeLinks(
   const meeting = await validateMeetingLink(dataSource, tenantId, projectId, links.sourceMeetingId ?? null);
   if (!meeting.ok) return meeting;
   if (links.documentId) {
-    const document = await dataSource.findKnowledgeDocument?.({
+    if (!dataSource.findKnowledgeDocument) {
+      return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+    }
+    const document = await dataSource.findKnowledgeDocument({
       tenantId,
       projectId,
       documentId: links.documentId
@@ -731,7 +743,10 @@ async function validateKnowledgeLinks(
     if (!document) return { ok: false as const, error: "knowledge_document_not_found" };
   }
   if (links.decisionId) {
-    const decision = await dataSource.findDecisionLogEntry?.({
+    if (!dataSource.findDecisionLogEntry) {
+      return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+    }
+    const decision = await dataSource.findDecisionLogEntry({
       tenantId,
       projectId,
       decisionId: links.decisionId
@@ -748,7 +763,10 @@ async function validateMeetingLink(
   meetingId: string | null
 ) {
   if (!meetingId) return { ok: true as const };
-  const meeting = await dataSource.findProjectMeeting?.({ tenantId, projectId, meetingId });
+  if (!dataSource.findProjectMeeting) {
+    return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+  }
+  const meeting = await dataSource.findProjectMeeting({ tenantId, projectId, meetingId });
   return meeting ? { ok: true as const } : { ok: false as const, error: "knowledge_meeting_not_found" };
 }
 
@@ -768,6 +786,10 @@ function readRecord(value: unknown): Record<string, unknown> {
 function requireMethod<T extends (...args: never[]) => unknown>(method: T | undefined): T {
   if (!method) throw new Error("knowledge_not_configured");
   return method;
+}
+
+function knowledgeErrorStatus(result: { ok: false; status?: 400 | 501 }): 400 | 501 {
+  return result.status ?? 400;
 }
 
 function isKnowledgeVersionConflict(error: unknown): boolean {
