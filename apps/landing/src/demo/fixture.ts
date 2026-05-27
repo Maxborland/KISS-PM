@@ -3,15 +3,111 @@
  * Kept as plain objects so it is trivial to serialise and snapshot.
  */
 
+export type DealActivityKind = "user" | "client" | "system";
+
+export type DealWorkspace = {
+  statusLabel: string;
+  createdAt: string;
+  summary: ReadonlyArray<{ label: string; value: string }>;
+  activities: ReadonlyArray<{
+    who: string;
+    what: string;
+    when: string;
+    kind: DealActivityKind;
+  }>;
+  thread: ReadonlyArray<{
+    author: string;
+    role: string;
+    when: string;
+    text: string;
+    highlight?: boolean;
+    fresh?: boolean;
+  }>;
+  related: ReadonlyArray<{ label: string; title: string; meta: string }>;
+  team: ReadonlyArray<{ initials: string; name: string; role: string; online?: boolean }>;
+};
+
+export type DemoDeal = {
+  id: string;
+  name: string;
+  stage: string;
+  amount: string;
+  owner: string;
+  hot: boolean;
+  workspace?: DealWorkspace;
+};
+
 export const DEMO_FIXTURE = {
   deals: [
     {
       id: "DEAL-204",
       name: "Новый проект: ГК Север",
-      stage: "Готова к приёмке",
+      stage: "Готова к оценке",
       amount: "₽ 8.4 млн",
       owner: "Анна К.",
       hot: true,
+      workspace: {
+        statusLabel: "Готов к оценке",
+        createdAt: "12 мая 2025",
+        summary: [
+          { label: "Бюджет", value: "₽ 8.4 млн" },
+          { label: "Тип", value: "Внедрение" },
+          { label: "Регион", value: "Север-Запад" },
+          { label: "Источник", value: "CRM / ручной ввод" },
+        ],
+        activities: [
+          {
+            who: "Анна К.",
+            what: "Прикрепила КП v2 и переписку",
+            when: "вчера · 17:48",
+            kind: "user",
+          },
+          {
+            who: "Клиент: А. Сергеев",
+            what: "Подтвердил готовность к подписанию",
+            when: "сегодня · 09:12",
+            kind: "client",
+          },
+          {
+            who: "KISS PM",
+            what: "Портфель сейчас: 147 активных проектов",
+            when: "сегодня · 11:00",
+            kind: "system",
+          },
+        ],
+        thread: [
+          {
+            author: "Анна К.",
+            role: "Sales Manager",
+            when: "11:24",
+            text: "Перед переносом в проект — проверить ёмкость: сделка DEAL-204 на ₽ 8.4 млн.",
+          },
+          {
+            author: "Михаил Б.",
+            role: "Head of Delivery",
+            when: "11:40",
+            text: "Согласен. До обещания срока проверим ресурсную ёмкость на 7–9 неделях.",
+            highlight: true,
+          },
+          {
+            author: "Анна К.",
+            role: "PM",
+            when: "11:42",
+            text: "Ок, запускаю проверку ёмкости.",
+            fresh: true,
+          },
+        ],
+        related: [
+          { label: "Клиент", title: "ГК Север", meta: "B2B · Север-Запад" },
+          { label: "Контакт", title: "Алексей Сергеев", meta: "Директор ИТ" },
+          { label: "Сделка", title: "DEAL-204", meta: "₽ 8.4 млн" },
+        ],
+        team: [
+          { initials: "АК", name: "Анна К.", role: "PM", online: true },
+          { initials: "МБ", name: "Михаил Б.", role: "Delivery", online: true },
+          { initials: "ИС", name: "Ирина С.", role: "Ресурсы", online: false },
+        ],
+      },
     },
     {
       id: "DEAL-198",
@@ -29,7 +125,7 @@ export const DEMO_FIXTURE = {
       owner: "Анна К.",
       hot: false,
     },
-  ],
+  ] as DemoDeal[],
   intake: {
     template: "Внедрение, 12 недель · портфель 147 проектов",
     feasibility: {
@@ -82,7 +178,7 @@ export const DEMO_FIXTURE = {
     description:
       "Сместить часть работ так, чтобы снять перегруз с ведущего инженера без срыва критичных сроков.",
     activity: [
-      { who: "Анна К.", what: "Добавила новый проектный спрос", when: "12:14" },
+      { who: "Анна К.", what: "Привязала сделку DEAL-204 к задаче", when: "12:14" },
       { who: "KISS PM", what: "Нашёл конфликт по роли «ведущий инженер»", when: "13:02" },
       { who: "Портфельный сигнал", what: "Перегруз через 3 недели", when: "16:18" },
     ],
@@ -93,7 +189,7 @@ export const DEMO_FIXTURE = {
     current: "112%",
     severity: "warning",
     rationale:
-      "Через три недели общая загрузка роли выходит за безопасную границу. Давление создают 4 проекта и один новый спрос.",
+      "Через три недели загрузка ведущего инженера — 112%. Давление дают 4 активных проекта и сделка DEAL-204.",
     options: [
       {
         id: "reassign",

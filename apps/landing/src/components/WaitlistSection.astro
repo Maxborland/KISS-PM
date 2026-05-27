@@ -5,9 +5,15 @@ import WaitlistForm from "./WaitlistForm.tsx";
 <section id="waitlist" class="l-band l-band--canvas" aria-labelledby="waitlist-title">
   <div class="l-container">
     <div class="waitlist">
-      <h2 id="waitlist-title" class="l-display" data-text-reveal>
-        Ранний доступ
-      </h2>
+      <header class="waitlist__head section-head section-head--tight">
+        <h2 id="waitlist-title" class="l-display" data-text-reveal>
+          Ранний доступ
+        </h2>
+        <p class="section-head__copy" data-text-reveal>
+          Закрытая альфа для команд с десятками активных проектов. Без
+          лидогенерации и холодных звонков.
+        </p>
+      </header>
 
       <div class="waitlist__panel kp-spotlight-card" data-reveal>
         <WaitlistForm client:visible />

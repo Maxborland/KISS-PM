@@ -5,11 +5,13 @@ interface Props {
   subtitle?: string;
   toolbar?: ReactNode;
   children: ReactNode;
+  /** Крупная карточка сделки: сводка + активность + обсуждение */
+  variant?: "default" | "workspace";
 }
 
-export function ScreenShell({ title, subtitle, toolbar, children }: Props) {
+export function ScreenShell({ title, subtitle, toolbar, children, variant = "default" }: Props) {
   return (
-    <div className="screen">
+    <div className={`screen${variant === "workspace" ? " screen--workspace" : ""}`}>
       <header className="screen__head">
         <div>
           <h3 className="screen__title">{title}</h3>
@@ -72,14 +74,16 @@ interface CtaProps {
   label: string;
   onClick: () => void;
   variant?: "primary" | "ghost";
+  /** Мягкий акцент для ключевого действия сценария */
+  emphasis?: boolean;
 }
 
-export function Cta({ label, onClick, variant = "primary" }: CtaProps) {
+export function Cta({ label, onClick, variant = "primary", emphasis = false }: CtaProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`cta cta--${variant}`}
+      className={`cta cta--${variant}${emphasis ? " cta--emphasis" : ""}`}
     >
       {label}
       <style>{`
@@ -105,6 +109,16 @@ export function Cta({ label, onClick, variant = "primary" }: CtaProps) {
           box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
         }
         .cta--primary:hover { background: var(--accent-hover); }
+        .cta--emphasis {
+          animation: cta-emphasis 2.8s ease-in-out infinite;
+        }
+        @keyframes cta-emphasis {
+          0%, 100% { box-shadow: 0 4px 14px -2px rgba(37, 99, 235, 0.35); }
+          50% { box-shadow: 0 6px 20px -2px rgba(37, 99, 235, 0.5); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .cta--emphasis { animation: none; }
+        }
         .cta--ghost {
           background: var(--panel);
           color: var(--text-strong);

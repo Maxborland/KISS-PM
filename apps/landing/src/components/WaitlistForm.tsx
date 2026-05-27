@@ -1,12 +1,26 @@
 import { useState } from "react";
-import type * as React from "react";
-import { COMPANY_SIZE_LABELS } from "../lib/waitlist/schema";
+import type { FocusEvent, FormEvent } from "react";
+import { z } from "zod";
+import {
+  COMPANY_SIZE_LABELS,
+  formatWaitlistIssues,
+  WaitlistSubmission,
+  waitlistPayloadFromFormData,
+} from "../lib/waitlist/schema";
+import { sanitizeText } from "../lib/waitlist/sanitize";
+import { isConsumerEmailDomain, WORK_EMAIL_ERROR } from "../lib/waitlist/work-email";
 
 type Status =
   | { phase: "idle" }
   | { phase: "submitting" }
   | { phase: "success" }
-  | { phase: "error"; message: string; issues?: Record<string, string[] | undefined> };
+  | {
+      phase: "error";
+      message: string;
+      issues?: Record<string, string[] | undefined>;
+    };
+
+type FieldIssues = Record<string, string | undefined>;
 
 const SIZE_ENTRIES = Object.entries(COMPANY_SIZE_LABELS) as Array<
   [keyof typeof COMPANY_SIZE_LABELS, string]
@@ -14,18 +28,46 @@ const SIZE_ENTRIES = Object.entries(COMPANY_SIZE_LABELS) as Array<
 
 export default function WaitlistForm() {
   const [status, setStatus] = useState<Status>({ phase: "idle" });
+  const [fieldIssues, setFieldIssues] = useState<FieldIssues>({});
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function onSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    const form = e.currentTarget;
+    const payload = waitlistPayloadFromFormData(new FormData(form));
+    const parsed = WaitlistSubmission.safeParse(payload);
+
+    if (!parsed.success) {
+      const issues = formatWaitlistIssues(parsed.error.issues);
+      const next: FieldIssues = {};
+      for (const [key, messages] of Object.entries(issues)) {
+        next[key] = messages[0];
+      }
+      setFieldIssues(next);
+      setStatus({
+        phase: "error",
+        message: "Проверьте поля формы и попробуйте снова.",
+        issues,
+      });
+      return;
+    }
+
+    setFieldIssues({});
     setStatus({ phase: "submitting" });
 
-    const form = e.currentTarget;
-    const data = new FormData(form);
+    const body = new FormData();
+    body.set("fullName", parsed.data.fullName);
+    body.set("email", parsed.data.email);
+    body.set("company", parsed.data.company);
+    body.set("role", parsed.data.role);
+    body.set("companySize", parsed.data.companySize);
+    if (parsed.data.context) body.set("context", parsed.data.context);
+    body.set("consent", "on");
+    body.set("hp", "");
 
     try {
       const res = await fetch("/api/waitlist", {
         method: "POST",
-        body: data,
+        body,
         headers: { accept: "application/json" },
       });
       if (res.ok) {
@@ -33,12 +75,12 @@ export default function WaitlistForm() {
         form.reset();
         return;
       }
-      const body = (await res.json().catch(() => null)) as {
+      const json = (await res.json().catch(() => null)) as {
         error?: string;
         issues?: Record<string, string[]>;
       } | null;
-      const message = errorMessage(body?.error, res.status);
-      setStatus({ phase: "error", message, issues: body?.issues });
+      const message = errorMessage(json?.error, res.status);
+      setStatus({ phase: "error", message, issues: json?.issues });
     } catch {
       setStatus({
         phase: "error",
@@ -47,23 +89,30 @@ export default function WaitlistForm() {
     }
   }
 
+  function onEmailBlur(value: string): void {
+    const message = validateWorkEmailInput(value);
+    setFieldIssues((prev) => ({ ...prev, email: message }));
+  }
+
   if (status.phase === "success") {
     return (
       <div className="wl wl--success" role="status">
-        <h3>Спасибо</h3>
-        <p>
-          Мы получили заявку и свяжемся с вами, когда будем готовы к следующему
-          набору.
+        <span className="wl__success-mark" aria-hidden="true" />
+        <h3 className="wl__success-title">Заявка принята</h3>
+        <p className="wl__success-copy">
+          Мы свяжемся с вами по email, когда откроем следующий набор в закрытую
+          альфу. Обычно это 3–7 рабочих дней.
         </p>
         <button
           type="button"
           className="wl__again"
-          onClick={() => setStatus({ phase: "idle" })}
+          onClick={() => {
+            setStatus({ phase: "idle" });
+            setFieldIssues({});
+          }}
         >
           Отправить ещё одну заявку
         </button>
-
-        <style>{styles}</style>
       </div>
     );
   }
@@ -72,117 +121,142 @@ export default function WaitlistForm() {
 
   return (
     <form className="wl" onSubmit={onSubmit} noValidate>
-      <Field
-        id="wl-fullName"
-        label="Имя и фамилия"
-        name="fullName"
-        required
-        autoComplete="name"
-        placeholder="Анна Каренина"
-        error={fieldError(status, "fullName")}
-      />
+      <p className="wl__intro">
+        Короткая форма — без звонков и «менеджера по продажам».
+        <br />
+        Ответ только на рабочую почту.
+      </p>
 
-      <Field
-        id="wl-email"
-        label="Рабочий email"
-        name="email"
-        type="email"
-        required
-        autoComplete="email"
-        placeholder="anna@company.ru"
-        error={fieldError(status, "email")}
-      />
-
-      <Field
-        id="wl-role"
-        label="Роль или должность"
-        name="role"
-        required
-        autoComplete="organization-title"
-        placeholder="PMO Lead, Head of Delivery, ...
-"
-        error={fieldError(status, "role")}
-      />
-
-      <Field
-        id="wl-company"
-        label="Компания"
-        name="company"
-        required
-        autoComplete="organization"
-        placeholder="Север Девелопмент"
-        error={fieldError(status, "company")}
-      />
-
-      <div className="wl__field">
-        <label htmlFor="wl-size">Активных проектов одновременно</label>
-        <select
-          id="wl-size"
-          name="companySize"
+      <div className="wl__row">
+        <Field
+          id="wl-fullName"
+          label="Имя и фамилия"
+          name="fullName"
           required
-          defaultValue=""
-          aria-invalid={Boolean(fieldError(status, "companySize"))}
-        >
-          <option value="" disabled>
-            Выберите диапазон
-          </option>
-          {SIZE_ENTRIES.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
+          autoComplete="name"
+          placeholder="Анна Каренина"
+          error={resolveError("fullName", fieldIssues, status)}
+        />
+        <Field
+          id="wl-email"
+          label="Рабочий email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          placeholder="anna@company.ru"
+          error={resolveError("email", fieldIssues, status)}
+          onBlur={(e) => onEmailBlur(e.currentTarget.value)}
+        />
+      </div>
+
+      <div className="wl__row">
+        <Field
+          id="wl-role"
+          label="Роль или должность"
+          name="role"
+          required
+          autoComplete="organization-title"
+          placeholder="PMO Lead, Head of Delivery"
+          error={resolveError("role", fieldIssues, status)}
+        />
+        <Field
+          id="wl-company"
+          label="Компания"
+          name="company"
+          required
+          autoComplete="organization"
+          placeholder="Север Девелопмент"
+          error={resolveError("company", fieldIssues, status)}
+        />
+      </div>
+
+      <div className="wl__field wl__field--full">
+        <label htmlFor="wl-size">
+          Активных проектов одновременно
+          <span className="wl__req" aria-hidden="true">
+            *
+          </span>
+        </label>
+        <p className="wl__hint" id="wl-size-hint">
+          Помогает подобрать формат альфы под масштаб портфеля.
+        </p>
+        <div className="wl__select-wrap">
+          <select
+            id="wl-size"
+            name="companySize"
+            required
+            defaultValue=""
+            aria-invalid={Boolean(resolveError("companySize", fieldIssues, status))}
+            aria-describedby="wl-size-hint"
+          >
+            <option value="" disabled>
+              Выберите диапазон
             </option>
-          ))}
-        </select>
-        {fieldError(status, "companySize") && (
-          <p className="wl__error">{fieldError(status, "companySize")}</p>
+            {SIZE_ENTRIES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {resolveError("companySize", fieldIssues, status) && (
+          <p className="wl__error">{resolveError("companySize", fieldIssues, status)}</p>
         )}
       </div>
 
       <div className="wl__field wl__field--full">
         <label htmlFor="wl-context">
-          Контекст <span className="wl__optional">(опционально)</span>
+          Контекст
+          <span className="wl__optional">опционально</span>
         </label>
         <textarea
           id="wl-context"
           name="context"
           rows={3}
-          placeholder="Коротко: где сейчас возникает давление — ресурсы, сроки, новые сделки, отчёты или решения."
+          placeholder="Где сейчас давление: ресурсы, сроки, новые сделки, отчёты или решения."
           maxLength={600}
+          aria-invalid={Boolean(resolveError("context", fieldIssues, status))}
         />
+        {resolveError("context", fieldIssues, status) && (
+          <p className="wl__error">{resolveError("context", fieldIssues, status)}</p>
+        )}
       </div>
 
-      <p className="wl__helper">
-        Нам важно понять масштаб портфеля и вашу роль, чтобы предложить
-        релевантный формат альфы.
-      </p>
+      <div className="wl__footer">
+        <label className="wl__consent">
+          <input type="checkbox" name="consent" required />
+          <span>
+            Я согласен(а) с{" "}
+            <a href="/privacy">политикой конфиденциальности</a> и{" "}
+            <a href="/terms">условиями закрытой альфы</a>.
+          </span>
+        </label>
+        {resolveError("consent", fieldIssues, status) && (
+          <p className="wl__error">{resolveError("consent", fieldIssues, status)}</p>
+        )}
 
-      <label className="wl__consent">
-        <input type="checkbox" name="consent" required />
-        <span>
-          Я согласен(а) с{" "}
-          <a href="/privacy">политикой конфиденциальности</a> и{" "}
-          <a href="/terms">условиями закрытой альфы</a>.
-        </span>
-      </label>
+        <div className="wl__hp" aria-hidden="true">
+          <label htmlFor="wl-hp">Не заполняйте</label>
+          <input id="wl-hp" name="hp" type="text" tabIndex={-1} autoComplete="off" />
+        </div>
 
-      {/* Honeypot — должен оставаться пустым у людей. */}
-      <div className="wl__hp" aria-hidden="true">
-        <label htmlFor="wl-hp">Не заполняйте</label>
-        <input id="wl-hp" name="hp" type="text" tabIndex={-1} autoComplete="off" />
-      </div>
+        {status.phase === "error" && status.message && (
+          <p className="wl__form-error" role="alert">
+            {status.message}
+          </p>
+        )}
 
-      {status.phase === "error" && (
-        <p className="wl__form-error" role="alert">
-          {status.message}
-        </p>
-      )}
-
-      <div className="wl__actions">
         <button type="submit" className="wl__submit" disabled={submitting}>
-          {submitting ? "Отправляем…" : "Запросить доступ"}
+          <span className="wl__submit-label">
+            {submitting ? "Отправляем…" : "Запросить доступ"}
+          </span>
         </button>
-      </div>
 
-      <style>{styles}</style>
+        <p className="wl__footnote">
+          Ручная модерация · без рассылок · ответ на указанный email
+        </p>
+      </div>
     </form>
   );
 }
@@ -196,6 +270,7 @@ interface FieldProps {
   autoComplete?: string;
   placeholder?: string;
   error?: string;
+  onBlur?: (e: FocusEvent<HTMLInputElement>) => void;
 }
 
 function Field({
@@ -207,12 +282,17 @@ function Field({
   autoComplete,
   placeholder,
   error,
+  onBlur,
 }: FieldProps) {
   return (
     <div className="wl__field">
       <label htmlFor={id}>
         {label}
-        {required && <span className="wl__req" aria-hidden="true">*</span>}
+        {required && (
+          <span className="wl__req" aria-hidden="true">
+            *
+          </span>
+        )}
       </label>
       <input
         id={id}
@@ -223,6 +303,7 @@ function Field({
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-err` : undefined}
+        onBlur={onBlur}
       />
       {error && (
         <p className="wl__error" id={`${id}-err`}>
@@ -233,179 +314,33 @@ function Field({
   );
 }
 
-function fieldError(status: Status, name: string): string | undefined {
-  if (status.phase !== "error" || !status.issues) return undefined;
-  return status.issues[name]?.[0];
+function resolveError(
+  name: string,
+  fieldIssues: FieldIssues,
+  status: Status,
+): string | undefined {
+  if (fieldIssues[name]) return fieldIssues[name];
+  if (status.phase === "error" && status.issues?.[name]?.[0]) {
+    return status.issues[name]?.[0];
+  }
+  return undefined;
+}
+
+function validateWorkEmailInput(raw: string): string | undefined {
+  const value = sanitizeText(raw).toLowerCase();
+  if (!value) return "Укажите рабочий email";
+  if (!z.string().email().safeParse(value).success) {
+    return "Похоже, в адресе опечатка";
+  }
+  if (isConsumerEmailDomain(value)) return WORK_EMAIL_ERROR;
+  return undefined;
 }
 
 function errorMessage(code: string | undefined, httpStatus: number): string {
-  if (httpStatus === 429) return "Слишком много попыток. Подождите минуту и попробуйте снова.";
+  if (httpStatus === 429) {
+    return "Слишком много попыток. Подождите минуту и попробуйте снова.";
+  }
   if (code === "validation_error") return "Проверьте поля формы и попробуйте снова.";
   if (code === "origin_not_allowed") return "Отправка с этого источника запрещена.";
   return "Не удалось отправить. Попробуйте позже.";
 }
-
-const styles = `
-.wl {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 640px) {
-  .wl { grid-template-columns: 1fr 1fr; }
-  .wl__field--full,
-  .wl__helper,
-  .wl__consent,
-  .wl__actions,
-  .wl__form-error { grid-column: 1 / -1; }
-}
-
-.wl__field { display: grid; gap: 6px; }
-.wl__field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.wl__optional {
-  color: var(--muted);
-  font-weight: 400;
-  margin-left: 4px;
-}
-.wl__req { color: var(--danger); margin-left: 4px; }
-
-.wl input[type="text"],
-.wl input[type="email"],
-.wl select,
-.wl textarea {
-  width: 100%;
-  font: inherit;
-  font-size: 14px;
-  color: var(--text-strong);
-  background: var(--panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  transition:
-    border-color var(--duration-ui) var(--ease-ui),
-    box-shadow var(--duration-ui) var(--ease-ui);
-}
-.wl textarea { resize: vertical; min-height: 80px; }
-
-.wl input:focus-visible,
-.wl select:focus-visible,
-.wl textarea:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--ring-focus);
-}
-
-.wl input[aria-invalid="true"],
-.wl select[aria-invalid="true"] {
-  border-color: var(--danger);
-}
-
-.wl__error {
-  font-size: 12px;
-  color: var(--danger-text, #b91c1c);
-}
-
-.wl__helper {
-  margin: 0;
-  color: var(--muted-strong);
-  font-size: 13px;
-  line-height: 1.55;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--panel-strong) 90%, var(--plasma-violet) 10%);
-  border: 1px solid color-mix(in oklab, var(--border) 65%, var(--plasma-violet) 35%);
-}
-
-.wl__consent {
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--muted-strong);
-  line-height: 1.5;
-}
-.wl__consent input { accent-color: var(--accent); margin-top: 3px; }
-
-.wl__hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-
-.wl__form-error {
-  background: var(--danger-soft);
-  color: #991b1b;
-  border: 1px solid #fecaca;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-}
-
-.wl__actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.wl__submit {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 48px;
-  padding-inline: 22px;
-  border-radius: var(--radius-full);
-  background: var(--text-strong);
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  border: 0;
-  transition:
-    background var(--duration-ui) var(--ease-ui),
-    transform var(--duration-ui) var(--ease-ui);
-}
-.wl__submit:hover:not(:disabled) { background: #1e293b; transform: translateY(-1px); }
-.wl__submit:disabled {
-  background: var(--muted-soft);
-  color: var(--panel);
-  cursor: progress;
-}
-
-.wl__note {
-  font-size: 12px;
-  color: var(--muted);
-  max-width: 360px;
-}
-
-.wl--success {
-  background: var(--success-soft);
-  border: 1px solid #a7f3d0;
-  padding: 24px;
-  border-radius: var(--radius-xl);
-  color: #065f46;
-  display: grid;
-  gap: 10px;
-}
-.wl--success h3 {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0;
-  color: #064e3b;
-}
-.wl--success p { font-size: 14px; line-height: 1.6; }
-.wl__again {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #065f46;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid #a7f3d0;
-  padding: 8px 14px;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  width: fit-content;
-}
-.wl__again:hover { background: #fff; }
-`;

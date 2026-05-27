@@ -1,183 +1,173 @@
-import { Cta, ScreenShell } from "../ScreenShell";
-import type { DemoFixture } from "../../../demo/fixture";
+import type { ReactNode } from "react";
+import { Cta } from "../ScreenShell";
+import type { DemoDeal } from "../../../demo/fixture";
 
 interface Props {
-  deal: DemoFixture["deals"][number];
+  deal: DemoDeal;
   onAdvance: () => void;
   onExplore: (message: string) => void;
 }
 
 export function CrmDealScreen({ deal, onAdvance, onExplore }: Props) {
+  const ws = deal.workspace;
+  if (!ws) {
+    return null;
+  }
+
   return (
-    <ScreenShell
-      title={deal.name}
-      subtitle={`${deal.id} · ${deal.stage} · ${deal.owner}`}
-      toolbar={
-        <>
+    <div className="deal-workspace">
+      <header className="deal-workspace__head">
+        <div className="deal-workspace__title-block">
+          <div className="deal-workspace__title-row">
+            <button
+              type="button"
+              className="deal-workspace__star"
+              aria-label="Добавить в избранное"
+              onClick={() => onExplore("Избранные сделки доступны из списка CRM.")}
+            >
+              ★
+            </button>
+            <h2 className="deal-workspace__title">{deal.name}</h2>
+            <span className="deal-workspace__status">{ws.statusLabel}</span>
+          </div>
+          <p className="deal-workspace__meta">
+            {deal.id} · Создана {ws.createdAt} · {deal.owner}
+            <span className="deal-workspace__sync" title="Синхронизировано с CRM">
+              · синхр. 2 мин назад
+            </span>
+          </p>
+        </div>
+
+        <div className="deal-workspace__toolbar">
+          <div className="deal-workspace__avatars" aria-label="Участники сделки">
+            {ws.team.map((member) => (
+              <span
+                key={member.initials}
+                className="deal-workspace__avatar"
+                title={`${member.name} · ${member.role}`}
+              >
+                {member.initials}
+                {member.online ? <span className="deal-workspace__avatar-dot" /> : null}
+              </span>
+            ))}
+          </div>
           <Cta
             variant="ghost"
             label="Обсудить"
             onClick={() =>
-              onExplore("Обсуждение остаётся рядом с проектным спросом: контекст не уезжает в отдельный чат.")
+              onExplore("Обсуждение ведётся на карточке — отдельный чат не нужен.")
             }
           />
-          <Cta label="Проверить ёмкость →" onClick={onAdvance} />
-        </>
-      }
-    >
-      <div className="deal__grid">
-        <div className="deal__col">
-          <Section title="Сводка">
-            <KV label="Бюджет" value={deal.amount} />
-            <KV label="Тип" value="Внедрение" />
-            <KV label="Регион" value="Север-Запад" />
-            <KV label="Источник" value="CRM / ручной ввод" />
-          </Section>
+          <Cta variant="primary" label="Проверить ёмкость →" emphasis onClick={onAdvance} />
+        </div>
+      </header>
 
-          <Section title="Активность">
-            <Activity who="Анна К." what="Прикрепила КП v2 и переписку" when="вчера · 17:48" />
-            <Activity who="Клиент: А. Сергеев" what="Подтвердил готовность к подписанию" when="сегодня · 09:12" />
-            <Activity who="KISS PM" what="Портфель сейчас: 147 активных проектов" when="сегодня · 11:00" />
-          </Section>
+      <div className="deal-workspace__body">
+        <div className="deal-workspace__cols">
+          <div className="deal-workspace__side">
+            <DealPanel title="Сводка по сделке">
+              <dl className="deal-kv">
+                {ws.summary.map((row) => (
+                  <div key={row.label} className="deal-kv__row">
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <button type="button" className="deal-panel__more" tabIndex={-1}>
+                Показать детали
+                <span aria-hidden="true">▾</span>
+              </button>
+            </DealPanel>
+
+            <DealPanel title="Активность">
+              <ul className="deal-activity" role="list">
+                {ws.activities.map((item) => (
+                  <li key={`${item.who}-${item.when}`} className="deal-activity__item">
+                    <span className={`deal-activity__icon deal-activity__icon--${item.kind}`} />
+                    <div className="deal-activity__content">
+                      <div className="deal-activity__head">
+                        <span className="deal-activity__who">{item.who}</span>
+                        <time dateTime={item.when}>{item.when}</time>
+                      </div>
+                      <p className="deal-activity__what">{item.what}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </DealPanel>
+          </div>
+
+          <DealPanel title="Обсуждение сделки" className="deal-panel--chat">
+            <div className="deal-chat" role="log" aria-label="Обсуждение сделки">
+              {ws.thread.map((msg) => (
+                <article
+                  key={`${msg.author}-${msg.when}`}
+                  className={`deal-chat__msg${msg.highlight ? " deal-chat__msg--note" : ""}${
+                    msg.fresh ? " deal-chat__msg--fresh" : ""
+                  }`}
+                >
+                  <header className="deal-chat__head">
+                    <span className="deal-chat__author">
+                      {msg.author}
+                      <span className="deal-chat__role">· {msg.role}</span>
+                    </span>
+                    <time dateTime={msg.when}>{msg.when}</time>
+                  </header>
+                  <p className="deal-chat__text">{msg.text}</p>
+                  {msg.fresh ? (
+                    <span className="deal-chat__read" aria-label="Доставлено">
+                      ✓✓
+                    </span>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <div className="deal-composer" aria-hidden="true">
+              <div className="deal-composer__field">Написать сообщение…</div>
+              <div className="deal-composer__tools">
+                <span className="deal-composer__tool">Файл</span>
+                <span className="deal-composer__tool">Упомянуть</span>
+              </div>
+            </div>
+          </DealPanel>
         </div>
 
-        <div className="deal__col">
-          <Section title="Обсуждение">
-            <Comment
-              who="Анна К. · PM"
-              when="11:24"
-              text="Нужно понять, выдержит ли портфель новый спрос без перегруза ведущих инженеров."
-            />
-            <Comment
-              who="Михаил Б. · Head of Delivery"
-              when="11:40"
-              text="Согласен. До обещания срока проверим ресурсную ёмкость на 7–9 неделях."
-              accent
-            />
-          </Section>
-        </div>
+        <section className="deal-related" aria-label="Связанные сущности">
+          <h3 className="deal-related__title">Связанные сущности</h3>
+          <div className="deal-related__grid">
+            {ws.related.map((entity) => (
+              <button
+                key={entity.label}
+                type="button"
+                className="deal-related__card"
+                onClick={() => onExplore(`${entity.label} «${entity.title}» открывается в CRM.`)}
+              >
+                <span className="deal-related__label">{entity.label}</span>
+                <span className="deal-related__name">{entity.title}</span>
+                <span className="deal-related__meta">{entity.meta}</span>
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
-
-      <style>{`
-        .deal__grid {
-          display: grid;
-          gap: 16px;
-          grid-template-columns: 1fr;
-        }
-        @media (min-width: 720px) {
-          .deal__grid {
-            grid-template-columns: 1fr 1fr;
-          }
-        }
-        .deal__col {
-          display: grid;
-          gap: 12px;
-        }
-        .section {
-          background: var(--panel-subtle);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          padding: 12px 14px;
-          display: grid;
-          gap: 8px;
-        }
-        .section__title {
-          font-size: 11px;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--muted);
-          font-weight: 700;
-        }
-        .kv {
-          display: grid;
-          grid-template-columns: 1fr max-content;
-          gap: 8px;
-          font-size: 13px;
-        }
-        .kv__label { color: var(--muted-strong); }
-        .kv__value { color: var(--text-strong); font-weight: 600; }
-        .activity {
-          font-size: 12.5px;
-          display: grid;
-          grid-template-columns: 1fr max-content;
-          gap: 6px;
-        }
-        .activity__who { color: var(--text-strong); font-weight: 600; }
-        .activity__what { color: var(--muted-strong); }
-        .activity__when { color: var(--muted); font-variant-numeric: tabular-nums; }
-        .comment {
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          padding: 10px 12px;
-          display: grid;
-          gap: 4px;
-        }
-        .comment--accent {
-          background: var(--accent-soft);
-          border-color: var(--accent-muted);
-        }
-        .comment__head {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          color: var(--muted-strong);
-          font-weight: 600;
-        }
-        .comment__text { font-size: 13px; color: var(--text); line-height: 1.5; }
-      `}</style>
-    </ScreenShell>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="section">
-      <span className="section__title">{title}</span>
-      {children}
     </div>
   );
 }
 
-function KV({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="kv">
-      <span className="kv__label">{label}</span>
-      <span className="kv__value">{value}</span>
-    </div>
-  );
-}
-
-function Activity({ who, what, when }: { who: string; what: string; when: string }) {
-  return (
-    <div className="activity">
-      <div>
-        <span className="activity__who">{who}</span>{" "}
-        <span className="activity__what">— {what}</span>
-      </div>
-      <span className="activity__when">{when}</span>
-    </div>
-  );
-}
-
-function Comment({
-  who,
-  when,
-  text,
-  accent,
+function DealPanel({
+  title,
+  className,
+  children,
 }: {
-  who: string;
-  when: string;
-  text: string;
-  accent?: boolean;
+  title: string;
+  className?: string;
+  children: ReactNode;
 }) {
   return (
-    <div className={`comment${accent ? " comment--accent" : ""}`}>
-      <header className="comment__head">
-        <span>{who}</span>
-        <span>{when}</span>
-      </header>
-      <p className="comment__text">{text}</p>
-    </div>
+    <section className={`deal-panel${className ? ` ${className}` : ""}`}>
+      <h3 className="deal-panel__title">{title}</h3>
+      <div className="deal-panel__body">{children}</div>
+    </section>
   );
 }
