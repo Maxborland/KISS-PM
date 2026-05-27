@@ -357,12 +357,12 @@ export function DashboardBento({ empty: emptyOverride }: DashboardBentoProps = {
                 </div>
                 <Button
                   variant="secondary"
-                  className="u-w-full u-mt-3"
+                  className="dashboard-bento__mgmt-cta u-w-full u-mt-3"
                   disabled
                   title="Демо Storybook: управленческая поверхность откроется из карточки сигнала"
                 >
-                  Открыть управленческую поверхность
-                  <ArrowUpRight className="size-4" aria-hidden />
+                  Управленческая поверхность
+                  <ArrowUpRight className="size-4 shrink-0" aria-hidden />
                 </Button>
               </>
             )}

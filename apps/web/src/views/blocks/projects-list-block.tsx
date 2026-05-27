@@ -49,12 +49,19 @@ function formatProjectSourceType(sourceType: Project["sourceType"]): string {
     case "opportunity":
       return "Из сделки CRM";
     case "workspace_inbox":
-      return "Из входящих workspace";
+      return "Из входящих рабочей области";
     case "manual":
       return "Создан вручную";
     default:
       return sourceType;
   }
+}
+
+function projectStatusLabel(status: Project["status"]): string {
+  if (status === "active") return "Активен";
+  if (status === "closed") return "Закрыт";
+  if (status === "draft") return "Черновик";
+  return status;
 }
 
 function buildProjectRows(projects: Project[]): ProjectRow[] {
@@ -251,7 +258,7 @@ export function ProjectsListBlock() {
                   <BemAvatar initials={row.owner.initials} color={row.owner.color} /> {row.owner.name}
                 </td>
                 <td>
-                  <Chip variant={row.statusVariant}>{row.status}</Chip>
+                  <Chip variant={row.statusVariant}>{projectStatusLabel(row.status)}</Chip>
                   <div className="u-text-xs u-text-muted">
                     {filter === "templates" ? "Из шаблона" : formatProjectSourceType(row.sourceType)}
                   </div>
@@ -293,9 +300,9 @@ export function ProjectsListBlock() {
                   <CellStack title="Шаблон" subtitle={projectTemplateName(openProject.templateId)} />
                   <CellStack title="Создан / активирован" subtitle={`${formatDate(openProject.createdAt)} · ${formatDate(openProject.activatedAt)}`} />
                   <div className="u-flex u-flex-col u-gap-2">
-                    <span className="u-text-xs u-text-muted">Demand по должностям</span>
+                    <span className="u-text-xs u-text-muted">Потребность по должностям</span>
                     {openProject.demand.length === 0 ? (
-                      <span className="u-text-sm u-text-muted">Для шаблона demand не задан.</span>
+                      <span className="u-text-sm u-text-muted">Для шаблона потребность не задана.</span>
                     ) : (
                       openProject.demand.map((item) => (
                         <div key={item.positionId} className="u-flex u-items-center u-justify-between u-text-sm">

@@ -4,7 +4,7 @@ import {
   assertStoryRendered,
   gotoStory,
   loadVrtStories,
-  storyBody
+  resolveProductRoot
 } from "./storybook-vrt-utils";
 
 const only = process.env.STORYBOOK_VRT_ONLY;
@@ -15,10 +15,11 @@ test.describe("Storybook visual regression", () => {
 
   for (const story of stories) {
     test(`@vrt ${story.section} · ${story.title}`, async ({ page }) => {
-      const frame = await gotoStory(page, story.id);
-      await assertStoryRendered(page, frame);
+      const preview = await gotoStory(page, story.id);
+      await assertStoryRendered(preview);
 
-      await expect(storyBody(frame)).toHaveScreenshot(`${story.id}.png`, {
+      const productRoot = await resolveProductRoot(preview);
+      await expect(productRoot).toHaveScreenshot(`${story.id}.png`, {
         animations: "disabled",
         maxDiffPixelRatio: 0.02,
         timeout: 30_000

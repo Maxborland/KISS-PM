@@ -25,24 +25,29 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
 
   const copy = {
     empty: {
-      title: "Нет задач",
-      lead: "Создайте первую задачу или импортируйте из CRM.",
+      title: "По этому виду задач нет",
+      lead: "Сохранённый вид активен, но сейчас не находит задач.",
       body: (
         <EmptyState
           level="L3"
-          title="Пока пусто"
-          description="Добавьте задачу или измените фильтры."
+          title="Нет задач для работы"
+          description="Создайте задачу вручную, импортируйте из CRM или сбросьте фильтры."
           action={
-            <Button variant="primary" onClick={() => toast.success("Задача создана (демо)")}>
-              Создать задачу
-            </Button>
+            <>
+              <Button variant="primary" onClick={() => toast.success("Задача создана (демо)")}>
+                Создать задачу
+              </Button>
+              <Button variant="secondary" onClick={() => toast.info("Фильтры сброшены (демо)")}>
+                Сбросить фильтры
+              </Button>
+            </>
           }
         />
       )
     },
     error: {
       title: "Ошибка загрузки",
-      lead: state.errorMessage ?? "Не удалось получить данные. Повторите позже.",
+      lead: state.errorMessage ?? "Не удалось обновить рабочие данные.",
       body: (
         <ErrorState
           level="L3"
@@ -53,7 +58,7 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
                 description:
                   retryCount > 0
                     ? `Повтор ${retryCount}: ${state.errorMessage ?? "Проверьте соединение и повторите запрос."}`
-                    : (state.errorMessage ?? "Проверьте соединение и повторите запрос.")
+                    : (state.errorMessage ?? "Данные на экране могли устареть. Повторите запрос.")
               }
             : {})}
           onRetry={() => {
@@ -66,12 +71,12 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
     },
     forbidden: {
       title: "Нет доступа",
-      lead: "Обратитесь к администратору рабочей области.",
+      lead: "Текущая роль не открывает этот раздел.",
       body: (
         <ForbiddenState
           level="L3"
           title="Доступ запрещён"
-          description="Недостаточно прав для этого раздела."
+          description="Запросите доступ у администратора рабочей области или переключитесь на профиль с нужной ролью."
           action={
             <Button variant="outline" onClick={() => toast.info("Запрос доступа (демо)")}>
               Запросить доступ

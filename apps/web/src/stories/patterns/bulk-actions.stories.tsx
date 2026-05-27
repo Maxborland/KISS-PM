@@ -17,16 +17,16 @@ export default meta;
 type Story = StoryObj;
 
 export const SelectionBar: Story = {
-  name: "Панель выбора (future scope)",
+  name: "Панель выбора (пока недоступно)",
   parameters: {
     docs: patternDocs(
-      "Bulk selection появится с governed command; до этого — disabled actions с явной причиной."
+      "Массовый выбор появится вместе с управляемой командой; до этого действия недоступны и объясняют причину."
     )
   },
   render: () => (
-    <PatternFrame title="Массовые действия" hint="Не fake: кнопки disabled до подключения command layer.">
+    <PatternFrame title="Массовые действия" hint="Кнопки недоступны до подключения командного слоя и аудита.">
       <BannerInline variant="info">
-        Выбрано 2 задачи. Массовое назначение и смена статуса — в backlog (governed action + audit).
+        Выбрано 2 задачи. Массовое назначение и смена статуса появятся после подключения управляемого действия и аудита.
       </BannerInline>
       <div className="pattern-story__bulk-bar">
         <Button variant="secondary" size="sm" disabled title="Демо Storybook: массовое назначение в backlog">

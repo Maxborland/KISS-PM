@@ -4,18 +4,9 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const webRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+import { STORYBOOK_APPROVED_ROOTS, extractMetaRoot } from "./storybook-approved-roots";
 
-export const STORYBOOK_APPROVED_ROOTS = [
-  "Foundations",
-  "Primitives",
-  "Composites",
-  "Widgets",
-  "Screens",
-  "Flows",
-  "Patterns",
-  "API Contract"
-] as const;
+const webRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function read(relativePath: string): string {
   return readFileSync(join(webRoot, relativePath), "utf8");
@@ -32,15 +23,6 @@ function walkStoryFiles(dir: string): string[] {
     if (name.endsWith(".stories.tsx")) out.push(path);
   }
   return out;
-}
-
-/** Первый `title` в блоке `const meta` — корень sidebar. */
-export function extractMetaRoot(source: string): string | null {
-  const metaIdx = source.indexOf("const meta");
-  if (metaIdx < 0) return null;
-  const slice = source.slice(metaIdx, metaIdx + 800);
-  const match = slice.match(/title:\s*["']([^/"']+)/);
-  return match?.[1] ?? null;
 }
 
 export function collectStorybookRoots(): Set<string> {

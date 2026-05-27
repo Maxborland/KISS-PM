@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -14,30 +14,50 @@ import { STORYBOOK_MSW_HANDLER_PATHS } from "@/lib/mock-data/storybook-msw-route
 const webRoot = join(fileURLToPath(new URL(".", import.meta.url)), "../..");
 const coverageDir = join(webRoot, ".storybook-verify-tmp");
 const coverageFile = join(coverageDir, "api-contract-coverage.json");
-const screensStoriesSource = readFileSync(
-  join(webRoot, "src/views/screens/screens.stories.tsx"),
-  "utf8"
-);
-
-function exportNameToStoryId(exportName: string): string {
-  const kebab = exportName
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
-    .toLowerCase();
-  return `screens--${kebab}`;
+function readAllScreensStoriesSources(): string {
+  const screensDir = join(webRoot, "src/views/screens");
+  return readdirSync(screensDir)
+    .filter((name) => name.endsWith(".stories.tsx"))
+    .map((name) => readFileSync(join(screensDir, name), "utf8"))
+    .join("\n");
 }
 
-function collectViewsScreenStoryIds(source: string): Set<string> {
+function collectViewsScreenStoryIdsFromIndex(): Set<string> {
+  const indexPath = join(webRoot, "storybook-static/index.json");
+  if (!existsSync(indexPath)) return collectViewsScreenStoryIdsFromSources(readAllScreensStoriesSources());
+  const index = JSON.parse(readFileSync(indexPath, "utf8")) as {
+    entries: Record<string, { type?: string; id?: string }>;
+  };
   const ids = new Set<string>();
-  const pattern = /export const (\w+): Story/g;
-  for (const match of source.matchAll(pattern)) {
-    const exportName = match[1];
-    if (exportName) ids.add(exportNameToStoryId(exportName));
+  for (const entry of Object.values(index.entries)) {
+    if (entry.type === "story" && entry.id?.startsWith("screens-")) ids.add(entry.id);
   }
   return ids;
 }
 
-const VIEWS_SCREEN_STORY_IDS = collectViewsScreenStoryIds(screensStoriesSource);
+/** Fallback when storybook-static is not built (kebab export → legacy id shape). */
+function collectViewsScreenStoryIdsFromSources(source: string): Set<string> {
+  const ids = new Set<string>();
+  const pattern = /export const (\w+): Story/g;
+  for (const match of source.matchAll(pattern)) {
+    const exportName = match[1];
+    if (!exportName) continue;
+    const kebab = exportName
+      .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+      .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+      .toLowerCase();
+    ids.add(`screens--${kebab}`);
+  }
+  return ids;
+}
+
+const VIEWS_SCREEN_STORY_IDS = collectViewsScreenStoryIdsFromIndex();
+
+function resolveScreenStoryId(registryId: string, available: Set<string>): boolean {
+  if (available.has(registryId)) return true;
+  const suffix = registryId.replace(/^screens--/, "");
+  return [...available].some((id) => id.endsWith(`--${suffix}`));
+}
 
 function normalizeRoute(route: string): string {
   return route.replace(/:projectId/g, ":projectId");
@@ -80,8 +100,11 @@ describe("api-contract fixtures", () => {
   it("maps registry stories to existing Views/Screens story ids", () => {
     for (const entry of API_CONTRACT_ENTRIES) {
       for (const storyId of entry.stories) {
-        if (!storyId.startsWith("screens--")) continue;
-        expect(VIEWS_SCREEN_STORY_IDS.has(storyId), `unknown story id ${storyId}`).toBe(true);
+        if (!storyId.startsWith("screens")) continue;
+        expect(
+          resolveScreenStoryId(storyId, VIEWS_SCREEN_STORY_IDS),
+          `unknown story id ${storyId}`
+        ).toBe(true);
       }
     }
   });

@@ -49,11 +49,21 @@ export function TaskDetailDrawer({
         {task ? (
           <>
             <SheetHeader className="task-drawer__head">
-              <SheetTitle>Карточка задачи</SheetTitle>
-              <Button asChild variant="secondary" size="sm" className="task-drawer__open-full">
-                <a target="_top" rel="noreferrer" href={taskHref}>
-                  <ExternalLink className="size-4" aria-hidden />
-                  Открыть как страницу
+              <SheetTitle className="sr-only">{task.title}</SheetTitle>
+              <Button
+                asChild
+                variant="secondary"
+                size="icon"
+                className="task-drawer__open-full"
+              >
+                <a
+                  target="_top"
+                  rel="noreferrer"
+                  href={taskHref}
+                  aria-label="Открыть карточку задачи как страницу"
+                  title="Открыть как страницу"
+                >
+                  <ExternalLink aria-hidden />
                 </a>
               </Button>
             </SheetHeader>

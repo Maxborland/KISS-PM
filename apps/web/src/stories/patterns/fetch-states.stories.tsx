@@ -24,12 +24,17 @@ export const Empty: Story = {
     <PatternFrame title="Пустое состояние" hint="Уровни L1–L4 — см. components/ui/empty-state.">
       <EmptyState
         level="L3"
-        title="Нет задач"
-        description="Создайте первую задачу или измените фильтры."
+        title="По этому фильтру задач нет"
+        description="Сохранённый вид активен, но сейчас не находит задач. Сбросьте фильтры или создайте задачу вручную."
         action={
-          <Button variant="primary" disabled title="Демо Storybook: создание подключится к API">
-            Создать задачу
-          </Button>
+          <>
+            <Button variant="primary" onClick={() => undefined}>
+              Создать задачу
+            </Button>
+            <Button variant="secondary" onClick={() => undefined}>
+              Сбросить фильтры
+            </Button>
+          </>
         }
       />
     </PatternFrame>
@@ -55,8 +60,9 @@ export const Error: Story = {
         level="L3"
         errorKey="500"
         correlationId="kiss-demo-7f3a2c91"
-        description="Не удалось получить данные. Повторите позже."
+        description="Не удалось обновить список задач. Данные на экране могли устареть; повторите запрос или передайте код обращения поддержке."
         onRetry={() => undefined}
+        onSupport={() => undefined}
       />
     </PatternFrame>
   )
@@ -70,7 +76,12 @@ export const Forbidden: Story = {
       <ForbiddenState
         level="L3"
         title="Недостаточно прав"
-        description="Обратитесь к администратору рабочей области."
+        description="Ваша роль не открывает этот раздел. Запросите доступ у администратора рабочей области."
+        action={
+          <Button variant="secondary" onClick={() => undefined}>
+            Запросить доступ
+          </Button>
+        }
       />
     </PatternFrame>
   )

@@ -17,7 +17,7 @@ type Story = StoryObj<typeof Pagination>;
 
 /** Витрина design-v3 (React + CVA, токены) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <PaginationShowcase />
 };

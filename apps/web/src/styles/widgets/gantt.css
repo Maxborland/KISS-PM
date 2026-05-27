@@ -570,6 +570,13 @@
 }
 
 /* --- Interactive shell (WBS + chart + inspector) --- */
+.gantt-story-shell {
+  box-sizing: border-box;
+  min-height: 80vh;
+  padding: var(--space-3);
+  background: var(--bg);
+}
+
 .gantt2__shell {
   display: flex;
   flex-direction: row;
@@ -1582,5 +1589,4 @@
     min-width: 280px;
   }
 }
-
 

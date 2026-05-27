@@ -80,7 +80,6 @@ describe("design-v3 quality gates (Phase 9 lockdown)", () => {
       "src/widgets/gantt/gantt-chart-bar.tsx: inline style={{",
       "src/widgets/gantt/gantt-context-menu.tsx: inline style={{",
       "src/widgets/gantt/gantt-view.tsx: inline style={{",
-      "src/widgets/gantt/gantt.stories.tsx: inline style={{",
       "src/widgets/resource-matrix/resource-matrix.tsx: inline style={{",
       "src/components/domain/capacity-bar.tsx: inline style={{",
       "src/components/domain/gantt-bar-demo.tsx: inline style={{",

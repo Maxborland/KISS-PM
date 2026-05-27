@@ -157,13 +157,15 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     const legacyPath = join(webRoot, ".storybook-verify-tmp/batch16-ci-evidence.json");
     const path = existsSync(evidencePath) ? evidencePath : legacyPath;
     if (!existsSync(path)) {
-      expect(read("scripts/run-storybook-contract-ci.mjs")).toContain("storybook-vrt");
+      expect(read("scripts/run-storybook-contract-ci.mjs")).toContain("storybook-vrt-harness");
       return;
     }
     const evidence = JSON.parse(readFileSync(path, "utf8")) as { pass: boolean; steps: { name: string; pass: boolean }[] };
     expect(evidence.pass).toBe(true);
     const copyStep = evidence.steps.find((s) => s.name === "copy-scan-all-stories");
     expect(copyStep?.pass).toBe(true);
+    const harnessStep = evidence.steps.find((s) => s.name === "storybook-vrt-harness");
+    expect(harnessStep?.pass).toBe(true);
   });
 
   it("interaction batch B1 evidence is green", () => {
@@ -361,9 +363,9 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
   });
 
   it("Phase 8: DnD play uses kanban item slots (storybook-kanban-play)", () => {
-    const screens = read("src/views/screens/screens.stories.tsx");
-    expect(screens).toContain("playKanbanPointerDrag");
-    expect(screens).toContain('playKanbanPointerDrag(board, "DEAL-103", "КП"');
+    const deals = read("src/views/screens/deals.stories.tsx");
+    expect(deals).toContain("playKanbanPointerDrag");
+    expect(deals).toContain('playKanbanPointerDrag(board, "DEAL-103", "КП"');
     const kanban = read("src/widgets/kanban/kanban.stories.tsx");
     expect(kanban).toContain("playKanbanPointerDrag");
   });

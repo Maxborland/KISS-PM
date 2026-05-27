@@ -7,7 +7,15 @@ import { KanbanWidgetDemo } from "@/widgets/kanban/kanban-widget-demo";
 const meta: Meta<typeof KanbanWidgetDemo> = {
   title: "Widgets/Kanban",
   component: KanbanWidgetDemo,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    docs: {
+      description: {
+        component:
+          "Канбан для задач и рабочих списков: колонки, карточки, пустые состояния и проверка перетаскивания."
+      }
+    }
+  },
   tags: ["!autodocs"]
 };
 
@@ -17,7 +25,7 @@ type Story = StoryObj<typeof KanbanWidgetDemo>;
 
 /** Единая витрина generic-виджета. Экраны (Моя работа и др.) используют тот же `<Kanban>` со своим renderCard. */
 export const Widget: Story = {
-  name: "Виджет",
+  name: "Обзор",
   render: () => (
     <div className="app-canvas app-content">
       <KanbanWidgetDemo />
@@ -27,7 +35,14 @@ export const Widget: Story = {
 
 /** Scoped selectors для DnD-карточек (без глобального getByText). */
 export const DragTargets: Story = {
-  name: "DnD targets",
+  name: "Цели перетаскивания",
+  parameters: {
+    docs: {
+      description: {
+        story: "Регрессионная проверка областей drop и scoped selectors для карточек."
+      }
+    }
+  },
   render: () => (
     <div className="app-canvas app-content">
       <KanbanWidgetDemo />

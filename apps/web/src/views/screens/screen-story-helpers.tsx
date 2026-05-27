@@ -17,6 +17,15 @@ export function screenStoryArgs(id: ScreenId): { id: ScreenId } {
   return { id };
 }
 
+/** Суффикс story id относительно meta.id `screens` (итог: `screens--*` для VRT). */
+export function screenStoryId(exportName: string): string {
+  const kebab = exportName
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+  return kebab;
+}
+
 /** Обёртка экрана в shell с фиксированным сценарием MSW/фикстур. */
 export function ScreenScenarioRender({ id }: { id: ScreenId }) {
   return <ScreenView id={id} />;
@@ -45,16 +54,14 @@ export function workspaceBlockStory<Props extends Record<string, unknown>>(
   };
 }
 
-export type ScreenStory = StoryObj<typeof ScreenView>;
+export type ScreenStory = StoryObj<typeof ScreenView> & { id?: string };
 
-/** Сценарий MSW для экрана (Phase 7: loading / empty / error / forbidden). */
+/** Параметры сценария MSW (Phase 7). `name` задавайте в object literal story — иначе Storybook CSF indexer подставит English из export id. */
 export function screenScenarioStory(
   id: ScreenId,
-  name: string,
   scenario: ScenarioName
-): ScreenStory {
+): Omit<ScreenStory, "name"> {
   return {
-    name,
     args: screenStoryArgs(id),
     parameters: { ...SCREEN_STORY_PARAMETERS, scenario }
   };
