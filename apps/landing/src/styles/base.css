@@ -3,7 +3,9 @@
 @import "./motion.css";
 @import "./editorial.css";
 @import "./landing.css";
+@import "./demo-sandbox.css";
 @import "./product-kanban.css";
+@import "./six-steps.css";
 
 *,
 *::before,

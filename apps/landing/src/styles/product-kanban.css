@@ -98,7 +98,7 @@
   gap: clamp(12px, 1.6vw, var(--space-4));
   min-height: 300px;
   width: 100%;
-  align-items: start;
+  align-items: stretch;
 }
 
 .kanban--landing {
@@ -111,14 +111,16 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .kanban-col__body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
-  min-height: 112px;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 10px 8px 12px;
   border-radius: var(--radius-lg);
   background: color-mix(in oklab, var(--panel-strong) 55%, transparent);
@@ -127,7 +129,8 @@
 
 .kanban-col__empty {
   margin: 0;
-  min-height: inherit;
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -221,7 +224,6 @@
 }
 
 .kanban-col[data-droppable="true"][data-over="true"] .kanban-col__body {
-  min-height: 112px;
   background: color-mix(in oklab, var(--accent-soft) 10%, transparent);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 7%, transparent) inset;
 }
