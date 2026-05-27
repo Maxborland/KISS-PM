@@ -21,6 +21,9 @@ import {
 } from "./schema";
 import type { FileAssetRecord } from "./attachmentRepository";
 
+const DEFAULT_BACKGROUND_JOB_LEASE_TIMEOUT_MS = 15 * 60_000;
+const BACKGROUND_JOB_LEASE_EXPIRED_ERROR = "background_job_lease_expired";
+
 export type BackgroundJobRunInput = {
   id: string;
   tenantId: TenantId;
@@ -49,11 +52,13 @@ export type BackgroundJobRepository = {
     workerId: string;
     now: Date;
     kinds?: BackgroundJobKind[];
+    leaseTimeoutMs?: number;
   }): Promise<BackgroundJobRun | undefined>;
   completeBackgroundJob(input: {
     tenantId: TenantId;
     jobId: string;
     finishedAt: Date;
+    workerId?: string;
     message?: string;
     metadata?: Record<string, unknown>;
   }): Promise<BackgroundJobRun | undefined>;
@@ -62,6 +67,7 @@ export type BackgroundJobRepository = {
     jobId: string;
     failedAt: Date;
     error: string;
+    workerId?: string;
     metadata?: Record<string, unknown>;
   }): Promise<BackgroundJobRun | undefined>;
   listBackgroundJobs(input: {
@@ -157,6 +163,16 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
       return mapBackgroundJobRun(row);
     },
     async claimNextBackgroundJob(input) {
+      const recoveryInput: {
+        now: Date;
+        kinds?: BackgroundJobKind[];
+        leaseTimeoutMs: number;
+      } = {
+        now: input.now,
+        leaseTimeoutMs: input.leaseTimeoutMs ?? DEFAULT_BACKGROUND_JOB_LEASE_TIMEOUT_MS
+      };
+      if (input.kinds) recoveryInput.kinds = input.kinds;
+      await recoverExpiredBackgroundJobLeases(recoveryInput);
       const filters = [
         eq(backgroundJobRuns.status, "queued"),
         lte(backgroundJobRuns.runAfter, input.now)
@@ -208,6 +224,12 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
       return mapBackgroundJobRun(row);
     },
     async completeBackgroundJob(input) {
+      const filters = [
+        eq(backgroundJobRuns.tenantId, input.tenantId),
+        eq(backgroundJobRuns.id, input.jobId),
+        eq(backgroundJobRuns.status, "running")
+      ];
+      if (input.workerId) filters.push(eq(backgroundJobRuns.lockedBy, input.workerId));
       const [row] = await db
         .update(backgroundJobRuns)
         .set({
@@ -218,13 +240,7 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
           updatedAt: input.finishedAt,
           lastError: null
         })
-        .where(
-          and(
-            eq(backgroundJobRuns.tenantId, input.tenantId),
-            eq(backgroundJobRuns.id, input.jobId),
-            eq(backgroundJobRuns.status, "running")
-          )
-        )
+        .where(and(...filters))
         .returning();
       if (!row) return undefined;
       await recordEvent({
@@ -238,16 +254,16 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
       return mapBackgroundJobRun(row);
     },
     async failBackgroundJob(input) {
+      const filters = [
+        eq(backgroundJobRuns.tenantId, input.tenantId),
+        eq(backgroundJobRuns.id, input.jobId),
+        eq(backgroundJobRuns.status, "running")
+      ];
+      if (input.workerId) filters.push(eq(backgroundJobRuns.lockedBy, input.workerId));
       const [current] = await db
         .select()
         .from(backgroundJobRuns)
-        .where(
-          and(
-            eq(backgroundJobRuns.tenantId, input.tenantId),
-            eq(backgroundJobRuns.id, input.jobId),
-            eq(backgroundJobRuns.status, "running")
-          )
-        )
+        .where(and(...filters))
         .limit(1);
       if (!current) return undefined;
       const next = nextBackgroundJobFailureState({
@@ -266,13 +282,7 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
           updatedAt: input.failedAt,
           lastError: input.error
         })
-        .where(
-          and(
-            eq(backgroundJobRuns.tenantId, input.tenantId),
-            eq(backgroundJobRuns.id, input.jobId),
-            eq(backgroundJobRuns.status, "running")
-          )
-        )
+        .where(and(...filters))
         .returning();
       if (!row) return undefined;
       await recordEvent({
@@ -429,6 +439,66 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
       )
       .limit(1);
     return existing;
+  }
+
+  async function recoverExpiredBackgroundJobLeases(input: {
+    now: Date;
+    kinds?: BackgroundJobKind[];
+    leaseTimeoutMs: number;
+  }) {
+    const staleBefore = new Date(input.now.getTime() - input.leaseTimeoutMs);
+    const filters = [
+      eq(backgroundJobRuns.status, "running"),
+      lte(backgroundJobRuns.lockedAt, staleBefore)
+    ];
+    if (input.kinds?.length) filters.push(inArray(backgroundJobRuns.kind, input.kinds));
+    const staleRows = await db
+      .select()
+      .from(backgroundJobRuns)
+      .where(and(...filters))
+      .orderBy(asc(backgroundJobRuns.lockedAt), asc(backgroundJobRuns.id));
+
+    for (const staleRow of staleRows) {
+      if (!staleRow.lockedAt) continue;
+      const next = nextBackgroundJobFailureState({
+        attempt: staleRow.attempt,
+        maxAttempts: staleRow.maxAttempts,
+        failedAt: input.now
+      });
+      const [row] = await db
+        .update(backgroundJobRuns)
+        .set({
+          status: next.status,
+          runAfter: next.runAfter,
+          lockedBy: null,
+          lockedAt: null,
+          finishedAt: next.status === "dead" ? input.now : null,
+          updatedAt: input.now,
+          lastError: BACKGROUND_JOB_LEASE_EXPIRED_ERROR
+        })
+        .where(
+          and(
+            eq(backgroundJobRuns.tenantId, staleRow.tenantId),
+            eq(backgroundJobRuns.id, staleRow.id),
+            eq(backgroundJobRuns.status, "running"),
+            eq(backgroundJobRuns.lockedAt, staleRow.lockedAt)
+          )
+        )
+        .returning();
+      if (!row) continue;
+      await recordEvent({
+        tenantId: row.tenantId,
+        jobId: row.id,
+        eventType: next.status === "dead" ? "dead" : "retry_scheduled",
+        message: BACKGROUND_JOB_LEASE_EXPIRED_ERROR,
+        metadata: {
+          attempt: staleRow.attempt,
+          leaseTimeoutMs: input.leaseTimeoutMs,
+          previousWorkerId: staleRow.lockedBy
+        },
+        createdAt: input.now
+      });
+    }
   }
 }
 

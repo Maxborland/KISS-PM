@@ -563,11 +563,13 @@ export type ApiTenantDataSource = {
     workerId: string;
     now: Date;
     kinds?: BackgroundJobKind[];
+    leaseTimeoutMs?: number;
   }): Promise<BackgroundJobRun | undefined>;
   completeBackgroundJob?(input: {
     tenantId: TenantId;
     jobId: string;
     finishedAt: Date;
+    workerId?: string;
     message?: string;
     metadata?: Record<string, unknown>;
   }): Promise<BackgroundJobRun | undefined>;
@@ -576,6 +578,7 @@ export type ApiTenantDataSource = {
     jobId: string;
     failedAt: Date;
     error: string;
+    workerId?: string;
     metadata?: Record<string, unknown>;
   }): Promise<BackgroundJobRun | undefined>;
   listBackgroundJobs?(input: {

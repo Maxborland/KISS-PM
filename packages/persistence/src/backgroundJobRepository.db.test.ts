@@ -57,4 +57,68 @@ describe("background job repository", () => {
     expect(second.id).toBe(first.id);
     expect(events.map((event) => event.eventType)).toEqual(["enqueued"]);
   });
+
+  it("recovers stale running jobs through retry scheduling before claiming new work", async () => {
+    await repository.enqueueBackgroundJob({
+      id: "background-job-stale",
+      tenantId: "tenant-alpha",
+      kind: "notification.dispatch",
+      payload: { digest: "daily" },
+      maxAttempts: 2,
+      runAfter: new Date("2026-05-27T00:00:00.000Z")
+    });
+    const claimed = await repository.claimNextBackgroundJob({
+      workerId: "worker-a",
+      now: new Date("2026-05-27T00:00:00.000Z"),
+      kinds: ["notification.dispatch"]
+    });
+    expect(claimed?.status).toBe("running");
+    expect(claimed?.attempt).toBe(1);
+
+    const recoveredOnly = await repository.claimNextBackgroundJob({
+      workerId: "worker-b",
+      now: new Date("2026-05-27T00:20:00.000Z"),
+      kinds: ["notification.dispatch"],
+      leaseTimeoutMs: 60_000
+    });
+    const queued = await repository.listBackgroundJobs({
+      tenantId: "tenant-alpha",
+      status: "queued",
+      limit: 10
+    });
+    const events = await repository.listBackgroundJobEvents({
+      tenantId: "tenant-alpha",
+      jobId: "background-job-stale",
+      limit: 10
+    });
+
+    expect(recoveredOnly).toBeUndefined();
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      id: "background-job-stale",
+      status: "queued",
+      lockedBy: null,
+      lockedAt: null,
+      lastError: "background_job_lease_expired"
+    });
+    expect(queued[0]?.runAfter.toISOString()).toBe("2026-05-27T00:21:00.000Z");
+    expect(events.map((event) => event.eventType).sort()).toEqual([
+      "claimed",
+      "enqueued",
+      "retry_scheduled"
+    ]);
+
+    const reclaimed = await repository.claimNextBackgroundJob({
+      workerId: "worker-b",
+      now: new Date("2026-05-27T00:21:00.000Z"),
+      kinds: ["notification.dispatch"],
+      leaseTimeoutMs: 60_000
+    });
+    expect(reclaimed).toMatchObject({
+      id: "background-job-stale",
+      status: "running",
+      attempt: 2,
+      lockedBy: "worker-b"
+    });
+  });
 });

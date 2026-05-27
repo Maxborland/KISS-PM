@@ -68,6 +68,36 @@ describe("background job worker", () => {
     expect(events).toEqual(["failed"]);
   });
 
+  it("redacts raw handler errors before persistence", async () => {
+    const job = backgroundJob("storage.asset_cleanup");
+    let persistedError: string | undefined;
+    const dataSource: ApiTenantDataSource = {
+      claimNextBackgroundJob: async () => job,
+      completeBackgroundJob: async () => ({ ...job, status: "succeeded" }),
+      failBackgroundJob: async (input: Parameters<NonNullable<ApiTenantDataSource["failBackgroundJob"]>>[0]) => {
+        persistedError = input.error;
+        return { ...job, status: "queued", lastError: input.error };
+      }
+    } as unknown as ApiTenantDataSource;
+
+    const result = await runBackgroundJobWorkerTick({
+      dataSource,
+      registry: {
+        "storage.asset_cleanup": async () => {
+          throw new Error("ENOENT C:\\storage\\tenant-alpha\\private-object-key");
+        }
+      },
+      workerId: "worker-test",
+      now: new Date("2026-05-27T00:00:00.000Z")
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error: "background_job_failed"
+    });
+    expect(persistedError).toBe("background_job_failed");
+  });
+
   it("enqueues due schedules with idempotency tied to schedule key and due instant", async () => {
     const enqueued: string[] = [];
     const dataSource: ApiTenantDataSource = {

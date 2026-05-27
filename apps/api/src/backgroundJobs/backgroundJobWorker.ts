@@ -1,4 +1,4 @@
-import type { BackgroundJobKind, BackgroundJobRun } from "@kiss-pm/domain";
+import { backgroundJobKinds, type BackgroundJobKind, type BackgroundJobRun } from "@kiss-pm/domain";
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource } from "../apiTypes";
@@ -21,6 +21,15 @@ export type BackgroundJobHandlerContext = {
 };
 
 export type BackgroundJobRegistry = Partial<Record<BackgroundJobKind, BackgroundJobHandler>>;
+
+const GENERIC_BACKGROUND_JOB_ERROR = "background_job_failed";
+const SAFE_BACKGROUND_JOB_ERROR_CODES = new Set([
+  GENERIC_BACKGROUND_JOB_ERROR,
+  "background_jobs_not_configured",
+  "capacity_warmup_failed",
+  "capacity_warmup_month_invalid",
+  "storage_cleanup_not_configured"
+]);
 
 export async function runBackgroundJobWorkerTick(input: {
   dataSource: ApiTenantDataSource;
@@ -56,7 +65,8 @@ export async function runBackgroundJobWorkerTick(input: {
       tenantId: job.tenantId,
       jobId: job.id,
       failedAt: now,
-      error
+      error,
+      workerId: input.workerId
     });
     return { status: "failed", job, error };
   }
@@ -71,22 +81,36 @@ export async function runBackgroundJobWorkerTick(input: {
     const completeInput: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0] = {
       tenantId: job.tenantId,
       jobId: job.id,
-      finishedAt: now
+      finishedAt: now,
+      workerId: input.workerId
     };
     if (result?.message) completeInput.message = result.message;
     if (result?.metadata) completeInput.metadata = result.metadata;
     await input.dataSource.completeBackgroundJob(completeInput);
     return { status: "succeeded", job };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "background_job_failed";
+    const message = sanitizeBackgroundJobError(error);
     await input.dataSource.failBackgroundJob({
       tenantId: job.tenantId,
       jobId: job.id,
       failedAt: now,
-      error: message
+      error: message,
+      workerId: input.workerId
     });
     return { status: "failed", job, error: message };
   }
+}
+
+export function sanitizeBackgroundJobError(error: unknown): string {
+  if (!(error instanceof Error)) return GENERIC_BACKGROUND_JOB_ERROR;
+  const message = error.message.trim();
+  if (SAFE_BACKGROUND_JOB_ERROR_CODES.has(message)) return message;
+  const missingHandlerPrefix = "background_job_handler_missing:";
+  if (message.startsWith(missingHandlerPrefix)) {
+    const kind = message.slice(missingHandlerPrefix.length);
+    if (backgroundJobKinds.includes(kind as BackgroundJobKind)) return message;
+  }
+  return GENERIC_BACKGROUND_JOB_ERROR;
 }
 
 export async function enqueueDueBackgroundJobSchedules(input: {
