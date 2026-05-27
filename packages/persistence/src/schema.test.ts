@@ -53,13 +53,24 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
       "external_references",
       "entity_attachments",
+      "background_job_schedules",
+      "background_job_runs",
+      "background_job_events",
+      "communication_channels",
+      "communication_channel_members",
       "conversations",
       "discussion_messages",
+      "message_reactions",
+      "sticker_packs",
+      "sticker_assets",
+      "message_stickers",
       "message_mentions",
       "conversation_read_states",
       "user_notifications",
@@ -74,6 +85,10 @@ describe("PostgreSQL persistence schema", () => {
       "call_participant_states",
       "call_events",
       "call_recordings",
+      "knowledge_documents",
+      "knowledge_document_versions",
+      "decision_log_entries",
+      "knowledge_action_items",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -129,13 +144,24 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
       "external_references",
       "entity_attachments",
+      "background_job_schedules",
+      "background_job_runs",
+      "background_job_events",
+      "communication_channels",
+      "communication_channel_members",
       "conversations",
       "discussion_messages",
+      "message_reactions",
+      "sticker_packs",
+      "sticker_assets",
+      "message_stickers",
       "message_mentions",
       "conversation_read_states",
       "user_notifications",
@@ -150,6 +176,10 @@ describe("PostgreSQL persistence schema", () => {
       "call_participant_states",
       "call_events",
       "call_recordings",
+      "knowledge_documents",
+      "knowledge_document_versions",
+      "decision_log_entries",
+      "knowledge_action_items",
       "task_participants",
       "task_activities",
       "crm_activities",
@@ -162,6 +192,31 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores Phase 12 personal calendars and occupancy events", () => {
+    expect(getPersistenceTableColumns("resource_personal_calendars")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "user_id",
+        "source_provider",
+        "sync_status",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("resource_calendar_events")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "calendar_id",
+        "user_id",
+        "starts_at",
+        "finishes_at",
+        "work_minutes",
+        "capacity_impact",
+        "visibility",
+        "metadata"
+      ])
+    );
   });
 
   it("stores Phase 7 KPI, signal and action engine records", () => {
@@ -324,6 +379,7 @@ describe("PostgreSQL persistence schema", () => {
         "safe_display_name",
         "checksum_sha256",
         "status",
+        "purged_at",
         "archived_at"
       ])
     );
@@ -347,6 +403,46 @@ describe("PostgreSQL persistence schema", () => {
         "source_activity_type",
         "source_activity_id",
         "archived_at"
+      ])
+    );
+  });
+
+  it("stores tenant-scoped background job schedules, runs and events", () => {
+    expect(getPersistenceTableColumns("background_job_schedules")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "kind",
+        "schedule_key",
+        "payload",
+        "interval_seconds",
+        "enabled",
+        "next_run_at",
+        "last_enqueued_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("background_job_runs")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "kind",
+        "status",
+        "priority",
+        "payload",
+        "idempotency_key",
+        "attempt",
+        "max_attempts",
+        "run_after",
+        "locked_by",
+        "last_error"
+      ])
+    );
+    expect(getPersistenceTableColumns("background_job_events")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "job_id",
+        "event_type",
+        "message",
+        "metadata",
+        "created_at"
       ])
     );
   });
@@ -430,6 +526,84 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("call_recordings")).toEqual(
       expect.arrayContaining(["room_id", "session_id", "attachment_id", "title"])
+    );
+    expect(getPersistenceTableColumns("communication_channels")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "channel_type",
+        "title",
+        "scope_entity_type",
+        "created_by_user_id",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("message_reactions")).toEqual(
+      expect.arrayContaining(["tenant_id", "message_id", "user_id", "emoji", "archived_at"])
+    );
+    expect(getPersistenceTableColumns("sticker_assets")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "pack_id",
+        "file_asset_id",
+        "mime_type",
+        "checksum_sha256",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("message_stickers")).toEqual(
+      expect.arrayContaining(["tenant_id", "message_id", "sticker_asset_id"])
+    );
+  });
+
+  it("stores the Phase H documents and knowledge layer contract", () => {
+    expect(getPersistenceTableColumns("knowledge_documents")).toEqual(
+      expect.arrayContaining([
+        "project_id",
+        "title",
+        "summary",
+        "document_type",
+        "status",
+        "current_version_id",
+        "source_meeting_id",
+        "approval_status",
+        "approval_requested_by_user_id",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("knowledge_document_versions")).toEqual(
+      expect.arrayContaining([
+        "document_id",
+        "version_number",
+        "title",
+        "body",
+        "summary",
+        "change_reason",
+        "created_by_user_id"
+      ])
+    );
+    expect(getPersistenceTableColumns("decision_log_entries")).toEqual(
+      expect.arrayContaining([
+        "project_id",
+        "decision",
+        "rationale",
+        "status",
+        "source_meeting_id",
+        "document_id",
+        "supersedes_decision_id"
+      ])
+    );
+    expect(getPersistenceTableColumns("knowledge_action_items")).toEqual(
+      expect.arrayContaining([
+        "project_id",
+        "owner_user_id",
+        "due_date",
+        "status",
+        "source_meeting_id",
+        "document_id",
+        "decision_id",
+        "target_entity_type",
+        "target_entity_id"
+      ])
     );
   });
 

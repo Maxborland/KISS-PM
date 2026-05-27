@@ -48,10 +48,21 @@
 42. `41_PHASE_10_BACKEND_HARDENING.md` — backend production hardening: security/privacy, DB/migrations, performance, operations readiness и release-like smoke.
 43. `42_PHASE_G_11_COLLABORATION_COMMUNICATIONS_BACKEND.md` — backend contract для chats/discussions, notifications, meetings, external video links, audit/security и storage integration.
 44. `43_PHASE_G_2_COMMUNICATIONS_REALTIME_BACKEND.md` — backend contract для call rooms, audio/video provider control-plane, join tokens, participant state, call events и recordings через Storage layer.
+45. `44_PHASE_12_CALENDAR_OCCUPANCY_V2_BACKEND.md` — backend contract для personal calendars, unified occupancy, meetings/calls capacity occupation, minute-slot capacity и future Google/Microsoft/CalDAV sync boundary.
+46. `45_PHASE_12_BACKGROUND_JOBS_INFRASTRUCTURE.md` — backend foundation для scheduled/background jobs, retries, cleanup, notification dispatch, connector sync, search projection rebuild и capacity cache warmup.
+47. `44_PHASE_H_DOCUMENTS_KNOWLEDGE_LAYER_BACKEND.md` — backend contract для project documents, meeting minutes, decision log, action items, document attachments, versioning и future approvals boundary.
+48. `44_PHASE_G_3_COMMUNICATIONS_UPGRADE_BACKEND.md` — backend contract для общих каналов, entity/CRM чатов, reactions, emoji, sticker packs/imports, channel-scoped calls и permissioned notifications/audit.
 
 ## Планы исправлений
 
 - [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
+
+## API
+
+- [`api/README.md`](api/README.md) — frontend-facing API documentation entrypoint: Scalar/OpenAPI, conventions, coverage status and screen recipes.
+- [`api/00_FRONTEND_API_CONVENTIONS.md`](api/00_FRONTEND_API_CONVENTIONS.md) — auth, mutation guard, error shape, permissions, stale-state and cache conventions for frontend integration.
+- [`api/07_FRONTEND_SCREEN_RECIPES.md`](api/07_FRONTEND_SCREEN_RECIPES.md) — frontend integration recipes for shell, CRM, projects, planning, capacity, storage, collaboration, calls, knowledge and background jobs.
+- [`api/99_COVERAGE_LEDGER.md`](api/99_COVERAGE_LEDGER.md) — current OpenAPI coverage level and remaining work to reach full exact schemas.
 
 ## Runbooks
 

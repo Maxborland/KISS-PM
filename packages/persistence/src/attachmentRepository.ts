@@ -15,7 +15,9 @@ export type AttachmentEntityType =
   | "contact"
   | "product"
   | "project"
-  | "task";
+  | "task"
+  | "communication_channel"
+  | "document";
 
 export type FileAssetProvider = "local" | "s3";
 export type FileAssetStatus = "pending" | "ready" | "archived" | "failed";
@@ -44,6 +46,7 @@ export type FileAssetRecord = {
   createdByUserId: UserId;
   createdAt: Date;
   archivedAt: Date | null;
+  purgedAt: Date | null;
 };
 
 export type ExternalReferenceRecord = {
@@ -81,7 +84,7 @@ export type AttachmentReadModel = EntityAttachmentRecord & {
 
 export type FileAssetInput = Omit<
   FileAssetRecord,
-  "createdAt" | "archivedAt" | "checksumSha256" | "status" | "sizeBytes"
+  "createdAt" | "archivedAt" | "purgedAt" | "checksumSha256" | "status" | "sizeBytes"
 > & {
   checksumSha256?: string | null;
   sizeBytes: number;
@@ -126,6 +129,7 @@ export type AttachmentRepository = {
     tenantId: TenantId,
     attachmentId: string
   ): Promise<AttachmentReadModel | undefined>;
+  findFileAssetById(tenantId: TenantId, assetId: string): Promise<FileAssetRecord | undefined>;
   archiveAttachment(input: {
     tenantId: TenantId;
     attachmentId: string;
@@ -248,6 +252,14 @@ export function createAttachmentRepository(db: KissPmDatabase): AttachmentReposi
         )
         .returning();
 
+      return row ? mapFileAsset(row) : undefined;
+    },
+    async findFileAssetById(tenantId, assetId) {
+      const [row] = await db
+        .select()
+        .from(fileAssets)
+        .where(and(eq(fileAssets.tenantId, tenantId), eq(fileAssets.id, assetId)))
+        .limit(1);
       return row ? mapFileAsset(row) : undefined;
     },
     async createExternalReference(input) {
@@ -436,7 +448,8 @@ function mapFileAsset(row: typeof fileAssets.$inferSelect): FileAssetRecord {
     status: row.status as FileAssetStatus,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
-    archivedAt: row.archivedAt
+    archivedAt: row.archivedAt,
+    purgedAt: row.purgedAt
   };
 }
 

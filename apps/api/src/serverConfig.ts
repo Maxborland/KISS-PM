@@ -12,6 +12,8 @@ export type ServerRuntimeConfig = {
   enableDevTenantRoutes: boolean;
   planningEventsBackend: PlanningEventsBackend;
   planningEventsRedisUrl: string | undefined;
+  backgroundJobsEnabled: boolean;
+  backgroundJobsPollMs: number;
   production: boolean;
 };
 
@@ -31,6 +33,7 @@ export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) 
   if (planningEventsBackend === "redis") {
     readRuntimeSecurityConfig(env);
   }
+  parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS);
 }
 
 export function readServerRuntimeConfig(
@@ -44,6 +47,8 @@ export function readServerRuntimeConfig(
     enableDevTenantRoutes: env.KISS_PM_ENABLE_DEV_ROUTES === "true",
     planningEventsBackend: parsePlanningEventsBackend(env.PLANNING_EVENTS_BACKEND),
     planningEventsRedisUrl: planningEventsRedisUrlFromEnv(env),
+    backgroundJobsEnabled: env.KISS_PM_BACKGROUND_JOBS_ENABLED === "true",
+    backgroundJobsPollMs: parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS),
     production: env.NODE_ENV === "production"
   };
 }
@@ -82,4 +87,16 @@ export function parsePlanningEventsBackend(value: string | undefined): PlanningE
 
 function planningEventsRedisUrlFromEnv(env: NodeJS.ProcessEnv): string | undefined {
   return env.PLANNING_EVENTS_REDIS_URL ?? env.REDIS_URL;
+}
+
+export function parseBackgroundJobsPollMs(value: string | undefined): number {
+  if (value === undefined || value === "") return 10_000;
+  if (!/^[1-9][0-9]{0,5}$/.test(value)) {
+    throw new Error("invalid_background_jobs_poll_ms");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1_000 || parsed > 600_000) {
+    throw new Error("invalid_background_jobs_poll_ms");
+  }
+  return parsed;
 }

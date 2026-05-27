@@ -4,8 +4,11 @@ import {
   createPostgresClient,
   createPostgresTenantDataSource
 } from "@kiss-pm/persistence";
+
 import { createApp, type CreateAppOptions } from "./app";
 import { createAuthRateLimiterFromEnv } from "./authRateLimit";
+import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
+import { createSerializedBackgroundJobPoller } from "./backgroundJobs/backgroundJobWorker";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
 import { readServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
@@ -62,12 +65,33 @@ if (postgresClient) {
   console.log("KISS PM API uses PostgreSQL persistence runtime");
 }
 
+let backgroundJobsTimer: NodeJS.Timeout | undefined;
+if (dataSource && runtimeConfig.backgroundJobsEnabled) {
+  const registry = createDefaultBackgroundJobRegistry();
+  const workerId = `api-worker-${process.pid}`;
+  const runBackgroundJobsPoll = createSerializedBackgroundJobPoller({
+    dataSource,
+    onError: (error) => {
+      console.error("background_jobs_tick_failed", error);
+    },
+    registry,
+    storageProvider,
+    workerId
+  });
+  backgroundJobsTimer = setInterval(() => {
+    void runBackgroundJobsPoll();
+  }, runtimeConfig.backgroundJobsPollMs);
+  backgroundJobsTimer.unref();
+  console.log("KISS PM background jobs worker enabled");
+}
+
 let shutdownStarted = false;
 
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (shutdownStarted) return;
   shutdownStarted = true;
   console.log(`KISS PM API shutting down after ${signal}`);
+  if (backgroundJobsTimer) clearInterval(backgroundJobsTimer);
   const forcedExit = setTimeout(() => {
     console.error("KISS PM API forced shutdown after timeout");
     process.exit(1);

@@ -17,6 +17,7 @@
     "@kiss-pm/persistence": "workspace:*",
     "@kiss-pm/tenant-org-structure": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
+    "@scalar/hono-api-reference": "^0.10.19",
     "hono": "^4.7.10",
     "redis": "^5.12.1"
   },

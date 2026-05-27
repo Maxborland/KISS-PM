@@ -76,6 +76,11 @@ describe("backend management loop DB smoke", () => {
     await client`
       TRUNCATE
         audit_events,
+        call_recordings,
+        call_events,
+        call_participant_states,
+        call_sessions,
+        call_rooms,
         meeting_action_items,
         meeting_notes,
         meeting_external_links,
@@ -83,6 +88,9 @@ describe("backend management loop DB smoke", () => {
         meetings,
         notification_preferences,
         user_notifications,
+        background_job_events,
+        background_job_runs,
+        background_job_schedules,
         conversation_read_states,
         message_mentions,
         discussion_messages,
@@ -92,6 +100,10 @@ describe("backend management loop DB smoke", () => {
         entity_attachments,
         external_references,
         file_assets,
+        knowledge_action_items,
+        decision_log_entries,
+        knowledge_document_versions,
+        knowledge_documents,
         task_participants,
         control_surface_versions,
         control_surface_definitions,
@@ -114,6 +126,8 @@ describe("backend management loop DB smoke", () => {
         task_assignment_allocations,
         task_assignments,
         resource_absences,
+        resource_calendar_events,
+        resource_personal_calendars,
         tenant_user_org_placements,
         tenant_org_nodes,
         planning_saved_views,
@@ -142,8 +156,7 @@ describe("backend management loop DB smoke", () => {
         positions,
         access_profiles,
         tenants
-      RESTART IDENTITY
-      CASCADE
+      RESTART IDENTITY CASCADE
     `;
   }
 

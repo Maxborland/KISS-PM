@@ -18,6 +18,7 @@ import type { AttachmentEntityType, TaskRecord } from "@kiss-pm/persistence";
 
 import type { EntityLookupDataPort } from "./apiDataPorts";
 import type { ProjectRecord } from "./apiTypes";
+import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
 
 export type AppEntityType = AttachmentEntityType;
 
@@ -108,6 +109,44 @@ export async function resolveEntityAccessContext<T extends AppEntityType>(input:
       readDecision: canReadProjects(policyInput),
       sourceEntity: { type: "Project", id: project.id },
       title: project.title
+    });
+  }
+
+  if (input.entityType === "communication_channel") {
+    const channel = await input.dataSource.findCommunicationChannel?.(
+      input.actor.tenantId,
+      input.entityId
+    );
+    if (!channel) return { ok: false, status: 404, error: notFoundError };
+    const channelAccess = await resolveCommunicationChannelAccess({
+      actor: input.actor,
+      channel,
+      dataSource: input.dataSource,
+      profile: input.profile
+    });
+    return ok(input.entityType, {
+      entityId: channel.id,
+      manageDecision: channelAccess.manageDecision,
+      readDecision: channelAccess.readDecision,
+      sourceEntity: { type: "CommunicationChannel", id: channel.id },
+      title: channel.title
+    });
+  }
+
+  if (input.entityType === "document") {
+    const document = await input.dataSource.findKnowledgeDocumentById?.({
+      documentId: input.entityId,
+      tenantId: input.actor.tenantId
+    });
+    if (!document) return { ok: false, status: 404, error: notFoundError };
+    const project = await findProject(input.dataSource, input.actor.tenantId, document.projectId);
+    if (!project) return { ok: false, status: 404, error: notFoundError };
+    return ok(input.entityType, {
+      entityId: document.id,
+      manageDecision: canManageProjects(policyInput),
+      readDecision: canReadProjects(policyInput),
+      sourceEntity: { type: "KnowledgeDocument", id: document.id },
+      title: document.title
     });
   }
 

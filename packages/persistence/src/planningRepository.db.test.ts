@@ -13,9 +13,11 @@ import { createProjectIntakeRepository } from "./projectIntakeRepository";
 import { createProjectWorkRepository } from "./projectWorkRepository";
 import {
   calendarExceptions,
+  resourceCalendarEvents,
   projectBaselineTasks,
   projectBaselines,
   projectCalendars,
+  resourcePersonalCalendars,
   resourceCalendars,
   resourceReservations,
   taskAssignmentAllocations,
@@ -174,6 +176,38 @@ describe("planning repository", () => {
       plannedFinish: "2026-06-05",
       workMinutes: 960
     });
+    await db.insert(resourcePersonalCalendars).values({
+      id: "personal-calendar-user-alpha-executor",
+      tenantId: "tenant-alpha",
+      userId: "user-alpha-executor",
+      name: "Личный календарь",
+      timezone: "UTC",
+      sourceProvider: "manual",
+      syncStatus: "manual",
+      createdByUserId: "user-alpha-admin",
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null
+    });
+    await db.insert(resourceCalendarEvents).values({
+      id: "calendar-event-alpha",
+      tenantId: "tenant-alpha",
+      calendarId: "personal-calendar-user-alpha-executor",
+      userId: "user-alpha-executor",
+      sourceProvider: "manual",
+      externalId: null,
+      title: "Фокус-время",
+      startsAt: new Date("2026-06-04T09:00:00.000Z"),
+      finishesAt: new Date("2026-06-04T10:30:00.000Z"),
+      workMinutes: null,
+      capacityImpact: "busy",
+      visibility: "busy_only",
+      metadata: {},
+      createdByUserId: "user-alpha-admin",
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null
+    });
 
     const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
 
@@ -209,7 +243,14 @@ describe("planning repository", () => {
         expect.objectContaining({ id: "calendar-project-alpha" })
       ]),
       calendarExceptions: [expect.objectContaining({ id: "calendar-exception-alpha" })],
-      reservations: [expect.objectContaining({ id: "reservation-alpha" })]
+      reservations: [expect.objectContaining({ id: "reservation-alpha" })],
+      occupancyWindows: [
+        expect.objectContaining({
+          id: "calendar-event:calendar-event-alpha",
+          resourceId: "user-alpha-executor",
+          sourceType: "personal_calendar_event"
+        })
+      ]
     });
     expect(snapshot?.resources).toEqual(
       expect.arrayContaining([

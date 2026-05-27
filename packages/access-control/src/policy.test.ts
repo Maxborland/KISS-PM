@@ -16,6 +16,7 @@ import {
   canManageProjects,
   canManageTaskStatuses,
   canManageControlSignals,
+  canManageCommunications,
   canManageCorrectiveActions,
   canManageControlSurfaces,
   canManageRetrospectives,
@@ -42,6 +43,7 @@ import {
   canReadResourceFeasibility,
   canReadControlSignals,
   canReadControlSurfaces,
+  canReadCommunications,
   canReadRetrospectives,
   canReadKpiDefinitions,
   canReadTenantUsers,
@@ -98,6 +100,8 @@ describe("access-control tenant policy", () => {
       "tenant.retrospectives.read",
       "tenant.retrospectives.manage",
       "tenant.template_improvements.apply",
+      "tenant.communications.read",
+      "tenant.communications.manage",
       "tenant.tasks.create",
       "tenant.tasks.edit",
       "tenant.tasks.delete",
@@ -108,6 +112,41 @@ describe("access-control tenant policy", () => {
       "profile.update",
       "workspace.theme.manage"
     ]
+  });
+
+  it("checks communications permissions for tenant-scoped chats and stickers", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна Администратор",
+      accessProfileId: adminProfile.id
+    });
+    const communicationsReader = createAccessProfile({
+      id: "communications-reader",
+      permissions: ["tenant.communications.read"]
+    });
+
+    expect(
+      canReadCommunications({
+        actor,
+        profile: communicationsReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({ allowed: true, reason: "same_tenant_permission_granted" });
+    expect(
+      canManageCommunications({
+        actor,
+        profile: communicationsReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({ allowed: false, reason: "permission_missing" });
+    expect(
+      canManageCommunications({
+        actor,
+        profile: adminProfile,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({ allowed: true, reason: "same_tenant_permission_granted" });
   });
 
   it("allows a user to read users in the same tenant when permission exists", () => {

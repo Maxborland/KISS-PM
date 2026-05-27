@@ -16,10 +16,13 @@ export type AuditDataPort = Pick<ApiTenantDataSource, "appendAuditEvent" | "list
 export type EntityLookupDataPort = Pick<
   ApiTenantDataSource,
   | "findClientById"
+  | "findCommunicationChannel"
   | "findContactById"
+  | "findKnowledgeDocumentById"
   | "findOpportunityById"
   | "findProductById"
   | "findTaskById"
+  | "listCommunicationChannelMembers"
   | "listProjects"
 >;
 

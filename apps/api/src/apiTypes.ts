@@ -1,6 +1,11 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  BackgroundJobEvent,
+  BackgroundJobKind,
+  BackgroundJobRun,
+  BackgroundJobSchedule,
+  BackgroundJobStatus,
   CallEvent,
   CallParticipantState,
   CallRecording,
@@ -8,12 +13,19 @@ import type {
   CallRoomStatus,
   CallSession,
   CallSessionStatus,
+  CommunicationChannel,
+  CommunicationChannelMember,
+  CommunicationChannelType,
   CollaborationEntityType,
   ControlSignal,
   CorrectiveAction,
   Conversation,
   ConversationReadState,
+  DecisionLogEntry,
   DiscussionMessage,
+  KnowledgeActionItem,
+  KnowledgeDocument,
+  KnowledgeDocumentVersion,
   KpiDefinition,
   KpiEvaluation,
   Meeting,
@@ -25,9 +37,14 @@ import type {
   MeetingParticipantRole,
   MeetingStatus,
   MessageMention,
+  MessageReaction,
+  MessageSticker,
   NotificationPreference,
+  OccupancyWindow,
   PlanSnapshot,
   ProjectClosureSnapshot,
+  ResourceCalendarEvent,
+  ResourcePersonalCalendar,
   RetrospectiveLesson,
   RetrospectiveReadModel,
   Tenant,
@@ -35,7 +52,9 @@ import type {
   TenantUser,
   TemplateImprovementAction,
   UserNotification,
-  UserId
+  UserId,
+  StickerAsset,
+  StickerPack
 } from "@kiss-pm/domain";
 import type {
   CrmActivityEntityType,
@@ -62,6 +81,7 @@ import type {
   ExternalReferenceRecord,
   FileAssetInput,
   FileAssetRecord,
+  PersonalCalendarEventInput,
   ActionExecutionInput,
   ActionExecutionRecord,
   TaskActivityInput,
@@ -518,6 +538,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     assetId: string;
   }): Promise<FileAssetRecord | undefined>;
+  findFileAssetById?(tenantId: TenantId, assetId: string): Promise<FileAssetRecord | undefined>;
   createExternalReference?(input: ExternalReferenceInput): Promise<ExternalReferenceRecord>;
   createEntityAttachment?(input: EntityAttachmentInput): Promise<AttachmentReadModel>;
   listEntityAttachments?(input: {
@@ -544,6 +565,77 @@ export type ApiTenantDataSource = {
     limit: number;
     offset?: number;
   }): Promise<AttachmentReadModel[]>;
+  enqueueBackgroundJob?(input: {
+    id: string;
+    tenantId: TenantId;
+    kind: BackgroundJobKind;
+    payload: Record<string, unknown>;
+    idempotencyKey?: string | null;
+    priority?: number;
+    maxAttempts?: number;
+    runAfter?: Date;
+  }): Promise<BackgroundJobRun>;
+  claimNextBackgroundJob?(input: {
+    workerId: string;
+    now: Date;
+    kinds?: BackgroundJobKind[];
+    leaseTimeoutMs?: number;
+  }): Promise<BackgroundJobRun | undefined>;
+  completeBackgroundJob?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    finishedAt: Date;
+    workerId?: string;
+    message?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<BackgroundJobRun | undefined>;
+  failBackgroundJob?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    failedAt: Date;
+    error: string;
+    workerId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<BackgroundJobRun | undefined>;
+  listBackgroundJobs?(input: {
+    tenantId: TenantId;
+    status?: BackgroundJobStatus | null;
+    limit: number;
+  }): Promise<BackgroundJobRun[]>;
+  listBackgroundJobEvents?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    limit: number;
+  }): Promise<BackgroundJobEvent[]>;
+  upsertBackgroundJobSchedule?(input: {
+    id: string;
+    tenantId: TenantId;
+    kind: BackgroundJobKind;
+    scheduleKey: string;
+    payload: Record<string, unknown>;
+    intervalSeconds: number;
+    enabled: boolean;
+    nextRunAt: Date;
+  }): Promise<BackgroundJobSchedule>;
+  listDueBackgroundJobSchedules?(input: {
+    now: Date;
+    limit: number;
+  }): Promise<BackgroundJobSchedule[]>;
+  markBackgroundJobScheduleEnqueued?(input: {
+    tenantId: TenantId;
+    scheduleId: string;
+    enqueuedAt: Date;
+  }): Promise<BackgroundJobSchedule | undefined>;
+  listArchivedFileAssetsForCleanup?(input: {
+    tenantId: TenantId;
+    archivedBefore: Date;
+    limit: number;
+  }): Promise<FileAssetRecord[]>;
+  markFileAssetPurged?(input: {
+    tenantId: TenantId;
+    assetId: string;
+    purgedAt: Date;
+  }): Promise<FileAssetRecord | undefined>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;
@@ -731,6 +823,42 @@ export type ApiTenantDataSource = {
       projectId?: string | null;
     }
   ): Promise<AuditEventListItem[]>;
+  ensureWorkspaceGeneralChannel?(input: {
+    tenantId: TenantId;
+    createdByUserId: UserId;
+    title?: string;
+  }): Promise<CommunicationChannel>;
+  createCommunicationChannel?(input: Omit<
+    CommunicationChannel,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<CommunicationChannel>;
+  updateCommunicationChannel?(input: {
+    tenantId: TenantId;
+    channelId: string;
+    title?: string;
+    description?: string;
+  }): Promise<CommunicationChannel | undefined>;
+  findCommunicationChannel?(
+    tenantId: TenantId,
+    channelId: string
+  ): Promise<CommunicationChannel | undefined>;
+  listCommunicationChannels?(input: {
+    tenantId: TenantId;
+    channelType?: CommunicationChannelType;
+  }): Promise<CommunicationChannel[]>;
+  upsertCommunicationChannelMember?(input: Omit<
+    CommunicationChannelMember,
+    "createdAt" | "archivedAt"
+  >): Promise<CommunicationChannelMember>;
+  archiveCommunicationChannelMember?(input: {
+    tenantId: TenantId;
+    channelId: string;
+    userId: UserId;
+  }): Promise<CommunicationChannelMember | undefined>;
+  listCommunicationChannelMembers?(input: {
+    tenantId: TenantId;
+    channelId: string;
+  }): Promise<CommunicationChannelMember[]>;
   ensureConversation?(input: Omit<Conversation, "createdAt" | "archivedAt">): Promise<Conversation>;
   findConversation?(
     tenantId: TenantId,
@@ -776,6 +904,41 @@ export type ApiTenantDataSource = {
     mentionedUserIds: UserId[];
   }): Promise<MessageMention[]>;
   listMessageMentions?(tenantId: TenantId, messageId: string): Promise<MessageMention[]>;
+  upsertMessageReaction?(input: Omit<
+    MessageReaction,
+    "createdAt" | "archivedAt"
+  >): Promise<MessageReaction>;
+  archiveMessageReaction?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    reactionId: string;
+    userId: UserId;
+  }): Promise<MessageReaction | undefined>;
+  listMessageReactionsByMessageIds?(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageReaction[]>;
+  createStickerPack?(input: Omit<StickerPack, "createdAt" | "archivedAt">): Promise<StickerPack>;
+  archiveStickerPack?(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerPack | undefined>;
+  listStickerPacks?(tenantId: TenantId): Promise<StickerPack[]>;
+  createStickerAsset?(input: Omit<StickerAsset, "createdAt" | "archivedAt">): Promise<StickerAsset>;
+  findStickerAsset?(tenantId: TenantId, stickerAssetId: string): Promise<StickerAsset | undefined>;
+  archiveStickerAsset?(input: {
+    tenantId: TenantId;
+    stickerAssetId: string;
+  }): Promise<StickerAsset | undefined>;
+  listStickerAssets?(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerAsset[]>;
+  createMessageSticker?(input: Omit<MessageSticker, "createdAt">): Promise<MessageSticker>;
+  listMessageStickersByMessageIds?(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageSticker[]>;
   getConversationReadState?(input: {
     tenantId: TenantId;
     conversationId: string;
@@ -908,6 +1071,134 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     roomId: string;
   }): Promise<CallRecording[]>;
+  createKnowledgeDocument?(input: Omit<
+    KnowledgeDocument,
+    "createdAt" | "updatedAt" | "archivedAt" | "currentVersionId"
+  >): Promise<KnowledgeDocument>;
+  findKnowledgeDocument?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  findKnowledgeDocumentById?(input: {
+    tenantId: TenantId;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  listKnowledgeDocuments?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<KnowledgeDocument[]>;
+  archiveKnowledgeDocument?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  createKnowledgeDocumentVersion?(input: Omit<
+    KnowledgeDocumentVersion,
+    "createdAt" | "versionNumber"
+  >): Promise<{ document: KnowledgeDocument; version: KnowledgeDocumentVersion }>;
+  listKnowledgeDocumentVersions?(input: {
+    tenantId: TenantId;
+    documentId: string;
+  }): Promise<KnowledgeDocumentVersion[]>;
+  createDecisionLogEntry?(input: Omit<
+    DecisionLogEntry,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<DecisionLogEntry>;
+  updateDecisionLogEntry?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    decisionId: string;
+    title: string;
+    decision: string;
+    rationale: string | null;
+    status: DecisionLogEntry["status"];
+  }): Promise<DecisionLogEntry | undefined>;
+  findDecisionLogEntry?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    decisionId: string;
+  }): Promise<DecisionLogEntry | undefined>;
+  listDecisionLogEntries?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<DecisionLogEntry[]>;
+  createKnowledgeActionItem?(input: Omit<
+    KnowledgeActionItem,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<KnowledgeActionItem>;
+  updateKnowledgeActionItem?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionItemId: string;
+    title: string;
+    description: string | null;
+    ownerUserId: UserId;
+    dueDate: string | null;
+    status: KnowledgeActionItem["status"];
+  }): Promise<KnowledgeActionItem | undefined>;
+  findKnowledgeActionItem?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionItemId: string;
+  }): Promise<KnowledgeActionItem | undefined>;
+  listKnowledgeActionItems?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<KnowledgeActionItem[]>;
+  findProjectMeeting?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    meetingId: string;
+  }): Promise<{ id: string } | undefined>;
+  searchKnowledge?(input: {
+    tenantId: TenantId;
+    query: string;
+    limit: number;
+  }): Promise<{
+    documents: KnowledgeDocument[];
+    decisions: DecisionLogEntry[];
+    actionItems: KnowledgeActionItem[];
+  }>;
+  ensureManualPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    createdByUserId: UserId;
+  }): Promise<ResourcePersonalCalendar>;
+  findPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+  }): Promise<ResourcePersonalCalendar | undefined>;
+  createPersonalCalendarEvent?(input: PersonalCalendarEventInput): Promise<ResourceCalendarEvent>;
+  updatePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+    title?: string | null;
+    startsAt: Date;
+    finishesAt: Date;
+    workMinutes?: number | null;
+    capacityImpact: "busy" | "unavailable" | "tentative";
+    visibility: "public" | "busy_only" | "private";
+    metadata?: Record<string, unknown>;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  archivePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  listPersonalCalendarEvents?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    from: Date;
+    to: Date;
+  }): Promise<ResourceCalendarEvent[]>;
+  listOccupancyWindows?(input: {
+    tenantId: TenantId;
+    resourceId?: UserId | undefined;
+    from: Date;
+    to: Date;
+  }): Promise<OccupancyWindow[]>;
 };
 
 export type CreateAppOptions = {
