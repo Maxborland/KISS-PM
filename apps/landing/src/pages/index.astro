@@ -1,0 +1,35 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import HeroSection from "../components/HeroSection.astro";
+import PortfolioStripSection from "../components/PortfolioStripSection.astro";
+import PhilosophySection from "../components/PhilosophySection.astro";
+import PathSection from "../components/PathSection.astro";
+import DemoSection from "../components/DemoSection.astro";
+import ScopeSection from "../components/ScopeSection.astro";
+import WaitlistSection from "../components/WaitlistSection.astro";
+import FaqSection from "../components/FaqSection.astro";
+import NotificationDock from "../components/NotificationDock.astro";
+
+export const prerender = true;
+---
+
+<BaseLayout
+  title="KISS PM — управление проектами без хаоса"
+  description="KISS PM помогает управлять мультипроектным портфелем как единой системой: увидеть напряжение до срыва, сравнить сценарии, применить решение и оставить след."
+>
+  <SiteHeader slot="header" />
+  <NotificationDock slot="notifications" />
+
+  <HeroSection />
+  <PortfolioStripSection />
+  <PhilosophySection />
+  <PathSection />
+  <DemoSection />
+  <ScopeSection />
+  <WaitlistSection />
+  <FaqSection />
+
+  <SiteFooter slot="footer" />
+</BaseLayout>
