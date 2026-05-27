@@ -141,6 +141,58 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     return context.json({ channel: serializeChannel(channel, { readDecision: manageDecision, manageDecision }) }, 201);
   });
 
+  app.get("/api/workspace/communication-channels/:channelId", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.readDecision.allowed) {
+      return context.json({ error: resolved.value.access.readDecision.reason }, 403);
+    }
+    const members = await deps.dataSource.listCommunicationChannelMembers?.({
+      tenantId: actor.tenantId,
+      channelId: resolved.value.channel.id
+    }) ?? [];
+    return context.json({
+      channel: serializeChannel(resolved.value.channel, resolved.value.access),
+      members: members.map(serializeMember)
+    });
+  });
+
+  app.patch("/api/workspace/communication-channels/:channelId", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, actor, {
+        action: "channel.update",
+        permissionResult: resolved.value.access.manageDecision
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseChannelPatchBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const updated = await deps.dataSource.updateCommunicationChannel?.({
+      tenantId: actor.tenantId,
+      channelId: resolved.value.channel.id,
+      ...parsed.value
+    });
+    if (!updated) return context.json({ error: "communication_channel_not_found" }, 404);
+    await deps.appendManagementAuditEvent(communicationAudit({
+      actionType: "communications.channel_updated",
+      actor,
+      commandInput: { channelId: updated.id, ...parsed.value },
+      permissionResult: resolved.value.access.manageDecision,
+      sourceEntity: { type: "CommunicationChannel", id: updated.id },
+      beforeState: serializeChannel(resolved.value.channel, resolved.value.access),
+      afterState: serializeChannel(updated, resolved.value.access)
+    }));
+    return context.json({ channel: serializeChannel(updated, resolved.value.access) });
+  });
+
   app.get("/api/workspace/communication-channels/:channelId/conversation", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -497,6 +549,25 @@ function parseChannelCreateBody(value: unknown) {
   };
 }
 
+function parseChannelPatchBody(value: unknown) {
+  const record = readRecord(value);
+  const patch: { title?: string; description?: string } = {};
+  if (record.title !== undefined) {
+    const title = parseConversationTitle(record.title);
+    if (!title.ok) return title;
+    patch.title = title.value;
+  }
+  if (record.description !== undefined) {
+    const description = parseCommunicationChannelDescription(record.description);
+    if (!description.ok) return description;
+    patch.description = description.value;
+  }
+  if (patch.title === undefined && patch.description === undefined) {
+    return { ok: false as const, error: "communication_channel_patch_empty" };
+  }
+  return { ok: true as const, value: patch };
+}
+
 function parseMemberBody(value: unknown) {
   const record = readRecord(value);
   const userId = parseCollaborationId(record.userId, "tenant_user_id_invalid");
@@ -567,6 +638,14 @@ async function parseStickerImportForm(request: Request): Promise<
   const checkedBytes = parseStickerFileSize(bytes.byteLength);
   if (!checkedBytes.ok) {
     return { ok: false, status: checkedBytes.error === "sticker_file_too_large" ? 413 : 400, error: checkedBytes.error };
+  }
+  const image = parseStickerImageMetadata(bytes);
+  if (!image.ok) return { ok: false, status: 400, error: image.error };
+  if (image.value.mimeType !== mimeType.value) {
+    return { ok: false, status: 400, error: "sticker_mime_type_invalid" };
+  }
+  if (image.value.width !== width.value || image.value.height !== height.value) {
+    return { ok: false, status: 400, error: "sticker_dimension_mismatch" };
   }
   return {
     ok: true,
@@ -678,7 +757,7 @@ async function importStickerFile(input: {
           },
           permissionResult: input.decision,
           sourceEntity: { type: "StickerPack", id: input.pack.id },
-          afterState: { stickerAssetId: created.id, fileAssetId: readyAsset.id }
+          afterState: { stickerAssetId: created.id }
         }),
         transactionDataSource
       );
@@ -693,6 +772,100 @@ async function importStickerFile(input: {
     });
     throw error;
   }
+}
+
+function parseStickerImageMetadata(bytes: Uint8Array): {
+  ok: true;
+  value: { mimeType: "image/png" | "image/webp"; width: number; height: number };
+} | { ok: false; error: string } {
+  const png = parsePngMetadata(bytes);
+  if (png.ok) return png;
+  const webp = parseWebpMetadata(bytes);
+  if (webp.ok) return webp;
+  return { ok: false, error: "sticker_image_invalid" };
+}
+
+function parsePngMetadata(bytes: Uint8Array): {
+  ok: true;
+  value: { mimeType: "image/png"; width: number; height: number };
+} | { ok: false } {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length < 24 || !signature.every((byte, index) => bytes[index] === byte)) {
+    return { ok: false };
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const type = String.fromCharCode(...bytes.slice(12, 16));
+  if (view.getUint32(8) !== 13 || type !== "IHDR") return { ok: false };
+  return {
+    ok: true,
+    value: {
+      mimeType: "image/png",
+      width: view.getUint32(16),
+      height: view.getUint32(20)
+    }
+  };
+}
+
+function parseWebpMetadata(bytes: Uint8Array): {
+  ok: true;
+  value: { mimeType: "image/webp"; width: number; height: number };
+} | { ok: false } {
+  if (
+    bytes.length < 30 ||
+    String.fromCharCode(...bytes.slice(0, 4)) !== "RIFF" ||
+    String.fromCharCode(...bytes.slice(8, 12)) !== "WEBP"
+  ) {
+    return { ok: false };
+  }
+  const chunkType = String.fromCharCode(...bytes.slice(12, 16));
+  if (chunkType === "VP8X" && bytes.length >= 30) {
+    return {
+      ok: true,
+      value: {
+        mimeType: "image/webp",
+        width: readUint24LE(bytes, 24) + 1,
+        height: readUint24LE(bytes, 27) + 1
+      }
+    };
+  }
+  if (chunkType === "VP8L" && bytes.length >= 25 && (bytes[20] ?? 0) === 0x2f) {
+    const bits =
+      (bytes[21] ?? 0) |
+      ((bytes[22] ?? 0) << 8) |
+      ((bytes[23] ?? 0) << 16) |
+      ((bytes[24] ?? 0) << 24);
+    return {
+      ok: true,
+      value: {
+        mimeType: "image/webp",
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >> 14) & 0x3fff) + 1
+      }
+    };
+  }
+  if (chunkType === "VP8 " && bytes.length >= 30) {
+    const start = 20;
+    if (
+      (bytes[start + 3] ?? 0) !== 0x9d ||
+      (bytes[start + 4] ?? 0) !== 0x01 ||
+      (bytes[start + 5] ?? 0) !== 0x2a
+    ) {
+      return { ok: false };
+    }
+    return {
+      ok: true,
+      value: {
+        mimeType: "image/webp",
+        width: ((bytes[start + 6] ?? 0) | ((bytes[start + 7] ?? 0) << 8)) & 0x3fff,
+        height: ((bytes[start + 8] ?? 0) | ((bytes[start + 9] ?? 0) << 8)) & 0x3fff
+      }
+    };
+  }
+  return { ok: false };
+}
+
+function readUint24LE(bytes: Uint8Array, offset: number) {
+  return (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8) | ((bytes[offset + 2] ?? 0) << 16);
 }
 
 function parseTagsFormValue(value: FormDataEntryValue | null): unknown {

@@ -122,6 +122,12 @@ export type CollaborationRepository = {
     title?: string;
   }): Promise<CommunicationChannel>;
   createCommunicationChannel(input: CommunicationChannelInput): Promise<CommunicationChannel>;
+  updateCommunicationChannel(input: {
+    tenantId: TenantId;
+    channelId: string;
+    title?: string;
+    description?: string;
+  }): Promise<CommunicationChannel | undefined>;
   findCommunicationChannel(
     tenantId: TenantId,
     channelId: string
@@ -184,6 +190,7 @@ export type CollaborationRepository = {
   upsertMessageReaction(input: MessageReactionInput): Promise<MessageReaction>;
   archiveMessageReaction(input: {
     tenantId: TenantId;
+    messageId: string;
     reactionId: string;
     userId: UserId;
   }): Promise<MessageReaction | undefined>;
@@ -392,6 +399,25 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .returning();
       if (!row) throw new Error("Communication channel insert returned no row");
       return mapCommunicationChannel(row);
+    },
+    async updateCommunicationChannel(input) {
+      const updates: Partial<typeof communicationChannels.$inferInsert> = {
+        updatedAt: new Date()
+      };
+      if (input.title !== undefined) updates.title = input.title;
+      if (input.description !== undefined) updates.description = input.description;
+      const [row] = await db
+        .update(communicationChannels)
+        .set(updates)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.id, input.channelId),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapCommunicationChannel(row) : undefined;
     },
     async findCommunicationChannel(tenantId, channelId) {
       const [row] = await db
@@ -711,6 +737,7 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .where(
           and(
             eq(messageReactions.tenantId, input.tenantId),
+            eq(messageReactions.messageId, input.messageId),
             eq(messageReactions.id, input.reactionId),
             eq(messageReactions.userId, input.userId),
             isNull(messageReactions.archivedAt)

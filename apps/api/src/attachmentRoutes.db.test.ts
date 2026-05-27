@@ -34,6 +34,8 @@ const dataset: SeedTenantDataset = {
         "tenant.clients.manage",
         "tenant.contacts.read",
         "tenant.contacts.manage",
+        "tenant.communications.read",
+        "tenant.communications.manage",
         "tenant.projects.read",
         "tenant.projects.manage",
         "tenant.tasks.create",
@@ -133,7 +135,7 @@ describe("attachment and unified search API", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE entity_attachments, external_references, file_assets, audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE communication_channel_members, communication_channels, entity_attachments, external_references, file_assets, audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       dataset,
@@ -142,7 +144,7 @@ describe("attachment and unified search API", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE entity_attachments, external_references, file_assets, audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE communication_channel_members, communication_channels, entity_attachments, external_references, file_assets, audit_events, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, products, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
     await rm(storageRoot, { recursive: true, force: true });
   });
@@ -211,6 +213,56 @@ describe("attachment and unified search API", () => {
     });
     expect(wildcardSearch.status).toBe(200);
     await expect(wildcardSearch.json()).resolves.toEqual({ results: [] });
+  });
+
+  it("supports communication channel attachments for call recordings", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const channels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie }
+    });
+    expect(channels.status).toBe(200);
+    const channelsPayload = await channels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    const generalChannel = channelsPayload.channels.find(
+      (channel) => channel.channelType === "workspace_general"
+    );
+
+    const attach = await app.request("/api/workspace/attachments/external-references", {
+      method: "POST",
+      headers: jsonHeaders(cookie),
+      body: JSON.stringify({
+        entityType: "communication_channel",
+        entityId: generalChannel?.id,
+        title: "Запись общего созвона",
+        url: "https://example.test/workspace-call-recording.mp4",
+        connectorType: "manual_link",
+        relationType: "recording"
+      })
+    });
+    expect(attach.status).toBe(201);
+    await expect(attach.json()).resolves.toMatchObject({
+      attachment: {
+        entityType: "communication_channel",
+        entityId: generalChannel?.id,
+        kind: "external_reference",
+        externalReference: { title: "Запись общего созвона" }
+      }
+    });
+
+    const list = await app.request(
+      `/api/workspace/attachments?entityType=communication_channel&entityId=${generalChannel?.id}`,
+      { headers: { cookie } }
+    );
+    expect(list.status).toBe(200);
+    await expect(list.json()).resolves.toMatchObject({
+      attachments: [
+        expect.objectContaining({
+          entityType: "communication_channel",
+          relationType: "recording"
+        })
+      ]
+    });
   });
 
   it("rejects unsafe external references and records denied audit for missing manage permission", async () => {

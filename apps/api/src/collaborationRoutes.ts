@@ -301,10 +301,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!reactionId.ok) return context.json({ error: reactionId.error }, 400);
     const reaction = await deps.dataSource.archiveMessageReaction?.({
       tenantId: actor.tenantId,
+      messageId: message.id,
       reactionId: reactionId.value,
       userId: actor.id
     });
-    if (!reaction || reaction.messageId !== message.id) {
+    if (!reaction) {
       return context.json({ error: "reaction_not_found" }, 404);
     }
     await deps.appendManagementAuditEvent(collaborationAudit({
@@ -1164,6 +1165,10 @@ function parseMeetingActionItemBody(
   if (!ownerUserId.ok) return ownerUserId;
   const dueDate = parseOptionalDate(record.dueDate);
   if (!dueDate.ok) return dueDate;
+  const canDefaultTarget = isMeetingActionTargetType(entity.entityType);
+  if (!canDefaultTarget && (record.targetEntityType === undefined || record.targetEntityId === undefined)) {
+    return { ok: false as const, error: "meeting_action_target_required" };
+  }
   const targetEntityType = record.targetEntityType === undefined
     ? { ok: true as const, value: defaultTargetType(entity.entityType) }
     : parseMeetingActionTargetType(record.targetEntityType);
@@ -1182,9 +1187,13 @@ function parseMeetingActionItemBody(
 }
 
 function defaultTargetType(entityType: CollaborationEntityType) {
-  return meetingActionTargetTypes.includes(entityType as never)
+  return isMeetingActionTargetType(entityType)
     ? entityType as "task" | "project" | "opportunity"
     : "project";
+}
+
+function isMeetingActionTargetType(entityType: CollaborationEntityType) {
+  return meetingActionTargetTypes.includes(entityType as never);
 }
 
 function parsePreferences(value: unknown, actor: TenantUser) {

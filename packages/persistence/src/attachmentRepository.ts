@@ -15,7 +15,8 @@ export type AttachmentEntityType =
   | "contact"
   | "product"
   | "project"
-  | "task";
+  | "task"
+  | "communication_channel";
 
 export type FileAssetProvider = "local" | "s3";
 export type FileAssetStatus = "pending" | "ready" | "archived" | "failed";

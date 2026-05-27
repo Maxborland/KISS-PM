@@ -823,6 +823,12 @@ export type ApiTenantDataSource = {
     CommunicationChannel,
     "createdAt" | "updatedAt" | "archivedAt"
   >): Promise<CommunicationChannel>;
+  updateCommunicationChannel?(input: {
+    tenantId: TenantId;
+    channelId: string;
+    title?: string;
+    description?: string;
+  }): Promise<CommunicationChannel | undefined>;
   findCommunicationChannel?(
     tenantId: TenantId,
     channelId: string
@@ -895,6 +901,7 @@ export type ApiTenantDataSource = {
   >): Promise<MessageReaction>;
   archiveMessageReaction?(input: {
     tenantId: TenantId;
+    messageId: string;
     reactionId: string;
     userId: UserId;
   }): Promise<MessageReaction | undefined>;
