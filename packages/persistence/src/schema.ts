@@ -971,6 +971,124 @@ export const resourceAbsences = pgTable(
   ]
 );
 
+export const resourcePersonalCalendars = pgTable(
+  "resource_personal_calendars",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    timezone: text("timezone").notNull(),
+    sourceProvider: text("source_provider").notNull(),
+    syncStatus: text("sync_status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_personal_calendars_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "resource_personal_calendars_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_personal_calendars_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("resource_personal_calendars_tenant_user_idx").on(table.tenantId, table.userId),
+    uniqueIndex("resource_personal_calendars_tenant_user_provider_uidx")
+      .on(table.tenantId, table.userId, table.sourceProvider)
+      .where(sql`${table.archivedAt} is null`),
+    check(
+      "resource_personal_calendars_provider_chk",
+      sql`${table.sourceProvider} in ('manual', 'google', 'microsoft', 'caldav')`
+    ),
+    check(
+      "resource_personal_calendars_sync_status_chk",
+      sql`${table.syncStatus} in ('manual', 'connected', 'sync_failed', 'disabled')`
+    )
+  ]
+);
+
+export const resourceCalendarEvents = pgTable(
+  "resource_calendar_events",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    calendarId: text("calendar_id").notNull(),
+    userId: text("user_id").notNull(),
+    sourceProvider: text("source_provider").notNull(),
+    externalId: text("external_id"),
+    title: text("title"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    finishesAt: timestamp("finishes_at", { withTimezone: true }).notNull(),
+    workMinutes: integer("work_minutes"),
+    capacityImpact: text("capacity_impact").notNull(),
+    visibility: text("visibility").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "resource_calendar_events_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "resource_calendar_events_calendar_fk",
+      columns: [table.tenantId, table.calendarId],
+      foreignColumns: [resourcePersonalCalendars.tenantId, resourcePersonalCalendars.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_calendar_events_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "resource_calendar_events_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("resource_calendar_events_tenant_user_start_idx").on(
+      table.tenantId,
+      table.userId,
+      table.startsAt
+    ),
+    uniqueIndex("resource_calendar_events_external_uidx")
+      .on(table.tenantId, table.calendarId, table.sourceProvider, table.externalId)
+      .where(sql`${table.externalId} is not null and ${table.archivedAt} is null`),
+    check(
+      "resource_calendar_events_provider_chk",
+      sql`${table.sourceProvider} in ('manual', 'google', 'microsoft', 'caldav')`
+    ),
+    check(
+      "resource_calendar_events_capacity_impact_chk",
+      sql`${table.capacityImpact} in ('busy', 'unavailable', 'tentative')`
+    ),
+    check(
+      "resource_calendar_events_visibility_chk",
+      sql`${table.visibility} in ('public', 'busy_only', 'private')`
+    ),
+    check("resource_calendar_events_time_range_chk", sql`${table.finishesAt} > ${table.startsAt}`),
+    check(
+      "resource_calendar_events_work_minutes_chk",
+      sql`${table.workMinutes} is null or ${table.workMinutes} >= 0`
+    )
+  ]
+);
+
 export const taskAssignments = pgTable(
   "task_assignments",
   {
@@ -1814,7 +1932,8 @@ export const fileAssets = pgTable(
     status: text("status").notNull(),
     createdByUserId: text("created_by_user_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-    archivedAt: timestamp("archived_at", { withTimezone: true })
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    purgedAt: timestamp("purged_at", { withTimezone: true })
   },
   (table) => [
     primaryKey({
@@ -1831,6 +1950,11 @@ export const fileAssets = pgTable(
       table.storageKey
     ),
     index("file_assets_tenant_status_idx").on(table.tenantId, table.status),
+    index("file_assets_tenant_archived_purge_idx").on(
+      table.tenantId,
+      table.archivedAt,
+      table.purgedAt
+    ),
     check("file_assets_provider_chk", sql`${table.provider} in ('local', 's3')`),
     check(
       "file_assets_status_chk",
@@ -1940,6 +2064,135 @@ export const entityAttachments = pgTable(
         or
         (${table.assetId} is null and ${table.externalReferenceId} is not null)
       )`
+    )
+  ]
+);
+
+export const backgroundJobSchedules = pgTable(
+  "background_job_schedules",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    scheduleKey: text("schedule_key").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    intervalSeconds: integer("interval_seconds").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+    lastEnqueuedAt: timestamp("last_enqueued_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "background_job_schedules_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    uniqueIndex("background_job_schedules_tenant_key_uidx").on(
+      table.tenantId,
+      table.scheduleKey
+    ),
+    index("background_job_schedules_due_idx").on(
+      table.enabled,
+      table.nextRunAt,
+      table.tenantId
+    ),
+    check(
+      "background_job_schedules_kind_chk",
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup')`
+    ),
+    check("background_job_schedules_interval_chk", sql`${table.intervalSeconds} > 0`)
+  ]
+);
+
+export const backgroundJobRuns = pgTable(
+  "background_job_runs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    priority: integer("priority").notNull().default(0),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    idempotencyKey: text("idempotency_key"),
+    attempt: integer("attempt").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull(),
+    lockedBy: text("locked_by"),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "background_job_runs_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    uniqueIndex("background_job_runs_tenant_idempotency_uidx").on(
+      table.tenantId,
+      table.idempotencyKey
+    ),
+    index("background_job_runs_claim_idx").on(
+      table.status,
+      table.runAfter,
+      table.priority,
+      table.createdAt
+    ),
+    index("background_job_runs_tenant_status_idx").on(table.tenantId, table.status),
+    check(
+      "background_job_runs_kind_chk",
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup')`
+    ),
+    check(
+      "background_job_runs_status_chk",
+      sql`${table.status} in ('queued', 'running', 'succeeded', 'dead', 'cancelled')`
+    ),
+    check("background_job_runs_attempt_chk", sql`${table.attempt} >= 0`),
+    check(
+      "background_job_runs_max_attempts_chk",
+      sql`${table.maxAttempts} >= 1 and ${table.maxAttempts} <= 25`
+    ),
+    check(
+      "background_job_runs_priority_chk",
+      sql`${table.priority} >= -100 and ${table.priority} <= 100`
+    )
+  ]
+);
+
+export const backgroundJobEvents = pgTable(
+  "background_job_events",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    jobId: text("job_id").notNull(),
+    eventType: text("event_type").notNull(),
+    message: text("message").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "background_job_events_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "background_job_events_job_fk",
+      columns: [table.tenantId, table.jobId],
+      foreignColumns: [backgroundJobRuns.tenantId, backgroundJobRuns.id]
+    }).onDelete("cascade"),
+    index("background_job_events_tenant_job_idx").on(table.tenantId, table.jobId),
+    check(
+      "background_job_events_type_chk",
+      sql`${table.eventType} in ('enqueued', 'claimed', 'succeeded', 'failed', 'retry_scheduled', 'dead', 'cancelled')`
     )
   ]
 );
@@ -3053,11 +3306,16 @@ export type PersistenceTableName =
   | "tenant_production_calendar_exceptions"
   | "planning_saved_views"
   | "resource_absences"
+  | "resource_personal_calendars"
+  | "resource_calendar_events"
   | "tenant_org_nodes"
   | "tenant_user_org_placements"
   | "file_assets"
   | "external_references"
   | "entity_attachments"
+  | "background_job_schedules"
+  | "background_job_runs"
+  | "background_job_events"
   | "conversations"
   | "discussion_messages"
   | "message_mentions"
@@ -3138,11 +3396,16 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "resource_personal_calendars",
+  "resource_calendar_events",
   "tenant_org_nodes",
   "tenant_user_org_placements",
   "file_assets",
   "external_references",
   "entity_attachments",
+  "background_job_schedules",
+  "background_job_runs",
+  "background_job_events",
   "conversations",
   "discussion_messages",
   "message_mentions",
@@ -3216,11 +3479,16 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "tenant_production_calendar_exceptions",
   "planning_saved_views",
   "resource_absences",
+  "resource_personal_calendars",
+  "resource_calendar_events",
   "tenant_org_nodes",
   "tenant_user_org_placements",
   "file_assets",
   "external_references",
   "entity_attachments",
+  "background_job_schedules",
+  "background_job_runs",
+  "background_job_events",
   "conversations",
   "discussion_messages",
   "message_mentions",
@@ -3757,6 +4025,38 @@ const tableColumns = {
     "created_at",
     "updated_at"
   ],
+  resource_personal_calendars: [
+    "id",
+    "tenant_id",
+    "user_id",
+    "name",
+    "timezone",
+    "source_provider",
+    "sync_status",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
+  resource_calendar_events: [
+    "id",
+    "tenant_id",
+    "calendar_id",
+    "user_id",
+    "source_provider",
+    "external_id",
+    "title",
+    "starts_at",
+    "finishes_at",
+    "work_minutes",
+    "capacity_impact",
+    "visibility",
+    "metadata",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
   tenant_org_nodes: [
     "id",
     "tenant_id",
@@ -3788,7 +4088,8 @@ const tableColumns = {
     "status",
     "created_by_user_id",
     "created_at",
-    "archived_at"
+    "archived_at",
+    "purged_at"
   ],
   external_references: [
     "id",
@@ -3815,6 +4116,47 @@ const tableColumns = {
     "created_by_user_id",
     "created_at",
     "archived_at"
+  ],
+  background_job_schedules: [
+    "id",
+    "tenant_id",
+    "kind",
+    "schedule_key",
+    "payload",
+    "interval_seconds",
+    "enabled",
+    "next_run_at",
+    "last_enqueued_at",
+    "created_at",
+    "updated_at"
+  ],
+  background_job_runs: [
+    "id",
+    "tenant_id",
+    "kind",
+    "status",
+    "priority",
+    "payload",
+    "idempotency_key",
+    "attempt",
+    "max_attempts",
+    "run_after",
+    "locked_by",
+    "locked_at",
+    "started_at",
+    "finished_at",
+    "last_error",
+    "created_at",
+    "updated_at"
+  ],
+  background_job_events: [
+    "id",
+    "tenant_id",
+    "job_id",
+    "event_type",
+    "message",
+    "metadata",
+    "created_at"
   ],
   conversations: [
     "id",

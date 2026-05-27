@@ -90,6 +90,68 @@ describe("planning auto-solver API", () => {
     });
   });
 
+  it("loads occupancy through the requested target deadline before solving", async () => {
+    const snapshot = createSnapshot();
+    const occupancyQueries: Array<{ from: Date; to: Date }> = [];
+    const harness = createApiHarness({
+      snapshot: {
+        ...snapshot,
+        project: {
+          ...snapshot.project,
+          plannedFinish: "2026-06-01",
+          deadline: "2026-06-01"
+        }
+      },
+      listOccupancyWindows: async (input) => {
+        occupancyQueries.push({ from: input.from, to: input.to });
+        return [
+          {
+            id: "calendar-event:deadline-day",
+            tenantId: "tenant-solver",
+            resourceId: "resource-alpha",
+            sourceType: "personal_calendar_event",
+            sourceId: "deadline-day",
+            startsAt: "2026-06-02T00:00:00.000Z",
+            finishesAt: "2026-06-02T08:00:00.000Z",
+            workMinutes: 480,
+            capacityImpact: "busy",
+            visibility: "busy_only",
+            title: "Занято",
+            entityType: "personal_calendar_event",
+            entityId: "deadline-day"
+          }
+        ];
+      }
+    });
+
+    const response = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        body: JSON.stringify({
+          mode: "schedule",
+          clientPlanVersion: 3,
+          targetDeadline: "2026-06-02"
+        })
+      }
+    );
+    const body = await response.json() as SolverRunResponse;
+
+    expect(response.status).toBe(200);
+    expect(occupancyQueries).toEqual([
+      {
+        from: new Date("2026-06-01T00:00:00.000Z"),
+        to: new Date("2026-06-02T23:59:59.999Z")
+      }
+    ]);
+    expect(body.proposals[0]).toMatchObject({ conflictEffect: "removed" });
+  });
+
   it("rejects invalid target deadline dates before running the solver", async () => {
     const harness = createApiHarness();
 
@@ -294,6 +356,7 @@ type SolverRunResponse = {
 function createApiHarness(input: {
   permissions?: AccessProfile["permissions"];
   snapshot?: PlanSnapshot;
+  listOccupancyWindows?: ApiTenantDataSource["listOccupancyWindows"];
 } = {}): ApiHarness {
   let snapshot = input.snapshot ?? createSnapshot();
   const storedRunBox: { value: PlanningSolverRunRecord | null } = { value: null };
@@ -399,6 +462,9 @@ function createApiHarness(input: {
       auditActionTypes.push(auditInput.actionType);
     }
   };
+  if (input.listOccupancyWindows) {
+    dataSource.listOccupancyWindows = input.listOccupancyWindows;
+  }
 
   return {
     app: createApp({ dataSource: dataSource as ApiTenantDataSource }),

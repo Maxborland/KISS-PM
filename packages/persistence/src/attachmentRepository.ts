@@ -45,6 +45,7 @@ export type FileAssetRecord = {
   createdByUserId: UserId;
   createdAt: Date;
   archivedAt: Date | null;
+  purgedAt: Date | null;
 };
 
 export type ExternalReferenceRecord = {
@@ -82,7 +83,7 @@ export type AttachmentReadModel = EntityAttachmentRecord & {
 
 export type FileAssetInput = Omit<
   FileAssetRecord,
-  "createdAt" | "archivedAt" | "checksumSha256" | "status" | "sizeBytes"
+  "createdAt" | "archivedAt" | "purgedAt" | "checksumSha256" | "status" | "sizeBytes"
 > & {
   checksumSha256?: string | null;
   sizeBytes: number;
@@ -437,7 +438,8 @@ function mapFileAsset(row: typeof fileAssets.$inferSelect): FileAssetRecord {
     status: row.status as FileAssetStatus,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
-    archivedAt: row.archivedAt
+    archivedAt: row.archivedAt,
+    purgedAt: row.purgedAt
   };
 }
 

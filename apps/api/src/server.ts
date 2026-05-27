@@ -5,6 +5,8 @@ import {
   createPostgresTenantDataSource
 } from "@kiss-pm/persistence";
 import { createApp, type CreateAppOptions } from "./app";
+import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
+import { createSerializedBackgroundJobPoller } from "./backgroundJobs/backgroundJobWorker";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
 import { readServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
@@ -59,10 +61,32 @@ if (postgresClient) {
   console.log("KISS PM API uses PostgreSQL persistence runtime");
 }
 
+let backgroundJobsTimer: NodeJS.Timeout | undefined;
+if (dataSource && runtimeConfig.backgroundJobsEnabled) {
+  const registry = createDefaultBackgroundJobRegistry();
+  const workerId = `api-worker-${process.pid}`;
+  const runBackgroundJobsPoll = createSerializedBackgroundJobPoller({
+    dataSource,
+    registry,
+    storageProvider,
+    workerId,
+    onError: (error) => {
+      console.error("background_jobs_tick_failed", error);
+    }
+  });
+  backgroundJobsTimer = setInterval(() => {
+    void runBackgroundJobsPoll();
+  }, runtimeConfig.backgroundJobsPollMs);
+  backgroundJobsTimer.unref();
+  console.log("KISS PM background jobs worker enabled");
+}
+
 process.on("SIGTERM", () => {
+  if (backgroundJobsTimer) clearInterval(backgroundJobsTimer);
   void postgresClient?.end();
 });
 
 process.on("SIGINT", () => {
+  if (backgroundJobsTimer) clearInterval(backgroundJobsTimer);
   void postgresClient?.end();
 });
