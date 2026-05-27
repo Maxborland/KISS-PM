@@ -2,8 +2,6 @@ FROM node:22-alpine AS builder
 
 WORKDIR /workspace
 
-ENV NODE_ENV=production
-
 RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig*.json ./
@@ -14,12 +12,12 @@ COPY packages/persistence/package.json packages/persistence/package.json
 COPY packages/tenant-org-structure/package.json packages/tenant-org-structure/package.json
 COPY packages/test-fixtures/package.json packages/test-fixtures/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @kiss-pm/api... install --prod=false --frozen-lockfile
 
 COPY apps/api apps/api
 COPY packages packages
 
-RUN pnpm --filter @kiss-pm/api build
+RUN pnpm --filter @kiss-pm/api exec esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js
 
 FROM node:22-alpine
 
