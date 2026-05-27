@@ -1166,7 +1166,9 @@ function parseMeetingActionItemBody(
   const dueDate = parseOptionalDate(record.dueDate);
   if (!dueDate.ok) return dueDate;
   const canDefaultTarget = isMeetingActionTargetType(entity.entityType);
-  if (!canDefaultTarget && (record.targetEntityType === undefined || record.targetEntityId === undefined)) {
+  const hasTargetEntityType = record.targetEntityType !== undefined;
+  const hasTargetEntityId = record.targetEntityId !== undefined;
+  if ((!canDefaultTarget || hasTargetEntityType !== hasTargetEntityId) && (!hasTargetEntityType || !hasTargetEntityId)) {
     return { ok: false as const, error: "meeting_action_target_required" };
   }
   const targetEntityType = record.targetEntityType === undefined
