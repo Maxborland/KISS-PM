@@ -20,6 +20,7 @@ import {
   parseOptionalKnowledgeId,
   type DecisionLogEntry,
   type KnowledgeActionItem,
+  type KnowledgeActionTargetType,
   type KnowledgeDocument,
   type KnowledgeDocumentVersion,
   type TenantUser
@@ -662,6 +663,14 @@ async function parseActionItemCreate(
   if ((targetEntityType.value === null) !== (targetEntityId.value === null)) {
     return { ok: false as const, error: "knowledge_action_target_invalid" };
   }
+  const targetValid = await validateKnowledgeActionTarget(
+    dataSource,
+    actor.tenantId,
+    projectId,
+    targetEntityType.value,
+    targetEntityId.value
+  );
+  if (!targetValid.ok) return targetValid;
   const links = await validateKnowledgeLinks(dataSource, actor.tenantId, projectId, {
     sourceMeetingId: sourceMeetingId.value,
     documentId: documentId.value,
@@ -754,6 +763,47 @@ async function validateKnowledgeLinks(
     if (!decision) return { ok: false as const, error: "knowledge_decision_not_found" };
   }
   return { ok: true as const };
+}
+
+async function validateKnowledgeActionTarget(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  projectId: string,
+  targetType: KnowledgeActionTargetType | null,
+  targetId: string | null
+) {
+  if (!targetType || !targetId) return { ok: true as const };
+  if (targetType === "project") {
+    const project = await findProject(dataSource, tenantId, targetId);
+    return project && project.id === projectId
+      ? { ok: true as const }
+      : { ok: false as const, error: "knowledge_action_target_not_found" };
+  }
+  if (targetType === "task") {
+    if (!dataSource.findTaskById) {
+      return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+    }
+    const task = await dataSource.findTaskById(tenantId, targetId);
+    return task && task.projectId === projectId && !task.archivedAt
+      ? { ok: true as const }
+      : { ok: false as const, error: "knowledge_action_target_not_found" };
+  }
+  if (targetType === "opportunity") {
+    if (!dataSource.findOpportunityById) {
+      return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+    }
+    const opportunity = await dataSource.findOpportunityById(tenantId, targetId);
+    return opportunity
+      ? { ok: true as const }
+      : { ok: false as const, error: "knowledge_action_target_not_found" };
+  }
+  if (!dataSource.listCorrectiveActions) {
+    return { ok: false as const, status: 501 as const, error: "knowledge_not_configured" };
+  }
+  const correctiveActions = await dataSource.listCorrectiveActions(tenantId, projectId);
+  return correctiveActions.some((action) => action.id === targetId)
+    ? { ok: true as const }
+    : { ok: false as const, error: "knowledge_action_target_not_found" };
 }
 
 async function validateMeetingLink(
