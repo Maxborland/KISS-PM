@@ -47,6 +47,14 @@ describe("server readiness checks", () => {
         PLANNING_EVENTS_BACKEND: "redis"
       } as NodeJS.ProcessEnv)
     ).toThrow("planning_events_redis_url_required");
+    expect(() =>
+      readServerRuntimeConfig({
+        DATABASE_URL: "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm",
+        NODE_ENV: "production",
+        PLANNING_EVENTS_BACKEND: "redis",
+        PLANNING_EVENTS_REDIS_URL: "redis://cache.internal:6379"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("redis_url_insecure_in_production");
   });
 
   it("rejects malformed server port and host configuration", () => {

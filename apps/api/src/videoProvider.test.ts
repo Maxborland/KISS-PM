@@ -25,6 +25,16 @@ describe("video provider", () => {
     ).toThrow("video_provider_misconfigured");
   });
 
+  it("rejects insecure provider URLs from production env", () => {
+    expect(() =>
+      createVideoProviderFromEnv({
+        NODE_ENV: "production",
+        KISS_PM_VIDEO_JITSI_BASE_URL: "http://meet.kiss.local",
+        KISS_PM_VIDEO_PROVIDER: "jitsi"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_insecure_url");
+  });
+
   it("generates LiveKit-compatible short-lived JWT without leaking secret", async () => {
     const provider = createVideoProvider({
       kind: "livekit",

@@ -1,5 +1,6 @@
 import type { PlanRealtimeEvent, PlanningEventPublisher } from "./planningEventBus";
 import { setPlanningRealtimeStatusProvider, type PlanningRealtimeStatus } from "./planningRealtimeHealth";
+import { requireSecureRedisUrl } from "./redisSecurity";
 
 const CHANNEL_PREFIX = "kiss-pm:planning:";
 const RETRY_DELAYS_MS = [200, 500, 1000] as const;
@@ -46,7 +47,14 @@ async function connectWithRetry(
 export async function createRedisPlanningEventPublisher(
   local: PlanningEventPublisher
 ): Promise<PlanningEventPublisher | null> {
-  const redisUrl = process.env.REDIS_URL ?? process.env.PLANNING_EVENTS_REDIS_URL;
+  const rawRedisUrl = process.env.REDIS_URL ?? process.env.PLANNING_EVENTS_REDIS_URL;
+  const redisUrl = rawRedisUrl
+    ? requireSecureRedisUrl({
+        allowInsecure: process.env.PLANNING_EVENTS_REDIS_ALLOW_INSECURE === "true",
+        production: process.env.NODE_ENV === "production",
+        url: rawRedisUrl
+      })
+    : undefined;
   if (!redisUrl) {
     lastStatus = {
       backend: "memory",
@@ -86,11 +94,22 @@ export async function createRedisPlanningEventPublisher(
     setPlanningRealtimeStatusProvider(() => lastStatus);
 
     const channelFor = (projectId: string) => `${CHANNEL_PREFIX}${projectId}`;
+    const markDisconnected = () => {
+      lastStatus = {
+        backend: "redis",
+        connected: false,
+        redisConfigured: true
+      };
+    };
+    publisher.on("error", markDisconnected);
+    subscriber.on("error", markDisconnected);
 
     return {
       publish(event: PlanRealtimeEvent) {
         local.publish(event);
-        void publisher.publish(channelFor(event.projectId), JSON.stringify(event));
+        void publisher
+          .publish(channelFor(event.projectId), JSON.stringify(event))
+          .catch(markDisconnected);
       },
       subscribe(projectId: string, listener: (event: PlanRealtimeEvent) => void) {
         const localUnsub = local.subscribe(projectId, listener);
@@ -103,11 +122,23 @@ export async function createRedisPlanningEventPublisher(
             // ignore malformed payloads
           }
         };
-        void subscriber.subscribe(channel, handler);
+        void subscriber.subscribe(channel, handler).catch(markDisconnected);
         return () => {
           localUnsub();
-          void subscriber.unsubscribe(channel);
+          void subscriber.unsubscribe(channel).catch(markDisconnected);
         };
+      },
+      async close() {
+        const results = await Promise.allSettled([subscriber.quit(), publisher.quit()]);
+        if (results.some((result) => result.status === "rejected")) {
+          markDisconnected();
+        } else {
+          lastStatus = {
+            backend: "redis",
+            connected: false,
+            redisConfigured: true
+          };
+        }
       }
     };
   } catch (error) {

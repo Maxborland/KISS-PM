@@ -4,14 +4,15 @@ export type VideoProviderKind = "disabled" | "manual" | "jitsi" | "livekit";
 
 export type VideoProviderConfig =
   | { kind: "disabled" }
-  | { kind: "manual"; baseUrl: string }
-  | { kind: "jitsi"; baseUrl: string }
+  | { kind: "manual"; baseUrl: string; allowInsecureHttp?: boolean }
+  | { kind: "jitsi"; baseUrl: string; allowInsecureHttp?: boolean }
   | {
       kind: "livekit";
       url: string;
       apiKey: string;
       apiSecret: string;
       tokenTtlSeconds?: number;
+      allowInsecureHttp?: boolean;
     };
 
 export type IssueJoinTokenInput = {
@@ -39,17 +40,28 @@ const maxTokenTtlSeconds = 60 * 60;
 
 export function createVideoProviderFromEnv(env: NodeJS.ProcessEnv = process.env): VideoProvider {
   const kind = parseProviderKind(env.KISS_PM_VIDEO_PROVIDER);
+  const allowInsecureHttp =
+    env.KISS_PM_VIDEO_ALLOW_INSECURE_HTTP === "true" && env.NODE_ENV !== "production";
   if (kind === "manual") {
-    return createVideoProvider({ kind, baseUrl: requiredEnvUrl(env.KISS_PM_VIDEO_MANUAL_BASE_URL) });
+    return createVideoProvider({
+      kind,
+      allowInsecureHttp,
+      baseUrl: requiredEnvUrl(env.KISS_PM_VIDEO_MANUAL_BASE_URL, allowInsecureHttp)
+    });
   }
   if (kind === "jitsi") {
-    return createVideoProvider({ kind, baseUrl: requiredEnvUrl(env.KISS_PM_VIDEO_JITSI_BASE_URL) });
+    return createVideoProvider({
+      kind,
+      allowInsecureHttp,
+      baseUrl: requiredEnvUrl(env.KISS_PM_VIDEO_JITSI_BASE_URL, allowInsecureHttp)
+    });
   }
   if (kind === "livekit") {
     const tokenTtlSeconds = parsePositiveInt(env.KISS_PM_VIDEO_TOKEN_TTL_SECONDS);
     return createVideoProvider({
       kind,
-      url: requiredEnvUrl(env.KISS_PM_VIDEO_LIVEKIT_URL),
+      allowInsecureHttp,
+      url: requiredEnvUrl(env.KISS_PM_VIDEO_LIVEKIT_URL, allowInsecureHttp),
       apiKey: requiredSecret(env.KISS_PM_VIDEO_LIVEKIT_API_KEY),
       apiSecret: requiredSecret(env.KISS_PM_VIDEO_LIVEKIT_API_SECRET),
       ...(tokenTtlSeconds === undefined ? {} : { tokenTtlSeconds })
@@ -69,7 +81,9 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
   }
 
   if (config.kind === "manual" || config.kind === "jitsi") {
-    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const baseUrl = normalizeBaseUrl(config.baseUrl, {
+      allowInsecureHttp: config.allowInsecureHttp ?? true
+    });
     return {
       kind: config.kind,
       async issueJoinToken(input) {
@@ -84,7 +98,9 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
   }
 
   const ttlSeconds = boundedTtl(config.tokenTtlSeconds);
-  const url = normalizeBaseUrl(config.url);
+  const url = normalizeBaseUrl(config.url, {
+    allowInsecureHttp: config.allowInsecureHttp ?? true
+  });
   return {
     kind: "livekit",
     async issueJoinToken(input) {
@@ -140,9 +156,9 @@ function boundedTtl(value: number | undefined): number {
   return Math.min(Math.max(value ?? defaultTokenTtlSeconds, 60), maxTokenTtlSeconds);
 }
 
-function requiredEnvUrl(value: string | undefined): string {
+function requiredEnvUrl(value: string | undefined, allowInsecureHttp: boolean): string {
   if (!value) throw new Error("video_provider_misconfigured");
-  return normalizeBaseUrl(value);
+  return normalizeBaseUrl(value, { allowInsecureHttp });
 }
 
 function requiredSecret(value: string | undefined): string {
@@ -150,10 +166,16 @@ function requiredSecret(value: string | undefined): string {
   return value;
 }
 
-function normalizeBaseUrl(value: string): string {
+function normalizeBaseUrl(
+  value: string,
+  options: { allowInsecureHttp: boolean }
+): string {
   const url = new URL(value);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("video_provider_misconfigured");
+  }
+  if (url.protocol === "http:" && !options.allowInsecureHttp) {
+    throw new Error("video_provider_insecure_url");
   }
   if (url.username || url.password) {
     throw new Error("video_provider_misconfigured");
