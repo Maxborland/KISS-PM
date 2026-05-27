@@ -57,6 +57,13 @@
 
 - [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
 
+## API
+
+- [`api/README.md`](api/README.md) — frontend-facing API documentation entrypoint: Scalar/OpenAPI, conventions, coverage status and screen recipes.
+- [`api/00_FRONTEND_API_CONVENTIONS.md`](api/00_FRONTEND_API_CONVENTIONS.md) — auth, mutation guard, error shape, permissions, stale-state and cache conventions for frontend integration.
+- [`api/07_FRONTEND_SCREEN_RECIPES.md`](api/07_FRONTEND_SCREEN_RECIPES.md) — frontend integration recipes for shell, CRM, projects, planning, capacity, storage, collaboration, calls, knowledge and background jobs.
+- [`api/99_COVERAGE_LEDGER.md`](api/99_COVERAGE_LEDGER.md) — current OpenAPI coverage level and remaining work to reach full exact schemas.
+
 ## Runbooks
 
 - [`runbooks/backend-operations.md`](runbooks/backend-operations.md) — Phase 10 backend operations: env, start/update, readiness, migrations, backup/restore, storage cleanup и incident checklist.
