@@ -1,6 +1,11 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  BackgroundJobEvent,
+  BackgroundJobKind,
+  BackgroundJobRun,
+  BackgroundJobSchedule,
+  BackgroundJobStatus,
   CallEvent,
   CallParticipantState,
   CallRecording,
@@ -548,6 +553,77 @@ export type ApiTenantDataSource = {
     limit: number;
     offset?: number;
   }): Promise<AttachmentReadModel[]>;
+  enqueueBackgroundJob?(input: {
+    id: string;
+    tenantId: TenantId;
+    kind: BackgroundJobKind;
+    payload: Record<string, unknown>;
+    idempotencyKey?: string | null;
+    priority?: number;
+    maxAttempts?: number;
+    runAfter?: Date;
+  }): Promise<BackgroundJobRun>;
+  claimNextBackgroundJob?(input: {
+    workerId: string;
+    now: Date;
+    kinds?: BackgroundJobKind[];
+    leaseTimeoutMs?: number;
+  }): Promise<BackgroundJobRun | undefined>;
+  completeBackgroundJob?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    finishedAt: Date;
+    workerId?: string;
+    message?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<BackgroundJobRun | undefined>;
+  failBackgroundJob?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    failedAt: Date;
+    error: string;
+    workerId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<BackgroundJobRun | undefined>;
+  listBackgroundJobs?(input: {
+    tenantId: TenantId;
+    status?: BackgroundJobStatus | null;
+    limit: number;
+  }): Promise<BackgroundJobRun[]>;
+  listBackgroundJobEvents?(input: {
+    tenantId: TenantId;
+    jobId: string;
+    limit: number;
+  }): Promise<BackgroundJobEvent[]>;
+  upsertBackgroundJobSchedule?(input: {
+    id: string;
+    tenantId: TenantId;
+    kind: BackgroundJobKind;
+    scheduleKey: string;
+    payload: Record<string, unknown>;
+    intervalSeconds: number;
+    enabled: boolean;
+    nextRunAt: Date;
+  }): Promise<BackgroundJobSchedule>;
+  listDueBackgroundJobSchedules?(input: {
+    now: Date;
+    limit: number;
+  }): Promise<BackgroundJobSchedule[]>;
+  markBackgroundJobScheduleEnqueued?(input: {
+    tenantId: TenantId;
+    scheduleId: string;
+    enqueuedAt: Date;
+  }): Promise<BackgroundJobSchedule | undefined>;
+  listArchivedFileAssetsForCleanup?(input: {
+    tenantId: TenantId;
+    archivedBefore: Date;
+    limit: number;
+  }): Promise<FileAssetRecord[]>;
+  markFileAssetPurged?(input: {
+    tenantId: TenantId;
+    assetId: string;
+    purgedAt: Date;
+  }): Promise<FileAssetRecord | undefined>;
   findCredentialByEmail?(
     email: string
   ): Promise<UserCredentialRecord | undefined>;

@@ -8,6 +8,7 @@ import {
   type AuditEventRecordInput,
   createAuditEventRecord
 } from "./auditEvent";
+import { createBackgroundJobRepository, type BackgroundJobRepository } from "./backgroundJobRepository";
 import type { KissPmDatabase } from "./connection";
 import {
   accessProfiles,
@@ -127,6 +128,7 @@ export type PostgresTenantDataSource = CrmRepository &
   ControlSurfaceRepository &
   RetrospectiveRepository &
   AttachmentRepository &
+  BackgroundJobRepository &
   CollaborationRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
@@ -200,6 +202,7 @@ export function createPostgresTenantDataSource(
     ...createResourceAbsencesRepository(db),
     ...createOccupancyRepository(db),
     ...createAttachmentRepository(db),
+    ...createBackgroundJobRepository(db),
     ...createCollaborationRepository(db),
     ...createCrmActivityRepository(db),
     ...createWorkspaceConfigRepository(db),
