@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { DemoStep } from "../../demo/machine";
 import type { DemoFixture } from "../../demo/fixture";
 import { CrmListScreen } from "./screens/CrmListScreen";
@@ -16,23 +17,59 @@ interface Props {
   onExplore: (message: string) => void;
 }
 
+function ScreenWrap({ children }: { children: ReactNode }) {
+  return <div className="sandbox__screen-wrap">{children}</div>;
+}
+
 export function DemoStage({ step, fixture, onAdvance, onExplore }: Props) {
   switch (step) {
     case "crm-list":
-      return <CrmListScreen deals={fixture.deals} onAdvance={onAdvance} onExplore={onExplore} />;
+      return (
+        <ScreenWrap>
+          <CrmListScreen deals={fixture.deals} onAdvance={onAdvance} onExplore={onExplore} />
+        </ScreenWrap>
+      );
     case "crm-deal":
-      return <CrmDealScreen deal={fixture.deals[0]!} onAdvance={onAdvance} onExplore={onExplore} />;
+      return (
+        <div className="sandbox__deal-wrap">
+          <CrmDealScreen deal={fixture.deals[0]!} onAdvance={onAdvance} onExplore={onExplore} />
+        </div>
+      );
     case "intake":
-      return <IntakeScreen intake={fixture.intake} onAdvance={onAdvance} />;
+      return (
+        <ScreenWrap>
+          <IntakeScreen intake={fixture.intake} onAdvance={onAdvance} />
+        </ScreenWrap>
+      );
     case "project":
-      return <ProjectScreen project={fixture.project} onAdvance={onAdvance} onExplore={onExplore} />;
+      return (
+        <ScreenWrap>
+          <ProjectScreen project={fixture.project} onAdvance={onAdvance} onExplore={onExplore} />
+        </ScreenWrap>
+      );
     case "task":
-      return <TaskScreen task={fixture.task} onAdvance={onAdvance} onExplore={onExplore} />;
+      return (
+        <ScreenWrap>
+          <TaskScreen task={fixture.task} onAdvance={onAdvance} onExplore={onExplore} />
+        </ScreenWrap>
+      );
     case "signal":
-      return <SignalScreen signal={fixture.signal} onAdvance={onAdvance} />;
+      return (
+        <ScreenWrap>
+          <SignalScreen signal={fixture.signal} onAdvance={onAdvance} />
+        </ScreenWrap>
+      );
     case "action":
-      return <ActionScreen action={fixture.action} onAdvance={onAdvance} onExplore={onExplore} />;
+      return (
+        <ScreenWrap>
+          <ActionScreen action={fixture.action} onAdvance={onAdvance} onExplore={onExplore} />
+        </ScreenWrap>
+      );
     case "audit":
-      return <AuditScreen audit={fixture.audit} />;
+      return (
+        <ScreenWrap>
+          <AuditScreen audit={fixture.audit} />
+        </ScreenWrap>
+      );
   }
 }

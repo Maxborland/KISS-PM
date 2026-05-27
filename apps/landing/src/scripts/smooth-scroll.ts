@@ -1,6 +1,8 @@
 /**
- * Плавный скролл страницы: колёсико/трекпад (lerp) + якоря (ease-in-out по дистанции).
- * Не трогает поля ввода; при prefers-reduced-motion не инициализируется.
+ * Плавный скролл только для якорей.
+ *
+ * Колёсико/трекпад не перехватываем: sticky storytelling sections должны
+ * получать нативный scrollY без stale targetY и без preventDefault.
  */
 
 export type SmoothScrollController = {
@@ -46,14 +48,9 @@ export function initSmoothScroll(): SmoothScrollController | null {
     return Math.min(max, Math.max(min, min + Math.abs(delta) * perPx));
   };
 
-  const getLerp = () => {
-    const value = readPxVar("--scroll-lerp", 0.09);
-    return Math.min(0.2, Math.max(0.06, value));
-  };
-
   const sync = () => {
     currentY = window.scrollY;
-    targetY = clamp(targetY);
+    targetY = currentY;
     anchorAnim = null;
   };
 
@@ -87,7 +84,7 @@ export function initSmoothScroll(): SmoothScrollController | null {
       return;
     }
 
-    currentY += diff * getLerp();
+    currentY += diff;
     window.scrollTo(0, currentY);
     rafId = requestAnimationFrame(tick);
   };
@@ -115,33 +112,6 @@ export function initSmoothScroll(): SmoothScrollController | null {
     };
     startLoop();
   };
-
-  const shouldHijackWheel = (event: WheelEvent) => {
-    if (event.ctrlKey || event.defaultPrevented) {
-      return false;
-    }
-
-    const interactive = (event.target as Element | null)?.closest(
-      "input, textarea, select, option, [contenteditable='true'], [data-native-scroll]"
-    );
-    return !interactive;
-  };
-
-  window.addEventListener(
-    "wheel",
-    (event) => {
-      if (!shouldHijackWheel(event)) {
-        return;
-      }
-
-      event.preventDefault();
-      anchorAnim = null;
-      currentY = window.scrollY;
-      targetY = clamp(targetY + event.deltaY);
-      startLoop();
-    },
-    { passive: false }
-  );
 
   window.addEventListener("resize", () => {
     targetY = clamp(targetY);

@@ -314,40 +314,7 @@
   .bento--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-/* Product loop — horizontal rail, not 6-col broken grid */
-.loop-rail {
-  display: flex;
-  gap: var(--bento-gap);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 12px;
-  scrollbar-width: none;
-}
-
-.loop-rail::-webkit-scrollbar { display: none; }
-
-.loop-rail__card {
-  flex: 0 0 min(78vw, 280px);
-  scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 200px;
-  padding: var(--bento-pad);
-  border-radius: var(--bento-radius);
-  border: 1px solid var(--border);
-  background: var(--panel);
-}
-
-.loop-rail__card--wide {
-  flex-basis: min(92vw, 420px);
-}
-
-@media (min-width: 1024px) {
-  .loop-rail__card { flex-basis: minmax(0, 1fr); flex: 1 1 0; min-width: 200px; }
-  .loop-rail__card--wide { flex: 1.6 1 0; min-width: 320px; }
-  .loop-rail { overflow: visible; }
-}
+/* Six Steps carousel — см. six-steps.css */
 
 .bento__cell {
   position: relative;
@@ -766,29 +733,6 @@
    Product loop (bento + mini gantt)
    ============================================================ */
 
-.loop-stepper {
-  position: relative;
-  margin: 0 0 22px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.loop-stepper__no {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 3vw, 2.5rem);
-  font-weight: 650;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  color: color-mix(in oklab, var(--text-strong) 55%, var(--plasma-violet) 45%);
-}
-
-.loop-stepper__line {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--plasma-soft-violet), transparent);
-}
-
 /* ============================================================
    Notification dock — fixed viewport corner (OS-style)
    ============================================================ */
@@ -1028,6 +972,8 @@
   letter-spacing: -0.01em;
 }
 
+/* Demo sandbox + deal workspace — см. demo-sandbox.css */
+
 /* Scope — ink band + product kanban */
 
 .scope-stage {
@@ -1050,14 +996,17 @@
   display: grid;
   gap: clamp(28px, 4vw, 40px);
   align-items: start;
-  justify-items: center;
-  text-align: center;
-  max-width: 560px;
+  max-width: min(720px, 100%);
   margin-inline: auto;
+}
+
+.waitlist__head {
+  margin-bottom: 0;
 }
 
 .waitlist__panel {
   width: 100%;
+  text-align: left;
 }
 
 .waitlist__badge {
@@ -1115,11 +1064,347 @@
 }
 
 .waitlist__panel {
-  padding: clamp(24px, 3vw, 32px);
+  position: relative;
+  padding: clamp(26px, 3.2vw, 36px);
   border-radius: 24px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   background: var(--panel);
-  box-shadow: 0 32px 72px -40px rgba(15, 23, 42, 0.22);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--panel) 80%, var(--text-strong) 20%),
+    0 28px 64px -36px color-mix(in oklab, var(--text-strong) 18%, transparent);
+  overflow: hidden;
+}
+
+.waitlist__panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--gradient-plasma-line);
+  opacity: 0.85;
+}
+
+/* Waitlist form (React island) */
+.wl {
+  display: grid;
+  gap: 18px;
+}
+
+.wl__intro {
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted-strong);
+  max-width: 52ch;
+  text-align: center;
+}
+
+.wl__row {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .wl__row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+  }
+}
+
+.wl__field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.wl__field--full {
+  grid-column: 1 / -1;
+}
+
+.wl__field label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-strong);
+  text-align: left;
+}
+
+.wl__optional {
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+}
+
+.wl__req {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.wl__hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.wl input[type="text"],
+.wl input[type="email"],
+.wl select,
+.wl textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text-strong);
+  background: var(--panel-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 11px 13px;
+  transition:
+    border-color var(--duration-ui) var(--ease-ui),
+    background var(--duration-ui) var(--ease-ui),
+    box-shadow var(--duration-ui) var(--ease-ui);
+}
+
+.wl input::placeholder,
+.wl textarea::placeholder {
+  color: var(--muted-soft);
+}
+
+.wl textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.wl__select-wrap {
+  position: relative;
+}
+
+.wl__select-wrap::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted-strong);
+  border-bottom: 2px solid var(--muted-strong);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+
+.wl select {
+  appearance: none;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.wl input:hover,
+.wl select:hover,
+.wl textarea:hover {
+  border-color: color-mix(in oklab, var(--border-strong) 55%, var(--accent) 45%);
+}
+
+.wl input:focus-visible,
+.wl select:focus-visible,
+.wl textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: var(--ring-focus);
+}
+
+.wl input[aria-invalid="true"],
+.wl select[aria-invalid="true"],
+.wl textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: color-mix(in oklab, var(--danger-soft) 35%, var(--panel) 65%);
+}
+
+.wl__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--prio-critical);
+}
+
+.wl__footer {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wl__consent {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px 12px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.wl__consent input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.wl__consent a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.wl__consent a:hover {
+  color: var(--accent-hover);
+}
+
+.wl__hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.wl__form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--danger) 35%, var(--border) 65%);
+  background: var(--danger-soft);
+  color: var(--prio-critical);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.wl__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--text-strong);
+  color: var(--panel);
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background var(--duration-ui) var(--ease-ui),
+    transform var(--duration-ui) var(--ease-ui),
+    box-shadow var(--duration-ui) var(--ease-ui);
+}
+
+.wl__submit:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--text-strong) 88%, var(--plasma-violet) 12%);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px -18px color-mix(in oklab, var(--plasma-violet) 55%, transparent);
+}
+
+.wl__submit:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.wl__submit:disabled {
+  background: var(--muted-soft);
+  color: var(--panel);
+  cursor: progress;
+  transform: none;
+  box-shadow: none;
+}
+
+.wl__footnote {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+}
+
+.wl--success {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 8px 4px 4px;
+  color: var(--success-text);
+}
+
+.wl__success-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--success-soft);
+  border: 1px solid color-mix(in oklab, var(--success) 40%, var(--border) 60%);
+  position: relative;
+}
+
+.wl__success-mark::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 11px;
+  width: 10px;
+  height: 16px;
+  border-right: 2.5px solid var(--success);
+  border-bottom: 2.5px solid var(--success);
+  transform: rotate(45deg);
+}
+
+.wl__success-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.wl__success-copy {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted-strong);
+}
+
+.wl__again {
+  margin-top: 4px;
+  padding: 9px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-subtle);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-ui) var(--ease-ui),
+    background var(--duration-ui) var(--ease-ui);
+}
+
+.wl__again:hover {
+  border-color: color-mix(in oklab, var(--border-strong) 50%, var(--accent) 50%);
+  background: var(--panel);
 }
 
 .waitlist__privacy {

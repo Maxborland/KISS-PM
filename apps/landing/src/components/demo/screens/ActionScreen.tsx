@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { labelPermission } from "../../../demo/labels";
-import { Cta, ScreenShell } from "../ScreenShell";
+import { Cta, DemoScreenFrame } from "../DemoScreenFrame";
 import type { DemoFixture } from "../../../demo/fixture";
 
 interface Props {
@@ -10,103 +11,61 @@ interface Props {
 
 export function ActionScreen({ action, onAdvance, onExplore }: Props) {
   return (
-    <ScreenShell
+    <DemoScreenFrame
       title={action.title}
-      subtitle="Подтверждение управляемого действия"
+      meta="DEAL-204 · ведущий инженер · сбалансированный сценарий"
+      status="Ожидает подтверждения"
+      statusTone="info"
       toolbar={
         <>
-          <Cta
-            variant="ghost"
-            label="Отменить"
-            onClick={() =>
-              onExplore("Отмена оставит задачу без изменений. Для демо подтвердите действие, чтобы увидеть запись в истории.")
-            }
-          />
-          <Cta label="Подтвердить и записать в аудит" onClick={onAdvance} />
+          <Cta variant="ghost" label="Отменить" onClick={() => onExplore("Отмена не изменит план и не создаст запись в аудите.")} />
+          <Cta label="Подтвердить и записать" emphasis onClick={onAdvance} />
         </>
       }
     >
-      <div className="act">
-        <Block title="Требуемые права" data-tone="info">
+      <div className="demo-action">
+        <ActionBlock title="Требуемые права" tone="info">
           <ul>
             {action.permissions.map((p) => (
               <li key={p}>{labelPermission(p)}</li>
             ))}
           </ul>
-        </Block>
+        </ActionBlock>
 
-        <Block title="Что произойдёт" data-tone="warn">
+        <ActionBlock title="Что изменится" tone="warn">
           <ol>
-            {action.side_effects.map((s, i) => (
-              <li key={i}>{s}</li>
+            {action.side_effects.map((s) => (
+              <li key={s}>{s}</li>
             ))}
           </ol>
-        </Block>
+        </ActionBlock>
 
-        <p className="act__note">
-          KISS PM не выполняет действие, пока пользователь не подтвердил.
-          Панель управления вызывает команду приложения, а не меняет данные напрямую.
+        <div className="demo-action__preview">
+          <span className="demo-action__preview-label">После подтверждения</span>
+          <span className="demo-action__preview-value">112% → 94% · запись #4128 в аудите</span>
+        </div>
+
+        <p className="demo-action__note">
+          Control surface вызывает команду приложения. Данные плана не меняются до явного подтверждения пользователем с нужными правами.
         </p>
       </div>
-
-      <style>{`
-        .act { display: grid; gap: 12px; }
-        .block {
-          padding: 12px 14px;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--border);
-        }
-        .block[data-tone="info"] {
-          background: var(--info-soft);
-          border-color: #bae6fd;
-        }
-        .block[data-tone="warn"] {
-          background: var(--warning-soft);
-          border-color: #fcd34d;
-        }
-        .block__title {
-          font-size: 11px;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          font-weight: 700;
-          margin-bottom: 6px;
-        }
-        .block[data-tone="info"] .block__title { color: #0369a1; }
-        .block[data-tone="warn"] .block__title { color: #b45309; }
-        .block ul, .block ol {
-          margin: 0;
-          padding-left: 22px;
-          font-size: 13px;
-          color: var(--text);
-          line-height: 1.6;
-          display: grid;
-          gap: 4px;
-        }
-        .act__note {
-          font-size: 12.5px;
-          color: var(--muted-strong);
-          line-height: 1.55;
-          border-top: 1px dashed var(--border-strong);
-          padding-top: 12px;
-        }
-      `}</style>
-    </ScreenShell>
+    </DemoScreenFrame>
   );
 }
 
-function Block({
+function ActionBlock({
   title,
+  tone,
   children,
-  "data-tone": tone,
 }: {
   title: string;
-  children: React.ReactNode;
-  "data-tone": "info" | "warn";
+  tone: "info" | "warn";
+  children: ReactNode;
 }) {
   return (
-    <div className="block" data-tone={tone}>
-      <p className="block__title">{title}</p>
+    <section className={`demo-action-block demo-action-block--${tone}`}>
+      <h3 className="demo-action-block__title">{title}</h3>
       {children}
-    </div>
+    </section>
   );
 }
