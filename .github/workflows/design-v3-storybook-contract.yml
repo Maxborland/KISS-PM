@@ -67,4 +67,5 @@ jobs:
             apps/web/.storybook-verify-tmp/batch16-ci-evidence.json
             apps/web/.storybook-verify-tmp/batch15c-copy-scan-evidence.json
             apps/web/.storybook-verify-tmp/batch15-build-evidence.json
+            apps/web/test-results/**
           if-no-files-found: warn
