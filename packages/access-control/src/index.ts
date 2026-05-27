@@ -47,6 +47,8 @@ export const permissions = [
   "tenant.retrospectives.read",
   "tenant.retrospectives.manage",
   "tenant.template_improvements.apply",
+  "tenant.background_jobs.read",
+  "tenant.background_jobs.manage",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -138,6 +140,28 @@ export function canReadAuditEvents(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.audit_events.read"
+  });
+}
+
+export function canReadBackgroundJobs(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.background_jobs.read"
+  });
+}
+
+export function canManageBackgroundJobs(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.background_jobs.manage"
   });
 }
 

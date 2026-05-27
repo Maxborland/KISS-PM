@@ -56,3 +56,4 @@ export * from "./control";
 export * from "./controlSurfaces";
 export * from "./retrospectives";
 export * from "./collaboration";
+export * from "./backgroundJobs";
