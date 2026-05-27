@@ -3,11 +3,39 @@ import type { ControlSignal } from "./control/types";
 import type { PlanningCommand } from "./planning/planningCommands";
 import type { PlanAssignment, PlanSnapshot, PlanTask } from "./planning/types";
 
-export const collaborationEntityTypes = ["project", "task", "opportunity"] as const;
+export const collaborationEntityTypes = [
+  "project",
+  "task",
+  "opportunity",
+  "client",
+  "contact",
+  "product",
+  "communication_channel"
+] as const;
 export type CollaborationEntityType = (typeof collaborationEntityTypes)[number];
 
 export const conversationTypes = ["default", "meeting_followup"] as const;
 export type ConversationType = (typeof conversationTypes)[number];
+
+export const communicationChannelTypes = [
+  "workspace_general",
+  "team",
+  "project_general",
+  "custom"
+] as const;
+export type CommunicationChannelType = (typeof communicationChannelTypes)[number];
+
+export const communicationChannelRoles = ["owner", "moderator", "member"] as const;
+export type CommunicationChannelRole = (typeof communicationChannelRoles)[number];
+
+export const stickerPackSources = ["manual_upload", "telegram_export", "other_import"] as const;
+export type StickerPackSource = (typeof stickerPackSources)[number];
+
+export const stickerStatuses = ["pending", "ready", "archived", "failed"] as const;
+export type StickerStatus = (typeof stickerStatuses)[number];
+
+export const stickerMimeTypes = ["image/png", "image/webp"] as const;
+export type StickerMimeType = (typeof stickerMimeTypes)[number];
 
 export const notificationTypes = [
   "mention",
@@ -106,6 +134,30 @@ export type Conversation = {
   archivedAt: Date | null;
 };
 
+export type CommunicationChannel = {
+  id: string;
+  tenantId: TenantId;
+  channelType: CommunicationChannelType;
+  title: string;
+  description: string;
+  scopeEntityType: "project" | "org_unit" | null;
+  scopeEntityId: string | null;
+  createdByUserId: UserId;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt: Date | null;
+};
+
+export type CommunicationChannelMember = {
+  tenantId: TenantId;
+  channelId: string;
+  userId: UserId;
+  role: CommunicationChannelRole;
+  createdByUserId: UserId;
+  createdAt: Date;
+  archivedAt: Date | null;
+};
+
 export type DiscussionMessage = {
   id: string;
   tenantId: TenantId;
@@ -118,6 +170,55 @@ export type DiscussionMessage = {
   archivedAt: Date | null;
   pinnedAt: Date | null;
   pinnedByUserId: UserId | null;
+};
+
+export type MessageReaction = {
+  id: string;
+  tenantId: TenantId;
+  messageId: string;
+  userId: UserId;
+  emoji: string;
+  createdAt: Date;
+  archivedAt: Date | null;
+};
+
+export type StickerPack = {
+  id: string;
+  tenantId: TenantId;
+  title: string;
+  description: string;
+  source: StickerPackSource;
+  status: "ready" | "archived";
+  createdByUserId: UserId;
+  createdAt: Date;
+  archivedAt: Date | null;
+};
+
+export type StickerAsset = {
+  id: string;
+  tenantId: TenantId;
+  packId: string;
+  fileAssetId: string;
+  emoji: string;
+  title: string;
+  tags: string[];
+  mimeType: StickerMimeType;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  checksumSha256: string;
+  status: StickerStatus;
+  createdByUserId: UserId;
+  createdAt: Date;
+  archivedAt: Date | null;
+};
+
+export type MessageSticker = {
+  tenantId: TenantId;
+  messageId: string;
+  stickerAssetId: string;
+  createdByUserId: UserId;
+  createdAt: Date;
 };
 
 export type MessageMention = {
@@ -306,8 +407,14 @@ const maxMessageBodyLength = 8000;
 const maxNoteBodyLength = 12000;
 const maxAgendaLength = 12000;
 const maxProviderRoomIdLength = 200;
+const maxChannelDescriptionLength = 2000;
+const maxEmojiLength = 32;
+const maxStickerTagLength = 40;
+const maxStickerTags = 20;
+const maxStickerFileBytes = 2 * 1024 * 1024;
 const controlCharacterPattern = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const mentionPattern = /@([a-zA-Z0-9][a-zA-Z0-9._:-]{1,120})/g;
+const customEmojiAliasPattern = /^:[a-zA-Z0-9][a-zA-Z0-9_+-]{0,39}:$/;
 
 export function parseCollaborationEntityType(
   value: unknown
@@ -347,12 +454,122 @@ export function parseConversationTitle(value: unknown): CollaborationParseResult
   });
 }
 
+export function parseCommunicationChannelType(
+  value: unknown
+): CollaborationParseResult<CommunicationChannelType> {
+  if (
+    typeof value === "string" &&
+    communicationChannelTypes.includes(value as CommunicationChannelType)
+  ) {
+    return { ok: true, value: value as CommunicationChannelType };
+  }
+  return { ok: false, error: "communication_channel_type_invalid" };
+}
+
+export function parseCommunicationChannelRole(
+  value: unknown
+): CollaborationParseResult<CommunicationChannelRole> {
+  if (
+    typeof value === "string" &&
+    communicationChannelRoles.includes(value as CommunicationChannelRole)
+  ) {
+    return { ok: true, value: value as CommunicationChannelRole };
+  }
+  return { ok: false, error: "communication_channel_role_invalid" };
+}
+
+export function parseCommunicationChannelDescription(
+  value: unknown
+): CollaborationParseResult<string> {
+  if (value === undefined || value === null) return { ok: true, value: "" };
+  return parseBoundedText(value, {
+    emptyError: "communication_channel_description_invalid",
+    invalidError: "communication_channel_description_invalid",
+    maxLength: maxChannelDescriptionLength,
+    allowEmpty: true
+  });
+}
+
 export function parseMessageBody(value: unknown): CollaborationParseResult<string> {
   return parseBoundedText(value, {
     emptyError: "message_body_required",
     invalidError: "message_body_invalid",
     maxLength: maxMessageBodyLength
   });
+}
+
+export function parseMessageReactionEmoji(value: unknown): CollaborationParseResult<string> {
+  if (typeof value !== "string") return { ok: false, error: "message_reaction_emoji_invalid" };
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    trimmed.length > maxEmojiLength ||
+    controlCharacterPattern.test(trimmed)
+  ) {
+    return { ok: false, error: "message_reaction_emoji_invalid" };
+  }
+  if (customEmojiAliasPattern.test(trimmed)) return { ok: true, value: trimmed };
+  if (/\p{Extended_Pictographic}/u.test(trimmed)) return { ok: true, value: trimmed };
+  return { ok: false, error: "message_reaction_emoji_invalid" };
+}
+
+export function parseStickerPackSource(
+  value: unknown
+): CollaborationParseResult<StickerPackSource> {
+  if (typeof value === "string" && stickerPackSources.includes(value as StickerPackSource)) {
+    return { ok: true, value: value as StickerPackSource };
+  }
+  return { ok: false, error: "sticker_pack_source_invalid" };
+}
+
+export function parseStickerMimeType(value: unknown): CollaborationParseResult<StickerMimeType> {
+  if (typeof value === "string" && stickerMimeTypes.includes(value as StickerMimeType)) {
+    return { ok: true, value: value as StickerMimeType };
+  }
+  return { ok: false, error: "sticker_mime_type_invalid" };
+}
+
+export function parseStickerFileSize(value: unknown): CollaborationParseResult<number> {
+  if (!Number.isInteger(value) || Number(value) <= 0) {
+    return { ok: false, error: "sticker_file_empty" };
+  }
+  if (Number(value) > maxStickerFileBytes) {
+    return { ok: false, error: "sticker_file_too_large" };
+  }
+  return { ok: true, value: Number(value) };
+}
+
+export function parseStickerDimension(value: unknown): CollaborationParseResult<number> {
+  if (!Number.isInteger(value) || Number(value) < 64 || Number(value) > 512) {
+    return { ok: false, error: "sticker_dimension_invalid" };
+  }
+  return { ok: true, value: Number(value) };
+}
+
+export function parseStickerTags(value: unknown): CollaborationParseResult<string[]> {
+  if (value === undefined || value === null) return { ok: true, value: [] };
+  if (!Array.isArray(value) || value.length > maxStickerTags) {
+    return { ok: false, error: "sticker_tags_invalid" };
+  }
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") return { ok: false, error: "sticker_tags_invalid" };
+    const tag = item.trim().toLowerCase();
+    if (
+      !tag ||
+      tag.length > maxStickerTagLength ||
+      controlCharacterPattern.test(tag) ||
+      !/^[\p{L}\p{N}._:-]+$/u.test(tag)
+    ) {
+      return { ok: false, error: "sticker_tags_invalid" };
+    }
+    if (!seen.has(tag)) {
+      seen.add(tag);
+      tags.push(tag);
+    }
+  }
+  return { ok: true, value: tags };
 }
 
 export function parseMeetingTitle(value: unknown): CollaborationParseResult<string> {

@@ -61,8 +61,14 @@ describe("PostgreSQL persistence schema", () => {
       "background_job_schedules",
       "background_job_runs",
       "background_job_events",
+      "communication_channels",
+      "communication_channel_members",
       "conversations",
       "discussion_messages",
+      "message_reactions",
+      "sticker_packs",
+      "sticker_assets",
+      "message_stickers",
       "message_mentions",
       "conversation_read_states",
       "user_notifications",
@@ -140,8 +146,14 @@ describe("PostgreSQL persistence schema", () => {
       "background_job_schedules",
       "background_job_runs",
       "background_job_events",
+      "communication_channels",
+      "communication_channel_members",
       "conversations",
       "discussion_messages",
+      "message_reactions",
+      "sticker_packs",
+      "sticker_assets",
+      "message_stickers",
       "message_mentions",
       "conversation_read_states",
       "user_notifications",
@@ -477,6 +489,32 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("call_recordings")).toEqual(
       expect.arrayContaining(["room_id", "session_id", "attachment_id", "title"])
+    );
+    expect(getPersistenceTableColumns("communication_channels")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "channel_type",
+        "title",
+        "scope_entity_type",
+        "created_by_user_id",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("message_reactions")).toEqual(
+      expect.arrayContaining(["tenant_id", "message_id", "user_id", "emoji", "archived_at"])
+    );
+    expect(getPersistenceTableColumns("sticker_assets")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "pack_id",
+        "file_asset_id",
+        "mime_type",
+        "checksum_sha256",
+        "status"
+      ])
+    );
+    expect(getPersistenceTableColumns("message_stickers")).toEqual(
+      expect.arrayContaining(["tenant_id", "message_id", "sticker_asset_id"])
     );
   });
 

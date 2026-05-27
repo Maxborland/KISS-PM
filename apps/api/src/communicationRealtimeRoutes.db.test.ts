@@ -30,6 +30,8 @@ const seed: SeedTenantDataset = {
         "tenant.projects.manage",
         "tenant.opportunities.read",
         "tenant.opportunities.manage",
+        "tenant.communications.read",
+        "tenant.communications.manage",
         "tenant.project_activation.manage",
         "tenant.tasks.create",
         "tenant.tasks.edit",
@@ -198,6 +200,51 @@ describe("communications realtime API", () => {
     );
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain(joinPayload.join.token);
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain("livekit-secret");
+  });
+
+  it("supports call rooms scoped to the workspace general communication channel", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+
+    const channels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie: adminCookie }
+    });
+    expect(channels.status).toBe(200);
+    const channelsPayload = await channels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    const generalChannel = channelsPayload.channels.find(
+      (channel) => channel.channelType === "workspace_general"
+    );
+    expect(generalChannel?.id).toBe("channel-workspace-general");
+
+    const roomResponse = await app.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "communication_channel",
+        entityId: generalChannel?.id,
+        title: "Общий созвон",
+        mediaKind: "audio",
+        provider: "livekit",
+        providerRoomId: "workspace-general-room"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const room = await roomResponse.json() as { callRoom: { roomId: string } };
+
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const join = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+    expect(join.status).toBe(200);
+    await expect(join.json()).resolves.toMatchObject({
+      join: {
+        provider: "livekit",
+        joinUrl: "https://livekit.kiss.local"
+      }
+    });
   });
 
   it("emits distinct events for invited and joining participant states", async () => {
@@ -608,7 +655,7 @@ describe("communications realtime API", () => {
   }
 
   async function truncateState() {
-    await client`TRUNCATE call_recordings, call_participant_states, call_events, call_sessions, call_rooms, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE message_stickers, sticker_assets, sticker_packs, message_reactions, communication_channel_members, communication_channels, call_recordings, call_participant_states, call_events, call_sessions, call_rooms, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   }
 
   function createSessionEndedRaceApp(sessionId: string) {

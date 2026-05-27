@@ -9,10 +9,16 @@ import {
   parseCallRoomProvider,
   parseCallRoomStatus,
   parseCallTitle,
+  parseCommunicationChannelType,
   parseProviderRoomId,
   parseCollaborationEntityType,
+  parseMessageReactionEmoji,
   parseMessageBody,
-  parseMeetingAgenda
+  parseMeetingAgenda,
+  parseStickerDimension,
+  parseStickerFileSize,
+  parseStickerMimeType,
+  parseStickerTags
 } from "./collaboration";
 import type { ControlSignal, PlanSnapshot } from "./index";
 
@@ -20,9 +26,26 @@ describe("collaboration domain contract", () => {
   it("accepts only scoped collaboration entity types", () => {
     expect(parseCollaborationEntityType("project")).toEqual({ ok: true, value: "project" });
     expect(parseCollaborationEntityType("task")).toEqual({ ok: true, value: "task" });
-    expect(parseCollaborationEntityType("client")).toEqual({
+    expect(parseCollaborationEntityType("client")).toEqual({ ok: true, value: "client" });
+    expect(parseCollaborationEntityType("contact")).toEqual({ ok: true, value: "contact" });
+    expect(parseCollaborationEntityType("communication_channel")).toEqual({
+      ok: true,
+      value: "communication_channel"
+    });
+    expect(parseCollaborationEntityType("invoice")).toEqual({
       ok: false,
       error: "collaboration_entity_type_invalid"
+    });
+  });
+
+  it("validates communication channel scope types", () => {
+    expect(parseCommunicationChannelType("workspace_general")).toEqual({
+      ok: true,
+      value: "workspace_general"
+    });
+    expect(parseCommunicationChannelType("secret_dm")).toEqual({
+      ok: false,
+      error: "communication_channel_type_invalid"
     });
   });
 
@@ -38,6 +61,40 @@ describe("collaboration domain contract", () => {
     expect(parseMessageBody("hello\u0001")).toEqual({
       ok: false,
       error: "message_body_invalid"
+    });
+  });
+
+  it("validates safe emoji reactions", () => {
+    expect(parseMessageReactionEmoji("👍")).toEqual({ ok: true, value: "👍" });
+    expect(parseMessageReactionEmoji(":ship_it:")).toEqual({ ok: true, value: ":ship_it:" });
+    expect(parseMessageReactionEmoji("alert(1)")).toEqual({
+      ok: false,
+      error: "message_reaction_emoji_invalid"
+    });
+  });
+
+  it("validates sticker import metadata", () => {
+    expect(parseStickerMimeType("image/png")).toEqual({ ok: true, value: "image/png" });
+    expect(parseStickerMimeType("image/svg+xml")).toEqual({
+      ok: false,
+      error: "sticker_mime_type_invalid"
+    });
+    expect(parseStickerFileSize(2 * 1024 * 1024)).toEqual({
+      ok: true,
+      value: 2 * 1024 * 1024
+    });
+    expect(parseStickerFileSize(2 * 1024 * 1024 + 1)).toEqual({
+      ok: false,
+      error: "sticker_file_too_large"
+    });
+    expect(parseStickerDimension(512)).toEqual({ ok: true, value: 512 });
+    expect(parseStickerDimension(2048)).toEqual({
+      ok: false,
+      error: "sticker_dimension_invalid"
+    });
+    expect(parseStickerTags(["CRM", "risk", "risk"])).toEqual({
+      ok: true,
+      value: ["crm", "risk"]
     });
   });
 
