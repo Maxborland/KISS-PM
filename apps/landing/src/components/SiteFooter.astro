@@ -1,0 +1,31 @@
+---
+const year = new Date().getFullYear();
+
+const links = [
+  { href: "#demo", label: "Демо-сценарий" },
+  { href: "#waitlist", label: "Закрытая альфа" },
+  { href: "/privacy", label: "Конфиденциальность" },
+  { href: "/terms", label: "Условия альфы" },
+  { href: "mailto:hello@kiss-pm.app", label: "hello@kiss-pm.app" },
+] as const;
+---
+
+<footer class="site-footer">
+  <hr class="l-hairline" />
+  <div class="l-container site-footer__inner">
+    <div class="site-footer__brand-block">
+      <p class="site-footer__brand">KISS PM</p>
+      <p class="site-footer__tag">
+        Увидеть напряжение до срыва. Сравнить сценарии. Применить решение. Оставить след.
+      </p>
+    </div>
+
+    <nav class="site-footer__nav" aria-label="Навигация в подвале">
+      {links.map((link) => (
+        <a href={link.href}>{link.label}</a>
+      ))}
+    </nav>
+
+    <p class="site-footer__copy">© {year} KISS PM · закрытая альфа</p>
+  </div>
+</footer>
