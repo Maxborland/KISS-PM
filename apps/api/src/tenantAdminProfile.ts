@@ -49,6 +49,8 @@ export const tenantAdminProfile = createAccessProfile({
     "tenant.retrospectives.read",
     "tenant.retrospectives.manage",
     "tenant.template_improvements.apply",
+    "tenant.background_jobs.read",
+    "tenant.background_jobs.manage",
     "tenant.resource_feasibility.read",
     "profile.read",
     "profile.update",

@@ -83,6 +83,9 @@ describe("backend management loop DB smoke", () => {
         meetings,
         notification_preferences,
         user_notifications,
+        background_job_events,
+        background_job_runs,
+        background_job_schedules,
         conversation_read_states,
         message_mentions,
         discussion_messages,
@@ -142,7 +145,7 @@ describe("backend management loop DB smoke", () => {
         positions,
         access_profiles,
         tenants
-      RESTART IDENTITY
+      RESTART IDENTITY CASCADE
     `;
   }
 
