@@ -12,8 +12,9 @@ import type {
   TenantUser
 } from "@kiss-pm/domain";
 
-import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
+import type { ManagementAuditDataSource, ManagementAuditEventInput } from "../apiTypes";
 import type { VideoJoinContract, VideoProvider } from "../videoProvider";
+import type { CommunicationCallDataSource } from "./callDataSource";
 
 export type CommunicationCallAccess = {
   sourceEntity: { type: string; id: string };
@@ -22,14 +23,14 @@ export type CommunicationCallAccess = {
 };
 
 export type CommunicationCallWorkspaceDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: CommunicationCallDataSource;
   videoProvider: VideoProvider;
   runDataSourceTransaction<T>(
-    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+    operation: (transactionDataSource: CommunicationCallDataSource) => Promise<T>
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: Pick<ApiTenantDataSource, "appendAuditEvent">
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 
@@ -539,7 +540,7 @@ function isProviderRoomConflictError(error: unknown): boolean {
 }
 
 async function tenantUserExists(
-  dataSource: ApiTenantDataSource,
+  dataSource: CommunicationCallDataSource,
   tenantId: string,
   userId: string
 ): Promise<boolean> {
