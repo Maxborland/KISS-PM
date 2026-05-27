@@ -10,6 +10,7 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
 } from "../apiTypes";
+import type { AttachmentDataPort } from "../apiDataPorts";
 import {
   resolveAttachmentEntityContext,
   type AttachmentEntityContext
@@ -26,7 +27,7 @@ import { attachExternalReference } from "./attachExternalReference";
 import { attachFile, prepareDownload } from "./fileAttachmentHandlers";
 
 export type AttachmentWorkspaceDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: AttachmentDataPort;
   storageProvider: StorageProvider;
   runDataSourceTransaction<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>

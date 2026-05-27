@@ -1,3 +1,5 @@
+import { readSecureCookiePolicy } from "./runtimeSecurityConfig";
+
 export const sessionCookieName = "kiss_pm_session";
 export const sessionTtlSeconds = 7 * 24 * 60 * 60;
 export const sessionTtlMs = sessionTtlSeconds * 1000;
@@ -46,9 +48,7 @@ export function buildExpiredSessionCookieHeader(options: CookieOptions = {}) {
 export function shouldUseSecureCookies(
   env: Partial<Pick<NodeJS.ProcessEnv, "KISS_PM_SECURE_COOKIES" | "NODE_ENV">> = process.env
 ) {
-  if (env.KISS_PM_SECURE_COOKIES === "true") return true;
-  if (env.KISS_PM_SECURE_COOKIES === "false") return false;
-  return env.NODE_ENV === "production";
+  return readSecureCookiePolicy(env);
 }
 
 function appendSecureFlag(header: string, options: CookieOptions) {

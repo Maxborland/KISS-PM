@@ -32,7 +32,10 @@ export function createStorageProviderFromEnv(
       endpoint: requireEnv(env, "KISS_PM_STORAGE_S3_ENDPOINT"),
       region: env.KISS_PM_STORAGE_S3_REGION ?? "us-east-1",
       secretAccessKey: requireEnv(env, "KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY"),
-      timeoutMs: parseBoundedIntegerEnv(env, "KISS_PM_STORAGE_S3_TIMEOUT_MS", 15_000, 1_000, 60_000)
+      timeoutMs: parseBoundedIntegerEnv(env, "KISS_PM_STORAGE_S3_TIMEOUT_MS", 15_000, 1_000, 60_000),
+      allowInsecureHttp:
+        env.KISS_PM_STORAGE_S3_ALLOW_INSECURE_HTTP === "true" &&
+        env.NODE_ENV !== "production"
     });
   }
 
@@ -88,8 +91,11 @@ export function createS3StorageProvider(input: {
   accessKeyId: string;
   secretAccessKey: string;
   timeoutMs?: number;
+  allowInsecureHttp?: boolean;
 }): StorageProvider {
-  const endpoint = normalizeS3Endpoint(input.endpoint);
+  const endpoint = normalizeS3Endpoint(input.endpoint, {
+    allowInsecureHttp: input.allowInsecureHttp ?? true
+  });
   const bucket = normalizeS3Bucket(input.bucket);
   const timeoutMs = input.timeoutMs ?? 15_000;
 
@@ -159,7 +165,10 @@ function requireEnv(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
-function normalizeS3Endpoint(value: string): string {
+function normalizeS3Endpoint(
+  value: string,
+  options: { allowInsecureHttp: boolean }
+): string {
   let url: URL;
   try {
     url = new URL(value);
@@ -168,6 +177,9 @@ function normalizeS3Endpoint(value: string): string {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("kiss_pm_storage_s3_endpoint_invalid");
+  }
+  if (url.protocol === "http:" && !options.allowInsecureHttp) {
+    throw new Error("kiss_pm_storage_s3_endpoint_insecure");
   }
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new Error("kiss_pm_storage_s3_endpoint_invalid");

@@ -6,12 +6,14 @@ import type {
   ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import type { ApiCapabilities } from "./apiDataPorts";
 import type { AuthRateLimiter } from "./authRateLimit";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
 
 export type ApiRouteDeps = {
   dataSource: ApiTenantDataSource;
+  capabilities: ApiCapabilities;
   authRateLimiter: AuthRateLimiter;
   secureCookies: boolean;
   storageProvider: StorageProvider;

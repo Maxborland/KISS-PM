@@ -89,6 +89,19 @@ describe("storage provider env", () => {
       })
     ).toThrow("kiss_pm_storage_s3_bucket_invalid");
   });
+
+  it("rejects insecure S3 endpoints in production", () => {
+    expect(() =>
+      createStorageProviderFromEnv({
+        NODE_ENV: "production",
+        KISS_PM_STORAGE_PROVIDER: "s3",
+        KISS_PM_STORAGE_S3_ACCESS_KEY_ID: "access",
+        KISS_PM_STORAGE_S3_BUCKET: "bucket",
+        KISS_PM_STORAGE_S3_ENDPOINT: "http://storage.example.test",
+        KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY: "secret"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("kiss_pm_storage_s3_endpoint_insecure");
+  });
 });
 
 describe("s3 storage provider", () => {

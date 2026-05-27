@@ -21,6 +21,7 @@ import type {
   ManagementAuditDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import { createApiCapabilities } from "./apiDataPorts";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
@@ -57,6 +58,7 @@ import {
   setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
+import { requestObservabilityMiddleware } from "./requestObservability";
 import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
@@ -68,6 +70,7 @@ export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
   const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
+  const capabilities = createApiCapabilities(dataSource);
   const authRateLimiter = options.authRateLimiter ?? createAuthRateLimiter();
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
   const trustedMutationOrigins =
@@ -82,6 +85,8 @@ export function createApp(options: CreateAppOptions = {}) {
     const response = resolveAppErrorResponse(error);
     return context.json(response.body, response.status);
   });
+
+  app.use("*", requestObservabilityMiddleware());
 
   app.use("*", async (context, next) => {
     context.header("Cache-Control", "no-store, private");
@@ -210,6 +215,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const routeDeps: ApiRouteDeps = {
     appendManagementAuditEvent,
     authRateLimiter,
+    capabilities,
     dataSource,
     getActor,
     getActorProfile,

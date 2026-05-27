@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createAuthRateLimiter, getClientIp } from "./authRateLimit";
+import {
+  createAuthRateLimiter,
+  createAuthRateLimiterFromEnv,
+  getClientIp,
+  parseAuthRateLimitBackend
+} from "./authRateLimit";
 
 describe("auth rate limiter", () => {
   it("blocks repeated failed attempts for the same email and IP", () => {
@@ -88,6 +93,30 @@ describe("auth rate limiter", () => {
     });
   });
 
+  it("reserves failed-login capacity before credential verification", () => {
+    const limiter = createAuthRateLimiter({
+      maxFailures: 2,
+      maxGlobalFailures: 100,
+      windowMs: 60_000,
+      blockMs: 30_000
+    });
+    const input = {
+      email: "parallel@kiss-pm.local",
+      ip: "203.0.113.55",
+      now: 1_000
+    };
+
+    expect(limiter.reserveAttempt?.(input)).toEqual({ allowed: true });
+    expect(limiter.reserveAttempt?.({ ...input, now: 1_001 })).toEqual({ allowed: true });
+    expect(limiter.reserveAttempt?.({ ...input, now: 1_002 })).toEqual({
+      allowed: false,
+      retryAfterSeconds: 30
+    });
+    limiter.recordFailure(input, { reserved: true });
+
+    expect(limiter.check({ ...input, now: 32_000 })).toEqual({ allowed: true });
+  });
+
   it("bounds tracked email buckets to avoid unbounded memory growth", () => {
     const limiter = createAuthRateLimiter({
       maxFailures: 2,
@@ -115,5 +144,26 @@ describe("auth rate limiter", () => {
         now: 3_000
       })
     ).toEqual({ allowed: true });
+  });
+
+  it("uses Redis by default in production so throttling is shared across nodes", async () => {
+    expect(parseAuthRateLimitBackend(undefined, true)).toBe("redis");
+    await expect(
+      createAuthRateLimiterFromEnv({
+        NODE_ENV: "production"
+      } as NodeJS.ProcessEnv)
+    ).rejects.toThrow("auth_rate_limit_redis_url_required");
+    await expect(
+      createAuthRateLimiterFromEnv({
+        KISS_PM_AUTH_RATE_LIMIT_BACKEND: "memory",
+        NODE_ENV: "production"
+      } as NodeJS.ProcessEnv)
+    ).rejects.toThrow("auth_rate_limit_memory_forbidden_in_production");
+    await expect(
+      createAuthRateLimiterFromEnv({
+        KISS_PM_AUTH_RATE_LIMIT_REDIS_URL: "redis://cache.internal:6379",
+        NODE_ENV: "production"
+      } as NodeJS.ProcessEnv)
+    ).rejects.toThrow("redis_url_insecure_in_production");
   });
 });
