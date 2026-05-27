@@ -37,12 +37,14 @@ export async function runBackgroundJobWorkerTick(input: {
   storageProvider?: StorageProvider;
   workerId: string;
   now?: Date;
+  clock?: () => Date;
 }): Promise<
   | { status: "idle" }
   | { status: "succeeded"; job: BackgroundJobRun }
   | { status: "failed"; job: BackgroundJobRun; error: string }
 > {
-  const now = input.now ?? new Date();
+  const clock = input.clock ?? (() => new Date());
+  const now = input.now ?? clock();
   if (
     !input.dataSource.claimNextBackgroundJob ||
     !input.dataSource.completeBackgroundJob ||
@@ -67,7 +69,7 @@ export async function runBackgroundJobWorkerTick(input: {
     await input.dataSource.failBackgroundJob({
       tenantId: job.tenantId,
       jobId: job.id,
-      failedAt: now,
+      failedAt: clock(),
       error,
       workerId: input.workerId
     });
@@ -84,7 +86,7 @@ export async function runBackgroundJobWorkerTick(input: {
     const completeInput: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0] = {
       tenantId: job.tenantId,
       jobId: job.id,
-      finishedAt: now,
+      finishedAt: clock(),
       workerId: input.workerId
     };
     if (result?.message) completeInput.message = result.message;
@@ -96,12 +98,41 @@ export async function runBackgroundJobWorkerTick(input: {
     await input.dataSource.failBackgroundJob({
       tenantId: job.tenantId,
       jobId: job.id,
-      failedAt: now,
+      failedAt: clock(),
       error: message,
       workerId: input.workerId
     });
     return { status: "failed", job, error: message };
   }
+}
+
+export function createSerializedBackgroundJobPoller(input: {
+  dataSource: ApiTenantDataSource;
+  registry: BackgroundJobRegistry;
+  storageProvider?: StorageProvider;
+  workerId: string;
+  onError?: (error: unknown) => void;
+}): () => Promise<"ran" | "skipped" | "failed"> {
+  let running = false;
+  return async () => {
+    if (running) return "skipped";
+    running = true;
+    try {
+      await enqueueDueBackgroundJobSchedules({ dataSource: input.dataSource });
+      await runBackgroundJobWorkerTick({
+        dataSource: input.dataSource,
+        registry: input.registry,
+        ...(input.storageProvider ? { storageProvider: input.storageProvider } : {}),
+        workerId: input.workerId
+      });
+      return "ran";
+    } catch (error) {
+      input.onError?.(error);
+      return "failed";
+    } finally {
+      running = false;
+    }
+  };
 }
 
 export function sanitizeBackgroundJobError(error: unknown): string {

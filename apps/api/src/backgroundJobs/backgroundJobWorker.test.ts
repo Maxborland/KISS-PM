@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiTenantDataSource } from "../apiTypes";
 import { createLocalStorageProvider } from "../storageProvider";
 import {
+  createSerializedBackgroundJobPoller,
   enqueueDueBackgroundJobSchedules,
   runBackgroundJobWorkerTick
 } from "./backgroundJobWorker";
@@ -98,6 +99,32 @@ describe("background job worker", () => {
     expect(persistedError).toBe("background_job_failed");
   });
 
+  it("uses completion time for terminal job timestamps", async () => {
+    const startedAt = new Date("2026-05-27T00:00:00.000Z");
+    const finishedAt = new Date("2026-05-27T00:05:00.000Z");
+    const job = backgroundJob("notification.dispatch");
+    let persistedFinishedAt: Date | undefined;
+    const dataSource: ApiTenantDataSource = {
+      claimNextBackgroundJob: async () => job,
+      completeBackgroundJob: async (input: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0]) => {
+        persistedFinishedAt = input.finishedAt;
+        return { ...job, status: "succeeded", finishedAt: input.finishedAt };
+      },
+      failBackgroundJob: async () => undefined
+    } as unknown as ApiTenantDataSource;
+    const clockValues = [startedAt, finishedAt];
+
+    await expect(runBackgroundJobWorkerTick({
+      dataSource,
+      registry: {
+        "notification.dispatch": async () => ({ message: "done" })
+      },
+      workerId: "worker-test",
+      clock: () => clockValues.shift() ?? finishedAt
+    })).resolves.toMatchObject({ status: "succeeded" });
+    expect(persistedFinishedAt?.toISOString()).toBe("2026-05-27T00:05:00.000Z");
+  });
+
   it("does not claim jobs when the worker registry is empty", async () => {
     let claimed = false;
     const dataSource: ApiTenantDataSource = {
@@ -116,6 +143,33 @@ describe("background job worker", () => {
       now: new Date("2026-05-27T00:00:00.000Z")
     })).resolves.toEqual({ status: "idle" });
     expect(claimed).toBe(false);
+  });
+
+  it("serializes poller ticks so overlapping intervals are skipped", async () => {
+    let releaseFirstTick!: () => void;
+    let scheduleReads = 0;
+    const dataSource: ApiTenantDataSource = {
+      ...createIdleSchedulerDataSource(),
+      listDueBackgroundJobSchedules: async () => {
+        scheduleReads += 1;
+        await new Promise<void>((resolve) => {
+          releaseFirstTick = resolve;
+        });
+        return [];
+      }
+    } as ApiTenantDataSource;
+    const poller = createSerializedBackgroundJobPoller({
+      dataSource,
+      registry: createDefaultBackgroundJobRegistry(),
+      workerId: "worker-test"
+    });
+
+    const firstTick = poller();
+    await Promise.resolve();
+    await expect(poller()).resolves.toBe("skipped");
+    releaseFirstTick();
+    await expect(firstTick).resolves.toBe("ran");
+    expect(scheduleReads).toBe(1);
   });
 
   it("enqueues due schedules with idempotency tied to schedule key and due instant", async () => {
@@ -150,6 +204,18 @@ describe("background job worker", () => {
     expect(enqueued).toEqual(["digest:daily:2026-05-27T00:00:00.000Z"]);
   });
 });
+
+function createIdleSchedulerDataSource(): ApiTenantDataSource {
+  return {
+    listDueBackgroundJobSchedules: async () => [],
+    enqueueBackgroundJob: async (input: Parameters<NonNullable<ApiTenantDataSource["enqueueBackgroundJob"]>>[0]) =>
+      backgroundJob(input.kind, input.payload),
+    markBackgroundJobScheduleEnqueued: async () => undefined,
+    claimNextBackgroundJob: async () => undefined,
+    completeBackgroundJob: async () => undefined,
+    failBackgroundJob: async () => undefined
+  } as unknown as ApiTenantDataSource;
+}
 
 function backgroundJob(
   kind: BackgroundJobRun["kind"],
