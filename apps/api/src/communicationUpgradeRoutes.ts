@@ -28,7 +28,8 @@ import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes"
 import {
   parseContentLength,
   parseMultipartContentType,
-  readBoundedMultipartRequest
+  readBoundedMultipartRequest,
+  toArrayBuffer
 } from "./attachmentUploadRequest";
 import { buildStorageKey, sanitizeFileName, sha256Hex } from "./attachmentValidation";
 import {
@@ -437,6 +438,36 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
       afterState: { archivedAt: pack.archivedAt?.toISOString() ?? null }
     }));
     return context.json({ stickerPack: serializeStickerPack(pack) });
+  });
+
+  app.get("/api/workspace/stickers/:stickerId/download", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const profile = await deps.getActorProfile(actor);
+    const decision = canReadCommunications({ actor, profile, targetTenantId: actor.tenantId });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!deps.dataSource.findStickerAsset || !deps.dataSource.findFileAssetById) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const stickerId = parseCollaborationId(context.req.param("stickerId"), "sticker_id_invalid");
+    if (!stickerId.ok) return context.json({ error: stickerId.error }, 400);
+    const sticker = await deps.dataSource.findStickerAsset(actor.tenantId, stickerId.value);
+    if (!sticker) return context.json({ error: "sticker_not_found" }, 404);
+    const asset = await deps.dataSource.findFileAssetById(actor.tenantId, sticker.fileAssetId);
+    if (!asset || asset.archivedAt) return context.json({ error: "sticker_not_found" }, 404);
+    if (asset.status !== "ready") return context.json({ error: "sticker_not_ready" }, 409);
+
+    const object = await deps.storageProvider.readObject(asset.storageKey);
+    const headers = new Headers();
+    headers.set("Cache-Control", "no-store, private");
+    headers.set("Content-Type", sticker.mimeType);
+    headers.set("Content-Length", String(object.bytes.byteLength));
+    headers.set(
+      "Content-Disposition",
+      `inline; filename="${escapeDownloadName(asset.safeDisplayName)}"`
+    );
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(toArrayBuffer(object.bytes), { headers });
   });
 
   app.delete("/api/workspace/stickers/:stickerId", async (context) => {
@@ -935,6 +966,7 @@ function serializeStickerAsset(sticker: StickerAsset) {
   return {
     id: sticker.id,
     packId: sticker.packId,
+    downloadUrl: `/api/workspace/stickers/${sticker.id}/download`,
     emoji: sticker.emoji,
     title: sticker.title,
     tags: sticker.tags,
@@ -946,6 +978,10 @@ function serializeStickerAsset(sticker: StickerAsset) {
     createdAt: sticker.createdAt.toISOString(),
     archivedAt: sticker.archivedAt?.toISOString() ?? null
   };
+}
+
+function escapeDownloadName(value: string): string {
+  return value.replace(/["\\\r\n]/g, "_");
 }
 
 async function appendDeniedAudit(

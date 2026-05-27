@@ -397,15 +397,24 @@ describe("collaboration and communications API", () => {
     );
     expect(imported.status).toBe(201);
     const importedPayload = await imported.json() as {
-      sticker: { id: string; emoji: string; mimeType: string; tags: string[] };
+      sticker: { id: string; downloadUrl: string; emoji: string; mimeType: string; tags: string[] };
     };
     expect(importedPayload).toMatchObject({
       sticker: {
+        downloadUrl: `/api/workspace/stickers/${importedPayload.sticker.id}/download`,
         emoji: "🚀",
         mimeType: "image/webp",
         tags: ["release", "fast"]
       }
     });
+    const downloadedSticker = await app.request(importedPayload.sticker.downloadUrl, {
+      headers: { cookie: adminCookie }
+    });
+    expect(downloadedSticker.status).toBe(200);
+    expect(downloadedSticker.headers.get("content-type")).toBe("image/webp");
+    expect(downloadedSticker.headers.get("content-disposition")).toContain("inline");
+    expect(downloadedSticker.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(new Uint8Array(await downloadedSticker.arrayBuffer())).toEqual(createWebpStickerBytes(128, 128));
 
     const mismatchForm = new FormData();
     mismatchForm.set("file", new File([createWebpStickerBytes(128, 128)], "mismatch.webp", { type: "image/webp" }));
@@ -486,6 +495,10 @@ describe("collaboration and communications API", () => {
     await expect(archivedSticker.json()).resolves.toMatchObject({
       sticker: { id: importedPayload.sticker.id, status: "archived" }
     });
+    const archivedStickerDownload = await app.request(importedPayload.sticker.downloadUrl, {
+      headers: { cookie: adminCookie }
+    });
+    expect(archivedStickerDownload.status).toBe(404);
 
     const archivedPack = await app.request(`/api/workspace/sticker-packs/${packPayload.stickerPack.id}`, {
       method: "DELETE",

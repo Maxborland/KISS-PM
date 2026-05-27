@@ -530,6 +530,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     assetId: string;
   }): Promise<FileAssetRecord | undefined>;
+  findFileAssetById?(tenantId: TenantId, assetId: string): Promise<FileAssetRecord | undefined>;
   createExternalReference?(input: ExternalReferenceInput): Promise<ExternalReferenceRecord>;
   createEntityAttachment?(input: EntityAttachmentInput): Promise<AttachmentReadModel>;
   listEntityAttachments?(input: {
