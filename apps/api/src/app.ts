@@ -14,6 +14,7 @@ import {
   MissingAccessProfileError,
   resolveAppErrorResponse
 } from "./appErrors";
+import { registerApiDocsRoutes } from "./apiDocs/apiDocsRoutes";
 import type {
   ApiTenantDataSource,
   CreateAppOptions,
@@ -226,6 +227,7 @@ export function createApp(options: CreateAppOptions = {}) {
     readinessChecks: options.readinessChecks,
     storageProvider
   });
+  registerApiDocsRoutes(app);
 
   app.get("/api/health/realtime", async (context) => {
     const { getPlanningRealtimeStatus } = await import("./planningRealtimeHealth.js");
