@@ -36,6 +36,210 @@ describe("KISS PM API Phase 1 shell", () => {
     });
   });
 
+  it("serves frontend-facing OpenAPI and Scalar API reference", async () => {
+    const app = createApp();
+
+    const openApiResponse = await app.request("/api/openapi.json");
+    const scalarResponse = await app.request("/api/docs");
+
+    expect(openApiResponse.status).toBe(200);
+    const document = await openApiResponse.json();
+    expect(document.openapi).toBe("3.1.0");
+    expect(document.info.title).toBe("KISS PM Backend API");
+    expect(document.paths["/api/auth/login"].post.summary).toBe("Create browser session");
+    expect(
+      document.paths["/api/auth/login"].post.requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/LoginRequest" });
+    expect(document.paths["/api/auth/me"].get.responses["200"].content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/AuthMeResponse"
+    });
+    expect(
+      document.paths["/api/workspace/users"].post.responses["201"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/WorkspaceUserResponse" });
+    expect(document.components.schemas.WorkspaceUserCreateRequest.required).toContain(
+      "password"
+    );
+    expect(document.paths["/api/workspace/clients"].get.responses["200"].content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/ClientsResponse"
+    });
+    expect(
+      document.paths["/api/workspace/products"].post.requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ProductWriteRequest" });
+    expect(document.components.schemas.ProductWriteRequest.required).toEqual([
+      "name",
+      "unit",
+      "price"
+    ]);
+    expect(
+      document.paths["/api/workspace/config/custom-fields"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/CustomFieldWriteRequest" });
+    expect(
+      document.paths["/api/tenant/current/org-structure"].put.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/TenantOrgStructureReplaceRequest" });
+    expect(
+      document.paths["/api/workspace/opportunities"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/OpportunityWriteRequest" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/tasks"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/TaskCreateRequest" });
+    expect(document.paths["/api/workspace/tasks/{taskId}"].get.responses["200"].content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/TaskDetailResponse"
+    });
+    expect(document.components.schemas.TaskUpdateRequest.required).toContain(
+      "clientUpdatedAt"
+    );
+    expect(document.paths["/api/workspace/projects/{projectId}/planning/read-model"].get.summary).toBe(
+      "Read planning model"
+    );
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/read-model"].get.responses["200"]
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningReadModelResponse" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/preview-command"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningCommandEnvelope" });
+    expect(document.components.schemas.PlanningCommand.oneOf).toContainEqual({
+      $ref: "#/components/schemas/PlanningTaskCreateCommand"
+    });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/apply-command-batch"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningCommandBatchEnvelope" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/baselines"].get.responses["200"]
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningBaselinesResponse" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/auto-solver-runs"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningAutoSolverRunCreateRequest" });
+    expect(
+      document.paths["/api/workspace/attachments"].get.parameters
+    ).toContainEqual(
+      expect.objectContaining({
+        in: "query",
+        name: "entityType",
+        required: true
+      })
+    );
+    expect(
+      document.paths["/api/workspace/attachments/external-references"].post.requestBody
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ExternalReferenceAttachRequest" });
+    expect(
+      document.paths["/api/workspace/search"].get.responses["200"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/WorkspaceSearchResponse" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/knowledge/documents"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/KnowledgeDocumentCreateRequest" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/knowledge/decisions"].post
+        .responses["201"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/KnowledgeDecisionResponse" });
+    expect(
+      document.paths["/api/workspace/capacity/tree"].get.responses["200"].content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/CapacityTreeResponse" });
+    expect(
+      document.paths["/api/tenant/current/production-calendar/bulk"].post.requestBody
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ProductionCalendarBulkRequest" });
+    expect(
+      document.paths["/api/tenant/current/absences"].post.requestBody.content["application/json"]
+        .schema
+    ).toEqual({ $ref: "#/components/schemas/ResourceAbsenceCreateRequest" });
+    expect(
+      document.paths[
+        "/api/workspace/resources/{resourceId}/personal-calendar/events"
+      ].post.requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PersonalCalendarEventWriteRequest" });
+    expect(
+      document.paths["/api/tenant/current/kpi-definitions"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/KpiDefinitionWriteRequest" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/control/read-model"].get.responses[
+        "200"
+      ].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ControlReadModelResponse" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/closure/close"].post.requestBody
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ClosureCloseRequest" });
+    expect(
+      document.paths[
+        "/api/tenant/current/project-templates/{templateId}/retrospective-insights"
+      ].get.responses["200"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/RetrospectiveInsightsResponse" });
+    expect(
+      document.paths["/api/tenant/current/control-surfaces"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/ControlSurfaceDraftSaveRequest" });
+    expect(
+      document.paths["/api/workspace/tasks/{taskId}/comments"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/TaskCommentCreateRequest" });
+    expect(
+      document.paths["/api/workspace/crm/{entityType}/{entityId}/tasks"].post.requestBody
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/CrmTaskCreateRequest" });
+    expect(
+      document.paths["/api/workspace/conversations/{conversationId}/messages"].post.requestBody
+        .content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/ConversationMessageCreateRequest" });
+    expect(
+      document.paths["/api/workspace/meetings"].post.responses["201"].content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/MeetingCreateResponse" });
+    expect(
+      document.paths["/api/workspace/communication-channels/{channelId}/members"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/CommunicationChannelMemberUpsertRequest" });
+    expect(
+      document.paths["/api/workspace/sticker-packs/{packId}/import"].post.requestBody
+        .content["multipart/form-data"].schema
+    ).toEqual({ $ref: "#/components/schemas/StickerImportMultipartRequest" });
+    expect(
+      document.paths["/api/workspace/call-rooms/{roomId}/sessions/{sessionId}/join-token"]
+        .post.responses["200"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/CallJoinTokenResponse" });
+    expect(
+      document.paths["/api/workspace/background-jobs/runs"].post.requestBody.content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/BackgroundJobEnqueueRequest" });
+    expect(
+      document.paths[
+        "/api/workspace/projects/{projectId}/planning/auto-solver-runs/{runId}/proposals/{proposalId}/apply"
+      ].post.parameters
+    ).toContainEqual(
+      expect.objectContaining({
+        in: "header",
+        name: "x-kiss-pm-action",
+        required: true
+      })
+    );
+
+    expect(scalarResponse.status).toBe(200);
+    expect(scalarResponse.headers.get("content-type")).toContain("text/html");
+    await expect(scalarResponse.text()).resolves.toContain("/api/openapi.json");
+  });
+
   it("returns readiness when dependency checks pass", async () => {
     const app = createApp({
       readinessChecks: {
