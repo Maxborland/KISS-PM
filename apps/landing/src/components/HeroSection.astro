@@ -1,0 +1,119 @@
+---
+import HeroShader from "./HeroShader.tsx";
+---
+
+<section id="hero" class="hero" aria-labelledby="hero-title">
+  <HeroShader client:load />
+
+  <div class="l-container hero__inner">
+    <div class="hero__clean-zone">
+      <h1 id="hero-title" class="hero__title">
+        <span class="hero__line">Управление проектами.</span>
+        <span class="hero__line">Без хаоса.</span>
+      </h1>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: var(--canvas);
+    isolation: isolate;
+    margin-bottom: 0;
+  }
+
+  /* Readability + seamless fade into --canvas (philosophy block) */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 52% 30% at 50% 46%, rgba(255, 255, 255, 0.64) 0%, rgba(255, 255, 255, 0.36) 38%, rgba(255, 255, 255, 0) 72%),
+      linear-gradient(
+        180deg,
+        rgba(238, 240, 244, 0.18) 0%,
+        rgba(238, 240, 244, 0) 16%,
+        rgba(238, 240, 244, 0) 52%,
+        var(--canvas) 88%,
+        var(--canvas) 100%
+      );
+  }
+
+  .hero__inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    min-height: 100svh;
+    padding-block: clamp(72px, 10vw, 128px);
+  }
+
+  :global(.hero-shader) {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: auto;
+  }
+
+  :global(.hero-shader__canvas) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .hero__clean-zone {
+    position: relative;
+    z-index: 1;
+    width: min(780px, calc(100vw - 32px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .hero__title {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.12em;
+    margin: 0;
+    color: color-mix(in oklab, var(--text-strong) 84%, var(--accent) 16%);
+    font-family: var(--font-display);
+    font-size: clamp(26px, 3.2vw, 40px);
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    font-weight: 600 !important;
+    font-variation-settings: "wght" 600;
+    font-synthesis-weight: none;
+    text-wrap: balance;
+    text-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.72),
+      0 18px 48px rgba(255, 255, 255, 0.82),
+      0 0 72px rgba(255, 255, 255, 0.92);
+  }
+
+  .hero__line {
+    display: block;
+  }
+
+  @media (max-width: 520px) {
+    .hero__clean-zone {
+      width: min(100%, calc(100vw - 20px));
+      padding-inline: 12px;
+    }
+
+    .hero__title {
+      font-size: clamp(24px, 7.5vw, 34px);
+    }
+  }
+</style>

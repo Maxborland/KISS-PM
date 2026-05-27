@@ -1,0 +1,17 @@
+---
+import WaitlistForm from "./WaitlistForm.tsx";
+---
+
+<section id="waitlist" class="l-band l-band--canvas" aria-labelledby="waitlist-title">
+  <div class="l-container">
+    <div class="waitlist">
+      <h2 id="waitlist-title" class="l-display" data-text-reveal>
+        Ранний доступ
+      </h2>
+
+      <div class="waitlist__panel kp-spotlight-card" data-reveal>
+        <WaitlistForm client:visible />
+      </div>
+    </div>
+  </div>
+</section>

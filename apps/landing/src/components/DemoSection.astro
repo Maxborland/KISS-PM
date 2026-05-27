@@ -1,0 +1,28 @@
+---
+import DemoSandbox from "./DemoSandbox.tsx";
+---
+
+<section id="demo" class="l-band l-band--panel demo-band" aria-labelledby="demo-title">
+  <div class="l-band__grid" aria-hidden="true"></div>
+
+  <div class="demo-band__wrap">
+    <header class="section-head section-head--tight">
+      <h2 id="demo-title" class="l-display" data-text-reveal>
+        Интерактивный сценарий
+      </h2>
+      <p class="section-head__copy section-head__copy--visible" data-text-reveal>
+        Восемь шагов контура на портфеле из 147 проектов — пройдите цепочку от спроса до аудита.
+      </p>
+    </header>
+
+    <div class="demo-frame kp-spotlight-card" data-reveal>
+      <div class="demo-frame__inner">
+        <DemoSandbox client:visible />
+      </div>
+    </div>
+
+    <div class="demo-controls">
+      <a href="#waitlist" class="l-btn l-btn--primary">Запросить доступ</a>
+    </div>
+  </div>
+</section>
