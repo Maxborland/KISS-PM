@@ -21,7 +21,11 @@ import type {
   CorrectiveAction,
   Conversation,
   ConversationReadState,
+  DecisionLogEntry,
   DiscussionMessage,
+  KnowledgeActionItem,
+  KnowledgeDocument,
+  KnowledgeDocumentVersion,
   KpiDefinition,
   KpiEvaluation,
   Meeting,
@@ -36,8 +40,11 @@ import type {
   MessageReaction,
   MessageSticker,
   NotificationPreference,
+  OccupancyWindow,
   PlanSnapshot,
   ProjectClosureSnapshot,
+  ResourceCalendarEvent,
+  ResourcePersonalCalendar,
   RetrospectiveLesson,
   RetrospectiveReadModel,
   Tenant,
@@ -74,6 +81,7 @@ import type {
   ExternalReferenceRecord,
   FileAssetInput,
   FileAssetRecord,
+  PersonalCalendarEventInput,
   ActionExecutionInput,
   ActionExecutionRecord,
   TaskActivityInput,
@@ -1063,6 +1071,134 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     roomId: string;
   }): Promise<CallRecording[]>;
+  createKnowledgeDocument?(input: Omit<
+    KnowledgeDocument,
+    "createdAt" | "updatedAt" | "archivedAt" | "currentVersionId"
+  >): Promise<KnowledgeDocument>;
+  findKnowledgeDocument?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  findKnowledgeDocumentById?(input: {
+    tenantId: TenantId;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  listKnowledgeDocuments?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<KnowledgeDocument[]>;
+  archiveKnowledgeDocument?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    documentId: string;
+  }): Promise<KnowledgeDocument | undefined>;
+  createKnowledgeDocumentVersion?(input: Omit<
+    KnowledgeDocumentVersion,
+    "createdAt" | "versionNumber"
+  >): Promise<{ document: KnowledgeDocument; version: KnowledgeDocumentVersion }>;
+  listKnowledgeDocumentVersions?(input: {
+    tenantId: TenantId;
+    documentId: string;
+  }): Promise<KnowledgeDocumentVersion[]>;
+  createDecisionLogEntry?(input: Omit<
+    DecisionLogEntry,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<DecisionLogEntry>;
+  updateDecisionLogEntry?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    decisionId: string;
+    title: string;
+    decision: string;
+    rationale: string | null;
+    status: DecisionLogEntry["status"];
+  }): Promise<DecisionLogEntry | undefined>;
+  findDecisionLogEntry?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    decisionId: string;
+  }): Promise<DecisionLogEntry | undefined>;
+  listDecisionLogEntries?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<DecisionLogEntry[]>;
+  createKnowledgeActionItem?(input: Omit<
+    KnowledgeActionItem,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<KnowledgeActionItem>;
+  updateKnowledgeActionItem?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionItemId: string;
+    title: string;
+    description: string | null;
+    ownerUserId: UserId;
+    dueDate: string | null;
+    status: KnowledgeActionItem["status"];
+  }): Promise<KnowledgeActionItem | undefined>;
+  findKnowledgeActionItem?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionItemId: string;
+  }): Promise<KnowledgeActionItem | undefined>;
+  listKnowledgeActionItems?(input: {
+    tenantId: TenantId;
+    projectId: string;
+  }): Promise<KnowledgeActionItem[]>;
+  findProjectMeeting?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    meetingId: string;
+  }): Promise<{ id: string } | undefined>;
+  searchKnowledge?(input: {
+    tenantId: TenantId;
+    query: string;
+    limit: number;
+  }): Promise<{
+    documents: KnowledgeDocument[];
+    decisions: DecisionLogEntry[];
+    actionItems: KnowledgeActionItem[];
+  }>;
+  ensureManualPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    createdByUserId: UserId;
+  }): Promise<ResourcePersonalCalendar>;
+  findPersonalCalendar?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+  }): Promise<ResourcePersonalCalendar | undefined>;
+  createPersonalCalendarEvent?(input: PersonalCalendarEventInput): Promise<ResourceCalendarEvent>;
+  updatePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+    title?: string | null;
+    startsAt: Date;
+    finishesAt: Date;
+    workMinutes?: number | null;
+    capacityImpact: "busy" | "unavailable" | "tentative";
+    visibility: "public" | "busy_only" | "private";
+    metadata?: Record<string, unknown>;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  archivePersonalCalendarEvent?(input: {
+    tenantId: TenantId;
+    eventId: string;
+    userId: UserId;
+  }): Promise<ResourceCalendarEvent | undefined>;
+  listPersonalCalendarEvents?(input: {
+    tenantId: TenantId;
+    userId: UserId;
+    from: Date;
+    to: Date;
+  }): Promise<ResourceCalendarEvent[]>;
+  listOccupancyWindows?(input: {
+    tenantId: TenantId;
+    resourceId?: UserId | undefined;
+    from: Date;
+    to: Date;
+  }): Promise<OccupancyWindow[]>;
 };
 
 export type CreateAppOptions = {

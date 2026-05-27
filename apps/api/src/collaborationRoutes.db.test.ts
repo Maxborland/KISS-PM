@@ -799,6 +799,73 @@ describe("collaboration and communications API", () => {
     });
   });
 
+  it("rolls back message edits when success audit cannot be written", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=project&entityId=project-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    const conversationsPayload = await conversations.json() as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+    const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Исходное сообщение" })
+    });
+    expect(message.status).toBe(201);
+    const messagePayload = await message.json() as { message: { id: string } };
+    const failingApp = createAuditFailingApp();
+
+    const update = await failingApp.request(
+      `/api/workspace/conversations/${conversationId}/messages/${messagePayload.message.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ body: "Не должно сохраниться" })
+      }
+    );
+
+    expect(update.status).toBe(500);
+    const rows = await client`
+      SELECT body
+      FROM discussion_messages
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = ${messagePayload.message.id}
+    `;
+    expect(rows[0]?.body).toBe("Исходное сообщение");
+  });
+
+  it("rolls back meeting external links when success audit cannot be written", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const meeting = await createMeeting(adminCookie);
+    const failingApp = createAuditFailingApp();
+
+    const response = await failingApp.request(
+      `/api/workspace/meetings/${meeting.meeting.id}/external-links`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          provider: "google_meet",
+          title: "Неатомарная ссылка",
+          url: "https://meet.google.com/rollback-check"
+        })
+      }
+    );
+
+    expect(response.status).toBe(500);
+    const rows = await client`
+      SELECT count(*)::int AS count
+      FROM meeting_external_links
+      WHERE tenant_id = 'tenant-alpha'
+        AND meeting_id = ${meeting.meeting.id}
+    `;
+    expect(Number(rows[0]?.count ?? 0)).toBe(0);
+  });
+
   async function createMeeting(cookie: string) {
     const response = await app.request("/api/workspace/meetings", {
       method: "POST",
@@ -908,6 +975,25 @@ describe("collaboration and communications API", () => {
 
   async function truncateCollaborationState() {
     await client`TRUNCATE message_stickers, sticker_assets, sticker_packs, message_reactions, communication_channel_members, communication_channels, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+  }
+
+  function createAuditFailingApp() {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    return createApp({
+      dataSource: {
+        ...dataSource,
+        async withTransaction(operation) {
+          return dataSource.withTransaction(async (transactionDataSource) =>
+            operation({
+              ...transactionDataSource,
+              async appendAuditEvent() {
+                throw new Error("audit_write_failed");
+              }
+            })
+          );
+        }
+      }
+    });
   }
 });
 

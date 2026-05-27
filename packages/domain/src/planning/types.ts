@@ -151,6 +151,7 @@ export type PlanSnapshot = {
   calendarExceptions: PlanCalendarException[];
   resources: PlanResource[];
   reservations: PlanReservation[];
+  occupancyWindows?: import("./occupancy").OccupancyWindow[] | undefined;
   constraints: PlanConstraint[];
   capturedAt: PlanDateTime;
 };

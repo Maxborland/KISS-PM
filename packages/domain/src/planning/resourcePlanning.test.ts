@@ -141,6 +141,122 @@ describe("resource planning", () => {
     ]);
   });
 
+  it("counts minute-accurate occupancy windows as committed capacity", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      assignments: [],
+      reservations: []
+    };
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      occupancyWindows: [
+        {
+          id: "occupancy-meeting-a",
+          tenantId: "tenant-alpha",
+          resourceId: "resource-alpha",
+          sourceType: "meeting",
+          sourceId: "meeting-a",
+          startsAt: "2026-06-01T09:00:00.000Z",
+          finishesAt: "2026-06-01T11:00:00.000Z",
+          workMinutes: null,
+          capacityImpact: "busy",
+          visibility: "busy_only",
+          title: "Планерка",
+          entityType: "meeting",
+          entityId: "meeting-a"
+        }
+      ],
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+
+    expect(matrix.buckets[0]).toMatchObject({
+      occupiedMinutes: 120,
+      freeMinutes: 360,
+      occupancyIds: ["occupancy-meeting-a"],
+      occupancyContributions: [
+        {
+          occupancyId: "occupancy-meeting-a",
+          sourceType: "meeting",
+          sourceId: "meeting-a",
+          workMinutes: 120
+        }
+      ]
+    });
+  });
+
+  it("reports overload when occupancy consumes capacity beyond assignment load", () => {
+    const snapshot = {
+      ...createSnapshot(),
+      assignments: [
+        {
+          id: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-alpha",
+          role: "executor" as const,
+          unitsPermille: 1000,
+          workMinutes: 420,
+          calendarId: null
+        }
+      ],
+      reservations: []
+    };
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      occupancyWindows: [
+        {
+          id: "occupancy-personal-a",
+          tenantId: "tenant-alpha",
+          resourceId: "resource-alpha",
+          sourceType: "personal_calendar_event",
+          sourceId: "event-a",
+          startsAt: "2026-06-01T15:00:00.000Z",
+          finishesAt: "2026-06-01T16:30:00.000Z",
+          workMinutes: null,
+          capacityImpact: "busy",
+          visibility: "private",
+          title: null,
+          entityType: null,
+          entityId: null
+        }
+      ],
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+
+    expect(matrix.overloads).toEqual([
+      expect.objectContaining({
+        overloadMinutes: 30,
+        reasons: expect.arrayContaining([
+          { type: "assignment", id: "assignment-a" },
+          { type: "occupancy", id: "occupancy-personal-a" }
+        ])
+      })
+    ]);
+  });
+
   it("splits task work across assignments without explicit assignment work", () => {
     const snapshot = {
       ...createSnapshot(),
