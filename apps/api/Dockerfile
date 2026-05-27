@@ -25,6 +25,7 @@ WORKDIR /workspace
 
 ENV NODE_ENV=production
 
+COPY --from=builder /workspace/apps/api/package.json apps/api/package.json
 COPY --from=builder /workspace/apps/api/dist apps/api/dist
 
 EXPOSE 4000
