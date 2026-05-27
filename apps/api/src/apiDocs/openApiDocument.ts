@@ -13,6 +13,7 @@ type RouteDoc = {
   successSchema?: string;
   successStatus?: 200 | 201;
   queryParameters?: Array<Record<string, unknown>>;
+  availability?: "always" | "test-hooks";
 };
 
 const routeDocs: RouteDoc[] = [
@@ -109,7 +110,7 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/workspace/projects/:projectId/planning/preview-command", tag: "Planning", summary: "Preview planning command", requestSchema: "PlanningCommandEnvelope", successSchema: "PlanningCommandPreviewResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/apply-command", tag: "Planning", summary: "Apply planning command", requestSchema: "PlanningCommandEnvelope", successSchema: "PlanningApplyResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/apply-command-batch", tag: "Planning", summary: "Apply planning command batch", requestSchema: "PlanningCommandBatchEnvelope", successSchema: "PlanningApplyResponse" },
-  { method: "post", path: "/api/workspace/projects/:projectId/planning/test/bump-plan-version", tag: "Planning", summary: "Test-only plan version bump", auth: "dev", successSchema: "PlanningPlanVersionBumpResponse" },
+  { method: "post", path: "/api/workspace/projects/:projectId/planning/test/bump-plan-version", tag: "Planning", summary: "Test-only plan version bump", auth: "dev", successSchema: "PlanningPlanVersionBumpResponse", availability: "test-hooks" },
   { method: "get", path: "/api/workspace/projects/:projectId/planning/baselines", tag: "Planning", summary: "List planning baselines", successSchema: "PlanningBaselinesResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/scenarios/preview", tag: "Planning", summary: "Preview planning scenario", requestSchema: "PlanningScenarioPreviewRequest", successSchema: "PlanningScenarioPreviewResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/scenario-proposals", tag: "Planning", summary: "Create planning scenario proposal", requestSchema: "PlanningScenarioPreviewRequest", successSchema: "PlanningScenarioPreviewResponse" },
@@ -220,6 +221,7 @@ const routeDocs: RouteDoc[] = [
 import { openApiSchemas } from "./schemas";
 
 export function createKissPmOpenApiDocument() {
+  const documentedRoutes = publicDocumentRoutes();
   return {
     openapi: "3.1.0",
     info: {
@@ -229,10 +231,10 @@ export function createKissPmOpenApiDocument() {
         "Frontend-facing contract for the KISS PM backend. The current document intentionally covers every implemented route as an integration inventory; module-specific request and response schemas are deepened incrementally without changing the Scalar/OpenAPI surface."
     },
     servers: [{ url: "/", description: "Current API origin" }],
-    tags: [...new Set(routeDocs.map((route) => route.tag))]
+    tags: [...new Set(documentedRoutes.map((route) => route.tag))]
       .sort()
       .map((name) => ({ name })),
-    paths: buildPaths(routeDocs),
+    paths: buildPaths(documentedRoutes),
     components: {
       securitySchemes: {
         cookieSession: {
@@ -255,7 +257,15 @@ export function createKissPmOpenApiDocument() {
 }
 
 export function listDocumentedApiRoutes() {
+  return publicDocumentRoutes().map((route) => ({ ...route }));
+}
+
+export function listAllKnownApiRoutes() {
   return routeDocs.map((route) => ({ ...route }));
+}
+
+function publicDocumentRoutes() {
+  return routeDocs.filter((route) => route.availability !== "test-hooks");
 }
 
 function buildPaths(routes: RouteDoc[]) {
@@ -270,6 +280,7 @@ function buildPaths(routes: RouteDoc[]) {
 
 function buildOperation(route: RouteDoc) {
   const mutation = !["get", "delete"].includes(route.method) || route.method === "delete";
+  const requestBody = requestBodyFor(route);
   return {
     tags: [route.tag],
     summary: route.summary,
@@ -281,13 +292,13 @@ function buildOperation(route: RouteDoc) {
       ...(route.queryParameters ?? []),
       ...(mutation && route.path !== "/api/auth/login" ? [sameOriginActionParameter()] : [])
     ],
-    ...(requestBodyFor(route) ? { requestBody: requestBodyFor(route) } : {}),
+    ...(requestBody ? { requestBody } : {}),
     responses: responsesFor(route)
   };
 }
 
 function requestBodyFor(route: RouteDoc) {
-  const body = route.body ?? (["post", "put", "patch"].includes(route.method) ? "json" : "none");
+  const body = route.body ?? (route.requestSchema ? "json" : "none");
   if (body === "none") return undefined;
   if (body === "multipart") {
     return {
@@ -390,7 +401,6 @@ function toOpenApiPath(path: string) {
 
 function operationIdFor(route: RouteDoc) {
   const pathName = route.path
-    .replace(/^\/api\//, "")
     .replace(/^\//, "")
     .replace(/[:{}]/g, "")
     .replace(/[^A-Za-z0-9]+/g, "_")
