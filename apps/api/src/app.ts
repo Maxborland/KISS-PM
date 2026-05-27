@@ -34,6 +34,7 @@ import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
 import { registerCrmActivityRoutes } from "./crmActivityRoutes";
 import { registerHealthRoutes } from "./healthRoutes";
+import { registerKnowledgeRoutes } from "./knowledgeRoutes";
 import { registerPositionRoutes } from "./positionRoutes";
 import { registerProfileRoutes } from "./profileRoutes";
 import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
@@ -241,6 +242,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
+  registerKnowledgeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);

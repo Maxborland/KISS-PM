@@ -1,5 +1,5 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { KnowledgeDocument, TenantUser } from "@kiss-pm/domain";
 import type { ProjectRecord, TaskRecord } from "@kiss-pm/persistence";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -99,6 +99,51 @@ describe("unified search routes", () => {
       ]
     });
   });
+
+  it("returns readable knowledge metadata results", async () => {
+    const app = new Hono();
+    const actor = {
+      id: "user-alpha",
+      tenantId: "tenant-alpha",
+      accessProfileId: "profile-alpha"
+    } as TenantUser;
+    const profile = {
+      id: "profile-alpha",
+      permissions: ["tenant.projects.read"]
+    } as AccessProfile;
+
+    registerSearchRoutes(app, {
+      dataSource: {
+        findTenantById: async () => ({ id: "tenant-alpha", name: "Tenant Alpha" }),
+        findUserById: async () => actor,
+        listDevUsers: async () => [actor],
+        listProjects: async () => [project("project-first", "Первый проект")],
+        listUsersByTenantId: async () => [actor],
+        searchKnowledge: async () => ({
+          documents: [knowledgeDocument("knowledge-doc-1", "Протокол архитектурного решения")],
+          decisions: [],
+          actionItems: []
+        })
+      } satisfies ApiTenantDataSource,
+      getActorProfile: async () => profile,
+      getSessionActorFromHeaders: async () => actor
+    });
+
+    const response = await app.request("/api/workspace/search?q=протокол&types=document", {
+      headers: { cookie: "kiss_pm_session=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          id: "document:knowledge-doc-1",
+          route: "/projects/project-first/knowledge/documents/knowledge-doc-1",
+          source: "knowledge"
+        })
+      ]
+    });
+  });
 });
 
 function project(id: string, title: string): ProjectRecord {
@@ -151,5 +196,26 @@ function task(id: string, title: string, projectId: string): TaskRecord {
     updatedAt: new Date("2026-05-24T00:00:00.000Z"),
     archivedAt: null,
     participants: []
+  };
+}
+
+function knowledgeDocument(id: string, title: string): KnowledgeDocument {
+  const now = new Date("2026-05-24T00:00:00.000Z");
+  return {
+    id,
+    tenantId: "tenant-alpha",
+    projectId: "project-first",
+    title,
+    summary: "Короткое резюме",
+    documentType: "meeting_minutes",
+    status: "active",
+    currentVersionId: "knowledge-version-1",
+    sourceMeetingId: null,
+    approvalStatus: "none",
+    approvalRequestedByUserId: null,
+    createdByUserId: "user-alpha",
+    createdAt: now,
+    updatedAt: now,
+    archivedAt: null
   };
 }
