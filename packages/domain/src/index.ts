@@ -57,3 +57,4 @@ export * from "./controlSurfaces";
 export * from "./retrospectives";
 export * from "./collaboration";
 export * from "./backgroundJobs";
+export * from "./knowledge";
