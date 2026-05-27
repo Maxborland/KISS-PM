@@ -8,6 +8,11 @@ import type { CommunicationChannel, TenantUser } from "@kiss-pm/domain";
 
 import type { ApiTenantDataSource } from "./apiTypes";
 
+export type CommunicationChannelAccessDataSource = Pick<
+  ApiTenantDataSource,
+  "listCommunicationChannelMembers" | "listProjects"
+>;
+
 export type CommunicationChannelAccess = {
   readDecision: PolicyDecision;
   manageDecision: PolicyDecision;
@@ -26,7 +31,7 @@ const missingDecision: PolicyDecision = {
 export async function resolveCommunicationChannelAccess(input: {
   actor: TenantUser;
   channel: CommunicationChannel;
-  dataSource: ApiTenantDataSource;
+  dataSource: CommunicationChannelAccessDataSource;
   profile: AccessProfile;
 }): Promise<CommunicationChannelAccess> {
   const policyInput = {
@@ -58,7 +63,7 @@ async function canReadScopedProjectChannel(
   input: {
     actor: TenantUser;
     channel: CommunicationChannel;
-    dataSource: ApiTenantDataSource;
+    dataSource: CommunicationChannelAccessDataSource;
   },
   policyInput: Parameters<typeof canReadProjects>[0]
 ): Promise<boolean> {
