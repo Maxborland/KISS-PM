@@ -1,0 +1,9 @@
+.git
+.codegraph
+.agents
+.kiss-pm-storage
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/coverage
