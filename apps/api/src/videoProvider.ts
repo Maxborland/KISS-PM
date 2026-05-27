@@ -128,7 +128,7 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
 
 function parseProviderKind(value: string | undefined): VideoProviderKind {
   if (value === undefined || value.trim() === "") return "disabled";
-  if (value === "manual" || value === "jitsi" || value === "livekit") return value;
+  if (value === "disabled" || value === "manual" || value === "jitsi" || value === "livekit") return value;
   throw new Error("video_provider_misconfigured");
 }
 

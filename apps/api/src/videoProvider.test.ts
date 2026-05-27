@@ -9,6 +9,15 @@ describe("video provider", () => {
     await expect(provider.issueJoinToken(joinInput())).rejects.toThrow("video_provider_disabled");
   });
 
+  it("accepts explicit disabled provider env", async () => {
+    const provider = createVideoProviderFromEnv({
+      KISS_PM_VIDEO_PROVIDER: "disabled"
+    } as NodeJS.ProcessEnv);
+
+    expect(provider.kind).toBe("disabled");
+    await expect(provider.issueJoinToken(joinInput())).rejects.toThrow("video_provider_disabled");
+  });
+
   it("fails closed for malformed video provider env", () => {
     expect(() =>
       createVideoProviderFromEnv({
