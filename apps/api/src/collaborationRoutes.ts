@@ -1,22 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import type { AccessProfile } from "@kiss-pm/access-control";
 import {
-  canEditTasks,
-  canManageClients,
-  canManageContacts,
-  canManageOpportunities,
-  canManageProducts,
-  canManageProjects,
-  canReadClients,
-  canReadContacts,
-  canReadOpportunities,
-  canReadProducts,
-  canReadProjects,
-  type AccessProfile,
-  type PolicyDecision
-} from "@kiss-pm/access-control";
-import {
-  extractMentionedUserIds,
   meetingActionTargetTypes,
   meetingParticipantRoles,
   parseCollaborationEntityType,
@@ -42,11 +27,14 @@ import type { Hono } from "hono";
 
 import type {
   ApiTenantDataSource,
-  ManagementAuditEventInput,
-  ProjectRecord
+  ManagementAuditEventInput
 } from "./apiTypes";
 import { parseExternalReferenceUrl, parseReferenceTitle } from "./attachmentValidation";
-import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
+import {
+  filterCollaborationMentionRecipients,
+  resolveCollaborationEntityAccess,
+  type CollaborationEntityAccessContext
+} from "./collaboration/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
 
 export type CollaborationRouteDeps = {
@@ -62,15 +50,6 @@ export type CollaborationRouteDeps = {
   ): Promise<string>;
 };
 
-type EntityAccessContext = {
-  entityType: CollaborationEntityType;
-  entityId: string;
-  sourceEntity: { type: string; id: string };
-  readDecision: PolicyDecision;
-  manageDecision: PolicyDecision;
-  title: string;
-};
-
 export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteDeps) {
   app.get("/api/workspace/conversations", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
@@ -78,7 +57,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: entity.value.entityId,
@@ -198,7 +177,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
             createdByUserId: actor.id
           })
         : null;
-      const mentionUserIds = await filterMentionRecipients({
+      const mentionUserIds = await filterCollaborationMentionRecipients({
         actor,
         body: parsedBody.value,
         dataSource: transactionDataSource,
@@ -504,7 +483,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     for (const notification of notifications) {
       const entityType = parseCollaborationEntityType(notification.sourceEntityType);
       if (!entityType.ok) continue;
-      const access = await resolveEntityAccess({
+      const access = await resolveCollaborationEntityAccess({
         actor,
         dataSource: deps.dataSource,
         entityId: notification.sourceEntityId,
@@ -577,7 +556,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: entity.value.entityId,
@@ -609,7 +588,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       parsed.value.participants.map((participant) => participant.userId)
     );
     if (!validParticipants.ok) return context.json({ error: validParticipants.error }, 400);
-    const access = await resolveEntityAccess({
+    const access = await resolveCollaborationEntityAccess({
       actor,
       dataSource: deps.dataSource,
       entityId: parsed.value.entityId,
@@ -917,7 +896,7 @@ async function resolveConversationForActor(
   actor: TenantUser,
   deps: CollaborationRouteDeps
 ): Promise<
-  | { ok: true; value: { conversation: Conversation; access: EntityAccessContext } }
+  | { ok: true; value: { conversation: Conversation; access: CollaborationEntityAccessContext } }
   | { ok: false; status: 400 | 403 | 404 | 501; error: string }
 > {
   const conversationId = parseCollaborationId(conversationIdRaw, "conversation_id_invalid");
@@ -925,7 +904,7 @@ async function resolveConversationForActor(
   const conversation = await deps.dataSource.findConversation?.(actor.tenantId, conversationId.value);
   if (!conversation) return { ok: false, status: 404, error: "conversation_not_found" };
   const profile = await deps.getActorProfile(actor);
-  const access = await resolveEntityAccess({
+  const access = await resolveCollaborationEntityAccess({
     actor,
     dataSource: deps.dataSource,
     entityId: conversation.entityId,
@@ -944,7 +923,7 @@ async function resolveMeetingForActor(
   actor: TenantUser,
   deps: CollaborationRouteDeps
 ): Promise<
-  | { ok: true; value: { meeting: Meeting; access: EntityAccessContext } }
+  | { ok: true; value: { meeting: Meeting; access: CollaborationEntityAccessContext } }
   | { ok: false; status: 400 | 403 | 404 | 501; error: string }
 > {
   const meetingId = parseCollaborationId(meetingIdRaw, "meeting_id_invalid");
@@ -952,7 +931,7 @@ async function resolveMeetingForActor(
   const meeting = await deps.dataSource.findMeeting?.(actor.tenantId, meetingId.value);
   if (!meeting) return { ok: false, status: 404, error: "meeting_not_found" };
   const profile = await deps.getActorProfile(actor);
-  const access = await resolveEntityAccess({
+  const access = await resolveCollaborationEntityAccess({
     actor,
     dataSource: deps.dataSource,
     entityId: meeting.entityId,
@@ -964,162 +943,6 @@ async function resolveMeetingForActor(
     return { ok: false, status: 403, error: access.value.readDecision.reason };
   }
   return { ok: true, value: { meeting, access: access.value } };
-}
-
-async function resolveEntityAccess(input: {
-  actor: TenantUser;
-  dataSource: ApiTenantDataSource;
-  entityId: string;
-  entityType: CollaborationEntityType;
-  profile: AccessProfile;
-}): Promise<
-  | { ok: true; value: EntityAccessContext }
-  | { ok: false; status: 404 | 501; error: string }
-> {
-  const policyInput = {
-    actor: input.actor,
-    profile: input.profile,
-    targetTenantId: input.actor.tenantId
-  };
-  if (input.entityType === "opportunity") {
-    const opportunity = await input.dataSource.findOpportunityById?.(
-      input.actor.tenantId,
-      input.entityId
-    );
-    if (!opportunity) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "opportunity",
-      entityId: opportunity.id,
-      sourceEntity: { type: "Opportunity", id: opportunity.id },
-      readDecision: canReadOpportunities(policyInput),
-      manageDecision: canManageOpportunities(policyInput),
-      title: opportunity.title
-    } };
-  }
-  if (input.entityType === "client") {
-    const client = await input.dataSource.findClientById?.(input.actor.tenantId, input.entityId);
-    if (!client) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "client",
-      entityId: client.id,
-      sourceEntity: { type: "Client", id: client.id },
-      readDecision: canReadClients(policyInput),
-      manageDecision: canManageClients(policyInput),
-      title: client.name
-    } };
-  }
-  if (input.entityType === "contact") {
-    const contact = await input.dataSource.findContactById?.(input.actor.tenantId, input.entityId);
-    if (!contact) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "contact",
-      entityId: contact.id,
-      sourceEntity: { type: "Contact", id: contact.id },
-      readDecision: canReadContacts(policyInput),
-      manageDecision: canManageContacts(policyInput),
-      title: contact.name
-    } };
-  }
-  if (input.entityType === "product") {
-    const product = await input.dataSource.findProductById?.(input.actor.tenantId, input.entityId);
-    if (!product) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "product",
-      entityId: product.id,
-      sourceEntity: { type: "Product", id: product.id },
-      readDecision: canReadProducts(policyInput),
-      manageDecision: canManageProducts(policyInput),
-      title: product.name
-    } };
-  }
-  if (input.entityType === "communication_channel") {
-    const channel = await input.dataSource.findCommunicationChannel?.(
-      input.actor.tenantId,
-      input.entityId
-    );
-    if (!channel) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    const channelAccess = await resolveCommunicationChannelAccess({
-      actor: input.actor,
-      channel,
-      dataSource: input.dataSource,
-      profile: input.profile
-    });
-    return { ok: true, value: {
-      entityType: "communication_channel",
-      entityId: channel.id,
-      sourceEntity: { type: "CommunicationChannel", id: channel.id },
-      readDecision: channelAccess.readDecision,
-      manageDecision: channelAccess.manageDecision,
-      title: channel.title
-    } };
-  }
-  if (input.entityType === "project") {
-    const project = await findProject(input.dataSource, input.actor.tenantId, input.entityId);
-    if (!project) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-    return { ok: true, value: {
-      entityType: "project",
-      entityId: project.id,
-      sourceEntity: { type: "Project", id: project.id },
-      readDecision: canReadProjects(policyInput),
-      manageDecision: canManageProjects(policyInput),
-      title: project.title
-    } };
-  }
-  const task = await input.dataSource.findTaskById?.(input.actor.tenantId, input.entityId);
-  if (!task) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
-  const projectRead = canReadProjects(policyInput);
-  const directTaskRead =
-    task.ownerUserId === input.actor.id ||
-    task.requesterUserId === input.actor.id ||
-    task.participants.some((participant) => participant.userId === input.actor.id);
-  return { ok: true, value: {
-    entityType: "task",
-    entityId: task.id,
-    sourceEntity: { type: "Task", id: task.id },
-    readDecision: projectRead.allowed || directTaskRead
-      ? { allowed: true, reason: "same_tenant_permission_granted" }
-      : projectRead,
-    manageDecision: canEditTasks(policyInput),
-    title: task.title
-  } };
-}
-
-async function findProject(
-  dataSource: ApiTenantDataSource,
-  tenantId: string,
-  projectId: string
-): Promise<ProjectRecord | undefined> {
-  return (await dataSource.listProjects?.(tenantId))?.find((project) => project.id === projectId);
-}
-
-async function filterMentionRecipients(input: {
-  actor: TenantUser;
-  body: string;
-  dataSource: ApiTenantDataSource;
-  entity: EntityAccessContext;
-}): Promise<string[]> {
-  const rawIds = extractMentionedUserIds(input.body).filter((id) => id !== input.actor.id);
-  if (rawIds.length === 0) return [];
-  const tenantUsers = await input.dataSource.listUsersByTenantId(input.actor.tenantId);
-  const usersById = new Map(tenantUsers.map((user) => [user.id, user]));
-  const allowed: string[] = [];
-  for (const userId of rawIds) {
-    const user = usersById.get(userId);
-    if (!user) continue;
-    const profile = input.dataSource.findAccessProfileById
-      ? await input.dataSource.findAccessProfileById(user.tenantId, user.accessProfileId)
-      : undefined;
-    if (!profile) continue;
-    const access = await resolveEntityAccess({
-      actor: user,
-      dataSource: input.dataSource,
-      entityId: input.entity.entityId,
-      entityType: input.entity.entityType,
-      profile
-    });
-    if (access.ok && access.value.readDecision.allowed) allowed.push(userId);
-  }
-  return allowed;
 }
 
 function parseMeetingCreateBody(record: Record<string, unknown>) {
@@ -1205,7 +1028,7 @@ function ensureOrganizer(
 
 function parseMeetingActionItemBody(
   record: Record<string, unknown>,
-  entity: EntityAccessContext
+  entity: CollaborationEntityAccessContext
 ) {
   const title = parseConversationTitle(record.title);
   if (!title.ok) return title;
@@ -1389,7 +1212,7 @@ function trimNotificationBody(body: string) {
   return body.length > 180 ? `${body.slice(0, 177)}...` : body;
 }
 
-function routeForEntity(entity: EntityAccessContext) {
+function routeForEntity(entity: CollaborationEntityAccessContext) {
   if (entity.entityType === "project") return `/projects/${entity.entityId}`;
   if (entity.entityType === "task") return `/tasks/${entity.entityId}`;
   if (entity.entityType === "opportunity") return `/crm/opportunities/${entity.entityId}`;
