@@ -15,6 +15,7 @@ export * from "./projectWorkRepository";
 export * from "./tenantProductionCalendarConstants";
 export * from "./tenantProductionCalendarRepository";
 export * from "./resourceAbsencesRepository";
+export * from "./occupancyRepository";
 export * from "./retrospectiveRepository";
 export * from "./tenantOrgStructureRepository";
 export * from "./repositories";
