@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 
 import type {
   CallEvent,
@@ -12,6 +12,10 @@ import type {
   CallRoomStatus,
   CallSession,
   CallSessionStatus,
+  CommunicationChannel,
+  CommunicationChannelMember,
+  CommunicationChannelRole,
+  CommunicationChannelType,
   CollaborationEntityType,
   Conversation,
   ConversationReadState,
@@ -30,9 +34,16 @@ import type {
   MeetingParticipantRole,
   MeetingStatus,
   MessageMention,
+  MessageReaction,
+  MessageSticker,
   NotificationChannel,
   NotificationPreference,
   NotificationType,
+  StickerAsset,
+  StickerMimeType,
+  StickerPack,
+  StickerPackSource,
+  StickerStatus,
   UserNotification,
   TenantId,
   UserId
@@ -45,6 +56,8 @@ import {
   callRecordings,
   callRooms,
   callSessions,
+  communicationChannelMembers,
+  communicationChannels,
   conversationReadStates,
   conversations,
   discussionMessages,
@@ -54,15 +67,31 @@ import {
   meetingParticipants,
   meetings,
   messageMentions,
+  messageReactions,
+  messageStickers,
   notificationPreferences,
+  stickerAssets,
+  stickerPacks,
   userNotifications
 } from "./schema";
 
+export type CommunicationChannelInput = Omit<
+  CommunicationChannel,
+  "createdAt" | "updatedAt" | "archivedAt"
+>;
+export type CommunicationChannelMemberInput = Omit<
+  CommunicationChannelMember,
+  "createdAt" | "archivedAt"
+>;
 export type ConversationInput = Omit<Conversation, "createdAt" | "archivedAt">;
 export type DiscussionMessageInput = Omit<
   DiscussionMessage,
   "createdAt" | "editedAt" | "archivedAt" | "pinnedAt" | "pinnedByUserId"
 >;
+export type MessageReactionInput = Omit<MessageReaction, "createdAt" | "archivedAt">;
+export type StickerPackInput = Omit<StickerPack, "createdAt" | "archivedAt">;
+export type StickerAssetInput = Omit<StickerAsset, "createdAt" | "archivedAt">;
+export type MessageStickerInput = Omit<MessageSticker, "createdAt">;
 export type UserNotificationInput = Omit<
   UserNotification,
   "createdAt" | "readAt" | "archivedAt"
@@ -87,6 +116,38 @@ export type CallEventInput = Omit<CallEvent, "createdAt">;
 export type CallRecordingInput = Omit<CallRecording, "createdAt" | "archivedAt">;
 
 export type CollaborationRepository = {
+  ensureWorkspaceGeneralChannel(input: {
+    tenantId: TenantId;
+    createdByUserId: UserId;
+    title?: string;
+  }): Promise<CommunicationChannel>;
+  createCommunicationChannel(input: CommunicationChannelInput): Promise<CommunicationChannel>;
+  updateCommunicationChannel(input: {
+    tenantId: TenantId;
+    channelId: string;
+    title?: string;
+    description?: string;
+  }): Promise<CommunicationChannel | undefined>;
+  findCommunicationChannel(
+    tenantId: TenantId,
+    channelId: string
+  ): Promise<CommunicationChannel | undefined>;
+  listCommunicationChannels(input: {
+    tenantId: TenantId;
+    channelType?: CommunicationChannelType;
+  }): Promise<CommunicationChannel[]>;
+  upsertCommunicationChannelMember(
+    input: CommunicationChannelMemberInput
+  ): Promise<CommunicationChannelMember>;
+  archiveCommunicationChannelMember(input: {
+    tenantId: TenantId;
+    channelId: string;
+    userId: UserId;
+  }): Promise<CommunicationChannelMember | undefined>;
+  listCommunicationChannelMembers(input: {
+    tenantId: TenantId;
+    channelId: string;
+  }): Promise<CommunicationChannelMember[]>;
   ensureConversation(input: ConversationInput): Promise<Conversation>;
   findConversation(tenantId: TenantId, conversationId: string): Promise<Conversation | undefined>;
   listConversationsByEntity(input: {
@@ -126,6 +187,41 @@ export type CollaborationRepository = {
     mentionedUserIds: UserId[];
   }): Promise<MessageMention[]>;
   listMessageMentions(tenantId: TenantId, messageId: string): Promise<MessageMention[]>;
+  upsertMessageReaction(input: MessageReactionInput): Promise<MessageReaction>;
+  archiveMessageReaction(input: {
+    tenantId: TenantId;
+    messageId: string;
+    reactionId: string;
+    userId: UserId;
+  }): Promise<MessageReaction | undefined>;
+  listMessageReactionsByMessageIds(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageReaction[]>;
+  createStickerPack(input: StickerPackInput): Promise<StickerPack>;
+  archiveStickerPack(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerPack | undefined>;
+  listStickerPacks(tenantId: TenantId): Promise<StickerPack[]>;
+  createStickerAsset(input: StickerAssetInput): Promise<StickerAsset>;
+  findStickerAsset(
+    tenantId: TenantId,
+    stickerAssetId: string
+  ): Promise<StickerAsset | undefined>;
+  archiveStickerAsset(input: {
+    tenantId: TenantId;
+    stickerAssetId: string;
+  }): Promise<StickerAsset | undefined>;
+  listStickerAssets(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerAsset[]>;
+  createMessageSticker(input: MessageStickerInput): Promise<MessageSticker>;
+  listMessageStickersByMessageIds(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageSticker[]>;
   getConversationReadState(input: {
     tenantId: TenantId;
     conversationId: string;
@@ -236,7 +332,174 @@ export type CollaborationRepository = {
 };
 
 export function createCollaborationRepository(db: KissPmDatabase): CollaborationRepository {
+  async function findActiveMessageReaction(
+    input: Pick<MessageReaction, "tenantId" | "messageId" | "userId" | "emoji">
+  ): Promise<MessageReaction | undefined> {
+    const [row] = await db
+      .select()
+      .from(messageReactions)
+      .where(
+        and(
+          eq(messageReactions.tenantId, input.tenantId),
+          eq(messageReactions.messageId, input.messageId),
+          eq(messageReactions.userId, input.userId),
+          eq(messageReactions.emoji, input.emoji),
+          isNull(messageReactions.archivedAt)
+        )
+      )
+      .limit(1);
+    return row ? mapMessageReaction(row) : undefined;
+  }
+
   return {
+    async ensureWorkspaceGeneralChannel(input) {
+      const now = new Date();
+      await db
+        .insert(communicationChannels)
+        .values({
+          id: "channel-workspace-general",
+          tenantId: input.tenantId,
+          channelType: "workspace_general",
+          title: input.title ?? "Общий чат",
+          description: "",
+          scopeEntityType: null,
+          scopeEntityId: null,
+          createdByUserId: input.createdByUserId,
+          createdAt: now,
+          updatedAt: now
+        })
+        .onConflictDoNothing({
+          target: [communicationChannels.tenantId, communicationChannels.channelType],
+          where: sql`${communicationChannels.channelType} = 'workspace_general' and ${communicationChannels.archivedAt} is null`
+        });
+
+      const [row] = await db
+        .select()
+        .from(communicationChannels)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.channelType, "workspace_general"),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .limit(1);
+      if (!row) throw new Error("Workspace general channel upsert returned no row");
+      return mapCommunicationChannel(row);
+    },
+    async createCommunicationChannel(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(communicationChannels)
+        .values({
+          ...input,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+      if (!row) throw new Error("Communication channel insert returned no row");
+      return mapCommunicationChannel(row);
+    },
+    async updateCommunicationChannel(input) {
+      const updates: Partial<typeof communicationChannels.$inferInsert> = {
+        updatedAt: new Date()
+      };
+      if (input.title !== undefined) updates.title = input.title;
+      if (input.description !== undefined) updates.description = input.description;
+      const [row] = await db
+        .update(communicationChannels)
+        .set(updates)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.id, input.channelId),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapCommunicationChannel(row) : undefined;
+    },
+    async findCommunicationChannel(tenantId, channelId) {
+      const [row] = await db
+        .select()
+        .from(communicationChannels)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, tenantId),
+            eq(communicationChannels.id, channelId),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .limit(1);
+      return row ? mapCommunicationChannel(row) : undefined;
+    },
+    async listCommunicationChannels(input) {
+      const rows = await db
+        .select()
+        .from(communicationChannels)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            input.channelType ? eq(communicationChannels.channelType, input.channelType) : sql`true`,
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .orderBy(asc(communicationChannels.channelType), asc(communicationChannels.createdAt));
+      return rows.map(mapCommunicationChannel);
+    },
+    async upsertCommunicationChannelMember(input) {
+      const [row] = await db
+        .insert(communicationChannelMembers)
+        .values({
+          ...input,
+          createdAt: new Date(),
+          archivedAt: null
+        })
+        .onConflictDoUpdate({
+          target: [
+            communicationChannelMembers.tenantId,
+            communicationChannelMembers.channelId,
+            communicationChannelMembers.userId
+          ],
+          set: {
+            role: input.role,
+            createdByUserId: input.createdByUserId,
+            archivedAt: null
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Communication channel member upsert returned no row");
+      return mapCommunicationChannelMember(row);
+    },
+    async archiveCommunicationChannelMember(input) {
+      const [row] = await db
+        .update(communicationChannelMembers)
+        .set({ archivedAt: new Date() })
+        .where(
+          and(
+            eq(communicationChannelMembers.tenantId, input.tenantId),
+            eq(communicationChannelMembers.channelId, input.channelId),
+            eq(communicationChannelMembers.userId, input.userId),
+            isNull(communicationChannelMembers.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapCommunicationChannelMember(row) : undefined;
+    },
+    async listCommunicationChannelMembers(input) {
+      const rows = await db
+        .select()
+        .from(communicationChannelMembers)
+        .where(
+          and(
+            eq(communicationChannelMembers.tenantId, input.tenantId),
+            eq(communicationChannelMembers.channelId, input.channelId),
+            isNull(communicationChannelMembers.archivedAt)
+          )
+        )
+        .orderBy(asc(communicationChannelMembers.role), asc(communicationChannelMembers.userId));
+      return rows.map(mapCommunicationChannelMember);
+    },
     async ensureConversation(input) {
       const now = new Date();
       await db
@@ -447,6 +710,205 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .orderBy(asc(messageMentions.mentionedUserId));
       return rows.map(mapMessageMention);
+    },
+    async upsertMessageReaction(input) {
+      const existing = await findActiveMessageReaction(input);
+      if (existing) return existing;
+      const [row] = await db
+        .insert(messageReactions)
+        .values({
+          ...input,
+          createdAt: new Date()
+        })
+        .returning()
+        .catch(async (error: unknown) => {
+          if (!isConstraintError(error, "message_reactions_active_uidx")) throw error;
+          const duplicate = await findActiveMessageReaction(input);
+          if (!duplicate) throw error;
+          return [messageReactionRow(duplicate)];
+        });
+      if (!row) throw new Error("Message reaction insert returned no row");
+      return mapMessageReaction(row);
+    },
+    async archiveMessageReaction(input) {
+      const [row] = await db
+        .update(messageReactions)
+        .set({ archivedAt: new Date() })
+        .where(
+          and(
+            eq(messageReactions.tenantId, input.tenantId),
+            eq(messageReactions.messageId, input.messageId),
+            eq(messageReactions.id, input.reactionId),
+            eq(messageReactions.userId, input.userId),
+            isNull(messageReactions.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapMessageReaction(row) : undefined;
+    },
+    async listMessageReactionsByMessageIds(input) {
+      if (input.messageIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(messageReactions)
+        .where(
+          and(
+            eq(messageReactions.tenantId, input.tenantId),
+            inArray(messageReactions.messageId, input.messageIds),
+            isNull(messageReactions.archivedAt)
+          )
+        )
+        .orderBy(asc(messageReactions.messageId), asc(messageReactions.createdAt));
+      return rows.map(mapMessageReaction);
+    },
+    async createStickerPack(input) {
+      const [row] = await db
+        .insert(stickerPacks)
+        .values({
+          ...input,
+          createdAt: new Date()
+        })
+        .returning();
+      if (!row) throw new Error("Sticker pack insert returned no row");
+      return mapStickerPack(row);
+    },
+    async archiveStickerPack(input) {
+      const now = new Date();
+      const [row] = await db
+        .update(stickerPacks)
+        .set({ status: "archived", archivedAt: now })
+        .where(
+          and(
+            eq(stickerPacks.tenantId, input.tenantId),
+            eq(stickerPacks.id, input.packId),
+            isNull(stickerPacks.archivedAt)
+          )
+        )
+        .returning();
+      if (!row) return undefined;
+      await db
+        .update(stickerAssets)
+        .set({ status: "archived", archivedAt: now })
+        .where(
+          and(
+            eq(stickerAssets.tenantId, input.tenantId),
+            eq(stickerAssets.packId, input.packId),
+            isNull(stickerAssets.archivedAt)
+          )
+        );
+      return mapStickerPack(row);
+    },
+    async listStickerPacks(tenantId) {
+      const rows = await db
+        .select()
+        .from(stickerPacks)
+        .where(
+          and(
+            eq(stickerPacks.tenantId, tenantId),
+            eq(stickerPacks.status, "ready"),
+            isNull(stickerPacks.archivedAt)
+          )
+        )
+        .orderBy(asc(stickerPacks.createdAt), asc(stickerPacks.id));
+      return rows.map(mapStickerPack);
+    },
+    async createStickerAsset(input) {
+      const [row] = await db
+        .insert(stickerAssets)
+        .values({
+          ...input,
+          createdAt: new Date()
+        })
+        .returning();
+      if (!row) throw new Error("Sticker asset insert returned no row");
+      return mapStickerAsset(row);
+    },
+    async findStickerAsset(tenantId, stickerAssetId) {
+      const [row] = await db
+        .select({ stickerAsset: stickerAssets })
+        .from(stickerAssets)
+        .innerJoin(
+          stickerPacks,
+          and(
+            eq(stickerPacks.tenantId, stickerAssets.tenantId),
+            eq(stickerPacks.id, stickerAssets.packId)
+          )
+        )
+        .where(
+          and(
+            eq(stickerAssets.tenantId, tenantId),
+            eq(stickerAssets.id, stickerAssetId),
+            eq(stickerAssets.status, "ready"),
+            isNull(stickerAssets.archivedAt),
+            eq(stickerPacks.status, "ready"),
+            isNull(stickerPacks.archivedAt)
+          )
+        )
+        .limit(1);
+      return row ? mapStickerAsset(row.stickerAsset) : undefined;
+    },
+    async archiveStickerAsset(input) {
+      const [row] = await db
+        .update(stickerAssets)
+        .set({ status: "archived", archivedAt: new Date() })
+        .where(
+          and(
+            eq(stickerAssets.tenantId, input.tenantId),
+            eq(stickerAssets.id, input.stickerAssetId),
+            isNull(stickerAssets.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapStickerAsset(row) : undefined;
+    },
+    async listStickerAssets(input) {
+      const rows = await db
+        .select({ stickerAsset: stickerAssets })
+        .from(stickerAssets)
+        .innerJoin(
+          stickerPacks,
+          and(
+            eq(stickerPacks.tenantId, stickerAssets.tenantId),
+            eq(stickerPacks.id, stickerAssets.packId)
+          )
+        )
+        .where(
+          and(
+            eq(stickerAssets.tenantId, input.tenantId),
+            eq(stickerAssets.packId, input.packId),
+            eq(stickerAssets.status, "ready"),
+            isNull(stickerAssets.archivedAt),
+            eq(stickerPacks.status, "ready"),
+            isNull(stickerPacks.archivedAt)
+          )
+        )
+        .orderBy(asc(stickerAssets.createdAt), asc(stickerAssets.id));
+      return rows.map((row) => mapStickerAsset(row.stickerAsset));
+    },
+    async createMessageSticker(input) {
+      const [row] = await db
+        .insert(messageStickers)
+        .values({
+          ...input,
+          createdAt: new Date()
+        })
+        .returning();
+      if (!row) throw new Error("Message sticker insert returned no row");
+      return mapMessageSticker(row);
+    },
+    async listMessageStickersByMessageIds(input) {
+      if (input.messageIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(messageStickers)
+        .where(
+          and(
+            eq(messageStickers.tenantId, input.tenantId),
+            inArray(messageStickers.messageId, input.messageIds)
+          )
+        )
+        .orderBy(asc(messageStickers.createdAt));
+      return rows.map(mapMessageSticker);
     },
     async getConversationReadState(input) {
       const [state] = await db
@@ -986,6 +1448,36 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
   };
 }
 
+function mapCommunicationChannel(row: typeof communicationChannels.$inferSelect): CommunicationChannel {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    channelType: row.channelType as CommunicationChannelType,
+    title: row.title,
+    description: row.description,
+    scopeEntityType: row.scopeEntityType as "project" | "org_unit" | null,
+    scopeEntityId: row.scopeEntityId,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function mapCommunicationChannelMember(
+  row: typeof communicationChannelMembers.$inferSelect
+): CommunicationChannelMember {
+  return {
+    tenantId: row.tenantId,
+    channelId: row.channelId,
+    userId: row.userId,
+    role: row.role as CommunicationChannelRole,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt
+  };
+}
+
 function mapConversation(row: typeof conversations.$inferSelect): Conversation {
   return {
     id: row.id,
@@ -1021,6 +1513,77 @@ function mapMessageMention(row: typeof messageMentions.$inferSelect): MessageMen
     tenantId: row.tenantId,
     messageId: row.messageId,
     mentionedUserId: row.mentionedUserId,
+    createdAt: row.createdAt
+  };
+}
+
+function mapMessageReaction(row: typeof messageReactions.$inferSelect): MessageReaction {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    messageId: row.messageId,
+    userId: row.userId,
+    emoji: row.emoji,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function messageReactionRow(
+  reaction: MessageReaction
+): typeof messageReactions.$inferSelect {
+  return {
+    id: reaction.id,
+    tenantId: reaction.tenantId,
+    messageId: reaction.messageId,
+    userId: reaction.userId,
+    emoji: reaction.emoji,
+    createdAt: reaction.createdAt,
+    archivedAt: reaction.archivedAt
+  };
+}
+
+function mapStickerPack(row: typeof stickerPacks.$inferSelect): StickerPack {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    title: row.title,
+    description: row.description,
+    source: row.source as StickerPackSource,
+    status: row.status as "ready" | "archived",
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function mapStickerAsset(row: typeof stickerAssets.$inferSelect): StickerAsset {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    packId: row.packId,
+    fileAssetId: row.fileAssetId,
+    emoji: row.emoji,
+    title: row.title,
+    tags: row.tags,
+    mimeType: row.mimeType as StickerMimeType,
+    width: row.width,
+    height: row.height,
+    sizeBytes: row.sizeBytes,
+    checksumSha256: row.checksumSha256,
+    status: row.status as StickerStatus,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt
+  };
+}
+
+function mapMessageSticker(row: typeof messageStickers.$inferSelect): MessageSticker {
+  return {
+    tenantId: row.tenantId,
+    messageId: row.messageId,
+    stickerAssetId: row.stickerAssetId,
+    createdByUserId: row.createdByUserId,
     createdAt: row.createdAt
   };
 }

@@ -17,6 +17,7 @@ import type { TenantUser } from "@kiss-pm/domain";
 import type { AttachmentEntityType, TaskRecord } from "@kiss-pm/persistence";
 
 import type { ApiTenantDataSource, ProjectRecord } from "./apiTypes";
+import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
 
 export type AttachmentEntityContext = {
   entityType: AttachmentEntityType;
@@ -94,6 +95,26 @@ export async function resolveAttachmentEntityContext(input: {
       sourceEntity: { type: "Project", id: project.id },
       readDecision: canReadProjects(policyInput),
       manageDecision: canManageProjects(policyInput)
+    } };
+  }
+  if (input.entityType === "communication_channel") {
+    const entity = await input.dataSource.findCommunicationChannel?.(
+      input.actor.tenantId,
+      input.entityId
+    );
+    if (!entity) return { ok: false, status: 404, error: "attachment_entity_not_found" };
+    const access = await resolveCommunicationChannelAccess({
+      actor: input.actor,
+      channel: entity,
+      dataSource: input.dataSource,
+      profile: input.profile
+    });
+    return { ok: true, value: {
+      entityType: "communication_channel",
+      entityId: entity.id,
+      sourceEntity: { type: "CommunicationChannel", id: entity.id },
+      readDecision: access.readDecision,
+      manageDecision: access.manageDecision
     } };
   }
   if (input.entityType === "document") {

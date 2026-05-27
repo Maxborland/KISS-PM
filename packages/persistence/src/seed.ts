@@ -412,6 +412,8 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.retrospectives.read",
     "tenant.retrospectives.manage",
     "tenant.template_improvements.apply",
+    "tenant.communications.read",
+    "tenant.communications.manage",
     "tenant.tasks.create",
     "tenant.tasks.edit",
     "tenant.tasks.delete",

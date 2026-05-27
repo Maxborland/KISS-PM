@@ -2051,7 +2051,7 @@ export const entityAttachments = pgTable(
     ),
     check(
       "entity_attachments_entity_type_chk",
-      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product', 'project', 'task', 'document')`
+      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product', 'project', 'task', 'communication_channel', 'document')`
     ),
     check(
       "entity_attachments_source_activity_type_chk",
@@ -2197,6 +2197,98 @@ export const backgroundJobEvents = pgTable(
   ]
 );
 
+export const communicationChannels = pgTable(
+  "communication_channels",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    channelType: text("channel_type").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    scopeEntityType: text("scope_entity_type"),
+    scopeEntityId: text("scope_entity_id"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "communication_channels_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "communication_channels_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    uniqueIndex("communication_channels_workspace_general_uidx")
+      .on(table.tenantId, table.channelType)
+      .where(sql`${table.channelType} = 'workspace_general' and ${table.archivedAt} is null`),
+    index("communication_channels_tenant_type_idx").on(
+      table.tenantId,
+      table.channelType,
+      table.createdAt
+    ),
+    check(
+      "communication_channels_type_chk",
+      sql`${table.channelType} in ('workspace_general', 'team', 'project_general', 'custom')`
+    ),
+    check(
+      "communication_channels_scope_type_chk",
+      sql`${table.scopeEntityType} is null or ${table.scopeEntityType} in ('project', 'org_unit')`
+    ),
+    check(
+      "communication_channels_scope_chk",
+      sql`(
+        (${table.channelType} in ('team', 'project_general') and ${table.scopeEntityType} is not null and ${table.scopeEntityId} is not null)
+        or
+        (${table.channelType} not in ('team', 'project_general'))
+      )`
+    )
+  ]
+);
+
+export const communicationChannelMembers = pgTable(
+  "communication_channel_members",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "communication_channel_members_pkey",
+      columns: [table.tenantId, table.channelId, table.userId]
+    }),
+    foreignKey({
+      name: "communication_channel_members_channel_fk",
+      columns: [table.tenantId, table.channelId],
+      foreignColumns: [communicationChannels.tenantId, communicationChannels.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "communication_channel_members_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "communication_channel_members_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("communication_channel_members_tenant_user_idx").on(table.tenantId, table.userId),
+    check("communication_channel_members_role_chk", sql`${table.role} in ('owner', 'moderator', 'member')`)
+  ]
+);
+
 export const conversations = pgTable(
   "conversations",
   {
@@ -2233,7 +2325,10 @@ export const conversations = pgTable(
       table.entityType,
       table.entityId
     ),
-    check("conversations_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check(
+      "conversations_entity_type_chk",
+      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel')`
+    ),
     check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup')`)
   ]
 );
@@ -2281,6 +2376,160 @@ export const discussionMessages = pgTable(
       table.createdAt,
       table.id
     )
+  ]
+);
+
+export const messageReactions = pgTable(
+  "message_reactions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    messageId: text("message_id").notNull(),
+    userId: text("user_id").notNull(),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "message_reactions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "message_reactions_message_fk",
+      columns: [table.tenantId, table.messageId],
+      foreignColumns: [discussionMessages.tenantId, discussionMessages.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "message_reactions_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    uniqueIndex("message_reactions_active_uidx")
+      .on(table.tenantId, table.messageId, table.userId, table.emoji)
+      .where(sql`${table.archivedAt} is null`),
+    index("message_reactions_tenant_message_idx").on(table.tenantId, table.messageId)
+  ]
+);
+
+export const stickerPacks = pgTable(
+  "sticker_packs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    source: text("source").notNull(),
+    status: text("status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "sticker_packs_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "sticker_packs_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("sticker_packs_tenant_created_idx").on(table.tenantId, table.createdAt),
+    check(
+      "sticker_packs_source_chk",
+      sql`${table.source} in ('manual_upload', 'telegram_export', 'other_import')`
+    ),
+    check("sticker_packs_status_chk", sql`${table.status} in ('ready', 'archived')`)
+  ]
+);
+
+export const stickerAssets = pgTable(
+  "sticker_assets",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    packId: text("pack_id").notNull(),
+    fileAssetId: text("file_asset_id").notNull(),
+    emoji: text("emoji").notNull(),
+    title: text("title").notNull(),
+    tags: jsonb("tags").$type<string[]>().notNull(),
+    mimeType: text("mime_type").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),
+    status: text("status").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "sticker_assets_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "sticker_assets_pack_fk",
+      columns: [table.tenantId, table.packId],
+      foreignColumns: [stickerPacks.tenantId, stickerPacks.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "sticker_assets_file_asset_fk",
+      columns: [table.tenantId, table.fileAssetId],
+      foreignColumns: [fileAssets.tenantId, fileAssets.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "sticker_assets_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("sticker_assets_tenant_pack_idx").on(table.tenantId, table.packId),
+    check("sticker_assets_mime_chk", sql`${table.mimeType} in ('image/png', 'image/webp')`),
+    check("sticker_assets_status_chk", sql`${table.status} in ('pending', 'ready', 'archived', 'failed')`),
+    check("sticker_assets_size_chk", sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= ${2 * 1024 * 1024}`),
+    check("sticker_assets_dimensions_chk", sql`${table.width} between 64 and 512 and ${table.height} between 64 and 512`)
+  ]
+);
+
+export const messageStickers = pgTable(
+  "message_stickers",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    messageId: text("message_id").notNull(),
+    stickerAssetId: text("sticker_asset_id").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "message_stickers_pkey",
+      columns: [table.tenantId, table.messageId]
+    }),
+    foreignKey({
+      name: "message_stickers_message_fk",
+      columns: [table.tenantId, table.messageId],
+      foreignColumns: [discussionMessages.tenantId, discussionMessages.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "message_stickers_sticker_fk",
+      columns: [table.tenantId, table.stickerAssetId],
+      foreignColumns: [stickerAssets.tenantId, stickerAssets.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "message_stickers_created_by_fk",
+      columns: [table.tenantId, table.createdByUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("message_stickers_tenant_sticker_idx").on(table.tenantId, table.stickerAssetId)
   ]
 );
 
@@ -2458,7 +2707,10 @@ export const meetings = pgTable(
       table.entityId,
       table.scheduledStart
     ),
-    check("meetings_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check(
+      "meetings_entity_type_chk",
+      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel')`
+    ),
     check("meetings_status_chk", sql`${table.status} in ('scheduled', 'completed', 'cancelled')`),
     check("meetings_schedule_chk", sql`${table.scheduledFinish} > ${table.scheduledStart}`)
   ]
@@ -2668,7 +2920,10 @@ export const callRooms = pgTable(
       table.provider,
       table.providerRoomId
     ),
-    check("call_rooms_entity_type_chk", sql`${table.entityType} in ('project', 'task', 'opportunity')`),
+    check(
+      "call_rooms_entity_type_chk",
+      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel')`
+    ),
     check("call_rooms_media_kind_chk", sql`${table.mediaKind} in ('audio', 'video')`),
     check("call_rooms_provider_chk", sql`${table.provider} in ('manual', 'jitsi', 'livekit')`),
     check(
@@ -3316,8 +3571,14 @@ export type PersistenceTableName =
   | "background_job_schedules"
   | "background_job_runs"
   | "background_job_events"
+  | "communication_channels"
+  | "communication_channel_members"
   | "conversations"
   | "discussion_messages"
+  | "message_reactions"
+  | "sticker_packs"
+  | "sticker_assets"
+  | "message_stickers"
   | "message_mentions"
   | "conversation_read_states"
   | "user_notifications"
@@ -3406,8 +3667,14 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "background_job_schedules",
   "background_job_runs",
   "background_job_events",
+  "communication_channels",
+  "communication_channel_members",
   "conversations",
   "discussion_messages",
+  "message_reactions",
+  "sticker_packs",
+  "sticker_assets",
+  "message_stickers",
   "message_mentions",
   "conversation_read_states",
   "user_notifications",
@@ -3489,8 +3756,14 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "background_job_schedules",
   "background_job_runs",
   "background_job_events",
+  "communication_channels",
+  "communication_channel_members",
   "conversations",
   "discussion_messages",
+  "message_reactions",
+  "sticker_packs",
+  "sticker_assets",
+  "message_stickers",
   "message_mentions",
   "conversation_read_states",
   "user_notifications",
@@ -4158,6 +4431,28 @@ const tableColumns = {
     "metadata",
     "created_at"
   ],
+  communication_channels: [
+    "id",
+    "tenant_id",
+    "channel_type",
+    "title",
+    "description",
+    "scope_entity_type",
+    "scope_entity_id",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "archived_at"
+  ],
+  communication_channel_members: [
+    "tenant_id",
+    "channel_id",
+    "user_id",
+    "role",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
   conversations: [
     "id",
     "tenant_id",
@@ -4181,6 +4476,51 @@ const tableColumns = {
     "archived_at",
     "pinned_at",
     "pinned_by_user_id"
+  ],
+  message_reactions: [
+    "id",
+    "tenant_id",
+    "message_id",
+    "user_id",
+    "emoji",
+    "created_at",
+    "archived_at"
+  ],
+  sticker_packs: [
+    "id",
+    "tenant_id",
+    "title",
+    "description",
+    "source",
+    "status",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  sticker_assets: [
+    "id",
+    "tenant_id",
+    "pack_id",
+    "file_asset_id",
+    "emoji",
+    "title",
+    "tags",
+    "mime_type",
+    "width",
+    "height",
+    "size_bytes",
+    "checksum_sha256",
+    "status",
+    "created_by_user_id",
+    "created_at",
+    "archived_at"
+  ],
+  message_stickers: [
+    "tenant_id",
+    "message_id",
+    "sticker_asset_id",
+    "created_by_user_id",
+    "created_at"
   ],
   message_mentions: [
     "tenant_id",
