@@ -151,6 +151,25 @@ function writeEvidence(audit) {
   writeFileSync(join(outDir, "phase9-ci-evidence.json"), `${JSON.stringify(audit, null, 2)}\n`, "utf8");
 }
 
+function writeBuildEvidence() {
+  writeFileSync(
+    join(outDir, "batch15-build-evidence.json"),
+    `${JSON.stringify(
+      {
+        batch: "15",
+        date: "2026-05-26",
+        command: "pnpm --filter @kiss-pm/web build",
+        pass: true,
+        exitCode: 0,
+        via: "phase9-ci"
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
 const port = process.env.STORYBOOK_CONTRACT_PORT
   ? Number(process.env.STORYBOOK_CONTRACT_PORT)
   : await getFreePort();
@@ -175,12 +194,6 @@ try {
     process.exit(1);
   }
 
-  steps.push(runPnpmStep("web-test", ["test"], webRoot));
-  if (!steps.at(-1).pass) {
-    writeEvidence({ startedAt, steps, pass: false, port });
-    process.exit(1);
-  }
-
   steps.push(runPnpmStep("build-storybook", ["build-storybook"], webRoot));
   if (!steps.at(-1).pass) {
     writeEvidence({ startedAt, steps, pass: false, port });
@@ -188,6 +201,13 @@ try {
   }
 
   steps.push(runPnpmStep("web-build", ["--filter", "@kiss-pm/web", "build"], repoRoot));
+  if (!steps.at(-1).pass) {
+    writeEvidence({ startedAt, steps, pass: false, port });
+    process.exit(1);
+  }
+  writeBuildEvidence();
+
+  steps.push(runPnpmStep("web-test", ["test"], webRoot));
   if (!steps.at(-1).pass) {
     writeEvidence({ startedAt, steps, pass: false, port });
     process.exit(1);
@@ -275,26 +295,6 @@ try {
     exitCode: harnessTargetsOk ? 0 : 1,
     pass: harnessTargetsOk
   });
-
-  const webBuild = steps.find((s) => s.name === "web-build");
-  if (webBuild?.pass) {
-    writeFileSync(
-      join(outDir, "batch15-build-evidence.json"),
-      `${JSON.stringify(
-        {
-          batch: "15",
-          date: "2026-05-26",
-          command: "pnpm --filter @kiss-pm/web build",
-          pass: true,
-          exitCode: 0,
-          via: "phase9-ci"
-        },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
-  }
 
   const pass = steps.every((s) => s.pass);
   writeEvidence({ startedAt, steps, pass, port });

@@ -62,6 +62,8 @@ jobs:
         with:
           name: storybook-contract-evidence
           path: |
+            apps/web/.storybook-verify-tmp/phase9-ci-evidence.json
+            apps/web/.storybook-verify-tmp/storybook-vrt-targets.json
             apps/web/.storybook-verify-tmp/batch16-ci-evidence.json
             apps/web/.storybook-verify-tmp/batch15c-copy-scan-evidence.json
             apps/web/.storybook-verify-tmp/batch15-build-evidence.json
