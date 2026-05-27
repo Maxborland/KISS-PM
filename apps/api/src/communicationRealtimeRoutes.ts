@@ -6,9 +6,6 @@ import {
   parseCollaborationEntityType,
   parseCollaborationId,
   parseProviderRoomId,
-  type CallEvent,
-  type CallParticipantState,
-  type CallRecording,
   type CallRoom,
   type CallSession,
   type CollaborationEntityType,
@@ -16,10 +13,14 @@ import {
 } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 
+import { createCommunicationCallWorkspace } from "./communications/callWorkspace";
 import {
-  createCommunicationCallWorkspace,
-  summarizeCallRoom
-} from "./communications/callWorkspace";
+  serializeCallEvent,
+  serializeCallParticipantState,
+  serializeCallRecording,
+  serializeCallRoom,
+  serializeCallSession
+} from "./communications/callSerializers";
 import {
   resolveCommunicationEntityAccess,
   type CommunicationEntityAccessContext
@@ -460,65 +461,4 @@ function parseLimit(value: string | undefined): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 50;
   return Math.max(1, Math.min(parsed, 100));
-}
-
-function serializeCallRoom(room: CallRoom) {
-  return {
-    ...summarizeCallRoom(room),
-    createdAt: room.createdAt.toISOString(),
-    createdByUserId: room.createdByUserId,
-    meetingId: room.meetingId,
-    title: room.title,
-    updatedAt: room.updatedAt.toISOString()
-  };
-}
-
-function serializeCallSession(session: CallSession) {
-  return {
-    endedAt: session.endedAt?.toISOString() ?? null,
-    endedByUserId: session.endedByUserId,
-    failureReason: session.failureReason,
-    id: session.id,
-    providerSessionId: session.providerSessionId,
-    roomId: session.roomId,
-    startedAt: session.startedAt.toISOString(),
-    startedByUserId: session.startedByUserId,
-    status: session.status
-  };
-}
-
-function serializeCallParticipantState(participantState: CallParticipantState) {
-  return {
-    joinedAt: participantState.joinedAt?.toISOString() ?? null,
-    lastSeenAt: participantState.lastSeenAt.toISOString(),
-    leftAt: participantState.leftAt?.toISOString() ?? null,
-    roomId: participantState.roomId,
-    sessionId: participantState.sessionId,
-    state: participantState.state,
-    userId: participantState.userId
-  };
-}
-
-function serializeCallEvent(event: CallEvent) {
-  return {
-    actorUserId: event.actorUserId,
-    createdAt: event.createdAt.toISOString(),
-    eventType: event.eventType,
-    id: event.id,
-    payload: event.payload,
-    roomId: event.roomId,
-    sessionId: event.sessionId
-  };
-}
-
-function serializeCallRecording(recording: CallRecording) {
-  return {
-    attachmentId: recording.attachmentId,
-    createdAt: recording.createdAt.toISOString(),
-    createdByUserId: recording.createdByUserId,
-    id: recording.id,
-    roomId: recording.roomId,
-    sessionId: recording.sessionId,
-    title: recording.title
-  };
 }
