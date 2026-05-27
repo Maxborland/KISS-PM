@@ -2,9 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import {
   canEditTasks,
+  canManageClients,
+  canManageContacts,
   canManageOpportunities,
+  canManageProducts,
   canManageProjects,
+  canReadClients,
+  canReadContacts,
   canReadOpportunities,
+  canReadProducts,
   canReadProjects,
   type AccessProfile,
   type PolicyDecision
@@ -23,6 +29,7 @@ import {
   parseMeetingNoteBody,
   parseMeetingStatus,
   parseMeetingTitle,
+  parseMessageReactionEmoji,
   parseMessageBody,
   parseNotificationChannel,
   parseNotificationType,
@@ -39,6 +46,7 @@ import type {
   ProjectRecord
 } from "./apiTypes";
 import { parseExternalReferenceUrl, parseReferenceTitle } from "./attachmentValidation";
+import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
 import { readLimitedJsonBody } from "./jsonBody";
 
 export type CollaborationRouteDeps = {
@@ -131,8 +139,20 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       ...(cursor.value ? { cursor: cursor.value } : {})
     });
     if (!messages) return context.json({ error: "collaboration_not_configured" }, 501);
+    const messageIds = messages.map((message) => message.id);
+    const reactions = await deps.dataSource.listMessageReactionsByMessageIds?.({
+      tenantId: actor.tenantId,
+      messageIds
+    }) ?? [];
+    const stickers = await deps.dataSource.listMessageStickersByMessageIds?.({
+      tenantId: actor.tenantId,
+      messageIds
+    }) ?? [];
     return context.json({
-      messages: messages.map(serializeMessage),
+      messages: messages.map((message) => serializeMessageWithExtras(message, {
+        reactions: reactions.filter((reaction) => reaction.messageId === message.id),
+        stickers: stickers.filter((sticker) => sticker.messageId === message.id)
+      })),
       nextCursor: messages[0]?.id ?? null
     });
   });
@@ -144,7 +164,18 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsedBody = parseMessageBody(readRecord(body.value).body);
+    const record = readRecord(body.value);
+    const stickerAssetId = parseOptionalCollaborationId(record.stickerAssetId, "sticker_asset_id_invalid");
+    if (!stickerAssetId.ok) return context.json({ error: stickerAssetId.error }, 400);
+    let stickerAsset: import("@kiss-pm/domain").StickerAsset | undefined;
+    if (stickerAssetId.value) {
+      if (!deps.dataSource.findStickerAsset || !deps.dataSource.createMessageSticker) {
+        return context.json({ error: "collaboration_not_configured" }, 501);
+      }
+      stickerAsset = await deps.dataSource.findStickerAsset(actor.tenantId, stickerAssetId.value);
+      if (!stickerAsset) return context.json({ error: "sticker_asset_not_found" }, 404);
+    }
+    const parsedBody = parseMessageBody(record.body ?? stickerAsset?.emoji);
     if (!parsedBody.ok) return context.json({ error: parsedBody.error }, 400);
     if (!deps.dataSource.createDiscussionMessage || !deps.dataSource.replaceMessageMentions) {
       return context.json({ error: "collaboration_not_configured" }, 501);
@@ -157,8 +188,16 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         conversationId: conversation.value.conversation.id,
         authorUserId: actor.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(readRecord(body.value).metadata)
+        metadata: parseMessageMetadata(record.metadata)
       });
+      const sticker = stickerAsset
+        ? await requireMethod(transactionDataSource.createMessageSticker).call(transactionDataSource, {
+            tenantId: actor.tenantId,
+            messageId: message.id,
+            stickerAssetId: stickerAsset.id,
+            createdByUserId: actor.id
+          })
+        : null;
       const mentionUserIds = await filterMentionRecipients({
         actor,
         body: parsedBody.value,
@@ -193,17 +232,90 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
           sourceEntity: conversation.value.access.sourceEntity,
           commandInput: { conversationId: conversation.value.conversation.id },
           permissionResult: conversation.value.access.readDecision,
-          afterState: { messageId: message.id, mentionedUserIds: mentionUserIds }
+          afterState: { messageId: message.id, mentionedUserIds: mentionUserIds, stickerAssetId: sticker?.stickerAssetId ?? null }
         }),
         transactionDataSource
       );
-      return { message, mentions };
+      return { message, mentions, sticker };
     });
 
     return context.json({
-      message: serializeMessage(result.message),
+      message: serializeMessageWithExtras(result.message, {
+        reactions: [],
+        stickers: result.sticker ? [result.sticker] : []
+      }),
       mentions: result.mentions
     }, 201);
+  });
+
+  app.post("/api/workspace/conversations/:conversationId/messages/:messageId/reactions", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
+    const message = await deps.dataSource.findDiscussionMessage?.(
+      actor.tenantId,
+      context.req.param("messageId")
+    );
+    if (!message || message.conversationId !== conversation.value.conversation.id || message.archivedAt) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const emoji = parseMessageReactionEmoji(readRecord(body.value).emoji);
+    if (!emoji.ok) return context.json({ error: emoji.error }, 400);
+    if (!deps.dataSource.upsertMessageReaction) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const reaction = await deps.dataSource.upsertMessageReaction({
+      id: `reaction-${randomUUID()}`,
+      tenantId: actor.tenantId,
+      messageId: message.id,
+      userId: actor.id,
+      emoji: emoji.value
+    });
+    await deps.appendManagementAuditEvent(collaborationAudit({
+      actionType: "communications.message_reaction_added",
+      actor,
+      sourceEntity: conversation.value.access.sourceEntity,
+      commandInput: { messageId: message.id, emoji: emoji.value },
+      permissionResult: conversation.value.access.readDecision,
+      afterState: { reactionId: reaction.id }
+    }));
+    return context.json({ reaction: serializeReaction(reaction) }, 201);
+  });
+
+  app.delete("/api/workspace/conversations/:conversationId/messages/:messageId/reactions/:reactionId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
+    const message = await deps.dataSource.findDiscussionMessage?.(
+      actor.tenantId,
+      context.req.param("messageId")
+    );
+    if (!message || message.conversationId !== conversation.value.conversation.id) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    const reactionId = parseCollaborationId(context.req.param("reactionId"), "reaction_id_invalid");
+    if (!reactionId.ok) return context.json({ error: reactionId.error }, 400);
+    const reaction = await deps.dataSource.archiveMessageReaction?.({
+      tenantId: actor.tenantId,
+      reactionId: reactionId.value,
+      userId: actor.id
+    });
+    if (!reaction || reaction.messageId !== message.id) {
+      return context.json({ error: "reaction_not_found" }, 404);
+    }
+    await deps.appendManagementAuditEvent(collaborationAudit({
+      actionType: "communications.message_reaction_removed",
+      actor,
+      sourceEntity: conversation.value.access.sourceEntity,
+      commandInput: { messageId: message.id, reactionId: reaction.id },
+      permissionResult: conversation.value.access.readDecision,
+      afterState: { archivedAt: reaction.archivedAt?.toISOString() ?? null }
+    }));
+    return context.json({ reaction: serializeReaction(reaction) });
   });
 
   app.patch("/api/workspace/conversations/:conversationId/messages/:messageId", async (context) => {
@@ -835,6 +947,63 @@ async function resolveEntityAccess(input: {
       title: opportunity.title
     } };
   }
+  if (input.entityType === "client") {
+    const client = await input.dataSource.findClientById?.(input.actor.tenantId, input.entityId);
+    if (!client) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
+    return { ok: true, value: {
+      entityType: "client",
+      entityId: client.id,
+      sourceEntity: { type: "Client", id: client.id },
+      readDecision: canReadClients(policyInput),
+      manageDecision: canManageClients(policyInput),
+      title: client.name
+    } };
+  }
+  if (input.entityType === "contact") {
+    const contact = await input.dataSource.findContactById?.(input.actor.tenantId, input.entityId);
+    if (!contact) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
+    return { ok: true, value: {
+      entityType: "contact",
+      entityId: contact.id,
+      sourceEntity: { type: "Contact", id: contact.id },
+      readDecision: canReadContacts(policyInput),
+      manageDecision: canManageContacts(policyInput),
+      title: contact.name
+    } };
+  }
+  if (input.entityType === "product") {
+    const product = await input.dataSource.findProductById?.(input.actor.tenantId, input.entityId);
+    if (!product) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
+    return { ok: true, value: {
+      entityType: "product",
+      entityId: product.id,
+      sourceEntity: { type: "Product", id: product.id },
+      readDecision: canReadProducts(policyInput),
+      manageDecision: canManageProducts(policyInput),
+      title: product.name
+    } };
+  }
+  if (input.entityType === "communication_channel") {
+    const channel = await input.dataSource.findCommunicationChannel?.(
+      input.actor.tenantId,
+      input.entityId
+    );
+    if (!channel) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
+    const channelAccess = await resolveCommunicationChannelAccess({
+      actor: input.actor,
+      channel,
+      dataSource: input.dataSource,
+      profile: input.profile
+    });
+    return { ok: true, value: {
+      entityType: "communication_channel",
+      entityId: channel.id,
+      sourceEntity: { type: "CommunicationChannel", id: channel.id },
+      readDecision: channelAccess.readDecision,
+      manageDecision: channelAccess.manageDecision,
+      title: channel.title
+    } };
+  }
   if (input.entityType === "project") {
     const project = await findProject(input.dataSource, input.actor.tenantId, input.entityId);
     if (!project) return { ok: false, status: 404, error: "collaboration_entity_not_found" };
@@ -1066,6 +1235,17 @@ function parseOptionalCursor(value: string | undefined):
   return { ok: true as const, value: parsed.value };
 }
 
+function parseOptionalCollaborationId(value: unknown, error: string):
+  | { ok: true; value: string | undefined }
+  | { ok: false; error: string } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true as const, value: undefined };
+  }
+  const parsed = parseCollaborationId(value, error);
+  if (!parsed.ok) return parsed;
+  return { ok: true as const, value: parsed.value };
+}
+
 function parseDateTime(value: unknown, error: string) {
   if (typeof value !== "string") return { ok: false as const, error };
   const date = new Date(value);
@@ -1153,7 +1333,11 @@ function trimNotificationBody(body: string) {
 function routeForEntity(entity: EntityAccessContext) {
   if (entity.entityType === "project") return `/projects/${entity.entityId}`;
   if (entity.entityType === "task") return `/tasks/${entity.entityId}`;
-  return `/crm/opportunities/${entity.entityId}`;
+  if (entity.entityType === "opportunity") return `/crm/opportunities/${entity.entityId}`;
+  if (entity.entityType === "client") return `/clients/${entity.entityId}`;
+  if (entity.entityType === "contact") return `/contacts/${entity.entityId}`;
+  if (entity.entityType === "product") return `/products/${entity.entityId}`;
+  return `/communication-channels/${entity.entityId}`;
 }
 
 async function appendDeniedAudit(
@@ -1217,12 +1401,41 @@ function serializeMessage(message: import("@kiss-pm/domain").DiscussionMessage) 
   };
 }
 
+function serializeMessageWithExtras(
+  message: import("@kiss-pm/domain").DiscussionMessage,
+  extras: {
+    reactions: import("@kiss-pm/domain").MessageReaction[];
+    stickers: import("@kiss-pm/domain").MessageSticker[];
+  }
+) {
+  return {
+    ...serializeMessage(message),
+    reactions: extras.reactions.map(serializeReaction),
+    stickers: extras.stickers.map(serializeMessageSticker)
+  };
+}
+
 function serializeNotification(notification: import("@kiss-pm/domain").UserNotification) {
   return {
     ...notification,
     createdAt: notification.createdAt.toISOString(),
     readAt: notification.readAt?.toISOString() ?? null,
     archivedAt: notification.archivedAt?.toISOString() ?? null
+  };
+}
+
+function serializeReaction(reaction: import("@kiss-pm/domain").MessageReaction) {
+  return {
+    ...reaction,
+    createdAt: reaction.createdAt.toISOString(),
+    archivedAt: reaction.archivedAt?.toISOString() ?? null
+  };
+}
+
+function serializeMessageSticker(sticker: import("@kiss-pm/domain").MessageSticker) {
+  return {
+    ...sticker,
+    createdAt: sticker.createdAt.toISOString()
   };
 }
 

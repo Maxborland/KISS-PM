@@ -2,9 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import {
   canEditTasks,
+  canManageClients,
+  canManageContacts,
   canManageOpportunities,
+  canManageProducts,
   canManageProjects,
+  canReadClients,
+  canReadContacts,
   canReadOpportunities,
+  canReadProducts,
   canReadProjects,
   type AccessProfile,
   type PolicyDecision
@@ -30,6 +36,7 @@ import {
 import type { Hono } from "hono";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput, ProjectRecord } from "./apiTypes";
+import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { ApiRouteDeps } from "./routeTypes";
 
@@ -794,6 +801,63 @@ async function resolveEntityAccess(input: {
       readDecision: canReadOpportunities(policyInput),
       sourceEntity: { type: "Opportunity", id: opportunity.id },
       title: opportunity.title
+    } };
+  }
+  if (input.entityType === "client") {
+    const client = await input.dataSource.findClientById?.(input.actor.tenantId, input.entityId);
+    if (!client) return { ok: false, status: 404, error: "communications_entity_not_found" };
+    return { ok: true, value: {
+      entityId: client.id,
+      entityType: "client",
+      manageDecision: canManageClients(policyInput),
+      readDecision: canReadClients(policyInput),
+      sourceEntity: { type: "Client", id: client.id },
+      title: client.name
+    } };
+  }
+  if (input.entityType === "contact") {
+    const contact = await input.dataSource.findContactById?.(input.actor.tenantId, input.entityId);
+    if (!contact) return { ok: false, status: 404, error: "communications_entity_not_found" };
+    return { ok: true, value: {
+      entityId: contact.id,
+      entityType: "contact",
+      manageDecision: canManageContacts(policyInput),
+      readDecision: canReadContacts(policyInput),
+      sourceEntity: { type: "Contact", id: contact.id },
+      title: contact.name
+    } };
+  }
+  if (input.entityType === "product") {
+    const product = await input.dataSource.findProductById?.(input.actor.tenantId, input.entityId);
+    if (!product) return { ok: false, status: 404, error: "communications_entity_not_found" };
+    return { ok: true, value: {
+      entityId: product.id,
+      entityType: "product",
+      manageDecision: canManageProducts(policyInput),
+      readDecision: canReadProducts(policyInput),
+      sourceEntity: { type: "Product", id: product.id },
+      title: product.name
+    } };
+  }
+  if (input.entityType === "communication_channel") {
+    const channel = await input.dataSource.findCommunicationChannel?.(
+      input.actor.tenantId,
+      input.entityId
+    );
+    if (!channel) return { ok: false, status: 404, error: "communications_entity_not_found" };
+    const channelAccess = await resolveCommunicationChannelAccess({
+      actor: input.actor,
+      channel,
+      dataSource: input.dataSource,
+      profile: input.profile
+    });
+    return { ok: true, value: {
+      entityId: channel.id,
+      entityType: "communication_channel",
+      manageDecision: channelAccess.manageDecision,
+      readDecision: channelAccess.readDecision,
+      sourceEntity: { type: "CommunicationChannel", id: channel.id },
+      title: channel.title
     } };
   }
   if (input.entityType === "project") {

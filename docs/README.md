@@ -48,7 +48,8 @@
 42. `41_PHASE_10_BACKEND_HARDENING.md` — backend production hardening: security/privacy, DB/migrations, performance, operations readiness и release-like smoke.
 43. `42_PHASE_G_11_COLLABORATION_COMMUNICATIONS_BACKEND.md` — backend contract для chats/discussions, notifications, meetings, external video links, audit/security и storage integration.
 44. `43_PHASE_G_2_COMMUNICATIONS_REALTIME_BACKEND.md` — backend contract для call rooms, audio/video provider control-plane, join tokens, participant state, call events и recordings через Storage layer.
-45. `45_PHASE_12_BACKGROUND_JOBS_INFRASTRUCTURE.md` — backend foundation для scheduled/background jobs, retries, cleanup, notification dispatch, connector sync, search projection rebuild и capacity cache warmup.
+45. `44_PHASE_G_3_COMMUNICATIONS_UPGRADE_BACKEND.md` — backend contract для общих каналов, entity/CRM чатов, reactions, emoji, sticker packs/imports, channel-scoped calls и permissioned notifications/audit.
+46. `45_PHASE_12_BACKGROUND_JOBS_INFRASTRUCTURE.md` — backend foundation для scheduled/background jobs, retries, cleanup, notification dispatch, connector sync, search projection rebuild и capacity cache warmup.
 
 ## Планы исправлений
 

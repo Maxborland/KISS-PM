@@ -49,6 +49,8 @@ export const permissions = [
   "tenant.template_improvements.apply",
   "tenant.background_jobs.read",
   "tenant.background_jobs.manage",
+  "tenant.communications.read",
+  "tenant.communications.manage",
   "tenant.tasks.create",
   "tenant.tasks.edit",
   "tenant.tasks.delete",
@@ -316,6 +318,28 @@ export function canManageProducts(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.products.manage"
+  });
+}
+
+export function canReadCommunications(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.communications.read"
+  });
+}
+
+export function canManageCommunications(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.communications.manage"
   });
 }
 

@@ -27,6 +27,12 @@ const collaborationSeed: SeedTenantDataset = {
         "tenant.projects.manage",
         "tenant.opportunities.read",
         "tenant.opportunities.manage",
+        "tenant.clients.read",
+        "tenant.clients.manage",
+        "tenant.contacts.read",
+        "tenant.contacts.manage",
+        "tenant.communications.read",
+        "tenant.communications.manage",
         "tenant.project_activation.manage",
         "tenant.tasks.create",
         "tenant.tasks.edit",
@@ -181,6 +187,216 @@ describe("collaboration and communications API", () => {
       conversations: Array<{ readState: { unreadCount: number } }>;
     };
     expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
+  });
+
+  it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const channels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie: adminCookie }
+    });
+    expect(channels.status).toBe(200);
+    const channelsPayload = await channels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    const generalChannel = channelsPayload.channels.find(
+      (channel) => channel.channelType === "workspace_general"
+    );
+    expect(generalChannel?.id).toBe("channel-workspace-general");
+
+    const customChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Закрытая рабочая группа"
+      })
+    });
+    expect(customChannel.status).toBe(201);
+    const customChannelPayload = await customChannel.json() as { channel: { id: string } };
+
+    const projectChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "project_general",
+        title: "Проектный чат",
+        scopeEntityType: "project",
+        scopeEntityId: "project-alpha"
+      })
+    });
+    expect(projectChannel.status).toBe(201);
+    const projectChannelPayload = await projectChannel.json() as { channel: { id: string } };
+
+    const executorChannels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie: executorCookie }
+    });
+    expect(executorChannels.status).toBe(200);
+    const executorChannelsPayload = await executorChannels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    expect(executorChannelsPayload.channels.map((channel) => channel.id)).toContain(generalChannel?.id);
+    expect(executorChannelsPayload.channels.map((channel) => channel.id)).toContain(projectChannelPayload.channel.id);
+    expect(executorChannelsPayload.channels.map((channel) => channel.id)).not.toContain(customChannelPayload.channel.id);
+
+    const channelConversation = await app.request(
+      `/api/workspace/communication-channels/${generalChannel?.id}/conversation`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(channelConversation.status).toBe(200);
+    const channelConversationPayload = await channelConversation.json() as {
+      conversation: { id: string };
+    };
+
+    const message = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ body: "Общий апдейт для @user-alpha-executor" })
+      }
+    );
+    expect(message.status).toBe(201);
+    const messagePayload = await message.json() as { message: { id: string } };
+
+    const reaction = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages/${messagePayload.message.id}/reactions`,
+      {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify({ emoji: "👍" })
+      }
+    );
+    expect(reaction.status).toBe(201);
+    await expect(reaction.json()).resolves.toMatchObject({
+      reaction: { emoji: "👍", userId: "user-alpha-executor" }
+    });
+
+    const notifications = await app.request("/api/workspace/notifications?status=unread", {
+      headers: { cookie: executorCookie }
+    });
+    expect(notifications.status).toBe(200);
+    await expect(notifications.json()).resolves.toMatchObject({
+      notifications: [
+        expect.objectContaining({
+          notificationType: "mention",
+          sourceEntityType: "communication_channel",
+          sourceEntityId: generalChannel?.id
+        })
+      ]
+    });
+
+    const pack = await app.request("/api/workspace/sticker-packs", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Рабочие реакции",
+        description: "PNG/WebP stickers",
+        source: "telegram_export"
+      })
+    });
+    expect(pack.status).toBe(201);
+    const packPayload = await pack.json() as { stickerPack: { id: string } };
+
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array([1, 2, 3, 4])], "ship-it.webp", { type: "image/webp" }));
+    form.set("emoji", "🚀");
+    form.set("title", "Ship it");
+    form.set("width", "128");
+    form.set("height", "128");
+    form.set("tags", "release,fast");
+    const imported = await app.request(
+      `/api/workspace/sticker-packs/${packPayload.stickerPack.id}/import`,
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: form
+      }
+    );
+    expect(imported.status).toBe(201);
+    const importedPayload = await imported.json() as {
+      sticker: { id: string; emoji: string; mimeType: string; tags: string[] };
+    };
+    expect(importedPayload).toMatchObject({
+      sticker: {
+        emoji: "🚀",
+        mimeType: "image/webp",
+        tags: ["release", "fast"]
+      }
+    });
+
+    const stickerMessage = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ stickerAssetId: importedPayload.sticker.id })
+      }
+    );
+    expect(stickerMessage.status).toBe(201);
+    await expect(stickerMessage.json()).resolves.toMatchObject({
+      message: {
+        body: "🚀",
+        stickers: [{ stickerAssetId: importedPayload.sticker.id }]
+      }
+    });
+
+    const listed = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(listed.status).toBe(200);
+    const listedPayload = await listed.json() as {
+      messages: Array<{
+        body: string;
+        reactions: Array<{ emoji: string; userId: string }>;
+        stickers: Array<{ stickerAssetId: string }>;
+      }>;
+    };
+    expect(listedPayload.messages.some((item) =>
+      item.reactions.some((itemReaction) =>
+        itemReaction.emoji === "👍" && itemReaction.userId === "user-alpha-executor"
+      )
+    )).toBe(true);
+    expect(listedPayload.messages.some((item) =>
+      item.body === "🚀" &&
+      item.stickers.some((sticker) => sticker.stickerAssetId === importedPayload.sticker.id)
+    )).toBe(true);
+
+    const packStickers = await app.request(
+      `/api/workspace/sticker-packs/${packPayload.stickerPack.id}/stickers`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(packStickers.status).toBe(200);
+    const packStickersPayload = await packStickers.json() as {
+      stickers: Array<{ id: string; checksumSha256?: string }>;
+    };
+    expect(packStickersPayload.stickers).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: importedPayload.sticker.id })])
+    );
+    expect(packStickersPayload.stickers[0]).not.toHaveProperty("checksumSha256");
+
+    const archivedSticker = await app.request(`/api/workspace/stickers/${importedPayload.sticker.id}`, {
+      method: "DELETE",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(archivedSticker.status).toBe(200);
+    await expect(archivedSticker.json()).resolves.toMatchObject({
+      sticker: { id: importedPayload.sticker.id, status: "archived" }
+    });
+
+    const archivedPack = await app.request(`/api/workspace/sticker-packs/${packPayload.stickerPack.id}`, {
+      method: "DELETE",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(archivedPack.status).toBe(200);
+    await expect(archivedPack.json()).resolves.toMatchObject({
+      stickerPack: { id: packPayload.stickerPack.id, status: "archived" }
+    });
   });
 
   it("lists the latest conversation messages and pages older history by cursor", async () => {
@@ -522,7 +738,7 @@ describe("collaboration and communications API", () => {
   }
 
   async function truncateCollaborationState() {
-    await client`TRUNCATE meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE message_stickers, sticker_assets, sticker_packs, message_reactions, communication_channel_members, communication_channels, meeting_action_items, meeting_notes, meeting_external_links, meeting_participants, meetings, notification_preferences, user_notifications, conversation_read_states, message_mentions, discussion_messages, conversations, entity_attachments, external_references, file_assets, audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
   }
 });
 

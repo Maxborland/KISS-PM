@@ -186,6 +186,13 @@ const phaseBackgroundJobsMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseG3CommunicationsUpgradeMigration = readFileSync(
+  new URL(
+    "../migrations/0039_phase_g3_communications_upgrade.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -207,6 +214,33 @@ describe("Phase 1.2 SQL migration", () => {
     );
     expect(uniqueIndexPosition).toBeGreaterThanOrEqual(0);
     expect(sameTenantForeignKeyPosition).toBeGreaterThan(uniqueIndexPosition);
+  });
+
+  it("adds Phase G.3 channels, reactions and sticker storage tables", () => {
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "communication_channels"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "communication_channel_members"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "message_reactions"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "sticker_packs"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "sticker_assets"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "message_stickers"'
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      "communication_channel"
+    );
+    expect(phaseG3CommunicationsUpgradeMigration).toContain(
+      'REFERENCES "file_assets"("tenant_id", "id")'
+    );
   });
 });
 
