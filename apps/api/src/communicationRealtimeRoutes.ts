@@ -555,6 +555,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     const attachment = await deps.dataSource.findAttachmentById(actor.tenantId, parsed.value.attachmentId);
     if (
       !attachment ||
+      attachment.archivedAt ||
       attachment.entityType !== resolved.value.room.entityType ||
       attachment.entityId !== resolved.value.room.entityId
     ) {

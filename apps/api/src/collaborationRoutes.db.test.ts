@@ -652,6 +652,18 @@ describe("collaboration and communications API", () => {
     });
     expect(note.status).toBe(201);
 
+    const partialTarget = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Уточнить задачу",
+        ownerUserId: "user-alpha-executor",
+        targetEntityType: "task"
+      })
+    });
+    expect(partialTarget.status).toBe(400);
+    await expect(partialTarget.json()).resolves.toEqual({ error: "meeting_action_target_required" });
+
     const actionItem = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
       method: "POST",
       headers: jsonHeaders(adminCookie),

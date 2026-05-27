@@ -533,6 +533,11 @@ describe("communications realtime API", () => {
       entityType: "project",
       entityId: "project-other"
     });
+    const archivedAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-archived",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
 
     const accepted = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
       method: "POST",
@@ -560,6 +565,24 @@ describe("communications realtime API", () => {
     });
     expect(rejected.status).toBe(400);
     await expect(rejected.json()).resolves.toEqual({
+      error: "call_recording_attachment_invalid"
+    });
+
+    const archived = await app.request(`/api/workspace/attachments/${archivedAttachment}`, {
+      method: "DELETE",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(archived.status).toBe(200);
+    const rejectedArchived = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        attachmentId: archivedAttachment,
+        title: "Удаленная запись"
+      })
+    });
+    expect(rejectedArchived.status).toBe(400);
+    await expect(rejectedArchived.json()).resolves.toEqual({
       error: "call_recording_attachment_invalid"
     });
   });
