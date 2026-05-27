@@ -414,7 +414,9 @@ const maxStickerTags = 20;
 const maxStickerFileBytes = 2 * 1024 * 1024;
 const controlCharacterPattern = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const mentionPattern = /@([a-zA-Z0-9][a-zA-Z0-9._:-]{1,120})/g;
-const customEmojiAliasPattern = /^:[a-zA-Z0-9][a-zA-Z0-9_+-]{0,39}:$/;
+type GraphemeSegmenter = {
+  segment(input: string): Iterable<{ segment: string }>;
+};
 
 export function parseCollaborationEntityType(
   value: unknown
@@ -508,9 +510,30 @@ export function parseMessageReactionEmoji(value: unknown): CollaborationParseRes
   ) {
     return { ok: false, error: "message_reaction_emoji_invalid" };
   }
-  if (customEmojiAliasPattern.test(trimmed)) return { ok: true, value: trimmed };
-  if (/\p{Extended_Pictographic}/u.test(trimmed)) return { ok: true, value: trimmed };
+  const graphemes = splitGraphemes(trimmed);
+  if (
+    graphemes.length === 1 &&
+    graphemes[0] === trimmed &&
+    /\p{Extended_Pictographic}/u.test(trimmed) &&
+    !/[<>{}[\]\\]/u.test(trimmed)
+  ) {
+    return { ok: true, value: trimmed };
+  }
   return { ok: false, error: "message_reaction_emoji_invalid" };
+}
+
+function splitGraphemes(value: string): string[] {
+  const segmenterCtor = (Intl as typeof Intl & {
+    Segmenter?: new (
+      locale?: string,
+      options?: { granularity: "grapheme" }
+    ) => GraphemeSegmenter;
+  }).Segmenter;
+  if (!segmenterCtor) return Array.from(value);
+  return Array.from(
+    new segmenterCtor(undefined, { granularity: "grapheme" }).segment(value),
+    (item) => item.segment
+  );
 }
 
 export function parseStickerPackSource(

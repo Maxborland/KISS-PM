@@ -66,7 +66,15 @@ describe("collaboration domain contract", () => {
 
   it("validates safe emoji reactions", () => {
     expect(parseMessageReactionEmoji("👍")).toEqual({ ok: true, value: "👍" });
-    expect(parseMessageReactionEmoji(":ship_it:")).toEqual({ ok: true, value: ":ship_it:" });
+    expect(parseMessageReactionEmoji("👨‍💻")).toEqual({ ok: true, value: "👨‍💻" });
+    expect(parseMessageReactionEmoji(":ship_it:")).toEqual({
+      ok: false,
+      error: "message_reaction_emoji_invalid"
+    });
+    expect(parseMessageReactionEmoji("👍<script>")).toEqual({
+      ok: false,
+      error: "message_reaction_emoji_invalid"
+    });
     expect(parseMessageReactionEmoji("alert(1)")).toEqual({
       ok: false,
       error: "message_reaction_emoji_invalid"

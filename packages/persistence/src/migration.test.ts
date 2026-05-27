@@ -193,6 +193,13 @@ const phaseG3CommunicationsUpgradeMigration = readFileSync(
   ),
   "utf8"
 );
+const phaseG3CommunicationChannelAttachmentsMigration = readFileSync(
+  new URL(
+    "../migrations/0040_phase_g3_communication_channel_attachments.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -240,6 +247,15 @@ describe("Phase 1.2 SQL migration", () => {
     );
     expect(phaseG3CommunicationsUpgradeMigration).toContain(
       'REFERENCES "file_assets"("tenant_id", "id")'
+    );
+  });
+
+  it("allows communication channels to own recording attachments", () => {
+    expect(phaseG3CommunicationChannelAttachmentsMigration).toContain(
+      'ALTER TABLE "entity_attachments" DROP CONSTRAINT IF EXISTS "entity_attachments_entity_type_chk"'
+    );
+    expect(phaseG3CommunicationChannelAttachmentsMigration).toContain(
+      "'communication_channel'"
     );
   });
 });

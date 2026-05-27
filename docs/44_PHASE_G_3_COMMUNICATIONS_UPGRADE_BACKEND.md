@@ -49,7 +49,7 @@ Phase G.3 расширяет уже реализованные Collaboration/Com
 - `MessageReaction`:
   - `tenantId`, `messageId`, `userId`, `emoji`, `createdAt`;
   - unique `(tenantId, messageId, userId, emoji)`;
-  - разрешены Unicode emoji и tenant-approved custom emoji aliases;
+  - v1 разрешает только одиночные Unicode emoji/grapheme; tenant-approved custom emoji aliases остаются future scope;
   - реакции не создают уведомления, кроме future preference.
 - Edit/delete/pin сохраняют текущую permission и audit модель.
 
@@ -87,6 +87,7 @@ Phase G.3 расширяет уже реализованные Collaboration/Com
   - never persisted/audited/logged.
 - Meetings могут быть связаны с project/task/opportunity/client/contact/channel.
 - Meeting notes, recordings and action items используют existing storage/attachments and audit contracts.
+- Attachment contract расширяется на `communication_channel`, чтобы channel call recordings имели валидный same-entity `EntityAttachment` path.
 
 ## Domain model
 
@@ -238,6 +239,7 @@ Existing call room endpoints preserve old entity fields and additionally accept 
 - Channel create/update/member manage: `tenant.communications.manage`.
 - Sticker pack import/archive: `tenant.communications.manage`.
 - Call room create/start/end/recording attach: parent entity manage, channel owner/moderator or `tenant.communications.manage`.
+- Channel attachment create/delete for recordings: channel owner/moderator or `tenant.communications.manage`; read follows channel visibility.
 - Join token: readable room plus active workspace user.
 
 ## Audit
@@ -270,7 +272,7 @@ Audit stores only safe metadata: ids, entity/channel scope, emoji, sticker pack 
 - Allowed sticker image dimensions v1: 64..512 px per side.
 - File names are sanitized through Storage safe display name.
 - Message body has strict size limit and no arbitrary HTML.
-- Reactions validate emoji/alias and reject arbitrary script-like strings.
+- Reactions validate a single Unicode emoji/grapheme and reject aliases or arbitrary script-like strings.
 - Call token and provider secrets never persist.
 - Notification and search read models must permission-filter before response.
 

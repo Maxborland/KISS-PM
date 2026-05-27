@@ -43,6 +43,7 @@ Acceptance:
 - [x] Add migration for `sticker_packs`.
 - [x] Add migration for `sticker_assets`.
 - [x] Add migration for `message_stickers`.
+- [x] Extend `entity_attachments` to `communication_channel` for channel call recordings.
 - [x] Extend repository methods for channels, reactions, stickers and channel-scoped calls.
 - [x] Keep tenant/project/entity isolation and index frequent read paths.
 

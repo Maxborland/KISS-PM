@@ -245,6 +245,27 @@ describe("communications realtime API", () => {
         joinUrl: "https://livekit.kiss.local"
       }
     });
+
+    const channelAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-channel-recording",
+      entityType: "communication_channel",
+      entityId: generalChannel?.id ?? "channel-workspace-general"
+    });
+    const recording = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        attachmentId: channelAttachment,
+        title: "Запись общего созвона"
+      })
+    });
+    expect(recording.status).toBe(201);
+    await expect(recording.json()).resolves.toMatchObject({
+      recording: {
+        attachmentId: channelAttachment,
+        title: "Запись общего созвона"
+      }
+    });
   });
 
   it("emits distinct events for invited and joining participant states", async () => {
@@ -415,7 +436,11 @@ describe("communications realtime API", () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
-    const sameEntityAttachment = await createProjectAttachment("attachment-project", "project-alpha");
+    const sameEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-project",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
 
     const missingParticipant = await app.request(
       `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`,
@@ -498,8 +523,16 @@ describe("communications realtime API", () => {
   it("attaches recordings only through same-entity attachments", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
-    const sameEntityAttachment = await createProjectAttachment("attachment-project", "project-alpha");
-    const otherEntityAttachment = await createProjectAttachment("attachment-other", "project-other");
+    const sameEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-project",
+      entityType: "project",
+      entityId: "project-alpha"
+    });
+    const otherEntityAttachment = await createExternalReferenceAttachment({
+      attachmentId: "attachment-other",
+      entityType: "project",
+      entityId: "project-other"
+    });
 
     const accepted = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/recordings`, {
       method: "POST",
@@ -626,24 +659,28 @@ describe("communications realtime API", () => {
     }).catch(() => undefined);
   }
 
-  async function createProjectAttachment(attachmentId: string, projectId: string) {
+  async function createExternalReferenceAttachment(input: {
+    attachmentId: string;
+    entityType: "project" | "communication_channel";
+    entityId: string;
+  }) {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
-    const referenceId = `reference-${attachmentId}`;
+    const referenceId = `reference-${input.attachmentId}`;
     await dataSource.createExternalReference({
       id: referenceId,
       tenantId: "tenant-alpha",
       connectorType: "manual_link",
       externalId: null,
-      url: `https://files.kiss.local/${attachmentId}`,
-      title: attachmentId,
+      url: `https://files.kiss.local/${input.attachmentId}`,
+      title: input.attachmentId,
       metadata: {},
       createdByUserId: "user-alpha-admin"
     });
     const attachment = await dataSource.createEntityAttachment({
-      id: attachmentId,
+      id: input.attachmentId,
       tenantId: "tenant-alpha",
-      entityType: "project",
-      entityId: projectId,
+      entityType: input.entityType,
+      entityId: input.entityId,
       assetId: null,
       externalReferenceId: referenceId,
       relationType: "recording",

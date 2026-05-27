@@ -1933,7 +1933,7 @@ export const entityAttachments = pgTable(
     ),
     check(
       "entity_attachments_entity_type_chk",
-      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product', 'project', 'task')`
+      sql`${table.entityType} in ('opportunity', 'client', 'contact', 'product', 'project', 'task', 'communication_channel')`
     ),
     check(
       "entity_attachments_source_activity_type_chk",

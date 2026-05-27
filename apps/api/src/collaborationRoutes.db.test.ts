@@ -240,6 +240,32 @@ describe("collaboration and communications API", () => {
     expect(executorChannelsPayload.channels.map((channel) => channel.id)).toContain(projectChannelPayload.channel.id);
     expect(executorChannelsPayload.channels.map((channel) => channel.id)).not.toContain(customChannelPayload.channel.id);
 
+    const customDetailsDenied = await app.request(
+      `/api/workspace/communication-channels/${customChannelPayload.channel.id}`,
+      { headers: { cookie: executorCookie } }
+    );
+    expect(customDetailsDenied.status).toBe(403);
+
+    const updatedCustom = await app.request(
+      `/api/workspace/communication-channels/${customChannelPayload.channel.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Закрытая группа",
+          description: "Только для модераторов"
+        })
+      }
+    );
+    expect(updatedCustom.status).toBe(200);
+    await expect(updatedCustom.json()).resolves.toMatchObject({
+      channel: {
+        id: customChannelPayload.channel.id,
+        title: "Закрытая группа",
+        description: "Только для модераторов"
+      }
+    });
+
     const channelConversation = await app.request(
       `/api/workspace/communication-channels/${generalChannel?.id}/conversation`,
       { headers: { cookie: adminCookie } }
@@ -269,9 +295,41 @@ describe("collaboration and communications API", () => {
       }
     );
     expect(reaction.status).toBe(201);
-    await expect(reaction.json()).resolves.toMatchObject({
+    const reactionPayload = await reaction.json() as {
+      reaction: { id: string; emoji: string; userId: string };
+    };
+    expect(reactionPayload).toMatchObject({
       reaction: { emoji: "👍", userId: "user-alpha-executor" }
     });
+
+    const otherMessage = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ body: "Другой апдейт" })
+      }
+    );
+    expect(otherMessage.status).toBe(201);
+    const otherMessagePayload = await otherMessage.json() as { message: { id: string } };
+    const crossMessageDelete = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages/${otherMessagePayload.message.id}/reactions/${reactionPayload.reaction.id}`,
+      {
+        method: "DELETE",
+        headers: jsonHeaders(executorCookie)
+      }
+    );
+    expect(crossMessageDelete.status).toBe(404);
+
+    const unsafeReaction = await app.request(
+      `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages/${messagePayload.message.id}/reactions`,
+      {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify({ emoji: "👍<script>" })
+      }
+    );
+    expect(unsafeReaction.status).toBe(400);
 
     const notifications = await app.request("/api/workspace/notifications?status=unread", {
       headers: { cookie: executorCookie }
@@ -299,8 +357,28 @@ describe("collaboration and communications API", () => {
     expect(pack.status).toBe(201);
     const packPayload = await pack.json() as { stickerPack: { id: string } };
 
+    const fakeForm = new FormData();
+    fakeForm.set("file", new File([new Uint8Array([1, 2, 3, 4])], "fake.webp", { type: "image/webp" }));
+    fakeForm.set("emoji", "🚀");
+    fakeForm.set("title", "Fake");
+    fakeForm.set("width", "128");
+    fakeForm.set("height", "128");
+    const fakeImport = await app.request(
+      `/api/workspace/sticker-packs/${packPayload.stickerPack.id}/import`,
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: fakeForm
+      }
+    );
+    expect(fakeImport.status).toBe(400);
+    await expect(fakeImport.json()).resolves.toEqual({ error: "sticker_image_invalid" });
+
     const form = new FormData();
-    form.set("file", new File([new Uint8Array([1, 2, 3, 4])], "ship-it.webp", { type: "image/webp" }));
+    form.set("file", new File([createWebpStickerBytes(128, 128)], "ship-it.webp", { type: "image/webp" }));
     form.set("emoji", "🚀");
     form.set("title", "Ship it");
     form.set("width", "128");
@@ -328,6 +406,26 @@ describe("collaboration and communications API", () => {
         tags: ["release", "fast"]
       }
     });
+
+    const mismatchForm = new FormData();
+    mismatchForm.set("file", new File([createWebpStickerBytes(128, 128)], "mismatch.webp", { type: "image/webp" }));
+    mismatchForm.set("emoji", "🚀");
+    mismatchForm.set("title", "Mismatch");
+    mismatchForm.set("width", "256");
+    mismatchForm.set("height", "128");
+    const mismatchImport = await app.request(
+      `/api/workspace/sticker-packs/${packPayload.stickerPack.id}/import`,
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: mismatchForm
+      }
+    );
+    expect(mismatchImport.status).toBe(400);
+    await expect(mismatchImport.json()).resolves.toEqual({ error: "sticker_dimension_mismatch" });
 
     const stickerMessage = await app.request(
       `/api/workspace/conversations/${channelConversationPayload.conversation.id}/messages`,
@@ -587,6 +685,52 @@ describe("collaboration and communications API", () => {
     );
   });
 
+  it("requires explicit action item target for non-actionable meeting scopes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const meeting = await app.request("/api/workspace/meetings", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "client",
+        entityId: "client-romashka",
+        title: "Обсуждение клиента",
+        scheduledStart: "2026-06-02T10:00:00.000Z",
+        scheduledFinish: "2026-06-02T10:30:00.000Z"
+      })
+    });
+    expect(meeting.status).toBe(201);
+    const meetingPayload = await meeting.json() as { meeting: { id: string } };
+
+    const missingTarget = await app.request(
+      `/api/workspace/meetings/${meetingPayload.meeting.id}/action-items`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Подготовить план контакта",
+          ownerUserId: "user-alpha-executor"
+        })
+      }
+    );
+    expect(missingTarget.status).toBe(400);
+    await expect(missingTarget.json()).resolves.toEqual({ error: "meeting_action_target_required" });
+
+    const explicitTarget = await app.request(
+      `/api/workspace/meetings/${meetingPayload.meeting.id}/action-items`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Подготовить план контакта",
+          ownerUserId: "user-alpha-executor",
+          targetEntityType: "project",
+          targetEntityId: "project-alpha"
+        })
+      }
+    );
+    expect(explicitTarget.status).toBe(201);
+  });
+
   it("persists notification preferences for digest-ready notification feeds", async () => {
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
@@ -748,4 +892,22 @@ function jsonHeaders(cookie: string) {
     "x-kiss-pm-action": "same-origin",
     cookie
   };
+}
+
+function createWebpStickerBytes(width: number, height: number) {
+  const bytes = new Uint8Array(30);
+  bytes.set([0x52, 0x49, 0x46, 0x46], 0);
+  bytes.set([0x16, 0x00, 0x00, 0x00], 4);
+  bytes.set([0x57, 0x45, 0x42, 0x50], 8);
+  bytes.set([0x56, 0x50, 0x38, 0x58], 12);
+  bytes.set([0x0a, 0x00, 0x00, 0x00], 16);
+  writeUint24LE(bytes, 24, width - 1);
+  writeUint24LE(bytes, 27, height - 1);
+  return bytes;
+}
+
+function writeUint24LE(bytes: Uint8Array, offset: number, value: number) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >> 8) & 0xff;
+  bytes[offset + 2] = (value >> 16) & 0xff;
 }
