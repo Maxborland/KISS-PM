@@ -1,5 +1,6 @@
 export * from "./auditEvent";
 export * from "./attachmentRepository";
+export * from "./backgroundJobRepository";
 export * from "./collaborationRepository";
 export * from "./auth";
 export * from "./connection";
@@ -15,6 +16,7 @@ export * from "./projectWorkRepository";
 export * from "./tenantProductionCalendarConstants";
 export * from "./tenantProductionCalendarRepository";
 export * from "./resourceAbsencesRepository";
+export * from "./occupancyRepository";
 export * from "./retrospectiveRepository";
 export * from "./tenantOrgStructureRepository";
 export * from "./repositories";

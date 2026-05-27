@@ -25,6 +25,7 @@ import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
@@ -40,6 +41,7 @@ import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
 import { registerAbsencesRoutes } from "./absencesRoutes";
 import { registerOrgStructureRoutes } from "./orgStructureRoutes";
+import { registerOccupancyRoutes } from "./occupancyRoutes";
 import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
@@ -230,6 +232,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
+  registerBackgroundJobRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
   }
@@ -249,6 +252,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCapacityRoutes(app, routeDeps);
   registerProductionCalendarRoutes(app, routeDeps);
   registerAbsencesRoutes(app, routeDeps);
+  registerOccupancyRoutes(app, routeDeps);
   registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerRetrospectiveRoutes(app, routeDeps);

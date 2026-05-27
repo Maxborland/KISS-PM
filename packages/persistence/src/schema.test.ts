@@ -53,11 +53,16 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
       "external_references",
       "entity_attachments",
+      "background_job_schedules",
+      "background_job_runs",
+      "background_job_events",
       "conversations",
       "discussion_messages",
       "message_mentions",
@@ -133,11 +138,16 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_production_calendar_exceptions",
       "planning_saved_views",
       "resource_absences",
+      "resource_personal_calendars",
+      "resource_calendar_events",
       "tenant_org_nodes",
       "tenant_user_org_placements",
       "file_assets",
       "external_references",
       "entity_attachments",
+      "background_job_schedules",
+      "background_job_runs",
+      "background_job_events",
       "conversations",
       "discussion_messages",
       "message_mentions",
@@ -170,6 +180,31 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores Phase 12 personal calendars and occupancy events", () => {
+    expect(getPersistenceTableColumns("resource_personal_calendars")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "user_id",
+        "source_provider",
+        "sync_status",
+        "archived_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("resource_calendar_events")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "calendar_id",
+        "user_id",
+        "starts_at",
+        "finishes_at",
+        "work_minutes",
+        "capacity_impact",
+        "visibility",
+        "metadata"
+      ])
+    );
   });
 
   it("stores Phase 7 KPI, signal and action engine records", () => {
@@ -332,6 +367,7 @@ describe("PostgreSQL persistence schema", () => {
         "safe_display_name",
         "checksum_sha256",
         "status",
+        "purged_at",
         "archived_at"
       ])
     );
@@ -355,6 +391,46 @@ describe("PostgreSQL persistence schema", () => {
         "source_activity_type",
         "source_activity_id",
         "archived_at"
+      ])
+    );
+  });
+
+  it("stores tenant-scoped background job schedules, runs and events", () => {
+    expect(getPersistenceTableColumns("background_job_schedules")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "kind",
+        "schedule_key",
+        "payload",
+        "interval_seconds",
+        "enabled",
+        "next_run_at",
+        "last_enqueued_at"
+      ])
+    );
+    expect(getPersistenceTableColumns("background_job_runs")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "kind",
+        "status",
+        "priority",
+        "payload",
+        "idempotency_key",
+        "attempt",
+        "max_attempts",
+        "run_after",
+        "locked_by",
+        "last_error"
+      ])
+    );
+    expect(getPersistenceTableColumns("background_job_events")).toEqual(
+      expect.arrayContaining([
+        "tenant_id",
+        "job_id",
+        "event_type",
+        "message",
+        "metadata",
+        "created_at"
       ])
     );
   });

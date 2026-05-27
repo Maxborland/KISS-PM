@@ -76,10 +76,20 @@ describe("backend management loop DB smoke", () => {
     await client`
       TRUNCATE
         audit_events,
+        call_recordings,
+        call_events,
+        call_participant_states,
+        call_sessions,
+        call_rooms,
         meeting_action_items,
         meeting_notes,
         meeting_external_links,
         meeting_participants,
+        call_recordings,
+        call_participant_states,
+        call_events,
+        call_sessions,
+        call_rooms,
         meetings,
         call_recordings,
         call_events,
@@ -88,6 +98,9 @@ describe("backend management loop DB smoke", () => {
         call_rooms,
         notification_preferences,
         user_notifications,
+        background_job_events,
+        background_job_runs,
+        background_job_schedules,
         conversation_read_states,
         message_mentions,
         discussion_messages,
@@ -133,6 +146,8 @@ describe("backend management loop DB smoke", () => {
         calendar_exceptions,
         resource_calendars,
         project_calendars,
+        resource_calendar_events,
+        resource_personal_calendars,
         plan_versions,
         tasks,
         task_statuses,
@@ -153,7 +168,7 @@ describe("backend management loop DB smoke", () => {
         positions,
         access_profiles,
         tenants
-      RESTART IDENTITY
+      RESTART IDENTITY CASCADE
     `;
   }
 

@@ -21,6 +21,13 @@
 | `KISS_PM_ENABLE_DEV_ROUTES` | dev-only tenant routes | must be `false`/unset in production |
 | `PLANNING_EVENTS_BACKEND` | planning realtime event backend: `memory` or `redis`, default `memory` | no |
 | `PLANNING_EVENTS_REDIS_URL` / `REDIS_URL` | Redis URL for planning realtime events | yes when `PLANNING_EVENTS_BACKEND=redis` |
+| `KISS_PM_VIDEO_PROVIDER` | video join provider: `manual`, `jitsi`, `livekit`; unset means disabled | no |
+| `KISS_PM_VIDEO_MANUAL_BASE_URL` | external meeting base URL for manual provider | yes when `KISS_PM_VIDEO_PROVIDER=manual` |
+| `KISS_PM_VIDEO_JITSI_BASE_URL` | Jitsi meeting base URL | yes when `KISS_PM_VIDEO_PROVIDER=jitsi` |
+| `KISS_PM_VIDEO_LIVEKIT_URL` | LiveKit server URL used by clients | yes when `KISS_PM_VIDEO_PROVIDER=livekit` |
+| `KISS_PM_VIDEO_LIVEKIT_API_KEY` | LiveKit API key for join token signing | yes when `KISS_PM_VIDEO_PROVIDER=livekit` |
+| `KISS_PM_VIDEO_LIVEKIT_API_SECRET` | LiveKit API secret for join token signing | yes when `KISS_PM_VIDEO_PROVIDER=livekit` |
+| `KISS_PM_VIDEO_TOKEN_TTL_SECONDS` | LiveKit join token TTL, 60..3600 seconds, default 600 | no |
 
 Secrets must not be logged, stored in audit metadata, or exposed through health/readiness responses.
 
@@ -32,8 +39,9 @@ Secrets must not be logged, stored in audit metadata, or exposed through health/
    - local: root directory exists or can be created by the API user;
    - s3: endpoint, bucket and credentials are valid.
 4. If `PLANNING_EVENTS_BACKEND=redis`, verify Redis connectivity and credentials before routing traffic.
-5. Start API.
-6. Check liveness:
+5. If video is enabled, verify provider env is exact and credentials are stored only in runtime secret storage. Unknown provider values and malformed LiveKit token TTL must fail startup.
+6. Start API.
+7. Check liveness:
 
 ```bash
 curl http://127.0.0.1:4000/health/live
@@ -45,7 +53,7 @@ Expected response:
 { "status": "live", "product": "KISS PM" }
 ```
 
-7. Check readiness:
+8. Check readiness:
 
 ```bash
 curl http://127.0.0.1:4000/health/ready
