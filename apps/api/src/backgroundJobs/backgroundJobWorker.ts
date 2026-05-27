@@ -51,10 +51,13 @@ export async function runBackgroundJobWorkerTick(input: {
     throw new Error("background_jobs_not_configured");
   }
 
+  const kinds = Object.keys(input.registry) as BackgroundJobKind[];
+  if (kinds.length === 0) return { status: "idle" };
+
   const job = await input.dataSource.claimNextBackgroundJob({
     workerId: input.workerId,
     now,
-    kinds: Object.keys(input.registry) as BackgroundJobKind[]
+    kinds
   });
   if (!job) return { status: "idle" };
 

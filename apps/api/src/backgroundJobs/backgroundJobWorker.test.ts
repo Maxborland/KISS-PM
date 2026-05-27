@@ -98,6 +98,26 @@ describe("background job worker", () => {
     expect(persistedError).toBe("background_job_failed");
   });
 
+  it("does not claim jobs when the worker registry is empty", async () => {
+    let claimed = false;
+    const dataSource: ApiTenantDataSource = {
+      claimNextBackgroundJob: async () => {
+        claimed = true;
+        return backgroundJob("notification.dispatch");
+      },
+      completeBackgroundJob: async () => undefined,
+      failBackgroundJob: async () => undefined
+    } as unknown as ApiTenantDataSource;
+
+    await expect(runBackgroundJobWorkerTick({
+      dataSource,
+      registry: {},
+      workerId: "worker-test",
+      now: new Date("2026-05-27T00:00:00.000Z")
+    })).resolves.toEqual({ status: "idle" });
+    expect(claimed).toBe(false);
+  });
+
   it("enqueues due schedules with idempotency tied to schedule key and due instant", async () => {
     const enqueued: string[] = [];
     const dataSource: ApiTenantDataSource = {
