@@ -16,6 +16,7 @@ export type AttachmentEntityType =
   | "product"
   | "project"
   | "task"
+  | "communication_channel"
   | "document";
 
 export type FileAssetProvider = "local" | "s3";
@@ -128,6 +129,7 @@ export type AttachmentRepository = {
     tenantId: TenantId,
     attachmentId: string
   ): Promise<AttachmentReadModel | undefined>;
+  findFileAssetById(tenantId: TenantId, assetId: string): Promise<FileAssetRecord | undefined>;
   archiveAttachment(input: {
     tenantId: TenantId;
     attachmentId: string;
@@ -250,6 +252,14 @@ export function createAttachmentRepository(db: KissPmDatabase): AttachmentReposi
         )
         .returning();
 
+      return row ? mapFileAsset(row) : undefined;
+    },
+    async findFileAssetById(tenantId, assetId) {
+      const [row] = await db
+        .select()
+        .from(fileAssets)
+        .where(and(eq(fileAssets.tenantId, tenantId), eq(fileAssets.id, assetId)))
+        .limit(1);
       return row ? mapFileAsset(row) : undefined;
     },
     async createExternalReference(input) {

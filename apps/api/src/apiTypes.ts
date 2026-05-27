@@ -13,6 +13,9 @@ import type {
   CallRoomStatus,
   CallSession,
   CallSessionStatus,
+  CommunicationChannel,
+  CommunicationChannelMember,
+  CommunicationChannelType,
   CollaborationEntityType,
   ControlSignal,
   CorrectiveAction,
@@ -34,6 +37,8 @@ import type {
   MeetingParticipantRole,
   MeetingStatus,
   MessageMention,
+  MessageReaction,
+  MessageSticker,
   NotificationPreference,
   OccupancyWindow,
   PlanSnapshot,
@@ -47,7 +52,9 @@ import type {
   TenantUser,
   TemplateImprovementAction,
   UserNotification,
-  UserId
+  UserId,
+  StickerAsset,
+  StickerPack
 } from "@kiss-pm/domain";
 import type {
   CrmActivityEntityType,
@@ -531,6 +538,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     assetId: string;
   }): Promise<FileAssetRecord | undefined>;
+  findFileAssetById?(tenantId: TenantId, assetId: string): Promise<FileAssetRecord | undefined>;
   createExternalReference?(input: ExternalReferenceInput): Promise<ExternalReferenceRecord>;
   createEntityAttachment?(input: EntityAttachmentInput): Promise<AttachmentReadModel>;
   listEntityAttachments?(input: {
@@ -815,6 +823,42 @@ export type ApiTenantDataSource = {
       projectId?: string | null;
     }
   ): Promise<AuditEventListItem[]>;
+  ensureWorkspaceGeneralChannel?(input: {
+    tenantId: TenantId;
+    createdByUserId: UserId;
+    title?: string;
+  }): Promise<CommunicationChannel>;
+  createCommunicationChannel?(input: Omit<
+    CommunicationChannel,
+    "createdAt" | "updatedAt" | "archivedAt"
+  >): Promise<CommunicationChannel>;
+  updateCommunicationChannel?(input: {
+    tenantId: TenantId;
+    channelId: string;
+    title?: string;
+    description?: string;
+  }): Promise<CommunicationChannel | undefined>;
+  findCommunicationChannel?(
+    tenantId: TenantId,
+    channelId: string
+  ): Promise<CommunicationChannel | undefined>;
+  listCommunicationChannels?(input: {
+    tenantId: TenantId;
+    channelType?: CommunicationChannelType;
+  }): Promise<CommunicationChannel[]>;
+  upsertCommunicationChannelMember?(input: Omit<
+    CommunicationChannelMember,
+    "createdAt" | "archivedAt"
+  >): Promise<CommunicationChannelMember>;
+  archiveCommunicationChannelMember?(input: {
+    tenantId: TenantId;
+    channelId: string;
+    userId: UserId;
+  }): Promise<CommunicationChannelMember | undefined>;
+  listCommunicationChannelMembers?(input: {
+    tenantId: TenantId;
+    channelId: string;
+  }): Promise<CommunicationChannelMember[]>;
   ensureConversation?(input: Omit<Conversation, "createdAt" | "archivedAt">): Promise<Conversation>;
   findConversation?(
     tenantId: TenantId,
@@ -860,6 +904,41 @@ export type ApiTenantDataSource = {
     mentionedUserIds: UserId[];
   }): Promise<MessageMention[]>;
   listMessageMentions?(tenantId: TenantId, messageId: string): Promise<MessageMention[]>;
+  upsertMessageReaction?(input: Omit<
+    MessageReaction,
+    "createdAt" | "archivedAt"
+  >): Promise<MessageReaction>;
+  archiveMessageReaction?(input: {
+    tenantId: TenantId;
+    messageId: string;
+    reactionId: string;
+    userId: UserId;
+  }): Promise<MessageReaction | undefined>;
+  listMessageReactionsByMessageIds?(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageReaction[]>;
+  createStickerPack?(input: Omit<StickerPack, "createdAt" | "archivedAt">): Promise<StickerPack>;
+  archiveStickerPack?(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerPack | undefined>;
+  listStickerPacks?(tenantId: TenantId): Promise<StickerPack[]>;
+  createStickerAsset?(input: Omit<StickerAsset, "createdAt" | "archivedAt">): Promise<StickerAsset>;
+  findStickerAsset?(tenantId: TenantId, stickerAssetId: string): Promise<StickerAsset | undefined>;
+  archiveStickerAsset?(input: {
+    tenantId: TenantId;
+    stickerAssetId: string;
+  }): Promise<StickerAsset | undefined>;
+  listStickerAssets?(input: {
+    tenantId: TenantId;
+    packId: string;
+  }): Promise<StickerAsset[]>;
+  createMessageSticker?(input: Omit<MessageSticker, "createdAt">): Promise<MessageSticker>;
+  listMessageStickersByMessageIds?(input: {
+    tenantId: TenantId;
+    messageIds: string[];
+  }): Promise<MessageSticker[]>;
   getConversationReadState?(input: {
     tenantId: TenantId;
     conversationId: string;

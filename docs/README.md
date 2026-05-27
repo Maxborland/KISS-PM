@@ -51,6 +51,7 @@
 45. `44_PHASE_12_CALENDAR_OCCUPANCY_V2_BACKEND.md` — backend contract для personal calendars, unified occupancy, meetings/calls capacity occupation, minute-slot capacity и future Google/Microsoft/CalDAV sync boundary.
 46. `45_PHASE_12_BACKGROUND_JOBS_INFRASTRUCTURE.md` — backend foundation для scheduled/background jobs, retries, cleanup, notification dispatch, connector sync, search projection rebuild и capacity cache warmup.
 47. `44_PHASE_H_DOCUMENTS_KNOWLEDGE_LAYER_BACKEND.md` — backend contract для project documents, meeting minutes, decision log, action items, document attachments, versioning и future approvals boundary.
+48. `44_PHASE_G_3_COMMUNICATIONS_UPGRADE_BACKEND.md` — backend contract для общих каналов, entity/CRM чатов, reactions, emoji, sticker packs/imports, channel-scoped calls и permissioned notifications/audit.
 
 ## Планы исправлений
 

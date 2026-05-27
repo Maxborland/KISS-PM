@@ -52,6 +52,7 @@ export const attachmentEntityTypes = [
   "product",
   "project",
   "task",
+  "communication_channel",
   "document"
 ] as const satisfies readonly AttachmentEntityType[];
 

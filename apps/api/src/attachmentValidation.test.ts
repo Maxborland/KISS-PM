@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseAttachmentId,
   parseAttachmentEntityId,
+  parseAttachmentEntityType,
   buildStorageKey,
   parseExternalReferenceUrl,
   parseExternalId,
@@ -68,6 +69,14 @@ describe("attachment validation", () => {
     expect(parseRelationType("bad/relation")).toEqual({
       ok: false,
       error: "attachment_relation_type_invalid"
+    });
+    expect(parseAttachmentEntityType("communication_channel")).toEqual({
+      ok: true,
+      value: "communication_channel"
+    });
+    expect(parseAttachmentEntityType("call_room")).toEqual({
+      ok: false,
+      error: "attachment_entity_type_invalid"
     });
     expect(parseExternalId(" jira:PM-42 ")).toEqual({
       ok: true,
