@@ -1,23 +1,18 @@
 import {
   createDatabase,
   createPostgresTenantDataSource,
-  createTenantAdminSeedProfile,
   seedTenantDataset,
   type PostgresClient,
   type SeedTenantDataset
 } from "@kiss-pm/persistence";
 
 import type { createApp } from "./app";
+import { createTenantScenarioDataset } from "./scenarioTestFixtures";
 
 type TestApp = ReturnType<typeof createApp>;
 
-export const planningRouteTestDataset: SeedTenantDataset = {
-  tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
+export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioDataset({
   accessProfiles: [
-    createTenantAdminSeedProfile({
-      id: "access-profile-admin",
-      tenantId: "tenant-alpha"
-    }),
     {
       id: "access-profile-reader",
       tenantId: "tenant-alpha",
@@ -60,24 +55,7 @@ export const planningRouteTestDataset: SeedTenantDataset = {
       permissions: ["tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply"]
     }
   ],
-  positions: [
-    { id: "position-manager", tenantId: "tenant-alpha", name: "Руководитель проекта" },
-    { id: "position-engineer", tenantId: "tenant-alpha", name: "Инженер" }
-  ],
-  clients: [{ id: "client-romashka", tenantId: "tenant-alpha", name: "ООО Ромашка" }],
-  projectTypes: [
-    { id: "project-type-implementation", tenantId: "tenant-alpha", name: "Внедрение" }
-  ],
   users: [
-    {
-      id: "user-alpha-admin",
-      tenantId: "tenant-alpha",
-      email: "admin@kiss-pm.local",
-      name: "Анна Администратор",
-      accessProfileId: "access-profile-admin",
-      positionId: "position-manager",
-      password: "admin12345"
-    },
     {
       id: "user-alpha-executor",
       tenantId: "tenant-alpha",
@@ -133,7 +111,7 @@ export const planningRouteTestDataset: SeedTenantDataset = {
       password: "scenario12345"
     }
   ]
-};
+});
 
 export async function resetPlanningRouteTestData(client: PostgresClient): Promise<void> {
   await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignment_allocations, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;

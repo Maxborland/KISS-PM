@@ -46,49 +46,59 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
         trustForwardedHeaders: trustForwardedAuthHeaders
       })
     };
-    const rateLimitDecision = deps.authRateLimiter.check(rateLimitInput);
+    const reservedAttempt = Boolean(deps.authRateLimiter.reserveAttempt);
+    const rateLimitDecision = deps.authRateLimiter.reserveAttempt
+      ? await deps.authRateLimiter.reserveAttempt(rateLimitInput)
+      : await deps.authRateLimiter.check(rateLimitInput);
     if (!rateLimitDecision.allowed) {
       context.header("Retry-After", String(rateLimitDecision.retryAfterSeconds));
       return context.json({ error: "too_many_login_attempts" }, 429);
     }
-    const credential = await dataSource.findCredentialByEmail(email);
+    try {
+      const credential = await dataSource.findCredentialByEmail(email);
 
-    const passwordMatches = verifyLoginPassword(password, credential);
+      const passwordMatches = verifyLoginPassword(password, credential);
 
-    if (!credential || !passwordMatches) {
-      deps.authRateLimiter.recordFailure(rateLimitInput);
-      return context.json({ error: "invalid_credentials" }, 401);
-    }
-    deps.authRateLimiter.recordSuccess(rateLimitInput);
-
-    const actor = await dataSource.findUserById(credential.userId);
-    if (!actor) {
-      return context.json({ error: "user_not_found" }, 404);
-    }
-    if (!(await isWorkspaceUserActive(actor))) {
-      return context.json({ error: "user_inactive" }, 403);
-    }
-
-    const rawToken = randomBytes(32).toString("hex");
-    await dataSource.createSession({
-      id: `session-${randomUUID()}`,
-      tenantId: credential.tenantId,
-      userId: credential.userId,
-      tokenHash: hashSessionToken(rawToken),
-      expiresAt: new Date(Date.now() + sessionTtlMs)
-    });
-
-    context.header(
-      "Set-Cookie",
-      buildSessionCookieHeader(rawToken, { secure: secureCookies })
-    );
-
-    return context.json({
-      user: toPublicUser(actor),
-      workspace: {
-        id: actor.tenantId
+      if (!credential || !passwordMatches) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invalid_credentials" }, 401);
       }
-    });
+      await deps.authRateLimiter.recordSuccess(rateLimitInput, { reserved: reservedAttempt });
+
+      const actor = await dataSource.findUserById(credential.userId);
+      if (!actor) {
+        return context.json({ error: "user_not_found" }, 404);
+      }
+      if (!(await isWorkspaceUserActive(actor))) {
+        return context.json({ error: "user_inactive" }, 403);
+      }
+
+      const rawToken = randomBytes(32).toString("hex");
+      await dataSource.createSession({
+        id: `session-${randomUUID()}`,
+        tenantId: credential.tenantId,
+        userId: credential.userId,
+        tokenHash: hashSessionToken(rawToken),
+        expiresAt: new Date(Date.now() + sessionTtlMs)
+      });
+
+      context.header(
+        "Set-Cookie",
+        buildSessionCookieHeader(rawToken, { secure: secureCookies })
+      );
+
+      return context.json({
+        user: toPublicUser(actor),
+        workspace: {
+          id: actor.tenantId
+        }
+      });
+    } catch (error) {
+      if (reservedAttempt) {
+        await deps.authRateLimiter.releaseReservedAttempt?.(rateLimitInput);
+      }
+      throw error;
+    }
   });
 
   app.post("/api/auth/logout", async (context) => {

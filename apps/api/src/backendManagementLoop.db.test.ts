@@ -143,6 +143,7 @@ describe("backend management loop DB smoke", () => {
         access_profiles,
         tenants
       RESTART IDENTITY
+      CASCADE
     `;
   }
 

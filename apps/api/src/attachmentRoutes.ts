@@ -10,10 +10,12 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
 } from "./apiTypes";
+import type { AttachmentDataPort } from "./apiDataPorts";
 import { serializeAttachment } from "./attachmentSerialization";
 import {
   parseContentLength,
   parseMultipartContentType,
+  createUploadConcurrencyLimiter,
   readBoundedMultipartRequest,
   toArrayBuffer
 } from "./attachmentUploadRequest";
@@ -31,15 +33,16 @@ import {
   parseReferenceTitle,
   sanitizeFileName
 } from "./attachmentValidation";
-import { createAttachmentWorkspace } from "./attachments/attachmentWorkspace";
+import { createAttachmentCommand } from "./attachments/attachmentCommand";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { StorageProvider } from "./storageProvider";
 
 const maxUploadBytes = 25 * 1024 * 1024;
 const maxMultipartEnvelopeBytes = maxUploadBytes + 1024 * 1024;
+const uploadConcurrencyLimiter = createUploadConcurrencyLimiter(2);
 
 type AttachmentRouteDeps = {
-  dataSource: ApiTenantDataSource;
+  dataSource: AttachmentDataPort;
   storageProvider: StorageProvider;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
@@ -53,7 +56,7 @@ type AttachmentRouteDeps = {
 };
 
 export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
-  const attachmentWorkspace = createAttachmentWorkspace(deps);
+  const attachmentCommand = createAttachmentCommand(deps);
 
   app.get("/api/workspace/attachments", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
@@ -65,7 +68,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!entityId.ok) return context.json({ error: entityId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentWorkspace.listAttachments({
+    const result = await attachmentCommand.listAttachments({
       actor,
       entityId: entityId.value,
       entityType: entityType.value,
@@ -85,7 +88,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentWorkspace.attachExternalReference({
+    const result = await attachmentCommand.attachExternalReference({
       actor,
       profile,
       ...parsed.value
@@ -97,35 +100,41 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
   app.post("/api/workspace/attachments/files", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+    const uploadSlot = uploadConcurrencyLimiter.tryAcquire(`${actor.tenantId}:${actor.id}`);
+    if (!uploadSlot.ok) return context.json({ error: "upload_rate_limited" }, 429);
 
-    const contentLength = parseContentLength(context.req.header("content-length"));
-    if (!contentLength.ok) return context.json({ error: contentLength.error }, 400);
-    if (contentLength.value !== null && contentLength.value > maxMultipartEnvelopeBytes) {
-      return context.json({ error: "file_too_large" }, 413);
+    try {
+      const contentLength = parseContentLength(context.req.header("content-length"));
+      if (!contentLength.ok) return context.json({ error: contentLength.error }, 400);
+      if (contentLength.value !== null && contentLength.value > maxMultipartEnvelopeBytes) {
+        return context.json({ error: "file_too_large" }, 413);
+      }
+
+      const contentType = parseMultipartContentType(context.req.header("content-type"));
+      if (!contentType.ok) return context.json({ error: contentType.error }, 415);
+
+      const boundedRequest = await readBoundedMultipartRequest(
+        context.req.raw,
+        maxMultipartEnvelopeBytes
+      );
+      if (!boundedRequest.ok) {
+        return context.json({ error: boundedRequest.error }, boundedRequest.status);
+      }
+
+      const parsedForm = await parseUploadForm(boundedRequest.request);
+      if (!parsedForm.ok) return context.json({ error: parsedForm.error }, parsedForm.status);
+
+      const profile = await deps.getActorProfile(actor);
+      const result = await attachmentCommand.attachFile({
+        actor,
+        profile,
+        ...parsedForm.value
+      });
+      if (!result.ok) return context.json({ error: result.error }, result.status);
+      return context.json({ attachment: serializeAttachment(result.attachment) }, 201);
+    } finally {
+      uploadSlot.release();
     }
-
-    const contentType = parseMultipartContentType(context.req.header("content-type"));
-    if (!contentType.ok) return context.json({ error: contentType.error }, 415);
-
-    const boundedRequest = await readBoundedMultipartRequest(
-      context.req.raw,
-      maxMultipartEnvelopeBytes
-    );
-    if (!boundedRequest.ok) {
-      return context.json({ error: boundedRequest.error }, boundedRequest.status);
-    }
-
-    const parsedForm = await parseUploadForm(boundedRequest.request);
-    if (!parsedForm.ok) return context.json({ error: parsedForm.error }, parsedForm.status);
-
-    const profile = await deps.getActorProfile(actor);
-    const result = await attachmentWorkspace.attachFile({
-      actor,
-      profile,
-      ...parsedForm.value
-    });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-    return context.json({ attachment: serializeAttachment(result.attachment) }, 201);
   });
 
   app.delete("/api/workspace/attachments/:attachmentId", async (context) => {
@@ -135,7 +144,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentWorkspace.archiveAttachment({
+    const result = await attachmentCommand.archiveAttachment({
       actor,
       attachmentId: attachmentId.value,
       profile
@@ -151,7 +160,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentWorkspace.prepareDownload({
+    const result = await attachmentCommand.prepareDownload({
       actor,
       attachmentId: attachmentId.value,
       profile

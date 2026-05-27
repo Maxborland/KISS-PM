@@ -9,6 +9,7 @@ export type PlanningEventListener = (event: PlanRealtimeEvent) => void;
 export interface PlanningEventPublisher {
   publish(event: PlanRealtimeEvent): void;
   subscribe(projectId: string, listener: PlanningEventListener): () => void;
+  close?(): Promise<void>;
 }
 
 export class InMemoryPlanningEventPublisher implements PlanningEventPublisher {
@@ -49,6 +50,9 @@ export async function bootstrapPlanningEventPublisher(): Promise<PlanningEventPu
     const { createRedisPlanningEventPublisher } = await import("./planningRedisEventBus.js");
     const redis = await createRedisPlanningEventPublisher(memory);
     if (redis) return redis;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("planning_events_redis_unavailable");
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[planning-events] Redis unavailable, falling back to in-memory publisher"

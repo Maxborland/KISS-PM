@@ -30,6 +30,26 @@ export function parseMultipartContentType(value: string | undefined):
   return { ok: true };
 }
 
+export function createUploadConcurrencyLimiter(maxConcurrentUploads: number) {
+  const activeUploadsByKey = new Map<string, number>();
+
+  return {
+    tryAcquire(key: string): { ok: true; release(): void } | { ok: false } {
+      const active = activeUploadsByKey.get(key) ?? 0;
+      if (active >= maxConcurrentUploads) return { ok: false };
+      activeUploadsByKey.set(key, active + 1);
+      return {
+        ok: true,
+        release() {
+          const next = (activeUploadsByKey.get(key) ?? 1) - 1;
+          if (next <= 0) activeUploadsByKey.delete(key);
+          else activeUploadsByKey.set(key, next);
+        }
+      };
+    }
+  };
+}
+
 export async function readBoundedMultipartRequest(
   request: Request,
   maxBytes: number
