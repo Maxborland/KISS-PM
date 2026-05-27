@@ -11,6 +11,10 @@ const only = process.env.STORYBOOK_VRT_ONLY;
 const stories = loadVrtStories().filter((story) => !only || story.id === only);
 // Linux CI rasterizes the Windows-authored Storybook baselines with different system fonts.
 const maxDiffPixelRatio = process.env.CI && process.platform === "linux" ? 0.08 : 0.02;
+const stableMinHeights: Record<string, number> = {
+  "flows-онбординг-рабочей-области--default": 2512,
+  "screens-администрирование--admin": 1426
+};
 
 test.describe("Storybook visual regression", () => {
   test.describe.configure({ mode: "parallel", timeout: 90_000 });
@@ -21,6 +25,16 @@ test.describe("Storybook visual regression", () => {
       await assertStoryRendered(preview);
 
       const productRoot = await resolveProductRoot(preview);
+      const stableMinHeight = stableMinHeights[story.id];
+      if (stableMinHeight) {
+        await productRoot.evaluate(
+          (element, minHeight) => {
+            (element as HTMLElement).style.minHeight = `${minHeight}px`;
+          },
+          stableMinHeight
+        );
+      }
+
       await expect(productRoot).toHaveScreenshot(`${story.id}.png`, {
         animations: "disabled",
         maxDiffPixelRatio,
