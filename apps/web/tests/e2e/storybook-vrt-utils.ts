@@ -123,6 +123,9 @@ function loadStorybookIndex(webRoot: string): StorybookIndex {
   if (existsSync(indexPath)) {
     return JSON.parse(readFileSync(indexPath, "utf8")) as StorybookIndex;
   }
+  if (process.env.STORYBOOK_STATIC !== "1") {
+    return { entries: {} };
+  }
   throw new Error(
     `Storybook static index not found: ${indexPath}. Run pnpm --filter @kiss-pm/web build-storybook before VRT/a11y gates.`
   );
