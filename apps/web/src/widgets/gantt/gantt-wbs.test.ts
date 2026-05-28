@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createTaskRow,
   hiddenRowIds,
   indentRow,
   moveRow,
@@ -68,6 +69,19 @@ describe("moveRow", () => {
   it("does not move a child row outside its parent subtree", () => {
     const rows = moveRow(sample(), "b", -1);
     expect(rows.map((row) => row.id)).toEqual(sample().map((row) => row.id));
+  });
+});
+
+describe("createTaskRow", () => {
+  it("adds after the whole selected summary subtree", () => {
+    const rows = createTaskRow(nested(), "p1");
+    const ids = rows.map((row) => row.id);
+    const inserted = rows.find((row) => row.name === "Новая задача");
+    expect(ids.indexOf(inserted!.id)).toBe(4);
+    expect(ids.slice(1, 5)).toEqual(["p1", "t1", "t2", inserted!.id]);
+    expect(inserted?.level).toBe(1);
+    expect(rows.find((row) => row.id === "t1")?.wbs).toBe("1.1.1");
+    expect(inserted?.wbs).toBe("1.2");
   });
 });
 

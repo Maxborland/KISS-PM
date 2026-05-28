@@ -38,9 +38,25 @@ describe("gantt keyboard policy", () => {
   it("Delete ignored while editing", () => {
     const action = resolveGanttKeyboardAction(
       { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
-      { ...emptyCtx, edit: { rowId: "a", field: "name", draft: "" } }
+      { ...emptyCtx, edit: { rowId: "a", field: "name", draft: "" }, activeGrid: true }
     );
     expect(action).toBeNull();
+  });
+
+  it("Delete is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Delete clears cells inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "clearCells" });
   });
 
   it("Ctrl+Z maps to undo", () => {

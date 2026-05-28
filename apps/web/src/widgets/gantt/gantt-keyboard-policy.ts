@@ -50,7 +50,7 @@ export function resolveGanttKeyboardAction(
     return { type: "pasteCells" };
   }
 
-  if (input.key === "Delete") {
+  if (input.key === "Delete" && ctx.activeGrid) {
     if (ctx.edit) return null;
     return { type: "clearCells" };
   }

@@ -138,8 +138,10 @@ export function createTaskRow(rows: GanttRow[], afterId?: string): GanttRow[] {
   const template = newTaskTemplate(afterId ? rows.find((r) => r.id === afterId) : undefined);
   if (!afterId) return renumberWbs([...rows, template]);
   const index = rows.findIndex((r) => r.id === afterId);
+  if (index < 0) return renumberWbs([...rows, template]);
+  const insertIndex = subtreeEndIndex(rows, index);
   const copy = [...rows];
-  copy.splice(index + 1, 0, template);
+  copy.splice(insertIndex, 0, template);
   return renumberWbs(copy);
 }
 
