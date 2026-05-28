@@ -57,6 +57,18 @@ describe("moveRow", () => {
     expect(rows[1]?.id).toBe("c");
     expect(rows[2]?.id).toBe("b");
   });
+
+  it("moves a summary row with its descendants", () => {
+    const rows = moveRow(nested(), "p1", 1);
+    expect(rows.map((row) => row.id)).toEqual(["root", "p2", "t3", "p1", "t1", "t2"]);
+    expect(rows.find((row) => row.id === "t1")?.level).toBe(2);
+    expect(rows.find((row) => row.id === "t2")?.level).toBe(2);
+  });
+
+  it("does not move a child row outside its parent subtree", () => {
+    const rows = moveRow(sample(), "b", -1);
+    expect(rows.map((row) => row.id)).toEqual(sample().map((row) => row.id));
+  });
 });
 
 describe("visibleRows", () => {

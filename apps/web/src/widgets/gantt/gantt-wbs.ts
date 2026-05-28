@@ -80,12 +80,46 @@ export function outdentRow(rows: GanttRow[], rowId: string): GanttRow[] {
 
 export function moveRow(rows: GanttRow[], rowId: string, direction: -1 | 1): GanttRow[] {
   const index = rows.findIndex((r) => r.id === rowId);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= rows.length) return rows;
-  const copy = [...rows];
-  const [item] = copy.splice(index, 1);
-  copy.splice(target, 0, item!);
-  return renumberWbs(copy);
+  if (index < 0) return rows;
+
+  const row = rows[index]!;
+  const end = subtreeEndIndex(rows, index);
+
+  if (direction < 0) {
+    const previousStart = previousSiblingBlockStart(rows, index);
+    if (previousStart === null) return rows;
+    return renumberWbs([
+      ...rows.slice(0, previousStart),
+      ...rows.slice(index, end),
+      ...rows.slice(previousStart, index),
+      ...rows.slice(end)
+    ]);
+  }
+
+  const nextStart = end;
+  if (nextStart >= rows.length || rows[nextStart]!.level < row.level) return rows;
+  const nextEnd = subtreeEndIndex(rows, nextStart);
+  return renumberWbs([
+    ...rows.slice(0, index),
+    ...rows.slice(nextStart, nextEnd),
+    ...rows.slice(index, end),
+    ...rows.slice(nextEnd)
+  ]);
+}
+
+function subtreeEndIndex(rows: GanttRow[], startIndex: number): number {
+  const level = rows[startIndex]!.level;
+  let end = startIndex + 1;
+  while (end < rows.length && rows[end]!.level > level) end += 1;
+  return end;
+}
+
+function previousSiblingBlockStart(rows: GanttRow[], index: number): number | null {
+  const level = rows[index]!.level;
+  let cursor = index - 1;
+  if (cursor < 0 || rows[cursor]!.level < level) return null;
+  while (cursor > 0 && rows[cursor]!.level > level) cursor -= 1;
+  return rows[cursor]!.level === level ? cursor : null;
 }
 
 function newTaskTemplate(near?: GanttRow): GanttRow {
