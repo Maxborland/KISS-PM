@@ -9,9 +9,13 @@ export function canDropRowBefore(
   targetRowId: string
 ): boolean {
   if (dragRootId === targetRowId) return false;
+  const dragIndex = rows.findIndex((row) => row.id === dragRootId);
+  const targetIndex = rows.findIndex((row) => row.id === targetRowId);
+  if (dragIndex < 0 || targetIndex < 0) return false;
   const subtree = new Set(rowSubtreeIds(rows, dragRootId));
   if (subtree.has(targetRowId)) return false;
-  return true;
+  return rows[dragIndex]!.level === rows[targetIndex]!.level &&
+    rowParentId(rows, dragIndex) === rowParentId(rows, targetIndex);
 }
 
 /**
@@ -36,10 +40,21 @@ export function reorderRowsByDrag(
     const targetIndex = rest.findIndex((r) => r.id === targetRowId);
     if (targetIndex < 0) return null;
     insertAt = targetIndex;
+  } else if (rows[dragIndex]!.level > 0) {
+    return null;
   }
 
   const next = [...rest.slice(0, insertAt), ...subtree, ...rest.slice(insertAt)];
   return next;
+}
+
+function rowParentId(rows: GanttRow[], index: number): string | null {
+  const level = rows[index]!.level;
+  if (level === 0) return null;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (rows[cursor]!.level < level) return rows[cursor]!.id;
+  }
+  return null;
 }
 
 export function shiftRowDates(row: GanttRow, deltaDays: number): GanttRow {

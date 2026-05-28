@@ -25,4 +25,17 @@ describe("reorderRowsByDrag", () => {
   it("blocks drop into own subtree", () => {
     expect(reorderRowsByDrag(rows, "s", "c1")).toBeNull();
   });
+
+  it("moves child rows only within the same summary parent", () => {
+    const next = reorderRowsByDrag(rows, "c2", "c1");
+    expect(next?.map((r) => r.id)).toEqual(["s", "c2", "c1", "t"]);
+  });
+
+  it("blocks top-level rows from dropping before another summary child", () => {
+    expect(reorderRowsByDrag(rows, "t", "c1")).toBeNull();
+  });
+
+  it("blocks child rows from appending outside their summary parent", () => {
+    expect(reorderRowsByDrag(rows, "c1", null)).toBeNull();
+  });
 });
