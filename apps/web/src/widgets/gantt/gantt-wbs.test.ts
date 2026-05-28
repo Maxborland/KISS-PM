@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createTaskRow,
+  deleteRow,
   hiddenRowIds,
   indentRow,
+  insertTaskBelow,
   moveRow,
   outdentRow,
   renumberWbs,
@@ -82,6 +84,30 @@ describe("createTaskRow", () => {
     expect(inserted?.level).toBe(1);
     expect(rows.find((row) => row.id === "t1")?.wbs).toBe("1.1.1");
     expect(inserted?.wbs).toBe("1.2");
+  });
+});
+
+describe("insertTaskBelow", () => {
+  it("adds below the whole selected summary subtree", () => {
+    const rows = insertTaskBelow(nested(), "p1");
+    const ids = rows.map((row) => row.id);
+    const inserted = rows.find((row) => row.name === "Новая задача");
+    expect(ids.indexOf(inserted!.id)).toBe(4);
+    expect(ids.slice(1, 5)).toEqual(["p1", "t1", "t2", inserted!.id]);
+    expect(inserted?.level).toBe(1);
+  });
+});
+
+describe("deleteRow", () => {
+  it("deletes a summary row with its descendants and related dependencies", () => {
+    const deps: GanttDependency[] = [
+      { id: "d1", fromId: "t1", toId: "t2", type: "FS" },
+      { id: "d2", fromId: "t2", toId: "t3", type: "FS" },
+      { id: "d3", fromId: "p2", toId: "t3", type: "FS" }
+    ];
+    const { rows, dependencies } = deleteRow(nested(), "p1", deps);
+    expect(rows.map((row) => row.id)).toEqual(["root", "p2", "t3"]);
+    expect(dependencies.map((dep) => dep.id)).toEqual(["d3"]);
   });
 });
 

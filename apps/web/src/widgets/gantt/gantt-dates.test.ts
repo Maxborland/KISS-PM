@@ -15,7 +15,7 @@ describe("gantt-dates", () => {
 
   it("computes finish day for task and milestone", () => {
     const task: GanttRow = { id: "t", level: 0, kind: "task", name: "T", startDay: 2, durationDays: 4 };
-    expect(finishDayIndex(task)).toBe(6);
+    expect(finishDayIndex(task)).toBe(5);
     const mile: GanttRow = { ...task, kind: "milestone", durationDays: 0 };
     expect(finishDayIndex(mile)).toBe(2);
   });

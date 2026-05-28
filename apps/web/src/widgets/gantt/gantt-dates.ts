@@ -19,7 +19,7 @@ export function dateLabelToDayIndex(label: string): number | null {
 
 export function finishDayIndex(row: GanttRow): number {
   if (row.kind === "milestone") return row.startDay;
-  return row.startDay + Math.max(row.durationDays, 0);
+  return row.startDay + Math.max(row.durationDays, 1) - 1;
 }
 
 export function clampDayIndex(day: number, maxDay: number) {

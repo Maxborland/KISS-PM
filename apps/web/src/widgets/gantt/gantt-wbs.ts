@@ -159,12 +159,16 @@ export function insertTaskBelow(rows: GanttRow[], anchorId: string): GanttRow[] 
   if (index < 0) return rows;
   const template = newTaskTemplate(rows[index]);
   const copy = [...rows];
-  copy.splice(index + 1, 0, template);
+  copy.splice(subtreeEndIndex(rows, index), 0, template);
   return renumberWbs(copy);
 }
 
 export function deleteRow(rows: GanttRow[], rowId: string, dependencies: GanttDependency[]) {
-  const nextRows = renumberWbs(rows.filter((r) => r.id !== rowId));
-  const nextDeps = dependencies.filter((d) => d.fromId !== rowId && d.toId !== rowId);
+  const index = rows.findIndex((r) => r.id === rowId);
+  if (index < 0) return { rows, dependencies };
+  const end = subtreeEndIndex(rows, index);
+  const deletedIds = new Set(rows.slice(index, end).map((row) => row.id));
+  const nextRows = renumberWbs(rows.filter((r) => !deletedIds.has(r.id)));
+  const nextDeps = dependencies.filter((d) => !deletedIds.has(d.fromId) && !deletedIds.has(d.toId));
   return { rows: nextRows, dependencies: nextDeps };
 }
