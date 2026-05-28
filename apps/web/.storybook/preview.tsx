@@ -1,5 +1,5 @@
 import type { Preview } from "@storybook/react";
-import { initialize, mswDecorator } from "msw-storybook-addon";
+import { initialize, mswLoader } from "msw-storybook-addon";
 import { ThemeProvider } from "next-themes";
 import React from "react";
 
@@ -14,6 +14,7 @@ initialize({ onUnhandledRequest: "bypass" });
 
 const preview: Preview = {
   globalTypes: scenarioGlobalType,
+  loaders: [mswLoader],
   parameters: {
     msw: {
       handlers: storybookMswHandlers
@@ -45,7 +46,7 @@ const preview: Preview = {
       }
     }
   },
-  decorators: [mswDecorator, withScenario, (Story, context) => {
+  decorators: [withScenario, (Story, context) => {
       const fullscreen = context.parameters.layout === "fullscreen";
       return (
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
