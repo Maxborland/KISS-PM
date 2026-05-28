@@ -29,6 +29,18 @@ import type {
   GanttPreviewState
 } from "./types";
 
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest("input, textarea, select, [contenteditable='true']")
+  );
+}
+
+function isGridKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest(".gantt2"));
+}
+
 export function GanttInteractive({
   initialData,
   className,
@@ -179,7 +191,8 @@ export function GanttInteractive({
           drag: state.drag,
           contextMenu: state.contextMenu,
           detailsDrawerOpen: state.detailsDrawerOpen,
-          focus: state.focus
+          focus: state.focus,
+          activeGrid: isGridKeyboardTarget(event.target) && !isEditableKeyboardTarget(event.target)
         }
       );
       if (!action) return;

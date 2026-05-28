@@ -324,7 +324,7 @@ export function GanttView({
               ? {
                   onDateCommit: (label: string) => {
                     onEditDraft?.(label);
-                    onCommitEdit?.();
+                    onCommitEdit?.(label);
                   }
                 }
               : {}),

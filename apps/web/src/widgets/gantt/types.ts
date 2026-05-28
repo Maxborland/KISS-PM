@@ -279,7 +279,7 @@ export type GanttProps = {
   onAssignResource?: (rowId: string, initials: string | null) => void;
   onStartEdit?: (rowId: string, field: GanttCellField) => void;
   onEditDraft?: (draft: string) => void;
-  onCommitEdit?: () => void;
+  onCommitEdit?: (draftOverride?: string) => void;
   onCancelEdit?: () => void;
   onToggleCollapse?: (rowId: string) => void;
   onChartPointerDown?: (

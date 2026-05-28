@@ -14,6 +14,7 @@ export type GanttKeyboardContext = {
   contextMenu: unknown | null;
   detailsDrawerOpen: boolean;
   focus: GanttFocusCell | null;
+  activeGrid: boolean;
 };
 
 export type GanttKeyboardAction =
@@ -42,10 +43,10 @@ export function resolveGanttKeyboardAction(
   if (mod && (input.key === "y" || (input.shiftKey && input.key === "Z"))) {
     return { type: "redo" };
   }
-  if (mod && input.key === "c") {
+  if (mod && input.key === "c" && ctx.activeGrid) {
     return { type: "copyCells" };
   }
-  if (mod && input.key === "v") {
+  if (mod && input.key === "v" && ctx.activeGrid) {
     return { type: "pasteCells" };
   }
 

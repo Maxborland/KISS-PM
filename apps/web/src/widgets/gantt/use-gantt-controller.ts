@@ -410,16 +410,17 @@ export function useGanttController(options: UseGanttControllerOptions) {
     [state.edit, state.data.rows]
   );
 
-  const commitEdit = useCallback(() => {
+  const commitEdit = useCallback((draftOverride?: string) => {
     if (!state.edit) return;
     const row = state.data.rows.find((r) => r.id === state.edit!.rowId);
     if (!row) return;
-    const error = validateCell(state.edit.field, state.edit.draft, row);
+    const draft = draftOverride ?? state.edit.draft;
+    const error = validateCell(state.edit.field, draft, row);
     if (error) {
-      dispatch({ type: "patch", patch: { edit: { ...state.edit, error } } });
+      dispatch({ type: "patch", patch: { edit: { ...state.edit, draft, error } } });
       return;
     }
-    const nextRow = applyCellCommit(row, state.edit.field, state.edit.draft);
+    const nextRow = applyCellCommit(row, state.edit.field, draft);
     const rows = renumberWbs(state.data.rows.map((r) => (r.id === row.id ? nextRow : r)));
     emit(
       { ...state.data, rows: syncPredecessorLabels(rows, state.data.dependencies ?? []) },

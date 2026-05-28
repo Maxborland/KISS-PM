@@ -8,7 +8,8 @@ const emptyCtx = {
   drag: null,
   contextMenu: null,
   detailsDrawerOpen: false,
-  focus: null
+  focus: null,
+  activeGrid: false
 };
 
 describe("gantt keyboard policy", () => {
@@ -48,6 +49,22 @@ describe("gantt keyboard policy", () => {
       emptyCtx
     );
     expect(action).toEqual({ type: "undo" });
+  });
+
+  it("Ctrl+C is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "c", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+C maps to cell copy inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "c", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "copyCells" });
   });
 
   it("Shift+ArrowDown extends selection navigation", () => {

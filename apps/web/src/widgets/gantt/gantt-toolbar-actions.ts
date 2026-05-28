@@ -22,7 +22,7 @@ import type {
 } from "./types";
 
 export type GanttToolbarContext = {
-  state: GanttControllerState & { history: { past: unknown[]; future: unknown[] } };
+  state: GanttControllerState & { history: { past: GanttData[]; future: GanttData[] } };
   emit: (data: GanttData, event: GanttChangeEvent, record?: boolean) => void;
   dispatch: (action: ControllerAction) => void;
   commitRows: (rows: GanttRow[], event: GanttChangeEvent) => void;
@@ -31,13 +31,18 @@ export type GanttToolbarContext = {
   onChange?: (data: GanttData, event: GanttChangeEvent) => void;
 };
 
+function insertedRowId(before: GanttRow[], after: GanttRow[]) {
+  const beforeIds = new Set(before.map((row) => row.id));
+  return after.find((row) => !beforeIds.has(row.id))?.id;
+}
+
 export function buildGanttToolbarApi(ctx: GanttToolbarContext): GanttToolbarApi {
   const { state, emit, dispatch, commitRows, deleteSelectedRow, toggleTaskDetails } = ctx;
 
   return {
     addTask: () => {
       const rows = createTaskRow(state.data.rows, state.data.selectedRowId);
-      const newId = rows.at(-1)?.id;
+      const newId = insertedRowId(state.data.rows, rows);
       emit(patchGanttData(state.data, { rows, ...(newId ? { selectedRowId: newId } : {}) }), {
         type: "rows-reorder"
       });
@@ -97,12 +102,16 @@ export function buildGanttToolbarApi(ctx: GanttToolbarContext): GanttToolbarApi 
         patch: { flags: { ...state.flags, showDependencies: !state.flags.showDependencies } }
       }),
     undo: () => {
+      const prev = state.history.past.at(-1);
+      if (!prev) return;
       dispatch({ type: "undo" });
-      ctx.onChange?.(state.data, { type: "undo" });
+      ctx.onChange?.(prev, { type: "undo" });
     },
     redo: () => {
+      const next = state.history.future[0];
+      if (!next) return;
       dispatch({ type: "redo" });
-      ctx.onChange?.(state.data, { type: "redo" });
+      ctx.onChange?.(next, { type: "redo" });
     },
     canUndo: state.history.past.length > 0,
     canRedo: state.history.future.length > 0,
