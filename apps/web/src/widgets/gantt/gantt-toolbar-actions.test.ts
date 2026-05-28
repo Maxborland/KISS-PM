@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildGanttToolbarApi } from "./gantt-toolbar-actions";
+import { buildGanttToolbarApi, runGanttContextAction } from "./gantt-toolbar-actions";
 import type { GanttData } from "./types";
 
 type ToolbarContext = Parameters<typeof buildGanttToolbarApi>[0];
@@ -79,5 +79,31 @@ describe("buildGanttToolbarApi", () => {
     buildGanttToolbarApi(context).redo();
 
     expect(onChange).toHaveBeenCalledWith(next, { type: "redo" });
+  });
+});
+
+describe("runGanttContextAction", () => {
+  it("deletes the context-menu target row instead of the stale selected row", () => {
+    const deleteSelectedRow = vi.fn<ToolbarContext["deleteSelectedRow"]>();
+    const context = ctx({
+      deleteSelectedRow,
+      state: {
+        ...ctx().state,
+        contextMenu: { x: 10, y: 20, target: { kind: "row", rowId: "c" } }
+      }
+    });
+
+    runGanttContextAction("deleteTask", {
+      ...context,
+      contextMenu: context.state.contextMenu,
+      openTaskDetails: vi.fn(),
+      copyCells: vi.fn(),
+      pasteCells: vi.fn(),
+      clearCells: vi.fn(),
+      closeContextMenu: vi.fn()
+    });
+
+    expect(deleteSelectedRow).toHaveBeenCalledWith("c");
+    expect(context.dispatch).not.toHaveBeenCalled();
   });
 });

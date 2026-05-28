@@ -6,6 +6,7 @@ import {
   deriveWorkHours,
   updateTaskDuration,
   updateTaskFinishDate,
+  updateTaskStartDate,
   updateTaskWorkHours
 } from "./gantt-effort";
 import type { GanttRow } from "./types";
@@ -36,5 +37,10 @@ describe("gantt effort", () => {
     const row = updateTaskFinishDate(base, "10.05.2026");
     expect(row?.durationDays).toBe(10);
     expect(deriveWorkHours(row!)).toBe(80);
+  });
+
+  it("start date commit preserves the inclusive finish date", () => {
+    const row = updateTaskStartDate({ ...base, startDay: 0, durationDays: 3 }, "01.05.2026");
+    expect(row?.durationDays).toBe(3);
   });
 });

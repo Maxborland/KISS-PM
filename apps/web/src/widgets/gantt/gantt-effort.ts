@@ -45,7 +45,7 @@ export function updateTaskStartDate(row: GanttRow, startLabel: string): GanttRow
   const day = dateLabelToDayIndex(startLabel);
   if (day === null) return null;
   const finish = finishDayIndex(row);
-  const duration = Math.max(finish - day, row.kind === "milestone" ? 0 : 1);
+  const duration = Math.max(finish - day + 1, row.kind === "milestone" ? 0 : 1);
   const next: GanttRow = {
     ...row,
     startDay: day,

@@ -495,8 +495,8 @@ export function useGanttController(options: UseGanttControllerOptions) {
     });
   }, [emit, state.data, state.drag]);
 
-  const deleteSelectedRow = useCallback(() => {
-    const id = state.data.selectedRowId;
+  const deleteSelectedRow = useCallback((rowId?: string) => {
+    const id = rowId ?? state.data.selectedRowId;
     if (!id) return;
     const { rows, dependencies } = deleteRow(state.data.rows, id, state.data.dependencies ?? []);
     emit(

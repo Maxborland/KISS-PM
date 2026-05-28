@@ -62,20 +62,26 @@ export function toggleRowCollapsed(rows: GanttRow[], rowId: string): GanttRow[] 
 }
 
 export function indentRow(rows: GanttRow[], rowId: string): GanttRow[] {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index <= 0) return rows;
-  const row = rows[index]!;
-  if (row.level >= 3) return rows;
-  const next = rows.map((r, i) => (i === index ? { ...r, level: (r.level + 1) as GanttRow["level"] } : r));
+  const range = rowSubtreeRange(rows, rowId);
+  if (!range || range.start <= 0) return rows;
+  const subtree = rows.slice(range.start, range.end);
+  if (subtree.some((row) => row.level >= 3)) return rows;
+  const affectedIds = new Set(subtree.map((row) => row.id));
+  const next = rows.map((r) =>
+    affectedIds.has(r.id) ? { ...r, level: (r.level + 1) as GanttRow["level"] } : r
+  );
   return renumberWbs(next);
 }
 
 export function outdentRow(rows: GanttRow[], rowId: string): GanttRow[] {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index < 0) return rows;
-  const row = rows[index]!;
+  const range = rowSubtreeRange(rows, rowId);
+  if (!range) return rows;
+  const row = rows[range.start]!;
   if (row.level <= 0) return rows;
-  const next = rows.map((r, i) => (i === index ? { ...r, level: (r.level - 1) as GanttRow["level"] } : r));
+  const affectedIds = new Set(rows.slice(range.start, range.end).map((subtreeRow) => subtreeRow.id));
+  const next = rows.map((r) =>
+    affectedIds.has(r.id) ? { ...r, level: (r.level - 1) as GanttRow["level"] } : r
+  );
   return renumberWbs(next);
 }
 

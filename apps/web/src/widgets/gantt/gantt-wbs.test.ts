@@ -52,6 +52,22 @@ describe("indent/outdent", () => {
     const rows = outdentRow(indentRow(sample(), "b"), "b");
     expect(rows.find((r) => r.id === "b")?.level).toBe(1);
   });
+
+  it("indents a summary row with its descendants", () => {
+    const rows = indentRow(nested(), "p1");
+    expect(rows.find((row) => row.id === "p1")?.level).toBe(2);
+    expect(rows.find((row) => row.id === "t1")?.level).toBe(3);
+    expect(rows.find((row) => row.id === "t2")?.level).toBe(3);
+    expect(rows.find((row) => row.id === "p2")?.level).toBe(1);
+  });
+
+  it("outdents a summary row with its descendants", () => {
+    const indented = indentRow(nested(), "p1");
+    const rows = outdentRow(indented, "p1");
+    expect(rows.find((row) => row.id === "p1")?.level).toBe(1);
+    expect(rows.find((row) => row.id === "t1")?.level).toBe(2);
+    expect(rows.find((row) => row.id === "t2")?.level).toBe(2);
+  });
 });
 
 describe("moveRow", () => {

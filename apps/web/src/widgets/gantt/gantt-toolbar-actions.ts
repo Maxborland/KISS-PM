@@ -26,7 +26,7 @@ export type GanttToolbarContext = {
   emit: (data: GanttData, event: GanttChangeEvent, record?: boolean) => void;
   dispatch: (action: ControllerAction) => void;
   commitRows: (rows: GanttRow[], event: GanttChangeEvent) => void;
-  deleteSelectedRow: () => void;
+  deleteSelectedRow: (rowId?: string) => void;
   toggleTaskDetails: () => void;
   onChange?: (data: GanttData, event: GanttChangeEvent) => void;
 };
@@ -154,13 +154,7 @@ export function runGanttContextAction(action: GanttContextAction, ctx: GanttCont
       if (rowId) ctx.emit({ ...ctx.state.data, rows: insertTaskBelow(ctx.state.data.rows, rowId) }, { type: "rows-reorder" });
       break;
     case "deleteTask":
-      if (rowId) {
-        ctx.dispatch({
-          type: "patch",
-          patch: { data: patchGanttData(ctx.state.data, { selectedRowId: rowId }) }
-        });
-      }
-      ctx.deleteSelectedRow();
+      ctx.deleteSelectedRow(rowId ?? undefined);
       break;
     case "copyCells":
       void ctx.copyCells();
