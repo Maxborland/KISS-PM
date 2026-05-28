@@ -123,10 +123,18 @@ describe("gantt keyboard policy", () => {
     expect(action).toEqual({ type: "startEdit" });
   });
 
-  it("Shift+ArrowDown extends selection navigation", () => {
+  it("Shift+ArrowDown is ignored outside the active grid", () => {
     const action = resolveGanttKeyboardAction(
       { key: "ArrowDown", ctrlKey: false, metaKey: false, shiftKey: true },
-      { ...emptyCtx, focus: { rowId: "t1", field: "name" } }
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Shift+ArrowDown extends selection navigation inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "ArrowDown", ctrlKey: false, metaKey: false, shiftKey: true },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
     );
     expect(action).toEqual({ type: "navigateCell", direction: "down", extend: true });
   });

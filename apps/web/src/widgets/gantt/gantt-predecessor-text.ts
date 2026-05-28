@@ -1,4 +1,5 @@
 import type { GanttDependency, GanttRow } from "./types";
+import { uniqueGanttId } from "./gantt-id";
 
 export {
   formatPredecessorText,
@@ -19,6 +20,7 @@ export function tokensToDependencies(
   const visibleIndex = new Map(rows.map((r, i) => [i + 1, r.id]));
   const next = existing.filter((d) => d.toId !== rowId);
   const rowIds = new Set(rows.map((r) => r.id));
+  const usedDependencyIds = new Set(existing.map((d) => d.id));
 
   for (const token of tokens) {
     const fromId = visibleIndex.get(token.rowNumber);
@@ -35,8 +37,15 @@ export function tokensToDependencies(
     );
     if (duplicate) return { dependencies: existing, error: "Такая связь уже есть" };
 
+    const id = uniqueGanttId(
+      "dep",
+      usedDependencyIds,
+      `dep-${fromId}-${rowId}-${token.type}-${token.lagDays ?? 0}`
+    );
+    usedDependencyIds.add(id);
+
     next.push({
-      id: `dep-${fromId}-${rowId}-${token.type}-${Date.now()}`,
+      id,
       fromId,
       toId: rowId,
       type: token.type,

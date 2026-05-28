@@ -101,6 +101,13 @@ describe("createTaskRow", () => {
     expect(rows.find((row) => row.id === "t1")?.wbs).toBe("1.1.1");
     expect(inserted?.wbs).toBe("1.2");
   });
+
+  it("generates unique ids across repeated task creation", () => {
+    const first = createTaskRow(sample());
+    const second = createTaskRow(first);
+    const ids = second.map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });
 
 describe("insertTaskBelow", () => {

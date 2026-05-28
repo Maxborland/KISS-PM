@@ -1,4 +1,5 @@
 import { validateDependencyCreation } from "./gantt-dependency-rules";
+import { uniqueGanttId } from "./gantt-id";
 import type {
   GanttData,
   GanttDependency,
@@ -43,12 +44,13 @@ export function tryCompleteLink(input: {
   now?: number;
 }): CompleteLinkResult {
   const { link, data, visibleRowIds, toId, toEndpoint, now = Date.now() } = input;
+  const dependencies = data.dependencies ?? [];
   const result = validateDependencyCreation({
     fromId: link.fromId,
     fromEndpoint: link.fromEndpoint,
     toId,
     toEndpoint,
-    dependencies: data.dependencies ?? [],
+    dependencies,
     rows: data.rows,
     visibleRowIds
   });
@@ -58,7 +60,7 @@ export function tryCompleteLink(input: {
   return {
     ok: true,
     dependency: {
-      id: `dep-${now}`,
+      id: uniqueGanttId("dep", dependencies.map((dependency) => dependency.id), `dep-${now}`),
       fromId: link.fromId,
       toId,
       type: result.type

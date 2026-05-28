@@ -1,4 +1,5 @@
 import type { GanttDependency, GanttRow } from "./types";
+import { uniqueGanttId } from "./gantt-id";
 import { rowSubtreeRange } from "./gantt-row-tree";
 
 export function renumberWbs(rows: GanttRow[]): GanttRow[] {
@@ -123,9 +124,13 @@ function previousSiblingBlockStart(rows: GanttRow[], index: number): number | nu
   return rows[cursor]!.level === level ? cursor : null;
 }
 
-function newTaskTemplate(near?: GanttRow): GanttRow {
+function nextTaskId(rows: GanttRow[]): string {
+  return uniqueGanttId("t", rows.map((row) => row.id));
+}
+
+function newTaskTemplate(id: string, near?: GanttRow): GanttRow {
   return {
-    id: `t-${Date.now()}`,
+    id,
     level: near?.level ?? 1,
     kind: "task",
     name: "Новая задача",
@@ -136,7 +141,7 @@ function newTaskTemplate(near?: GanttRow): GanttRow {
 }
 
 export function createTaskRow(rows: GanttRow[], afterId?: string): GanttRow[] {
-  const template = newTaskTemplate(afterId ? rows.find((r) => r.id === afterId) : undefined);
+  const template = newTaskTemplate(nextTaskId(rows), afterId ? rows.find((r) => r.id === afterId) : undefined);
   if (!afterId) return renumberWbs([...rows, template]);
   const range = rowSubtreeRange(rows, afterId);
   if (!range) return renumberWbs([...rows, template]);
@@ -148,7 +153,7 @@ export function createTaskRow(rows: GanttRow[], afterId?: string): GanttRow[] {
 export function insertTaskAbove(rows: GanttRow[], anchorId: string): GanttRow[] {
   const index = rows.findIndex((r) => r.id === anchorId);
   if (index < 0) return rows;
-  const template = newTaskTemplate(rows[index]);
+  const template = newTaskTemplate(nextTaskId(rows), rows[index]);
   const copy = [...rows];
   copy.splice(index, 0, template);
   return renumberWbs(copy);
@@ -157,7 +162,7 @@ export function insertTaskAbove(rows: GanttRow[], anchorId: string): GanttRow[] 
 export function insertTaskBelow(rows: GanttRow[], anchorId: string): GanttRow[] {
   const range = rowSubtreeRange(rows, anchorId);
   if (!range) return rows;
-  const template = newTaskTemplate(rows[range.start]);
+  const template = newTaskTemplate(nextTaskId(rows), rows[range.start]);
   const copy = [...rows];
   copy.splice(range.end, 0, template);
   return renumberWbs(copy);

@@ -68,6 +68,8 @@ export function resolveGanttKeyboardAction(
     return { type: "startEdit" };
   }
 
+  if (!ctx.activeGrid || !ctx.focus || ctx.edit) return null;
+
   if (input.shiftKey && input.key === "ArrowDown") {
     return { type: "navigateCell", direction: "down", extend: true };
   }
