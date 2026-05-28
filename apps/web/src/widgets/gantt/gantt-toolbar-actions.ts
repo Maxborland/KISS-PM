@@ -147,12 +147,26 @@ export function runGanttContextAction(action: GanttContextAction, ctx: GanttCont
     case "openTaskDetails":
       if (rowId) ctx.openTaskDetails(rowId);
       break;
-    case "insertTaskAbove":
-      if (rowId) ctx.emit({ ...ctx.state.data, rows: insertTaskAbove(ctx.state.data.rows, rowId) }, { type: "rows-reorder" });
+    case "insertTaskAbove": {
+      if (rowId) {
+        const rows = insertTaskAbove(ctx.state.data.rows, rowId);
+        ctx.emit(
+          { ...ctx.state.data, rows: syncPredecessorLabels(rows, ctx.state.data.dependencies ?? []) },
+          { type: "rows-reorder" }
+        );
+      }
       break;
-    case "insertTaskBelow":
-      if (rowId) ctx.emit({ ...ctx.state.data, rows: insertTaskBelow(ctx.state.data.rows, rowId) }, { type: "rows-reorder" });
+    }
+    case "insertTaskBelow": {
+      if (rowId) {
+        const rows = insertTaskBelow(ctx.state.data.rows, rowId);
+        ctx.emit(
+          { ...ctx.state.data, rows: syncPredecessorLabels(rows, ctx.state.data.dependencies ?? []) },
+          { type: "rows-reorder" }
+        );
+      }
       break;
+    }
     case "deleteTask":
       ctx.deleteSelectedRow(rowId ?? undefined);
       break;

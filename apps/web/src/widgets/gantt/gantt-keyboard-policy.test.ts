@@ -59,12 +59,36 @@ describe("gantt keyboard policy", () => {
     expect(action).toEqual({ type: "clearCells" });
   });
 
-  it("Ctrl+Z maps to undo", () => {
+  it("Ctrl+Z is ignored outside the active grid", () => {
     const action = resolveGanttKeyboardAction(
       { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
       emptyCtx
     );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+Z maps to undo inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, focus: { rowId: "t1", field: "name" } }
+    );
     expect(action).toEqual({ type: "undo" });
+  });
+
+  it("Ctrl+Z is ignored while editing a grid cell", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, edit: { rowId: "t1", field: "name", draft: "Task" } }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+Y maps to redo inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "y", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, focus: { rowId: "t1", field: "name" } }
+    );
+    expect(action).toEqual({ type: "redo" });
   });
 
   it("Ctrl+C is ignored outside the active grid", () => {

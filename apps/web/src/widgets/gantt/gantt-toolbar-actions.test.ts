@@ -106,4 +106,32 @@ describe("runGanttContextAction", () => {
     expect(deleteSelectedRow).toHaveBeenCalledWith("c");
     expect(context.dispatch).not.toHaveBeenCalled();
   });
+
+  it("recomputes predecessor labels after context-menu inserts", () => {
+    const emit = vi.fn<ToolbarContext["emit"]>();
+    const context = ctx({
+      emit,
+      state: {
+        ...ctx().state,
+        data: {
+          ...data(),
+          dependencies: [{ id: "d1", fromId: "b", toId: "c", type: "FS" }]
+        },
+        contextMenu: { x: 10, y: 20, target: { kind: "row", rowId: "b" } }
+      }
+    });
+
+    runGanttContextAction("insertTaskAbove", {
+      ...context,
+      contextMenu: context.state.contextMenu,
+      openTaskDetails: vi.fn(),
+      copyCells: vi.fn(),
+      pasteCells: vi.fn(),
+      clearCells: vi.fn(),
+      closeContextMenu: vi.fn()
+    });
+
+    const [nextData] = emit.mock.calls[0]!;
+    expect(nextData.rows.find((row) => row.id === "c")?.predecessors).toBe("3");
+  });
 });

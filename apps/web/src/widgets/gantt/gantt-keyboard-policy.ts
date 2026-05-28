@@ -37,10 +37,10 @@ export function resolveGanttKeyboardAction(
 ): GanttKeyboardAction | null {
   const mod = input.ctrlKey || input.metaKey;
 
-  if (mod && input.key === "z") {
+  if (mod && input.key === "z" && ctx.activeGrid && !ctx.edit) {
     return { type: "undo" };
   }
-  if (mod && (input.key === "y" || (input.shiftKey && input.key === "Z"))) {
+  if (mod && (input.key === "y" || (input.shiftKey && input.key === "Z")) && ctx.activeGrid && !ctx.edit) {
     return { type: "redo" };
   }
   if (mod && input.key === "c" && ctx.activeGrid) {
