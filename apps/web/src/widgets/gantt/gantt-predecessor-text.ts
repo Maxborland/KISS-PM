@@ -1,4 +1,5 @@
 import type { GanttDependency, GanttRow } from "./types";
+import { createsDependencyCycle } from "./gantt-dependency-rules";
 import { uniqueGanttId } from "./gantt-id";
 
 export {
@@ -14,12 +15,12 @@ import type { ParsedPredecessorToken } from "@/lib/gantt/predecessor-text";
 export function tokensToDependencies(
   rowId: string,
   tokens: ParsedPredecessorToken[],
-  rows: GanttRow[],
+  visibleRows: GanttRow[],
   existing: GanttDependency[]
 ): { dependencies: GanttDependency[]; error?: string } {
-  const visibleIndex = new Map(rows.map((r, i) => [i + 1, r.id]));
+  const visibleIndex = new Map(visibleRows.map((r, i) => [i + 1, r.id]));
   const next = existing.filter((d) => d.toId !== rowId);
-  const rowIds = new Set(rows.map((r) => r.id));
+  const rowIds = new Set(visibleRows.map((r) => r.id));
   const usedDependencyIds = new Set(existing.map((d) => d.id));
 
   for (const token of tokens) {
@@ -36,6 +37,9 @@ export function tokensToDependencies(
         (d.lagDays ?? 0) === token.lagDays
     );
     if (duplicate) return { dependencies: existing, error: "Такая связь уже есть" };
+    if (createsDependencyCycle(next, fromId, rowId)) {
+      return { dependencies: existing, error: "Такая связь создаёт циклическую зависимость" };
+    }
 
     const id = uniqueGanttId(
       "dep",

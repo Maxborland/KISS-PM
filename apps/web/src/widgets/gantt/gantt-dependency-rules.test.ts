@@ -6,6 +6,7 @@ import {
   isDuplicateDependency,
   validateDependency,
   validateDependencyCreation,
+  syncPredecessorLabels,
   wouldCreateCycle
 } from "./gantt-dependency-rules";
 import type { GanttDependency, GanttRow } from "./types";
@@ -154,5 +155,17 @@ describe("createsDependencyCycle alias", () => {
     ];
     expect(createsDependencyCycle(deps, "c", "a")).toBe(true);
     expect(isDuplicateDependency(deps, "a", "b", "FS")).toBe(true);
+  });
+});
+
+describe("syncPredecessorLabels", () => {
+  it("formats predecessor numbers from the provided visible row order", () => {
+    const rows = [task("summary", "summary"), task("hidden"), task("visible")];
+    const visibleRows = [rows[0]!, rows[2]!];
+    const labelled = syncPredecessorLabels(visibleRows, [
+      { id: "d1", fromId: "summary", toId: "visible", type: "FS" }
+    ], visibleRows);
+
+    expect(labelled.find((row) => row.id === "visible")?.predecessors).toBe("1");
   });
 });

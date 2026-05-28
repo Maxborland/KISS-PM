@@ -92,10 +92,10 @@ export function validateDependency(
 
 export function formatPredecessors(
   rowId: string,
-  rows: GanttRow[],
+  rowsForNumbering: GanttRow[],
   dependencies: GanttDependency[]
 ): string {
-  const indexById = new Map(rows.map((r, i) => [r.id, i + 1]));
+  const indexById = new Map(rowsForNumbering.map((r, i) => [r.id, i + 1]));
   const preds = dependencies
     .filter((d) => d.toId === rowId)
     .map((d) => {
@@ -110,10 +110,14 @@ export function formatPredecessors(
   return preds.length ? preds.join(",") : "—";
 }
 
-export function syncPredecessorLabels(rows: GanttRow[], dependencies: GanttDependency[]): GanttRow[] {
+export function syncPredecessorLabels(
+  rows: GanttRow[],
+  dependencies: GanttDependency[],
+  rowsForNumbering = rows
+): GanttRow[] {
   return rows.map((row) => ({
     ...row,
-    predecessors: formatPredecessors(row.id, rows, dependencies)
+    predecessors: formatPredecessors(row.id, rowsForNumbering, dependencies)
   }));
 }
 

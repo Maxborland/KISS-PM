@@ -98,9 +98,11 @@ export function useGanttController(options: UseGanttControllerOptions) {
   );
 
   const displayRows = useMemo(() => {
-    if (state.flags.showCriticalPath) return rowsVisible;
-    return rowsVisible.map((r) => ({ ...r, critical: false }));
-  }, [rowsVisible, state.flags.showCriticalPath]);
+    const rows = state.flags.showCriticalPath
+      ? rowsVisible
+      : rowsVisible.map((r) => ({ ...r, critical: false }));
+    return syncPredecessorLabels(rows, state.data.dependencies ?? [], rows);
+  }, [rowsVisible, state.data.dependencies, state.flags.showCriticalPath]);
 
   const displayDependencies = useMemo(
     () => visibleDependencies(state.data.dependencies ?? [], rowsVisible),
@@ -187,7 +189,7 @@ export function useGanttController(options: UseGanttControllerOptions) {
         const { dependencies, error: depErr } = tokensToDependencies(
           rowId,
           tokens,
-          state.data.rows,
+          rowsVisible,
           state.data.dependencies ?? []
         );
         if (depErr) return depErr;
@@ -302,7 +304,7 @@ export function useGanttController(options: UseGanttControllerOptions) {
       }
       if (target.field === "predecessors") {
         const tokens = parsePredecessorText(target.value);
-        const result = tokensToDependencies(target.rowId, tokens, rows, deps);
+        const result = tokensToDependencies(target.rowId, tokens, rowsVisible, deps);
         if (result.error) {
           lastError = result.error;
           continue;
