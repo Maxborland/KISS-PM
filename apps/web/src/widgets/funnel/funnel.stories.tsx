@@ -136,11 +136,17 @@ function FunnelHarness({
     [cardView]
   );
 
-  const handleReorder = (columnId: StageId, fromIndex: number, toIndex: number) => {
+  const handleReorder = (
+    columnId: StageId,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => {
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
     }
-    reorderDeal(columnId, fromIndex, toIndex);
+    reorderDeal(columnId, fromIndex, toIndex, movingId, overId);
   };
 
   const handleSortChange = (columnId: StageId, key: KanbanColumnSortKey) => {

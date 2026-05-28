@@ -276,18 +276,24 @@ function DealsBlockInner({
     setColumnSort((prev) => ({ ...prev, [columnId]: key }));
   };
 
-  const handleItemReorder = (columnId: StageId, fromIndex: number, toIndex: number) => {
+  const handleItemReorder = (
+    columnId: StageId,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => {
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
       toast.info("Ручной порядок", {
         description: `Стадия «${stageLabel[columnId]}» переключена на ручную сортировку.`
       });
     }
-    reorderDeal(columnId, fromIndex, toIndex);
+    reorderDeal(columnId, fromIndex, toIndex, movingId, overId);
   };
 
-  const handleItemMove = (id: string, toColumnId: StageId, toIndex: number) => {
-    moveDeal(id, toColumnId, toIndex);
+  const handleItemMove = (id: string, toColumnId: StageId, toIndex: number, overId?: string) => {
+    moveDeal(id, toColumnId, toIndex, overId);
   };
 
   const handleColumnAction = (columnId: StageId, action: KanbanColumnAction) => {

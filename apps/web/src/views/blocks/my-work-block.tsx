@@ -1,6 +1,5 @@
 "use client";
 
-import { arrayMove } from "@dnd-kit/sortable";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +26,8 @@ import {
   TaskKanbanCard,
   buildTaskKanbanComparators,
   defaultTaskKanbanViewState,
+  kanbanInsertIndexById,
+  reorderKanbanColumnByIds,
   resolveVisibleFields,
   useKanbanOrderedItems,
   type KanbanColumnAction,
@@ -72,7 +73,13 @@ function flattenByColumns(items: CardModel[]): CardModel[] {
   return KANBAN_COLUMNS.flatMap((col) => items.filter((c) => c.columnId === col.id));
 }
 
-function handleItemMove(items: CardModel[], id: string, toColumnId: ColumnId, toIndex: number): CardModel[] {
+function handleItemMove(
+  items: CardModel[],
+  id: string,
+  toColumnId: ColumnId,
+  toIndex: number,
+  overId?: string
+): CardModel[] {
   const item = items.find((c) => c.id === id);
   if (!item) return items;
   const without = items.filter((c) => c.id !== id);
@@ -84,7 +91,7 @@ function handleItemMove(items: CardModel[], id: string, toColumnId: ColumnId, to
   };
   for (const c of without) byCol[c.columnId].push(c);
   const moved = { ...item, columnId: toColumnId };
-  byCol[toColumnId].splice(toIndex, 0, moved);
+  byCol[toColumnId].splice(kanbanInsertIndexById(byCol[toColumnId], toIndex, overId), 0, moved);
   return KANBAN_COLUMNS.flatMap((col) => byCol[col.id]);
 }
 
@@ -92,7 +99,9 @@ function handleItemReorder(
   items: CardModel[],
   columnId: ColumnId,
   fromIndex: number,
-  toIndex: number
+  toIndex: number,
+  movingId?: string,
+  overId?: string
 ): CardModel[] {
   const byCol: Record<ColumnId, CardModel[]> = {
     new: [],
@@ -101,7 +110,7 @@ function handleItemReorder(
     done: []
   };
   for (const c of items) byCol[c.columnId].push(c);
-  byCol[columnId] = arrayMove(byCol[columnId], fromIndex, toIndex);
+  byCol[columnId] = reorderKanbanColumnByIds(byCol[columnId], fromIndex, toIndex, movingId, overId);
   return KANBAN_COLUMNS.flatMap((col) => byCol[col.id]);
 }
 
@@ -157,14 +166,20 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
     setColumnSort((prev) => ({ ...prev, [columnId]: key }));
   };
 
-  const handleReorder = (columnId: ColumnId, fromIndex: number, toIndex: number) => {
+  const handleReorder = (
+    columnId: ColumnId,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => {
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
       toast.info("Ручной порядок", {
         description: `Колонка «${COLUMN_LABEL[columnId]}» переключена на ручную сортировку.`
       });
     }
-    setCards((prev) => handleItemReorder(prev, columnId, fromIndex, toIndex));
+    setCards((prev) => handleItemReorder(prev, columnId, fromIndex, toIndex, movingId, overId));
   };
 
   const toolbar = (
@@ -256,8 +271,8 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
                 onOpen={setOpenCardId}
               />
             )}
-            onItemMove={(id, toColumnId, toIndex) =>
-              setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex))
+            onItemMove={(id, toColumnId, toIndex, overId) =>
+              setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex, overId))
             }
             onItemReorder={handleReorder}
             onColumnAction={handleColumnAction}

@@ -181,10 +181,14 @@ export function Kanban<T extends KanbanItem<C>, C extends string = string>({
         toIndex = overIndex >= 0 ? overIndex : byColumn[toColumnId].length;
       }
 
+      const overItemId = overData?.type === "item" ? overId : undefined;
+
       if (fromColumnId === toColumnId) {
-        if (fromIndex !== toIndex) onItemReorder?.(fromColumnId, fromIndex, toIndex);
+        if (fromIndex !== toIndex) {
+          onItemReorder?.(fromColumnId, fromIndex, toIndex, movingId, overItemId);
+        }
       } else {
-        onItemMove?.(movingId, toColumnId, toIndex);
+        onItemMove?.(movingId, toColumnId, toIndex, overItemId);
       }
     },
     [byColumn, columns, items, onItemMove, onItemReorder]

@@ -1,18 +1,24 @@
 "use client";
 
-import { arrayMove } from "@dnd-kit/sortable";
 import { useCallback, useMemo, useState } from "react";
 
 import type { FunnelDeal, FunnelStage } from "@/widgets/funnel/types";
 import { parseDealAmount } from "@/widgets/kanban/deal-kanban-profiles";
+import { kanbanInsertIndexById, reorderKanbanColumnByIds } from "@/widgets/kanban/kanban-reorder";
 
 export type UseFunnelStateResult = {
   deals: FunnelDeal[];
   setDeals: (deals: FunnelDeal[]) => void;
   /** Перемещает сделку в стадию `toStageId` на позицию `toIndex` (по умолчанию — в конец). */
-  moveDeal: (dealId: string, toStageId: string, toIndex?: number) => void;
+  moveDeal: (dealId: string, toStageId: string, toIndex?: number, overId?: string) => void;
   /** Меняет порядок сделок внутри одной стадии. */
-  reorderDeal: (stageId: string, fromIndex: number, toIndex: number) => void;
+  reorderDeal: (
+    stageId: string,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => void;
   addDeal: (deal: FunnelDeal) => void;
   countByStage: Record<string, number>;
   amountByStage: Record<string, number>;
@@ -39,14 +45,14 @@ export function useFunnelState(
   const [deals, setDeals] = useState<FunnelDeal[]>(initialDeals);
 
   const moveDeal = useCallback(
-    (dealId: string, toStageId: string, toIndex?: number) => {
+    (dealId: string, toStageId: string, toIndex?: number, overId?: string) => {
       setDeals((prev) => {
         const item = prev.find((d) => d.id === dealId);
         if (!item) return prev;
         const without = prev.filter((d) => d.id !== dealId);
         const by = groupByStage(without, stages);
         const targetBucket = by[toStageId] ?? [];
-        const insertAt = toIndex == null ? targetBucket.length : Math.max(0, Math.min(toIndex, targetBucket.length));
+        const insertAt = kanbanInsertIndexById(targetBucket, toIndex ?? targetBucket.length, overId);
         targetBucket.splice(insertAt, 0, { ...item, stage: toStageId });
         by[toStageId] = targetBucket;
         return flatten(by, stages);
@@ -56,12 +62,12 @@ export function useFunnelState(
   );
 
   const reorderDeal = useCallback(
-    (stageId: string, fromIndex: number, toIndex: number) => {
+    (stageId: string, fromIndex: number, toIndex: number, movingId?: string, overId?: string) => {
       setDeals((prev) => {
         const by = groupByStage(prev, stages);
         const bucket = by[stageId];
         if (!bucket || fromIndex === toIndex) return prev;
-        by[stageId] = arrayMove(bucket, fromIndex, toIndex);
+        by[stageId] = reorderKanbanColumnByIds(bucket, fromIndex, toIndex, movingId, overId);
         return flatten(by, stages);
       });
     },

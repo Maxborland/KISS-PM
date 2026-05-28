@@ -1,6 +1,5 @@
 "use client";
 
-import { arrayMove } from "@dnd-kit/sortable";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -12,6 +11,8 @@ import {
   TaskKanbanCard,
   buildTaskKanbanComparators,
   defaultTaskKanbanViewState,
+  kanbanInsertIndexById,
+  reorderKanbanColumnByIds,
   resolveVisibleFields,
   useKanbanOrderedItems,
   type KanbanColumnAction,
@@ -79,13 +80,19 @@ function flatten(items: DemoKanbanItem[]): DemoKanbanItem[] {
   return DEMO_COLUMNS.flatMap((col) => items.filter((c) => c.columnId === col.id));
 }
 
-function moveItem(items: DemoKanbanItem[], id: string, toColumnId: DemoColumnId, toIndex: number) {
+function moveItem(
+  items: DemoKanbanItem[],
+  id: string,
+  toColumnId: DemoColumnId,
+  toIndex: number,
+  overId?: string
+) {
   const item = items.find((c) => c.id === id);
   if (!item) return items;
   const rest = items.filter((c) => c.id !== id);
   const by: Record<DemoColumnId, DemoKanbanItem[]> = { backlog: [], "in-progress": [], done: [] };
   for (const c of rest) by[c.columnId].push(c);
-  by[toColumnId].splice(toIndex, 0, { ...item, columnId: toColumnId });
+  by[toColumnId].splice(kanbanInsertIndexById(by[toColumnId], toIndex, overId), 0, { ...item, columnId: toColumnId });
   return DEMO_COLUMNS.flatMap((col) => by[col.id]);
 }
 
@@ -93,11 +100,13 @@ function reorderItem(
   items: DemoKanbanItem[],
   columnId: DemoColumnId,
   fromIndex: number,
-  toIndex: number
+  toIndex: number,
+  movingId?: string,
+  overId?: string
 ) {
   const by: Record<DemoColumnId, DemoKanbanItem[]> = { backlog: [], "in-progress": [], done: [] };
   for (const c of items) by[c.columnId].push(c);
-  by[columnId] = arrayMove(by[columnId], fromIndex, toIndex);
+  by[columnId] = reorderKanbanColumnByIds(by[columnId], fromIndex, toIndex, movingId, overId);
   return DEMO_COLUMNS.flatMap((col) => by[col.id]);
 }
 
@@ -134,14 +143,20 @@ export function KanbanWidgetDemo() {
     setColumnSort((prev) => ({ ...prev, [columnId]: key }));
   };
 
-  const handleReorder = (columnId: DemoColumnId, fromIndex: number, toIndex: number) => {
+  const handleReorder = (
+    columnId: DemoColumnId,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => {
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
       toast.info("Ручной порядок", {
         description: `Колонка «${DEMO_LABEL[columnId]}» переключена на ручную сортировку.`
       });
     }
-    setItems((prev) => reorderItem(prev, columnId, fromIndex, toIndex));
+    setItems((prev) => reorderItem(prev, columnId, fromIndex, toIndex, movingId, overId));
   };
 
   return (
@@ -169,7 +184,7 @@ export function KanbanWidgetDemo() {
             onOpen={(id) => toast.info(`Открыть карточку ${id}`)}
           />
         )}
-        onItemMove={(id, toCol, toIndex) => setItems((prev) => moveItem(prev, id, toCol, toIndex))}
+        onItemMove={(id, toCol, toIndex, overId) => setItems((prev) => moveItem(prev, id, toCol, toIndex, overId))}
         onItemReorder={handleReorder}
         onColumnAction={handleColumnAction}
       />

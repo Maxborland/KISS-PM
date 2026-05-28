@@ -62,8 +62,14 @@ export type KanbanProps<T extends KanbanItem<C>, C extends string = string> = {
   renderColumnFooter?: (column: KanbanColumnDef<C>) => ReactNode;
   renderColumnEmpty?: (column: KanbanColumnDef<C>) => ReactNode;
   onItemOpen?: (id: string) => void;
-  onItemMove?: (id: string, toColumnId: C, toIndex: number) => void;
-  onItemReorder?: (columnId: C, fromIndex: number, toIndex: number) => void;
+  onItemMove?: (id: string, toColumnId: C, toIndex: number, overId?: string) => void;
+  onItemReorder?: (
+    columnId: C,
+    fromIndex: number,
+    toIndex: number,
+    movingId?: string,
+    overId?: string
+  ) => void;
   onColumnAction?: (columnId: C, action: KanbanColumnAction) => void;
   /** Опции сортировки в меню колонки. Включают `manual` или пресеты потребителя. */
   sortOptions?: KanbanSortOption[];

@@ -18,6 +18,7 @@ export type {
 } from "@/widgets/kanban/types";
 
 export { Kanban } from "@/widgets/kanban/kanban";
+export { kanbanInsertIndexById, reorderKanbanColumnByIds } from "@/widgets/kanban/kanban-reorder";
 export { KanbanWidgetDemo } from "@/widgets/kanban/kanban-widget-demo";
 export { TaskKanbanCard, type TaskKanbanCardProps, type TaskKanbanItem } from "@/widgets/kanban/task-kanban-card";
 export {

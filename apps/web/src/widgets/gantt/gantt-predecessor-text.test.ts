@@ -49,4 +49,18 @@ describe("tokensToDependencies", () => {
 
     expect(result.error).toBe("Такая связь создаёт циклическую зависимость");
   });
+
+  it("rejects summary rows from text edits", () => {
+    const result = tokensToDependencies(
+      "a",
+      [{ rowNumber: 2, type: "FS", lagDays: 0 }],
+      [
+        rows[0]!,
+        { id: "s", level: 0, kind: "summary", name: "Summary", startDay: 0, durationDays: 5 }
+      ],
+      []
+    );
+
+    expect(result.error).toBe("Для суммарных задач связь пока недоступна");
+  });
 });

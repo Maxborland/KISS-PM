@@ -1,5 +1,5 @@
 import type { GanttDependency, GanttRow } from "./types";
-import { createsDependencyCycle } from "./gantt-dependency-rules";
+import { canLinkRow, createsDependencyCycle } from "./gantt-dependency-rules";
 import { uniqueGanttId } from "./gantt-id";
 
 export {
@@ -22,12 +22,19 @@ export function tokensToDependencies(
   const next = existing.filter((d) => d.toId !== rowId);
   const rowIds = new Set(visibleRows.map((r) => r.id));
   const usedDependencyIds = new Set(existing.map((d) => d.id));
+  const toRow = visibleRows.find((row) => row.id === rowId);
+  if (!toRow) return { dependencies: existing, error: "Не найдена строка для связи" };
+  if (!canLinkRow(toRow)) return { dependencies: existing, error: "Для суммарных задач связь пока недоступна" };
 
   for (const token of tokens) {
     const fromId = visibleIndex.get(token.rowNumber);
+    const fromRow = visibleRows.find((row) => row.id === fromId);
     if (!fromId) return { dependencies: existing, error: `Нет строки №${token.rowNumber}` };
     if (fromId === rowId) return { dependencies: existing, error: "Задача не может зависеть от себя" };
     if (!rowIds.has(fromId)) return { dependencies: existing, error: "Не найдена строка для связи" };
+    if (!canLinkRow(fromRow)) {
+      return { dependencies: existing, error: "Для суммарных задач связь пока недоступна" };
+    }
 
     const duplicate = next.some(
       (d) =>

@@ -53,12 +53,12 @@ export type TaskValidationIssue = {
   message: string;
 };
 
-/** Перевод даты в формат API (`YYYY-MM-DD`, UTC). */
+/** Перевод локальной календарной даты в формат API (`YYYY-MM-DD`). */
 export function formatPlanDate(value: Date | undefined | null): string {
   if (!value) return "";
-  const year = value.getUTCFullYear();
-  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(value.getUTCDate()).padStart(2, "0");
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
