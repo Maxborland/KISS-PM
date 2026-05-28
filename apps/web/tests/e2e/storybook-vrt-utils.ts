@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -124,31 +123,9 @@ function loadStorybookIndex(webRoot: string): StorybookIndex {
   if (existsSync(indexPath)) {
     return JSON.parse(readFileSync(indexPath, "utf8")) as StorybookIndex;
   }
-  if (process.env.STORYBOOK_STATIC === "1") {
-    throw new Error(`Storybook static index not found: ${indexPath}`);
-  }
-  return loadLiveStorybookIndex();
-}
-
-function loadLiveStorybookIndex(): StorybookIndex {
-  const port = process.env.STORYBOOK_CONTRACT_PORT ?? "6006";
-  const url = `http://127.0.0.1:${port}/index.json`;
-  const script = [
-    "const url = process.argv[1];",
-    "fetch(url)",
-    "  .then((res) => { if (!res.ok) throw new Error(`${res.status} ${res.statusText}`); return res.text(); })",
-    "  .then((text) => process.stdout.write(text))",
-    "  .catch((err) => { process.stderr.write(String(err && err.stack ? err.stack : err)); process.exit(1); });"
-  ].join("\n");
-  const result = spawnSync(process.execPath, ["-e", script, url], {
-    encoding: "utf8",
-    timeout: 120_000,
-    windowsHide: true
-  });
-  if (result.status !== 0) {
-    throw new Error(`Unable to load live Storybook index from ${url}: ${result.stderr || result.stdout}`);
-  }
-  return JSON.parse(result.stdout) as StorybookIndex;
+  throw new Error(
+    `Storybook static index not found: ${indexPath}. Run pnpm --filter @kiss-pm/web build-storybook before VRT/a11y gates.`
+  );
 }
 
 /** Story-only iframe path — resolved against Playwright `use.baseURL` (static serve, no manager). */

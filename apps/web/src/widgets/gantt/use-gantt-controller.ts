@@ -499,7 +499,14 @@ export function useGanttController(options: UseGanttControllerOptions) {
     const id = state.data.selectedRowId;
     if (!id) return;
     const { rows, dependencies } = deleteRow(state.data.rows, id, state.data.dependencies ?? []);
-    emit(patchGanttData(state.data, { rows, dependencies, selectedRowId: null }), { type: "rows-reorder" });
+    emit(
+      patchGanttData(state.data, {
+        rows: syncPredecessorLabels(rows, dependencies),
+        dependencies,
+        selectedRowId: null
+      }),
+      { type: "rows-reorder" }
+    );
   }, [emit, state.data]);
 
   const toolbarApi: GanttToolbarApi = useMemo(
@@ -578,7 +585,11 @@ export function useGanttController(options: UseGanttControllerOptions) {
     }
     const next = reorderRowsByDrag(state.data.rows, state.rowDrag.rowId, state.rowDrag.dropBeforeRowId);
     if (next) {
-      emit({ ...state.data, rows: renumberWbs(next) }, { type: "row-drag-commit", rowId: state.rowDrag.rowId });
+      const rows = renumberWbs(next);
+      emit(
+        { ...state.data, rows: syncPredecessorLabels(rows, state.data.dependencies ?? []) },
+        { type: "row-drag-commit", rowId: state.rowDrag.rowId }
+      );
     }
     dispatch({ type: "patch", patch: { rowDrag: null } });
   }, [emit, state.data, state.rowDrag]);

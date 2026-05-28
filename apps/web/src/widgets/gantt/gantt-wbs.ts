@@ -1,4 +1,5 @@
 import type { GanttDependency, GanttRow } from "./types";
+import { rowSubtreeRange } from "./gantt-row-tree";
 
 export function renumberWbs(rows: GanttRow[]): GanttRow[] {
   const counters = [0, 0, 0, 0];
@@ -79,11 +80,11 @@ export function outdentRow(rows: GanttRow[], rowId: string): GanttRow[] {
 }
 
 export function moveRow(rows: GanttRow[], rowId: string, direction: -1 | 1): GanttRow[] {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index < 0) return rows;
+  const range = rowSubtreeRange(rows, rowId);
+  if (!range) return rows;
 
+  const { start: index, end } = range;
   const row = rows[index]!;
-  const end = subtreeEndIndex(rows, index);
 
   if (direction < 0) {
     const previousStart = previousSiblingBlockStart(rows, index);
@@ -98,20 +99,14 @@ export function moveRow(rows: GanttRow[], rowId: string, direction: -1 | 1): Gan
 
   const nextStart = end;
   if (nextStart >= rows.length || rows[nextStart]!.level < row.level) return rows;
-  const nextEnd = subtreeEndIndex(rows, nextStart);
+  const nextRange = rowSubtreeRange(rows, rows[nextStart]!.id);
+  if (!nextRange) return rows;
   return renumberWbs([
     ...rows.slice(0, index),
-    ...rows.slice(nextStart, nextEnd),
+    ...rows.slice(nextStart, nextRange.end),
     ...rows.slice(index, end),
-    ...rows.slice(nextEnd)
+    ...rows.slice(nextRange.end)
   ]);
-}
-
-function subtreeEndIndex(rows: GanttRow[], startIndex: number): number {
-  const level = rows[startIndex]!.level;
-  let end = startIndex + 1;
-  while (end < rows.length && rows[end]!.level > level) end += 1;
-  return end;
 }
 
 function previousSiblingBlockStart(rows: GanttRow[], index: number): number | null {
@@ -137,11 +132,10 @@ function newTaskTemplate(near?: GanttRow): GanttRow {
 export function createTaskRow(rows: GanttRow[], afterId?: string): GanttRow[] {
   const template = newTaskTemplate(afterId ? rows.find((r) => r.id === afterId) : undefined);
   if (!afterId) return renumberWbs([...rows, template]);
-  const index = rows.findIndex((r) => r.id === afterId);
-  if (index < 0) return renumberWbs([...rows, template]);
-  const insertIndex = subtreeEndIndex(rows, index);
+  const range = rowSubtreeRange(rows, afterId);
+  if (!range) return renumberWbs([...rows, template]);
   const copy = [...rows];
-  copy.splice(insertIndex, 0, template);
+  copy.splice(range.end, 0, template);
   return renumberWbs(copy);
 }
 
@@ -155,19 +149,18 @@ export function insertTaskAbove(rows: GanttRow[], anchorId: string): GanttRow[] 
 }
 
 export function insertTaskBelow(rows: GanttRow[], anchorId: string): GanttRow[] {
-  const index = rows.findIndex((r) => r.id === anchorId);
-  if (index < 0) return rows;
-  const template = newTaskTemplate(rows[index]);
+  const range = rowSubtreeRange(rows, anchorId);
+  if (!range) return rows;
+  const template = newTaskTemplate(rows[range.start]);
   const copy = [...rows];
-  copy.splice(subtreeEndIndex(rows, index), 0, template);
+  copy.splice(range.end, 0, template);
   return renumberWbs(copy);
 }
 
 export function deleteRow(rows: GanttRow[], rowId: string, dependencies: GanttDependency[]) {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index < 0) return { rows, dependencies };
-  const end = subtreeEndIndex(rows, index);
-  const deletedIds = new Set(rows.slice(index, end).map((row) => row.id));
+  const range = rowSubtreeRange(rows, rowId);
+  if (!range) return { rows, dependencies };
+  const deletedIds = new Set(rows.slice(range.start, range.end).map((row) => row.id));
   const nextRows = renumberWbs(rows.filter((r) => !deletedIds.has(r.id)));
   const nextDeps = dependencies.filter((d) => !deletedIds.has(d.fromId) && !deletedIds.has(d.toId));
   return { rows: nextRows, dependencies: nextDeps };

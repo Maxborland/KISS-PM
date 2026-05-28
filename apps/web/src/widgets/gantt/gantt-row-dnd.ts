@@ -1,17 +1,7 @@
 import type { GanttRow } from "./types";
+import { rowSubtreeIds } from "./gantt-row-tree";
 
-/** Task id + all descendants until level returns to parent level. */
-export function rowSubtreeIds(rows: GanttRow[], rowId: string): string[] {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index < 0) return [];
-  const level = rows[index]!.level;
-  const ids = [rowId];
-  for (let i = index + 1; i < rows.length; i += 1) {
-    if (rows[i]!.level <= level) break;
-    ids.push(rows[i]!.id);
-  }
-  return ids;
-}
+export { rowSubtreeIds } from "./gantt-row-tree";
 
 export function canDropRowBefore(
   rows: GanttRow[],
