@@ -35,6 +35,33 @@ export type EntityKind = "clients" | "contacts" | "products";
 
 type EntityRow = Record<string, unknown> & { name: string; code: string };
 
+const ENTITY_FIELD_LABELS: Record<string, string> = {
+  id: "Идентификатор",
+  tenantId: "Рабочая область",
+  clientId: "Клиент",
+  clientName: "Компания",
+  description: "Описание",
+  status: "Статус",
+  createdAt: "Создано",
+  updatedAt: "Обновлено",
+  email: "Эл. почта",
+  phone: "Телефон",
+  telegram: "Telegram",
+  role: "Роль",
+  sku: "Артикул",
+  type: "Тип",
+  unit: "Единица",
+  price: "Цена"
+};
+
+function entityStatusLabel(value: unknown): string {
+  const status = String(value);
+  if (status === "active") return "Активен";
+  if (status === "draft") return "Черновик";
+  if (status === "archived") return "Архив";
+  return status;
+}
+
 function matchesQuery(row: EntityRow, query: string): boolean {
   if (!query.trim()) return true;
   const q = query.trim().toLowerCase();
@@ -126,7 +153,7 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
                 {kind === "clients" ? (
                   <>
                     <td>
-                      <Chip variant={String(r.status) === "active" ? "success" : "warning"}>{String(r.status)}</Chip>
+                      <Chip variant={String(r.status) === "active" ? "success" : "warning"}>{entityStatusLabel(r.status)}</Chip>
                     </td>
                     <td>{String(r.description ?? "—")}</td>
                     <td className="mono">{formatDate(String(r.createdAt))}</td>
@@ -141,7 +168,7 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
                       <CellStack title={String(r.email ?? "—")} subtitle={`${String(r.phone ?? "—")} · ${String(r.telegram ?? "—")}`} />
                     </td>
                     <td>
-                      <Chip variant={String(r.status) === "active" ? "success" : "warning"}>{String(r.status)}</Chip>
+                      <Chip variant={String(r.status) === "active" ? "success" : "warning"}>{entityStatusLabel(r.status)}</Chip>
                     </td>
                   </>
                 ) : null}
@@ -197,13 +224,13 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
 }
 
 function EntityContractDetails({ kind, row }: { kind: EntityKind; row: EntityRow }) {
-  const rows =
+  const rows: Array<[string, string]> =
     kind === "clients"
       ? [
           ["id", String(row.id)],
           ["tenantId", String(row.tenantId)],
           ["description", String(row.description ?? "—")],
-          ["status", String(row.status)],
+          ["status", entityStatusLabel(row.status)],
           ["createdAt", formatDate(String(row.createdAt))],
           ["updatedAt", formatDate(String(row.updatedAt))]
         ]
@@ -217,7 +244,7 @@ function EntityContractDetails({ kind, row }: { kind: EntityKind; row: EntityRow
             ["phone", String(row.phone ?? "—")],
             ["telegram", String(row.telegram ?? "—")],
             ["role", String(row.role ?? "—")],
-            ["status", String(row.status)]
+            ["status", entityStatusLabel(row.status)]
           ]
         : [
             ["id", String(row.id)],
@@ -227,14 +254,14 @@ function EntityContractDetails({ kind, row }: { kind: EntityKind; row: EntityRow
             ["unit", String(row.unit)],
             ["price", formatRub(Number(row.price))],
             ["description", String(row.description ?? "—")],
-            ["status", String(row.status)]
+            ["status", entityStatusLabel(row.status)]
           ];
 
   return (
     <dl className="entity-fields">
       {rows.map(([label, value]) => (
         <div key={label} className="entity-fields__row">
-          <dt>{label}</dt>
+          <dt>{ENTITY_FIELD_LABELS[label] ?? label}</dt>
           <dd>{value}</dd>
         </div>
       ))}

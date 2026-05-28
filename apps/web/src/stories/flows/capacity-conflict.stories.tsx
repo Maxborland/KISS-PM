@@ -28,7 +28,7 @@ export default meta;
 type Story = StoryObj;
 
 export const Default: Story = {
-  name: "Конфликт capacity",
+  name: "Конфликт загрузки",
   parameters: flowParameters([...STEPS], "overload"),
   render: () => (
     <WorkspaceChrome meta={getScreenRoute("13-project-resources")}>

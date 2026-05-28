@@ -13,13 +13,13 @@ import {
 } from "@/stories/flows/flow-story-helpers";
 
 const STEPS = [
-  "Администратор tenant приглашает пользователей и назначает профили доступа.",
+  "Администратор рабочей области приглашает пользователей и назначает профили доступа.",
   "Настраивает оргструктуру и должности.",
-  "Включает шаблоны проектов и пользовательские поля в настройках workspace."
+  "Включает шаблоны проектов и пользовательские поля в настройках рабочей области."
 ] as const;
 
 const meta: Meta = {
-  title: "Flows/Онбординг tenant",
+  title: "Flows/Онбординг рабочей области",
   parameters: FLOW_STORY_PARAMETERS,
   tags: ["!autodocs"]
 };
@@ -29,19 +29,19 @@ export default meta;
 type Story = StoryObj;
 
 export const Default: Story = {
-  name: "Онбординг tenant",
+  name: "Онбординг рабочей области",
   parameters: flowParameters([...STEPS]),
   render: () => (
     <WorkspaceChrome meta={getScreenRoute("09-admin")}>
       <FlowStoryFrame
-        title="Онбординг tenant"
+        title="Онбординг рабочей области"
         lead="Первичная настройка рабочей области перед запуском проектов."
         steps={[...STEPS]}
       >
         <FlowStage index={1} title="Администрирование" apiHint="GET /api/tenant/current/access-profiles">
           <AdminBlock />
         </FlowStage>
-        <FlowStage index={2} title="Настройки workspace" apiHint="GET /api/workspace/config/project-templates">
+        <FlowStage index={2} title="Настройки рабочей области" apiHint="GET /api/workspace/config/project-templates">
           <SettingsBlock />
         </FlowStage>
       </FlowStoryFrame>

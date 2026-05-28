@@ -16,11 +16,24 @@ export default meta;
 
 type Story = StoryObj;
 
+const CREATE_TASK_STORY_FORM = {
+  plannedStart: new Date(Date.UTC(2026, 4, 27)),
+  plannedFinish: new Date(Date.UTC(2026, 4, 29)),
+  durationWorkingDays: 3,
+  plannedWork: 24,
+  participants: [{ userId: "user-ivanova", role: "executor" as const }]
+};
+
 export const CreateTaskPayload: Story = {
   name: "POST CreateTaskBody — превью",
   render: () => (
     <WorkspaceChrome meta={getScreenRoute("04-create-task-modal")}>
-      <TaskCreateModalBlock initialStep={2} initialProjectId="PRJ-2026-014" showApiContractPreview />
+      <TaskCreateModalBlock
+        initialStep={2}
+        initialProjectId="PRJ-2026-014"
+        initialForm={CREATE_TASK_STORY_FORM}
+        showApiContractPreview
+      />
     </WorkspaceChrome>
   ),
   play: async ({ canvasElement }) => {

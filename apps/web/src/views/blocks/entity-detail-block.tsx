@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { Briefcase, Calendar, MoreHorizontal, Paperclip, Send, Trash2 } from "lucide-react";
+import { Briefcase, Calendar, MoreHorizontal, Paperclip, Plus, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
@@ -230,7 +230,7 @@ export function EntityDetailBlock({
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
-              variant="primary"
+              variant={dirty ? "primary" : "secondary"}
               disabled={!dirty}
               onClick={handleSave}
               title={dirty ? undefined : "Нет изменений"}
@@ -503,7 +503,7 @@ function TaskAside({
                 checked={form.requiresAcceptance}
                 onCheckedChange={(value) => onChange("requiresAcceptance", value === true)}
               />
-              <span className="u-text-body">requiresAcceptance: true</span>
+              <span className="u-text-body">Требуется приёмка результата руководителем</span>
             </label>
           </Field>
           <Field
@@ -542,30 +542,38 @@ function ParticipantsEditor({
   };
 
   return (
-    <div className="u-flex u-flex-col u-gap-2">
+    <div className="participant-editor">
       {participants.map((p, i) => (
-        <div key={i} className="u-grid u-grid-cols-[minmax(0,1fr)_140px_auto] u-gap-2">
-          <Combobox
-            options={USER_OPTIONS}
-            value={p.userId}
-            onValueChange={(value) => setUser(i, value)}
-            placeholder="Сотрудник"
-          />
-          <Select value={p.role} onValueChange={(value) => setRole(i, value as TaskParticipantRole)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ROLE_OPTIONS.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div key={i} className="participant-editor__row">
+          <div className="participant-editor__employee">
+            <Combobox
+              options={USER_OPTIONS}
+              value={p.userId}
+              onValueChange={(value) => setUser(i, value)}
+              placeholder="Сотрудник"
+            />
+          </div>
+          <div className="participant-editor__role">
+            <Select
+              value={p.role}
+              onValueChange={(value) => setRole(i, value as TaskParticipantRole)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_OPTIONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"
+            className="participant-editor__remove"
             aria-label="Удалить участника"
             disabled={participants.length === 1}
             onClick={() => remove(i)}
@@ -575,12 +583,14 @@ function ParticipantsEditor({
         </div>
       ))}
       <Button
-        variant="secondary"
+        variant="soft"
         size="sm"
+        className="participant-editor__add"
         onClick={add}
         disabled={participants.length >= 20}
       >
-        + Добавить участника
+        <Plus className="size-4" aria-hidden />
+        Добавить участника
       </Button>
     </div>
   );

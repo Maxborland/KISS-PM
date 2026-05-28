@@ -128,6 +128,40 @@ const STAGE_ACTION_LABEL: Record<KanbanColumnAction, string> = {
   add: "Добавить сделку"
 };
 
+const DEAL_FIELD_LABELS: Record<string, string> = {
+  "Backend id": "Идентификатор",
+  Tenant: "Рабочая область",
+  "Client id": "Клиент",
+  "Primary contact id": "Основной контакт",
+  "Owner user id": "Ответственный",
+  "Project type id": "Тип проекта",
+  "Stage id": "Стадия",
+  "Template id": "Шаблон"
+};
+
+function feasibilityLabel(value: string | null | undefined): string {
+  if (value === "feasible") return "Реализуемо";
+  if (value === "risk") return "Есть риск";
+  if (value === "blocked") return "Заблокировано";
+  if (value === "not_checked" || value == null) return "Не проверено";
+  return value;
+}
+
+function dealStatusLabel(value: string | null | undefined): string {
+  if (value === "new") return "Новая";
+  if (value === "active") return "Активна";
+  if (value === "won") return "Выиграна";
+  if (value === "lost") return "Проиграна";
+  return value ?? "—";
+}
+
+function customFieldLabel(key: string): string {
+  if (key === "priority") return "Приоритет";
+  if (key === "source") return "Источник";
+  if (key === "riskLevel") return "Уровень риска";
+  return "Дополнительное поле";
+}
+
 export type DealsBlockProps = {
   initialMode?: "kanban" | "list" | "forecast";
   initialDeals?: FunnelDeal[];
@@ -363,7 +397,7 @@ function DealsBlockInner({
                       {stages.find((s) => s.id === openDeal.stage)?.title ?? openDeal.stage}
                     </Chip>
                     <Chip variant={openDeal.feasibilityStatus === "feasible" ? "success" : "warning"}>
-                      {openDeal.feasibilityStatus ?? "feasibility не проверен"}
+                      {feasibilityLabel(openDeal.feasibilityStatus)}
                     </Chip>
                     <span className="mono u-text-sm u-text-strong">{openDeal.amount}</span>
                   </div>
@@ -385,9 +419,9 @@ function DealsBlockInner({
                       ["Ставка", `${formatRub(openDeal.plannedHourlyRate ?? 0)} / ч`],
                       ["Плановые часы", formatHours(openDeal.plannedHours ?? 0)],
                       ["Вероятность", `${openDeal.probability ?? 0}%`],
-                      ["Статус", openDeal.status ?? "—"],
+                      ["Статус", dealStatusLabel(openDeal.status)],
                       ["Template id", openDeal.templateId ?? "—"],
-                      ["Проверка feasibility", openDeal.feasibilityCheckedAt ? formatDate(openDeal.feasibilityCheckedAt) : "—"],
+                      ["Проверка реализуемости", openDeal.feasibilityCheckedAt ? formatDate(openDeal.feasibilityCheckedAt) : "—"],
                       ["Создана", formatDate(openDeal.createdAt ?? null)],
                       ["Обновлена", formatDate(openDeal.updatedAt ?? null)]
                     ]}
@@ -396,7 +430,7 @@ function DealsBlockInner({
                     <p className="u-text-sm u-text-muted">{openDeal.description}</p>
                   ) : null}
                   <div className="u-flex u-flex-col u-gap-2">
-                    <span className="u-text-xs u-text-muted">Demand</span>
+                    <span className="u-text-xs u-text-muted">Потребность по ролям</span>
                     {(openDeal.demand ?? []).map((item) => (
                       <div key={item.positionId} className="u-flex u-items-center u-justify-between u-text-sm">
                         <span>{positionName(item.positionId)}</span>
@@ -405,7 +439,10 @@ function DealsBlockInner({
                     ))}
                   </div>
                   <ContractFields
-                    rows={Object.entries(openDeal.customFieldValues ?? {}).map(([key, value]) => [key, value])}
+                    rows={Object.entries(openDeal.customFieldValues ?? {}).map(([key, value]) => [
+                      customFieldLabel(key),
+                      String(value)
+                    ])}
                   />
                 </div>
               </SheetBody>
@@ -622,9 +659,9 @@ function ContractFields({ rows }: { rows: Array<[string, string]> }) {
 
   return (
     <dl className="entity-fields">
-      {rows.map(([label, value]) => (
-        <div key={label} className="entity-fields__row">
-          <dt>{label}</dt>
+      {rows.map(([label, value], index) => (
+        <div key={`${label}-${index}`} className="entity-fields__row">
+          <dt>{DEAL_FIELD_LABELS[label] ?? label}</dt>
           <dd>{value}</dd>
         </div>
       ))}

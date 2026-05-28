@@ -5,29 +5,29 @@ import type { Meta, StoryObj } from "@storybook/react";
  */
 const DOC_LINKS = [
   {
-    title: "Production-grade brief",
+    title: "Критерии качества",
     path: "docs/design-v3/PRODUCTION-GRADE-BRIEF.md",
-    lead: "Цель, blockers, фазы, scope PR."
+    lead: "Цель, блокеры, фазы и границы работ."
   },
   {
-    title: "Design contract",
+    title: "Контракт дизайна",
     path: "docs/design-v3/DESIGN_CONTRACT.md",
-    lead: "Enforceable правила UI, Storybook, density/depth/gradient."
+    lead: "Обязательные правила UI, Storybook, плотности, глубины и акцентов."
   },
   {
-    title: "Tokens",
+    title: "Токены",
     path: "docs/design-v3/TOKENS.md",
-    lead: "Reconciliation и Phase 1 token deltas."
+    lead: "Палитра, типографика, отступы и изменения токенов."
   },
   {
-    title: "Storybook structure",
+    title: "Структура Storybook",
     path: "docs/design-v3/STORYBOOK-STRUCTURE.md",
-    lead: "Подготовка 8 секций (inventory, globs, миграция) — внедрение Phase 8."
+    lead: "Восемь разделов, правила группировки и миграция каталога."
   },
   {
-    title: "Phase 0–1 scope",
+    title: "Границы первых фаз",
     path: "docs/design-v3/PHASE-0-1-SCOPE-BOUNDARY.md",
-    lead: "Что входит в Storybook PR, что вынести (API, task-contract)."
+    lead: "Что входит в каталог, а что остаётся в API- и task-контрактах."
   }
 ] as const;
 
@@ -43,7 +43,7 @@ function DesignContractOverview() {
         </p>
         <h1 className="type-h1">Контракт design-v3</h1>
         <p className="type-body mt-3 text-[var(--muted)]">
-          Storybook показывает визуальные примеры (Colors, Typography, Density, Depth, Iconography). Полные
+          Storybook показывает визуальные примеры: цвета, типографику, плотность, глубину и иконки. Полные
           спецификации и планы — в каталоге <code className="mono text-[length:var(--text-sm)]">docs/design-v3/</code>{" "}
           в git, не дублируются на тысячи строк здесь.
         </p>
@@ -52,15 +52,12 @@ function DesignContractOverview() {
       <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[var(--shadow-sm)]">
         <h2 className="type-h3">Быстрые правила</h2>
         <ul className="mt-3 list-disc space-y-2 pl-5 type-body text-[var(--text)]">
-          <li>UI copy — русский; API/types/identifiers — English.</li>
+          <li>Текст продукта и Storybook — русский; API, типы и идентификаторы остаются на английском.</li>
           <li>
-            Product screens (<code className="mono text-[length:var(--text-xs)]">Views/Screens</code>) — готовый экран
-            1440px, без Storybook error UI.
+            Экраны — готовый рабочий контекст 1440px, без служебных ошибок Storybook внутри продукта.
           </li>
           <li>
-            Корни sidebar (<code className="mono text-[length:var(--text-xs)]">Foundations</code>,{" "}
-            <code className="mono text-[length:var(--text-xs)]">UI</code>, …) — system English до Phase 8; имена
-            stories (<code className="mono text-[length:var(--text-xs)]">name</code>) — RU.
+            Sidebar держит ровно восемь корневых разделов; видимые названия историй и групп — русские.
           </li>
           <li>
             <code className="mono text-[length:var(--text-xs)]">--brand-grad</code> — только акцентные поверхности, не
@@ -92,7 +89,7 @@ function DesignContractOverview() {
       <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] p-4">
         <h2 className="type-h3">Визуальные Foundations рядом</h2>
         <p className="type-body mt-2 text-[var(--muted)]">
-          Colors · Typography · Density · Depth · Iconography — в той же группе Foundations в sidebar.
+          Цвета, типографика, плотность, глубина и иконки — в той же группе «Основы».
         </p>
       </section>
     </div>
@@ -109,6 +106,6 @@ export default meta;
 type Story = StoryObj;
 
 export const Overview: Story = {
-  name: "Обзор и ссылки на docs",
+  name: "Обзор и ссылки на документы",
   render: () => <DesignContractOverview />
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CardPanel } from "@/components/domain/card-panel";
@@ -62,6 +62,8 @@ export type TaskCreateModalBlockProps = {
   initialStep?: 1 | 2 | 3;
   /** Storybook: пред-выбранный проект (id из MOCK_PROJECT_OPTIONS). */
   initialProjectId?: string;
+  /** Storybook/demo seed for realistic non-empty forms. */
+  initialForm?: Partial<CreateTaskFormState>;
   /** Storybook API Contract: после «Создать» показать JSON превью запроса. */
   showApiContractPreview?: boolean;
 };
@@ -69,13 +71,15 @@ export type TaskCreateModalBlockProps = {
 export function TaskCreateModalBlock({
   initialStep = 1,
   initialProjectId = "inbox",
+  initialForm,
   showApiContractPreview = false
 }: TaskCreateModalBlockProps = {}) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [projectScopeId, setProjectScopeId] = useState(initialProjectId);
   const [form, setForm] = useState<CreateTaskFormState>(() => ({
     ...EMPTY_CREATE_TASK_FORM,
-    participants: [{ userId: "", role: "executor" }]
+    ...initialForm,
+    participants: initialForm?.participants ?? [{ userId: "", role: "executor" }]
   }));
   const [issues, setIssues] = useState<ReturnType<typeof issuesToFieldMap>>({});
   const [preview, setPreview] = useState<CreateTaskRequestPreview | null>(null);
@@ -132,7 +136,11 @@ export function TaskCreateModalBlock({
   };
 
   const reset = () => {
-    setForm({ ...EMPTY_CREATE_TASK_FORM, participants: [{ userId: "", role: "executor" }] });
+    setForm({
+      ...EMPTY_CREATE_TASK_FORM,
+      ...initialForm,
+      participants: initialForm?.participants ?? [{ userId: "", role: "executor" }]
+    });
     setProjectScopeId(initialProjectId);
     setStep(1);
     setIssues({});
@@ -356,7 +364,7 @@ export function TaskCreateModalBlock({
           >
             <FormGrid columns={1}>
               <Field
-                label="Участники"
+                label="Состав команды"
                 full
                 {...(issues.participants ? { error: issues.participants } : {})}
               >
@@ -417,30 +425,38 @@ function ParticipantsEditor({
   onAdd: () => void;
 }) {
   return (
-    <div className="u-flex u-flex-col u-gap-2">
+    <div className="participant-editor">
       {participants.map((p, i) => (
-        <div key={i} className="u-grid u-grid-cols-[minmax(0,1fr)_180px_auto] u-gap-2">
-          <Combobox
-            options={USER_OPTIONS}
-            value={p.userId}
-            onValueChange={(value) => onUserChange(i, value)}
-            placeholder="Выбрать сотрудника"
-          />
-          <Select value={p.role} onValueChange={(value) => onRoleChange(i, value as TaskParticipantRole)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ROLE_OPTIONS.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div key={i} className="participant-editor__row">
+          <div className="participant-editor__employee">
+            <Combobox
+              options={USER_OPTIONS}
+              value={p.userId}
+              onValueChange={(value) => onUserChange(i, value)}
+              placeholder="Выбрать сотрудника"
+            />
+          </div>
+          <div className="participant-editor__role">
+            <Select
+              value={p.role}
+              onValueChange={(value) => onRoleChange(i, value as TaskParticipantRole)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_OPTIONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"
+            className="participant-editor__remove"
             aria-label="Удалить участника"
             onClick={() => onRemove(i)}
             disabled={participants.length === 1}
@@ -450,8 +466,15 @@ function ParticipantsEditor({
           </Button>
         </div>
       ))}
-      <Button variant="secondary" size="sm" onClick={onAdd} disabled={participants.length >= 20}>
-        + Добавить участника
+      <Button
+        variant="soft"
+        size="sm"
+        className="participant-editor__add"
+        onClick={onAdd}
+        disabled={participants.length >= 20}
+      >
+        <Plus className="size-4" aria-hidden />
+        Добавить участника
       </Button>
     </div>
   );

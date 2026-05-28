@@ -114,7 +114,7 @@ function CatalogPage() {
 
       <Section title="Состояния (примитивы · L1–L4)">
         <p className="text-[var(--text-sm)] text-[var(--muted)]">
-          Каталог без оболочки приложения. Продуктовые экраны состояний — в Views/Screens с WorkspaceChrome.
+          Каталог без оболочки приложения. Продуктовые экраны состояний — в разделе «Экраны» с рабочей оболочкой.
         </p>
         <BannerInline variant="info">
           L1 в строке · L2 в панели · L3 секция страницы · L4 на весь экран
@@ -204,7 +204,7 @@ function CatalogPage() {
             <SheetContent>
               <SheetHeader>
                 <SheetTitle>Инспектор</SheetTitle>
-                <SheetDescription>Правый drawer 380px.</SheetDescription>
+                <SheetDescription>Правая боковая панель 380px.</SheetDescription>
               </SheetHeader>
             </SheetContent>
           </Sheet>
@@ -307,7 +307,7 @@ const meta: Meta = {
     layout: "fullscreen",
     docs: {
       description: {
-        component: "Единая страница для согласования design-v3 UI kit (Phase 2 / PR #21)."
+        component: "Единая страница для согласования набора компонентов design-v3."
       }
     }
   }

@@ -20,6 +20,39 @@ import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { PageIntro } from "@/views/layout/page-intro";
 import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
+function statusLabel(value: string): string {
+  if (value === "active") return "Активно";
+  if (value === "draft") return "Черновик";
+  if (value === "archived") return "Архив";
+  if (value === "system") return "Системный";
+  return value;
+}
+
+function entityLabel(value: string): string {
+  if (value === "project") return "проект";
+  if (value === "task") return "задача";
+  if (value === "deal") return "сделка";
+  if (value === "client") return "клиент";
+  return value;
+}
+
+function fieldTypeLabel(value: string): string {
+  if (value === "text") return "текст";
+  if (value === "number") return "число";
+  if (value === "date") return "дата";
+  if (value === "select") return "список";
+  if (value === "boolean") return "да/нет";
+  return value;
+}
+
+function taskStatusCategoryLabel(value: string): string {
+  if (value === "todo") return "к выполнению";
+  if (value === "in_progress") return "в работе";
+  if (value === "done") return "готово";
+  if (value === "blocked") return "заблокировано";
+  return value;
+}
+
 export function SettingsBlock() {
   const { fixtures } = useScenarioFixtures();
   const [tab, setTab] = useState<"profile" | "notifications" | "integrations" | "billing" | "workspace">("profile");
@@ -47,7 +80,7 @@ export function SettingsBlock() {
           options={[
             { value: "profile", label: "Профиль" },
             { value: "notifications", label: "Уведомления" },
-            { value: "workspace", label: "Workspace config" },
+            { value: "workspace", label: "Рабочая область" },
             { value: "integrations", label: "Интеграции" },
             { value: "billing", label: "Оплата" }
           ]}
@@ -58,7 +91,7 @@ export function SettingsBlock() {
           {tab === "notifications"
             ? "Вкладка «Уведомления» (демо переключения)."
             : tab === "workspace"
-              ? "Tenant-настройки: поля, шаблоны, стадии и статусы."
+              ? "Настройки рабочей области: поля, шаблоны, стадии и статусы."
               : tab === "integrations"
               ? "Вкладка «Интеграции» (демо переключения)."
               : "Вкладка «Оплата» (демо переключения)."}
@@ -120,38 +153,38 @@ export function SettingsBlock() {
         </FormSection>
         ) : null}
         {tab === "workspace" ? (
-          <FormSection title="Workspace config" lead="CustomFieldDefinition, ProjectTemplate, DealStage и TaskStatus из API-контракта.">
+          <FormSection title="Настройки рабочей области" lead="Поля, шаблоны, стадии и статусы, которые влияют на проектный контур.">
             <div className="grid-2">
               <ConfigList
                 title="Шаблоны проектов"
                 rows={fixtures.projectTemplates.map((template) => ({
                   title: template.tenantLabel,
-                  subtitle: template.systemKey,
-                  meta: template.status
+                  subtitle: `Ключ шаблона: ${template.systemKey}`,
+                  meta: statusLabel(template.status)
                 }))}
               />
               <ConfigList
                 title="Кастомные поля"
                 rows={fixtures.customFields.map((field) => ({
                   title: field.tenantLabel,
-                  subtitle: `${field.systemKey} · ${field.targetEntity} · ${field.fieldType}`,
-                  meta: field.required ? "required" : field.status
+                  subtitle: `Поле: ${field.systemKey} · ${entityLabel(field.targetEntity)} · ${fieldTypeLabel(field.fieldType)}`,
+                  meta: field.required ? "Обязательное" : statusLabel(field.status)
                 }))}
               />
               <ConfigList
                 title="Стадии сделок"
                 rows={fixtures.dealStages.map((stage) => ({
                   title: stage.name,
-                  subtitle: `${stage.id} · sortOrder ${stage.sortOrder}`,
-                  meta: stage.status
+                  subtitle: `Код: ${stage.id} · порядок ${stage.sortOrder}`,
+                  meta: statusLabel(stage.status)
                 }))}
               />
               <ConfigList
                 title="Статусы задач"
                 rows={fixtures.taskStatuses.map((status) => ({
                   title: status.name,
-                  subtitle: `${status.id} · ${status.category} · order ${status.sortOrder}`,
-                  meta: status.isSystem ? "system" : status.status
+                  subtitle: `Код: ${status.id} · ${taskStatusCategoryLabel(status.category)} · порядок ${status.sortOrder}`,
+                  meta: status.isSystem ? "Системный" : statusLabel(status.status)
                 }))}
               />
             </div>
@@ -178,7 +211,7 @@ function ConfigList({
             <span className="u-text-sm">{row.title}</span>
             <span className="u-text-xs u-text-muted u-block">{row.subtitle}</span>
           </span>
-          <Chip variant={row.meta === "active" || row.meta === "system" ? "success" : "warning"}>{row.meta}</Chip>
+          <Chip variant={row.meta === "Активно" || row.meta === "Системный" ? "success" : "warning"}>{row.meta}</Chip>
         </div>
       ))}
     </div>

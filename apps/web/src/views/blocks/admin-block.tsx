@@ -14,6 +14,20 @@ import { formatDate } from "@/lib/mock-data/format";
 import { PageIntro } from "@/views/layout/page-intro";
 import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
+function absenceTypeLabel(value: string): string {
+  if (value === "vacation") return "Отпуск";
+  if (value === "sick") return "Больничный";
+  if (value === "day_off") return "Выходной";
+  return value;
+}
+
+function absenceStatusLabel(value: string): string {
+  if (value === "approved") return "Согласовано";
+  if (value === "pending") return "На согласовании";
+  if (value === "rejected") return "Отклонено";
+  return value;
+}
+
 export function AdminBlock() {
   const { fixtures } = useScenarioFixtures();
   const { workspaceUsers, accessProfiles, positions, orgStructure, absences } = fixtures;
@@ -39,7 +53,7 @@ export function AdminBlock() {
       forbiddenTitle="Нет доступа к администрированию"
     >
       <div className="grid-2">
-        <CardPanel title="Пользователи" subtitle={`${workspaceUsers.length} записей WorkspaceUser`} flush>
+        <CardPanel title="Пользователи" subtitle={`${workspaceUsers.length} сотрудников`} flush>
           <DataTable>
             <thead>
               <tr>
@@ -85,7 +99,7 @@ export function AdminBlock() {
         </CardPanel>
         <CardPanel
           title="Политики безопасности"
-          subtitle="RBAC и tenant-политики"
+          subtitle="Права доступа и политики рабочей области"
           actions={
             <Button variant="ghost" size="sm">
               <ShieldCheck className="size-4" aria-hidden />
@@ -100,7 +114,7 @@ export function AdminBlock() {
             <SwitchRow label="Разрешённые домены" description="Только адреса email из доменов арендатора" />
           </SwitchRowList>
         </CardPanel>
-        <CardPanel title="Должности" subtitle="PositionRecord" flush>
+        <CardPanel title="Должности" subtitle="Роли в ресурсном планировании" flush>
           <DataTable>
             <thead>
               <tr>
@@ -120,12 +134,12 @@ export function AdminBlock() {
             </tbody>
           </DataTable>
         </CardPanel>
-        <CardPanel title="Профили доступа" subtitle="AccessProfileRecord" flush>
+        <CardPanel title="Профили доступа" subtitle="Наборы разрешений" flush>
           <DataTable>
             <thead>
               <tr>
                 <th>Профиль</th>
-                <th>Permissions</th>
+                <th>Разрешения</th>
                 <th>Пользователей</th>
               </tr>
             </thead>
@@ -140,20 +154,20 @@ export function AdminBlock() {
             </tbody>
           </DataTable>
         </CardPanel>
-        <CardPanel title="Оргструктура" subtitle="functional / project tracks">
+        <CardPanel title="Оргструктура" subtitle="Функциональный и проектный контуры">
           <div className="u-flex u-flex-col u-gap-2">
             <CellStack
-              title="Functional track"
+              title="Функциональный контур"
               subtitle={`${orgStructure.functional.nodes.length} узла · ${orgStructure.functional.placements.length} назначений`}
             />
             <CellStack
-              title="Project track"
+              title="Проектный контур"
               subtitle={`${orgStructure.project.nodes.length} узла · ${orgStructure.project.placements.length} назначений`}
             />
             <span className="u-text-xs u-text-muted">Последняя сверка: {formatDate("2026-05-25T00:00:00.000Z")}</span>
           </div>
         </CardPanel>
-        <CardPanel title="Отсутствия" subtitle="Absence records" flush>
+        <CardPanel title="Отсутствия" subtitle="Отпуска и недоступность сотрудников" flush>
           <DataTable>
             <thead>
               <tr>
@@ -167,9 +181,9 @@ export function AdminBlock() {
               {absences.map((absence) => (
                 <tr key={absence.id}>
                   <td>{workspaceUsers.find((user) => user.id === absence.userId)?.name ?? absence.userId}</td>
-                  <td>{absence.type}</td>
+                  <td>{absenceTypeLabel(absence.type)}</td>
                   <td className="mono">{formatDate(absence.dateFrom)} — {formatDate(absence.dateTo)}</td>
-                  <td><Chip variant={absence.status === "approved" ? "success" : "warning"}>{absence.status}</Chip></td>
+                  <td><Chip variant={absence.status === "approved" ? "success" : "warning"}>{absenceStatusLabel(absence.status)}</Chip></td>
                 </tr>
               ))}
             </tbody>

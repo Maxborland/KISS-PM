@@ -24,7 +24,7 @@ export const Default: Story = {
 
 /** Витрина design-v3 (popover + календарь) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <DatePickerShowcase />
 };

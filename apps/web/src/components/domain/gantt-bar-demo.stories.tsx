@@ -21,7 +21,7 @@ export default meta;
 type Story = StoryObj<typeof GanttBarDemo>;
 
 export const Variants: Story = {
-  name: "Варианты",
+  name: "Состояния",
   render: () => (
     <div className="catalog-section__body catalog-section__body--narrow">
       <GanttBarDemo label="Проектирование API" progress={65} />

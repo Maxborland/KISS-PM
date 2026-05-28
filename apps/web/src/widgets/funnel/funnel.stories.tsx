@@ -188,7 +188,15 @@ function FunnelHarness({
 const meta: Meta<typeof FunnelHarness> = {
   title: "Widgets/Funnel",
   component: FunnelHarness,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    docs: {
+      description: {
+        component:
+          "Воронка CRM на общем канбан-движке: стадии сделки, сортировка внутри колонок, настройка состава карточки, пустые и отфильтрованные состояния."
+      }
+    }
+  },
   tags: ["!autodocs"]
 };
 
@@ -197,16 +205,30 @@ export default meta;
 type Story = StoryObj<typeof FunnelHarness>;
 
 export const Default: Story = {
-  name: "Default",
+  name: "Обзор",
   render: () => <FunnelHarness />
 };
 
 export const EmptyStage: Story = {
-  name: "EmptyStage",
+  name: "Пустая стадия",
+  parameters: {
+    docs: {
+      description: {
+        story: "Проверяет, что пустая колонка остаётся читаемой и принимает перенос сделок."
+      }
+    }
+  },
   render: () => <FunnelHarness initialDeals={DEALS.filter((d) => d.stage !== "deal")} />
 };
 
 export const Filtered: Story = {
-  name: "Filtered",
+  name: "Фильтр",
+  parameters: {
+    docs: {
+      description: {
+        story: "Показывает узкий результат поиска без переполнения карточек и футера."
+      }
+    }
+  },
   render: () => <FunnelHarness query="DataHub" />
 };

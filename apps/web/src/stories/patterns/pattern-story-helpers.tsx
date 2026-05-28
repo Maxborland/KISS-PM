@@ -25,7 +25,7 @@ export function PatternFrame({
   return (
     <div className="pattern-story">
       <header className="pattern-story__header">
-        <p className="pattern-story__eyebrow">Patterns · повторяемые состояния UI</p>
+        <p className="pattern-story__eyebrow">Паттерны · повторяемые состояния UI</p>
         <h1 className="pattern-story__title type-h2">{title}</h1>
         {hint ? <p className="pattern-story__hint type-body">{hint}</p> : null}
       </header>

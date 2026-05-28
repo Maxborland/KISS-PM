@@ -6,7 +6,7 @@ import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { PatternFrame, patternDocs, PATTERN_STORY_PARAMETERS } from "@/stories/patterns/pattern-story-helpers";
 
 const meta: Meta = {
-  title: "Patterns/Drawer детали",
+  title: "Patterns/Боковая панель детали",
   parameters: PATTERN_STORY_PARAMETERS,
   tags: ["!autodocs"]
 };
@@ -19,8 +19,8 @@ function DrawerDetailDemo() {
   const [open, setOpen] = useState(true);
   return (
     <PatternFrame
-      title="Drawer детали задачи"
-      hint="Sheet xl + EntityDetailBlock; ссылка «Открыть как страницу»."
+      title="Боковая панель задачи"
+      hint="Боковая панель xl + EntityDetailBlock; ссылка «Открыть как страницу»."
     >
       <Button variant="secondary" onClick={() => setOpen(true)}>
         Открыть задачу
@@ -40,10 +40,10 @@ function DrawerDetailDemo() {
 }
 
 export const TaskDetail: Story = {
-  name: "Карточка задачи в Sheet",
+  name: "Карточка задачи в боковой панели",
   parameters: {
     docs: patternDocs(
-      "Паттерн быстрого просмотра из дашборда / канбана без смены маршрута. Play: Views/Screens → 02 Моя работа · DnD."
+      "Паттерн быстрого просмотра из дашборда или канбана без смены маршрута. Связанный экран: «Моя работа»."
     )
   },
   render: () => <DrawerDetailDemo />

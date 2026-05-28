@@ -6,6 +6,10 @@
 
 .kanban-col {
   position: relative;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-subtle);
 }
 
 .kanban-col__accent {
@@ -42,7 +46,16 @@
 
 .kanban-card__foot-meta--deal {
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
+}
+
+.kanban-card__deal-amount,
+.kanban-card__deal-date {
+  white-space: nowrap;
+}
+
+.kanban-card__deal-date {
+  color: var(--muted);
 }
 
 /* CRM-funnel variant: 5 panel-style columns, same DnD affordances. */
@@ -54,11 +67,15 @@
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-3);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kanban--funnel .kanban-col__head {
-  padding: 0 0 var(--space-1);
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .kanban--funnel .kanban-col__title {
@@ -71,6 +88,80 @@
 
 .kanban--funnel .kanban-col__body {
   gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.kanban--funnel .kanban-card {
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: var(--space-3);
+  gap: var(--space-2);
+}
+
+.kanban--funnel .kanban-card__title {
+  overflow-wrap: anywhere;
+}
+
+.kanban--funnel .kanban-card__meta {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.kanban--funnel .kanban-card__foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.kanban--funnel .kanban-card__foot-meta--deal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  align-content: flex-start;
+  gap: 4px 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.kanban--funnel .kanban-card__foot-meta--deal > * {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban--funnel .kanban-card__deal-amount {
+  flex: 1 1 88px;
+}
+
+.kanban--funnel .kanban-card__deal-probability {
+  flex: 0 0 auto;
+}
+
+.kanban--funnel .kanban-card__deal-trend {
+  flex: 1 1 42px;
+  min-width: 0;
+}
+
+.kanban--funnel .kanban-card__deal-trend > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban--funnel .kanban-card__deal-date {
+  flex: 1 0 100%;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  justify-content: flex-start;
 }
 
 /* Make funnel columns wrap nicely on narrow viewports. */

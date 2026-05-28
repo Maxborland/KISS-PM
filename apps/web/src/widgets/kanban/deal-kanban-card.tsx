@@ -43,6 +43,14 @@ export type DealKanbanCardProps<C extends string = string> = {
   foot?: ReactNode;
 };
 
+function feasibilityLabel(value: string): string {
+  if (value === "feasible") return "Реализуемо";
+  if (value === "risk") return "Риск";
+  if (value === "blocked") return "Блокер";
+  if (value === "not_checked") return "Не проверено";
+  return value;
+}
+
 export function DealKanbanCard<C extends string = string>({
   item,
   draggable,
@@ -125,10 +133,15 @@ export function DealKanbanCard<C extends string = string>({
             <span />
           )}
           <div className="kanban-card__foot-meta kanban-card__foot-meta--deal">
-            {showAmount ? <MoneyValue amount={parseDealAmount(item.amount)} /> : null}
-            {showProbability ? <ProbabilityRing value={item.probability ?? 0} /> : null}
+            {showAmount ? (
+              <MoneyValue amount={parseDealAmount(item.amount)} className="kanban-card__deal-amount" />
+            ) : null}
+            {showProbability ? (
+              <ProbabilityRing value={item.probability ?? 0} className="kanban-card__deal-probability" />
+            ) : null}
             {showProbability && item.probabilityTrend ? (
               <TrendArrow
+                className="kanban-card__deal-trend"
                 direction={item.probabilityTrend}
                 label={
                   item.probabilityTrend === "up"
@@ -140,12 +153,12 @@ export function DealKanbanCard<C extends string = string>({
               />
             ) : null}
             {showFinish && item.plannedFinish ? (
-              <span className="mono">
+              <span className="kanban-card__deal-date mono">
                 {new Intl.DateTimeFormat("ru-RU").format(new Date(item.plannedFinish))}
               </span>
             ) : null}
             {showHours ? <span>{item.plannedHours ?? 0} ч</span> : null}
-            {showFeasibility && item.feasibilityStatus ? <span>{item.feasibilityStatus}</span> : null}
+            {showFeasibility && item.feasibilityStatus ? <span>{feasibilityLabel(item.feasibilityStatus)}</span> : null}
           </div>
         </div>
       ) : null}
