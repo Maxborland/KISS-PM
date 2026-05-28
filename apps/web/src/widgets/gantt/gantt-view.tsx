@@ -140,6 +140,23 @@ function rowClass(row: GanttRow, selected: boolean) {
   return cn("gantt2__row", row.kind === "summary" && "gantt2__row--group", selected && "gantt2__row--selected");
 }
 
+export type GanttEndpointPointerAction =
+  | { type: "start"; rowId: string; endpoint: GanttDependencyEndpoint }
+  | { type: "complete"; rowId: string; endpoint: GanttDependencyEndpoint }
+  | { type: "ignore" };
+
+export function resolveEndpointPointerAction(
+  link: GanttLinkSession | null,
+  rowId: string,
+  endpoint: GanttDependencyEndpoint
+): GanttEndpointPointerAction {
+  if (!link) return { type: "start", rowId, endpoint };
+  if (canCompleteLinkHover(link.fromId, { rowId, endpoint })) {
+    return { type: "complete", rowId, endpoint };
+  }
+  return { type: "ignore" };
+}
+
 export function GanttView({
   data,
   className,
@@ -419,8 +436,14 @@ export function GanttView({
                           clientX: event.clientX,
                           clientY: event.clientY
                         };
+                        const action = resolveEndpointPointerAction(link ?? null, row.id, endpoint);
+                        if (action.type === "complete") {
+                          onLinkComplete?.(action.rowId, action.endpoint);
+                          return;
+                        }
+                        if (action.type === "ignore") return;
                         const { x, y } = clientToChart(event.clientX, event.clientY);
-                        onLinkStart?.(row.id, endpoint, x, y);
+                        onLinkStart?.(action.rowId, action.endpoint, x, y);
                       }}
                     />
                   </div>

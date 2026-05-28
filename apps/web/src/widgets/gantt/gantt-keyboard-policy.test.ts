@@ -107,6 +107,22 @@ describe("gantt keyboard policy", () => {
     expect(action).toEqual({ type: "copyCells" });
   });
 
+  it("Enter is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Enter", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Enter starts editing inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Enter", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "startEdit" });
+  });
+
   it("Shift+ArrowDown extends selection navigation", () => {
     const action = resolveGanttKeyboardAction(
       { key: "ArrowDown", ctrlKey: false, metaKey: false, shiftKey: true },

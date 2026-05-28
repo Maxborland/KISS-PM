@@ -64,7 +64,7 @@ export function resolveGanttKeyboardAction(
     return null;
   }
 
-  if (input.key === "Enter" && ctx.focus && !ctx.edit) {
+  if (input.key === "Enter" && ctx.activeGrid && ctx.focus && !ctx.edit) {
     return { type: "startEdit" };
   }
 
