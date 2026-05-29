@@ -208,7 +208,7 @@ export function createLandingAgentDemoState(preset: LandingAgentDemoPreset): Lan
   if (preset === "second-prompt-thinking") {
     return {
       ...reviewState,
-      phase: "second-thinking",
+      phase: "applied",
       inputValue: "",
       messages: [userMessage, henryMessage, appliedMessage, secondMessage, SECOND_ANSWER_MESSAGE],
       visibleSteps: 5,

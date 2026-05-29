@@ -85,6 +85,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
     const answerTimer = window.setTimeout(() => {
       setState((current) => ({
         ...current,
+        phase: "applied",
         messages: current.messages.some((message) => message.id === SECOND_ANSWER_MESSAGE.id)
           ? current.messages
           : [...current.messages, SECOND_ANSWER_MESSAGE]
