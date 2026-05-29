@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
  */
 export function hashIp(ip: string | null): string | null {
   if (!ip) return null;
-  const salt = process.env["WAITLIST_IP_SALT"] || "kiss-pm-alpha";
+  const salt = process.env["WAITLIST_IP_SALT"]?.trim();
+  if (!salt) return null;
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }

@@ -155,9 +155,19 @@ export default function DemoSandbox() {
             <p className="sandbox__dock-hint">{meta.hint}</p>
           </div>
           <div className="sandbox__dock-actions">
-            <button type="button" className="sandbox__dock-secondary">
-              Сохранить и выйти
-            </button>
+            <div className="sandbox__dock-disabled-action">
+              <button
+                type="button"
+                className="sandbox__dock-secondary"
+                disabled
+                aria-describedby="sandbox-save-disabled-reason"
+              >
+                Сохранить и выйти
+              </button>
+              <span id="sandbox-save-disabled-reason" className="sandbox__dock-action-note">
+                Доступно после входа в рабочий продукт
+              </span>
+            </div>
             {dockPrimary ? (
               <button
                 type="button"
