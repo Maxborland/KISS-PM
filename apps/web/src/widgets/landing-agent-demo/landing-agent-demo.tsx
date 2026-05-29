@@ -230,22 +230,24 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           editingChangeId={state.editingChangeId}
           mobileOpen={reviewPanelVisible && state.mobileReviewDrawer}
           onCloseMobile={() => setState((current) => ({ ...current, mobileReviewDrawer: false }))}
+          onFocusChange={(id) => setState((current) => ({ ...current, activeChangeId: id }))}
           onSelectChange={(id) =>
             setState((current) => ({
               ...current,
               activeChangeId: id,
               changes: current.changes.map((change) =>
                 change.id === id
-                  ? {
-                      ...change,
-                      selected: !change.selected,
-                      status: change.selected ? "отклонено" : "выбрано"
-                    }
+                  ? change.status === "требует прав"
+                    ? { ...change, selected: false }
+                    : {
+                        ...change,
+                        selected: !change.selected,
+                        status: change.selected ? "отклонено" : "выбрано"
+                      }
                   : change
               )
             }))
           }
-          onFocusChange={(id) => setState((current) => ({ ...current, activeChangeId: id }))}
           onRejectChange={(id) =>
             setState((current) => ({
               ...current,
@@ -262,7 +264,11 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
             setState((current) => ({
               ...current,
               changes: current.changes.map((change) =>
-                change.id === id ? { ...change, after: value, status: "изменено", selected: true } : change
+                change.id === id
+                  ? change.status === "требует прав"
+                    ? { ...change, after: value, selected: false }
+                    : { ...change, after: value, status: "изменено", selected: true }
+                  : change
               )
             }))
           }
