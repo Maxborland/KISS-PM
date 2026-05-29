@@ -1,0 +1,9 @@
+.astro/
+dist/
+node_modules/
+data/
+*.sqlite
+*.sqlite-journal
+*.log
+.env
+.env.local

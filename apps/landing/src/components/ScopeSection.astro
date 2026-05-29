@@ -1,0 +1,22 @@
+---
+import LandingKanbanShowcase from "./showcase/LandingKanbanShowcase.tsx";
+---
+
+<section id="scope" class="l-band l-band--ink" aria-labelledby="scope-title">
+  <div class="l-band__grid" aria-hidden="true"></div>
+
+  <div class="l-container">
+    <header class="section-head section-head--tight">
+      <h2 id="scope-title" class="l-display l-display--ink" data-text-reveal>
+        Сигнал → действие → аудит
+      </h2>
+      <p class="section-head__copy section-head__copy--visible" data-text-reveal>
+        Канбан — не список задач, а очередь управленческих решений: сигнал, подтверждённое действие и запись в аудит.
+      </p>
+    </header>
+
+    <div data-reveal>
+      <LandingKanbanShowcase client:load />
+    </div>
+  </div>
+</section>
