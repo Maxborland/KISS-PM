@@ -74,7 +74,13 @@ export function CrmDealScreen({ deal, onAdvance, onExplore }: Props) {
                   </div>
                 ))}
               </dl>
-              <button type="button" className="deal-panel__more" tabIndex={-1}>
+              <button
+                type="button"
+                className="deal-panel__more"
+                onClick={() =>
+                  onExplore("Детальная карточка уже собрана: условия, команда и активности показаны в этом окне.")
+                }
+              >
                 Показать детали
                 <span aria-hidden="true">▾</span>
               </button>
