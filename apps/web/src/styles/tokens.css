@@ -61,6 +61,12 @@
   --grad-cool-overlay: rgba(255, 255, 255, 0.22);
   --grad-mono: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 
+  /* KPI accent — полоска + мягкий блик (контент на --panel) */
+  --kpi-accent-warm-bar: linear-gradient(90deg, #fb923c 0%, #fbbf24 55%, #fde68a 100%);
+  --kpi-accent-warm-glow: color-mix(in srgb, #fdba74 22%, transparent);
+  --kpi-accent-cool-bar: linear-gradient(90deg, #38bdf8 0%, #60a5fa 50%, #a78bfa 100%);
+  --kpi-accent-cool-glow: color-mix(in srgb, #93c5fd 24%, transparent);
+
   /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
@@ -76,7 +82,8 @@
   /* Typography — pair: Plus Jakarta Sans (display) + Inter (body) + JetBrains Mono (code).
      next/font подставляет --next-font-*; fallback в var() обеспечивает корректный стек в Storybook. */
   --font-ui: var(--next-font-ui, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: var(--next-font-display, "Plus Jakarta Sans"), "Inter", system-ui, sans-serif;
+  --font-display: var(--next-font-display, "Inter Tight"), "Plus Jakarta Sans", "Inter", system-ui,
+    sans-serif;
   --font-mono: var(--next-font-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
 
   /* Type scale: body 14 · h3 18 · h2 24 · h1 32 */
@@ -92,6 +99,8 @@
   --text-2xl: var(--text-h2);
   --text-3xl: var(--text-h1);
   --text-4xl: 40px;
+  --text-display: 40px;
+  --text-eyebrow: 11px;
 
   --lh-xs: 16px;
   --lh-sm: 18px;
@@ -105,6 +114,12 @@
   --lh-2xl: var(--lh-h2);
   --lh-3xl: var(--lh-h1);
   --lh-4xl: 44px;
+  --lh-display: 44px;
+  --lh-eyebrow: 16px;
+  --letter-eyebrow: 0.08em;
+
+  /* Brand gradient — только разрешённые поверхности (см. DESIGN_CONTRACT §3c) */
+  --brand-grad: linear-gradient(135deg, #2563eb 0%, #1d4ed8 52%, #0f172a 100%);
 
   /* Radii */
   --radius-xs: 4px;
@@ -123,14 +138,20 @@
   --shadow-lg: 0 12px 24px -8px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.05);
   --shadow-xl: 0 24px 48px -12px rgba(15, 23, 42, 0.18);
   --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.04), 0 24px 48px -16px rgba(15, 23, 42, 0.12);
+  --shadow-floating: 0 20px 40px -10px rgba(15, 23, 42, 0.16), 0 8px 20px -6px rgba(15, 23, 42, 0.08);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.4);
   --ring-focus: 0 0 0 3px var(--accent-ring);
 
   /* Layout */
+  --icon-rail-width: 56px;
+  --context-sidebar-width: 232px;
   --sidebar-width: 232px;
-  --topbar-height: 60px;
+  --topbar-height: 56px;
   --page-header-height: 64px;
   --row-h: 30px;
+  --row-h-ultra: 24px;
+  --row-h-compact: 32px;
+  --row-h-cozy: 40px;
   --toolbar-h: 36px;
   --content-max: 1480px;
   --canvas-pad: 16px;
@@ -152,4 +173,17 @@
   --ease-in: cubic-bezier(.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, .2, 1);
   --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Dark palette stub — не подменяет светлую тему до явного theme switch */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --_dark-canvas: #0b1220;
+    --_dark-panel: #111827;
+    --_dark-panel-elevated: #1e293b;
+    --_dark-text: #e2e8f0;
+    --_dark-muted: #94a3b8;
+    --_dark-border: #334155;
+    --_dark-accent: #2563eb;
+  }
 }

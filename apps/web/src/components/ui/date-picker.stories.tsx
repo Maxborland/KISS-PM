@@ -6,7 +6,7 @@ import { DatePickerShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof DatePicker> = {
-  title: "UI/DatePicker",
+  title: "Primitives/DatePicker",
   component: DatePicker,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
@@ -24,7 +24,7 @@ export const Default: Story = {
 
 /** Витрина design-v3 (popover + календарь) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <DatePickerShowcase />
 };

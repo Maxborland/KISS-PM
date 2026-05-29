@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 3000",
+    "dev:lan": "next dev -H 0.0.0.0 -p 3000",
     "dev:docker": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
@@ -12,8 +13,11 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:a11y": "playwright test --grep @a11y",
+    "test:vrt": "pnpm build-storybook && playwright test --grep @vrt",
+    "test:a11y": "pnpm build-storybook && playwright test --grep @a11y",
+    "test:storybook-gates": "pnpm build-storybook && playwright test --grep \"@vrt|@a11y\"",
     "storybook": "storybook dev -p 6006",
+    "storybook:lan": "storybook dev -h 0.0.0.0 -p 6006",
     "build-storybook": "storybook build",
     "verify:storybook-contract": "node scripts/run-storybook-contract-ci.mjs"
   },
@@ -85,11 +89,18 @@
     "eslint": "^9.20.0",
     "eslint-config-next": "^16.2.6",
     "happy-dom": "^15.11.7",
+    "msw": "^2.14.6",
+    "msw-storybook-addon": "^2.0.7",
     "postcss": "^8.5.14",
     "serve": "^14.2.4",
     "shadcn": "^4.7.0",
     "storybook": "^8.6.18",
     "tailwindcss": "^4.3.0",
     "vitest": "^3.2.4"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

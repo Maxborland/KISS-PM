@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
 
 export type AppShellProps = {
-  sidebar: ReactNode;
+  iconRail: ReactNode;
+  contextSidebar: ReactNode;
   topbar: ReactNode;
   children: ReactNode;
 };
 
-export function AppShell({ sidebar, topbar, children }: AppShellProps) {
+export function AppShell({ iconRail, contextSidebar, topbar, children }: AppShellProps) {
   return (
     <div className="app-canvas">
       <div className="app-canvas__panel">
-        {sidebar}
+        {iconRail}
+        {contextSidebar}
         <div className="app-main">
           {topbar}
           <div className="app-content">{children}</div>

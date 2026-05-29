@@ -7,7 +7,7 @@ import { Form } from "./form";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Form> = {
-  title: "UI/Form",
+  title: "Primitives/Form",
   component: Form,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

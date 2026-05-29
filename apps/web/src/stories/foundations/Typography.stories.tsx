@@ -57,22 +57,33 @@ export const TypeScale: Story = {
 };
 
 export const FontPair: Story = {
-  name: "Пара шрифтов",
+  name: "Семейства шрифтов",
   render: () => (
     <div className="space-y-6">
       <header>
-        <h1 className="type-h1">Пара шрифтов</h1>
+        <h1 className="type-h1">Семейства шрифтов</h1>
         <p className="type-body mt-2 text-[var(--muted)]">
-          Display + UI + mono — как на продуктовых экранах и в таблицах.
+          Inter (UI) · Inter Tight (display) · JetBrains Mono (код и числа).
         </p>
       </header>
       <div className="space-y-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--panel)] p-6">
-        <h2 className="type-h2">Plus Jakarta Sans · KISS PM</h2>
-        <p className="type-body max-w-[640px] text-[var(--muted-strong)]">
-          Inter — основной текст интерфейса 14px. Plus Jakarta Sans — заголовки h1–h3. JetBrains Mono —
-          идентификаторы и табличные числа.
+        <p
+          className="text-[length:var(--text-display)] font-semibold leading-[var(--lh-display)] text-[var(--text-strong)]"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Inter Tight · KISS PM
+        </p>
+        <p className="type-body max-w-[640px] text-[var(--muted-strong)]" style={{ fontFamily: "var(--font-ui)" }}>
+          Inter — основной текст интерфейса 14px. Inter Tight — заголовки и display (`--text-display` 40px).
+          Plus Jakarta Sans остаётся fallback в `--font-display`.
         </p>
         <p className="mono text-[length:var(--text-md)] text-[var(--muted-strong)]">PRJ-2026-014 · 27.05.2026</p>
+        <p
+          className="text-[length:var(--text-eyebrow)] font-semibold uppercase tracking-[var(--letter-eyebrow)] text-[var(--muted-strong)]"
+          style={{ fontFamily: "var(--font-ui)" }}
+        >
+          Eyebrow · --text-eyebrow
+        </p>
       </div>
     </div>
   )

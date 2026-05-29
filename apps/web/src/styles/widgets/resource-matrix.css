@@ -1,4 +1,4 @@
-﻿/* Auto-synced from design-v2/_partials-core.css — do not edit by hand; re-sync from reference */
+/* Auto-synced from design-v2/_partials-core.css — do not edit by hand; re-sync from reference */
 /* --- Stats strip --- */
 .rmatrix-stats {
   display: grid;
@@ -39,18 +39,18 @@
 .rmatrix-stats__value--warning { color: var(--warning-text); }
 .rmatrix-stats__value--danger { color: var(--danger-text); }
 
-.rmatrix-stats__bar {
-  height: 8px;
-  background: var(--panel-strong);
-  border-radius: 4px;
-  overflow: hidden;
-  position: relative;
+.rmatrix-stats__capacity {
+  grid-column: 1 / -1;
+  min-width: 200px;
+  padding-top: 4px;
 }
 
-.rmatrix-stats__bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--success), var(--warning) 70%, var(--danger));
-  width: 95%;
+.rmatrix-stats__capacity-bar .capacity-bar__head span:first-child {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 /* --- Legend strip --- */
@@ -90,6 +90,9 @@
 
 /* --- Matrix table --- */
 .rmatrix {
+  --rmatrix-aggregate-bg: color-mix(in srgb, var(--muted-soft) 24%, var(--panel));
+  --rmatrix-aggregate-bg-strong: color-mix(in srgb, var(--muted-soft) 32%, var(--panel));
+
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -98,6 +101,13 @@
   line-height: 1.2;
   max-height: 75vh;
   position: relative;
+  scrollbar-gutter: stable;
+  background-image: linear-gradient(
+    90deg,
+    transparent calc(100% - 20px),
+    color-mix(in srgb, var(--border) 40%, transparent) 100%
+  );
+  background-attachment: local, scroll;
 }
 
 .rmatrix__inner { min-width: max-content; }
@@ -146,47 +156,69 @@
   box-shadow: inset -1px 0 0 var(--border);
 }
 
-/* % bar embedded under the value */
-.rmatrix__cell--pct::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  bottom: 2px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--success);
-  width: 0;
+.rmatrix__pct-value {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: var(--text-strong);
 }
 
-.rmatrix__cell--pct-low::after { width: 30%; background: var(--success); }
-.rmatrix__cell--pct-mid::after { width: 60%; background: var(--success); }
-.rmatrix__cell--pct-norm::after { width: 80%; background: var(--accent); }
-.rmatrix__cell--pct-high { color: var(--warning-text); }
-.rmatrix__cell--pct-high::after { width: 95%; background: var(--warning); }
-.rmatrix__cell--pct-over { color: var(--danger); }
-.rmatrix__cell--pct-over::after { width: 100%; background: var(--danger); }
-
-/* --- Cell tones (data semantics) --- */
-.rmatrix__cell--num-normal {
-  background: var(--panel);
-  color: var(--text);
-}
-
-.rmatrix__cell--num-high {
-  background: rgba(245, 158, 11, 0.10);
+.rmatrix__cell--pct-warn .rmatrix__pct-value {
   color: var(--warning-text);
+}
+
+.rmatrix__cell--pct-over .rmatrix__pct-value {
+  color: var(--danger-text);
+}
+
+/* --- Day cells (единый контейнер) --- */
+.rmatrix__cell--day {
+  min-height: 24px;
+  font-size: 11px;
   font-weight: 600;
 }
 
-.rmatrix__cell--num-over {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+.rmatrix__cell--day-head {
+  font-size: 10px;
   font-weight: 700;
 }
 
-.rmatrix__cell--num-zero {
+.rmatrix__cell--load-normal {
+  background: color-mix(in srgb, var(--success) 8%, var(--panel));
+}
+
+.rmatrix__cell--load-high {
+  background: color-mix(in srgb, var(--warning) 12%, var(--panel));
+}
+
+.rmatrix__cell--load-over {
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+}
+
+.rmatrix__day-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.rmatrix__day-num--normal {
+  color: var(--success-text);
+  font-weight: 600;
+}
+
+.rmatrix__day-num--high {
+  color: var(--warning-text);
+  font-weight: 700;
+}
+
+.rmatrix__day-num--over {
+  color: var(--danger-text);
+  font-weight: 700;
+}
+
+.rmatrix__cell--load-zero {
   color: var(--muted-soft);
   background: var(--panel);
+  font-weight: 500;
 }
 
 /* Weekend — neutral grey tint */
@@ -244,38 +276,145 @@
   box-shadow: none;
 }
 
+/* Строки агрегатов: серое затенение как у выходных (без обводок) */
+.rmatrix__row--aggregate {
+  background: var(--rmatrix-aggregate-bg);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell {
+  background: var(--rmatrix-aggregate-bg);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--name,
+.rmatrix__row--aggregate > .rmatrix__cell--pct {
+  background: var(--rmatrix-aggregate-bg);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--weekend {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--vacation {
+  background: rgba(100, 116, 139, 0.3);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--holiday {
+  background: rgba(244, 63, 94, 0.14);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--load-zero {
+  background: var(--rmatrix-aggregate-bg);
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--load-normal {
+  background: color-mix(in srgb, var(--success) 10%, var(--rmatrix-aggregate-bg));
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--load-high {
+  background: color-mix(in srgb, var(--warning) 14%, var(--rmatrix-aggregate-bg));
+}
+
+.rmatrix__row--aggregate > .rmatrix__cell--load-over {
+  background: color-mix(in srgb, var(--danger) 16%, var(--rmatrix-aggregate-bg));
+}
+
 .rmatrix__row--workshop {
-  background: #e0e7ff;
   font-weight: 700;
   position: sticky;
   z-index: 1;
+  background: var(--rmatrix-aggregate-bg-strong);
 }
 
-.rmatrix__row--workshop .rmatrix__cell { background: #e0e7ff; }
-.rmatrix__row--workshop .rmatrix__cell--name { color: #312e81; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; }
+.rmatrix__row--workshop > .rmatrix__cell {
+  background: var(--rmatrix-aggregate-bg-strong);
+}
+
+.rmatrix__row--workshop > .rmatrix__cell--name {
+  color: var(--text-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+  background: var(--rmatrix-aggregate-bg-strong);
+}
+
+.rmatrix__row--workshop > .rmatrix__cell--pct {
+  background: var(--rmatrix-aggregate-bg-strong);
+}
 
 .rmatrix__row--role {
-  background: #eef2ff;
   font-weight: 600;
 }
 
-.rmatrix__row--role .rmatrix__cell { background: #eef2ff; }
-.rmatrix__row--role .rmatrix__cell--name { color: #3730a3; }
+.rmatrix__row--role > .rmatrix__cell--name {
+  color: var(--text);
+}
 
-.rmatrix__row--sub {
-  background: rgba(99, 102, 241, 0.03);
+.rmatrix__row--sub > .rmatrix__cell--name {
   font-style: italic;
   color: var(--muted);
 }
 
-.rmatrix__row--sub .rmatrix__cell { background: rgba(99, 102, 241, 0.03); color: var(--muted); }
+/* Иерархия имён */
+.rmatrix__indent {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0;
+}
 
-/* Zebra removed — too noisy with semantic tones */
+.rmatrix__indent--0 { width: 0; }
+.rmatrix__indent--1 { width: 14px; }
+.rmatrix__indent--2 { width: 28px; }
 
-/* Hover */
-.rmatrix__row:hover .rmatrix__cell { background-color: rgba(99, 102, 241, 0.05); }
-.rmatrix__row--workshop:hover .rmatrix__cell { background-color: #c7d2fe; }
-.rmatrix__row--role:hover .rmatrix__cell { background-color: #ddd6fe; }
+.rmatrix__toggle-spacer {
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.rmatrix__toggle--open svg {
+  transform: rotate(90deg);
+}
+
+/* Hover — не сбивать цвет цифр нагрузки */
+.rmatrix__row:hover .rmatrix__cell--name,
+.rmatrix__row:hover .rmatrix__cell--pct {
+  filter: brightness(1.03);
+}
+
+.rmatrix__row--person:hover .rmatrix__cell--day.rmatrix__cell--load-normal {
+  background: color-mix(in srgb, var(--success) 14%, var(--panel));
+}
+
+.rmatrix__row--person:hover .rmatrix__cell--day.rmatrix__cell--load-high {
+  background: color-mix(in srgb, var(--warning) 18%, var(--panel));
+}
+
+.rmatrix__row--person:hover .rmatrix__cell--day.rmatrix__cell--load-over {
+  background: color-mix(in srgb, var(--danger) 20%, var(--panel));
+}
+
+.rmatrix__row--aggregate:hover > .rmatrix__cell--day.rmatrix__cell--load-normal {
+  background: color-mix(in srgb, var(--success) 14%, var(--rmatrix-aggregate-bg));
+}
+
+.rmatrix__row--aggregate:hover > .rmatrix__cell--day.rmatrix__cell--load-high {
+  background: color-mix(in srgb, var(--warning) 18%, var(--rmatrix-aggregate-bg));
+}
+
+.rmatrix__row--aggregate:hover > .rmatrix__cell--day.rmatrix__cell--load-over {
+  background: color-mix(in srgb, var(--danger) 20%, var(--rmatrix-aggregate-bg));
+}
+
+.rmatrix__row--workshop:hover > .rmatrix__cell--day.rmatrix__cell--load-normal {
+  background: color-mix(in srgb, var(--success) 14%, var(--rmatrix-aggregate-bg-strong));
+}
+
+.rmatrix__row--workshop:hover > .rmatrix__cell--day.rmatrix__cell--load-high {
+  background: color-mix(in srgb, var(--warning) 18%, var(--rmatrix-aggregate-bg-strong));
+}
+
+.rmatrix__row--workshop:hover > .rmatrix__cell--day.rmatrix__cell--load-over {
+  background: color-mix(in srgb, var(--danger) 20%, var(--rmatrix-aggregate-bg-strong));
+}
 
 /* Toggle / avatar / name text */
 .rmatrix__toggle {
@@ -290,6 +429,11 @@
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
+  padding: 0;
+}
+
+.rmatrix__toggle svg {
+  transition: transform 0.12s ease;
 }
 
 .rmatrix__avatar {

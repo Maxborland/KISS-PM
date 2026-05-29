@@ -6,7 +6,7 @@ import { ToastShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Sonner",
+  title: "Primitives/Sonner",
   component: Toaster,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
@@ -17,7 +17,7 @@ type Story = StoryObj<typeof Toaster>;
 
 /** Витрина design-v3 (React + CVA, токены) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <ToastShowcase />
 };

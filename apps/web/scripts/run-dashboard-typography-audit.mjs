@@ -9,7 +9,7 @@ mkdirSync(outDir, { recursive: true });
 const port = process.env.SB_PORT ?? "6032";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto(`http://127.0.0.1:${port}/?path=/story/views-screens--dashboard&viewMode=story`, {
+await page.goto(`http://127.0.0.1:${port}/?path=/story/screens--dashboard&viewMode=story`, {
   waitUntil: "networkidle",
   timeout: 120000
 });
@@ -31,7 +31,7 @@ await browser.close();
 const audit = {
   batch: "13d",
   date: "2026-05-24",
-  storyId: "views-screens--dashboard",
+  storyId: "screens--dashboard",
   welcomeHeroTitle,
   pageIntroTitle,
   h1TypeH1,

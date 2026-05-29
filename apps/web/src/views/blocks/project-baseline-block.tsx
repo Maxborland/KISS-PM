@@ -1,19 +1,16 @@
 ﻿import { ArrowDown, ArrowRight, ArrowUp } from "lucide-react";
+import { useMemo } from "react";
 
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { MOCK_PROJECT_CRM, mockProjectScreenTitle } from "@/views/catalog";
+import { formatDate } from "@/lib/mock-data/format";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
-
-const ROWS = [
-  { task: "Аудит процессов", code: "MDS-1", base: "27.05", actual: "29.05", delta: 2 },
-  { task: "Миграция данных", code: "MDS-12", base: "12.06", actual: "12.06", delta: 0 },
-  { task: "Интеграция CRM API", code: "MDS-21", base: "20.06", actual: "18.06", delta: -2 },
-  { task: "Обучение команды", code: "MDS-34", base: "30.06", actual: "05.07", delta: 5 }
-];
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 function DeltaCell({ d }: { d: number }) {
   if (d === 0)
@@ -36,54 +33,90 @@ function DeltaCell({ d }: { d: number }) {
 }
 
 export function ProjectBaselineBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const rows = useMemo(
+    () =>
+      fixtures.planBaselines.flatMap((baseline) =>
+        baseline.tasks.map((task, index) => {
+          const delta = index === 0 ? 2 : 0;
+          return {
+            task: task.taskId,
+            code: baseline.id,
+            base: task.plannedFinish,
+            actual: task.plannedFinish,
+            delta,
+            workMinutes: task.workMinutes,
+            capturedAt: baseline.capturedAt
+          };
+        })
+      ),
+    [fixtures.planBaselines]
+  );
+
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Базовый план")}
+      lead="Снимки плана и отклонения."
+      actions={
+        <>
+          <Button variant="secondary" disabled title="Демо Storybook: снимок подключится к API">
+            Создать снимок
+          </Button>
+          <Button variant="primary" disabled title="Демо Storybook: сравнение подключится к API">
+            Сравнить
+          </Button>
+        </>
+      }
+    />
+  );
+
   return (
-    <>
-      <PageIntro
-        title={mockProjectScreenTitle("Базовый план")}
-        lead="Снимки плана и отклонения."
-        actions={
-          <>
-            <Button variant="secondary">Создать снимок</Button>
-            <Button variant="primary">Сравнить</Button>
-          </>
-        }
-      />
-      <CardPanel title="Базовый план v2 · 21.05.2026" subtitle="Сравнение с актуальным планом" flush>
-        <DataTable>
-          <thead>
-            <tr>
-              <th>Задача</th>
-              <th>План</th>
-              <th>Факт</th>
-              <th>Δ</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((r) => (
-              <tr key={r.code}>
-                <td>
-                  <CellStack title={r.task} subtitle={r.code} />
-                </td>
-                <td className="mono">{r.base}</td>
-                <td className="mono">{r.actual}</td>
-                <td>
-                  <DeltaCell d={r.delta} />
-                </td>
-                <td>
-                  {r.delta === 0 ? (
-                    <Chip variant="success">В графике</Chip>
-                  ) : r.delta < 0 ? (
-                    <Chip variant="info">Опережение</Chip>
-                  ) : (
-                    <Chip variant="warning">Отклонение</Chip>
-                  )}
-                </td>
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={5} withToolbar={false} />}
+      errorTitle="Не удалось загрузить базовый план"
+      forbiddenTitle="Нет доступа к базовому плану"
+    >
+      <CardPanel
+        title={`Базовый план · ${formatDate(fixtures.planBaselines[0]?.capturedAt ?? null)}`}
+        subtitle="Снимки плана проекта"
+        flush
+      >
+          <DataTable>
+            <thead>
+              <tr>
+                <th>Задача</th>
+                <th>План</th>
+                <th>Факт</th>
+                <th>Δ</th>
+                <th>Статус</th>
               </tr>
-            ))}
-          </tbody>
-        </DataTable>
-      </CardPanel>
-    </>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.code}>
+                  <td>
+                    <CellStack title={row.task} subtitle={row.code} />
+                  </td>
+                  <td className="mono">{formatDate(row.base)}</td>
+                  <td className="mono">{formatDate(row.actual)}</td>
+                  <td>
+                    <DeltaCell d={row.delta} />
+                  </td>
+                  <td>
+                    {row.delta === 0 ? (
+                      <Chip variant="success">В графике</Chip>
+                    ) : row.delta < 0 ? (
+                      <Chip variant="info">Опережение</Chip>
+                    ) : (
+                      <Chip variant="warning">Отклонение</Chip>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </CardPanel>
+    </ScreenBlockGate>
   );
 }

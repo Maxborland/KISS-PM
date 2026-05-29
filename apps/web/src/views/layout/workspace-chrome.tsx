@@ -1,61 +1,51 @@
 import type { ReactNode } from "react";
-import { Download, Plus } from "lucide-react";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
-import { Button } from "@/components/ui/button";
+import { AppContextSidebar } from "@/shell/app-context-sidebar";
+import { AppIconRail } from "@/shell/app-icon-rail";
 import { AppShell } from "@/shell/app-shell";
-import { AppSidebar } from "@/shell/app-sidebar";
 import { AppTopbar } from "@/shell/app-topbar";
+import { contextNavForSection, type ScreenRouteMeta } from "@/shell/navigation-registry";
 import { TopbarBreadcrumbs } from "@/shell/topbar-breadcrumbs";
-import type { ScreenMeta } from "@/views/catalog";
-import { DEFAULT_USER, sidebarGroupsForActive } from "@/views/config/sidebar-nav";
+import { ScreenRouteProvider } from "@/views/layout/screen-route-context";
+import { DEFAULT_USER } from "@/views/config/sidebar-nav";
 
 export type WorkspaceChromeProps = {
-  meta: Pick<ScreenMeta, "breadcrumb" | "activeNav">;
+  meta: ScreenRouteMeta;
   children: ReactNode;
   topbarActions?: ReactNode;
-  showDefaultActions?: boolean;
 };
 
-export function WorkspaceChrome({
-  meta,
-  children,
-  topbarActions,
-  showDefaultActions = true
-}: WorkspaceChromeProps) {
-  const actions =
+export function WorkspaceChrome({ meta, children, topbarActions }: WorkspaceChromeProps) {
+  const topbarExtras =
     topbarActions ??
-    (showDefaultActions ? (
-      <>
-        <Button variant="secondary" size="sm" disabled title="Демо Storybook: экспорт подключится к API">
-          <Download className="size-4" aria-hidden />
-          Экспорт
-        </Button>
-        <Button variant="primary" size="sm" disabled title="Демо Storybook: создание сущности в продукте">
-          <Plus className="size-4" aria-hidden />
-          Создать
-        </Button>
-        <BemAvatarStack more="+2">
-          <BemAvatar initials="ИИ" color="c1" />
-          <BemAvatar initials="АП" color="c3" />
-          <BemAvatar initials="КБ" color="c4" />
-        </BemAvatarStack>
-      </>
+    (meta.topbarMode === "team" ? (
+      <BemAvatarStack more="+2">
+        <BemAvatar initials="ИИ" color="c1" />
+        <BemAvatar initials="АП" color="c3" />
+        <BemAvatar initials="КБ" color="c4" />
+      </BemAvatarStack>
     ) : null);
 
   return (
-    <AppShell
-      sidebar={
-        <AppSidebar groups={sidebarGroupsForActive(meta.activeNav)} user={DEFAULT_USER} />
-      }
-      topbar={
-        <AppTopbar
-          breadcrumbs={<TopbarBreadcrumbs items={meta.breadcrumb} />}
-          actions={actions}
-        />
-      }
-    >
-      {children}
-    </AppShell>
+    <ScreenRouteProvider meta={meta}>
+      <AppShell
+        iconRail={<AppIconRail activeSection={meta.railSection} />}
+        contextSidebar={
+          <AppContextSidebar
+            groups={contextNavForSection(meta.railSection, meta.contextActiveItem)}
+            user={DEFAULT_USER}
+          />
+        }
+        topbar={
+          <AppTopbar
+            breadcrumbs={<TopbarBreadcrumbs items={meta.breadcrumb} />}
+            actions={topbarExtras}
+          />
+        }
+      >
+        {children}
+      </AppShell>
+    </ScreenRouteProvider>
   );
 }

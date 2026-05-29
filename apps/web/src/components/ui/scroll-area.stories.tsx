@@ -7,7 +7,7 @@ import { ScrollArea } from "./scroll-area";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof ScrollArea> = {
-  title: "UI/ScrollArea",
+  title: "Primitives/ScrollArea",
   component: ScrollArea,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

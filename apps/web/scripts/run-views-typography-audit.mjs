@@ -9,10 +9,10 @@ mkdirSync(outDir, { recursive: true });
 const index = JSON.parse(readFileSync(join(root, "storybook-static/index.json"), "utf8"));
 
 const VIEW_SCREEN_STORIES = Object.keys(index.entries)
-  .filter((id) => id.startsWith("views-screens--"))
+  .filter((id) => id.startsWith("screens--"))
   .sort();
 
-const LOGIN_ID = "views-screens--login";
+const LOGIN_ID = "screens--login";
 
 function walkTsx(dir, acc = []) {
   for (const name of readdirSync(dir)) {

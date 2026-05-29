@@ -6,7 +6,7 @@ import { PopoverShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Popover",
+  title: "Primitives/Popover",
   component: Popover,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
@@ -17,7 +17,7 @@ type Story = StoryObj<typeof Popover>;
 
 /** Витрина design-v3 (React + CVA, токены) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <PopoverShowcase />
 };

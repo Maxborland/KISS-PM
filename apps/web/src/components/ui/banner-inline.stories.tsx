@@ -7,7 +7,7 @@ import { BannerInline } from "./banner-inline";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof BannerInline> = {
-  title: "UI/BannerInline",
+  title: "Primitives/BannerInline",
   component: BannerInline,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

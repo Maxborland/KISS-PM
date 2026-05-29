@@ -1,0 +1,25 @@
+/** GET-маршруты, реализованные MSW в Storybook (единый список для handlers и health-тестов). */
+export const STORYBOOK_MSW_HANDLER_PATHS = [
+  "/api/workspace/opportunities",
+  "/api/workspace/projects",
+  "/api/workspace/projects/:projectId",
+  "/api/workspace/projects/:projectId/tasks",
+  "/api/workspace/projects/:projectId/control/read-model",
+  "/api/workspace/clients",
+  "/api/workspace/contacts",
+  "/api/workspace/products",
+  "/api/workspace/deal-stages",
+  "/api/workspace/project-types",
+  "/api/workspace/users",
+  "/api/workspace/positions",
+  "/api/workspace/task-statuses",
+  "/api/workspace/config/custom-fields",
+  "/api/workspace/config/project-templates",
+  "/api/tenant/current/kpi-definitions",
+  "/api/tenant/current/access-profiles",
+  "/api/tenant/current/org-structure",
+  "/api/tenant/current/audit-events",
+  "/api/tenant/current/production-calendar",
+  "/api/tenant/current/absences",
+  "/api/tenant/current/scheduled-tasks"
+] as const;

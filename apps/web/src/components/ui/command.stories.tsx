@@ -7,7 +7,7 @@ import { Command } from "./command";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Command> = {
-  title: "UI/Command",
+  title: "Primitives/Command",
   component: Command,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

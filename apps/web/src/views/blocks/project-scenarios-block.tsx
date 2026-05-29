@@ -3,65 +3,65 @@ import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { formatDate, formatRub } from "@/lib/mock-data/format";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
-
-const SCENARIOS = [
-  { id: "S-1", name: "Базовый", deadline: "12.06", cost: "890 000 ₽", risk: "Средний", spi: "0.94", recommended: false },
-  { id: "S-2", name: "Ускоренный (+1 dev)", deadline: "05.06", cost: "1 050 000 ₽", risk: "Низкий", spi: "1.02", recommended: true },
-  { id: "S-3", name: "Бережный (-1 dev)", deadline: "26.06", cost: "780 000 ₽", risk: "Высокий", spi: "0.81", recommended: false }
-];
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export function ProjectScenariosBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const scenarios = fixtures.planningScenarios;
+
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Сценарии")}
+      lead="Сценарии «что если» и сравнение вариантов."
+      actions={
+        <Button variant="primary" disabled title="Демо Storybook: принятие сценария подключится к API">
+          Принять сценарий
+        </Button>
+      }
+    />
+  );
+
   return (
-    <>
-      <PageIntro
-        title={mockProjectScreenTitle("Сценарии")}
-        lead="Сценарии «что если» и сравнение вариантов."
-        actions={<Button variant="primary">Принять сценарий</Button>}
-      />
-      <CardPanel title="Сравнение" subtitle={`${SCENARIOS.length} варианта`} flush>
-        <DataTable>
-          <thead>
-            <tr>
-              <th>Сценарий</th>
-              <th>Срок</th>
-              <th>Бюджет</th>
-              <th>Риск</th>
-              <th>SPI</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {SCENARIOS.map((s) => (
-              <tr key={s.id} className={s.recommended ? "is-selected" : undefined}>
-                <td>
-                  <CellStack title={s.name} subtitle={s.id} />
-                </td>
-                <td className="mono">{s.deadline}</td>
-                <td className="mono">{s.cost}</td>
-                <td>
-                  <Chip
-                    variant={s.risk === "Низкий" ? "success" : s.risk === "Средний" ? "info" : "warning"}
-                  >
-                    {s.risk}
-                  </Chip>
-                </td>
-                <td className="mono">{s.spi}</td>
-                <td>
-                  {s.recommended ? (
-                    <Chip variant="success">Рекомендуем</Chip>
-                  ) : (
-                    <Button variant="ghost" size="sm">
-                      Принять
-                    </Button>
-                  )}
-                </td>
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={4} withToolbar={false} />}
+      errorTitle="Не удалось загрузить сценарии плана"
+      forbiddenTitle="Нет доступа к сценариям плана"
+    >
+      <CardPanel title="Сравнение" subtitle={`${scenarios.length} варианта`} flush>
+          <DataTable>
+            <thead>
+              <tr>
+                <th>Сценарий</th>
+                <th>Срок</th>
+                <th>Бюджет</th>
+                <th>Риск</th>
+                <th>SPI</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </DataTable>
-      </CardPanel>
-    </>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => (
+                <tr key={scenario.id} className={scenario.recommended ? "is-selected" : undefined}>
+                  <td>
+                    <CellStack title={scenario.name} subtitle={scenario.id} />
+                  </td>
+                  <td className="mono">{formatDate(scenario.deadline)}</td>
+                  <td className="mono">{formatRub(scenario.cost)}</td>
+                  <td className="mono">{scenario.risk}%</td>
+                  <td className="mono">{scenario.spi}</td>
+                  <td>
+                    {scenario.recommended ? <Chip variant="success">Рекомендован</Chip> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </CardPanel>
+    </ScreenBlockGate>
   );
 }

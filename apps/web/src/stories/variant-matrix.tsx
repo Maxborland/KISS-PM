@@ -8,6 +8,12 @@ export type VariantMatrixItem = {
 export function VariantMatrix({ items }: { items: VariantMatrixItem[] }) {
   return (
     <div className="flex max-w-3xl flex-col gap-[var(--space-3)] p-[var(--space-4)]">
+      <div className="flex flex-col gap-[var(--space-1)]">
+        <h2 className="type-h3 text-[var(--text)]">Состояния компонента</h2>
+        <p className="type-body text-[var(--muted)]">
+          Быстрая матрица для проверки размеров, тонов, пустого/ошибочного и недоступного состояния там, где они применимы.
+        </p>
+      </div>
       {items.map((item) => (
         <div key={item.label} className="flex flex-col gap-[var(--space-2)]">
           <span className="type-meta text-[var(--muted)]">{item.label}</span>

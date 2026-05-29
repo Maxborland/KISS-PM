@@ -7,7 +7,7 @@ import { Label } from "./label";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Label> = {
-  title: "UI/Label",
+  title: "Primitives/Label",
   component: Label,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -8,12 +8,12 @@ mkdirSync(outDir, { recursive: true });
 
 const port = process.env.SB_PORT ?? "6028";
 const stateStories = [
-  "views-screens--state-empty",
-  "views-screens--state-error",
-  "views-screens--state-forbidden",
-  "views-screens--state-loading"
+  "screens--state-empty",
+  "screens--state-error",
+  "screens--state-forbidden",
+  "screens--state-loading"
 ];
-const controlStory = "views-screens--dashboard";
+const controlStory = "screens--dashboard";
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

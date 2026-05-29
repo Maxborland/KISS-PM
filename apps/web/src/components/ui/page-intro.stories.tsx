@@ -7,7 +7,7 @@ import { PageIntro } from "./page-intro";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof PageIntro> = {
-  title: "UI/PageIntro",
+  title: "Primitives/PageIntro",
   component: PageIntro,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

@@ -1,4 +1,5 @@
-/* Planning geometry — design-v3 (from planning-ui-approved, see docs/design-v3/TOKENS.md) */
+/* Planning geometry — design-v3 (from planning-ui-approved, see docs/design-v3/TOKENS.md)
+   Плотность строк Gantt/WBS: --row-h-compact / --row-h-cozy из tokens.css */
 :root {
   --row-h-summary: 36px;
   --gantt-bar-h: 18px;

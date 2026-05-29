@@ -7,7 +7,7 @@ import { Skeleton } from "./skeleton";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Skeleton> = {
-  title: "UI/Skeleton",
+  title: "Primitives/Skeleton",
   component: Skeleton,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

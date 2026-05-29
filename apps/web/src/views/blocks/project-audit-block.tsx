@@ -5,44 +5,62 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { SearchPill } from "@/components/ui/search-pill";
+import { formatDate } from "@/lib/mock-data/format";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import { userAvatar, userName } from "@/lib/mock-data/users";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
-
-const ENTRIES = [
-  { who: { initials: "ИИ", color: "c1" as const, name: "Иванова М." }, when: "23.05 14:32", action: "Изменена стадия", body: "Квалификация → КП", tone: "info" },
-  { who: { initials: "АП", color: "c2" as const, name: "Петров А." }, when: "23.05 12:05", action: "Задача создана", body: "Расчёт сметы — этап 2", tone: "success" },
-  { who: { initials: "КБ", color: "c4" as const, name: "Козлова Е." }, when: "22.05 17:48", action: "Согласован базовый план", body: "v2 принят командой", tone: "violet" },
-  { who: { initials: "ВВ", color: "c3" as const, name: "Васильев В." }, when: "22.05 09:11", action: "Перегруз ресурса", body: "Иванова М. · 112% на неделе 21", tone: "warning" }
-];
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 export function ProjectAuditBlock() {
+  const { fixtures } = useScenarioFixtures();
+  const auditEvents = fixtures.auditEvents;
+
+  const intro = (
+    <PageIntro title={mockProjectScreenTitle("Аудит")} lead="Журнал управленческих действий." />
+  );
+
   return (
-    <>
-      <PageIntro title={mockProjectScreenTitle("Аудит")} lead="Журнал управленческих действий." />
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={6} />}
+      errorTitle="Не удалось загрузить аудит проекта"
+      forbiddenTitle="Нет доступа к аудиту проекта"
+    >
       <div className="view-toolbar">
         <SearchPill className="u-w-280" placeholder="Поиск по аудиту" />
-        <Button variant="secondary" size="sm">
+        <Button variant="secondary" size="sm" disabled title="Демо Storybook: фильтр подключится к API">
           <Filter className="size-4" aria-hidden />
           Фильтр
         </Button>
       </div>
-      <CardPanel title="Журнал событий" subtitle={`${ENTRIES.length} записей`} flush>
+      <CardPanel title="Журнал событий" subtitle={`${auditEvents.length} записей`} flush>
         <ul className="audit-list">
-          {ENTRIES.map((e, i) => (
-            <li key={i} className="audit-list__item">
-              <BemAvatar initials={e.who.initials} color={e.who.color} size="sm" />
-              <div className="audit-list__body">
-                <div className="audit-list__head">
-                  <strong className="u-text-body u-text-strong">{e.who.name}</strong>
-                  <Chip variant={e.tone as "info" | "success" | "violet" | "warning"}>{e.action}</Chip>
+          {auditEvents.map((event) => {
+            const avatar = userAvatar(event.actorUserId);
+            const allowed = Boolean(event.permissionResult.allowed);
+            return (
+              <li key={event.id} className="audit-list__item">
+                <BemAvatar initials={avatar.initials} color={avatar.color} size="sm" />
+                <div className="audit-list__body">
+                  <div className="audit-list__head">
+                    <strong className="u-text-body u-text-strong">{userName(event.actorUserId)}</strong>
+                    <Chip variant={allowed ? "success" : "warning"}>{event.actionType}</Chip>
+                  </div>
+                  <p className="u-text-body u-text-muted">
+                    {event.sourceWorkflow ?? "контур"} · {String(event.sourceEntity.type ?? "сущность")}:
+                    {String(event.sourceEntity.id ?? "—")}
+                  </p>
+                  <p className="u-text-xs u-text-muted">
+                    Право: {allowed ? "разрешено" : "отклонено"} · корреляция {event.correlationId}
+                  </p>
                 </div>
-                <p className="u-text-body u-text-muted">{e.body}</p>
-              </div>
-              <span className="u-text-xs u-text-muted mono">{e.when}</span>
-            </li>
-          ))}
+                <span className="u-text-xs u-text-muted mono">{formatDate(event.createdAt)}</span>
+              </li>
+            );
+          })}
         </ul>
       </CardPanel>
-    </>
+    </ScreenBlockGate>
   );
 }

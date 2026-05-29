@@ -6,11 +6,16 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 const webRoot = join(configDir, "..");
 
 const config: StorybookConfig = {
+  staticDirs: ["../public"],
   // Legacy design-v2 stories removed (batch 8); index is design-v3 only (DESIGN_CONTRACT §10).
   stories: [
     "../src/components/**/*.stories.@(ts|tsx)",
+    "../src/widgets/**/*.stories.@(ts|tsx)",
     "../src/views/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
+    "../src/stories/flows/**/*.stories.@(ts|tsx)",
+    "../src/stories/patterns/**/*.stories.@(ts|tsx)",
+    "../src/stories/api-contract/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"
   ],
   addons: ["@storybook/addon-essentials", "@storybook/addon-a11y"],

@@ -1,0 +1,141 @@
+import { describe, expect, it } from "vitest";
+
+import { escapeActionPriority, resolveGanttKeyboardAction } from "./gantt-keyboard-policy";
+
+const emptyCtx = {
+  edit: null,
+  link: null,
+  drag: null,
+  contextMenu: null,
+  detailsDrawerOpen: false,
+  focus: null,
+  activeGrid: false
+};
+
+describe("gantt keyboard policy", () => {
+  it("Escape cancels link before edit", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Escape", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, link: {}, edit: { rowId: "a", field: "name", draft: "" } }
+    );
+    expect(action).toEqual({ type: "cancelLink" });
+  });
+
+  it("Escape closes drawer only when nothing else active", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Escape", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, detailsDrawerOpen: true }
+    );
+    expect(action).toEqual({ type: "closeTaskDetails" });
+  });
+
+  it("escapeActionPriority matches resolve order", () => {
+    expect(escapeActionPriority({ ...emptyCtx, link: {}, detailsDrawerOpen: true })).toBe("cancelLink");
+    expect(escapeActionPriority({ ...emptyCtx, edit: {}, detailsDrawerOpen: true })).toBe("cancelEdit");
+    expect(escapeActionPriority({ ...emptyCtx, detailsDrawerOpen: true })).toBe("closeTaskDetails");
+  });
+
+  it("Delete ignored while editing", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, edit: { rowId: "a", field: "name", draft: "" }, activeGrid: true }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Delete is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Delete clears cells inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Delete", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "clearCells" });
+  });
+
+  it("Ctrl+Z is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
+      emptyCtx
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+Z maps to undo inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, focus: { rowId: "t1", field: "name" } }
+    );
+    expect(action).toEqual({ type: "undo" });
+  });
+
+  it("Ctrl+Z is ignored while editing a grid cell", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "z", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, edit: { rowId: "t1", field: "name", draft: "Task" } }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+Y maps to redo inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "y", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, activeGrid: true, focus: { rowId: "t1", field: "name" } }
+    );
+    expect(action).toEqual({ type: "redo" });
+  });
+
+  it("Ctrl+C is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "c", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Ctrl+C maps to cell copy inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "c", ctrlKey: true, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "copyCells" });
+  });
+
+  it("Enter is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Enter", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Enter starts editing inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "Enter", ctrlKey: false, metaKey: false, shiftKey: false },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "startEdit" });
+  });
+
+  it("Shift+ArrowDown is ignored outside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "ArrowDown", ctrlKey: false, metaKey: false, shiftKey: true },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: false }
+    );
+    expect(action).toBeNull();
+  });
+
+  it("Shift+ArrowDown extends selection navigation inside the active grid", () => {
+    const action = resolveGanttKeyboardAction(
+      { key: "ArrowDown", ctrlKey: false, metaKey: false, shiftKey: true },
+      { ...emptyCtx, focus: { rowId: "t1", field: "name" }, activeGrid: true }
+    );
+    expect(action).toEqual({ type: "navigateCell", direction: "down", extend: true });
+  });
+});

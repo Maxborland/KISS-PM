@@ -62,12 +62,12 @@ import { Skeleton, SkeletonRow, SkeletonText } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AppContextSidebar } from "@/shell/app-context-sidebar";
+import { AppIconRail } from "@/shell/app-icon-rail";
 import { AppShell } from "@/shell/app-shell";
-import { AppSidebar } from "@/shell/app-sidebar";
 import { AppTopbar } from "@/shell/app-topbar";
 import { TopbarBreadcrumbs } from "@/shell/topbar-breadcrumbs";
-import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
-import { KanbanCard } from "@/widgets/kanban/kanban-card";
+import { Kanban, TaskKanbanCard, type KanbanColumnDef, type TaskKanbanItem } from "@/widgets/kanban";
 
 import { MOCK_PROJECT_CRM, mockTaskProjectRef } from "@/views/catalog";
 
@@ -291,55 +291,65 @@ export function EntityRowShowcase() {
   );
 }
 
+type ShowcaseColumnId = "backlog" | "in-progress";
+
+const KANBAN_SHOWCASE_COLUMNS: KanbanColumnDef<ShowcaseColumnId>[] = [
+  { id: "backlog", title: "Бэклог" },
+  { id: "in-progress", title: "В работе" }
+];
+
+const KANBAN_SHOWCASE_ITEMS: TaskKanbanItem<ShowcaseColumnId>[] = [
+  {
+    id: "MDS-39",
+    columnId: "backlog",
+    title: "Новая страница продукта",
+    priority: "urgent",
+    priorityLabel: "Срочный",
+    meta: [{ label: "Новая Homepage" }, { label: "Срок: 29 июля" }],
+    assignees: [{ initials: "ИИ", color: "c1" }],
+    comments: 13,
+    date: "30.05.2024"
+  },
+  {
+    id: "MDS-2",
+    columnId: "in-progress",
+    title: "Презентация для клиента",
+    priority: "low",
+    priorityLabel: "Низкий",
+    highlight: true,
+    assignees: [
+      { initials: "КБ", color: "c4" },
+      { initials: "МД", color: "c5" }
+    ],
+    comments: 7,
+    date: "31.05.2024"
+  }
+];
+
 export function KanbanShowcase() {
   return (
     <ShowcaseFrame title="Канбан" wide>
-      <KanbanBoard>
-        <KanbanColumn title="Бэклог" count={24}>
-          <KanbanCard
-            id="MDS-39"
-            title="Новая страница продукта"
-            priority="urgent"
-            priorityLabel="Срочный"
-            meta={[{ label: "Новая Homepage" }, { label: "Срок: 29 июля" }]}
-            assignees={[{ initials: "ИИ", color: "c1" }]}
-            comments={13}
-            date="30.05.2024"
+      <Kanban<TaskKanbanItem<ShowcaseColumnId>, ShowcaseColumnId>
+        columns={KANBAN_SHOWCASE_COLUMNS}
+        items={KANBAN_SHOWCASE_ITEMS}
+        renderCard={(item, ctx) => (
+          <TaskKanbanCard
+            item={item}
+            draggable={ctx.draggable}
+            isDragging={ctx.isDragging}
+            visibleFields={ctx.visibleFields}
           />
-        </KanbanColumn>
-        <KanbanColumn title="В работе" count={4}>
-          <KanbanCard
-            id="MDS-2"
-            title="Презентация для клиента"
-            priority="low"
-            priorityLabel="Низкий"
-            highlight
-            assignees={[
-              { initials: "КБ", color: "c4" },
-              { initials: "МД", color: "c5" }
-            ]}
-            comments={7}
-            date="31.05.2024"
-          />
-        </KanbanColumn>
-      </KanbanBoard>
+        )}
+      />
     </ShowcaseFrame>
   );
 }
 
 export function KanbanCardShowcase() {
+  const item = KANBAN_SHOWCASE_ITEMS[0]!;
   return (
     <ShowcaseFrame title="Карточка канбана">
-      <KanbanCard
-        id="MDS-39"
-        title="Новая страница продукта"
-        priority="urgent"
-        priorityLabel="Срочный"
-        meta={[{ label: "Срок: 29 июля" }]}
-        assignees={[{ initials: "ИИ", color: "c1" }]}
-        comments={13}
-        date="30.05.2024"
-      />
+      <TaskKanbanCard item={item} draggable={false} isDragging={false} />
     </ShowcaseFrame>
   );
 }
@@ -439,15 +449,15 @@ export function ShellShowcase() {
   return (
     <div style={{ minHeight: 640 }}>
       <AppShell
-        sidebar={
-          <AppSidebar
+        iconRail={<AppIconRail activeSection="projects" />}
+        contextSidebar={
+          <AppContextSidebar
             groups={[
               {
-                title: "Обзор",
+                title: "Проекты",
                 items: [
-                  { label: "Дашборд" },
-                  { label: "Задачи", active: true },
-                  { label: "Бэклог", nested: true, badge: "24" }
+                  { label: "Все проекты", active: true },
+                  { label: "Гант", nested: true }
                 ]
               }
             ]}

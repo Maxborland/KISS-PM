@@ -6,7 +6,7 @@ import { SelectShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Select",
+  title: "Primitives/Select",
   component: Select,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
@@ -17,7 +17,7 @@ type Story = StoryObj<typeof Select>;
 
 /** Витрина design-v3 (React + CVA, токены) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <SelectShowcase />
 };

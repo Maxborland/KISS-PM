@@ -1,6 +1,6 @@
 # Design Contract — KISS PM (design-v3)
 
-Краткий enforceable-контракт для UI и Storybook. Источник токенов: [`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css). Детали компонентов: [`SHADCN-OVERRIDE.md`](./SHADCN-OVERRIDE.md), [`TOKENS.md`](./TOKENS.md).
+**Версия: 2.0 · Phase 9 lockdown (2026-05-26).** Источник токенов: [`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css). Checkpoint: [`CHECKPOINT-2026-05-26-STORYBOOK-BASELINE.md`](./CHECKPOINT-2026-05-26-STORYBOOK-BASELINE.md).
 
 **Путь визуала:** `tokens.css` → `bem.css` / `bem-supplement.css` → `components/{ui,domain}`, `shell`, `widgets` → `app` / `features` / `views`.
 
@@ -11,9 +11,9 @@
 | Область | Правило |
 |--------|---------|
 | UI copy | **Русский** по умолчанию (кнопки, заголовки, пустые состояния, ошибки, табы, breadcrumbs). |
-| Storybook sidebar | Имена stories на **русском** (как продуктовые экраны), без `Dashboard` / `My work` / `State · empty`. |
+| Storybook sidebar | **8 корней:** `Foundations`, `Primitives`, `Composites`, `Widgets`, `Screens`, `Flows`, `Patterns`, `API Contract`. Имена stories (`name`) на русском для product screens. |
 | EN в UI | Только: устойчивые коды (`PRJ-2026-014`, `MDS-39`), зарегистрированные термины в скобках (`ИСП (SPI)`), бренды устройств (`iPhone` — по необходимости). |
-| Запрещено в UI | Dev-лейблы (`Primary`, `Default`, `Dialog`, `Toast`), жаргон (`tenant` → **арендатор**, `baseline` → **базовый план**, `What-if` → **сценарии «что если»**). |
+| Запрещено в UI | Dev-лейблы (`Primary`, `Default`, `Dialog`, `Toast`), жаргон (`tenant` → **арендатор**, `baseline` → **базовый план**). |
 | Storybook catalog | Не показывать EN variant names как пользовательский текст; EN допустим в `argTypes`/docs. |
 | Доменные имена | Mock-проекты локализовать: `CRM intake` → **Внедрение CRM** (`MOCK_PROJECT_CRM` в `views/catalog.ts`). |
 
@@ -64,15 +64,37 @@
 | `.app-content` padding | `--space-6` × `--space-5` | Основная область |
 | `.card__body` | `--space-4` / `--space-5` | Карточки |
 
-**MUST**
+### 3a. Density tiers (Phase 1)
 
-- Sidebar nav: **12px** (`--text-sm`); контент: **14px** base — это норма, не баг.
-- Списки настроек: `SwitchRow` + `switch-row-list` (BEM), padding `var(--space-2)` по вертикали.
-- Toolbar: `view-toolbar` + один ряд фильтров; не два несвязанных ряда кнопок.
+| Tier | Token | Высота строк | Где |
+|------|--------|--------------|-----|
+| Ultra | `--row-h-ultra` | **24px** | Плотные матрицы, вторичные списки |
+| Compact | `--row-h-compact` | **32px** | Таблицы, Kanban meta, Gantt grid |
+| Cozy | `--row-h-cozy` | **40px** | Decision surfaces, формы |
+| Free | без фиксированного token | по контенту | Hero, empty L4 |
 
-**NEVER**
+**MUST:** один dominant tier на экране.
 
-- Смешивать «рыхлые» таблицы (td 48px) и compact на одном экране без причины — списки сущностей: `DataTable` + `table--compact` или выровненная высота строк.
+### 3b. Depth tiers (Phase 1)
+
+| Tier | Токены | Где |
+|------|--------|-----|
+| Flat | border `--border` | Inset panels |
+| Resting | `--shadow-xs` / `--shadow-sm` | `CardPanel` |
+| Elevated | `--shadow-md` / `--shadow-panel` | Popover, sticky sub-panels |
+| Floating | `--shadow-floating` | Modals, drag overlay |
+
+### 3c. Brand gradient (`--brand-grad`)
+
+Градиент **не** на `body`, sidebar, topbar. Допустимо: bento KPI, hero callout в Foundations.
+
+### 3d. Язык и Storybook (production-grade)
+
+| Область | Правило |
+|--------|---------|
+| UI copy | Русский (см. §1). |
+| API / types / fixtures | English identifiers. |
+| Product Storybook `Screens` | Default = готовый экран **1440×900**: shell + плотность + без error UI. |
 
 ---
 
@@ -81,20 +103,10 @@
 | Primitive | Когда |
 |-----------|--------|
 | `CardPanel` (BEM `.card`) | Все workspace-экраны, формы, настройки |
-| shadcn `Card` | Только Storybook catalog / изолированные demos, не дублировать на экранах |
+| shadcn `Card` | Только Storybook catalog / изолированные demos |
 | `tile` / `bento` | Дашборд, KPI-плитки |
-| `panel` / `--panel` | Фон карточек, sidebar, topbar |
 
-**MUST**
-
-- У карточки один заголовок h3 (18px) + опциональный `card__sub` (11px muted).
-- `flush` на таблицах внутри карточки — для audit, admin, baseline lists.
-
-**NEVER**
-
-- Inline `style={{}}` в TSX (кроме SVG Gantt с комментарием).
-- Новые `*.css` в `features/**` или `components/**` — только `styles/bem.css`, `styles/widgets/*`, `globals.css`.
-- Legacy `src/stories/design-v2/**` в Storybook (удалены из репозитория и индекса); импорты `apps/web/src/design-v2/*`, `features/dv2/*` в product code.
+**NEVER:** inline `style={{}}` в TSX (кроме SVG Gantt с комментарием); новые `*.css` в `features/**` / `components/**`.
 
 ---
 
@@ -103,123 +115,71 @@
 | Тип | Компонент | Стиль |
 |-----|-----------|--------|
 | App lists | `DataTable` → `.table` | body 14px; compact: `.table--compact` |
-| Storybook catalog table | Тот же `DataTable`, не shadcn `Table` | Parity с app |
-| Audit / feed | `.audit-list`, `.feed`, `.exception-list` | body 14px; meta 12px |
+| Primary cell | `CellStack` | title 14px semibold, subtitle 12px `--muted-strong` |
 
-**MUST**
-
-- Primary cell: `CellStack` (title 14px semibold, subtitle 12px).
-- Деньги и коды: класс `mono` + 14px.
-- Выравнивание действий: `cell-actions` + `IconButton` с `aria-label`.
-
-**NEVER**
-
-- Две таблицы с разным row-height на одном экране без смысла (пример: канбан + полная таблица при активном «Канбан»).
+Кликабельные строки: `tabIndex={0}` + keyboard, **без** `role="button"` если в строке есть `DropdownMenu` / кнопки (axe `nested-interactive`).
 
 ---
 
 ## 6. Forms
 
-| Элемент | Правило |
-|---------|---------|
-| Label | `Field` + `Label` / `.field__label` — **14px** |
-| Input, Select, Textarea | **14px** (`data-slot` / `--text-md`) |
-| Section title | `FormSection` — **14px** semibold внутри карточки |
-| Hint / error | **11–12px**, `--danger-text` для ошибки |
-
-**MUST**
-
-- `SwitchRow` / `SwitchRowList` для boolean-настроек, не голый `Switch` без подписи.
-- `FormGrid` columns 1 | 2 | 3; на mobile — одна колонка (уже в CSS).
-- Модалки создания — `Dialog` / `Sheet`, не `CardPanel` на странице с заголовком «модалка».
-
-**NEVER**
-
-- Fake tabs: Segmented «Канбан / Список» при одновременном показе обоих видов.
-- EN labels в формах (`Domain allowlist` → **Белый список доменов**).
+`SwitchRow` / `SwitchRowList` для boolean; `FormGrid`; модалки — `Dialog` / `Sheet`.
 
 ---
 
 ## 7. Badge / Chip / status taxonomy
 
-| Primitive | Назначение | Пример |
-|-----------|------------|--------|
-| **Badge** | Счётчик, нумерация, микро-метка без смысла стадии | `24` в funnel, soft count |
-| **Chip** | Стадия, статус сущности, риск, тип исключения | «В работе», «Праздник», «Высокий» |
-| **PriorityFlag** | Приоритет задачи в Kanban | Срочный / Низкий (RU label) |
-| Legacy `.badge` BEM | **Запрещён** в новом коде | Заменить на `<Badge>` |
-
-**Variant mapping (Chip)**
-
-| Смысл | variant |
-|-------|---------|
-| Нейтральный / черновик | default / outline |
-| Активный / в работе / info | `info` |
-| Успех / активен | `success` |
-| Риск / праздник / внимание | `warning` |
-| Кастом / роль / фиолетовая стадия | `violet` |
-
-**NEVER**
-
-- Chip для английского сегмента (`Enterprise`) или английского audit action (`Action` / `Review`).
-- Badge и Chip для одного и того же «статуса строки» на соседних экранах — выбрать Chip для стадий.
+| Primitive | Назначение |
+|-----------|------------|
+| **Badge** | Счётчик, микро-метка |
+| **Chip** | Стадия, статус, риск |
+| **PriorityFlag** | Приоритет Kanban (RU label, цвета `--*-text` на белом фоне) |
 
 ---
 
 ## 8. Date / money / percentage formats
 
-| Тип | Формат | Пример |
-|-----|--------|--------|
-| Дата в таблице | `ДД.ММ.ГГГГ` | `27.05.2026` |
-| Дата в карточке / компакт | `ДД.ММ` допустимо только в Gantt/baseline grid с легендой | `27.05` + колонка «Год» |
-| Время аудита | `ДД.ММ.ГГГГ, ЧЧ:ММ` | `23.05.2026, 14:32` |
-| Деньги RU | Пробел тысяч, суффикс `₽` | `1 240 000 ₽` |
-| «От» в каталоге | Единообразно: везде **от** или нигде | `от 890 000 ₽` |
-| Процент | Без пробела перед `%` | `82%`, `112%` |
-| Delta сроков | `+2 дн.` / `−4 дн.` | Не `+2 д` и не `baseline` в UI |
-| ID | `mono`, префикс латиницей OK | `PRJ-2026-014`, `DEAL-101` |
+`ДД.ММ.ГГГГ`, `1 240 000 ₽`, `82%`, `+2 дн.` — см. v1.1 §8 (без изменений).
 
 ---
 
 ## 9. CTA / link / action patterns
 
-| Зона | Правило |
-|------|---------|
-| Page actions | В `PageIntro` → `btn-group`: вторичное слева, **primary** справа |
-| Topbar default | «Экспорт» + «Создать» **только** если `SCREEN_META` разрешает; иначе `showDefaultActions={false}` |
-| Primary CTA | Один на экран (сохранить / создать / принять) |
-| Destructive | `variant="destructive"` в menu; не primary |
-| Ghost | Фильтры, вторичные иконки |
-| Links в тексте | Accent + underline on hover; не кнопка под текст |
-
-**NEVER**
-
-- Кнопки без сценария (экспорт на audit-only, «Создать» на login).
-- EN глаголы на кнопках (`Save` → **Сохранить**).
+Один primary CTA на экран; destructive не primary; RU глаголы на кнопках.
 
 ---
 
-## 10. Storybook acceptance checklist
+## 10. Storybook acceptance checklist (Phase 9 — locked)
 
-Перед merge UI / stories агент **отмечает всё**. Последний re-audit: [`STORYBOOK-CONTRACT-AUDIT-2026-05-24.md`](./STORYBOOK-CONTRACT-AUDIT-2026-05-24.md) (batch 10).
+Перед merge UI / stories:
 
-- [x] Story в `Views/Screens` — **fullscreen** + `WorkspaceChrome` (кроме `19-login`, state-*). _Batch 13a: `variant: "bare"` + `app-canvas__panel--bare`; Playwright `batch13a-state-bare-evidence.json`._
-- [x] Нет stories из `src/stories/design-v2/**` в индексе (каталог удалён, batch 8).
-- [x] `Catalog/All Components` использует те же primitives, что экраны (`CardPanel`, `DataTable`, RU copy). _Batch 13b: domain `CardPanel`/`DataTable`; evidence `batch13b-catalog-domain-evidence.json`._
-- [x] UI/* stories: есть variant states, не только один fullscreen DesignV2 showcase. _Batch 13c: story «Варианты» в 43 UI files; id `ui-*--variants`; evidence `batch13c-ui-variants-evidence.json`._
-- [x] Copy: нет EN dev labels; breadcrumbs RU; mock dates/money по §8. _Batch 15c: все story entries (106), Playwright EN_DEV; evidence `batch15c-copy-scan-evidence.json`._
-- [x] Typography: один h1 32px; card h3 18px; section 14px; body 14px; кнопки 12px. _Batch 14 + 14m: `PageIntro` 32px; `deal-card__title` → `--text-h3` (18px); evidence `batch14-views-typography-evidence.json`, `batch14m-deal-card-typography-evidence.json`._
-- [x] Badge/Chip по §7; нет legacy `.badge` BEM в новых блоках. _Batch 13e: `deals-block.tsx`, `widgets/kanban/kanban-board.tsx`; evidence `batch13e-badge-chip-evidence.json`._
-- [x] Нет fake segmented / fake topbar actions. _Batch 13g: `Segmented` + `useState` в blocks; `WorkspaceChrome` export/create `disabled` + title; `run-fake-affordances-audit.mjs` + health test._
-- [x] `pnpm --filter @kiss-pm/web typecheck` + `test` + `build` (AGENTS §10). _Batch 15: build evidence; batch 16: `pnpm verify:storybook-contract` в CI (`.github/workflows/design-v3-storybook-contract.yml`)._
-- [x] Визуально открыты: затронутые screen stories + 1 соседний экран для сравнения плотности. _7 эталонных PNG в `.storybook-verify-tmp/`; соседний экран для плотности — batch 13._
+- [x] **8 корней** Storybook (`storybook-section-roots.health.test.ts`).
+- [x] **VRT:** `widgets-*`, `screens-*`, `flows-*`, `patterns-*` — 119 snapshots в `apps/web/tests/e2e/storybook-vrt-baselines/`; `pnpm test:vrt` после `build-storybook`.
+- [x] **axe:** 11 эталонных stories, 0 critical/serious — `pnpm test:a11y`.
+- [x] **Health gates:** `design-v3-quality-gates.health.test.ts` (density/depth tokens, contrast pairs, bundle budget, inline-style allowlist, strict `views`+`app`).
+- [x] **Copy scan:** `run-copy-scan-all-stories.mjs` (все stories, RU, без EN dev labels).
+- [x] **CI:** `pnpm verify:storybook-contract` = typecheck + vitest + build-storybook + web build + copy-scan + VRT + a11y.
+- [x] **Product screens** — `Screens/*` fullscreen + `WorkspaceChrome` (кроме login / state-* bare по контракту).
+- [x] **Primitives** — `Primitives/*` с variant states (`ui-variant-presets`).
+
+Команды:
+
+```bash
+pnpm --filter @kiss-pm/web typecheck
+pnpm --filter @kiss-pm/web test
+pnpm --filter @kiss-pm/web build-storybook
+pnpm --filter @kiss-pm/web test:vrt
+pnpm --filter @kiss-pm/web test:a11y
+pnpm --filter @kiss-pm/web build
+pnpm verify:storybook-contract
+```
 
 ---
 
 ## Быстрые ссылки
 
-- Импорты UI на экранах: `@/components/ui`, `@/components/domain`, `@/widgets`, `@/shell`, `@/views/layout`.
-- Единый `PageIntro`: `@/views/layout/page-intro` (не дублировать `@/components/ui/page-intro` на экранах).
-- Аудит-основа: [`STORYBOOK-CONTRACT-AUDIT-2026-05-24.md`](./STORYBOOK-CONTRACT-AUDIT-2026-05-24.md) (batch 10).
-
-_Версия: 1.0 · design-v3 rebuild worktree._
+- Структура: [`STORYBOOK-STRUCTURE.md`](./STORYBOOK-STRUCTURE.md)
+- Production brief: [`PRODUCTION-GRADE-BRIEF.md`](./PRODUCTION-GRADE-BRIEF.md)
+- Baseline checkpoint: [`CHECKPOINT-2026-05-26-STORYBOOK-BASELINE.md`](./CHECKPOINT-2026-05-26-STORYBOOK-BASELINE.md)
+- VRT: `apps/web/tests/e2e/storybook-vrt*.ts`
+- Обзор в Storybook: `Foundations/Контракт дизайна`

@@ -1,7 +1,18 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import type { DayLoadLevel } from "./load-level";
 import type { DayCell, DayHeader } from "./types";
+
+function loadToneClass(level: DayLoadLevel): string {
+  if (level === "over") return "rmatrix__cell--load-over";
+  if (level === "high") return "rmatrix__cell--load-high";
+  return "rmatrix__cell--load-normal";
+}
+
+function formatHours(hours: number): string {
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
 
 /** Шапка матрицы — числа дней (1..31). */
 export function DayHeadCell({ day }: { day: DayHeader }) {
@@ -9,6 +20,7 @@ export function DayHeadCell({ day }: { day: DayHeader }) {
     <div
       className={cn(
         "rmatrix__cell",
+        "rmatrix__cell--day-head",
         day.weekend && "rmatrix__cell--weekend",
         day.holiday && "rmatrix__cell--holiday",
         day.today && "rmatrix__cell--today"
@@ -20,7 +32,7 @@ export function DayHeadCell({ day }: { day: DayHeader }) {
   );
 }
 
-/** Ячейка с дневной нагрузкой. */
+/** Ячейка с дневной нагрузкой — единый контейнер на все состояния. */
 export function DayValueCell({
   cell,
   isToday = false,
@@ -30,51 +42,51 @@ export function DayValueCell({
   isToday?: boolean;
   weekday?: string;
 }) {
+  const todayClass = isToday ? "rmatrix__cell--today" : "";
+  const base = cn("rmatrix__cell", "rmatrix__cell--day", todayClass);
+
   switch (cell.kind) {
     case "weekend":
       return (
         <div
-          className={cn("rmatrix__cell", "rmatrix__cell--weekend", isToday && "rmatrix__cell--today")}
+          className={cn(base, "rmatrix__cell--weekend")}
           aria-hidden
+          title={weekday ? `${weekday}, выходной` : "Выходной"}
         />
       );
     case "holiday":
       return (
         <div
-          className={cn("rmatrix__cell", "rmatrix__cell--holiday", isToday && "rmatrix__cell--today")}
-          title="Праздник"
+          className={cn(base, "rmatrix__cell--holiday")}
+          title={weekday ? `${weekday}, праздник` : "Праздник"}
         />
       );
     case "vacation":
       return (
         <div
-          className={cn("rmatrix__cell", "rmatrix__cell--vacation", isToday && "rmatrix__cell--today")}
-          title="Отпуск"
+          className={cn(base, "rmatrix__cell--vacation")}
+          title={weekday ? `${weekday}, отпуск` : "Отпуск"}
         />
       );
     case "zero":
       return (
         <div
-          className={cn("rmatrix__cell", "rmatrix__cell--num-zero", isToday && "rmatrix__cell--today")}
+          className={cn(base, "rmatrix__cell--load-zero")}
           aria-label={weekday ? `${weekday}, нет нагрузки` : "Нет нагрузки"}
         >
-          ·
+          —
         </div>
       );
-    case "load":
+    case "load": {
+      const level = cell.level;
+      const label = `${weekday ? `${weekday}: ` : ""}${cell.hours} ч`;
       return (
-        <div
-          className={cn(
-            "rmatrix__cell",
-            cell.level === "normal" && "rmatrix__cell--num-normal",
-            cell.level === "high" && "rmatrix__cell--num-high",
-            cell.level === "over" && "rmatrix__cell--num-over",
-            isToday && "rmatrix__cell--today"
-          )}
-          title={`${cell.hours} ч`}
-        >
-          {Number.isInteger(cell.hours) ? cell.hours : cell.hours.toFixed(1)}
+        <div className={cn(base, loadToneClass(level))} title={label}>
+          <span className={cn("rmatrix__day-num", `rmatrix__day-num--${level}`)}>
+            {formatHours(cell.hours)}
+          </span>
         </div>
       );
+    }
   }
 }

@@ -7,7 +7,7 @@ import { Separator } from "./separator";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof Separator> = {
-  title: "UI/Separator",
+  title: "Primitives/Separator",
   component: Separator,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

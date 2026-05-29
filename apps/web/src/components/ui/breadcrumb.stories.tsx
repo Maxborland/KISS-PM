@@ -6,7 +6,7 @@ import { BreadcrumbsShowcase } from "@/stories/showcases/demos";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta = {
-  title: "UI/Breadcrumb",
+  title: "Primitives/Breadcrumb",
   component: Breadcrumb,
   tags: ["autodocs"],
   parameters: { layout: "centered" }
@@ -17,7 +17,7 @@ type Story = StoryObj<typeof Breadcrumb>;
 
 /** Витрина design-v3 (React + CVA, токены) */
 export const DesignV2: Story = {
-  name: "Витрина",
+  name: "Обзор",
   parameters: { layout: "fullscreen" },
   render: () => <BreadcrumbsShowcase />
 };

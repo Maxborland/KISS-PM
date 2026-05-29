@@ -34,8 +34,12 @@ export function CommandPalette() {
         <CommandEmpty>Ничего не найдено</CommandEmpty>
         <CommandGroup heading="Навигация">
           <CommandItem onSelect={() => setOpen(false)}>Дашборд</CommandItem>
-          <CommandItem onSelect={() => setOpen(false)}>Проекты</CommandItem>
+          <CommandItem onSelect={() => setOpen(false)}>Моя работа</CommandItem>
           <CommandItem onSelect={() => setOpen(false)}>Сделки</CommandItem>
+          <CommandItem onSelect={() => setOpen(false)}>Проекты</CommandItem>
+          <CommandItem onSelect={() => setOpen(false)}>Справочники</CommandItem>
+          <CommandItem onSelect={() => setOpen(false)}>Отчёты</CommandItem>
+          <CommandItem onSelect={() => setOpen(false)}>Настройки</CommandItem>
         </CommandGroup>
       </CommandDialog>
     </>

@@ -1,0 +1,31 @@
+export const SCREEN_IDS = [
+  "00-space-discipline",
+  "01-dashboard",
+  "02-my-work",
+  "03-task-card",
+  "04-create-task-modal",
+  "05-deals",
+  "06-deal-card",
+  "07-projects-list",
+  "07b-project-detail",
+  "08-entities-clients",
+  "08-entities-contacts",
+  "08-entities-products",
+  "09-admin",
+  "10-settings",
+  "11-avatar-menu",
+  "12-project-gantt",
+  "13-project-resources",
+  "14-project-baseline",
+  "15-project-scenarios",
+  "16-project-kpi",
+  "17-project-audit",
+  "18-project-calendars",
+  "19-login",
+  "state-empty",
+  "state-error",
+  "state-forbidden",
+  "state-loading"
+] as const;
+
+export type ScreenId = (typeof SCREEN_IDS)[number];

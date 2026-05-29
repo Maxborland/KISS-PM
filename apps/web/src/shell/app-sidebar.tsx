@@ -2,24 +2,14 @@ import type { ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
+import type { SidebarGroup } from "@/shell/sidebar-types";
 
-export type SidebarItem = {
-  label: string;
-  active?: boolean;
-  nested?: boolean;
-  badge?: string;
-  alert?: boolean;
-};
-
-export type SidebarGroup = {
-  title: string;
-  items: SidebarItem[];
-};
+export type { SidebarGroup, SidebarItem } from "@/shell/sidebar-types";
 
 export type AppSidebarProps = {
   workspace?: string;
   groups: SidebarGroup[];
-  user?: { initials: string; name: string; email: string; color?: "c1" | "c2" | "c3" | "c4" | "c5" };
+  user?: { initials: string; name: string; email: string; positionName?: string; color?: "c1" | "c2" | "c3" | "c4" | "c5" };
 };
 
 export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSidebarProps) {
@@ -67,7 +57,9 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
             <BemAvatar initials={user.initials} color={user.color ?? "c4"} size="md" />
             <div className="app-sidebar__user-meta">
               <span className="app-sidebar__user-name">{user.name}</span>
-              <span className="app-sidebar__user-mail">{user.email}</span>
+              <span className="app-sidebar__user-mail">
+                {user.positionName ? `${user.positionName} · ` : ""}{user.email}
+              </span>
             </div>
           </div>
         </div>

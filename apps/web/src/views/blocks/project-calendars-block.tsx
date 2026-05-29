@@ -1,4 +1,5 @@
-﻿import { CalendarDays, Plus } from "lucide-react";
+﻿import { useState } from "react";
+import { CalendarDays, Plus } from "lucide-react";
 
 import { CardPanel } from "@/components/domain/card-panel";
 import { Field, FormGrid, FormSection } from "@/components/domain/form-layout";
@@ -13,12 +14,14 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import type { ProductionCalendar } from "@/lib/api-types";
+import { formatDate } from "@/lib/mock-data/format";
+import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { ScreenBlockGate, ScreenBlockPanelSkeleton } from "@/views/blocks/screen-block-fetch";
 
 type WeekdayDef = { label: string; hours: string; on: boolean };
-type Exception = { date: string; reason: string; kind: "holiday" | "short" | "custom" };
-
 const WEEKDAYS: WeekdayDef[] = [
   { label: "Понедельник", hours: "9:00–18:00", on: true },
   { label: "Вторник", hours: "9:00–18:00", on: true },
@@ -29,25 +32,28 @@ const WEEKDAYS: WeekdayDef[] = [
   { label: "Воскресенье", hours: "выходной", on: false }
 ];
 
-const EXCEPTIONS: Exception[] = [
-  { date: "12.06.2026", reason: "День России", kind: "holiday" },
-  { date: "01.06.2026", reason: "Сокращённый день", kind: "short" },
-  { date: "30.05.2026", reason: "Тимбилдинг", kind: "custom" }
-];
-
-const KIND_COPY: Record<Exception["kind"], { label: string; tone: "warning" | "info" | "violet" }> = {
-  holiday: { label: "Праздник", tone: "warning" },
-  short: { label: "Сокр.", tone: "info" },
-  custom: { label: "Кастом", tone: "violet" }
-};
-
-function ExceptionRow({ item, onRemove }: { item: Exception; onRemove?: () => void }) {
-  const meta = KIND_COPY[item.kind];
+function ExceptionRow({
+  item,
+  workingMinutesPerDay,
+  onRemove
+}: {
+  item: ProductionCalendar["exceptions"][number];
+  workingMinutesPerDay: number;
+  onRemove?: () => void;
+}) {
+  const tone =
+    item.workingMinutes === 0
+      ? "warning"
+      : item.workingMinutes < workingMinutesPerDay
+        ? "info"
+        : "violet";
   return (
     <li className="exception-list__item">
-      <span className="mono u-text-xs u-text-strong">{item.date}</span>
-      <span className="flex-1 u-text-body">{item.reason}</span>
-      <Chip variant={meta.tone}>{meta.label}</Chip>
+      <span className="mono u-text-xs u-text-strong">{formatDate(item.date)}</span>
+      <span className="flex-1 u-text-body">
+        {item.reason ?? "Без причины"} · ресурс {item.resourceId ?? "арендатор"}
+      </span>
+      <Chip variant={tone}>{item.workingMinutes} мин</Chip>
       <Button
         variant="ghost"
         size="xs"
@@ -62,23 +68,35 @@ function ExceptionRow({ item, onRemove }: { item: Exception; onRemove?: () => vo
 }
 
 export function ProjectCalendarsBlock() {
-  return (
-    <>
-      <PageIntro
-        title={mockProjectScreenTitle("Календари")}
-        lead="Рабочие часы и исключения календаря арендатора."
-        actions={
-          <>
-            <Button variant="ghost" size="sm">
+  const { fixtures } = useScenarioFixtures();
+  const calendar = fixtures.productionCalendar;
+  const [newExceptionDate, setNewExceptionDate] = useState<Date | undefined>();
+
+  const intro = (
+    <PageIntro
+      title={mockProjectScreenTitle("Календари")}
+      lead="Рабочие часы и исключения календаря арендатора."
+      actions={
+        <>
+          <Button variant="ghost" size="sm" disabled title="Демо Storybook: импорт подключится к API">
               <CalendarDays className="size-4" aria-hidden />
               Шаблоны
             </Button>
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" disabled title="Демо Storybook: сохранение подключится к API">
               Сохранить
             </Button>
           </>
         }
-      />
+    />
+  );
+
+  return (
+    <ScreenBlockGate
+      intro={intro}
+      skeleton={<ScreenBlockPanelSkeleton rows={4} withToolbar={false} />}
+      errorTitle="Не удалось загрузить календарь"
+      forbiddenTitle="Нет доступа к календарю"
+    >
       <div className="grid-2">
         <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь арендатора">
           <FormSection title="Шаблон" lead="Выберите базовый паттерн или настройте дни вручную.">
@@ -97,7 +115,7 @@ export function ProjectCalendarsBlock() {
               </Field>
             </FormGrid>
           </FormSection>
-          <FormSection title="Дни недели" lead="Включите рабочие дни и проверьте часы.">
+          <FormSection title="Дни недели" lead={`${calendar.workingMinutesPerDay} минут в рабочем дне.`}>
             <SwitchRowList>
               {WEEKDAYS.map((d) => (
                 <SwitchRow key={d.label} label={d.label} description={d.hours} defaultChecked={d.on} />
@@ -107,7 +125,7 @@ export function ProjectCalendarsBlock() {
         </CardPanel>
         <CardPanel
           title="Исключения"
-          subtitle={`${EXCEPTIONS.length} даты`}
+          subtitle={`${calendar.exceptions.length} даты`}
           actions={
             <Button variant="ghost" size="sm">
               <Plus className="size-4" aria-hidden />
@@ -118,7 +136,7 @@ export function ProjectCalendarsBlock() {
           <FormSection title="Новая дата">
             <FormGrid columns={2}>
               <Field label="Дата" htmlFor="cal-date">
-                <DatePicker placeholder="Выберите дату" />
+                <DatePicker value={newExceptionDate} onChange={setNewExceptionDate} placeholder="Выберите дату" />
               </Field>
               <Field label="Тип" htmlFor="cal-kind">
                 <Select defaultValue="holiday">
@@ -136,13 +154,17 @@ export function ProjectCalendarsBlock() {
           </FormSection>
           <FormSection title="Список исключений">
             <ul className="exception-list">
-              {EXCEPTIONS.map((e) => (
-                <ExceptionRow key={e.date} item={e} />
+              {calendar.exceptions.map((exception) => (
+                <ExceptionRow
+                  key={exception.id}
+                  item={exception}
+                  workingMinutesPerDay={calendar.workingMinutesPerDay}
+                />
               ))}
             </ul>
           </FormSection>
         </CardPanel>
       </div>
-    </>
+    </ScreenBlockGate>
   );
 }

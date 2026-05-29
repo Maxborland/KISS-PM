@@ -7,7 +7,7 @@ import { SearchPill } from "./search-pill";
 import { createVariantsStory } from "@/stories/createVariantsStory";
 
 const meta: Meta<typeof SearchPill> = {
-  title: "UI/SearchPill",
+  title: "Primitives/SearchPill",
   component: SearchPill,
   tags: ["autodocs"],
   parameters: { layout: "centered" }

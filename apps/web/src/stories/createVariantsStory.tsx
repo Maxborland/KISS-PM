@@ -7,8 +7,15 @@ import { VariantMatrix } from "@/stories/variant-matrix";
 export function createVariantsStory(key: UiVariantKey): StoryObj<Record<string, never>> {
   const items = UI_VARIANT_ITEMS[key];
   return {
-    name: "Варианты",
-    parameters: { layout: "centered" },
+    name: "Состояния",
+    parameters: {
+      layout: "centered",
+      docs: {
+        description: {
+          story: "Матрица основных продуктовых состояний компонента: базовое использование, тоны, disabled/empty/error-варианты там, где они есть в API компонента."
+        }
+      }
+    },
     render: () => <VariantMatrix items={items} />
   };
 }

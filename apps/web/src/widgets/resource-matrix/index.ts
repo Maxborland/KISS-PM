@@ -1,7 +1,14 @@
+export {
+  aggregateDayCells,
+  aggregatePeriodTotals,
+  aggregateRowPercent,
+  computeMatrixStats,
+  sumLoadHoursInRow
+} from "./aggregate-matrix";
 export { ResourceMatrix } from "./resource-matrix";
 export { ResourceMatrixLegend } from "./legend";
 export { ResourceMatrixStats } from "./stats";
-export { RESOURCE_MATRIX_MOCK } from "./mock-data";
+export { RESOURCE_MATRIX_MOCK, getResourceMatrixMock } from "./mock-data";
 export type {
   DayCell,
   DayHeader,
