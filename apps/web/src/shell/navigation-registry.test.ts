@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { SCREEN_ROUTE_BY_ID } from "@/shell/navigation-registry";
+import {
+  pathForScreenId,
+  RAIL_SECTIONS,
+  screenIdForPath,
+  SCREEN_ROUTE_BY_ID
+} from "@/shell/navigation-registry";
 
 describe("navigation-registry", () => {
   it("highlights CRM for deals, not inbox", () => {
@@ -28,5 +33,32 @@ describe("navigation-registry", () => {
     const dashboard = SCREEN_ROUTE_BY_ID["01-dashboard"];
     expect(dashboard.topbarMode).toBe("team");
     expect(dashboard.pageIntroActions).toBe("create-export");
+  });
+
+  it("resolves runtime paths to accepted screen ids", () => {
+    expect(screenIdForPath("/dashboard")).toBe("01-dashboard");
+    expect(screenIdForPath("/my-work")).toBe("02-my-work");
+    expect(screenIdForPath("/deals")).toBe("05-deals");
+    expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
+    expect(screenIdForPath("/settings")).toBe("10-settings");
+    expect(screenIdForPath("/login")).toBe("19-login");
+  });
+
+  it("keeps ScreenId to runtime path lookup available for Storybook metadata", () => {
+    expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
+    expect(pathForScreenId("05-deals")).toBe("/deals");
+    expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
+  });
+
+  it("provides real hrefs for primary rail entries", () => {
+    expect(RAIL_SECTIONS.map((section) => section.href)).toEqual([
+      "/dashboard",
+      "/my-work",
+      "/deals",
+      "/projects",
+      "/directories/clients",
+      "/projects/demo/kpi",
+      "/settings"
+    ]);
   });
 });

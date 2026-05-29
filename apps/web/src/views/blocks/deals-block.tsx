@@ -22,7 +22,11 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
-import { buildFunnelDeals, buildFunnelStages } from "@/lib/mock-data/scenario-presenters";
+import {
+  buildFunnelDeals,
+  buildFunnelStages,
+  buildFunnelStagesFromDealStages
+} from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import {
   ScreenBlockGate,
@@ -165,6 +169,8 @@ function customFieldLabel(key: string): string {
 export type DealsBlockProps = {
   initialMode?: "kanban" | "list" | "forecast";
   initialDeals?: FunnelDeal[];
+  stages?: FunnelStage[];
+  readOnly?: boolean;
 };
 
 export function DealsBlock(props: DealsBlockProps = {}) {
@@ -174,10 +180,16 @@ export function DealsBlock(props: DealsBlockProps = {}) {
 
 function DealsBlockInner({
   initialMode = "kanban",
-  initialDeals: initialDealsOverride
+  initialDeals: initialDealsOverride,
+  stages: stagesOverride,
+  readOnly = false
 }: DealsBlockProps = {}) {
   const { fixtures } = useScenarioFixtures();
-  const stages = useMemo(() => buildFunnelStages(fixtures), [fixtures.dealStages]);
+  const sources = useMemo(
+    () => resolveDealsBlockSources(fixtures, { initialDeals: initialDealsOverride, stages: stagesOverride }),
+    [fixtures, initialDealsOverride, stagesOverride]
+  );
+  const stages = sources.stages;
   const stageLabel = useMemo(
     () =>
       stages.reduce<Record<string, string>>((acc, stage) => {
@@ -186,11 +198,7 @@ function DealsBlockInner({
       }, {}),
     [stages]
   );
-  const derivedDeals = useMemo(
-    () => buildFunnelDeals(fixtures.opportunities),
-    [fixtures.opportunities]
-  );
-  const initialDeals = initialDealsOverride ?? derivedDeals;
+  const initialDeals = sources.deals;
   const dealColumns = useMemo<KanbanColumnDef<StageId>[]>(
     () =>
       stages.map((stage) => ({
@@ -230,6 +238,7 @@ function DealsBlockInner({
   const openDeal = useMemo(() => deals.find((d) => d.id === openDealId) ?? null, [deals, openDealId]);
 
   const handleCreate = () => {
+    if (readOnly) return;
     if (!draft.title.trim()) return;
     const id = `DEAL-NEW-${deals.length + 1}`;
     const contractValue = Number(draft.contractValue.replace(/[^\d]/g, "")) || 0;
@@ -283,6 +292,7 @@ function DealsBlockInner({
     movingId?: string,
     overId?: string
   ) => {
+    if (readOnly) return;
     if ((columnSort[columnId] ?? "manual") !== "manual") {
       setColumnSort((prev) => ({ ...prev, [columnId]: "manual" }));
       toast.info("Ручной порядок", {
@@ -293,10 +303,12 @@ function DealsBlockInner({
   };
 
   const handleItemMove = (id: string, toColumnId: StageId, toIndex: number, overId?: string) => {
+    if (readOnly) return;
     moveDeal(id, toColumnId, toIndex, overId);
   };
 
   const handleColumnAction = (columnId: StageId, action: KanbanColumnAction) => {
+    if (readOnly) return;
     toast.info(`${STAGE_ACTION_LABEL[action]} — ${stageLabel[columnId]}`, {
       description: "Демо Storybook: действие зафиксировано локально."
     });
@@ -305,7 +317,12 @@ function DealsBlockInner({
   const intro = (
     <RoutePageIntro
       actions={
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+        <Button
+          variant="primary"
+          onClick={() => setCreateOpen(true)}
+          disabled={readOnly}
+          title={readOnly ? "Создание сделки будет подключено в следующем API-срезе" : undefined}
+        >
           <Plus className="size-4" aria-hidden />
           Сделка
         </Button>
@@ -372,9 +389,14 @@ function DealsBlockInner({
               onOpen={setOpenDealId}
             />
           )}
-          onItemMove={handleItemMove}
-          onItemReorder={handleItemReorder}
-          onColumnAction={handleColumnAction}
+          disableDnd={readOnly}
+          {...(readOnly
+            ? {}
+            : {
+                onItemMove: handleItemMove,
+                onItemReorder: handleItemReorder,
+                onColumnAction: handleColumnAction
+              })}
         />
       ) : null}
 
@@ -591,6 +613,19 @@ function DealsBlockInner({
       </Sheet>
     </ScreenBlockGate>
   );
+}
+
+export function resolveDealsBlockSources(
+  fixtures: Parameters<typeof buildFunnelStages>[0],
+  props: {
+    initialDeals?: FunnelDeal[] | undefined;
+    stages?: FunnelStage[] | undefined;
+  } = {}
+) {
+  return {
+    stages: props.stages ?? buildFunnelStagesFromDealStages(fixtures.dealStages),
+    deals: props.initialDeals ?? buildFunnelDeals(fixtures.opportunities)
+  };
 }
 
 function DealsList({

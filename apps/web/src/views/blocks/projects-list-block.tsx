@@ -38,6 +38,12 @@ import { projectTemplateName } from "@/lib/mock-data/workspace-config";
 import { positionName, userAvatar } from "@/lib/mock-data/users";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
+export type ProjectsListBlockProps = {
+  projects?: Project[];
+  projectTemplates?: ProjectTemplate[];
+  readOnly?: boolean;
+};
+
 type ProjectRow = Project & {
   code: string;
   owner: { initials: string; color: "c1" | "c2" | "c3" | "c4" | "c5"; name: string };
@@ -119,9 +125,30 @@ function projectsForFilter(
   return active;
 }
 
-export function ProjectsListBlock() {
+export function resolveProjectsListSources(
+  fixtures: { projects: Project[]; projectTemplates: ProjectTemplate[] },
+  props: {
+    projects?: Project[] | undefined;
+    projectTemplates?: ProjectTemplate[] | undefined;
+  } = {}
+) {
+  return {
+    projects: props.projects ?? fixtures.projects,
+    projectTemplates: props.projectTemplates ?? fixtures.projectTemplates
+  };
+}
+
+export function ProjectsListBlock({
+  projects,
+  projectTemplates,
+  readOnly = false
+}: ProjectsListBlockProps = {}) {
   const { fixtures } = useScenarioFixtures();
-  const projectRows = useMemo(() => buildProjectRows(fixtures.projects), [fixtures.projects]);
+  const sources = useMemo(
+    () => resolveProjectsListSources(fixtures, { projects, projectTemplates }),
+    [fixtures, projects, projectTemplates]
+  );
+  const projectRows = useMemo(() => buildProjectRows(sources.projects), [sources.projects]);
   const activeProjects = useMemo(
     () => projectRows.filter((project) => project.status === "active"),
     [projectRows]
@@ -131,8 +158,8 @@ export function ProjectsListBlock() {
     [projectRows]
   );
   const templateProjects = useMemo(
-    () => buildTemplateProjects(fixtures.projectTemplates),
-    [fixtures.projectTemplates]
+    () => buildTemplateProjects(sources.projectTemplates),
+    [sources.projectTemplates]
   );
 
   const [filter, setFilter] = useState<"active" | "archive" | "templates">("active");
@@ -158,7 +185,12 @@ export function ProjectsListBlock() {
   const intro = (
     <RoutePageIntro
       actions={
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+        <Button
+          variant="primary"
+          onClick={() => setCreateOpen(true)}
+          disabled={readOnly}
+          title={readOnly ? "Создание проекта будет подключено в следующем API-срезе" : undefined}
+        >
           <Plus className="size-4" aria-hidden />
           Проект
         </Button>
@@ -210,7 +242,12 @@ export function ProjectsListBlock() {
           }
           action={
             filter === "active" ? (
-              <Button variant="primary" onClick={() => setCreateOpen(true)}>
+              <Button
+                variant="primary"
+                onClick={() => setCreateOpen(true)}
+                disabled={readOnly}
+                title={readOnly ? "Создание проекта будет подключено в следующем API-срезе" : undefined}
+              >
                 Создать проект
               </Button>
             ) : undefined
@@ -270,7 +307,7 @@ export function ProjectsListBlock() {
                   />
                 </td>
                 <td className="cell-actions" onClick={(event) => event.stopPropagation()}>
-                  <ProjectRowMenu project={row} />
+                  <ProjectRowMenu project={row} readOnly={readOnly} />
                 </td>
               </tr>
             ))}
@@ -354,7 +391,7 @@ export function ProjectsListBlock() {
   );
 }
 
-function ProjectRowMenu({ project }: { project: ProjectRow }) {
+function ProjectRowMenu({ project, readOnly }: { project: ProjectRow; readOnly: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -362,6 +399,8 @@ function ProjectRowMenu({ project }: { project: ProjectRow }) {
           variant="ghost"
           size="icon-sm"
           aria-label={`Действия: ${project.title}`}
+          disabled={readOnly}
+          title={readOnly ? "Изменение проектов будет подключено в следующем API-срезе" : undefined}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >

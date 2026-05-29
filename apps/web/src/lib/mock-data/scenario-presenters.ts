@@ -1,4 +1,4 @@
-import type { Opportunity, Task, TaskStatusCategory } from "@/lib/api-types";
+import type { DealStage, Opportunity, Task, TaskStatusCategory } from "@/lib/api-types";
 import type { FunnelDeal, FunnelStage } from "@/widgets/funnel/types";
 import type { TaskKanbanItem } from "@/widgets/kanban";
 
@@ -48,11 +48,15 @@ export function buildTaskKanbanCards(tasks: Task[]): TaskKanbanCardModel[] {
 
 export type EntityCatalogKind = "clients" | "contacts" | "products";
 
-export function buildFunnelStages(fixtures: FixtureBundle): FunnelStage[] {
-  return fixtures.dealStages
+export function buildFunnelStagesFromDealStages(dealStages: DealStage[]): FunnelStage[] {
+  return dealStages
     .filter((stage) => stage.status === "active")
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((stage) => ({ id: stage.id, title: stage.name }));
+}
+
+export function buildFunnelStages(fixtures: FixtureBundle): FunnelStage[] {
+  return buildFunnelStagesFromDealStages(fixtures.dealStages);
 }
 
 export function buildFunnelDeals(opportunities: Opportunity[]): FunnelDeal[] {

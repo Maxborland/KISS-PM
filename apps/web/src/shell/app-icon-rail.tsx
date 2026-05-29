@@ -19,12 +19,11 @@ export function AppIconRail({ activeSection }: AppIconRailProps) {
           return (
             <a
               key={section.id}
-              href="#"
+              href={section.href}
               className={cn("app-icon-rail__btn", active && "is-active")}
               aria-label={section.label}
               aria-current={active ? "page" : undefined}
               title={section.label}
-              onClick={(e) => e.preventDefault()}
             >
               <Icon className="size-5" strokeWidth={1.75} aria-hidden />
             </a>
