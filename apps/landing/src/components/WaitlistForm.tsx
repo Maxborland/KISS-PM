@@ -120,7 +120,13 @@ export default function WaitlistForm() {
   const submitting = status.phase === "submitting";
 
   return (
-    <form className="wl" onSubmit={onSubmit} noValidate>
+    <form
+      className="wl"
+      method="post"
+      action="/api/waitlist"
+      onSubmit={onSubmit}
+      noValidate
+    >
       <p className="wl__intro">
         Короткая форма — без звонков и «менеджера по продажам».
         <br />
