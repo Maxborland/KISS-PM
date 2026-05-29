@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 
-import { ACTIVITY_STEPS, HISTORY_ITEMS, NAV_ITEMS } from "./scenario";
+import { ACTIVITY_STEPS, formatChangeCount, HISTORY_ITEMS, NAV_ITEMS } from "./scenario";
 import type { DemoChange, DemoMessage } from "./types";
 
 type AgentWorkspaceFrameProps = {
@@ -324,6 +324,7 @@ export function ChangeReviewPanel({
   onReset
 }: ChangeReviewPanelProps) {
   const selectedCount = changes.filter((change) => change.selected).length;
+  const appliedCount = changes.filter((change) => change.status === "применено").length;
 
   if (!visible && !mobileOpen) {
     return null;
@@ -376,7 +377,7 @@ export function ChangeReviewPanel({
           <ShieldCheck aria-hidden />
           <div>
             <strong>Выбранные изменения применены</strong>
-            <span>4 изменения записаны в журнал проекта</span>
+            <span>{formatChangeCount(appliedCount || selectedCount)} записано в журнал проекта</span>
           </div>
         </div>
       ) : null}

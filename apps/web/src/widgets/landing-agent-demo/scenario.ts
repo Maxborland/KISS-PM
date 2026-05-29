@@ -1,4 +1,4 @@
-import type { DemoChange, LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
+import type { DemoChange, DemoMessage, LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
 
 export const FIRST_PROMPT = "Генри, проверь сдвиг по согласованию и подготовь план на неделю.";
 export const SECOND_PROMPT = "Проверь, что сказать клиенту перед встречей.";
@@ -75,12 +75,31 @@ const henryMessage = {
   time: "10:42",
   text: "Проверил. Сдвиг затронул две работы и встречу с клиентом. Подготовил Сверку из 5 изменений."
 };
-const appliedMessage = {
-  id: "henry-2",
-  author: "henry" as const,
-  time: "10:44",
-  text: "Готово. Применил 4 изменения и оставил запись в журнале. Одно изменение осталось отклоненным."
-};
+
+export function formatChangeCount(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const noun =
+    mod10 === 1 && mod100 !== 11
+      ? "изменение"
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? "изменения"
+        : "изменений";
+
+  return `${count} ${noun}`;
+}
+
+export function createAppliedMessage(appliedCount: number, id = "henry-2"): DemoMessage {
+  return {
+    id,
+    author: "henry",
+    time: "10:44",
+    text: `Готово. Применил ${formatChangeCount(appliedCount)} и оставил запись в журнале. Остальные пункты оставлены без применения.`
+  };
+}
+
+const defaultAppliedCount = INITIAL_CHANGES.filter((change) => change.selected).length;
+const appliedMessage = createAppliedMessage(defaultAppliedCount);
 const secondMessage = {
   id: "user-2",
   author: "user" as const,

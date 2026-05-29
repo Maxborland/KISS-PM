@@ -11,7 +11,12 @@ import {
   MobileDrawerBackdrop
 } from "./components";
 import { cn } from "@/lib/cn";
-import { createLandingAgentDemoState, SECOND_ANSWER_MESSAGE, SECOND_PROMPT } from "./scenario";
+import {
+  createAppliedMessage,
+  createLandingAgentDemoState,
+  SECOND_ANSWER_MESSAGE,
+  SECOND_PROMPT
+} from "./scenario";
 import type { LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
 
 export type LandingAgentDemoProps = {
@@ -22,9 +27,9 @@ export type LandingAgentDemoProps = {
 export function LandingAgentDemo({ preset = "initial", mobile = false }: LandingAgentDemoProps) {
   const initialState = useMemo(() => createLandingAgentDemoState(preset), [preset]);
   const [state, setState] = useState<LandingAgentDemoState>(initialState);
-  const reviewPending =
+  const reviewPanelVisible =
     state.reviewVisible &&
-    (state.phase === "review-opening" || state.phase === "review-open");
+    (state.phase === "review-opening" || state.phase === "review-open" || state.phase === "applied");
 
   useEffect(() => {
     setState(initialState);
@@ -145,28 +150,22 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
   }
 
   function applySelected() {
-    setState((current) => ({
-      ...current,
-      phase: "applied",
-      inputValue: SECOND_PROMPT,
-      reviewVisible: false,
-      mobileReviewDrawer: false,
-      messages:
-        current.messages.some((message) => message.id === "henry-applied")
+    setState((current) => {
+      const appliedCount = current.changes.filter((change) => change.selected).length;
+
+      return {
+        ...current,
+        phase: "applied",
+        inputValue: SECOND_PROMPT,
+        reviewVisible: true,
+        messages: current.messages.some((message) => message.id === "henry-applied")
           ? current.messages
-          : [
-              ...current.messages,
-              {
-                id: "henry-applied",
-                author: "henry",
-                time: "10:44",
-                text: "Готово. Применил 4 изменения и оставил запись в журнале. Одно изменение осталось отклоненным."
-              }
-            ],
-      changes: current.changes.map((change) =>
-        change.selected ? { ...change, status: "применено" } : change
-      )
-    }));
+          : [...current.messages, createAppliedMessage(appliedCount, "henry-applied")],
+        changes: current.changes.map((change) =>
+          change.selected ? { ...change, status: "применено" } : change
+        )
+      };
+    });
   }
 
   function resetDemo() {
@@ -179,7 +178,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
         className={cn(
           "lad-layout",
           state.navExpanded && "lad-layout--nav-expanded",
-          reviewPending && "lad-layout--review-open"
+          reviewPanelVisible && "lad-layout--review-open"
         )}
       >
         <CollapsedAppNav
@@ -204,7 +203,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           visibleSteps={state.visibleSteps}
           phase={state.phase}
           agentMenuOpen={state.agentMenuOpen}
-          reviewVisible={reviewPending}
+          reviewVisible={reviewPanelVisible}
           onInputChange={(value) => setState((current) => ({ ...current, inputValue: value }))}
           onSend={sendMessage}
           onToggleAgentMenu={() =>
@@ -216,19 +215,19 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           onOpenMobileReview={() =>
             setState((current) => ({
               ...current,
-              mobileReviewDrawer: reviewPending,
+              mobileReviewDrawer: reviewPanelVisible,
               mobileLeftDrawer: false
             }))
           }
         />
         <ChangeReviewPanel
           changes={state.changes}
-          visible={reviewPending}
+          visible={reviewPanelVisible}
           opening={state.phase === "review-opening"}
           applied={state.phase === "applied" || state.changes.some((change) => change.status === "применено")}
           activeChangeId={state.activeChangeId}
           editingChangeId={state.editingChangeId}
-          mobileOpen={reviewPending && state.mobileReviewDrawer}
+          mobileOpen={reviewPanelVisible && state.mobileReviewDrawer}
           onCloseMobile={() => setState((current) => ({ ...current, mobileReviewDrawer: false }))}
           onSelectChange={(id) =>
             setState((current) => ({
