@@ -1,5 +1,4 @@
 import type { WaitlistSubmissionParsed } from "./schema";
-import { COMPANY_SIZE_LABELS } from "./schema";
 
 /**
  * Notification side of the waitlist pipeline. Falls back to console logging
@@ -11,6 +10,8 @@ export interface NotifyResult {
   ok: boolean;
   detail?: string;
 }
+
+type ResendNotificationPayload = Pick<WaitlistSubmissionParsed, "email" | "fullName" | "role">;
 
 export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<NotifyResult> {
   const key = process.env["RESEND_API_KEY"]?.trim();
@@ -51,20 +52,17 @@ export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<Notif
   }
 }
 
-function renderText(s: WaitlistSubmissionParsed): string {
+function renderText(s: ResendNotificationPayload): string {
   return [
     `Имя: ${s.fullName}`,
     `Email: ${s.email}`,
-    `Компания: ${s.company}`,
     `Роль: ${s.role}`,
-    `Активных проектов: ${COMPANY_SIZE_LABELS[s.companySize]}`,
-    s.context ? `Контекст: ${s.context}` : null,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function renderHtml(s: WaitlistSubmissionParsed): string {
+function renderHtml(s: ResendNotificationPayload): string {
   const safe = (v: string) =>
     v.replace(/[&<>"]/g, (c) =>
       c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;",
@@ -77,10 +75,7 @@ function renderHtml(s: WaitlistSubmissionParsed): string {
         <tr><td colspan="2" style="padding:18px 20px;background:linear-gradient(135deg,#2563eb,#6366f1);color:#fff;font-weight:700;font-family:Inter Tight,Inter,sans-serif;">KISS PM · заявка в альфу</td></tr>
         ${row("Имя", s.fullName)}
         ${row("Email", s.email)}
-        ${row("Компания", s.company)}
         ${row("Роль", s.role)}
-        ${row("Активных проектов", COMPANY_SIZE_LABELS[s.companySize])}
-        ${s.context ? row("Контекст", s.context) : ""}
       </table>
     </div>
   `;
