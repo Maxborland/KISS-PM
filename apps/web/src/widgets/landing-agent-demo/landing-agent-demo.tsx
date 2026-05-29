@@ -30,6 +30,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
   const reviewPanelVisible =
     state.reviewVisible &&
     (state.phase === "review-opening" || state.phase === "review-open" || state.phase === "applied");
+  const reviewApplied = state.phase === "applied" || state.changes.some((change) => change.status === "применено");
 
   useEffect(() => {
     setState(initialState);
@@ -153,9 +154,10 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
   function applySelected() {
     setState((current) => {
       const appliedCount = current.changes.filter((change) => change.selected).length;
+      const { editingChangeId: _editingChangeId, ...nextState } = current;
 
       return {
-        ...current,
+        ...nextState,
         phase: "applied",
         inputValue: SECOND_PROMPT,
         reviewVisible: true,
@@ -225,13 +227,16 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           changes={state.changes}
           visible={reviewPanelVisible}
           opening={state.phase === "review-opening"}
-          applied={state.phase === "applied" || state.changes.some((change) => change.status === "применено")}
+          applied={reviewApplied}
           activeChangeId={state.activeChangeId}
           editingChangeId={state.editingChangeId}
           mobileOpen={reviewPanelVisible && state.mobileReviewDrawer}
           onCloseMobile={() => setState((current) => ({ ...current, mobileReviewDrawer: false }))}
           onFocusChange={(id) => setState((current) => ({ ...current, activeChangeId: id }))}
           onSelectChange={(id) =>
+            reviewApplied
+              ? undefined
+              :
             setState((current) => ({
               ...current,
               activeChangeId: id,
@@ -249,6 +254,9 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
             }))
           }
           onRejectChange={(id) =>
+            reviewApplied
+              ? undefined
+              :
             setState((current) => ({
               ...current,
               activeChangeId: id,
@@ -258,9 +266,14 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
             }))
           }
           onEditChange={(id) =>
-            setState((current) => ({ ...current, activeChangeId: id, editingChangeId: id }))
+            reviewApplied
+              ? undefined
+              : setState((current) => ({ ...current, activeChangeId: id, editingChangeId: id }))
           }
           onUpdateChange={(id, value) =>
+            reviewApplied
+              ? undefined
+              :
             setState((current) => ({
               ...current,
               changes: current.changes.map((change) =>

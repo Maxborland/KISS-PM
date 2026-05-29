@@ -364,6 +364,7 @@ export function ChangeReviewPanel({
             change={change}
             active={change.id === activeChangeId}
             editing={change.id === editingChangeId}
+            locked={applied || change.status === "применено"}
             onSelect={() => onSelectChange(change.id)}
             onFocus={() => onFocusChange(change.id)}
             onReject={() => onRejectChange(change.id)}
@@ -399,6 +400,7 @@ type ChangeHunkCardProps = {
   change: DemoChange;
   active: boolean;
   editing: boolean;
+  locked: boolean;
   onSelect: () => void;
   onFocus: () => void;
   onReject: () => void;
@@ -410,6 +412,7 @@ export function ChangeHunkCard({
   change,
   active,
   editing,
+  locked,
   onSelect,
   onFocus,
   onReject,
@@ -424,17 +427,23 @@ export function ChangeHunkCard({
       <div className="lad-change__top">
         <span className="lad-change__number">{change.number}</span>
         <strong>{change.title}</strong>
-        <button
-          className={cn("lad-status", `lad-status--${statusClass(change.status)}`)}
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect();
-          }}
-        >
-          {change.status}
-          <ChevronDown aria-hidden />
-        </button>
+        {locked ? (
+          <span className={cn("lad-status", `lad-status--${statusClass(change.status)}`)}>
+            {change.status}
+          </span>
+        ) : (
+          <button
+            className={cn("lad-status", `lad-status--${statusClass(change.status)}`)}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect();
+            }}
+          >
+            {change.status}
+            <ChevronDown aria-hidden />
+          </button>
+        )}
       </div>
       <div className="lad-change__grid">
         <div>
@@ -444,21 +453,23 @@ export function ChangeHunkCard({
         <div className="lad-change__arrow">→</div>
         <div>
           <span>Стало</span>
-          {editing ? (
+          {editing && !locked ? (
             <EditableAfterValue change={change} onUpdate={onUpdate} />
           ) : (
             <p className="lad-change__after">{change.after}</p>
           )}
         </div>
       </div>
-      <div className="lad-change__actions">
-        <button type="button" onClick={onEdit}>
-          Изменить
-        </button>
-        <button type="button" onClick={onReject}>
-          Отклонить
-        </button>
-      </div>
+      {locked ? null : (
+        <div className="lad-change__actions">
+          <button type="button" onClick={onEdit}>
+            Изменить
+          </button>
+          <button type="button" onClick={onReject}>
+            Отклонить
+          </button>
+        </div>
+      )}
     </article>
   );
 }
