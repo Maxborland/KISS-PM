@@ -31,6 +31,34 @@ export type WorkspaceBootstrapData = {
 };
 
 type ListResponse<Key extends string, Item> = Record<Key, Item[]>;
+type WorkspaceBootstrapQueryDefinition = {
+  permission: string;
+  queryKey: readonly string[];
+  queryFn: () => Promise<unknown>;
+};
+
+const WORKSPACE_BOOTSTRAP_QUERY_DEFINITIONS: readonly WorkspaceBootstrapQueryDefinition[] = [
+  {
+    permission: "tenant.users.read",
+    queryKey: queryKeys.workspace.users,
+    queryFn: fetchWorkspaceUsers
+  },
+  {
+    permission: "tenant.positions.read",
+    queryKey: queryKeys.workspace.positions,
+    queryFn: fetchWorkspacePositions
+  },
+  {
+    permission: "tenant.access_profiles.read",
+    queryKey: queryKeys.workspace.accessRoles,
+    queryFn: fetchWorkspaceAccessRoles
+  },
+  {
+    permission: "tenant.workspace_config.read",
+    queryKey: queryKeys.workspace.customFields,
+    queryFn: fetchWorkspaceCustomFields
+  }
+];
 
 export function fetchAuthMe(): Promise<AuthMeResponse> {
   return apiFetch<AuthMeResponse>("/api/auth/me", { method: "GET" });
@@ -81,30 +109,26 @@ export function useAuthMeQuery() {
   });
 }
 
-export function useWorkspaceBootstrapQueries(enabled: boolean) {
+export function selectWorkspaceBootstrapQueries(permissions: readonly string[]) {
+  const permissionSet = new Set(permissions);
+  return WORKSPACE_BOOTSTRAP_QUERY_DEFINITIONS.filter((definition) =>
+    permissionSet.has(definition.permission)
+  );
+}
+
+export function useWorkspaceBootstrapQueries({
+  enabled,
+  permissions
+}: {
+  enabled: boolean;
+  permissions: readonly string[];
+}) {
   return useQueries({
-    queries: [
-      {
-        queryKey: queryKeys.workspace.users,
-        queryFn: fetchWorkspaceUsers,
-        enabled
-      },
-      {
-        queryKey: queryKeys.workspace.positions,
-        queryFn: fetchWorkspacePositions,
-        enabled
-      },
-      {
-        queryKey: queryKeys.workspace.accessRoles,
-        queryFn: fetchWorkspaceAccessRoles,
-        enabled
-      },
-      {
-        queryKey: queryKeys.workspace.customFields,
-        queryFn: fetchWorkspaceCustomFields,
-        enabled
-      }
-    ]
+    queries: selectWorkspaceBootstrapQueries(permissions).map((definition) => ({
+      queryKey: definition.queryKey,
+      queryFn: definition.queryFn,
+      enabled
+    }))
   });
 }
 

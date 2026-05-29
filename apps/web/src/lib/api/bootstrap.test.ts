@@ -7,7 +7,8 @@ import {
   fetchWorkspaceCustomFields,
   fetchWorkspacePositions,
   fetchWorkspaceUsers,
-  isSessionRequiredError
+  isSessionRequiredError,
+  selectWorkspaceBootstrapQueries
 } from "@/lib/api/bootstrap";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -52,6 +53,18 @@ describe("runtime API bootstrap", () => {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
     }
+  });
+
+  it("skips permission-scoped dictionaries that the authenticated user cannot read", () => {
+    expect(selectWorkspaceBootstrapQueries(["tenant.projects.read"])).toEqual([]);
+
+    expect(
+      selectWorkspaceBootstrapQueries([
+        "tenant.users.read",
+        "tenant.workspace_config.read",
+        "tenant.projects.read"
+      ]).map((query) => query.queryKey)
+    ).toEqual([queryKeys.workspace.users, queryKeys.workspace.customFields]);
   });
 
   it("treats 401 session_required as login state", () => {

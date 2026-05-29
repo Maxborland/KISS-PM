@@ -23,7 +23,10 @@ export function RuntimeScreen({ screenId }: { screenId: ScreenId }) {
 
 function AuthenticatedRuntimeScreen({ screenId }: { screenId: ScreenId }) {
   const authQuery = useAuthMeQuery();
-  const bootstrapQueries = useWorkspaceBootstrapQueries(authQuery.isSuccess);
+  const bootstrapQueries = useWorkspaceBootstrapQueries({
+    enabled: authQuery.isSuccess,
+    permissions: authQuery.data?.permissions ?? []
+  });
 
   if (authQuery.isPending) {
     return <LoadingState layout="bento" level="L1" label="Загружаем рабочую область…" />;
