@@ -63,15 +63,14 @@ export function ManagementSignalDemo({ active }: { active: boolean }) {
           <h5 className="six-signal__actions-title">Рекомендуемые действия</h5>
           <div className="six-signal__actions-row">
             {ACTIONS.map((action, i) => (
-              <button
+              <span
                 key={action.id}
-                type="button"
                 className={`six-signal__action six-signal__action--${i + 1}${"primary" in action && action.primary ? " six-signal__action--primary" : ""}`}
-                tabIndex={-1}
+                aria-hidden="true"
               >
                 <ActionIcon kind={action.icon} />
                 {action.label}
-              </button>
+              </span>
             ))}
           </div>
         </div>

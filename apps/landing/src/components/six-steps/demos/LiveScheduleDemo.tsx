@@ -16,11 +16,11 @@ export function LiveScheduleDemo({ active }: { active: boolean }) {
     <DemoShell active={active}>
       <div className="six-gantt">
         <header className="six-gantt__head">
-          <button type="button" className="six-gantt__menu" tabIndex={-1} aria-label="Меню">
+          <span className="six-gantt__menu" aria-hidden="true">
             <span />
             <span />
             <span />
-          </button>
+          </span>
           <span className="six-gantt__period">
             Май — Июнь 2024
             <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">

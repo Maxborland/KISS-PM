@@ -96,9 +96,9 @@ export function ProjectDraftDemo({ active }: { active: boolean }) {
               <dd>₽ 8 400 000</dd>
             </div>
           </dl>
-          <button type="button" className="six-draft__cta" tabIndex={-1}>
+          <span className="six-draft__cta" aria-hidden="true">
             Открыть черновик
-          </button>
+          </span>
         </article>
       </div>
     </DemoShell>

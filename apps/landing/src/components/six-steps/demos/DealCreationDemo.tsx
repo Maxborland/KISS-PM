@@ -32,9 +32,9 @@ export function DealCreationDemo({ active }: { active: boolean }) {
               </span>
             </div>
           ))}
-          <button type="button" className="six-deal__cta" tabIndex={-1}>
+          <span className="six-deal__cta" aria-hidden="true">
             Создать сделку
-          </button>
+          </span>
         </div>
         <DottedConnector className="six-deal__arrow" variant="horizontal-long" />
         <article className="six-deal__lead">

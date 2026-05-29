@@ -125,9 +125,9 @@ export function LessonsTemplateDemo({ active }: { active: boolean }) {
               </li>
             ))}
           </ul>
-          <button type="button" className="six-closure__add" tabIndex={-1}>
+          <span className="six-closure__add" aria-hidden="true">
             + Добавить пункт
-          </button>
+          </span>
         </article>
       </div>
     </DemoShell>

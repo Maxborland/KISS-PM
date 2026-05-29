@@ -4,6 +4,7 @@ import { insertSubmission } from "../../lib/waitlist/db";
 import { notifyTeam } from "../../lib/waitlist/notify";
 import { rateLimit } from "../../lib/waitlist/ratelimit";
 import { hashIp } from "../../lib/waitlist/hash";
+import { resolveClientIp } from "../../lib/waitlist/client-ip";
 
 export const prerender = false;
 
@@ -21,7 +22,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     }
   }
 
-  const ip = clientAddress || request.headers.get("x-forwarded-for") || "";
+  const ip = resolveClientIp(request, clientAddress);
   const rl = rateLimit(`waitlist:${ip}`, { limit: 5, windowMs: 60_000 });
   if (!rl.ok) {
     return json(
