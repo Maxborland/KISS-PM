@@ -154,6 +154,10 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
   function applySelected() {
     setState((current) => {
       const appliedCount = current.changes.filter((change) => change.selected).length;
+      if (appliedCount === 0) {
+        return current;
+      }
+
       const { editingChangeId: _editingChangeId, ...nextState } = current;
 
       return {

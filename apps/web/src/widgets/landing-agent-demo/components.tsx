@@ -383,7 +383,7 @@ export function ChangeReviewPanel({
         </div>
       ) : null}
       <div className="lad-review__actions">
-        <Button type="button" size="sm" onClick={onApply} disabled={applied}>
+        <Button type="button" size="sm" onClick={onApply} disabled={applied || selectedCount === 0}>
           <Check aria-hidden />
           Применить выбранное
         </Button>
