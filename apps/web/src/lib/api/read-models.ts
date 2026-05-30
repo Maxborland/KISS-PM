@@ -1,9 +1,9 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
-import type { DealStage, Opportunity, Project } from "@/lib/api-types";
+import type { DealStage, Opportunity, Project, ScheduledTask, Task } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
 type ListResponse<Key extends string, Item> = Record<Key, Item[]>;
@@ -17,11 +17,54 @@ export type DealsBoardReadModel = {
   dealStages: DealStage[];
 };
 
+export type MyWorkReadModel = {
+  tasks: Task[];
+  scheduledTasks: ScheduledTask[];
+};
+
+export type DashboardReadModel = {
+  projects: Project[];
+  tasks: Task[];
+  scheduledTasks: ScheduledTask[];
+};
+
+export type ScheduledTasksQueryInput = {
+  assigneeUserId: string;
+  fromDate: string;
+  toDate: string;
+};
+
+export type RuntimeTaskReadModelInput = {
+  assigneeUserId: string;
+  fromDate?: string;
+  toDate?: string;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
   });
   return response.projects;
+}
+
+export async function fetchWorkspaceMyWorkTasks(): Promise<Task[]> {
+  const response = await apiFetch<ListResponse<"tasks", Task>>("/api/workspace/my-work", {
+    method: "GET"
+  });
+  return response.tasks;
+}
+
+export async function fetchTenantCurrentScheduledTasks({
+  assigneeUserId,
+  fromDate,
+  toDate
+}: ScheduledTasksQueryInput): Promise<ScheduledTask[]> {
+  const searchParams = new URLSearchParams({ assigneeUserId, fromDate, toDate });
+  const response = await apiFetch<ListResponse<"tasks", ScheduledTask>>(
+    `/api/tenant/current/scheduled-tasks?${searchParams.toString()}`,
+    { method: "GET" }
+  );
+  return response.tasks;
 }
 
 export async function fetchWorkspaceOpportunities(): Promise<Opportunity[]> {
@@ -47,6 +90,107 @@ export function useProjectsListReadModelQuery() {
   });
 }
 
+export function getRuntimeTodayIsoDate(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function resolveRuntimeTaskReadModelInput({
+  assigneeUserId,
+  fromDate,
+  toDate
+}: RuntimeTaskReadModelInput): ScheduledTasksQueryInput {
+  const today = getRuntimeTodayIsoDate();
+  return {
+    assigneeUserId,
+    fromDate: fromDate ?? today,
+    toDate: toDate ?? fromDate ?? today
+  };
+}
+
+function aggregateQueries<TData>(
+  queries: readonly UseQueryResult<unknown, unknown>[],
+  data: TData | undefined
+) {
+  return {
+    data,
+    error: queries.find((query) => query.error)?.error ?? null,
+    isPending: queries.some((query) => query.isPending),
+    isFetching: queries.some((query) => query.isFetching),
+    refetchAll: () => {
+      for (const query of queries) {
+        void query.refetch();
+      }
+    }
+  };
+}
+
+export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
+  const scheduledInput = resolveRuntimeTaskReadModelInput(input);
+  const queries = useQueries({
+    queries: [
+      {
+        queryKey: queryKeys.workspace.myWork,
+        queryFn: fetchWorkspaceMyWorkTasks
+      },
+      {
+        queryKey: queryKeys.tenant.currentScheduledTasks(
+          scheduledInput.assigneeUserId,
+          scheduledInput.fromDate,
+          scheduledInput.toDate
+        ),
+        queryFn: () => fetchTenantCurrentScheduledTasks(scheduledInput)
+      }
+    ]
+  });
+
+  const [tasksQuery, scheduledTasksQuery] = queries;
+  const data =
+    tasksQuery.data && scheduledTasksQuery.data
+      ? {
+          tasks: tasksQuery.data as Task[],
+          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[]
+        }
+      : undefined;
+
+  return aggregateQueries<MyWorkReadModel>(queries, data);
+}
+
+export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
+  const scheduledInput = resolveRuntimeTaskReadModelInput(input);
+  const queries = useQueries({
+    queries: [
+      {
+        queryKey: queryKeys.workspace.projects,
+        queryFn: fetchWorkspaceProjects
+      },
+      {
+        queryKey: queryKeys.workspace.myWork,
+        queryFn: fetchWorkspaceMyWorkTasks
+      },
+      {
+        queryKey: queryKeys.tenant.currentScheduledTasks(
+          scheduledInput.assigneeUserId,
+          scheduledInput.fromDate,
+          scheduledInput.toDate
+        ),
+        queryFn: () => fetchTenantCurrentScheduledTasks(scheduledInput)
+      }
+    ]
+  });
+
+  const [projectsQuery, tasksQuery, scheduledTasksQuery] = queries;
+  const data =
+    projectsQuery.data && tasksQuery.data && scheduledTasksQuery.data
+      ? {
+          projects: projectsQuery.data as Project[],
+          tasks: tasksQuery.data as Task[],
+          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[]
+        }
+      : undefined;
+
+  return aggregateQueries<DashboardReadModel>(queries, data);
+}
+
 export function useDealsBoardReadModelQueries() {
   const queries = useQueries({
     queries: [
@@ -70,15 +214,5 @@ export function useDealsBoardReadModelQueries() {
         }
       : undefined;
 
-  return {
-    data,
-    error: queries.find((query) => query.error)?.error ?? null,
-    isPending: queries.some((query) => query.isPending),
-    isFetching: queries.some((query) => query.isFetching),
-    refetchAll: () => {
-      for (const query of queries) {
-        void query.refetch();
-      }
-    }
-  };
+  return aggregateQueries<DealsBoardReadModel>(queries, data);
 }

@@ -73,12 +73,13 @@ describe("navigation-registry", () => {
 
     expect(
       railSectionsForPermissions([
+        "tenant.projects.read",
         "tenant.opportunities.read",
         "tenant.deal_stages.read",
         "tenant.clients.read",
         "tenant.workspace_config.read"
       ]).map((section) => section.href)
-    ).toEqual(["/dashboard", "/my-work", "/deals", "/directories/clients", "/settings"]);
+    ).toEqual(["/dashboard", "/my-work", "/deals", "/projects", "/directories/clients", "/settings"]);
   });
 
   it("requires both opportunities and deal stages for the deals route", () => {

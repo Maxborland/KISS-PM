@@ -1,11 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/lib/api";
 import {
+  useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
+  useMyWorkReadModelQueries,
   useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import {
@@ -13,10 +17,13 @@ import {
   buildFunnelStagesFromDealStages
 } from "@/lib/mock-data/scenario-presenters";
 import { DealsBlock } from "@/views/blocks/deals-block";
+import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import { canOpenScreenRoute, getScreenRoute } from "@/views/screens/screen-route";
 import { ScreenView } from "@/views/screens/screen-view";
+import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
+import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,
@@ -27,19 +34,13 @@ export function canOpenStaticRuntimeScreen(
 
 export function RuntimeDataScreen({
   screenId,
-  permissions = []
+  permissions = [],
+  currentUserId
 }: {
   screenId: ScreenId;
   permissions?: readonly string[];
+  currentUserId?: string | undefined;
 }) {
-  if (screenId === "07-projects-list") {
-    return <RuntimeProjectsListScreen />;
-  }
-
-  if (screenId === "05-deals") {
-    return <RuntimeDealsScreen />;
-  }
-
   if (!canOpenStaticRuntimeScreen(screenId, permissions)) {
     return (
       <ForbiddenState
@@ -50,7 +51,115 @@ export function RuntimeDataScreen({
     );
   }
 
+  if (screenId === "01-dashboard") {
+    if (!currentUserId) return <RuntimeMissingUserState />;
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeDashboardDataScreen currentUserId={currentUserId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "02-my-work") {
+    if (!currentUserId) return <RuntimeMissingUserState />;
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeMyWorkScreen currentUserId={currentUserId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "07-projects-list") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeProjectsListScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "05-deals") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeDealsScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
   return <ScreenView id={screenId} permissions={permissions} />;
+}
+
+function RuntimeMissingUserState() {
+  return (
+    <ErrorState
+      level="L1"
+      title="Не удалось загрузить пользователя"
+      description="Сессия активна, но API не вернул идентификатор пользователя для runtime read model."
+    />
+  );
+}
+
+function RuntimeWorkspaceFrame({
+  screenId,
+  permissions,
+  children
+}: {
+  screenId: ScreenId;
+  permissions: readonly string[];
+  children: ReactNode;
+}) {
+  return (
+    <WorkspaceChrome meta={getScreenRoute(screenId)} permissions={permissions}>
+      {children}
+    </WorkspaceChrome>
+  );
+}
+
+function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }) {
+  const readModel = useDashboardReadModelQueries({ assigneeUserId: currentUserId });
+
+  if (readModel.isPending || readModel.isFetching) {
+    return <LoadingState layout="bento" level="L1" label="Загружаем дашборд…" />;
+  }
+
+  if (readModel.error) {
+    return (
+      <RuntimeReadModelError
+        error={readModel.error}
+        title="Не удалось загрузить дашборд"
+        forbiddenTitle="Нет доступа к дашборду"
+        onRetry={readModel.refetchAll}
+      />
+    );
+  }
+
+  return readModel.data ? <RuntimeDashboardScreen data={readModel.data} /> : null;
+}
+
+function RuntimeMyWorkScreen({ currentUserId }: { currentUserId: string }) {
+  const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
+
+  if (readModel.isPending || readModel.isFetching) {
+    return <LoadingState layout="bento" level="L1" label="Загружаем мою работу…" />;
+  }
+
+  if (readModel.error) {
+    return (
+      <RuntimeReadModelError
+        error={readModel.error}
+        title="Не удалось загрузить задачи"
+        forbiddenTitle="Нет доступа к разделу «Моя работа»"
+        onRetry={readModel.refetchAll}
+      />
+    );
+  }
+
+  return readModel.data ? (
+    <RuntimeMyWorkBlock
+      tasks={readModel.data.tasks}
+      scheduledTasks={readModel.data.scheduledTasks}
+      readOnly
+    />
+  ) : null;
 }
 
 function RuntimeProjectsListScreen() {
