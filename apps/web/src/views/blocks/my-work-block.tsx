@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
@@ -10,10 +10,12 @@ import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { ScheduledTask } from "@/lib/api-types";
+import type { ScheduledTask, Task } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
+import type { ScenarioFetchPhase, ScenarioName } from "@/lib/mock-data/scenarios";
+import { getRuntimeTodayIsoDate, getScheduledTaskDailyWorkMinutes } from "@/lib/scheduled-tasks";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MyWorkFetchIssue, MyWorkListSkeleton } from "@/views/blocks/my-work-fetch-issue";
 import { MyWorkKanbanSkeleton } from "@/views/blocks/my-work-kanban-skeleton";
@@ -118,16 +120,71 @@ export type MyWorkBlockProps = {
   initialMode?: "kanban" | "list";
 };
 
+export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
+  tasks?: Task[];
+  scheduledTasks?: ScheduledTask[];
+  readOnly?: boolean;
+};
+
 export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
-  const { scenario } = useScenarioFixtures();
-  return <MyWorkBlockInner key={scenario} initialMode={initialMode} />;
+  return <FixtureMyWorkBlock initialMode={initialMode} />;
 }
 
-function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
+function FixtureMyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   const { fixtures, state, scenario } = useScenarioFixtures();
+  return (
+    <MyWorkBlockInner
+      key={scenario}
+      initialMode={initialMode}
+      tasks={fixtures.tasks}
+      scheduledTasks={fixtures.scheduledTasks}
+      fetchPhase={state.fetchPhase}
+      errorMessage={state.errorMessage}
+      scenario={scenario}
+    />
+  );
+}
+
+export function RuntimeMyWorkBlock({
+  initialMode = "kanban",
+  tasks = [],
+  scheduledTasks = [],
+  readOnly = true
+}: RuntimeMyWorkBlockProps = {}) {
+  return (
+    <MyWorkBlockInner
+      key="runtime"
+      initialMode={initialMode}
+      tasks={tasks}
+      scheduledTasks={scheduledTasks}
+      readOnly={readOnly}
+      fetchPhase="success"
+      scenario="default"
+      runtime
+    />
+  );
+}
+
+function MyWorkBlockInner({
+  initialMode = "kanban",
+  tasks,
+  scheduledTasks,
+  readOnly = false,
+  fetchPhase,
+  errorMessage,
+  scenario,
+  runtime = false
+}: RuntimeMyWorkBlockProps & {
+  fetchPhase: ScenarioFetchPhase;
+  errorMessage?: string | undefined;
+  scenario: ScenarioName;
+  runtime?: boolean;
+}) {
+  const sourceTasks = tasks ?? [];
+  const sourceScheduledTasks = scheduledTasks ?? [];
   const initialCards = useMemo(
-    () => buildTaskKanbanCards(fixtures.tasks),
-    [fixtures.tasks]
+    () => buildTaskKanbanCards(sourceTasks),
+    [sourceTasks]
   );
   const [mode, setMode] = useState<"kanban" | "list">(initialMode);
   const [cards, setCards] = useState<CardModel[]>(initialCards);
@@ -136,8 +193,17 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
   const [retryCount, setRetryCount] = useState(0);
 
+  useEffect(() => {
+    if (!runtime) return;
+
+    setCards(initialCards);
+    setOpenCardId((current) =>
+      current && initialCards.some((card) => card.id === current) ? current : null
+    );
+  }, [initialCards, runtime]);
+
   const cardsOrdered = useMemo(() => flattenByColumns(cards), [cards]);
-  const isEmpty = scenario === "empty" || cardsOrdered.length === 0;
+  const isEmpty = (!runtime && scenario === "empty") || cardsOrdered.length === 0;
 
   const comparators = useMemo(() => buildTaskKanbanComparators<CardModel, ColumnId>(), []);
   const sortedCards = useKanbanOrderedItems(KANBAN_COLUMNS, cardsOrdered, columnSort, comparators);
@@ -158,7 +224,7 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
       add: "Добавление карточки"
     };
     toast.info(`${labels[action]} — ${COLUMN_LABEL[columnId]}`, {
-      description: "Демо Storybook: действие зафиксировано локально."
+      description: runtime ? "Runtime read-only: изменение будет подключено отдельным срезом." : "Демо Storybook: действие зафиксировано локально."
     });
   };
 
@@ -205,7 +271,7 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
     </div>
   );
 
-  if (state.fetchPhase === "loading") {
+  if (fetchPhase === "loading") {
     return (
       <div className="my-work">
         <RoutePageIntro />
@@ -215,14 +281,14 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
     );
   }
 
-  if (state.fetchPhase === "error") {
+  if (fetchPhase === "error") {
     return (
       <div className="my-work">
         <RoutePageIntro />
         {toolbar}
         <MyWorkFetchIssue
           kind="error"
-          {...(state.errorMessage ? { message: state.errorMessage } : {})}
+          {...(!runtime && errorMessage ? { message: errorMessage } : {})}
           onRetry={() => setRetryCount((n) => n + 1)}
         />
         {retryCount > 0 ? (
@@ -232,7 +298,7 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
     );
   }
 
-  if (state.fetchPhase === "forbidden") {
+  if (fetchPhase === "forbidden") {
     return (
       <div className="my-work">
         <RoutePageIntro />
@@ -247,8 +313,8 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
       <RoutePageIntro />
       {toolbar}
 
-      {mode === "kanban" && fixtures.scheduledTasks.length > 0 ? (
-        <MyWorkTodayPlan tasks={fixtures.scheduledTasks} />
+      {mode === "kanban" && sourceScheduledTasks.length > 0 ? (
+        <MyWorkTodayPlan tasks={sourceScheduledTasks} />
       ) : null}
 
       {mode === "list" ? (
@@ -271,11 +337,15 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
                 onOpen={setOpenCardId}
               />
             )}
-            onItemMove={(id, toColumnId, toIndex, overId) =>
-              setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex, overId))
-            }
-            onItemReorder={handleReorder}
-            onColumnAction={handleColumnAction}
+            disableDnd={readOnly}
+            {...(!readOnly
+              ? {
+                  onItemMove: (id, toColumnId, toIndex, overId) =>
+                    setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex, overId)),
+                  onItemReorder: handleReorder,
+                  onColumnAction: handleColumnAction
+                }
+              : {})}
           />
         </div>
       )}
@@ -283,6 +353,7 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
       <TaskDetailDrawer
         open={openCard != null}
         onOpenChange={(o) => !o && setOpenCardId(null)}
+        {...(runtime ? { taskHref: null } : {})}
         task={
           openCard
             ? {
@@ -308,6 +379,8 @@ function MyWorkBlockInner({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
 }
 
 function MyWorkTodayPlan({ tasks }: { tasks: ScheduledTask[] }) {
+  const today = getRuntimeTodayIsoDate();
+
   return (
     <CardPanel
       title="План на сегодня"
@@ -332,7 +405,7 @@ function MyWorkTodayPlan({ tasks }: { tasks: ScheduledTask[] }) {
               </td>
               <td>{task.projectTitle}</td>
               <td className="mono">{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
-              <td className="mono">{Math.round(task.workMinutes / 60)} ч</td>
+              <td className="mono">{Math.round(getScheduledTaskDailyWorkMinutes(task, today) / 60)} ч</td>
             </tr>
           ))}
         </tbody>

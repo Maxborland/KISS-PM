@@ -92,5 +92,11 @@ function AuthenticatedRuntimeScreen({ screenId }: { screenId: ScreenId }) {
     return <LoadingState layout="bento" level="L1" label="Подготавливаем справочники…" />;
   }
 
-  return <RuntimeDataScreen screenId={screenId} permissions={authQuery.data?.permissions ?? []} />;
+  return (
+    <RuntimeDataScreen
+      screenId={screenId}
+      permissions={authQuery.data?.permissions ?? []}
+      currentUserId={authQuery.data.user.id}
+    />
+  );
 }

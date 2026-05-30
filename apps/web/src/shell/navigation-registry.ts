@@ -178,7 +178,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     contextActiveItem: "Дашборд",
     topbarMode: "team",
     pageIntroActions: "create-export",
-    path: "/dashboard"
+    path: "/dashboard",
+    requiredPermissions: ["tenant.projects.read"]
   }),
   "02-my-work": route({
     id: "02-my-work",
@@ -189,7 +190,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     railSection: "tasks",
     contextActiveItem: "Моя работа",
     pageIntroActions: "create-export",
-    path: "/my-work"
+    path: "/my-work",
+    requiredPermissions: ["tenant.projects.read"]
   }),
   "03-task-card": route({
     id: "03-task-card",

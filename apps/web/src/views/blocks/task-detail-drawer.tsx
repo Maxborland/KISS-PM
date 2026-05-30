@@ -29,7 +29,7 @@ export type TaskDetailDrawerProps = {
    * историю `screens-задачи--task-card`; в продукте подставляется реальный
    * URL задачи (например, `/tasks/MDS-39`).
    */
-  taskHref?: string;
+  taskHref?: string | null;
 };
 
 const DEFAULT_STORYBOOK_TASK_HREF =
@@ -50,22 +50,24 @@ export function TaskDetailDrawer({
           <>
             <SheetHeader className="task-drawer__head">
               <SheetTitle className="sr-only">{task.title}</SheetTitle>
-              <Button
-                asChild
-                variant="secondary"
-                size="icon"
-                className="task-drawer__open-full"
-              >
-                <a
-                  target="_top"
-                  rel="noreferrer"
-                  href={taskHref}
-                  aria-label="Открыть карточку задачи как страницу"
-                  title="Открыть как страницу"
+              {taskHref ? (
+                <Button
+                  asChild
+                  variant="secondary"
+                  size="icon"
+                  className="task-drawer__open-full"
                 >
-                  <ExternalLink aria-hidden />
-                </a>
-              </Button>
+                  <a
+                    target="_top"
+                    rel="noreferrer"
+                    href={taskHref}
+                    aria-label="Открыть карточку задачи как страницу"
+                    title="Открыть как страницу"
+                  >
+                    <ExternalLink aria-hidden />
+                  </a>
+                </Button>
+              ) : null}
             </SheetHeader>
             <SheetBody className="task-drawer__body">
               <EntityDetailBlock
