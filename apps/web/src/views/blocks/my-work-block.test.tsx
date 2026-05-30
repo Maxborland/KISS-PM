@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { Task } from "@/lib/api-types";
+import type { ScheduledTask, Task } from "@/lib/api-types";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import { ScreenRouteProvider } from "@/views/layout/screen-route-context";
 import { getScreenRoute } from "@/views/screens/screen-route";
@@ -49,7 +49,33 @@ describe("RuntimeMyWorkBlock", () => {
     expect(host?.querySelector('a[aria-label="Открыть карточку задачи как страницу"]')).toBeNull();
   });
 
-  async function renderRuntimeMyWork(tasks: Task[]) {
+  it("shows today's daily work slice for multi-day scheduled tasks", async () => {
+    const today = isoDateOffset(0);
+    const finish = isoDateOffset(4);
+
+    await renderRuntimeMyWork([], {
+      initialMode: "kanban",
+      scheduledTasks: [
+        makeScheduledTask({
+          plannedStart: today,
+          plannedFinish: finish,
+          workMinutes: 2400
+        })
+      ]
+    });
+
+    expect(host?.textContent).toContain("План на сегодня");
+    expect(host?.textContent).toContain("8 ч");
+    expect(host?.textContent).not.toContain("40 ч");
+  });
+
+  async function renderRuntimeMyWork(
+    tasks: Task[],
+    options: {
+      initialMode?: "kanban" | "list";
+      scheduledTasks?: ScheduledTask[];
+    } = {}
+  ) {
     if (!host) {
       host = document.createElement("div");
       document.body.append(host);
@@ -60,9 +86,9 @@ describe("RuntimeMyWorkBlock", () => {
       root?.render(
         <ScreenRouteProvider meta={getScreenRoute("02-my-work")}>
           <RuntimeMyWorkBlock
-            initialMode="list"
+            initialMode={options.initialMode ?? "list"}
             readOnly
-            scheduledTasks={[]}
+            scheduledTasks={options.scheduledTasks ?? []}
             tasks={tasks}
           />
         </ScreenRouteProvider>
@@ -99,4 +125,32 @@ function makeTask({ id, title }: { id: string; title: string }): Task {
     archivedAt: null,
     participants: [{ userId: "usr-1", role: "executor" }]
   };
+}
+
+function makeScheduledTask({
+  plannedStart,
+  plannedFinish,
+  workMinutes
+}: {
+  plannedStart: string;
+  plannedFinish: string;
+  workMinutes: number;
+}): ScheduledTask {
+  return {
+    id: "scheduled-task-1",
+    title: "Runtime scheduled task",
+    projectId: "project-1",
+    projectTitle: "Runtime project",
+    plannedStart,
+    plannedFinish,
+    workMinutes,
+    createdAt: `${plannedStart}T00:00:00.000Z`,
+    statusId: "task-status-in-progress"
+  };
+}
+
+function isoDateOffset(days: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }

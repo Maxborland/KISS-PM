@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getScheduledTaskDailyWorkMinutes } from "@/shell/runtime-dashboard-screen";
+import { getScheduledTaskDailyWorkMinutes } from "@/lib/scheduled-tasks";
 
 describe("getScheduledTaskDailyWorkMinutes", () => {
   it("uses the full scheduled work for a single-day task", () => {

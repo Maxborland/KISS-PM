@@ -15,6 +15,7 @@ import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
 import type { ScenarioFetchPhase, ScenarioName } from "@/lib/mock-data/scenarios";
+import { getRuntimeTodayIsoDate, getScheduledTaskDailyWorkMinutes } from "@/lib/scheduled-tasks";
 import { TaskDetailDrawer } from "@/views/blocks/task-detail-drawer";
 import { MyWorkFetchIssue, MyWorkListSkeleton } from "@/views/blocks/my-work-fetch-issue";
 import { MyWorkKanbanSkeleton } from "@/views/blocks/my-work-kanban-skeleton";
@@ -378,6 +379,8 @@ function MyWorkBlockInner({
 }
 
 function MyWorkTodayPlan({ tasks }: { tasks: ScheduledTask[] }) {
+  const today = getRuntimeTodayIsoDate();
+
   return (
     <CardPanel
       title="План на сегодня"
@@ -402,7 +405,7 @@ function MyWorkTodayPlan({ tasks }: { tasks: ScheduledTask[] }) {
               </td>
               <td>{task.projectTitle}</td>
               <td className="mono">{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
-              <td className="mono">{Math.round(task.workMinutes / 60)} ч</td>
+              <td className="mono">{Math.round(getScheduledTaskDailyWorkMinutes(task, today) / 60)} ч</td>
             </tr>
           ))}
         </tbody>
