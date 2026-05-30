@@ -15,8 +15,8 @@ import {
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
-import { ScreenView } from "@/views/screens/screen-view";
 import { canOpenScreenRoute, getScreenRoute } from "@/views/screens/screen-route";
+import { ScreenView } from "@/views/screens/screen-view";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,

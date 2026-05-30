@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RuntimeLoginScreen } from "@/app/runtime-login-screen";
+import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
 const replace = vi.fn();
 

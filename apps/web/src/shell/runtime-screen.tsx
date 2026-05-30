@@ -10,8 +10,8 @@ import {
   useWorkspaceBootstrapQueries
 } from "@/lib/api/bootstrap";
 import type { ScreenId } from "@/views/catalog";
-import { RuntimeDataScreen } from "./runtime-data-screen";
-import { RuntimeLoginScreen } from "./runtime-login-screen";
+import { RuntimeDataScreen } from "@/shell/runtime-data-screen";
+import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
 export function RuntimeScreen({ screenId }: { screenId: ScreenId }) {
   if (screenId === "19-login") {

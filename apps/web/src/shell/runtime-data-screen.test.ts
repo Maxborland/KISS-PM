@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canOpenStaticRuntimeScreen } from "@/app/runtime-data-screen";
+import { canOpenStaticRuntimeScreen } from "@/shell/runtime-data-screen";
 
 describe("RuntimeDataScreen permission gate", () => {
   it("blocks static admin, settings and catalog screens for project-only users", () => {

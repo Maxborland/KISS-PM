@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { RuntimeScreen } from "@/app/runtime-screen";
 import { screenIdForPath } from "@/shell/navigation-registry";
+import { RuntimeScreen } from "@/shell/runtime-screen";
 
 export default async function RuntimePathPage({
   params
