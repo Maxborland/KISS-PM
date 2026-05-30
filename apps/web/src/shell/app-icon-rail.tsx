@@ -1,19 +1,22 @@
 import type { RailSectionId } from "@/shell/navigation-registry";
-import { RAIL_SECTIONS } from "@/shell/navigation-registry";
+import { railSectionsForPermissions } from "@/shell/navigation-registry";
 import { cn } from "@/lib/cn";
 
 export type AppIconRailProps = {
   activeSection: RailSectionId;
+  permissions?: readonly string[] | undefined;
 };
 
-export function AppIconRail({ activeSection }: AppIconRailProps) {
+export function AppIconRail({ activeSection, permissions }: AppIconRailProps) {
+  const sections = railSectionsForPermissions(permissions);
+
   return (
     <nav className="app-icon-rail" aria-label="Разделы продукта">
       <div className="app-icon-rail__logo" aria-hidden>
         <span className="brand-mark">К</span>
       </div>
       <div className="app-icon-rail__sections">
-        {RAIL_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const Icon = section.icon;
           const active = section.id === activeSection;
           return (

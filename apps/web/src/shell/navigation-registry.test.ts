@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  contextNavForSection,
   pathForScreenId,
   RAIL_SECTIONS,
+  railSectionsForPermissions,
   screenIdForPath,
   SCREEN_ROUTE_BY_ID
 } from "@/shell/navigation-registry";
@@ -60,5 +62,35 @@ describe("navigation-registry", () => {
       "/projects/demo/kpi",
       "/settings"
     ]);
+  });
+
+  it("filters protected rail entries for restricted runtime users", () => {
+    expect(railSectionsForPermissions(["tenant.projects.read"]).map((section) => section.href)).toEqual([
+      "/dashboard",
+      "/my-work",
+      "/projects"
+    ]);
+
+    expect(
+      railSectionsForPermissions([
+        "tenant.opportunities.read",
+        "tenant.clients.read",
+        "tenant.workspace_config.read"
+      ]).map((section) => section.href)
+    ).toEqual(["/dashboard", "/my-work", "/deals", "/directories/clients", "/settings"]);
+  });
+
+  it("filters protected context links for restricted runtime users", () => {
+    expect(
+      contextNavForSection("projects", "Все проекты", ["tenant.projects.read"]).flatMap((group) =>
+        group.items.map((item) => item.href)
+      ).filter(Boolean)
+    ).toEqual(["/projects"]);
+
+    expect(
+      contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(
+        (group) => group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/settings", null]);
   });
 });

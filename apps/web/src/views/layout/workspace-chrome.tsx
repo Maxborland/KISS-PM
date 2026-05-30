@@ -14,9 +14,15 @@ export type WorkspaceChromeProps = {
   meta: ScreenRouteMeta;
   children: ReactNode;
   topbarActions?: ReactNode;
+  permissions?: readonly string[] | undefined;
 };
 
-export function WorkspaceChrome({ meta, children, topbarActions }: WorkspaceChromeProps) {
+export function WorkspaceChrome({
+  meta,
+  children,
+  topbarActions,
+  permissions
+}: WorkspaceChromeProps) {
   const topbarExtras =
     topbarActions ??
     (meta.topbarMode === "team" ? (
@@ -30,10 +36,14 @@ export function WorkspaceChrome({ meta, children, topbarActions }: WorkspaceChro
   return (
     <ScreenRouteProvider meta={meta}>
       <AppShell
-        iconRail={<AppIconRail activeSection={meta.railSection} />}
+        iconRail={<AppIconRail activeSection={meta.railSection} permissions={permissions} />}
         contextSidebar={
           <AppContextSidebar
-            groups={contextNavForSection(meta.railSection, meta.contextActiveItem)}
+            groups={contextNavForSection(
+              meta.railSection,
+              meta.contextActiveItem,
+              permissions
+            )}
             user={DEFAULT_USER}
           />
         }
