@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
@@ -191,6 +191,15 @@ function MyWorkBlockInner({
   const [columnSort, setColumnSort] = useState<KanbanColumnSortState<ColumnId>>({});
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
   const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    if (!runtime) return;
+
+    setCards(initialCards);
+    setOpenCardId((current) =>
+      current && initialCards.some((card) => card.id === current) ? current : null
+    );
+  }, [initialCards, runtime]);
 
   const cardsOrdered = useMemo(() => flattenByColumns(cards), [cards]);
   const isEmpty = (!runtime && scenario === "empty") || cardsOrdered.length === 0;
