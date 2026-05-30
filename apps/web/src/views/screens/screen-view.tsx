@@ -76,7 +76,13 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
   "state-loading": () => <StateScreenBlock kind="loading" />
 };
 
-export function ScreenView({ id }: { id: ScreenId }) {
+export function ScreenView({
+  id,
+  permissions
+}: {
+  id: ScreenId;
+  permissions?: readonly string[] | undefined;
+}) {
   const meta = getScreenRoute(id);
   const Block = BLOCK_BY_ID[id] ?? (() => <ScreenPlaceholderBlock title={meta.pageTitle} lead={meta.lead} />);
 
@@ -92,5 +98,9 @@ export function ScreenView({ id }: { id: ScreenId }) {
     );
   }
 
-  return <WorkspaceChrome meta={meta}>{Block()}</WorkspaceChrome>;
+  return (
+    <WorkspaceChrome meta={meta} permissions={permissions}>
+      {Block()}
+    </WorkspaceChrome>
+  );
 }

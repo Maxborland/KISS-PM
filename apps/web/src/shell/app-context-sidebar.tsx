@@ -29,13 +29,14 @@ export function AppContextSidebar({ groups, user, footer }: AppContextSidebarPro
           {g.items.map((item) => (
             <a
               key={item.label}
-              href="#"
+              href={item.href ?? "#"}
               className={cn(
                 "app-context-sidebar__item",
                 item.nested && "app-context-sidebar__item--nested",
                 item.active && "is-active"
               )}
-              onClick={(e) => e.preventDefault()}
+              aria-disabled={item.href ? undefined : true}
+              onClick={item.href ? undefined : (e) => e.preventDefault()}
             >
               {item.label}
               {item.badge ? (

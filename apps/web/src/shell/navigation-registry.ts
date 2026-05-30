@@ -15,13 +15,13 @@ import { MOCK_PROJECT_CRM, mockProjectScreenTitle, mockTaskProjectRef } from "@/
 import type { ScreenId } from "@/views/screen-ids";
 
 export const RAIL_SECTIONS = [
-  { id: "overview", label: "Обзор", shortLabel: "Обзор", icon: LayoutDashboard },
-  { id: "tasks", label: "Задачи", shortLabel: "Задачи", icon: SquareCheckBig },
-  { id: "crm", label: "CRM", shortLabel: "CRM", icon: Briefcase },
-  { id: "projects", label: "Проекты", shortLabel: "Проекты", icon: FolderKanban },
-  { id: "directories", label: "Справочники", shortLabel: "Спр.", icon: BookOpen },
-  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3 },
-  { id: "settings", label: "Настройки", shortLabel: "Настр.", icon: Settings }
+  { id: "overview", label: "Обзор", shortLabel: "Обзор", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "tasks", label: "Задачи", shortLabel: "Задачи", icon: SquareCheckBig, href: "/my-work" },
+  { id: "crm", label: "CRM", shortLabel: "CRM", icon: Briefcase, href: "/deals" },
+  { id: "projects", label: "Проекты", shortLabel: "Проекты", icon: FolderKanban, href: "/projects" },
+  { id: "directories", label: "Справочники", shortLabel: "Спр.", icon: BookOpen, href: "/directories/clients" },
+  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3, href: "/projects/demo/kpi" },
+  { id: "settings", label: "Настройки", shortLabel: "Настр.", icon: Settings, href: "/settings" }
 ] as const;
 
 export type RailSectionId = (typeof RAIL_SECTIONS)[number]["id"];
@@ -37,6 +37,9 @@ export type ScreenRouteMeta = {
   variant?: "workspace" | "login" | "bare";
   topbarMode?: "minimal" | "team";
   pageIntroActions?: "create-export" | "none";
+  path?: string;
+  requiredPermissions?: readonly string[];
+  requiredPermissionMode?: "any" | "all";
 };
 
 export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
@@ -44,9 +47,9 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Обзор",
       items: [
-        { label: "Дашборд" },
+        { label: "Дашборд", href: "/dashboard" },
         { label: "Календарь" },
-        { label: "Витрина" }
+        { label: "Витрина", href: "/showcase/spacing" }
       ]
     }
   ],
@@ -54,7 +57,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Задачи",
       items: [
-        { label: "Моя работа" },
+        { label: "Моя работа", href: "/my-work" },
         { label: "Бэклог", nested: true, badge: "24" },
         { label: "В работе", nested: true, badge: "4" },
         { label: "Проверка", nested: true, badge: "7" },
@@ -66,9 +69,9 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "CRM",
       items: [
-        { label: "Сделки" },
+        { label: "Сделки", href: "/deals" },
         { label: "Входящие", badge: "3" },
-        { label: "Контакты" }
+        { label: "Контакты", href: "/directories/contacts" }
       ]
     }
   ],
@@ -76,7 +79,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Проекты",
       items: [
-        { label: "Все проекты" },
+        { label: "Все проекты", href: "/projects" },
         { label: "Активные", badge: "14" },
         { label: "На ревью", badge: "3" }
       ]
@@ -84,29 +87,33 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Текущий проект",
       items: [
-        { label: "Гант", nested: true },
-        { label: "Ресурсы", nested: true },
-        { label: "Базовый план", nested: true },
-        { label: "Сценарии", nested: true },
-        { label: "KPI", nested: true },
-        { label: "Аудит", nested: true },
-        { label: "Календари", nested: true }
+        { label: "Гант", nested: true, href: "/projects/demo/gantt" },
+        { label: "Ресурсы", nested: true, href: "/projects/demo/resources" },
+        { label: "Базовый план", nested: true, href: "/projects/demo/baseline" },
+        { label: "Сценарии", nested: true, href: "/projects/demo/scenarios" },
+        { label: "KPI", nested: true, href: "/projects/demo/kpi" },
+        { label: "Аудит", nested: true, href: "/projects/demo/audit" },
+        { label: "Календари", nested: true, href: "/projects/demo/calendars" }
       ]
     }
   ],
   directories: [
     {
       title: "Справочники",
-      items: [{ label: "Клиенты" }, { label: "Контакты" }, { label: "Продукты" }]
+      items: [
+        { label: "Клиенты", href: "/directories/clients" },
+        { label: "Контакты", href: "/directories/contacts" },
+        { label: "Продукты", href: "/directories/products" }
+      ]
     }
   ],
   reports: [
     {
       title: "Отчёты",
       items: [
-        { label: "Сводка портфеля" },
-        { label: "Загрузка ресурсов" },
-        { label: "KPI арендатора" }
+        { label: "Сводка портфеля", href: "/dashboard" },
+        { label: "Загрузка ресурсов", href: "/projects/demo/resources" },
+        { label: "KPI арендатора", href: "/projects/demo/kpi" }
       ]
     }
   ],
@@ -114,8 +121,8 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Настройки",
       items: [
-        { label: "Рабочая область" },
-        { label: "Администрирование" },
+        { label: "Рабочая область", href: "/settings" },
+        { label: "Администрирование", href: "/admin" },
         { label: "Интеграции" }
       ]
     }
@@ -128,15 +135,20 @@ export function railSectionIcon(id: RailSectionId): LucideIcon {
 
 export function contextNavForSection(
   section: RailSectionId,
-  activeItem: string
+  activeItem: string,
+  permissions?: readonly string[]
 ): SidebarGroup[] {
-  return CONTEXT_NAV[section].map((group) => ({
-    ...group,
-    items: group.items.map((item) => ({
-      ...item,
-      active: item.label === activeItem
+  return CONTEXT_NAV[section]
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter((item) => !item.href || canOpenRuntimePath(item.href, permissions))
+        .map((item) => ({
+          ...item,
+          active: item.label === activeItem
+        }))
     }))
-  }));
+    .filter((group) => group.items.length > 0);
 }
 
 function route(
@@ -153,7 +165,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только наложение поверх.",
     breadcrumb: [{ label: "Витрина", current: true }],
     railSection: "overview",
-    contextActiveItem: "Витрина"
+    contextActiveItem: "Витрина",
+    path: "/showcase/spacing"
   }),
   "01-dashboard": route({
     id: "01-dashboard",
@@ -164,7 +177,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     railSection: "overview",
     contextActiveItem: "Дашборд",
     topbarMode: "team",
-    pageIntroActions: "create-export"
+    pageIntroActions: "create-export",
+    path: "/dashboard"
   }),
   "02-my-work": route({
     id: "02-my-work",
@@ -174,7 +188,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "Задачи" }, { label: "Моя работа", current: true }],
     railSection: "tasks",
     contextActiveItem: "Моя работа",
-    pageIntroActions: "create-export"
+    pageIntroActions: "create-export",
+    path: "/my-work"
   }),
   "03-task-card": route({
     id: "03-task-card",
@@ -183,7 +198,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: mockTaskProjectRef("MDS-39"),
     breadcrumb: [{ label: "Задачи" }, { label: "MDS-39", current: true }],
     railSection: "tasks",
-    contextActiveItem: "Моя работа"
+    contextActiveItem: "Моя работа",
+    path: "/tasks/demo/MDS-39"
   }),
   "04-create-task-modal": route({
     id: "04-create-task-modal",
@@ -192,7 +208,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Модальное создание с пошаговым мастером и формой.",
     breadcrumb: [{ label: "Задачи" }, { label: "Новая задача", current: true }],
     railSection: "tasks",
-    contextActiveItem: "Моя работа"
+    contextActiveItem: "Моя работа",
+    path: "/tasks/new"
   }),
   "05-deals": route({
     id: "05-deals",
@@ -202,7 +219,10 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "CRM" }, { label: "Сделки", current: true }],
     railSection: "crm",
     contextActiveItem: "Сделки",
-    pageIntroActions: "create-export"
+    pageIntroActions: "create-export",
+    path: "/deals",
+    requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+    requiredPermissionMode: "all"
   }),
   "06-deal-card": route({
     id: "06-deal-card",
@@ -211,7 +231,10 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Активная сделка в воронке «Продажи».",
     breadcrumb: [{ label: "CRM" }, { label: "Сделки" }, { label: "Ромашка", current: true }],
     railSection: "crm",
-    contextActiveItem: "Сделки"
+    contextActiveItem: "Сделки",
+    path: "/deals/demo/DEAL-101",
+    requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+    requiredPermissionMode: "all"
   }),
   "07-projects-list": route({
     id: "07-projects-list",
@@ -221,7 +244,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "Проекты", current: true }],
     railSection: "projects",
     contextActiveItem: "Все проекты",
-    pageIntroActions: "create-export"
+    pageIntroActions: "create-export",
+    path: "/projects",
+    requiredPermissions: ["tenant.projects.read"]
   }),
   "07b-project-detail": route({
     id: "07b-project-detail",
@@ -230,7 +255,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "PRJ-2026-014 · ООО «Ромашка»",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }],
     railSection: "projects",
-    contextActiveItem: "Все проекты"
+    contextActiveItem: "Все проекты",
+    path: "/projects/demo",
+    requiredPermissions: ["tenant.projects.read"]
   }),
   "08-entities-clients": route({
     id: "08-entities-clients",
@@ -239,7 +266,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Справочник клиентов арендатора.",
     breadcrumb: [{ label: "Справочники" }, { label: "Клиенты", current: true }],
     railSection: "directories",
-    contextActiveItem: "Клиенты"
+    contextActiveItem: "Клиенты",
+    path: "/directories/clients",
+    requiredPermissions: ["tenant.clients.read"]
   }),
   "08-entities-contacts": route({
     id: "08-entities-contacts",
@@ -248,7 +277,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Контактные лица и связи с CRM.",
     breadcrumb: [{ label: "Справочники" }, { label: "Контакты", current: true }],
     railSection: "directories",
-    contextActiveItem: "Контакты"
+    contextActiveItem: "Контакты",
+    path: "/directories/contacts",
+    requiredPermissions: ["tenant.contacts.read"]
   }),
   "08-entities-products": route({
     id: "08-entities-products",
@@ -257,7 +288,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Каталог продуктов для сделок и проектов.",
     breadcrumb: [{ label: "Справочники" }, { label: "Продукты", current: true }],
     railSection: "directories",
-    contextActiveItem: "Продукты"
+    contextActiveItem: "Продукты",
+    path: "/directories/products",
+    requiredPermissions: ["tenant.products.read"]
   }),
   "09-admin": route({
     id: "09-admin",
@@ -266,7 +299,13 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Пользователи, роли и политики рабочей области.",
     breadcrumb: [{ label: "Настройки" }, { label: "Администрирование", current: true }],
     railSection: "settings",
-    contextActiveItem: "Администрирование"
+    contextActiveItem: "Администрирование",
+    path: "/admin",
+    requiredPermissions: [
+      "tenant.users.read",
+      "tenant.access_profiles.read",
+      "tenant.positions.read"
+    ]
   }),
   "10-settings": route({
     id: "10-settings",
@@ -275,7 +314,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Профиль, уведомления и интеграции.",
     breadcrumb: [{ label: "Настройки", current: true }],
     railSection: "settings",
-    contextActiveItem: "Рабочая область"
+    contextActiveItem: "Рабочая область",
+    path: "/settings",
+    requiredPermissions: ["tenant.workspace_config.read"]
   }),
   "11-avatar-menu": route({
     id: "11-avatar-menu",
@@ -284,7 +325,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Меню аватара и быстрые действия.",
     breadcrumb: [{ label: "Профиль", current: true }],
     railSection: "overview",
-    contextActiveItem: "Дашборд"
+    contextActiveItem: "Дашборд",
+    path: "/profile"
   }),
   "12-project-gantt": route({
     id: "12-project-gantt",
@@ -294,7 +336,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Гант", current: true }],
     railSection: "projects",
     contextActiveItem: "Гант",
-    pageIntroActions: "create-export"
+    pageIntroActions: "create-export",
+    path: "/projects/demo/gantt",
+    requiredPermissions: ["tenant.project_plan.read"]
   }),
   "13-project-resources": route({
     id: "13-project-resources",
@@ -303,7 +347,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Матрица загрузки и назначения.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Ресурсы", current: true }],
     railSection: "projects",
-    contextActiveItem: "Ресурсы"
+    contextActiveItem: "Ресурсы",
+    path: "/projects/demo/resources",
+    requiredPermissions: ["tenant.project_resources.read"]
   }),
   "14-project-baseline": route({
     id: "14-project-baseline",
@@ -312,7 +358,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Снимки плана и отклонения.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Базовый план", current: true }],
     railSection: "projects",
-    contextActiveItem: "Базовый план"
+    contextActiveItem: "Базовый план",
+    path: "/projects/demo/baseline",
+    requiredPermissions: ["tenant.project_baselines.manage"]
   }),
   "15-project-scenarios": route({
     id: "15-project-scenarios",
@@ -321,7 +369,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Сценарии «что если» и сравнение вариантов.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Сценарии", current: true }],
     railSection: "projects",
-    contextActiveItem: "Сценарии"
+    contextActiveItem: "Сценарии",
+    path: "/projects/demo/scenarios",
+    requiredPermissions: ["tenant.planning_scenarios.preview"]
   }),
   "16-project-kpi": route({
     id: "16-project-kpi",
@@ -330,7 +380,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Показатели и сигналы управления.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "KPI", current: true }],
     railSection: "projects",
-    contextActiveItem: "KPI"
+    contextActiveItem: "KPI",
+    path: "/projects/demo/kpi",
+    requiredPermissions: ["tenant.kpi_definitions.read", "tenant.control_signals.read"]
   }),
   "17-project-audit": route({
     id: "17-project-audit",
@@ -339,7 +391,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Журнал управленческих действий.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Аудит", current: true }],
     railSection: "projects",
-    contextActiveItem: "Аудит"
+    contextActiveItem: "Аудит",
+    path: "/projects/demo/audit",
+    requiredPermissions: ["tenant.audit_events.read"]
   }),
   "18-project-calendars": route({
     id: "18-project-calendars",
@@ -348,7 +402,9 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Рабочие календари и исключения.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Календари", current: true }],
     railSection: "projects",
-    contextActiveItem: "Календари"
+    contextActiveItem: "Календари",
+    path: "/projects/demo/calendars",
+    requiredPermissions: ["tenant.project_resources.read"]
   }),
   "19-login": route({
     id: "19-login",
@@ -358,7 +414,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [],
     railSection: "overview",
     contextActiveItem: "Дашборд",
-    variant: "login"
+    variant: "login",
+    path: "/login"
   }),
   "state-empty": route({
     id: "state-empty",
@@ -400,4 +457,48 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
 
 export function getScreenRoute(id: ScreenId): ScreenRouteMeta {
   return SCREEN_ROUTE_BY_ID[id];
+}
+
+export const DEFAULT_RUNTIME_SCREEN_ID: ScreenId = "01-dashboard";
+
+export const SCREEN_ID_BY_PATH = Object.fromEntries(
+  Object.values(SCREEN_ROUTE_BY_ID)
+    .filter((meta): meta is ScreenRouteMeta & { path: string } => Boolean(meta.path))
+    .map((meta) => [normalizeRuntimePath(meta.path), meta.id])
+) as Record<string, ScreenId>;
+
+export function normalizeRuntimePath(path: string): string {
+  const pathname = path.split(/[?#]/, 1)[0] ?? "/";
+  const normalized = `/${pathname.split("/").filter(Boolean).join("/")}`;
+  return normalized === "/" ? "/" : normalized;
+}
+
+export function screenIdForPath(path: string): ScreenId | null {
+  return SCREEN_ID_BY_PATH[normalizeRuntimePath(path)] ?? null;
+}
+
+export function pathForScreenId(id: ScreenId): string | null {
+  return SCREEN_ROUTE_BY_ID[id].path ?? null;
+}
+
+export function canOpenScreenRoute(
+  meta: Pick<ScreenRouteMeta, "requiredPermissions" | "requiredPermissionMode">,
+  permissions?: readonly string[]
+): boolean {
+  if (!permissions) return true;
+  if (!meta.requiredPermissions?.length) return true;
+  if (meta.requiredPermissionMode === "all") {
+    return meta.requiredPermissions.every((permission) => permissions.includes(permission));
+  }
+  return meta.requiredPermissions.some((permission) => permissions.includes(permission));
+}
+
+export function canOpenRuntimePath(path: string, permissions?: readonly string[]): boolean {
+  const screenId = screenIdForPath(path);
+  if (!screenId) return true;
+  return canOpenScreenRoute(SCREEN_ROUTE_BY_ID[screenId], permissions);
+}
+
+export function railSectionsForPermissions(permissions?: readonly string[]) {
+  return RAIL_SECTIONS.filter((section) => canOpenRuntimePath(section.href, permissions));
 }

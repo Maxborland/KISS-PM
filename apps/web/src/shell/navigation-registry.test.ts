@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { SCREEN_ROUTE_BY_ID } from "@/shell/navigation-registry";
+import {
+  contextNavForSection,
+  pathForScreenId,
+  RAIL_SECTIONS,
+  railSectionsForPermissions,
+  screenIdForPath,
+  SCREEN_ROUTE_BY_ID
+} from "@/shell/navigation-registry";
 
 describe("navigation-registry", () => {
   it("highlights CRM for deals, not inbox", () => {
@@ -28,5 +35,74 @@ describe("navigation-registry", () => {
     const dashboard = SCREEN_ROUTE_BY_ID["01-dashboard"];
     expect(dashboard.topbarMode).toBe("team");
     expect(dashboard.pageIntroActions).toBe("create-export");
+  });
+
+  it("resolves runtime paths to accepted screen ids", () => {
+    expect(screenIdForPath("/dashboard")).toBe("01-dashboard");
+    expect(screenIdForPath("/my-work")).toBe("02-my-work");
+    expect(screenIdForPath("/deals")).toBe("05-deals");
+    expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
+    expect(screenIdForPath("/settings")).toBe("10-settings");
+    expect(screenIdForPath("/login")).toBe("19-login");
+  });
+
+  it("keeps ScreenId to runtime path lookup available for Storybook metadata", () => {
+    expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
+    expect(pathForScreenId("05-deals")).toBe("/deals");
+    expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
+  });
+
+  it("provides real hrefs for primary rail entries", () => {
+    expect(RAIL_SECTIONS.map((section) => section.href)).toEqual([
+      "/dashboard",
+      "/my-work",
+      "/deals",
+      "/projects",
+      "/directories/clients",
+      "/projects/demo/kpi",
+      "/settings"
+    ]);
+  });
+
+  it("filters protected rail entries for restricted runtime users", () => {
+    expect(railSectionsForPermissions(["tenant.projects.read"]).map((section) => section.href)).toEqual([
+      "/dashboard",
+      "/my-work",
+      "/projects"
+    ]);
+
+    expect(
+      railSectionsForPermissions([
+        "tenant.opportunities.read",
+        "tenant.deal_stages.read",
+        "tenant.clients.read",
+        "tenant.workspace_config.read"
+      ]).map((section) => section.href)
+    ).toEqual(["/dashboard", "/my-work", "/deals", "/directories/clients", "/settings"]);
+  });
+
+  it("requires both opportunities and deal stages for the deals route", () => {
+    expect(railSectionsForPermissions(["tenant.opportunities.read"]).map((section) => section.href)).not.toContain(
+      "/deals"
+    );
+    expect(
+      railSectionsForPermissions(["tenant.opportunities.read", "tenant.deal_stages.read"]).map(
+        (section) => section.href
+      )
+    ).toContain("/deals");
+  });
+
+  it("filters protected context links for restricted runtime users", () => {
+    expect(
+      contextNavForSection("projects", "Все проекты", ["tenant.projects.read"]).flatMap((group) =>
+        group.items.map((item) => item.href)
+      ).filter(Boolean)
+    ).toEqual(["/projects"]);
+
+    expect(
+      contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(
+        (group) => group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/settings", null]);
   });
 });

@@ -1,5 +1,6 @@
 export type SidebarItem = {
   label: string;
+  href?: string;
   active?: boolean;
   nested?: boolean;
   badge?: string;
