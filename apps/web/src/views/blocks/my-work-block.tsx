@@ -352,6 +352,7 @@ function MyWorkBlockInner({
       <TaskDetailDrawer
         open={openCard != null}
         onOpenChange={(o) => !o && setOpenCardId(null)}
+        {...(runtime ? { taskHref: null } : {})}
         task={
           openCard
             ? {

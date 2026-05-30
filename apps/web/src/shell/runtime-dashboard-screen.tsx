@@ -9,6 +9,7 @@ import { KpiTile } from "@/components/domain/kpi-tile";
 import { NumericValue } from "@/components/domain/numeric-value";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { ScheduledTask } from "@/lib/api-types";
 import type { DashboardReadModel } from "@/lib/api/read-models";
 import { formatDate, formatDateRange } from "@/lib/mock-data/format";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -17,8 +18,9 @@ export function RuntimeDashboardScreen({ data }: { data: DashboardReadModel }) {
   const activeProjects = data.projects.filter((project) => project.status === "active");
   const unfinishedTasks = data.tasks.filter((task) => task.statusCategory !== "done");
   const overdueTasks = unfinishedTasks.filter((task) => isPastDate(task.plannedFinish));
+  const today = getDashboardTodayIsoDate();
   const todayWorkHours = Math.round(
-    data.scheduledTasks.reduce((sum, task) => sum + task.workMinutes, 0) / 60
+    data.scheduledTasks.reduce((sum, task) => sum + getScheduledTaskDailyWorkMinutes(task, today), 0) / 60
   );
   const taskRows = unfinishedTasks.slice(0, 5);
 
@@ -131,5 +133,35 @@ export function RuntimeDashboardScreen({ data }: { data: DashboardReadModel }) {
 }
 
 function isPastDate(value: string): boolean {
-  return value.slice(0, 10) < new Date().toISOString().slice(0, 10);
+  return value.slice(0, 10) < getDashboardTodayIsoDate();
+}
+
+function getDashboardTodayIsoDate(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+export function getScheduledTaskDailyWorkMinutes(
+  task: Pick<ScheduledTask, "plannedStart" | "plannedFinish" | "workMinutes">,
+  targetDate: string = getDashboardTodayIsoDate()
+): number {
+  const start = task.plannedStart.slice(0, 10);
+  const finish = task.plannedFinish.slice(0, 10);
+
+  if (targetDate < start || targetDate > finish) return 0;
+
+  const days = inclusiveCalendarDays(start, finish);
+  if (days <= 1) return task.workMinutes;
+
+  return Math.round(task.workMinutes / days);
+}
+
+function inclusiveCalendarDays(start: string, finish: string): number {
+  const startMs = Date.parse(`${start}T00:00:00.000Z`);
+  const finishMs = Date.parse(`${finish}T00:00:00.000Z`);
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(finishMs) || finishMs <= startMs) {
+    return 1;
+  }
+
+  return Math.floor((finishMs - startMs) / 86_400_000) + 1;
 }

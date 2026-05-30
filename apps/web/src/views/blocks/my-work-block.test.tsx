@@ -35,6 +35,20 @@ describe("RuntimeMyWorkBlock", () => {
     expect(host?.textContent).not.toContain("Runtime task before refresh");
   });
 
+  it("does not expose the Storybook task page link in runtime drawers", async () => {
+    await renderRuntimeMyWork([makeTask({ id: "task-runtime", title: "Runtime task drawer" })]);
+
+    const row = host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-runtime"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row?.click();
+    });
+
+    expect(host?.querySelector('a[href*="screens-задачи--task-card"]')).toBeNull();
+    expect(host?.querySelector('a[aria-label="Открыть карточку задачи как страницу"]')).toBeNull();
+  });
+
   async function renderRuntimeMyWork(tasks: Task[]) {
     if (!host) {
       host = document.createElement("div");
