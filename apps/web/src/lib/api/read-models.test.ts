@@ -12,7 +12,8 @@ import {
   fetchWorkspaceOpportunities,
   fetchWorkspaceProjects,
   useDashboardReadModelQueries,
-  useDealsBoardReadModelQueries
+  useDealsBoardReadModelQueries,
+  useMyWorkReadModelQueries
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -25,7 +26,8 @@ describe("runtime read model API", () => {
 
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
-    expect(queryKeys.workspace.myWork).toEqual(["workspace", "my-work"]);
+    expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
+    expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
     expect(queryKeys.tenant.currentScheduledTasks("usr-1", "2026-05-30", "2026-05-30")).toEqual([
@@ -183,6 +185,73 @@ describe("runtime read model API", () => {
       );
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/deal-stages");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keys my-work task data by current user", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/my-work") {
+        return json({ tasks: [{ id: `task-${fetchMock.mock.calls.length}` }] });
+      }
+      if (
+        path ===
+          "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30" ||
+        path ===
+          "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-2&fromDate=2026-05-30&toDate=2026-05-30"
+      ) {
+        return json({ tasks: [] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    function MyWorkProbe({ userId }: { userId: string }) {
+      useMyWorkReadModelQueries({
+        assigneeUserId: userId,
+        fromDate: "2026-05-30",
+        toDate: "2026-05-30"
+      });
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(MyWorkProbe, { userId: "usr-1" })
+          )
+        );
+      });
+
+      await vi.waitFor(() =>
+        expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/workspace/my-work")
+      );
+
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(MyWorkProbe, { userId: "usr-2" })
+          )
+        );
+      });
+
+      await vi.waitFor(() =>
+        expect(fetchMock.mock.calls.filter((call) => call[0] === "/api/workspace/my-work")).toHaveLength(2)
+      );
     } finally {
       act(() => root.unmount());
       queryClient.clear();

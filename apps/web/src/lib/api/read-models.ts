@@ -129,7 +129,7 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
   const queries = useQueries({
     queries: [
       {
-        queryKey: queryKeys.workspace.myWork,
+        queryKey: queryKeys.workspace.myWork(scheduledInput.assigneeUserId),
         queryFn: fetchWorkspaceMyWorkTasks
       },
       {
@@ -164,7 +164,7 @@ export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
         queryFn: fetchWorkspaceProjects
       },
       {
-        queryKey: queryKeys.workspace.myWork,
+        queryKey: queryKeys.workspace.myWork(scheduledInput.assigneeUserId),
         queryFn: fetchWorkspaceMyWorkTasks
       },
       {
