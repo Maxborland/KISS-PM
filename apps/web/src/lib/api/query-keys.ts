@@ -10,8 +10,6 @@ export const queryKeys = {
     customFields: ["workspace", "config", "custom-fields"] as const,
     projects: ["workspace", "projects"] as const,
     opportunities: ["workspace", "opportunities"] as const,
-    dealStages: ["workspace", "deal-stages"] as const,
-    clients: ["workspace", "clients"] as const,
-    projectTypes: ["workspace", "project-types"] as const
+    dealStages: ["workspace", "deal-stages"] as const
   }
 } as const;

@@ -3,7 +3,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
-import type { Client, DealStage, Opportunity, Project, ProjectType } from "@/lib/api-types";
+import type { DealStage, Opportunity, Project } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
 type ListResponse<Key extends string, Item> = Record<Key, Item[]>;
@@ -15,8 +15,6 @@ export type ProjectsListReadModel = {
 export type DealsBoardReadModel = {
   opportunities: Opportunity[];
   dealStages: DealStage[];
-  clients: Client[];
-  projectTypes: ProjectType[];
 };
 
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
@@ -41,21 +39,6 @@ export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
   return response.dealStages;
 }
 
-export async function fetchWorkspaceClients(): Promise<Client[]> {
-  const response = await apiFetch<ListResponse<"clients", Client>>("/api/workspace/clients", {
-    method: "GET"
-  });
-  return response.clients;
-}
-
-export async function fetchWorkspaceProjectTypes(): Promise<ProjectType[]> {
-  const response = await apiFetch<ListResponse<"projectTypes", ProjectType>>(
-    "/api/workspace/project-types",
-    { method: "GET" }
-  );
-  return response.projectTypes;
-}
-
 export function useProjectsListReadModelQuery() {
   return useQuery({
     queryKey: queryKeys.workspace.projects,
@@ -74,26 +57,16 @@ export function useDealsBoardReadModelQueries() {
       {
         queryKey: queryKeys.workspace.dealStages,
         queryFn: fetchWorkspaceDealStages
-      },
-      {
-        queryKey: queryKeys.workspace.clients,
-        queryFn: fetchWorkspaceClients
-      },
-      {
-        queryKey: queryKeys.workspace.projectTypes,
-        queryFn: fetchWorkspaceProjectTypes
       }
     ]
   });
 
-  const [opportunitiesQuery, dealStagesQuery, clientsQuery, projectTypesQuery] = queries;
+  const [opportunitiesQuery, dealStagesQuery] = queries;
   const data =
-    opportunitiesQuery.data && dealStagesQuery.data && clientsQuery.data && projectTypesQuery.data
+    opportunitiesQuery.data && dealStagesQuery.data
       ? {
           opportunities: opportunitiesQuery.data,
-          dealStages: dealStagesQuery.data,
-          clients: clientsQuery.data,
-          projectTypes: projectTypesQuery.data
+          dealStages: dealStagesQuery.data
         }
       : undefined;
 
