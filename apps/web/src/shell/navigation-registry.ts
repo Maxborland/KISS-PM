@@ -39,6 +39,7 @@ export type ScreenRouteMeta = {
   pageIntroActions?: "create-export" | "none";
   path?: string;
   requiredPermissions?: readonly string[];
+  requiredPermissionMode?: "any" | "all";
 };
 
 export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
@@ -220,7 +221,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     contextActiveItem: "Сделки",
     pageIntroActions: "create-export",
     path: "/deals",
-    requiredPermissions: ["tenant.opportunities.read"]
+    requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+    requiredPermissionMode: "all"
   }),
   "06-deal-card": route({
     id: "06-deal-card",
@@ -231,7 +233,8 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     railSection: "crm",
     contextActiveItem: "Сделки",
     path: "/deals/demo/DEAL-101",
-    requiredPermissions: ["tenant.opportunities.read"]
+    requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+    requiredPermissionMode: "all"
   }),
   "07-projects-list": route({
     id: "07-projects-list",
@@ -479,11 +482,14 @@ export function pathForScreenId(id: ScreenId): string | null {
 }
 
 export function canOpenScreenRoute(
-  meta: Pick<ScreenRouteMeta, "requiredPermissions">,
+  meta: Pick<ScreenRouteMeta, "requiredPermissions" | "requiredPermissionMode">,
   permissions?: readonly string[]
 ): boolean {
   if (!permissions) return true;
   if (!meta.requiredPermissions?.length) return true;
+  if (meta.requiredPermissionMode === "all") {
+    return meta.requiredPermissions.every((permission) => permissions.includes(permission));
+  }
   return meta.requiredPermissions.some((permission) => permissions.includes(permission));
 }
 

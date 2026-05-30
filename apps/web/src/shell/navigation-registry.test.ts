@@ -74,10 +74,22 @@ describe("navigation-registry", () => {
     expect(
       railSectionsForPermissions([
         "tenant.opportunities.read",
+        "tenant.deal_stages.read",
         "tenant.clients.read",
         "tenant.workspace_config.read"
       ]).map((section) => section.href)
     ).toEqual(["/dashboard", "/my-work", "/deals", "/directories/clients", "/settings"]);
+  });
+
+  it("requires both opportunities and deal stages for the deals route", () => {
+    expect(railSectionsForPermissions(["tenant.opportunities.read"]).map((section) => section.href)).not.toContain(
+      "/deals"
+    );
+    expect(
+      railSectionsForPermissions(["tenant.opportunities.read", "tenant.deal_stages.read"]).map(
+        (section) => section.href
+      )
+    ).toContain("/deals");
   });
 
   it("filters protected context links for restricted runtime users", () => {
