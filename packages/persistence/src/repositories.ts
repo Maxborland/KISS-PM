@@ -19,6 +19,10 @@ import {
   userSessions
 } from "./schema";
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
+import {
+  createOperationsCockpitReadRepository,
+  type OperationsCockpitReadRepository
+} from "./operationsCockpitReadRepository";
 import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
 import {
   createPlanningSavedViewsRepository,
@@ -125,6 +129,7 @@ export type UserSessionRecord = {
 };
 export type PostgresTenantDataSource = CrmRepository &
   ProjectIntakeRepository &
+  OperationsCockpitReadRepository &
   PlanningRepository &
   PlanningSavedViewsRepository &
   ProjectWorkRepository &
@@ -188,6 +193,7 @@ export function createPostgresTenantDataSource(
     ...createCrmRepository(db),
     ...createControlRepository(db),
     ...createProjectIntakeRepository(db),
+    ...createOperationsCockpitReadRepository(db),
     ...createPlanningRepository(db),
     ...createPlanningSavedViewsRepository(db),
     ...createProjectWorkRepository(db),

@@ -33,6 +33,7 @@ import { registerCapacityRoutes } from "./capacity/registerCapacityRoutes";
 import { registerPlanningRoutes } from "./planningRoutes";
 import { registerAbsencesRoutes } from "./absencesRoutes";
 import { registerOrgStructureRoutes } from "./orgStructureRoutes";
+import { registerOperationsCockpitRoutes } from "./operationsCockpitRoutes";
 import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
@@ -226,6 +227,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerProductionCalendarRoutes(app, routeDeps);
   registerAbsencesRoutes(app, routeDeps);
   registerOrgStructureRoutes(app, routeDeps);
+  registerOperationsCockpitRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceAgentRoutes(app, routeDeps);
