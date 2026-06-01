@@ -2072,6 +2072,60 @@ a:hover { color: var(--accent-hover); }
   margin-top: 1px;
 }
 
+.runtime-agent-proposal__result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--success-soft);
+  color: var(--success-text);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
+.runtime-agent-proposal__result[data-status="pending"] {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.runtime-agent-proposal__result[data-status="rejected"] {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.runtime-agent-proposal__result svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.runtime-agent-proposal__result div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.runtime-agent-proposal__result strong {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.runtime-agent-proposal__result span,
+.runtime-agent-proposal__result code {
+  overflow-wrap: anywhere;
+}
+
+.runtime-agent-proposal__result code {
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+}
+
 .runtime-agent-proposal__actions {
   display: flex;
   flex-wrap: wrap;

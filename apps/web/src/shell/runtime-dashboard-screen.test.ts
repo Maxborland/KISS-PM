@@ -177,8 +177,20 @@ describe("RuntimeDashboardScreen", () => {
                         messageId: "message-runtime",
                         payload: {
                           task: {
+                            id: "task-agent-result",
                             title: "Проверить исходные данные"
                           }
+                        },
+                        resultSummary: {
+                          status: "succeeded",
+                          mutationApplied: true,
+                          changedEntity: {
+                            type: "Task",
+                            id: "task-agent-result",
+                            title: "Проверить исходные данные"
+                          },
+                          auditEventId: "audit-agent-action-1",
+                          description: "Создана задача «Проверить исходные данные»."
                         },
                         resolvedAt: "2026-06-01T00:02:00.000Z",
                         status: "applied",
@@ -194,6 +206,7 @@ describe("RuntimeDashboardScreen", () => {
       });
 
       expect(host.textContent).toContain("Создана задача: Проверить исходные данные");
+      expect(host.textContent).toContain("Task:task-agent-result · Проверить исходные данные");
       expect(host.textContent).toContain("Записано в аудит: audit-agent-action-1");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
       expect(host.textContent).toContain("применено");
