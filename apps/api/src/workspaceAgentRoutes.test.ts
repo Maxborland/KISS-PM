@@ -92,8 +92,15 @@ describe("workspace agent routes", () => {
     expect(post.status).toBe(201);
     await expect(post.json()).resolves.toMatchObject({
       context: { focus: { type: "project", id: "project-alpha", title: "Проект Альфа" } },
-      message: { body: "Что горит по проекту?" },
-      messages: [{ body: "Что горит по проекту?" }],
+      message: { authorType: "user", body: "Что горит по проекту?" },
+      agentMessage: {
+        authorType: "agent",
+        body: expect.stringContaining("Подготовил действие")
+      },
+      messages: [
+        { authorType: "user", body: "Что горит по проекту?" },
+        { authorType: "agent", body: expect.stringContaining("Подготовил действие") }
+      ],
       proposals: [
         {
           actionType: "workspace.agent.review_request",
@@ -106,7 +113,10 @@ describe("workspace agent routes", () => {
     const get = await app.request("/api/workspace/agent-thread?projectId=project-alpha", requestOptions());
     expect(get.status).toBe(200);
     await expect(get.json()).resolves.toMatchObject({
-      messages: [{ body: "Что горит по проекту?" }]
+      messages: [
+        { authorType: "user", body: "Что горит по проекту?" },
+        { authorType: "agent", body: expect.stringContaining("Подготовил действие") }
+      ]
     });
   });
 
@@ -578,7 +588,8 @@ describe("workspace agent routes", () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({
       context: {},
-      message: { body: "Покажи внимание на сегодня", context: {} }
+      message: { authorType: "user", body: "Покажи внимание на сегодня", context: {} },
+      agentMessage: { authorType: "agent", context: {} }
     });
   });
 
@@ -910,6 +921,7 @@ function message(id: string, context: WorkspaceAgentThreadContext, body: string)
     id,
     tenantId: "tenant-alpha",
     authorUserId: actor.id,
+    authorType: "user",
     body,
     context,
     createdAt: new Date("2026-06-01T00:00:00.000Z")

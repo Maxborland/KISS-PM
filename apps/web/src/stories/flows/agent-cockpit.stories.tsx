@@ -28,13 +28,15 @@ export const ReviewAndAudit: Story = {
             messages: [
               {
                 authorUserId: "usr-1",
+                authorType: "user",
                 body: "Что требует внимания сегодня?",
                 context: {},
                 createdAt: "2026-06-01T09:00:00.000Z",
                 id: "message-1"
               },
               {
-                authorUserId: "agent-henry",
+                authorUserId: "usr-1",
+                authorType: "agent",
                 body: "Нашел риск по срокам и подготовил действие для ревью.",
                 context: {},
                 createdAt: "2026-06-01T09:01:00.000Z",

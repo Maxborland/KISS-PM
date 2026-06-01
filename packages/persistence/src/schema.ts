@@ -1708,6 +1708,7 @@ export const workspaceAgentMessages = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     authorUserId: text("author_user_id").notNull(),
+    authorType: text("author_type").notNull().default("user"),
     focusType: text("focus_type"),
     focusId: text("focus_id"),
     body: text("body").notNull(),
@@ -1730,6 +1731,10 @@ export const workspaceAgentMessages = pgTable(
       table.focusId,
       table.createdAt,
       table.id
+    ),
+    check(
+      "workspace_agent_messages_author_type_chk",
+      sql`${table.authorType} in ('user', 'agent')`
     ),
     check(
       "workspace_agent_messages_focus_type_chk",
@@ -2510,6 +2515,7 @@ const tableColumns = {
     "id",
     "tenant_id",
     "author_user_id",
+    "author_type",
     "focus_type",
     "focus_id",
     "body",

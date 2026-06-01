@@ -166,4 +166,49 @@ describe("AgentCockpitBlock", () => {
       host.remove();
     }
   });
+
+  it("renders persisted agent replies as Henry even when the triggering user id is stored for audit", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(AgentCockpitBlock, {
+            currentUserId: "user-alpha",
+            thread: {
+              context: {},
+              messages: [
+                {
+                  id: "message-user",
+                  authorUserId: "user-alpha",
+                  authorType: "user",
+                  body: "Что требует внимания?",
+                  context: {},
+                  createdAt: "2026-06-01T00:00:00.000Z"
+                },
+                {
+                  id: "message-agent",
+                  authorUserId: "user-alpha",
+                  authorType: "agent",
+                  body: "Подготовил действие. Без подтверждения ничего не изменю.",
+                  context: {},
+                  createdAt: "2026-06-01T00:01:00.000Z"
+                }
+              ],
+              proposals: []
+            }
+          })
+        );
+      });
+
+      expect(host.textContent).toContain("Вы");
+      expect(host.textContent).toContain("Генри Гантт");
+      expect(host.textContent).toContain("Подготовил действие. Без подтверждения ничего не изменю.");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });

@@ -91,7 +91,8 @@ export function AgentCockpitBlock({
             />
           ) : (
             thread.messages.slice(-8).map((message) => {
-              const isOwnMessage = currentUserId ? message.authorUserId === currentUserId : true;
+              const isOwnMessage =
+                message.authorType !== "agent" && (currentUserId ? message.authorUserId === currentUserId : true);
               return (
                 <article
                   key={message.id}

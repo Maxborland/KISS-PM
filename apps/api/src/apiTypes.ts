@@ -87,6 +87,7 @@ export type WorkspaceAgentMessageRecord = {
   id: string;
   tenantId: TenantId;
   authorUserId: UserId;
+  authorType: "user" | "agent";
   body: string;
   context: WorkspaceAgentThreadContext;
   createdAt: Date;

@@ -136,6 +136,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       id: `workspace-agent-message-${randomUUID()}`,
       tenantId: actor.tenantId,
       authorUserId: actor.id,
+      authorType: "user",
       body: parsedMessage.body,
       context: resolvedContext.context,
       createdAt: new Date()
@@ -146,6 +147,15 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
             buildWorkspaceAgentProposal(actor, message, resolvedContext.context, operationsContext)
           )
         : undefined;
+    const agentMessage = await deps.dataSource.createWorkspaceAgentMessage({
+      id: `workspace-agent-message-${randomUUID()}`,
+      tenantId: actor.tenantId,
+      authorUserId: actor.id,
+      authorType: "agent",
+      body: buildWorkspaceAgentReply(proposal, operationsContext),
+      context: resolvedContext.context,
+      createdAt: new Date(message.createdAt.getTime() + 1)
+    });
 
     const messages = await deps.dataSource.listWorkspaceAgentMessages({
       tenantId: actor.tenantId,
@@ -164,6 +174,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       {
         context: resolvedContext.context,
         message: serializeWorkspaceAgentMessage(message),
+        agentMessage: serializeWorkspaceAgentMessage(agentMessage),
         proposal: proposal ? serializeWorkspaceAgentProposal(proposal) : undefined,
         messages: messages.map(serializeWorkspaceAgentMessage),
         proposals: proposals.map(serializeWorkspaceAgentProposal)
@@ -416,6 +427,7 @@ function serializeWorkspaceAgentMessage(message: WorkspaceAgentMessageRecord) {
   return {
     id: message.id,
     authorUserId: message.authorUserId,
+    authorType: message.authorType,
     body: message.body,
     context: message.context,
     createdAt: message.createdAt.toISOString()
@@ -436,6 +448,20 @@ function serializeWorkspaceAgentProposal(proposal: WorkspaceAgentActionProposalR
     createdAt: proposal.createdAt.toISOString(),
     resolvedAt: proposal.resolvedAt?.toISOString() ?? null
   };
+}
+
+function buildWorkspaceAgentReply(
+  proposal: WorkspaceAgentActionProposalRecord | undefined,
+  operationsContext: WorkspaceAgentOperationsContext
+): string {
+  const contextLine =
+    operationsContext.status === "available"
+      ? `Вижу ${operationsContext.indicators.overdueTasks} просроченных задач, ${operationsContext.indicators.criticalTasks} критичных задач и ${operationsContext.indicators.openDeals} открытых сделок.`
+      : "Операционный контекст сейчас недоступен, поэтому отвечаю без сводки cockpit.";
+  const actionLine = proposal
+    ? `Подготовил действие «${proposal.title}». Проверьте сверку справа: без подтверждения я ничего не изменю.`
+    : "Не смог подготовить действие, но сообщение сохранено в истории.";
+  return `${contextLine} ${actionLine}`;
 }
 
 function buildWorkspaceAgentProposal(

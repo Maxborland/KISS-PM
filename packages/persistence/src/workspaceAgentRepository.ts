@@ -21,6 +21,7 @@ export type WorkspaceAgentMessageRecord = {
   id: string;
   tenantId: TenantId;
   authorUserId: UserId;
+  authorType: "user" | "agent";
   body: string;
   context: WorkspaceAgentThreadContext;
   createdAt: Date;
@@ -102,6 +103,7 @@ export function createWorkspaceAgentRepository(db: KissPmDatabase): WorkspaceAge
           id: input.id,
           tenantId: input.tenantId,
           authorUserId: input.authorUserId,
+          authorType: input.authorType,
           focusType: input.context.focus?.type ?? null,
           focusId: input.context.focus?.id ?? null,
           body: input.body,
@@ -182,6 +184,7 @@ function mapWorkspaceAgentMessage(
     id: row.id,
     tenantId: row.tenantId,
     authorUserId: row.authorUserId,
+    authorType: row.authorType as "user" | "agent",
     body: row.body,
     context: normalizeContext(row.context),
     createdAt: row.createdAt
