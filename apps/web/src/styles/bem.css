@@ -2022,6 +2022,11 @@ a:hover { color: var(--accent-hover); }
   color: var(--success-text);
 }
 
+.runtime-agent-proposal__head span[data-status="applying"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .runtime-agent-proposal__head span[data-status="rejected"] {
   background: var(--danger-soft);
   color: var(--danger-text);
@@ -2040,6 +2045,24 @@ a:hover { color: var(--accent-hover); }
   color: var(--success-text);
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
+}
+
+.runtime-agent-proposal__effect {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--success-soft);
+  color: var(--success-text);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.runtime-agent-proposal__effect svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .runtime-agent-proposal__actions {

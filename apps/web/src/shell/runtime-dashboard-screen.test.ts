@@ -144,4 +144,62 @@ describe("RuntimeDashboardScreen", () => {
       host.remove();
     }
   });
+
+  it("shows the concrete task changed by an applied agent proposal", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            ScreenRouteProvider,
+            {
+              meta: getScreenRoute("01-dashboard"),
+              children: createElement(RuntimeDashboardScreen, {
+                currentUserId: "usr-1",
+                data: {
+                  projects: [],
+                  scheduledTasks: [],
+                  tasks: [],
+                  workspaceAgentThread: {
+                    context: {},
+                    messages: [],
+                    proposals: [
+                      {
+                        actionType: "workspace.agent.create_task",
+                        auditEventId: "audit-agent-action-1",
+                        context: {},
+                        createdAt: "2026-06-01T00:01:00.000Z",
+                        description: "Генри подготовил задачу: Проверить исходные данные.",
+                        id: "proposal-task",
+                        messageId: "message-runtime",
+                        payload: {
+                          task: {
+                            title: "Проверить исходные данные"
+                          }
+                        },
+                        resolvedAt: "2026-06-01T00:02:00.000Z",
+                        status: "applied",
+                        title: "Создать задачу"
+                      }
+                    ]
+                  }
+                } as never
+              })
+            }
+          )
+        );
+      });
+
+      expect(host.textContent).toContain("Создана задача: Проверить исходные данные");
+      expect(host.textContent).toContain("Аудит: audit-agent-action-1");
+      expect(host.textContent).toContain("применено");
+      expect(host.textContent).not.toContain("Применить");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });

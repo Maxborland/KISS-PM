@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import type { ApiTenantDataSource, WorkspaceUserRecord } from "./apiTypes";
+import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import type { ControlSignal, KpiDefinition, PlanSnapshot, PlanningCommand } from "@kiss-pm/domain";
 import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { hashPassword } from "@kiss-pm/persistence";
@@ -55,6 +56,52 @@ describe("KISS PM API Phase 1 shell", () => {
         tenantId: "tenant-alpha",
         name: "Анна Администратор"
       }
+    });
+  });
+
+  it("provides transaction semantics for the in-memory data source", async () => {
+    const dataSource = createInMemoryTenantDataSource();
+    const createdAt = new Date("2026-06-01T00:00:00.000Z");
+
+    await dataSource.withTransaction?.(async (transactionDataSource) => {
+      await transactionDataSource.createWorkspaceAgentProposal?.({
+        id: "proposal-in-memory-commit",
+        tenantId: "tenant-alpha",
+        actorUserId: "user-alpha-admin",
+        messageId: "message-in-memory",
+        actionType: "workspace.agent.review_request",
+        title: "Проверить демо-транзакцию",
+        description: "Commit",
+        payload: {},
+        status: "proposed",
+        auditEventId: null,
+        context: {},
+        createdAt,
+        resolvedAt: null
+      });
+      return undefined;
+    });
+    await expect(dataSource.findWorkspaceAgentProposal?.("tenant-alpha", "proposal-in-memory-commit")).resolves.toMatchObject({
+      status: "proposed"
+    });
+
+    await expect(
+      dataSource.withTransaction?.(async (transactionDataSource) => {
+        await transactionDataSource.updateWorkspaceAgentProposalStatus?.({
+          tenantId: "tenant-alpha",
+          proposalId: "proposal-in-memory-commit",
+          status: "rejected",
+          auditEventId: null,
+          resolvedAt: createdAt,
+          expectedStatus: "proposed"
+        });
+        throw new Error("rollback");
+      })
+    ).rejects.toThrow("rollback");
+    await expect(dataSource.findWorkspaceAgentProposal?.("tenant-alpha", "proposal-in-memory-commit")).resolves.toMatchObject({
+      status: "proposed",
+      auditEventId: null,
+      resolvedAt: null
     });
   });
 

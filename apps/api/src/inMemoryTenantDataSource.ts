@@ -22,7 +22,22 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
   const workspaceAgentMessages: WorkspaceAgentMessageRecord[] = [];
   const workspaceAgentProposals: WorkspaceAgentActionProposalRecord[] = [];
 
-  return {
+  const dataSource: ApiTenantDataSource = {
+    async withTransaction(operation) {
+      const accessProfileSnapshot = accessProfiles.map((profile) => ({ ...profile }));
+      const auditEventSnapshot = auditEvents.map((event) => ({ ...event }));
+      const messageSnapshot = workspaceAgentMessages.map((message) => ({ ...message }));
+      const proposalSnapshot = workspaceAgentProposals.map((proposal) => ({ ...proposal }));
+      try {
+        return await operation(dataSource);
+      } catch (error) {
+        accessProfiles.splice(0, accessProfiles.length, ...accessProfileSnapshot);
+        auditEvents.splice(0, auditEvents.length, ...auditEventSnapshot);
+        workspaceAgentMessages.splice(0, workspaceAgentMessages.length, ...messageSnapshot);
+        workspaceAgentProposals.splice(0, workspaceAgentProposals.length, ...proposalSnapshot);
+        throw error;
+      }
+    },
     async listDevUsers() {
       return demo.users;
     },
@@ -93,6 +108,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
       if (index < 0) return undefined;
       const current = workspaceAgentProposals[index];
       if (!current) return undefined;
+      if (input.expectedStatus && current.status !== input.expectedStatus) return undefined;
       const updated = {
         ...current,
         status: input.status,
@@ -103,6 +119,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
       return updated;
     }
   };
+  return dataSource;
 }
 
 function workspaceAgentContextKey(context: WorkspaceAgentThreadContext): string {

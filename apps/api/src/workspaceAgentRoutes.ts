@@ -1,9 +1,17 @@
-import { canReadOpportunities, canReadProjects, type AccessProfile } from "@kiss-pm/access-control";
+import {
+  canCreateTasks,
+  canManageProjects,
+  canReadOpportunities,
+  canReadProjects,
+  type AccessProfile
+} from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
+import type { TaskRecord, TaskStatusCategory, TaskStatusRecord } from "@kiss-pm/persistence";
 import { randomUUID } from "node:crypto";
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
+  ProjectRecord,
   WorkspaceAgentActionProposalRecord,
   WorkspaceAgentContextFocus,
   WorkspaceAgentFocusType,
@@ -12,12 +20,16 @@ import type {
 } from "./apiTypes";
 import { isId } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
+import { buildCreateTaskPlanningCommand } from "./planningTaskCompatibility";
 import type { ApiApp } from "./routeTypes";
 
 type WorkspaceAgentRouteDeps = {
   dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
+  runDataSourceTransaction<T>(
+    operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
+  ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
     auditDataSource?: ApiTenantDataSource
@@ -163,38 +175,13 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       return context.json({ error: resolvedContext.error }, resolvedContext.status);
     }
 
-    const actionType =
-      decision.decision === "apply"
-        ? "workspace.agent_action.applied"
-        : "workspace.agent_action.rejected";
-    const auditEventId = await deps.appendManagementAuditEvent({
-      tenantId: actor.tenantId,
-      actorUserId: actor.id,
-      actionType,
-      sourceWorkflow: "workspace_agent_action",
-      sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
-      commandInput: {
-        proposalId: proposal.id,
-        decision: decision.decision,
-        actionType: proposal.actionType,
-        payload: proposal.payload
-      },
-      beforeState: { status: proposal.status },
-      afterState: { status: decision.decision === "apply" ? "applied" : "rejected" },
-      permissionResult: { allowed: true },
-      executionResult: {
-        status: decision.decision === "apply" ? "succeeded" : "rejected",
-        mutationApplied: false
-      }
-    });
-
-    const updatedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus({
-      tenantId: actor.tenantId,
-      proposalId: proposal.id,
-      status: decision.decision === "apply" ? "applied" : "rejected",
-      auditEventId,
-      resolvedAt: new Date()
-    });
+    const resolvedProposal =
+      decision.decision === "apply" && proposal.actionType === "workspace.agent.create_task"
+        ? await applyCreateTaskProposal(deps, actor, proposal)
+        : await resolveNonMutatingProposal(deps, actor, proposal, decision.decision);
+    if (!resolvedProposal.ok) {
+      return context.json({ error: resolvedProposal.error }, resolvedProposal.status);
+    }
 
     const messages = await deps.dataSource.listWorkspaceAgentMessages({
       tenantId: actor.tenantId,
@@ -211,10 +198,10 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
 
     return context.json({
       context: resolvedContext.context,
-      proposal: updatedProposal ? serializeWorkspaceAgentProposal(updatedProposal) : undefined,
+      proposal: serializeWorkspaceAgentProposal(resolvedProposal.proposal),
       messages: messages.map(serializeWorkspaceAgentMessage),
       proposals: proposals.map(serializeWorkspaceAgentProposal),
-      auditEventId
+      auditEventId: resolvedProposal.auditEventId
     });
   });
 }
@@ -430,6 +417,25 @@ function buildWorkspaceAgentProposal(
   message: WorkspaceAgentMessageRecord,
   context: WorkspaceAgentThreadContext
 ): WorkspaceAgentActionProposalRecord {
+  const taskProposal = buildCreateTaskProposalPayload(actor, message, context);
+  if (taskProposal) {
+    return {
+      id: `workspace-agent-proposal-${randomUUID()}`,
+      tenantId: actor.tenantId,
+      actorUserId: actor.id,
+      messageId: message.id,
+      actionType: "workspace.agent.create_task",
+      title: "Создать задачу",
+      description: `Генри подготовил задачу: ${taskProposal.title}. Изменение будет применено только после подтверждения.`,
+      context,
+      payload: { task: taskProposal },
+      status: "proposed",
+      auditEventId: null,
+      createdAt: new Date(),
+      resolvedAt: null
+    };
+  }
+
   return {
     id: `workspace-agent-proposal-${randomUUID()}`,
     tenantId: actor.tenantId,
@@ -447,6 +453,378 @@ function buildWorkspaceAgentProposal(
     auditEventId: null,
     createdAt: new Date(),
     resolvedAt: null
+  };
+}
+
+function buildCreateTaskProposalPayload(
+  actor: TenantUser,
+  message: WorkspaceAgentMessageRecord,
+  context: WorkspaceAgentThreadContext
+): {
+  title: string;
+  description: string;
+  plannedStart: string;
+  plannedFinish: string;
+  durationWorkingDays: number;
+  plannedWork: number;
+  priority: "normal";
+  requiresAcceptance: false;
+  participants: Array<{ userId: string; role: "executor" | "requester" }>;
+} | null {
+  const title = extractCreateTaskTitle(message.body);
+  if (!title) return null;
+
+  const plannedDate = message.createdAt.toISOString().slice(0, 10);
+  const focus = context.focus?.title ? ` Контекст: ${context.focus.title}.` : "";
+  return {
+    title,
+    description: `Создано из сообщения агенту: ${message.body.trim()}.${focus}`,
+    plannedStart: plannedDate,
+    plannedFinish: plannedDate,
+    durationWorkingDays: 1,
+    plannedWork: 1,
+    priority: "normal",
+    requiresAcceptance: false,
+    participants: [
+      { userId: actor.id, role: "executor" },
+      { userId: actor.id, role: "requester" }
+    ]
+  };
+}
+
+function extractCreateTaskTitle(body: string): string | null {
+  const trimmed = body.trim();
+  const normalized = trimmed.toLocaleLowerCase("ru-RU");
+  const isCreateTaskRequest =
+    normalized.startsWith("создай задачу") ||
+    normalized.startsWith("создать задачу") ||
+    normalized.startsWith("добавь задачу");
+  if (!isCreateTaskRequest) return null;
+
+  const candidate = (trimmed.split(":").slice(1).join(":").trim() || trimmed)
+    .replace(/^(создай|создать|добавь)\s+задачу\s*/i, "")
+    .trim();
+  const title = candidate.length > 0 ? candidate : "Поручение от Генри";
+  if (title.length < 3) return null;
+  return title.slice(0, 160);
+}
+
+async function resolveNonMutatingProposal(
+  deps: WorkspaceAgentRouteDeps,
+  actor: TenantUser,
+  proposal: WorkspaceAgentActionProposalRecord,
+  decision: "apply" | "reject"
+): Promise<
+  | { ok: true; auditEventId: string; proposal: WorkspaceAgentActionProposalRecord }
+  | { ok: false; status: 409 | 501; error: string }
+> {
+  const resolvedAt = new Date();
+  const finalStatus = decision === "apply" ? "applied" : "rejected";
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    const claimedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus?.({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: finalStatus,
+      auditEventId: null,
+      resolvedAt,
+      expectedStatus: "proposed"
+    });
+    if (!claimedProposal) {
+      return { ok: false as const, status: 409 as const, error: "agent_proposal_already_resolved" };
+    }
+
+    const auditEventId = await deps.appendManagementAuditEvent(
+      {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: finalStatus === "applied" ? "workspace.agent_action.applied" : "workspace.agent_action.rejected",
+        sourceWorkflow: "workspace_agent_action",
+        sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
+        commandInput: {
+          proposalId: proposal.id,
+          decision,
+          actionType: proposal.actionType,
+          payload: proposal.payload
+        },
+        beforeState: { status: proposal.status },
+        afterState: { status: finalStatus },
+        permissionResult: { allowed: true },
+        executionResult: {
+          status: finalStatus === "applied" ? "succeeded" : "rejected",
+          mutationApplied: false
+        }
+      },
+      transactionDataSource
+    );
+
+    const updatedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus?.({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: finalStatus,
+      auditEventId,
+      resolvedAt,
+      expectedStatus: finalStatus
+    });
+    return updatedProposal
+      ? { ok: true as const, auditEventId, proposal: updatedProposal }
+      : { ok: false as const, status: 501 as const, error: "persistence_not_configured" };
+  });
+}
+
+async function applyCreateTaskProposal(
+  deps: WorkspaceAgentRouteDeps,
+  actor: TenantUser,
+  proposal: WorkspaceAgentActionProposalRecord
+): Promise<
+  | { ok: true; auditEventId: string; proposal: WorkspaceAgentActionProposalRecord }
+  | { ok: false; status: 400 | 403 | 409 | 501; error: string }
+> {
+  if (!hasCreateTaskDataSource(deps.dataSource)) {
+    return { ok: false, status: 501, error: "persistence_not_configured" };
+  }
+
+  const taskPayload = parseCreateTaskProposalPayload(proposal.payload);
+  if (!taskPayload) return { ok: false, status: 400, error: "invalid_agent_proposal_payload" };
+
+  const profile = await deps.getActorProfile(actor);
+  const decision = canCreateTasks({ actor, profile, targetTenantId: actor.tenantId });
+  const legacyManageDecision = canManageProjects({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!decision.allowed && !legacyManageDecision.allowed) {
+    return { ok: false, status: 403, error: decision.reason };
+  }
+
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    if (!hasCreateTaskDataSource(transactionDataSource)) {
+      return { ok: false as const, status: 501 as const, error: "persistence_not_configured" };
+    }
+
+    await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+    const users = await transactionDataSource.listWorkspaceUsers(actor.tenantId);
+    const activeUserIds = new Set(users.filter((user) => user.status !== "inactive").map((user) => user.id));
+    if (taskPayload.participants.some((participant) => !activeUserIds.has(participant.userId))) {
+      return { ok: false as const, status: 400 as const, error: "invalid_task_participant" };
+    }
+    const requesterUserId = taskPayload.participants.find((participant) => participant.role === "requester")?.userId;
+    const ownerUserId = taskPayload.participants.find((participant) => participant.role === "executor")?.userId;
+    if (!requesterUserId || !ownerUserId) {
+      return { ok: false as const, status: 400 as const, error: "invalid_agent_proposal_payload" };
+    }
+
+    const statuses = await transactionDataSource.listTaskStatuses(actor.tenantId);
+    const taskStatus = getRequiredStatusByCategory(statuses, "new");
+    if (!taskStatus) return { ok: false as const, status: 400 as const, error: "task_status_not_found" };
+
+    const claimedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: "applying",
+      auditEventId: null,
+      resolvedAt: null,
+      expectedStatus: "proposed"
+    });
+    if (!claimedProposal) {
+      return { ok: false as const, status: 409 as const, error: "agent_proposal_already_resolved" };
+    }
+
+    const taskId = `task-${randomUUID()}`;
+    const taskBody = {
+      id: taskId,
+      title: taskPayload.title,
+      description: taskPayload.description,
+      priority: taskPayload.priority,
+      statusId: taskStatus.id,
+      plannedStart: new Date(`${taskPayload.plannedStart}T00:00:00.000Z`),
+      plannedFinish: new Date(`${taskPayload.plannedFinish}T00:00:00.000Z`),
+      durationWorkingDays: taskPayload.durationWorkingDays,
+      plannedWork: taskPayload.plannedWork,
+      requiresAcceptance: taskPayload.requiresAcceptance,
+      participants: taskPayload.participants
+    };
+    const inboxProject = await transactionDataSource.ensureWorkspaceInboxProject({
+      tenantId: actor.tenantId,
+      plannedStart: taskBody.plannedStart,
+      plannedFinish: taskBody.plannedFinish
+    });
+    const planningCommand = buildCreateTaskPlanningCommand({
+      taskId,
+      projectId: inboxProject.id,
+      statusId: taskStatus.id,
+      body: taskBody,
+      participants: taskBody.participants
+    });
+    await transactionDataSource.applyPlanningCommand({
+      tenantId: actor.tenantId,
+      projectId: inboxProject.id,
+      actorUserId: actor.id,
+      command: planningCommand
+    });
+    const metadataTask = await transactionDataSource.updateTaskMetadata({
+      tenantId: actor.tenantId,
+      taskId,
+      description: taskBody.description,
+      priority: taskBody.priority,
+      requesterUserId,
+      ownerUserId,
+      requiresAcceptance: taskBody.requiresAcceptance,
+      participants: taskBody.participants
+    });
+    if (!metadataTask) throw new Error("task_create_metadata_failed");
+
+    const createdTask = (await transactionDataSource.findTaskById(actor.tenantId, taskId)) ?? metadataTask;
+    const planVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, inboxProject.id);
+    await createTaskSystemActivity(transactionDataSource, {
+      tenantId: actor.tenantId,
+      taskId: createdTask.id,
+      actorUserId: actor.id,
+      title: "Задача создана агентом",
+      body: `Генри создал задачу после подтверждения. Статус: ${taskStatus.name}.`
+    });
+
+    const auditEventId = await deps.appendManagementAuditEvent(
+      {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "workspace.agent_action.applied",
+        sourceWorkflow: "workspace_agent_action",
+        sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
+        commandInput: {
+          proposalId: proposal.id,
+          actionType: proposal.actionType,
+          payload: proposal.payload
+        },
+        beforeState: { status: proposal.status },
+        afterState: summarizeCreatedTask(createdTask, inboxProject, planVersion),
+        permissionResult: {
+          allowed: true,
+          reason: decision.allowed ? decision.reason : legacyManageDecision.reason,
+          permission: decision.allowed ? "tenant.tasks.create" : "tenant.projects.manage"
+        },
+        executionResult: {
+          status: "succeeded",
+          mutationApplied: true,
+          createdEntity: { type: "Task", id: createdTask.id }
+        }
+      },
+      transactionDataSource
+    );
+
+    const updatedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: "applied",
+      auditEventId,
+      resolvedAt: new Date(),
+      expectedStatus: "applying"
+    });
+    if (!updatedProposal) throw new Error("agent_proposal_finalize_failed");
+    return { ok: true as const, auditEventId, proposal: updatedProposal };
+  });
+}
+
+function hasCreateTaskDataSource(dataSource: ApiTenantDataSource): dataSource is ApiTenantDataSource & {
+  ensureWorkspaceInboxProject(input: { tenantId: string; plannedStart: Date; plannedFinish: Date }): Promise<ProjectRecord>;
+  listWorkspaceUsers(tenantId: string): Promise<Array<{ id: string; status: string }>>;
+  listTaskStatuses(tenantId: string): Promise<TaskStatusRecord[]>;
+  applyPlanningCommand: NonNullable<ApiTenantDataSource["applyPlanningCommand"]>;
+  updateTaskMetadata: NonNullable<ApiTenantDataSource["updateTaskMetadata"]>;
+  findTaskById(tenantId: string, taskId: string): Promise<TaskRecord | undefined>;
+  incrementPlanVersion(tenantId: string, projectId: string): Promise<number>;
+  createTaskActivity: NonNullable<ApiTenantDataSource["createTaskActivity"]>;
+  updateWorkspaceAgentProposalStatus: NonNullable<ApiTenantDataSource["updateWorkspaceAgentProposalStatus"]>;
+} {
+  return Boolean(
+    dataSource.ensureWorkspaceInboxProject &&
+      dataSource.listWorkspaceUsers &&
+      dataSource.listTaskStatuses &&
+      dataSource.applyPlanningCommand &&
+      dataSource.updateTaskMetadata &&
+      dataSource.findTaskById &&
+      dataSource.incrementPlanVersion &&
+      dataSource.createTaskActivity &&
+      dataSource.updateWorkspaceAgentProposalStatus
+  );
+}
+
+function parseCreateTaskProposalPayload(value: Record<string, unknown>): ReturnType<typeof buildCreateTaskProposalPayload> {
+  const task = value.task;
+  if (!isRecord(task)) return null;
+  if (typeof task.title !== "string" || task.title.length < 3) return null;
+  if (typeof task.description !== "string") return null;
+  if (typeof task.plannedStart !== "string" || typeof task.plannedFinish !== "string") return null;
+  if (typeof task.durationWorkingDays !== "number" || typeof task.plannedWork !== "number") return null;
+  if (task.priority !== "normal" || task.requiresAcceptance !== false) return null;
+  if (!Array.isArray(task.participants)) return null;
+  const participants = task.participants.filter(
+    (participant): participant is { userId: string; role: "executor" | "requester" } =>
+      isRecord(participant) &&
+      typeof participant.userId === "string" &&
+      (participant.role === "executor" || participant.role === "requester")
+  );
+  if (participants.length !== task.participants.length) return null;
+  return {
+    title: task.title,
+    description: task.description,
+    plannedStart: task.plannedStart,
+    plannedFinish: task.plannedFinish,
+    durationWorkingDays: task.durationWorkingDays,
+    plannedWork: task.plannedWork,
+    priority: task.priority,
+    requiresAcceptance: task.requiresAcceptance,
+    participants
+  };
+}
+
+function getRequiredStatusByCategory(
+  statuses: TaskStatusRecord[],
+  category: TaskStatusCategory
+): TaskStatusRecord | undefined {
+  return statuses.find((status) => status.category === category && status.status === "active");
+}
+
+async function createTaskSystemActivity(
+  dataSource: ApiTenantDataSource,
+  input: {
+    tenantId: string;
+    taskId: string;
+    actorUserId: string;
+    title: string;
+    body: string;
+  }
+) {
+  if (!dataSource.createTaskActivity) throw new Error("persistence_not_configured");
+  await dataSource.createTaskActivity({
+    id: `task-activity-${randomUUID()}`,
+    tenantId: input.tenantId,
+    taskId: input.taskId,
+    type: "system",
+    body: input.body,
+    title: input.title,
+    fileUrl: null,
+    fileSizeBytes: null,
+    mimeType: null,
+    authorUserId: input.actorUserId
+  });
+}
+
+function summarizeCreatedTask(task: TaskRecord, project: ProjectRecord, planVersion: number): Record<string, unknown> {
+  return {
+    task: {
+      id: task.id,
+      projectId: task.projectId,
+      title: task.title,
+      statusId: task.statusId,
+      ownerUserId: task.ownerUserId
+    },
+    project: {
+      id: project.id,
+      title: project.title,
+      sourceType: project.sourceType
+    },
+    planVersion
   };
 }
 

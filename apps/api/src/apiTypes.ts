@@ -639,7 +639,8 @@ export type ApiTenantDataSource = {
     proposalId: string;
     status: WorkspaceAgentActionProposalRecord["status"];
     auditEventId: string | null;
-    resolvedAt: Date;
+    resolvedAt: Date | null;
+    expectedStatus?: WorkspaceAgentActionProposalRecord["status"];
   }): Promise<WorkspaceAgentActionProposalRecord | undefined>;
 };
 

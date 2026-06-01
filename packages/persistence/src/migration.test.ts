@@ -147,6 +147,13 @@ const phase78AutoSolverAllocationsMigration = readFileSync(
   ),
   "utf8"
 );
+const workspaceAgentApplyingStatusMigration = readFileSync(
+  new URL(
+    "../migrations/0043_workspace_agent_applying_status.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -253,6 +260,17 @@ describe("Phase 2.3 SQL migration", () => {
     );
     expect(phase23AccessProfileScopedIdsMigration).toContain(
       'ADD CONSTRAINT "access_profiles_pkey" PRIMARY KEY ("tenant_id","id")'
+    );
+  });
+});
+
+describe("Workspace agent action proposal SQL migrations", () => {
+  it("allows the applying claim status used before confirmed mutations", () => {
+    expect(workspaceAgentApplyingStatusMigration).toContain(
+      'DROP CONSTRAINT IF EXISTS "workspace_agent_proposals_status_chk"'
+    );
+    expect(workspaceAgentApplyingStatusMigration).toContain(
+      "CHECK (\"status\" IN ('proposed', 'applying', 'applied', 'rejected'))"
     );
   });
 });

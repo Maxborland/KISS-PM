@@ -26,7 +26,7 @@ export type WorkspaceAgentMessageRecord = {
   createdAt: Date;
 };
 
-export type WorkspaceAgentProposalStatus = "proposed" | "applied" | "rejected";
+export type WorkspaceAgentProposalStatus = "proposed" | "applying" | "applied" | "rejected";
 
 export type WorkspaceAgentActionProposalRecord = {
   id: string;
@@ -68,7 +68,8 @@ export type WorkspaceAgentRepository = {
     proposalId: string;
     status: WorkspaceAgentProposalStatus;
     auditEventId: string | null;
-    resolvedAt: Date;
+    resolvedAt: Date | null;
+    expectedStatus?: WorkspaceAgentProposalStatus;
   }): Promise<WorkspaceAgentActionProposalRecord | undefined>;
 };
 
@@ -151,6 +152,14 @@ export function createWorkspaceAgentRepository(db: KissPmDatabase): WorkspaceAge
       return row ? mapWorkspaceAgentProposal(row) : undefined;
     },
     async updateWorkspaceAgentProposalStatus(input) {
+      const filters = [
+        eq(workspaceAgentProposals.tenantId, input.tenantId),
+        eq(workspaceAgentProposals.id, input.proposalId)
+      ];
+      if (input.expectedStatus) {
+        filters.push(eq(workspaceAgentProposals.status, input.expectedStatus));
+      }
+
       const [row] = await db
         .update(workspaceAgentProposals)
         .set({
@@ -158,7 +167,7 @@ export function createWorkspaceAgentRepository(db: KissPmDatabase): WorkspaceAge
           auditEventId: input.auditEventId,
           resolvedAt: input.resolvedAt
         })
-        .where(and(eq(workspaceAgentProposals.tenantId, input.tenantId), eq(workspaceAgentProposals.id, input.proposalId)))
+        .where(and(...filters))
         .returning();
 
       return row ? mapWorkspaceAgentProposal(row) : undefined;
