@@ -603,6 +603,11 @@ async function applyCreateTaskProposal(
     if (taskPayload.participants.some((participant) => !activeUserIds.has(participant.userId))) {
       return { ok: false as const, status: 400 as const, error: "invalid_task_participant" };
     }
+    const requesterUserId = taskPayload.participants.find((participant) => participant.role === "requester")?.userId;
+    const ownerUserId = taskPayload.participants.find((participant) => participant.role === "executor")?.userId;
+    if (!requesterUserId || !ownerUserId) {
+      return { ok: false as const, status: 400 as const, error: "invalid_agent_proposal_payload" };
+    }
 
     const statuses = await transactionDataSource.listTaskStatuses(actor.tenantId);
     const taskStatus = getRequiredStatusByCategory(statuses, "new");
@@ -657,8 +662,8 @@ async function applyCreateTaskProposal(
       taskId,
       description: taskBody.description,
       priority: taskBody.priority,
-      requesterUserId: actor.id,
-      ownerUserId: actor.id,
+      requesterUserId,
+      ownerUserId,
       requiresAcceptance: taskBody.requiresAcceptance,
       participants: taskBody.participants
     });

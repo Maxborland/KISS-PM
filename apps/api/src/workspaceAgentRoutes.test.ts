@@ -22,6 +22,11 @@ const actor = {
   accessProfileId: "profile-alpha"
 } as TenantUser;
 
+const confirmingActor = {
+  ...actor,
+  id: "user-confirmer"
+} as TenantUser;
+
 const readerProfile = {
   id: "profile-alpha",
   permissions: ["tenant.projects.read", "tenant.opportunities.read"]
@@ -243,6 +248,49 @@ describe("workspace agent routes", () => {
           status: "succeeded",
           createdEntity: expect.objectContaining({ type: "Task" })
         })
+      })
+    ]);
+  });
+
+  it("keeps task requester and owner aligned with proposal participants when another user confirms", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const authorApp = createRouteApp(fixture);
+    const confirmerApp = createRouteApp(fixture, { actor: confirmingActor });
+
+    const post = await authorApp.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Подготовить материалы к планерке")
+    });
+    expect(post.status).toBe(201);
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const confirmed = await confirmerApp.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(200);
+    expect(fixture.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Подготовить материалы к планерке",
+          requesterUserId: actor.id,
+          ownerUserId: actor.id,
+          participants: [
+            { userId: actor.id, role: "executor" },
+            { userId: actor.id, role: "requester" }
+          ]
+        })
+      ])
+    );
+    expect(fixture.audits).toEqual([
+      expect.objectContaining({
+        actorUserId: confirmingActor.id,
+        executionResult: expect.objectContaining({ mutationApplied: true })
       })
     ]);
   });
