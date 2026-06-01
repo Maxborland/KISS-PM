@@ -1,12 +1,18 @@
 import {
   canCreateTasks,
   canManageProjects,
+  canReadProjectResources,
   canReadOpportunities,
   canReadProjects,
   type AccessProfile
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { TaskRecord, TaskStatusCategory, TaskStatusRecord } from "@kiss-pm/persistence";
+import type {
+  OperationsCockpitReadModel,
+  TaskRecord,
+  TaskStatusCategory,
+  TaskStatusRecord
+} from "@kiss-pm/persistence";
 import { randomUUID } from "node:crypto";
 import type {
   ApiTenantDataSource,
@@ -43,6 +49,25 @@ type ContextParseResult =
 type MessageBodyParseResult =
   | { ok: true; body: string; context: WorkspaceAgentThreadContext; rawFocus?: WorkspaceAgentContextFocus }
   | { ok: false; status: 400 | 413 | 415; error: string };
+
+type WorkspaceAgentOperationsContext =
+  | {
+      status: "available";
+      generatedAt: string;
+      indicators: OperationsCockpitReadModel["indicators"];
+      attentionItems: Array<{
+        id: string;
+        severity: string;
+        title: string;
+        entity: OperationsCockpitReadModel["attentionItems"][number]["entity"];
+        dueDate: string | null;
+      }>;
+      unavailableSources: OperationsCockpitReadModel["agentContext"]["unavailableSources"];
+    }
+  | {
+      status: "unavailable";
+      reason: "persistence_not_configured" | "permission_missing";
+    };
 
 const maxAgentMessageLength = 4000;
 
@@ -105,6 +130,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
     if (!resolvedContext.ok) {
       return context.json({ error: resolvedContext.error }, resolvedContext.status);
     }
+    const operationsContext = await readWorkspaceAgentOperationsContext(deps, actor);
 
     const message = await deps.dataSource.createWorkspaceAgentMessage({
       id: `workspace-agent-message-${randomUUID()}`,
@@ -117,7 +143,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
     const proposal =
       deps.dataSource.createWorkspaceAgentProposal
         ? await deps.dataSource.createWorkspaceAgentProposal(
-            buildWorkspaceAgentProposal(actor, message, resolvedContext.context)
+            buildWorkspaceAgentProposal(actor, message, resolvedContext.context, operationsContext)
           )
         : undefined;
 
@@ -415,9 +441,10 @@ function serializeWorkspaceAgentProposal(proposal: WorkspaceAgentActionProposalR
 function buildWorkspaceAgentProposal(
   actor: TenantUser,
   message: WorkspaceAgentMessageRecord,
-  context: WorkspaceAgentThreadContext
+  context: WorkspaceAgentThreadContext,
+  operationsContext: WorkspaceAgentOperationsContext
 ): WorkspaceAgentActionProposalRecord {
-  const taskProposal = buildCreateTaskProposalPayload(actor, message, context);
+  const taskProposal = buildCreateTaskProposalPayload(actor, message, context, operationsContext);
   if (taskProposal) {
     return {
       id: `workspace-agent-proposal-${randomUUID()}`,
@@ -426,9 +453,9 @@ function buildWorkspaceAgentProposal(
       messageId: message.id,
       actionType: "workspace.agent.create_task",
       title: "Создать задачу",
-      description: `Генри подготовил задачу: ${taskProposal.title}. Изменение будет применено только после подтверждения.`,
+      description: `Генри подготовил задачу: ${taskProposal.title}. ${describeOperationsContext(operationsContext)} Изменение будет применено только после подтверждения.`,
       context,
-      payload: { task: taskProposal },
+      payload: { task: taskProposal, agentContext: { operationsCockpit: operationsContext } },
       status: "proposed",
       auditEventId: null,
       createdAt: new Date(),
@@ -443,11 +470,12 @@ function buildWorkspaceAgentProposal(
     messageId: message.id,
     actionType: "workspace.agent.review_request",
     title: "Зафиксировать управленческое поручение",
-    description: "Генри подготовил безопасное действие: записать поручение без изменения проектов, задач или сделок.",
+    description: `Генри подготовил безопасное действие: записать поручение без изменения проектов, задач или сделок. ${describeOperationsContext(operationsContext)}`,
     context,
     payload: {
       messageBody: message.body,
-      context
+      context,
+      agentContext: { operationsCockpit: operationsContext }
     },
     status: "proposed",
     auditEventId: null,
@@ -459,7 +487,8 @@ function buildWorkspaceAgentProposal(
 function buildCreateTaskProposalPayload(
   actor: TenantUser,
   message: WorkspaceAgentMessageRecord,
-  context: WorkspaceAgentThreadContext
+  context: WorkspaceAgentThreadContext,
+  operationsContext: WorkspaceAgentOperationsContext
 ): {
   title: string;
   description: string;
@@ -476,9 +505,13 @@ function buildCreateTaskProposalPayload(
 
   const plannedDate = message.createdAt.toISOString().slice(0, 10);
   const focus = context.focus?.title ? ` Контекст: ${context.focus.title}.` : "";
+  const operationsSummary =
+    operationsContext.status === "available"
+      ? ` Операционный контекст: ${operationsContext.indicators.overdueTasks} просроченных задач, ${operationsContext.indicators.criticalTasks} критичных задач.`
+      : " Операционный контекст недоступен.";
   return {
     title,
-    description: `Создано из сообщения агенту: ${message.body.trim()}.${focus}`,
+    description: `Создано из сообщения агенту: ${message.body.trim()}.${focus}${operationsSummary}`,
     plannedStart: plannedDate,
     plannedFinish: plannedDate,
     durationWorkingDays: 1,
@@ -490,6 +523,64 @@ function buildCreateTaskProposalPayload(
       { userId: actor.id, role: "requester" }
     ]
   };
+}
+
+async function readWorkspaceAgentOperationsContext(
+  deps: WorkspaceAgentRouteDeps,
+  actor: TenantUser
+): Promise<WorkspaceAgentOperationsContext> {
+  if (!deps.dataSource.getOperationsCockpitReadModel) {
+    return { status: "unavailable", reason: "persistence_not_configured" };
+  }
+
+  const profile = await deps.getActorProfile(actor);
+  const projectDecision = canReadProjects({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  if (!projectDecision.allowed) {
+    return { status: "unavailable", reason: "permission_missing" };
+  }
+
+  const opportunityDecision = canReadOpportunities({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  const resourceDecision = canReadProjectResources({
+    actor,
+    profile,
+    targetTenantId: actor.tenantId
+  });
+  const cockpit = await deps.dataSource.getOperationsCockpitReadModel({
+    tenantId: actor.tenantId,
+    now: new Date(),
+    includePipelinePressure: opportunityDecision.allowed,
+    includeWorkloadHints: resourceDecision.allowed
+  });
+
+  return {
+    status: "available",
+    generatedAt: cockpit.generatedAt,
+    indicators: cockpit.indicators,
+    attentionItems: cockpit.attentionItems.slice(0, 5).map((item) => ({
+      id: item.id,
+      severity: item.severity,
+      title: item.title,
+      entity: item.entity,
+      dueDate: item.dueDate
+    })),
+    unavailableSources: cockpit.agentContext.unavailableSources
+  };
+}
+
+function describeOperationsContext(context: WorkspaceAgentOperationsContext): string {
+  if (context.status === "unavailable") {
+    return "Операционный контекст сейчас недоступен.";
+  }
+  const indicators = context.indicators;
+  return `Учтён cockpit: ${indicators.activeProjects} активных проектов, ${indicators.overdueTasks} просроченных задач, ${indicators.criticalTasks} критичных задач, ${indicators.openDeals} открытых сделок.`;
 }
 
 function extractCreateTaskTitle(body: string): string | null {
