@@ -516,12 +516,26 @@ async function resolveNonMutatingProposal(
   decision: "apply" | "reject"
 ): Promise<
   | { ok: true; auditEventId: string; proposal: WorkspaceAgentActionProposalRecord }
-  | { ok: false; status: 501; error: string }
+  | { ok: false; status: 409 | 501; error: string }
 > {
+  const resolvedAt = new Date();
+  const finalStatus = decision === "apply" ? "applied" : "rejected";
+  const claimedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus?.({
+    tenantId: actor.tenantId,
+    proposalId: proposal.id,
+    status: finalStatus,
+    auditEventId: null,
+    resolvedAt,
+    expectedStatus: "proposed"
+  });
+  if (!claimedProposal) {
+    return { ok: false, status: 409, error: "agent_proposal_already_resolved" };
+  }
+
   const auditEventId = await deps.appendManagementAuditEvent({
     tenantId: actor.tenantId,
     actorUserId: actor.id,
-    actionType: decision === "apply" ? "workspace.agent_action.applied" : "workspace.agent_action.rejected",
+    actionType: finalStatus === "applied" ? "workspace.agent_action.applied" : "workspace.agent_action.rejected",
     sourceWorkflow: "workspace_agent_action",
     sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
     commandInput: {
@@ -531,10 +545,10 @@ async function resolveNonMutatingProposal(
       payload: proposal.payload
     },
     beforeState: { status: proposal.status },
-    afterState: { status: decision === "apply" ? "applied" : "rejected" },
+    afterState: { status: finalStatus },
     permissionResult: { allowed: true },
     executionResult: {
-      status: decision === "apply" ? "succeeded" : "rejected",
+      status: finalStatus === "applied" ? "succeeded" : "rejected",
       mutationApplied: false
     }
   });
@@ -542,9 +556,10 @@ async function resolveNonMutatingProposal(
   const updatedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus?.({
     tenantId: actor.tenantId,
     proposalId: proposal.id,
-    status: decision === "apply" ? "applied" : "rejected",
+    status: finalStatus,
     auditEventId,
-    resolvedAt: new Date()
+    resolvedAt,
+    expectedStatus: finalStatus
   });
   return updatedProposal
     ? { ok: true, auditEventId, proposal: updatedProposal }

@@ -137,6 +137,31 @@ describe("workspace agent routes", () => {
     ]);
   });
 
+  it("does not let a late reject overwrite an already claimed proposal", async () => {
+    const fixture = createFixture({ forceNonMutatingResolutionConflict: true });
+    const app = createRouteApp(fixture);
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Отклони, если уже не применено")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const rejected = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "reject" })
+    });
+
+    expect(rejected.status).toBe(409);
+    await expect(rejected.json()).resolves.toEqual({ error: "agent_proposal_already_resolved" });
+    expect(fixture.audits).toEqual([]);
+    expect(fixture.proposalStatusUpdates).toEqual([{ expectedStatus: "proposed", status: "rejected" }]);
+  });
+
+
   it("creates a real task only after confirming a create-task agent proposal", async () => {
     const fixture = createFixture({ profile: taskCreatorProfile });
     const app = createRouteApp(fixture);
@@ -437,7 +462,13 @@ function createRouteApp(
   return app;
 }
 
-function createFixture(options: { profile?: AccessProfile; forceProposalClaimConflict?: boolean } = {}) {
+function createFixture(
+  options: {
+    profile?: AccessProfile;
+    forceNonMutatingResolutionConflict?: boolean;
+    forceProposalClaimConflict?: boolean;
+  } = {}
+) {
   const messages: WorkspaceAgentMessageRecord[] = [];
   const proposals: WorkspaceAgentActionProposalRecord[] = [];
   const audits: ManagementAuditEventInput[] = [];
@@ -605,6 +636,13 @@ function createFixture(options: { profile?: AccessProfile; forceProposalClaimCon
         planningCommandCountAtProposalClaim = planningCommandCount;
         proposalStatusUpdates.push({ expectedStatus: input.expectedStatus, status: input.status });
         if (options.forceProposalClaimConflict) return undefined;
+      } else if (
+        input.expectedStatus === "proposed" &&
+        (input.status === "applied" || input.status === "rejected") &&
+        options.forceNonMutatingResolutionConflict
+      ) {
+        proposalStatusUpdates.push({ expectedStatus: input.expectedStatus, status: input.status });
+        return undefined;
       } else {
         proposalStatusUpdates.push({ expectedStatus: input.expectedStatus, status: input.status });
       }
