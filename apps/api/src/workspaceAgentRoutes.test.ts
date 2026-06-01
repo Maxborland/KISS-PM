@@ -166,6 +166,32 @@ describe("workspace agent routes", () => {
     expect(fixture.proposalStatusUpdates).toEqual([{ expectedStatus: "proposed", status: "rejected" }]);
   });
 
+  it("keeps non-mutating proposal unresolved when audit persistence fails", async () => {
+    const fixture = createFixture();
+    const app = createRouteApp(fixture, { failAuditWrites: true });
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Зафиксируй поручение без записи аудита")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const rejected = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "reject" })
+    });
+
+    expect(rejected.status).toBe(500);
+    expect(fixture.audits).toEqual([]);
+    expect(fixture.proposals.find((proposal) => proposal.id === body.proposal.id)).toMatchObject({
+      status: "proposed",
+      auditEventId: null,
+      resolvedAt: null
+    });
+  });
 
   it("creates a real task only after confirming a create-task agent proposal", async () => {
     const fixture = createFixture({ profile: taskCreatorProfile });
@@ -494,15 +520,24 @@ describe("workspace agent routes", () => {
 
 function createRouteApp(
   fixture: ReturnType<typeof createFixture>,
-  options: { actor?: TenantUser | null } = {}
+  options: { actor?: TenantUser | null; failAuditWrites?: boolean } = {}
 ) {
   const app = new Hono();
   registerWorkspaceAgentRoutes(app, {
     dataSource: fixture.dataSource,
     getActorProfile: async () => fixture.profile,
     getSessionActorFromHeaders: async () => (options.actor === null ? undefined : options.actor ?? actor),
-    runDataSourceTransaction: async (operation) => operation(fixture.dataSource),
+    runDataSourceTransaction: async (operation) => {
+      const proposalSnapshot = fixture.proposals.map((proposal) => ({ ...proposal }));
+      try {
+        return await operation(fixture.dataSource);
+      } catch (error) {
+        fixture.proposals.splice(0, fixture.proposals.length, ...proposalSnapshot);
+        throw error;
+      }
+    },
     appendManagementAuditEvent: async (event) => {
+      if (options.failAuditWrites) throw new Error("audit_write_failed");
       fixture.audits.push(event);
       return `audit-agent-action-${fixture.audits.length}`;
     }
@@ -709,6 +744,7 @@ function createFixture(
     audits,
     dataSource,
     messages,
+    proposals,
     get planningCommandCountAtProposalClaim() {
       return planningCommandCountAtProposalClaim;
     },

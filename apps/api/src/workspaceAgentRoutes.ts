@@ -520,50 +520,55 @@ async function resolveNonMutatingProposal(
 > {
   const resolvedAt = new Date();
   const finalStatus = decision === "apply" ? "applied" : "rejected";
-  const claimedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus?.({
-    tenantId: actor.tenantId,
-    proposalId: proposal.id,
-    status: finalStatus,
-    auditEventId: null,
-    resolvedAt,
-    expectedStatus: "proposed"
-  });
-  if (!claimedProposal) {
-    return { ok: false, status: 409, error: "agent_proposal_already_resolved" };
-  }
-
-  const auditEventId = await deps.appendManagementAuditEvent({
-    tenantId: actor.tenantId,
-    actorUserId: actor.id,
-    actionType: finalStatus === "applied" ? "workspace.agent_action.applied" : "workspace.agent_action.rejected",
-    sourceWorkflow: "workspace_agent_action",
-    sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
-    commandInput: {
+  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+    const claimedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus?.({
+      tenantId: actor.tenantId,
       proposalId: proposal.id,
-      decision,
-      actionType: proposal.actionType,
-      payload: proposal.payload
-    },
-    beforeState: { status: proposal.status },
-    afterState: { status: finalStatus },
-    permissionResult: { allowed: true },
-    executionResult: {
-      status: finalStatus === "applied" ? "succeeded" : "rejected",
-      mutationApplied: false
+      status: finalStatus,
+      auditEventId: null,
+      resolvedAt,
+      expectedStatus: "proposed"
+    });
+    if (!claimedProposal) {
+      return { ok: false as const, status: 409 as const, error: "agent_proposal_already_resolved" };
     }
-  });
 
-  const updatedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus?.({
-    tenantId: actor.tenantId,
-    proposalId: proposal.id,
-    status: finalStatus,
-    auditEventId,
-    resolvedAt,
-    expectedStatus: finalStatus
+    const auditEventId = await deps.appendManagementAuditEvent(
+      {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: finalStatus === "applied" ? "workspace.agent_action.applied" : "workspace.agent_action.rejected",
+        sourceWorkflow: "workspace_agent_action",
+        sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
+        commandInput: {
+          proposalId: proposal.id,
+          decision,
+          actionType: proposal.actionType,
+          payload: proposal.payload
+        },
+        beforeState: { status: proposal.status },
+        afterState: { status: finalStatus },
+        permissionResult: { allowed: true },
+        executionResult: {
+          status: finalStatus === "applied" ? "succeeded" : "rejected",
+          mutationApplied: false
+        }
+      },
+      transactionDataSource
+    );
+
+    const updatedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus?.({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: finalStatus,
+      auditEventId,
+      resolvedAt,
+      expectedStatus: finalStatus
+    });
+    return updatedProposal
+      ? { ok: true as const, auditEventId, proposal: updatedProposal }
+      : { ok: false as const, status: 501 as const, error: "persistence_not_configured" };
   });
-  return updatedProposal
-    ? { ok: true, auditEventId, proposal: updatedProposal }
-    : { ok: false, status: 501, error: "persistence_not_configured" };
 }
 
 async function applyCreateTaskProposal(
