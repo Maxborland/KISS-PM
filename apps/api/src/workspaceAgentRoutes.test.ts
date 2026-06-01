@@ -279,7 +279,9 @@ describe("workspace agent routes", () => {
       headers: { ...requestOptions().headers, "content-type": "application/json" },
       body: JSON.stringify("Отклони, если уже не применено")
     });
-    const body = (await post.json()) as { proposal: { id: string } };
+    const body = (await post.json()) as {
+      proposal: { id: string; payload: { task: { id: string } } };
+    };
 
     const rejected = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
       ...requestOptions(),
@@ -332,13 +334,16 @@ describe("workspace agent routes", () => {
       body: JSON.stringify("Создай задачу: Проверить исходные данные по БЦ Север")
     });
     expect(post.status).toBe(201);
-    const body = (await post.json()) as { proposal: { id: string } };
+    const body = (await post.json()) as {
+      proposal: { id: string; payload: { task: { id: string } } };
+    };
     await expect(Promise.resolve(body)).resolves.toMatchObject({
       proposal: {
         actionType: "workspace.agent.create_task",
         status: "proposed",
         payload: {
           task: {
+            id: expect.stringMatching(/^task-/),
             title: "Проверить исходные данные по БЦ Север",
             participants: [
               { userId: actor.id, role: "executor" },
@@ -349,6 +354,7 @@ describe("workspace agent routes", () => {
       }
     });
     expect(fixture.tasks).toHaveLength(1);
+    const reservedTaskId = body.proposal.payload.task.id;
 
     const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
       ...requestOptions(),
@@ -362,13 +368,24 @@ describe("workspace agent routes", () => {
       proposal: {
         id: body.proposal.id,
         status: "applied",
-        auditEventId: "audit-agent-action-1"
+        auditEventId: "audit-agent-action-1",
+        resultSummary: {
+          status: "succeeded",
+          mutationApplied: true,
+          changedEntity: {
+            type: "Task",
+            id: reservedTaskId,
+            title: "Проверить исходные данные по БЦ Север"
+          },
+          auditEventId: "audit-agent-action-1"
+        }
       },
       auditEventId: "audit-agent-action-1"
     });
     expect(fixture.tasks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          id: reservedTaskId,
           title: "Проверить исходные данные по БЦ Север",
           projectId: "project-workspace-inbox",
           requesterUserId: actor.id,
@@ -882,6 +899,7 @@ function createFixture(
         ...current,
         status: input.status,
         auditEventId: input.auditEventId,
+        payload: input.payload ?? current.payload,
         resolvedAt: input.resolvedAt
       };
       proposals[index] = updated;

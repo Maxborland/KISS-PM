@@ -323,6 +323,7 @@ function AgentProposalCard({
           {effectLabel}
         </div>
       ) : null}
+      {proposal.resultSummary ? <AgentProposalResult summary={proposal.resultSummary} /> : null}
       {proposal.auditEventId ? (
         <div className="runtime-agent-proposal__audit" aria-label={`След аудита: ${proposal.auditEventId}`}>
           <CheckCircle2 aria-hidden />
@@ -357,11 +358,44 @@ function AgentProposalCard({
   );
 }
 
+function AgentProposalResult({
+  summary
+}: {
+  summary: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>;
+}) {
+  const ResultIcon = workspaceAgentResultStatusIcon(summary.status);
+
+  return (
+    <div className="runtime-agent-proposal__result" data-status={summary.status}>
+      <ResultIcon aria-hidden />
+      <div>
+        <strong>{workspaceAgentResultStatusLabel(summary.status)}</strong>
+        <span>{summary.description}</span>
+        {summary.changedEntity ? (
+          <code>{`${summary.changedEntity.type}:${summary.changedEntity.id} · ${summary.changedEntity.title}`}</code>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function agentProposalStatusLabel(status: WorkspaceAgentProposalStatus): string {
   if (status === "applying") return "применяется";
   if (status === "applied") return "применено";
   if (status === "rejected") return "отклонено";
   return "ожидает";
+}
+
+function workspaceAgentResultStatusLabel(status: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>["status"]): string {
+  if (status === "succeeded") return "Изменение применено";
+  if (status === "rejected") return "Изменение не применено";
+  return "Ожидает подтверждения";
+}
+
+function workspaceAgentResultStatusIcon(status: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>["status"]) {
+  if (status === "succeeded") return CheckCircle2;
+  if (status === "rejected") return AlertTriangle;
+  return Clock3;
 }
 
 function workspaceAgentProposalEffectLabel(proposal: WorkspaceAgentActionProposal): string | null {

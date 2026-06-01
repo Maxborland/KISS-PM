@@ -68,6 +68,17 @@ describe("AgentCockpitBlock", () => {
                   id: "proposal-applied",
                   messageId: "message-runtime",
                   payload: { task: { title: "Проверить просроченный этап" } },
+                  resultSummary: {
+                    status: "succeeded",
+                    mutationApplied: true,
+                    changedEntity: {
+                      type: "Task",
+                      id: "task-agent-result",
+                      title: "Проверить просроченный этап"
+                    },
+                    auditEventId: "audit-hidden",
+                    description: "Создана задача «Проверить просроченный этап»."
+                  },
                   resolvedAt: "2026-06-01T00:02:00.000Z",
                   status: "applied",
                   title: "Создать задачу"
@@ -99,6 +110,8 @@ describe("AgentCockpitBlock", () => {
       expect(host.textContent).toContain("Сверка изменений");
       expect(host.textContent).toContain("До / после");
       expect(host.textContent).toContain("Создана задача: Проверить просроченный этап");
+      expect(host.textContent).toContain("Изменение применено");
+      expect(host.textContent).toContain("Task:task-agent-result · Проверить просроченный этап");
       expect(host.textContent).toContain("Записано в аудит: audit-hidden");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
 

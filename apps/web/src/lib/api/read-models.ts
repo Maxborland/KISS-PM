@@ -107,6 +107,14 @@ export type WorkspaceAgentMessage = {
 
 export type WorkspaceAgentProposalStatus = "proposed" | "applying" | "applied" | "rejected";
 
+export type WorkspaceAgentActionResultSummary = {
+  status: "pending" | "succeeded" | "rejected";
+  mutationApplied: boolean;
+  changedEntity: { type: "Task"; id: string; title: string } | null;
+  auditEventId: string | null;
+  description: string;
+};
+
 export type WorkspaceAgentActionProposal = {
   id: string;
   messageId: string;
@@ -117,6 +125,7 @@ export type WorkspaceAgentActionProposal = {
   payload: Record<string, unknown>;
   status: WorkspaceAgentProposalStatus;
   auditEventId: string | null;
+  resultSummary?: WorkspaceAgentActionResultSummary;
   createdAt: string;
   resolvedAt: string | null;
 };

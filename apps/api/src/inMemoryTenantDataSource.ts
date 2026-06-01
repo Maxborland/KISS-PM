@@ -113,6 +113,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
         ...current,
         status: input.status,
         auditEventId: input.auditEventId,
+        payload: input.payload ?? current.payload,
         resolvedAt: input.resolvedAt
       };
       workspaceAgentProposals[index] = updated;

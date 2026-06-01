@@ -52,7 +52,18 @@ export const ReviewAndAudit: Story = {
                 description: "Добавить задачу для проверки просроченного этапа.",
                 id: "proposal-1",
                 messageId: "message-2",
-                payload: { task: { title: "Проверить просроченный этап" } },
+                payload: { task: { id: "task-agent-story", title: "Проверить просроченный этап" } },
+                resultSummary: {
+                  status: "succeeded",
+                  mutationApplied: true,
+                  changedEntity: {
+                    type: "Task",
+                    id: "task-agent-story",
+                    title: "Проверить просроченный этап"
+                  },
+                  auditEventId: "audit-hidden",
+                  description: "Создана задача «Проверить просроченный этап»."
+                },
                 resolvedAt: "2026-06-01T09:03:00.000Z",
                 status: "applied",
                 title: "Создать задачу восстановления"
@@ -68,6 +79,7 @@ export const ReviewAndAudit: Story = {
     await expect(canvas.getAllByText("Агент рабочей области").length).toBeGreaterThan(0);
     await expect(canvas.getByText("Сверка изменений")).toBeTruthy();
     await expect(canvas.getByText("Создана задача: Проверить просроченный этап")).toBeTruthy();
+    await expect(canvas.getByText(/Task:task-agent-story/)).toBeTruthy();
     await expect(canvas.getByText(/audit-hidden/)).toBeTruthy();
   }
 };

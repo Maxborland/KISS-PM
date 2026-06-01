@@ -69,6 +69,7 @@ export type WorkspaceAgentRepository = {
     proposalId: string;
     status: WorkspaceAgentProposalStatus;
     auditEventId: string | null;
+    payload?: Record<string, unknown>;
     resolvedAt: Date | null;
     expectedStatus?: WorkspaceAgentProposalStatus;
   }): Promise<WorkspaceAgentActionProposalRecord | undefined>;
@@ -167,6 +168,7 @@ export function createWorkspaceAgentRepository(db: KissPmDatabase): WorkspaceAge
         .set({
           status: input.status,
           auditEventId: input.auditEventId,
+          ...(input.payload ? { payload: input.payload } : {}),
           resolvedAt: input.resolvedAt
         })
         .where(and(...filters))

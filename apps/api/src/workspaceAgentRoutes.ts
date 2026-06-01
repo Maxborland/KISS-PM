@@ -69,6 +69,27 @@ type WorkspaceAgentOperationsContext =
       reason: "persistence_not_configured" | "permission_missing";
     };
 
+type WorkspaceAgentActionResultSummary = {
+  status: "pending" | "succeeded" | "rejected";
+  mutationApplied: boolean;
+  changedEntity: { type: "Task"; id: string; title: string } | null;
+  auditEventId: string | null;
+  description: string;
+};
+
+type CreateTaskProposalPayload = {
+  id: string;
+  title: string;
+  description: string;
+  plannedStart: string;
+  plannedFinish: string;
+  durationWorkingDays: number;
+  plannedWork: number;
+  priority: "normal";
+  requiresAcceptance: false;
+  participants: Array<{ userId: string; role: "executor" | "requester" }>;
+};
+
 const maxAgentMessageLength = 4000;
 
 export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRouteDeps) {
@@ -445,8 +466,86 @@ function serializeWorkspaceAgentProposal(proposal: WorkspaceAgentActionProposalR
     payload: proposal.payload,
     status: proposal.status,
     auditEventId: proposal.auditEventId,
+    resultSummary: buildWorkspaceAgentResultSummary(proposal),
     createdAt: proposal.createdAt.toISOString(),
     resolvedAt: proposal.resolvedAt?.toISOString() ?? null
+  };
+}
+
+function buildWorkspaceAgentResultSummary(
+  proposal: WorkspaceAgentActionProposalRecord
+): WorkspaceAgentActionResultSummary {
+  const taskPayload =
+    proposal.actionType === "workspace.agent.create_task"
+      ? readCreateTaskProposalResultView(proposal.payload)
+      : null;
+  if (taskPayload) {
+    const changedEntity = taskPayload.id
+      ? { type: "Task" as const, id: taskPayload.id, title: taskPayload.title }
+      : null;
+    if (proposal.status === "applied") {
+      return {
+        status: "succeeded",
+        mutationApplied: true,
+        changedEntity,
+        auditEventId: proposal.auditEventId,
+        description: `Создана задача «${taskPayload.title}».`
+      };
+    }
+    if (proposal.status === "rejected") {
+      return {
+        status: "rejected",
+        mutationApplied: false,
+        changedEntity: null,
+        auditEventId: proposal.auditEventId,
+        description: `Задача «${taskPayload.title}» не создана.`
+      };
+    }
+    return {
+      status: "pending",
+      mutationApplied: false,
+      changedEntity,
+      auditEventId: null,
+      description: `После подтверждения будет создана задача «${taskPayload.title}».`
+    };
+  }
+
+  if (proposal.status === "rejected") {
+    return {
+      status: "rejected",
+      mutationApplied: false,
+      changedEntity: null,
+      auditEventId: proposal.auditEventId,
+      description: "Предложение отклонено, данные рабочей области не изменены."
+    };
+  }
+  if (proposal.status === "applied") {
+    return {
+      status: "succeeded",
+      mutationApplied: false,
+      changedEntity: null,
+      auditEventId: proposal.auditEventId,
+      description: "Поручение зафиксировано без изменения проектов, задач или сделок."
+    };
+  }
+
+  return {
+    status: "pending",
+    mutationApplied: false,
+    changedEntity: null,
+    auditEventId: null,
+    description: "Предложение ожидает явного подтверждения."
+  };
+}
+
+function readCreateTaskProposalResultView(
+  value: Record<string, unknown>
+): { id: string | null; title: string } | null {
+  const task = value.task;
+  if (!isRecord(task) || typeof task.title !== "string" || task.title.length < 3) return null;
+  return {
+    id: typeof task.id === "string" && isId(task.id) ? task.id : null,
+    title: task.title
   };
 }
 
@@ -515,17 +614,7 @@ function buildCreateTaskProposalPayload(
   message: WorkspaceAgentMessageRecord,
   context: WorkspaceAgentThreadContext,
   operationsContext: WorkspaceAgentOperationsContext
-): {
-  title: string;
-  description: string;
-  plannedStart: string;
-  plannedFinish: string;
-  durationWorkingDays: number;
-  plannedWork: number;
-  priority: "normal";
-  requiresAcceptance: false;
-  participants: Array<{ userId: string; role: "executor" | "requester" }>;
-} | null {
+): CreateTaskProposalPayload | null {
   const title = extractCreateTaskTitle(message.body);
   if (!title) return null;
 
@@ -536,6 +625,7 @@ function buildCreateTaskProposalPayload(
       ? ` Операционный контекст: ${operationsContext.indicators.overdueTasks} просроченных задач, ${operationsContext.indicators.criticalTasks} критичных задач.`
       : " Операционный контекст недоступен.";
   return {
+    id: `task-${randomUUID()}`,
     title,
     description: `Создано из сообщения агенту: ${message.body.trim()}.${focus}${operationsSummary}`,
     plannedStart: plannedDate,
@@ -740,6 +830,7 @@ async function applyCreateTaskProposal(
       proposalId: proposal.id,
       status: "applying",
       auditEventId: null,
+      payload: { ...proposal.payload, task: taskPayload },
       resolvedAt: null,
       expectedStatus: "proposed"
     });
@@ -747,9 +838,8 @@ async function applyCreateTaskProposal(
       return { ok: false as const, status: 409 as const, error: "agent_proposal_already_resolved" };
     }
 
-    const taskId = `task-${randomUUID()}`;
     const taskBody = {
-      id: taskId,
+      id: taskPayload.id,
       title: taskPayload.title,
       description: taskPayload.description,
       priority: taskPayload.priority,
@@ -767,7 +857,7 @@ async function applyCreateTaskProposal(
       plannedFinish: taskBody.plannedFinish
     });
     const planningCommand = buildCreateTaskPlanningCommand({
-      taskId,
+      taskId: taskPayload.id,
       projectId: inboxProject.id,
       statusId: taskStatus.id,
       body: taskBody,
@@ -781,7 +871,7 @@ async function applyCreateTaskProposal(
     });
     const metadataTask = await transactionDataSource.updateTaskMetadata({
       tenantId: actor.tenantId,
-      taskId,
+      taskId: taskPayload.id,
       description: taskBody.description,
       priority: taskBody.priority,
       requesterUserId,
@@ -791,7 +881,7 @@ async function applyCreateTaskProposal(
     });
     if (!metadataTask) throw new Error("task_create_metadata_failed");
 
-    const createdTask = (await transactionDataSource.findTaskById(actor.tenantId, taskId)) ?? metadataTask;
+    const createdTask = (await transactionDataSource.findTaskById(actor.tenantId, taskPayload.id)) ?? metadataTask;
     const planVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, inboxProject.id);
     await createTaskSystemActivity(transactionDataSource, {
       tenantId: actor.tenantId,
@@ -811,7 +901,7 @@ async function applyCreateTaskProposal(
         commandInput: {
           proposalId: proposal.id,
           actionType: proposal.actionType,
-          payload: proposal.payload
+          payload: { ...proposal.payload, task: taskPayload }
         },
         beforeState: { status: proposal.status },
         afterState: summarizeCreatedTask(createdTask, inboxProject, planVersion),
@@ -866,9 +956,10 @@ function hasCreateTaskDataSource(dataSource: ApiTenantDataSource): dataSource is
   );
 }
 
-function parseCreateTaskProposalPayload(value: Record<string, unknown>): ReturnType<typeof buildCreateTaskProposalPayload> {
+function parseCreateTaskProposalPayload(value: Record<string, unknown>): CreateTaskProposalPayload | null {
   const task = value.task;
   if (!isRecord(task)) return null;
+  const taskId = typeof task.id === "string" && isId(task.id) ? task.id : `task-${randomUUID()}`;
   if (typeof task.title !== "string" || task.title.length < 3) return null;
   if (typeof task.description !== "string") return null;
   if (typeof task.plannedStart !== "string" || typeof task.plannedFinish !== "string") return null;
@@ -883,6 +974,7 @@ function parseCreateTaskProposalPayload(value: Record<string, unknown>): ReturnT
   );
   if (participants.length !== task.participants.length) return null;
   return {
+    id: taskId,
     title: task.title,
     description: task.description,
     plannedStart: task.plannedStart,
