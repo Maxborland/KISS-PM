@@ -2730,6 +2730,71 @@ button.stepper__item:disabled {
   white-space: nowrap;
 }
 
+@media (max-width: 720px) {
+  .app-canvas {
+    padding: var(--space-2);
+    overflow-x: hidden;
+  }
+
+  .app-canvas__panel {
+    flex-direction: column;
+    max-width: 100%;
+  }
+
+  .app-icon-rail {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    overflow-x: auto;
+  }
+
+  .app-icon-rail__logo {
+    padding: 0;
+  }
+
+  .app-icon-rail__sections {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: var(--space-1);
+  }
+
+  .app-context-sidebar {
+    width: 100%;
+    flex-direction: row;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    overflow-x: auto;
+  }
+
+  .app-context-sidebar__head,
+  .app-context-sidebar__footer {
+    display: none;
+  }
+
+  .app-context-sidebar__group {
+    flex: 0 0 auto;
+    min-width: 160px;
+  }
+
+  .app-context-sidebar__item {
+    white-space: nowrap;
+  }
+
+  .app-topbar {
+    padding-inline: var(--space-3);
+  }
+
+  .app-content {
+    padding: var(--space-4) var(--space-3);
+  }
+}
+
 /* Phase 6 — shared dashboard / funnel primitives */
 .prob-ring {
   position: relative;
