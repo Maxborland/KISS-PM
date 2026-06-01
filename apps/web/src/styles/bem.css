@@ -2022,6 +2022,11 @@ a:hover { color: var(--accent-hover); }
   color: var(--success-text);
 }
 
+.runtime-agent-proposal__head span[data-status="applying"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .runtime-agent-proposal__head span[data-status="rejected"] {
   background: var(--danger-soft);
   color: var(--danger-text);

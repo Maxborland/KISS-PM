@@ -222,6 +222,76 @@ describe("workspace agent routes", () => {
     ]);
   });
 
+  it("does not create a duplicate task when proposal claim loses the race", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile, forceProposalClaimConflict: true });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Проверить коллизии подтверждения")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(409);
+    await expect(confirmed.json()).resolves.toEqual({ error: "agent_proposal_already_resolved" });
+    expect(fixture.tasks).toHaveLength(1);
+    expect(fixture.taskActivities).toEqual([]);
+    expect(fixture.audits).toEqual([]);
+  });
+
+  it("does not create a task proposal for titles rejected by the task parser", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: QA")
+    });
+
+    expect(post.status).toBe(201);
+    await expect(post.json()).resolves.toMatchObject({
+      proposal: {
+        actionType: "workspace.agent.review_request",
+        status: "proposed"
+      }
+    });
+  });
+
+  it("marks a task proposal as applying before mutating planning data", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Проверить порядок применения")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(200);
+    expect(fixture.proposalStatusUpdates.map((update) => update.status)).toEqual(["applying", "applied"]);
+    expect(fixture.planningCommandCountAtProposalClaim).toBe(0);
+  });
+
   it("denies applying a create-task proposal without task create permission", async () => {
     const fixture = createFixture();
     const app = createRouteApp(fixture);
@@ -367,10 +437,13 @@ function createRouteApp(
   return app;
 }
 
-function createFixture(input: { profile?: AccessProfile } = {}) {
+function createFixture(options: { profile?: AccessProfile; forceProposalClaimConflict?: boolean } = {}) {
   const messages: WorkspaceAgentMessageRecord[] = [];
   const proposals: WorkspaceAgentActionProposalRecord[] = [];
   const audits: ManagementAuditEventInput[] = [];
+  const proposalStatusUpdates: Array<{ expectedStatus: string | undefined; status: string }> = [];
+  let planningCommandCount = 0;
+  let planningCommandCountAtProposalClaim: number | undefined;
   const projectRecord = project("project-alpha", "Проект Альфа");
   const taskRecord = task("task-alpha", "Задача Альфа", projectRecord.id);
   const tasks: TaskRecord[] = [taskRecord];
@@ -424,6 +497,7 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
     },
     async applyPlanningCommand(input) {
       if (input.command.type !== "task.create") return;
+      planningCommandCount += 1;
       const payload = input.command.payload;
       const now = new Date("2026-06-01T00:00:00.000Z");
       const durationMinutes = typeof payload.durationMinutes === "number" ? payload.durationMinutes : 480;
@@ -526,6 +600,14 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
       if (index < 0) return undefined;
       const current = proposals[index];
       if (!current) return undefined;
+      if (input.expectedStatus && current.status !== input.expectedStatus) return undefined;
+      if (input.expectedStatus === "proposed" && input.status === "applying" && input.auditEventId === null) {
+        planningCommandCountAtProposalClaim = planningCommandCount;
+        proposalStatusUpdates.push({ expectedStatus: input.expectedStatus, status: input.status });
+        if (options.forceProposalClaimConflict) return undefined;
+      } else {
+        proposalStatusUpdates.push({ expectedStatus: input.expectedStatus, status: input.status });
+      }
       const updated = {
         ...current,
         status: input.status,
@@ -537,7 +619,18 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
     }
   } satisfies ApiTenantDataSource;
 
-  return { audits, dataSource, messages, profile: input.profile ?? readerProfile, taskActivities, tasks };
+  return {
+    audits,
+    dataSource,
+    messages,
+    get planningCommandCountAtProposalClaim() {
+      return planningCommandCountAtProposalClaim;
+    },
+    profile: options.profile ?? readerProfile,
+    proposalStatusUpdates,
+    taskActivities,
+    tasks
+  };
 }
 
 function requestOptions() {

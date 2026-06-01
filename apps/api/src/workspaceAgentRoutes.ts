@@ -505,6 +505,7 @@ function extractCreateTaskTitle(body: string): string | null {
     .replace(/^(создай|создать|добавь)\s+задачу\s*/i, "")
     .trim();
   const title = candidate.length > 0 ? candidate : "Поручение от Генри";
+  if (title.length < 3) return null;
   return title.slice(0, 160);
 }
 
@@ -556,7 +557,7 @@ async function applyCreateTaskProposal(
   proposal: WorkspaceAgentActionProposalRecord
 ): Promise<
   | { ok: true; auditEventId: string; proposal: WorkspaceAgentActionProposalRecord }
-  | { ok: false; status: 400 | 403 | 501; error: string }
+  | { ok: false; status: 400 | 403 | 409 | 501; error: string }
 > {
   if (!hasCreateTaskDataSource(deps.dataSource)) {
     return { ok: false, status: 501, error: "persistence_not_configured" };
@@ -591,6 +592,18 @@ async function applyCreateTaskProposal(
     const statuses = await transactionDataSource.listTaskStatuses(actor.tenantId);
     const taskStatus = getRequiredStatusByCategory(statuses, "new");
     if (!taskStatus) return { ok: false as const, status: 400 as const, error: "task_status_not_found" };
+
+    const claimedProposal = await transactionDataSource.updateWorkspaceAgentProposalStatus({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: "applying",
+      auditEventId: null,
+      resolvedAt: null,
+      expectedStatus: "proposed"
+    });
+    if (!claimedProposal) {
+      return { ok: false as const, status: 409 as const, error: "agent_proposal_already_resolved" };
+    }
 
     const taskId = `task-${randomUUID()}`;
     const taskBody = {
@@ -634,7 +647,7 @@ async function applyCreateTaskProposal(
       requiresAcceptance: taskBody.requiresAcceptance,
       participants: taskBody.participants
     });
-    if (!metadataTask) return { ok: false as const, status: 501 as const, error: "task_create_metadata_failed" };
+    if (!metadataTask) throw new Error("task_create_metadata_failed");
 
     const createdTask = (await transactionDataSource.findTaskById(actor.tenantId, taskId)) ?? metadataTask;
     const planVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, inboxProject.id);
@@ -679,9 +692,10 @@ async function applyCreateTaskProposal(
       proposalId: proposal.id,
       status: "applied",
       auditEventId,
-      resolvedAt: new Date()
+      resolvedAt: new Date(),
+      expectedStatus: "applying"
     });
-    if (!updatedProposal) return { ok: false as const, status: 501 as const, error: "persistence_not_configured" };
+    if (!updatedProposal) throw new Error("agent_proposal_finalize_failed");
     return { ok: true as const, auditEventId, proposal: updatedProposal };
   });
 }

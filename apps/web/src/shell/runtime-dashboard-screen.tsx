@@ -324,6 +324,7 @@ function isPastDate(value: string): boolean {
 }
 
 function agentProposalStatusLabel(status: string): string {
+  if (status === "applying") return "применяется";
   if (status === "applied") return "применено";
   if (status === "rejected") return "отклонено";
   return "ожидает";

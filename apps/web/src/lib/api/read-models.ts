@@ -49,7 +49,7 @@ export type WorkspaceAgentMessage = {
   createdAt: string;
 };
 
-export type WorkspaceAgentProposalStatus = "proposed" | "applied" | "rejected";
+export type WorkspaceAgentProposalStatus = "proposed" | "applying" | "applied" | "rejected";
 
 export type WorkspaceAgentActionProposal = {
   id: string;

@@ -93,6 +93,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
       if (index < 0) return undefined;
       const current = workspaceAgentProposals[index];
       if (!current) return undefined;
+      if (input.expectedStatus && current.status !== input.expectedStatus) return undefined;
       const updated = {
         ...current,
         status: input.status,
