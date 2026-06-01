@@ -99,8 +99,8 @@ describe("AgentCockpitBlock", () => {
       expect(host.textContent).toContain("Сверка изменений");
       expect(host.textContent).toContain("До / после");
       expect(host.textContent).toContain("Создана задача: Проверить просроченный этап");
+      expect(host.textContent).toContain("Записано в аудит: audit-hidden");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
-      expect(host.textContent).not.toContain("audit-hidden");
 
       const applyButton = Array.from(host.querySelectorAll("button")).find((button) =>
         button.textContent?.includes("Применить")

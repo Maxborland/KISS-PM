@@ -68,6 +68,6 @@ export const ReviewAndAudit: Story = {
     await expect(canvas.getAllByText("Агент рабочей области").length).toBeGreaterThan(0);
     await expect(canvas.getByText("Сверка изменений")).toBeTruthy();
     await expect(canvas.getByText("Создана задача: Проверить просроченный этап")).toBeTruthy();
-    await expect(canvas.queryByText("audit-hidden")).toBeNull();
+    await expect(canvas.getByText(/audit-hidden/)).toBeTruthy();
   }
 };

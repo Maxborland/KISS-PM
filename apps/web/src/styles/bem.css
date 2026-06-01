@@ -2047,6 +2047,13 @@ a:hover { color: var(--accent-hover); }
   line-height: var(--lh-xs);
 }
 
+.runtime-agent-proposal__audit code {
+  overflow-wrap: anywhere;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+}
+
 .runtime-agent-proposal__effect {
   display: inline-flex;
   align-items: flex-start;
