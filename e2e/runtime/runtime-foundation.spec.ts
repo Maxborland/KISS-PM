@@ -67,6 +67,12 @@ test("authenticated beta runtime routes open without blank or error states", asy
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.locator("body")).toContainText(route.marker);
+    if (route.path === "/dashboard") {
+      await expect(page.getByRole("link", { name: "Агент" })).toBeVisible();
+    }
+    if (route.path === "/projects") {
+      await expect(page.getByRole("link", { name: "Гант" })).toBeVisible();
+    }
     const narrowScreenshotPath = testInfo.outputPath(
       `runtime-${route.path.slice(1).replaceAll("/", "-")}-narrow.png`
     );

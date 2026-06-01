@@ -39,6 +39,7 @@ describe("navigation-registry", () => {
 
   it("resolves runtime paths to accepted screen ids", () => {
     expect(screenIdForPath("/dashboard")).toBe("01-dashboard");
+    expect(screenIdForPath("/agent")).toBe("20-agent-cockpit");
     expect(screenIdForPath("/my-work")).toBe("02-my-work");
     expect(screenIdForPath("/deals")).toBe("05-deals");
     expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
@@ -48,6 +49,7 @@ describe("navigation-registry", () => {
 
   it("keeps ScreenId to runtime path lookup available for Storybook metadata", () => {
     expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
+    expect(pathForScreenId("20-agent-cockpit")).toBe("/agent");
     expect(pathForScreenId("05-deals")).toBe("/deals");
     expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
   });
@@ -62,6 +64,18 @@ describe("navigation-registry", () => {
       "/projects/demo/kpi",
       "/settings"
     ]);
+  });
+
+  it("exposes the workspace agent as an overview surface", () => {
+    const agent = SCREEN_ROUTE_BY_ID["20-agent-cockpit"];
+    expect(agent.railSection).toBe("overview");
+    expect(agent.contextActiveItem).toBe("Агент");
+    expect(agent.requiredPermissions).toEqual(["tenant.projects.read"]);
+    expect(
+      contextNavForSection("overview", "Агент", ["tenant.projects.read"]).flatMap((group) =>
+        group.items.map((item) => [item.label, item.href])
+      )
+    ).toContainEqual(["Агент", "/agent"]);
   });
 
   it("filters protected rail entries for restricted runtime users", () => {
