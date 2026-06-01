@@ -22,6 +22,7 @@ export const SCREEN_IDS = [
   "17-project-audit",
   "18-project-calendars",
   "19-login",
+  "20-agent-cockpit",
   "state-empty",
   "state-error",
   "state-forbidden",

@@ -15,6 +15,7 @@ export const queryKeys = {
     dealStages: ["workspace", "deal-stages"] as const
   },
   tenant: {
+    currentScheduledTasksRoot: ["tenant", "current", "scheduled-tasks"] as const,
     currentScheduledTasks: (assigneeUserId: string, fromDate: string, toDate: string) =>
       ["tenant", "current", "scheduled-tasks", assigneeUserId, fromDate, toDate] as const
   }

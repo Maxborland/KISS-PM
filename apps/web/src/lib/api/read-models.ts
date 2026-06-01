@@ -29,6 +29,10 @@ export type DashboardReadModel = {
   workspaceAgentThread: WorkspaceAgentThread;
 };
 
+export type AgentCockpitReadModel = {
+  workspaceAgentThread: WorkspaceAgentThread;
+};
+
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
 
 export type WorkspaceAgentContextFocus = {
@@ -154,6 +158,14 @@ export function useProjectsListReadModelQuery() {
     queryKey: queryKeys.workspace.projects,
     queryFn: fetchWorkspaceProjects,
     select: (projects): ProjectsListReadModel => ({ projects })
+  });
+}
+
+export function useAgentCockpitReadModelQuery() {
+  return useQuery({
+    queryKey: queryKeys.workspace.workspaceAgentThread,
+    queryFn: fetchWorkspaceAgentThread,
+    select: (workspaceAgentThread): AgentCockpitReadModel => ({ workspaceAgentThread })
   });
 }
 

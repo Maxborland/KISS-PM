@@ -48,6 +48,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
       title: "Обзор",
       items: [
         { label: "Дашборд", href: "/dashboard" },
+        { label: "Агент", href: "/agent" },
         { label: "Календарь" },
         { label: "Витрина", href: "/showcase/spacing" }
       ]
@@ -179,6 +180,18 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     topbarMode: "team",
     pageIntroActions: "create-export",
     path: "/dashboard",
+    requiredPermissions: ["tenant.projects.read"]
+  }),
+  "20-agent-cockpit": route({
+    id: "20-agent-cockpit",
+    storyTitle: "20 Агент рабочей области",
+    pageTitle: "Агент рабочей области",
+    lead: "Единый управленческий cockpit для вопросов по портфелю, сверки предложений и подтверждения действий.",
+    breadcrumb: [{ label: "Обзор" }, { label: "Агент", current: true }],
+    railSection: "overview",
+    contextActiveItem: "Агент",
+    topbarMode: "minimal",
+    path: "/agent",
     requiredPermissions: ["tenant.projects.read"]
   }),
   "02-my-work": route({

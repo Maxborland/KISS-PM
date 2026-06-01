@@ -11,6 +11,7 @@
 @import "../styles/widgets/funnel.css" layer(components);
 @import "../styles/widgets/kanban.css" layer(components);
 @import "../styles/widgets/my-work.css" layer(components);
+@import "../styles/widgets/agent-cockpit.css" layer(components);
 @import "../styles/widgets/landing-agent-demo.css" layer(components);
 
 @theme inline {
