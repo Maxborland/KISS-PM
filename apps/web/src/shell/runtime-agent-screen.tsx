@@ -22,12 +22,14 @@ export function RuntimeAgentScreen({ currentUserId }: { currentUserId: string })
     mutationFn: postWorkspaceAgentMessage,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
     }
   });
   const confirmWorkspaceAgentAction = useMutation({
     mutationFn: confirmWorkspaceAgentProposal,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
@@ -54,7 +56,7 @@ export function RuntimeAgentScreen({ currentUserId }: { currentUserId: string })
         level="L1"
         title="Не удалось загрузить агент"
         description="Повторите попытку или проверьте доступность API."
-        onRetry={() => void readModel.refetch()}
+        onRetry={() => readModel.refetchAll()}
       />
     );
   }
@@ -65,6 +67,7 @@ export function RuntimeAgentScreen({ currentUserId }: { currentUserId: string })
       <AgentCockpitBlock
         variant="surface"
         thread={readModel.data.workspaceAgentThread}
+        operationsCockpit={readModel.data.operationsCockpit}
         currentUserId={currentUserId}
         isSending={sendWorkspaceAgentMessage.isPending}
         isConfirming={confirmWorkspaceAgentAction.isPending}

@@ -2,11 +2,61 @@
 
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { apiFetch } from "@/lib/api";
-import type { DealStage, Opportunity, Project, ScheduledTask, Task } from "@/lib/api-types";
+import { ApiError, apiFetch } from "@/lib/api";
+import type {
+  DealStage,
+  OperationsCockpitReadModel,
+  Opportunity,
+  Project,
+  ScheduledTask,
+  Task
+} from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
 type ListResponse<Key extends string, Item> = Record<Key, Item[]>;
+type WorkspaceOperationsCockpitResponse = {
+  cockpit: OperationsCockpitReadModel;
+};
+
+const EMPTY_OPERATIONS_COCKPIT: OperationsCockpitReadModel = {
+  generatedAt: "",
+  scope: {
+    type: "workspace",
+    tenantId: ""
+  },
+  indicators: {
+    activeProjects: 0,
+    overdueProjects: 0,
+    activeTasks: 0,
+    overdueTasks: 0,
+    waitingTasks: 0,
+    criticalTasks: 0,
+    openDeals: 0,
+    readyToActivateDeals: 0
+  },
+  attentionItems: [],
+  workloadHints: {
+    byPerson: []
+  },
+  pipelinePressure: {
+    deals: []
+  },
+  agentContext: {
+    contextType: "operations_cockpit",
+    focus: {
+      type: "workspace",
+      tenantId: ""
+    },
+    generatedAt: "",
+    sourceEntityTypes: [],
+    unavailableSources: [
+      {
+        source: "operations_cockpit",
+        reason: "persistence_not_configured"
+      }
+    ]
+  }
+};
 
 export type ProjectsListReadModel = {
   projects: Project[];
@@ -30,6 +80,7 @@ export type DashboardReadModel = {
 };
 
 export type AgentCockpitReadModel = {
+  operationsCockpit: OperationsCockpitReadModel;
   workspaceAgentThread: WorkspaceAgentThread;
 };
 
@@ -133,6 +184,25 @@ export async function fetchWorkspaceAgentThread(): Promise<WorkspaceAgentThread>
   return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread", { method: "GET" });
 }
 
+export async function fetchWorkspaceOperationsCockpit(): Promise<OperationsCockpitReadModel> {
+  try {
+    const response = await apiFetch<WorkspaceOperationsCockpitResponse>(
+      "/api/workspace/operations-cockpit",
+      { method: "GET" }
+    );
+    return response.cockpit;
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.status === 501 &&
+      error.body.error === "persistence_not_configured"
+    ) {
+      return EMPTY_OPERATIONS_COCKPIT;
+    }
+    throw error;
+  }
+}
+
 export async function postWorkspaceAgentMessage(body: string): Promise<WorkspaceAgentThread> {
   return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread/messages", {
     method: "POST",
@@ -162,11 +232,29 @@ export function useProjectsListReadModelQuery() {
 }
 
 export function useAgentCockpitReadModelQuery() {
-  return useQuery({
-    queryKey: queryKeys.workspace.workspaceAgentThread,
-    queryFn: fetchWorkspaceAgentThread,
-    select: (workspaceAgentThread): AgentCockpitReadModel => ({ workspaceAgentThread })
+  const queries = useQueries({
+    queries: [
+      {
+        queryKey: queryKeys.workspace.workspaceAgentThread,
+        queryFn: fetchWorkspaceAgentThread
+      },
+      {
+        queryKey: queryKeys.workspace.operationsCockpit,
+        queryFn: fetchWorkspaceOperationsCockpit
+      }
+    ]
   });
+
+  const [workspaceAgentThreadQuery, operationsCockpitQuery] = queries;
+  const data =
+    workspaceAgentThreadQuery.data && operationsCockpitQuery.data
+      ? {
+          workspaceAgentThread: workspaceAgentThreadQuery.data as WorkspaceAgentThread,
+          operationsCockpit: operationsCockpitQuery.data as OperationsCockpitReadModel
+        }
+      : undefined;
+
+  return aggregateQueries<AgentCockpitReadModel>(queries, data);
 }
 
 export function getRuntimeTodayIsoDate(now = new Date()): string {

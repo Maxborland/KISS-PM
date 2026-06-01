@@ -4,6 +4,7 @@ export type * from "./control";
 export type * from "./crm";
 export type * from "./deals";
 export type * from "./planning";
+export type * from "./operations-cockpit";
 export type * from "./projects";
 export type * from "./tasks";
 export type * from "./users";

@@ -19,6 +19,42 @@ describe("AgentCockpitBlock", () => {
         root.render(
           createElement(AgentCockpitBlock, {
             isSending: true,
+            operationsCockpit: {
+              generatedAt: "2026-06-01T00:00:00.000Z",
+              scope: { type: "workspace", tenantId: "tenant-alpha" },
+              indicators: {
+                activeProjects: 3,
+                overdueProjects: 1,
+                activeTasks: 9,
+                overdueTasks: 2,
+                waitingTasks: 1,
+                criticalTasks: 1,
+                openDeals: 4,
+                readyToActivateDeals: 1
+              },
+              attentionItems: [
+                {
+                  id: "attention-1",
+                  kind: "project_overdue",
+                  severity: "critical",
+                  title: "Проект требует решения",
+                  reason: "Плановая дата завершения проекта уже прошла.",
+                  entity: { type: "project", id: "project-1", title: "Проект требует решения" },
+                  projectId: "project-1",
+                  ownerUserId: null,
+                  dueDate: "2026-05-30"
+                }
+              ],
+              workloadHints: { byPerson: [] },
+              pipelinePressure: { deals: [] },
+              agentContext: {
+                contextType: "operations_cockpit",
+                focus: { type: "workspace", tenantId: "tenant-alpha" },
+                generatedAt: "2026-06-01T00:00:00.000Z",
+                sourceEntityTypes: ["Project", "Task", "Opportunity", "TenantUser"],
+                unavailableSources: []
+              }
+            },
             thread: {
               context: {},
               messages: [],
@@ -56,6 +92,9 @@ describe("AgentCockpitBlock", () => {
       });
 
       expect(host.textContent).toContain("История пуста");
+      expect(host.textContent).toContain("Контекст cockpit");
+      expect(host.textContent).toContain("3 активных проектов");
+      expect(host.textContent).toContain("Проект требует решения");
       expect(host.textContent).toContain("Читает доступный контекст рабочей области");
       expect(host.textContent).toContain("Сверка изменений");
       expect(host.textContent).toContain("До / после");
@@ -67,6 +106,61 @@ describe("AgentCockpitBlock", () => {
         button.textContent?.includes("Применить")
       );
       expect(applyButton?.hasAttribute("disabled")).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("surfaces unavailable operations cockpit context instead of presenting it as empty", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(AgentCockpitBlock, {
+            operationsCockpit: {
+              generatedAt: "",
+              scope: { type: "workspace", tenantId: "" },
+              indicators: {
+                activeProjects: 0,
+                overdueProjects: 0,
+                activeTasks: 0,
+                overdueTasks: 0,
+                waitingTasks: 0,
+                criticalTasks: 0,
+                openDeals: 0,
+                readyToActivateDeals: 0
+              },
+              attentionItems: [],
+              workloadHints: { byPerson: [] },
+              pipelinePressure: { deals: [] },
+              agentContext: {
+                contextType: "operations_cockpit",
+                focus: { type: "workspace", tenantId: "" },
+                generatedAt: "",
+                sourceEntityTypes: [],
+                unavailableSources: [
+                  {
+                    source: "operations_cockpit",
+                    reason: "persistence_not_configured"
+                  }
+                ]
+              }
+            },
+            thread: {
+              context: {},
+              messages: [],
+              proposals: []
+            }
+          })
+        );
+      });
+
+      expect(host.textContent).toContain("Операционный контекст недоступен: persistence_not_configured.");
+      expect(host.textContent).not.toContain("Критичных сигналов в доступном контексте нет.");
     } finally {
       act(() => root.unmount());
       host.remove();

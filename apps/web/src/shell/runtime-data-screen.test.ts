@@ -103,7 +103,10 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.deals.mockReturnValue(successReadModel({ opportunities: [], dealStages: [] }));
     readModelHooks.agent.mockReturnValue(
       {
-        data: { workspaceAgentThread: { context: {}, messages: [], proposals: [] } },
+        data: {
+          operationsCockpit: emptyOperationsCockpit(),
+          workspaceAgentThread: { context: {}, messages: [], proposals: [] }
+        },
         error: null,
         isPending: false,
         isFetching: false,
@@ -194,6 +197,29 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.agent.mockReturnValue(
       {
         data: {
+          operationsCockpit: {
+            ...emptyOperationsCockpit(),
+            indicators: {
+              ...emptyOperationsCockpit().indicators,
+              activeProjects: 2,
+              overdueTasks: 1,
+              criticalTasks: 1,
+              openDeals: 3
+            },
+            attentionItems: [
+              {
+                id: "attention-runtime",
+                kind: "task_overdue",
+                severity: "critical",
+                title: "Просрочен авторский надзор",
+                reason: "Плановая дата завершения задачи уже прошла.",
+                entity: { type: "task", id: "task-attention", title: "Просрочен авторский надзор" },
+                projectId: "project-1",
+                ownerUserId: "usr-1",
+                dueDate: "2026-05-30"
+              }
+            ]
+          },
           workspaceAgentThread: {
             context: {},
             messages: [
@@ -238,6 +264,9 @@ describe("RuntimeDataScreen permission gate", () => {
     );
 
     expect(host.textContent).toContain("Единый управленческий cockpit");
+    expect(host.textContent).toContain("Контекст cockpit");
+    expect(host.textContent).toContain("2 активных проектов");
+    expect(host.textContent).toContain("Просрочен авторский надзор");
     expect(host.textContent).toContain("Что требует внимания сегодня?");
     expect(host.textContent).toContain("Сверка изменений");
     expect(host.textContent).toContain("Будет создана задача: Проверить риски портфеля");
@@ -289,6 +318,33 @@ function successReadModel<T>(data: T) {
     isPending: false,
     isFetching: false,
     refetchAll: vi.fn()
+  };
+}
+
+function emptyOperationsCockpit() {
+  return {
+    generatedAt: "2026-06-01T00:00:00.000Z",
+    scope: { type: "workspace", tenantId: "tenant-alpha" },
+    indicators: {
+      activeProjects: 0,
+      overdueProjects: 0,
+      activeTasks: 0,
+      overdueTasks: 0,
+      waitingTasks: 0,
+      criticalTasks: 0,
+      openDeals: 0,
+      readyToActivateDeals: 0
+    },
+    attentionItems: [],
+    workloadHints: { byPerson: [] },
+    pipelinePressure: { deals: [] },
+    agentContext: {
+      contextType: "operations_cockpit",
+      focus: { type: "workspace", tenantId: "tenant-alpha" },
+      generatedAt: "2026-06-01T00:00:00.000Z",
+      sourceEntityTypes: ["Project", "Task", "Opportunity", "TenantUser"],
+      unavailableSources: []
+    }
   };
 }
 
