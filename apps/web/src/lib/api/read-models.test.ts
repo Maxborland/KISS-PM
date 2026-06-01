@@ -6,11 +6,13 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
   fetchWorkspaceDealStages,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
   fetchWorkspaceProjects,
+  postWorkspaceAgentMessage,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries
@@ -28,6 +30,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
+    expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
     expect(queryKeys.tenant.currentScheduledTasks("usr-1", "2026-05-30", "2026-05-30")).toEqual([
@@ -51,6 +54,12 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/deal-stages") {
         return json({ dealStages: [{ id: "lead" }] });
       }
+      if (path === "/api/workspace/agent-thread") {
+        return json({ context: {}, messages: [{ id: "agent-message-1" }] });
+      }
+      if (path === "/api/workspace/agent-thread/messages") {
+        return json({ context: {}, messages: [{ id: "agent-message-2" }] }, 201);
+      }
       if (
         path ===
         "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
@@ -64,6 +73,14 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
+    await expect(fetchWorkspaceAgentThread()).resolves.toEqual({
+      context: {},
+      messages: [{ id: "agent-message-1" }]
+    });
+    await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toEqual({
+      context: {},
+      messages: [{ id: "agent-message-2" }]
+    });
     await expect(
       fetchTenantCurrentScheduledTasks({
         assigneeUserId: "usr-1",
@@ -77,8 +94,14 @@ describe("runtime read model API", () => {
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
       "/api/workspace/deal-stages",
+      "/api/workspace/agent-thread",
+      "/api/workspace/agent-thread/messages",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
+    expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify("Что горит?")
+    });
     for (const [, init] of fetchMock.mock.calls) {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
@@ -153,6 +176,9 @@ describe("runtime read model API", () => {
       ) {
         return json({ tasks: [{ id: "scheduled-1" }] });
       }
+      if (path === "/api/workspace/agent-thread") {
+        return json({ context: {}, messages: [{ id: "agent-message-1", body: "Runtime only" }] });
+      }
       return json({ error: "not_found" }, 404);
     });
 
@@ -179,12 +205,14 @@ describe("runtime read model API", () => {
       await vi.waitFor(() =>
         expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
           "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30",
+          "/api/workspace/agent-thread",
           "/api/workspace/my-work",
           "/api/workspace/projects"
         ])
       );
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/deal-stages");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/dashboard-agent");
     } finally {
       act(() => root.unmount());
       queryClient.clear();
