@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import {
+  AlertTriangle,
+  BarChart3,
   Bot,
   CheckCircle2,
   Clock3,
@@ -14,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
+import type { OperationsCockpitReadModel } from "@/lib/api-types";
 import type {
   WorkspaceAgentActionProposal,
   WorkspaceAgentProposalStatus,
@@ -24,6 +27,7 @@ import { formatDate } from "@/lib/mock-data/format";
 
 export type AgentCockpitBlockProps = {
   thread: WorkspaceAgentThread;
+  operationsCockpit?: OperationsCockpitReadModel | undefined;
   currentUserId?: string | undefined;
   isSending?: boolean;
   isConfirming?: boolean;
@@ -42,6 +46,7 @@ const THINKING_STEPS = [
 
 export function AgentCockpitBlock({
   thread,
+  operationsCockpit,
   currentUserId,
   isSending = false,
   isConfirming = false,
@@ -148,6 +153,8 @@ export function AgentCockpitBlock({
           </div>
         </header>
 
+        {operationsCockpit ? <AgentOperationsContextPanel data={operationsCockpit} /> : null}
+
         {!hasProposals ? (
           <>
             <div className="runtime-agent-review__list">
@@ -192,6 +199,62 @@ export function AgentCockpitBlock({
         ) : null}
       </aside>
     </div>
+  );
+}
+
+function AgentOperationsContextPanel({ data }: { data: OperationsCockpitReadModel }) {
+  const topAttention = data.attentionItems.slice(0, 3);
+  const cockpitUnavailable = data.agentContext.unavailableSources.find(
+    (source) => source.source === "operations_cockpit"
+  );
+  const permissionUnavailable = data.agentContext.unavailableSources.filter(
+    (source) => source.source === "opportunity_pipeline" || source.source === "resource_workload"
+  );
+
+  return (
+    <section className="agent-cockpit-context" aria-label="Контекст агента">
+      <div className="agent-cockpit-context__head">
+        <BarChart3 aria-hidden />
+        <div>
+          <span>Контекст cockpit</span>
+          <strong>{data.indicators.activeProjects} активных проектов</strong>
+        </div>
+      </div>
+      <div className="agent-cockpit-context__metrics">
+        <span>
+          <strong>{data.indicators.overdueTasks}</strong>
+          просрочено
+        </span>
+        <span>
+          <strong>{data.indicators.criticalTasks}</strong>
+          критично
+        </span>
+        <span>
+          <strong>{data.indicators.openDeals}</strong>
+          сделок
+        </span>
+      </div>
+      {topAttention.length > 0 ? (
+        <div className="agent-cockpit-context__attention">
+          {topAttention.map((item) => (
+            <div key={item.id} className="agent-cockpit-context__item">
+              <AlertTriangle aria-hidden />
+              <span>{item.title}</span>
+            </div>
+          ))}
+        </div>
+      ) : cockpitUnavailable ? (
+        <p>Операционный контекст недоступен: {cockpitUnavailable.reason}.</p>
+      ) : (
+        <p>Критичных сигналов в доступном контексте нет.</p>
+      )}
+      {permissionUnavailable.length > 0 ? (
+        <p>
+          Часть источников скрыта правами:{" "}
+          {permissionUnavailable.map((source) => source.source).join(", ")}.
+        </p>
+      ) : null}
+    </section>
   );
 }
 

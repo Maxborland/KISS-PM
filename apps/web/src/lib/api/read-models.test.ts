@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchWorkspaceOperationsCockpit,
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
   fetchWorkspaceDealStages,
@@ -14,6 +15,7 @@ import {
   fetchWorkspaceOpportunities,
   fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
+  useAgentCockpitReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries
@@ -29,6 +31,7 @@ describe("runtime read model API", () => {
 
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
+    expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
@@ -58,6 +61,15 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/agent-thread") {
         return json({ context: {}, messages: [{ id: "agent-message-1" }], proposals: [] });
       }
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({
+          cockpit: {
+            indicators: { activeProjects: 1 },
+            attentionItems: [],
+            agentContext: { unavailableSources: [] }
+          }
+        });
+      }
       if (path === "/api/workspace/agent-thread/messages") {
         return json({ context: {}, messages: [{ id: "agent-message-2" }], proposals: [{ id: "proposal-1" }] }, 201);
       }
@@ -81,6 +93,11 @@ describe("runtime read model API", () => {
       context: {},
       messages: [{ id: "agent-message-1" }],
       proposals: []
+    });
+    await expect(fetchWorkspaceOperationsCockpit()).resolves.toEqual({
+      indicators: { activeProjects: 1 },
+      attentionItems: [],
+      agentContext: { unavailableSources: [] }
     });
     await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toEqual({
       context: {},
@@ -106,15 +123,16 @@ describe("runtime read model API", () => {
       "/api/workspace/opportunities",
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
+      "/api/workspace/operations-cockpit",
       "/api/workspace/agent-thread/messages",
       "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
-    expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({
+    expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
     });
-    expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({
+    expect(fetchMock.mock.calls[7]?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
     });
@@ -173,6 +191,104 @@ describe("runtime read model API", () => {
       queryClient.clear();
       host.remove();
     }
+  });
+
+  it("loads the agent cockpit from agent thread and operations cockpit endpoints", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/agent-thread") {
+        return json({ context: {}, messages: [{ id: "agent-message-1" }], proposals: [] });
+      }
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({
+          cockpit: {
+            indicators: { activeProjects: 2, overdueTasks: 1, criticalTasks: 1, openDeals: 3 },
+            attentionItems: [{ id: "attention-1", title: "Просрочен этап" }],
+            agentContext: { contextType: "operations_cockpit", unavailableSources: [] }
+          }
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    function AgentProbe() {
+      useAgentCockpitReadModelQuery();
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AgentProbe)
+          )
+        );
+      });
+
+      await vi.waitFor(() =>
+        expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
+          "/api/workspace/agent-thread",
+          "/api/workspace/operations-cockpit"
+        ])
+      );
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/agent");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keeps the agent cockpit usable when operations cockpit persistence is unavailable", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({ error: "persistence_not_configured" }, 501);
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    await expect(fetchWorkspaceOperationsCockpit()).resolves.toMatchObject({
+      indicators: {
+        activeProjects: 0,
+        activeTasks: 0,
+        openDeals: 0
+      },
+      attentionItems: [],
+      agentContext: {
+        contextType: "operations_cockpit",
+        unavailableSources: [
+          {
+            source: "operations_cockpit",
+            reason: "persistence_not_configured"
+          }
+        ]
+      }
+    });
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/operations-cockpit"]);
+  });
+
+  it("does not hide operations cockpit permission errors", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({ error: "forbidden" }, 403);
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    await expect(fetchWorkspaceOperationsCockpit()).rejects.toMatchObject({
+      status: 403,
+      body: { error: "forbidden" }
+    });
   });
 
   it("uses only project/task endpoints for the dashboard read model", async () => {

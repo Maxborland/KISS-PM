@@ -21,6 +21,101 @@
   background: var(--panel-subtle);
 }
 
+.agent-cockpit-context {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.agent-cockpit-context__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.agent-cockpit-context__head svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.agent-cockpit-context__head div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.agent-cockpit-context__head span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.agent-cockpit-context__head strong {
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.agent-cockpit-context__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.agent-cockpit-context__metrics span {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.agent-cockpit-context__metrics strong {
+  color: var(--text);
+  font-size: var(--text-lg);
+  line-height: var(--lh-lg);
+}
+
+.agent-cockpit-context__attention {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-cockpit-context__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
+.agent-cockpit-context__item svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  color: var(--warning-text);
+}
+
+.agent-cockpit-context p {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
 .runtime-agent-review__step.is-active {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
   color: var(--accent);
