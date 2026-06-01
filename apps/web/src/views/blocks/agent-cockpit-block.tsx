@@ -324,9 +324,11 @@ function AgentProposalCard({
         </div>
       ) : null}
       {proposal.auditEventId ? (
-        <div className="runtime-agent-proposal__audit">
+        <div className="runtime-agent-proposal__audit" aria-label={`След аудита: ${proposal.auditEventId}`}>
           <CheckCircle2 aria-hidden />
-          Записано в аудит
+          <span>
+            Записано в аудит: <code>{proposal.auditEventId}</code>
+          </span>
         </div>
       ) : null}
       {proposal.status === "proposed" ? (

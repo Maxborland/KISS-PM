@@ -194,9 +194,8 @@ describe("RuntimeDashboardScreen", () => {
       });
 
       expect(host.textContent).toContain("Создана задача: Проверить исходные данные");
-      expect(host.textContent).toContain("Записано в аудит");
+      expect(host.textContent).toContain("Записано в аудит: audit-agent-action-1");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
-      expect(host.textContent).not.toContain("audit-agent-action-1");
       expect(host.textContent).toContain("применено");
       expect(host.textContent).not.toContain("Применить");
     } finally {
