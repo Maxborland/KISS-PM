@@ -95,6 +95,30 @@ describe("AgentCockpitBlock", () => {
                   resolvedAt: null,
                   status: "proposed",
                   title: "Зафиксировать поручение"
+                },
+                {
+                  actionType: "workspace.agent.create_task",
+                  auditEventId: null,
+                  context: {},
+                  createdAt: "2026-06-01T00:04:00.000Z",
+                  description: "Создать задачу, но еще не применять.",
+                  id: "proposal-pending-task",
+                  messageId: "message-runtime",
+                  payload: { task: { id: "task-pending-result", title: "Проверить договор" } },
+                  resultSummary: {
+                    status: "pending",
+                    mutationApplied: false,
+                    changedEntity: {
+                      type: "Task",
+                      id: "task-pending-result",
+                      title: "Проверить договор"
+                    },
+                    auditEventId: null,
+                    description: "После подтверждения будет создана задача «Проверить договор»."
+                  },
+                  resolvedAt: null,
+                  status: "proposed",
+                  title: "Создать задачу"
                 }
               ]
             }
@@ -115,6 +139,8 @@ describe("AgentCockpitBlock", () => {
       expect(host.querySelector('a[href="/my-work?taskId=task-agent-result"]')?.textContent).toContain(
         "Task:task-agent-result"
       );
+      expect(host.textContent).toContain("Task:task-pending-result · Проверить договор");
+      expect(host.querySelector('a[href="/my-work?taskId=task-pending-result"]')).toBeNull();
       expect(host.textContent).toContain("Записано в аудит: audit-hidden");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
 

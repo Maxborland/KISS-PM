@@ -364,7 +364,10 @@ function AgentProposalResult({
   summary: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>;
 }) {
   const ResultIcon = workspaceAgentResultStatusIcon(summary.status);
-  const changedEntityHref = workspaceAgentChangedEntityHref(summary.changedEntity);
+  const changedEntityHref =
+    summary.status === "succeeded" && summary.mutationApplied
+      ? workspaceAgentChangedEntityHref(summary.changedEntity)
+      : null;
   const changedEntityLabel = summary.changedEntity
     ? `${summary.changedEntity.type}:${summary.changedEntity.id} · ${summary.changedEntity.title}`
     : null;
