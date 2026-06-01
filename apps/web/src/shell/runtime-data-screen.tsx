@@ -6,7 +6,10 @@ import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/api/query-keys";
 import {
+  postWorkspaceAgentMessage,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -115,7 +118,15 @@ function RuntimeWorkspaceFrame({
 }
 
 function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }) {
+  const queryClient = useQueryClient();
   const readModel = useDashboardReadModelQueries({ assigneeUserId: currentUserId });
+  const sendWorkspaceAgentMessage = useMutation({
+    mutationFn: postWorkspaceAgentMessage,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      readModel.refetchAll();
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем дашборд…" />;
@@ -132,7 +143,15 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
     );
   }
 
-  return readModel.data ? <RuntimeDashboardScreen data={readModel.data} /> : null;
+  return readModel.data ? (
+    <RuntimeDashboardScreen
+      data={readModel.data}
+      currentUserId={currentUserId}
+      isSendingWorkspaceAgentMessage={sendWorkspaceAgentMessage.isPending}
+      workspaceAgentMessageError={sendWorkspaceAgentMessage.error}
+      onSendWorkspaceAgentMessage={(body) => sendWorkspaceAgentMessage.mutateAsync(body)}
+    />
+  ) : null;
 }
 
 function RuntimeMyWorkScreen({ currentUserId }: { currentUserId: string }) {

@@ -2,6 +2,7 @@
 
 import { act, createElement, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-data-screen";
@@ -12,10 +13,12 @@ const readModelHooks = vi.hoisted(() => ({
   dashboard: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
-  projects: vi.fn()
+  projects: vi.fn(),
+  postWorkspaceAgentMessage: vi.fn()
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
+  postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
@@ -23,8 +26,24 @@ vi.mock("@/lib/api/read-models", () => ({
 }));
 
 vi.mock("@/shell/runtime-dashboard-screen", () => ({
-  RuntimeDashboardScreen: ({ data }: { data: { tasks: { title: string }[] } }) =>
-    createElement("div", { "data-testid": "runtime-dashboard" }, data.tasks.map((task) => task.title).join(", "))
+  RuntimeDashboardScreen: ({
+    data,
+    onSendWorkspaceAgentMessage
+  }: {
+    data: { tasks: { title: string }[]; workspaceAgentThread?: { messages: { body: string }[] } };
+    onSendWorkspaceAgentMessage?: (body: string) => Promise<unknown>;
+  }) =>
+    createElement(
+      "button",
+      {
+        "data-testid": "runtime-dashboard",
+        onClick: () => void onSendWorkspaceAgentMessage?.("Что горит?")
+      },
+      [
+        data.tasks.map((task) => task.title).join(", "),
+        data.workspaceAgentThread?.messages.map((message) => message.body).join(", ")
+      ].join(" ")
+    )
 }));
 
 vi.mock("@/views/blocks/my-work-block", () => ({
@@ -54,10 +73,18 @@ vi.mock("@/views/screens/screen-view", () => ({
 describe("RuntimeDataScreen permission gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    readModelHooks.dashboard.mockReturnValue(successReadModel({ projects: [], tasks: [], scheduledTasks: [] }));
+    readModelHooks.dashboard.mockReturnValue(
+      successReadModel({
+        projects: [],
+        tasks: [],
+        scheduledTasks: [],
+        workspaceAgentThread: { context: {}, messages: [] }
+      })
+    );
     readModelHooks.deals.mockReturnValue(successReadModel({ opportunities: [], dealStages: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue({ data: { projects: [] }, error: null, isPending: false, isFetching: false });
+    readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [] });
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
@@ -86,7 +113,11 @@ describe("RuntimeDataScreen permission gate", () => {
       successReadModel({
         projects: [],
         tasks: [{ id: "task-runtime", title: "Runtime dashboard task" }],
-        scheduledTasks: []
+        scheduledTasks: [],
+        workspaceAgentThread: {
+          context: {},
+          messages: [{ id: "agent-runtime", body: "Runtime agent message" }]
+        }
       })
     );
 
@@ -99,8 +130,26 @@ describe("RuntimeDataScreen permission gate", () => {
     );
 
     expect(host.textContent).toContain("Runtime dashboard task");
+    expect(host.textContent).toContain("Runtime agent message");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.dashboard).toHaveBeenCalledWith({ assigneeUserId: "usr-1" });
+  });
+
+  it("sends dashboard agent messages through the runtime workspace agent API", async () => {
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "01-dashboard",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(readModelHooks.postWorkspaceAgentMessage).toHaveBeenCalled();
+    expect(readModelHooks.postWorkspaceAgentMessage.mock.calls[0]?.[0]).toBe("Что горит?");
   });
 
   it("renders my work from runtime read models without fixture fallback", async () => {
@@ -139,9 +188,12 @@ async function renderRuntime(element: ReactNode): Promise<HTMLElement> {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+  });
 
   await act(async () => {
-    root.render(element);
+    root.render(createElement(QueryClientProvider, { client: queryClient }, element));
   });
 
   return host;

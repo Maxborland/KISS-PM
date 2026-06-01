@@ -26,6 +26,32 @@ export type DashboardReadModel = {
   projects: Project[];
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
+  workspaceAgentThread: WorkspaceAgentThread;
+};
+
+export type WorkspaceAgentFocusType = "project" | "task" | "deal";
+
+export type WorkspaceAgentContextFocus = {
+  type: WorkspaceAgentFocusType;
+  id: string;
+  title?: string;
+};
+
+export type WorkspaceAgentThreadContext = {
+  focus?: WorkspaceAgentContextFocus;
+};
+
+export type WorkspaceAgentMessage = {
+  id: string;
+  authorUserId: string;
+  body: string;
+  context: WorkspaceAgentThreadContext;
+  createdAt: string;
+};
+
+export type WorkspaceAgentThread = {
+  context: WorkspaceAgentThreadContext;
+  messages: WorkspaceAgentMessage[];
 };
 
 export type ScheduledTasksQueryInput = {
@@ -80,6 +106,17 @@ export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
     method: "GET"
   });
   return response.dealStages;
+}
+
+export async function fetchWorkspaceAgentThread(): Promise<WorkspaceAgentThread> {
+  return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread", { method: "GET" });
+}
+
+export async function postWorkspaceAgentMessage(body: string): Promise<WorkspaceAgentThread> {
+  return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread/messages", {
+    method: "POST",
+    json: body
+  });
 }
 
 export function useProjectsListReadModelQuery() {
@@ -174,17 +211,22 @@ export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
           scheduledInput.toDate
         ),
         queryFn: () => fetchTenantCurrentScheduledTasks(scheduledInput)
+      },
+      {
+        queryKey: queryKeys.workspace.workspaceAgentThread,
+        queryFn: fetchWorkspaceAgentThread
       }
     ]
   });
 
-  const [projectsQuery, tasksQuery, scheduledTasksQuery] = queries;
+  const [projectsQuery, tasksQuery, scheduledTasksQuery, workspaceAgentThreadQuery] = queries;
   const data =
-    projectsQuery.data && tasksQuery.data && scheduledTasksQuery.data
+    projectsQuery.data && tasksQuery.data && scheduledTasksQuery.data && workspaceAgentThreadQuery.data
       ? {
           projects: projectsQuery.data as Project[],
           tasks: tasksQuery.data as Task[],
-          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[]
+          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
+          workspaceAgentThread: workspaceAgentThreadQuery.data as WorkspaceAgentThread
         }
       : undefined;
 

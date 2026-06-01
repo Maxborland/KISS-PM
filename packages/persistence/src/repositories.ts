@@ -38,6 +38,7 @@ import {
   type CrmActivityRepository
 } from "./crmActivityRepository";
 import { createControlRepository, type ControlRepository } from "./controlRepository";
+import { createWorkspaceAgentRepository, type WorkspaceAgentRepository } from "./workspaceAgentRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -130,6 +131,7 @@ export type PostgresTenantDataSource = CrmRepository &
   TenantProductionCalendarRepository &
   ResourceAbsencesRepository &
   ControlRepository &
+  WorkspaceAgentRepository &
   CrmActivityRepository & {
   db: KissPmDatabase;
   listDevUsers(): Promise<TenantUser[]>;
@@ -192,6 +194,7 @@ export function createPostgresTenantDataSource(
     ...createTenantProductionCalendarRepository(db),
     ...createResourceAbsencesRepository(db),
     ...createCrmActivityRepository(db),
+    ...createWorkspaceAgentRepository(db),
     ...createWorkspaceConfigRepository(db),
     async listDevUsers() {
       const rows = await db.select().from(tenantUsers).orderBy(tenantUsers.id);

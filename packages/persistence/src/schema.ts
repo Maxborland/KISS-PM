@@ -1700,6 +1700,52 @@ export const auditEvents = pgTable(
   ]
 );
 
+export const workspaceAgentMessages = pgTable(
+  "workspace_agent_messages",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    authorUserId: text("author_user_id").notNull(),
+    focusType: text("focus_type"),
+    focusId: text("focus_id"),
+    body: text("body").notNull(),
+    context: jsonb("context").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "workspace_agent_messages_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "workspace_agent_messages_author_fk",
+      columns: [table.tenantId, table.authorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("workspace_agent_messages_context_created_idx").on(
+      table.tenantId,
+      table.focusType,
+      table.focusId,
+      table.createdAt,
+      table.id
+    ),
+    check(
+      "workspace_agent_messages_focus_type_chk",
+      sql`${table.focusType} is null or ${table.focusType} in ('project', 'task', 'deal')`
+    ),
+    check(
+      "workspace_agent_messages_focus_pair_chk",
+      sql`(
+        (${table.focusType} is null and ${table.focusId} is null)
+        or
+        (${table.focusType} is not null and ${table.focusId} is not null)
+      )`
+    )
+  ]
+);
+
 export type PersistenceTableName =
   | "tenants"
   | "access_profiles"
@@ -1748,7 +1794,8 @@ export type PersistenceTableName =
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
-  | "audit_events";
+  | "audit_events"
+  | "workspace_agent_messages";
 
 export type TenantOwnedTableName = Exclude<PersistenceTableName, "tenants">;
 
@@ -1805,7 +1852,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenant_users",
   "user_credentials",
   "user_sessions",
-  "audit_events"
+  "audit_events",
+  "workspace_agent_messages"
 ];
 
 export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
@@ -1855,7 +1903,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "tenant_users",
   "user_credentials",
   "user_sessions",
-  "audit_events"
+  "audit_events",
+  "workspace_agent_messages"
 ];
 
 const tableColumns = {
@@ -2390,6 +2439,16 @@ const tableColumns = {
     "permission_result",
     "execution_result",
     "correlation_id",
+    "created_at"
+  ],
+  workspace_agent_messages: [
+    "id",
+    "tenant_id",
+    "author_user_id",
+    "focus_type",
+    "focus_id",
+    "body",
+    "context",
     "created_at"
   ]
 } as const satisfies Record<PersistenceTableName, readonly string[]>;
