@@ -146,6 +146,7 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
   return readModel.data ? (
     <RuntimeDashboardScreen
       data={readModel.data}
+      currentUserId={currentUserId}
       isSendingWorkspaceAgentMessage={sendWorkspaceAgentMessage.isPending}
       workspaceAgentMessageError={sendWorkspaceAgentMessage.error}
       onSendWorkspaceAgentMessage={(body) => sendWorkspaceAgentMessage.mutateAsync(body)}

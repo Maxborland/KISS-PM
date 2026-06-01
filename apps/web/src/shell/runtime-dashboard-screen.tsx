@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { BriefcaseBusiness, CalendarClock, FolderKanban, ListChecks } from "lucide-react";
+import {
+  Bot,
+  BriefcaseBusiness,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  FolderKanban,
+  ListChecks,
+  SendHorizontal,
+  ShieldCheck
+} from "lucide-react";
 
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
@@ -19,11 +29,13 @@ import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 export function RuntimeDashboardScreen({
   data,
+  currentUserId,
   isSendingWorkspaceAgentMessage = false,
   workspaceAgentMessageError = null,
   onSendWorkspaceAgentMessage
 }: {
   data: DashboardReadModel;
+  currentUserId?: string;
   isSendingWorkspaceAgentMessage?: boolean;
   workspaceAgentMessageError?: unknown;
   onSendWorkspaceAgentMessage?: (body: string) => Promise<unknown>;
@@ -144,60 +156,106 @@ export function RuntimeDashboardScreen({
 
         <div className="bento__cell bento__cell--12">
           <CardPanel title="Управленческий агент" subtitle="Единый поток рабочей области" flush>
-            {data.workspaceAgentThread.messages.length === 0 ? (
-              <EmptyState
-                title="История пуста"
-                description="Задайте вопрос по портфелю, задачам, срокам или загрузке."
-              />
-            ) : (
-              <DataTable>
-                <thead>
-                  <tr>
-                    <th>Сообщение</th>
-                    <th>Время</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.workspaceAgentThread.messages.slice(-5).map((message) => (
-                    <tr key={message.id}>
-                      <td>
-                        <CellStack title={message.body} subtitle={message.authorUserId} />
-                      </td>
-                      <td className="mono cell-muted">{formatDate(message.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </DataTable>
-            )}
+            <div className="runtime-agent" aria-label="Единый управленческий агент">
+              <section className="runtime-agent__chat" aria-label="Чат с Генри Ганттом">
+                <header className="runtime-agent__header">
+                  <div className="runtime-agent__title">
+                    <span className="runtime-agent__mark"><Bot aria-hidden /></span>
+                    <div>
+                      <h3>Генри Гантт</h3>
+                      <span>Агент рабочей области</span>
+                    </div>
+                  </div>
+                  <div className="runtime-agent__status">
+                    <span className="dot dot--success" />
+                    Ждет подтверждения перед изменениями
+                  </div>
+                </header>
 
-            <form
-              className="u-flex-col u-gap-3 u-pad-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const body = agentInput.trim();
-                if (!body || !onSendWorkspaceAgentMessage) return;
-                void onSendWorkspaceAgentMessage(body).then(() => setAgentInput(""));
-              }}
-            >
-              <Textarea
-                aria-label="Сообщение агенту"
-                placeholder="Спросить, что требует внимания сегодня"
-                value={agentInput}
-                onChange={(event) => setAgentInput(event.target.value)}
-              />
-              {workspaceAgentMessageError ? (
-                <p className="u-text-xs u-text-muted">Не удалось отправить сообщение агенту.</p>
-              ) : null}
-              <div className="u-flex">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!agentInput.trim() || isSendingWorkspaceAgentMessage || !onSendWorkspaceAgentMessage}
+                <div className="runtime-agent__body">
+                  {data.workspaceAgentThread.messages.length === 0 ? (
+                    <EmptyState
+                      title="История пуста"
+                      description="Задайте вопрос по портфелю, задачам, срокам или загрузке."
+                    />
+                  ) : (
+                    data.workspaceAgentThread.messages.slice(-6).map((message) => {
+                      const isOwnMessage = currentUserId ? message.authorUserId === currentUserId : true;
+                      return (
+                        <article
+                          key={message.id}
+                          className={`runtime-agent-message${isOwnMessage ? " runtime-agent-message--user" : ""}`}
+                        >
+                          <span className="runtime-agent-message__avatar" aria-hidden>
+                            {isOwnMessage ? "Вы" : <Bot aria-hidden />}
+                          </span>
+                          <div className="runtime-agent-message__content">
+                            <div className="runtime-agent-message__meta">
+                              <span>{isOwnMessage ? "Вы" : "Генри Гантт"}</span>
+                              <time>{formatDate(message.createdAt)}</time>
+                            </div>
+                            <p>{message.body}</p>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+
+                <form
+                  className="runtime-agent__composer"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const body = agentInput.trim();
+                    if (!body || !onSendWorkspaceAgentMessage) return;
+                    void onSendWorkspaceAgentMessage(body).then(() => setAgentInput(""));
+                  }}
                 >
-                  {isSendingWorkspaceAgentMessage ? "Отправляем…" : "Отправить"}
-                </Button>
-              </div>
-            </form>
+                  <Textarea
+                    aria-label="Сообщение Генри Гантту"
+                    placeholder="Спросить, что требует внимания сегодня"
+                    value={agentInput}
+                    onChange={(event) => setAgentInput(event.target.value)}
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="icon"
+                    aria-label="Отправить сообщение"
+                    disabled={!agentInput.trim() || isSendingWorkspaceAgentMessage || !onSendWorkspaceAgentMessage}
+                  >
+                    <SendHorizontal aria-hidden />
+                  </Button>
+                </form>
+                {workspaceAgentMessageError ? (
+                  <p className="runtime-agent__error">Не удалось отправить сообщение агенту.</p>
+                ) : null}
+              </section>
+
+              <aside className="runtime-agent-review" aria-label="Сверка изменений">
+                <header className="runtime-agent-review__header">
+                  <ShieldCheck aria-hidden />
+                  <div>
+                    <span>Сверка изменений</span>
+                    <strong>0 предложений</strong>
+                  </div>
+                </header>
+                <div className="runtime-agent-review__list">
+                  <div className="runtime-agent-review__step is-done">
+                    <CheckCircle2 aria-hidden />
+                    <span>Контекст рабочей области подключен</span>
+                  </div>
+                  <div className="runtime-agent-review__step">
+                    <Clock3 aria-hidden />
+                    <span>Action proposal API будет подключен отдельным slice</span>
+                  </div>
+                </div>
+                <p>
+                  Генри пока сохраняет сообщения и читает контекст. Изменения появятся здесь только после
+                  backend-контракта подтверждаемых действий.
+                </p>
+              </aside>
+            </div>
           </CardPanel>
         </div>
       </div>

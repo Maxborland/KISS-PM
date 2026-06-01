@@ -83,10 +83,11 @@ describe("RuntimeDashboardScreen", () => {
                       }
                     ]
                   }
-                } as never,
-                onSendWorkspaceAgentMessage: async (body) => {
-                  sent.push(body);
-                }
+              } as never,
+              currentUserId: "usr-1",
+              onSendWorkspaceAgentMessage: async (body) => {
+                sent.push(body);
+              }
               })
             }
           )
@@ -94,7 +95,11 @@ describe("RuntimeDashboardScreen", () => {
       });
 
       expect(host.textContent).toContain("Управленческий агент");
+      expect(host.textContent).toContain("Генри Гантт");
+      expect(host.textContent).toContain("Сверка изменений");
+      expect(host.textContent).toContain("Ждет подтверждения перед изменениями");
       expect(host.textContent).toContain("Проверить просроченные задачи");
+      expect(host.textContent).not.toContain("Применить выбранное");
 
       const textarea = host.querySelector("textarea");
       expect(textarea).not.toBeNull();
