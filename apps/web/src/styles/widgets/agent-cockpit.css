@@ -1,0 +1,126 @@
+.agent-cockpit-screen {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.agent-cockpit--surface {
+  min-height: calc(100vh - var(--topbar-height) - var(--space-8));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.agent-cockpit-thinking {
+  display: grid;
+  gap: var(--space-2);
+  max-width: min(560px, 100%);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-subtle);
+}
+
+.runtime-agent-review__step.is-active {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  color: var(--accent);
+}
+
+.runtime-agent-review__step.is-active svg {
+  color: var(--accent);
+}
+
+.agent-cockpit-diff {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-subtle);
+}
+
+.agent-cockpit-diff__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 700;
+}
+
+.agent-cockpit-diff__title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.agent-cockpit-diff__row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
+.agent-cockpit-diff__row span {
+  color: var(--muted);
+}
+
+.agent-cockpit-diff__row del {
+  color: var(--danger-text);
+  text-decoration-color: var(--danger);
+}
+
+.agent-cockpit-diff__row strong {
+  color: var(--success-text);
+  font-weight: 650;
+}
+
+.agent-cockpit__audit-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--success-soft);
+  color: var(--success-text);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
+.agent-cockpit__audit-strip--pending {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.agent-cockpit__audit-strip svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.agent-cockpit__spin {
+  animation: agent-cockpit-spin var(--duration-slow) linear infinite;
+}
+
+@keyframes agent-cockpit-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-cockpit--surface {
+    min-height: auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .agent-cockpit-diff__row {
+    grid-template-columns: 1fr;
+  }
+}

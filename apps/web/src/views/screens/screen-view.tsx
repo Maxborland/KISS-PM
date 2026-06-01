@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { AgentCockpitBlock } from "@/views/blocks/agent-cockpit-block";
 import { AdminBlock } from "@/views/blocks/admin-block";
 import { AvatarMenuBlock } from "@/views/blocks/avatar-menu-block";
 import { DashboardBento } from "@/views/blocks/dashboard-bento";
@@ -70,6 +71,9 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
   "17-project-audit": () => <ProjectAuditBlock />,
   "18-project-calendars": () => <ProjectCalendarsBlock />,
   "19-login": () => <LoginScreenView variant="default" />,
+  "20-agent-cockpit": () => (
+    <AgentCockpitBlock thread={{ context: {}, messages: [], proposals: [] }} variant="surface" />
+  ),
   "state-empty": () => <StateScreenBlock kind="empty" />,
   "state-error": () => <StateScreenBlock kind="error" />,
   "state-forbidden": () => <StateScreenBlock kind="forbidden" />,

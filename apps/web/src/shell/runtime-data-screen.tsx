@@ -27,6 +27,7 @@ import type { ScreenId } from "@/views/catalog";
 import { canOpenScreenRoute, getScreenRoute } from "@/views/screens/screen-route";
 import { ScreenView } from "@/views/screens/screen-view";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
+import { RuntimeAgentScreen } from "@/shell/runtime-agent-screen";
 import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
 
 export function canOpenStaticRuntimeScreen(
@@ -69,6 +70,15 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeMyWorkScreen currentUserId={currentUserId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "20-agent-cockpit") {
+    if (!currentUserId) return <RuntimeMissingUserState />;
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeAgentScreen currentUserId={currentUserId} />
       </RuntimeWorkspaceFrame>
     );
   }
