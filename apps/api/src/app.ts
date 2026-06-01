@@ -46,6 +46,7 @@ import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { registerWorkspaceConfigRoutes } from "./workspaceConfigRoutes";
 import { registerWorkspaceUserRoutes } from "./workspaceUserRoutes";
+import { registerWorkspaceAgentRoutes } from "./workspaceAgentRoutes";
 
 export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 
@@ -227,6 +228,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
   registerScheduledTasksRoutes(app, routeDeps);
+  registerWorkspaceAgentRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);
   registerWorkspaceUserRoutes(app, routeDeps);
   registerPositionRoutes(app, routeDeps);

@@ -56,7 +56,8 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
-      "audit_events"
+      "audit_events",
+      "workspace_agent_messages"
     ]);
   });
 
@@ -108,7 +109,8 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
-      "audit_events"
+      "audit_events",
+      "workspace_agent_messages"
     ]);
 
     for (const tableName of tenantOwnedTableNames) {
@@ -193,6 +195,19 @@ describe("PostgreSQL persistence schema", () => {
         "mime_type"
       ])
     );
+  });
+
+  it("stores workspace agent messages by tenant and optional focus", () => {
+    expect(getPersistenceTableColumns("workspace_agent_messages")).toEqual([
+      "id",
+      "tenant_id",
+      "author_user_id",
+      "focus_type",
+      "focus_id",
+      "body",
+      "context",
+      "created_at"
+    ]);
   });
 
   it("stores the Phase 4.2 task workspace contract", () => {

@@ -8,6 +8,7 @@ export * from "./projectIntakeRepository";
 export * from "./planningRepository";
 export * from "./planningSavedViewsRepository";
 export * from "./projectWorkRepository";
+export * from "./workspaceAgentRepository";
 export * from "./tenantProductionCalendarConstants";
 export * from "./tenantProductionCalendarRepository";
 export * from "./resourceAbsencesRepository";

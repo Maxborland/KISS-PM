@@ -3,7 +3,9 @@ import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
 import type {
   AccessProfileRecord,
   ApiTenantDataSource,
-  AuditEventListItem
+  AuditEventListItem,
+  WorkspaceAgentMessageRecord,
+  WorkspaceAgentThreadContext
 } from "./apiTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 
@@ -16,6 +18,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
     permissions: tenantAdminProfile.permissions
   }));
   const auditEvents: AuditEventListItem[] = [];
+  const workspaceAgentMessages: WorkspaceAgentMessageRecord[] = [];
 
   return {
     async listDevUsers() {
@@ -49,6 +52,25 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
     },
     async listAuditEventsByTenantId(tenantId) {
       return auditEvents.filter((event) => event.tenantId === tenantId);
+    },
+    async listWorkspaceAgentMessages(input) {
+      return workspaceAgentMessages
+        .filter(
+          (message) =>
+            message.tenantId === input.tenantId &&
+            workspaceAgentContextKey(message.context) === workspaceAgentContextKey(input.context)
+        )
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(-(input.limit ?? 100));
+    },
+    async createWorkspaceAgentMessage(input) {
+      workspaceAgentMessages.push(input);
+      return input;
     }
   };
+}
+
+function workspaceAgentContextKey(context: WorkspaceAgentThreadContext): string {
+  if (!context.focus) return "portfolio";
+  return `${context.focus.type}:${context.focus.id}`;
 }

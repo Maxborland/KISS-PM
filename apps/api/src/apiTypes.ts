@@ -67,6 +67,27 @@ export type WorkspaceUserRecord = TenantUser & {
   accentColor: string;
 };
 
+export type WorkspaceAgentFocusType = "project" | "task" | "deal";
+
+export type WorkspaceAgentContextFocus = {
+  type: WorkspaceAgentFocusType;
+  id: string;
+  title?: string;
+};
+
+export type WorkspaceAgentThreadContext = {
+  focus?: WorkspaceAgentContextFocus;
+};
+
+export type WorkspaceAgentMessageRecord = {
+  id: string;
+  tenantId: TenantId;
+  authorUserId: UserId;
+  body: string;
+  context: WorkspaceAgentThreadContext;
+  createdAt: Date;
+};
+
 export type PositionRecord = {
   id: string;
   tenantId: TenantId;
@@ -592,6 +613,12 @@ export type ApiTenantDataSource = {
     createdAt: Date;
   }): Promise<void>;
   listAuditEventsByTenantId?(tenantId: TenantId): Promise<AuditEventListItem[]>;
+  listWorkspaceAgentMessages?(input: {
+    tenantId: TenantId;
+    context: WorkspaceAgentThreadContext;
+    limit?: number;
+  }): Promise<WorkspaceAgentMessageRecord[]>;
+  createWorkspaceAgentMessage?(input: WorkspaceAgentMessageRecord): Promise<WorkspaceAgentMessageRecord>;
 };
 
 export type CreateAppOptions = {
