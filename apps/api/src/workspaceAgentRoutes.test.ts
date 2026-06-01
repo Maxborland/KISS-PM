@@ -1,6 +1,6 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { TaskRecord } from "@kiss-pm/persistence";
+import type { TaskActivityRecord, TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -25,6 +25,11 @@ const actor = {
 const readerProfile = {
   id: "profile-alpha",
   permissions: ["tenant.projects.read", "tenant.opportunities.read"]
+} as AccessProfile;
+
+const taskCreatorProfile = {
+  id: "profile-alpha",
+  permissions: ["tenant.projects.read", "tenant.opportunities.read", "tenant.tasks.create"]
 } as AccessProfile;
 
 describe("workspace agent routes", () => {
@@ -130,6 +135,117 @@ describe("workspace agent routes", () => {
         })
       })
     ]);
+  });
+
+  it("creates a real task only after confirming a create-task agent proposal", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Проверить исходные данные по БЦ Север")
+    });
+    expect(post.status).toBe(201);
+    const body = (await post.json()) as { proposal: { id: string } };
+    await expect(Promise.resolve(body)).resolves.toMatchObject({
+      proposal: {
+        actionType: "workspace.agent.create_task",
+        status: "proposed",
+        payload: {
+          task: {
+            title: "Проверить исходные данные по БЦ Север",
+            participants: [
+              { userId: actor.id, role: "executor" },
+              { userId: actor.id, role: "requester" }
+            ]
+          }
+        }
+      }
+    });
+    expect(fixture.tasks).toHaveLength(1);
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(200);
+    await expect(confirmed.json()).resolves.toMatchObject({
+      proposal: {
+        id: body.proposal.id,
+        status: "applied",
+        auditEventId: "audit-agent-action-1"
+      },
+      auditEventId: "audit-agent-action-1"
+    });
+    expect(fixture.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Проверить исходные данные по БЦ Север",
+          projectId: "project-workspace-inbox",
+          requesterUserId: actor.id,
+          ownerUserId: actor.id,
+          participants: [
+            { userId: actor.id, role: "executor" },
+            { userId: actor.id, role: "requester" }
+          ]
+        })
+      ])
+    );
+    expect(fixture.taskActivities).toEqual([
+      expect.objectContaining({
+        taskId: expect.stringMatching(/^task-/),
+        type: "system",
+        title: "Задача создана агентом"
+      })
+    ]);
+    expect(fixture.audits).toEqual([
+      expect.objectContaining({
+        actionType: "workspace.agent_action.applied",
+        afterState: expect.objectContaining({
+          task: expect.objectContaining({
+            title: "Проверить исходные данные по БЦ Север",
+            projectId: "project-workspace-inbox"
+          }),
+          planVersion: 2
+        }),
+        executionResult: expect.objectContaining({
+          mutationApplied: true,
+          status: "succeeded",
+          createdEntity: expect.objectContaining({ type: "Task" })
+        })
+      })
+    ]);
+  });
+
+  it("denies applying a create-task proposal without task create permission", async () => {
+    const fixture = createFixture();
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Проверить доступы")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(403);
+    await expect(confirmed.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(fixture.tasks).toHaveLength(1);
+    expect(fixture.taskActivities).toEqual([]);
+    expect(fixture.audits).toEqual([]);
   });
 
   it("rejects repeat confirmation for already resolved proposal", async () => {
@@ -242,6 +358,7 @@ function createRouteApp(
     dataSource: fixture.dataSource,
     getActorProfile: async () => fixture.profile,
     getSessionActorFromHeaders: async () => (options.actor === null ? undefined : options.actor ?? actor),
+    runDataSourceTransaction: async (operation) => operation(fixture.dataSource),
     appendManagementAuditEvent: async (event) => {
       fixture.audits.push(event);
       return `audit-agent-action-${fixture.audits.length}`;
@@ -256,6 +373,13 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
   const audits: ManagementAuditEventInput[] = [];
   const projectRecord = project("project-alpha", "Проект Альфа");
   const taskRecord = task("task-alpha", "Задача Альфа", projectRecord.id);
+  const tasks: TaskRecord[] = [taskRecord];
+  const taskActivities: TaskActivityRecord[] = [];
+  const taskStatusRecord = taskStatus("task-status-new", "Новая");
+  const inboxProject = {
+    ...project("project-workspace-inbox", "Входящие задачи"),
+    sourceType: "workspace_inbox" as const
+  };
   const dealRecord = deal("deal-alpha", "Сделка Альфа");
 
   const dataSource = {
@@ -274,8 +398,98 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
     async listProjects() {
       return [projectRecord];
     },
-    async findTaskById() {
-      return taskRecord;
+    async ensureWorkspaceInboxProject() {
+      return inboxProject;
+    },
+    async findTaskById(tenantId, taskId) {
+      return tasks.find((candidate) => candidate.tenantId === tenantId && candidate.id === taskId);
+    },
+    async listWorkspaceUsers() {
+      return [
+        {
+          ...actor,
+          email: "user-alpha@example.test",
+          positionId: null,
+          positionName: null,
+          phone: null,
+          telegram: null,
+          status: "active",
+          theme: "light",
+          accentColor: "teal"
+        }
+      ];
+    },
+    async listTaskStatuses() {
+      return [taskStatusRecord];
+    },
+    async applyPlanningCommand(input) {
+      if (input.command.type !== "task.create") return;
+      const payload = input.command.payload;
+      const now = new Date("2026-06-01T00:00:00.000Z");
+      const durationMinutes = typeof payload.durationMinutes === "number" ? payload.durationMinutes : 480;
+      const workMinutes = typeof payload.workMinutes === "number" ? payload.workMinutes : 60;
+      tasks.push({
+        id: payload.id,
+        tenantId: input.tenantId,
+        projectId: input.projectId,
+        stageId: null,
+        title: payload.title,
+        description: null,
+        status: taskStatusRecord.category,
+        statusId: payload.statusId,
+        statusName: taskStatusRecord.name,
+        statusCategory: taskStatusRecord.category,
+        priority: "normal",
+        requesterUserId: actor.id,
+        ownerUserId: actor.id,
+        plannedStart: new Date(`${payload.plannedStart}T00:00:00.000Z`),
+        plannedFinish: new Date(`${payload.plannedFinish}T00:00:00.000Z`),
+        durationWorkingDays: durationMinutes / 480,
+        plannedWork: workMinutes / 60,
+        actualWork: 0,
+        progress: 0,
+        requiresAcceptance: false,
+        source: "manual",
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        participants: []
+      });
+    },
+    async updateTaskMetadata(input) {
+      const index = tasks.findIndex(
+        (candidate) => candidate.tenantId === input.tenantId && candidate.id === input.taskId
+      );
+      if (index < 0) return undefined;
+      const current = tasks[index];
+      if (!current) return undefined;
+      const updated = {
+        ...current,
+        description: input.description,
+        priority: input.priority,
+        requesterUserId: input.requesterUserId,
+        ownerUserId: input.ownerUserId,
+        requiresAcceptance: input.requiresAcceptance,
+        participants: input.participants,
+        updatedAt: new Date("2026-06-01T00:00:00.000Z")
+      };
+      tasks[index] = updated;
+      return updated;
+    },
+    async incrementPlanVersion() {
+      return 2;
+    },
+    async createTaskActivity(input) {
+      const record = {
+        ...input,
+        createdAt: new Date("2026-06-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-01T00:00:00.000Z")
+      };
+      taskActivities.push(record);
+      return record;
+    },
+    async lockTenantResourcePlanning() {
+      return;
     },
     async findOpportunityById() {
       return dealRecord;
@@ -323,7 +537,7 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
     }
   } satisfies ApiTenantDataSource;
 
-  return { audits, dataSource, messages, profile: input.profile ?? readerProfile };
+  return { audits, dataSource, messages, profile: input.profile ?? readerProfile, taskActivities, tasks };
 }
 
 function requestOptions() {
@@ -398,6 +612,20 @@ function task(id: string, title: string, projectId: string): TaskRecord {
     updatedAt: now,
     archivedAt: null,
     participants: []
+  };
+}
+
+function taskStatus(id: string, name: string): TaskStatusRecord {
+  return {
+    id,
+    tenantId: "tenant-alpha",
+    name,
+    category: "new",
+    sortOrder: 10,
+    status: "active",
+    isSystem: true,
+    createdAt: new Date("2026-06-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-01T00:00:00.000Z")
   };
 }
 
