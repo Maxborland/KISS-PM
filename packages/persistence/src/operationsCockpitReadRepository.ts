@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
@@ -110,24 +110,48 @@ export type OperationsCockpitReadRepository = {
 const finalOpportunityStatuses = ["won_closed", "lost_rejected"];
 const activeProjectStatuses = ["active", "draft", "paused"];
 const activeTaskCategories = ["new", "waiting", "in_progress", "review"];
+const attentionLimit = 25;
+const pipelinePressureLimit = 20;
+const workloadHintsLimit = 20;
 
 export function createOperationsCockpitReadRepository(
   db: KissPmDatabase
 ): OperationsCockpitReadRepository {
   return {
     async getOperationsCockpitReadModel(input) {
-      const [projectRows, taskRows] = await Promise.all([
-        db
-          .select()
-          .from(projects)
-          .where(eq(projects.tenantId, input.tenantId))
-          .orderBy(desc(projects.activatedAt), desc(projects.createdAt), desc(projects.id)),
+      const generatedAt = input.now.toISOString();
+      const today = toIsoDate(input.now);
+      const taskCategory = sql`coalesce(${taskStatuses.category}, ${tasks.status})`;
+      const activeProjectStatus = inArray(projects.status, activeProjectStatuses);
+      const activeTaskStatus = inArray(taskCategory, activeTaskCategories);
+      const overdueProject = sql`${projects.plannedFinish}::date < ${today}::date`;
+      const overdueTask = sql`${tasks.plannedFinish}::date < ${today}::date`;
+      const baseActiveTaskScope = and(
+        eq(tasks.tenantId, input.tenantId),
+        isNull(tasks.archivedAt),
+        activeProjectStatus,
+        activeTaskStatus
+      );
+
+      const [
+        projectIndicators,
+        taskIndicators,
+        projectAttentionRows,
+        taskAttentionRows
+      ] = await Promise.all([
         db
           .select({
-            task: tasks,
-            status: taskStatuses,
-            projectTitle: projects.title,
-            projectStatus: projects.status
+            activeProjects: sql<number>`count(*) filter (where ${activeProjectStatus})::int`,
+            overdueProjects: sql<number>`count(*) filter (where ${activeProjectStatus} and ${overdueProject})::int`
+          })
+          .from(projects)
+          .where(eq(projects.tenantId, input.tenantId)),
+        db
+          .select({
+            activeTasks: sql<number>`count(*)::int`,
+            overdueTasks: sql<number>`count(*) filter (where ${overdueTask})::int`,
+            waitingTasks: sql<number>`count(*) filter (where ${taskCategory} = 'waiting')::int`,
+            criticalTasks: sql<number>`count(*) filter (where ${tasks.priority} = 'critical')::int`
           })
           .from(tasks)
           .leftJoin(
@@ -141,26 +165,74 @@ export function createOperationsCockpitReadRepository(
             projects,
             and(eq(projects.tenantId, tasks.tenantId), eq(projects.id, tasks.projectId))
           )
-          .where(and(eq(tasks.tenantId, input.tenantId), isNull(tasks.archivedAt)))
-          .orderBy(desc(tasks.plannedFinish), desc(tasks.createdAt), desc(tasks.id)),
+          .where(baseActiveTaskScope),
+        db
+          .select()
+          .from(projects)
+          .where(
+            and(eq(projects.tenantId, input.tenantId), activeProjectStatus, overdueProject)
+          )
+          .orderBy(asc(projects.plannedFinish), desc(projects.createdAt), desc(projects.id))
+          .limit(attentionLimit),
+        db
+          .select({
+            task: tasks,
+            statusName: taskStatuses.name,
+            statusCategory: taskStatuses.category
+          })
+          .from(tasks)
+          .leftJoin(
+            taskStatuses,
+            and(
+              eq(taskStatuses.tenantId, tasks.tenantId),
+              eq(taskStatuses.id, tasks.statusId)
+            )
+          )
+          .leftJoin(
+            projects,
+            and(eq(projects.tenantId, tasks.tenantId), eq(projects.id, tasks.projectId))
+          )
+          .where(
+            and(
+              baseActiveTaskScope,
+              sql`(${overdueTask} or ${taskCategory} = 'waiting' or ${tasks.priority} = 'critical')`
+            )
+          )
+          .orderBy(asc(tasks.plannedFinish), desc(tasks.createdAt), desc(tasks.id))
+          .limit(attentionLimit * 3)
       ]);
-      const userRows = input.includeWorkloadHints
+
+      const dealIndicators = input.includePipelinePressure
+        ? (
+            await db
+              .select({
+                openDeals: sql<number>`count(*)::int`,
+                readyToActivateDeals: sql<number>`count(*) filter (where ${opportunities.status} = 'ready_to_activate')::int`
+              })
+              .from(opportunities)
+              .where(
+                and(
+                  eq(opportunities.tenantId, input.tenantId),
+                  notInArray(opportunities.status, finalOpportunityStatuses)
+                )
+              )
+          )[0]
+        : { openDeals: 0, readyToActivateDeals: 0 };
+
+      const readyDealAttentionRows = input.includePipelinePressure
         ? await db
-            .select({
-              user: tenantUsers,
-              positionName: positions.name
-            })
-            .from(tenantUsers)
-            .leftJoin(
-              positions,
+            .select()
+            .from(opportunities)
+            .where(
               and(
-                eq(positions.tenantId, tenantUsers.tenantId),
-                eq(positions.id, tenantUsers.positionId)
+                eq(opportunities.tenantId, input.tenantId),
+                eq(opportunities.status, "ready_to_activate")
               )
             )
-            .where(eq(tenantUsers.tenantId, input.tenantId))
+            .orderBy(asc(opportunities.plannedFinish), desc(opportunities.updatedAt), desc(opportunities.id))
+            .limit(attentionLimit)
         : [];
-      const opportunityRows = input.includePipelinePressure
+      const pipelinePressureRows = input.includePipelinePressure
         ? await db
             .select()
             .from(opportunities)
@@ -171,58 +243,58 @@ export function createOperationsCockpitReadRepository(
               )
             )
             .orderBy(desc(opportunities.probability), desc(opportunities.updatedAt), desc(opportunities.id))
+            .limit(pipelinePressureLimit)
+        : [];
+      const workloadRows = input.includeWorkloadHints
+        ? await db
+            .select({
+              userId: tasks.ownerUserId,
+              name: tenantUsers.name,
+              positionName: positions.name,
+              activeTaskCount: sql<number>`count(*)::int`,
+              overdueTaskCount: sql<number>`count(*) filter (where ${overdueTask})::int`,
+              criticalTaskCount: sql<number>`count(*) filter (where ${tasks.priority} = 'critical')::int`,
+              plannedWorkHours: sql<number>`coalesce(sum(${tasks.plannedWork}), 0)::int`
+            })
+            .from(tasks)
+            .leftJoin(
+              taskStatuses,
+              and(
+                eq(taskStatuses.tenantId, tasks.tenantId),
+                eq(taskStatuses.id, tasks.statusId)
+              )
+            )
+            .leftJoin(
+              projects,
+              and(eq(projects.tenantId, tasks.tenantId), eq(projects.id, tasks.projectId))
+            )
+            .leftJoin(
+              tenantUsers,
+              and(
+                eq(tenantUsers.tenantId, tasks.tenantId),
+                eq(tenantUsers.id, tasks.ownerUserId)
+              )
+            )
+            .leftJoin(
+              positions,
+              and(
+                eq(positions.tenantId, tenantUsers.tenantId),
+                eq(positions.id, tenantUsers.positionId)
+              )
+            )
+            .where(baseActiveTaskScope)
+            .groupBy(tasks.ownerUserId, tenantUsers.name, positions.name)
+            .orderBy(
+              desc(sql<number>`count(*) filter (where ${overdueTask})`),
+              desc(sql<number>`count(*) filter (where ${tasks.priority} = 'critical')`),
+              desc(sql<number>`coalesce(sum(${tasks.plannedWork}), 0)`),
+              asc(tenantUsers.name)
+            )
+            .limit(workloadHintsLimit)
         : [];
 
-      const generatedAt = input.now.toISOString();
-      const usersById = new Map(userRows.map((row) => [row.user.id, row]));
-      const activeProjects = projectRows.filter((project) =>
-        activeProjectStatuses.includes(project.status)
-      );
-      const activeTasks = taskRows.filter((row) => {
-        const category = row.status?.category ?? row.task.status;
-        return activeTaskCategories.includes(category) && isNonTerminalProjectStatus(row.projectStatus);
-      });
-      const overdueProjects = activeProjects.filter(
-        (project) => isBeforeDateOnly(project.plannedFinish, input.now)
-      );
-      const overdueTasks = activeTasks.filter(
-        (row) => isBeforeDateOnly(row.task.plannedFinish, input.now)
-      );
-      const waitingTasks = activeTasks.filter((row) => {
-        const category = row.status?.category ?? row.task.status;
-        return category === "waiting";
-      });
-      const criticalTasks = activeTasks.filter((row) => row.task.priority === "critical");
-      const readyToActivateDeals = opportunityRows.filter(
-        (opportunity) => opportunity.status === "ready_to_activate"
-      );
-
-      const workloadByUser = new Map<UserId, OperationsCockpitPersonWorkloadHint>();
-      for (const row of input.includeWorkloadHints ? activeTasks : []) {
-        const owner = usersById.get(row.task.ownerUserId);
-        const current =
-          workloadByUser.get(row.task.ownerUserId) ??
-          {
-            userId: row.task.ownerUserId,
-            name: owner?.user.name ?? row.task.ownerUserId,
-            positionName: owner?.positionName ?? null,
-            activeTaskCount: 0,
-            overdueTaskCount: 0,
-            criticalTaskCount: 0,
-            plannedWorkHours: 0
-          };
-
-        current.activeTaskCount += 1;
-        current.plannedWorkHours += row.task.plannedWork;
-        if (isBeforeDateOnly(row.task.plannedFinish, input.now)) {
-          current.overdueTaskCount += 1;
-        }
-        if (row.task.priority === "critical") current.criticalTaskCount += 1;
-        workloadByUser.set(row.task.ownerUserId, current);
-      }
-
       const attentionItems: OperationsCockpitAttentionItem[] = [
-        ...overdueProjects.map((project) => ({
+        ...projectAttentionRows.map((project) => ({
           id: `project-overdue:${project.id}`,
           kind: "project_overdue" as const,
           severity: "critical" as const,
@@ -233,40 +305,46 @@ export function createOperationsCockpitReadRepository(
           ownerUserId: null,
           dueDate: toIsoDate(project.plannedFinish)
         })),
-        ...overdueTasks.map((row) => ({
-          id: `task-overdue:${row.task.id}`,
-          kind: "task_overdue" as const,
-          severity: "critical" as const,
-          title: row.task.title,
-          reason: "Плановая дата завершения задачи уже прошла.",
-          entity: { type: "task" as const, id: row.task.id, title: row.task.title },
-          projectId: row.task.projectId,
-          ownerUserId: row.task.ownerUserId,
-          dueDate: toIsoDate(row.task.plannedFinish)
-        })),
-        ...waitingTasks.map((row) => ({
-          id: `task-waiting:${row.task.id}`,
-          kind: "task_waiting" as const,
-          severity: "warning" as const,
-          title: row.task.title,
-          reason: `Статус задачи: ${row.status?.name ?? "ожидание"}.`,
-          entity: { type: "task" as const, id: row.task.id, title: row.task.title },
-          projectId: row.task.projectId,
-          ownerUserId: row.task.ownerUserId,
-          dueDate: toIsoDate(row.task.plannedFinish)
-        })),
-        ...criticalTasks.map((row) => ({
-          id: `task-critical:${row.task.id}`,
-          kind: "critical_task" as const,
-          severity: "warning" as const,
-          title: row.task.title,
-          reason: "Задача отмечена критическим приоритетом.",
-          entity: { type: "task" as const, id: row.task.id, title: row.task.title },
-          projectId: row.task.projectId,
-          ownerUserId: row.task.ownerUserId,
-          dueDate: toIsoDate(row.task.plannedFinish)
-        })),
-        ...readyToActivateDeals.map((deal) => ({
+        ...taskAttentionRows
+          .filter((row) => isBeforeDateOnly(row.task.plannedFinish, input.now))
+          .map((row) => ({
+            id: `task-overdue:${row.task.id}`,
+            kind: "task_overdue" as const,
+            severity: "critical" as const,
+            title: row.task.title,
+            reason: "Плановая дата завершения задачи уже прошла.",
+            entity: { type: "task" as const, id: row.task.id, title: row.task.title },
+            projectId: row.task.projectId,
+            ownerUserId: row.task.ownerUserId,
+            dueDate: toIsoDate(row.task.plannedFinish)
+          })),
+        ...taskAttentionRows
+          .filter((row) => (row.statusCategory ?? row.task.status) === "waiting")
+          .map((row) => ({
+            id: `task-waiting:${row.task.id}`,
+            kind: "task_waiting" as const,
+            severity: "warning" as const,
+            title: row.task.title,
+            reason: `Статус задачи: ${row.statusName ?? "ожидание"}.`,
+            entity: { type: "task" as const, id: row.task.id, title: row.task.title },
+            projectId: row.task.projectId,
+            ownerUserId: row.task.ownerUserId,
+            dueDate: toIsoDate(row.task.plannedFinish)
+          })),
+        ...taskAttentionRows
+          .filter((row) => row.task.priority === "critical")
+          .map((row) => ({
+            id: `task-critical:${row.task.id}`,
+            kind: "critical_task" as const,
+            severity: "warning" as const,
+            title: row.task.title,
+            reason: "Задача отмечена критическим приоритетом.",
+            entity: { type: "task" as const, id: row.task.id, title: row.task.title },
+            projectId: row.task.projectId,
+            ownerUserId: row.task.ownerUserId,
+            dueDate: toIsoDate(row.task.plannedFinish)
+          })),
+        ...readyDealAttentionRows.map((deal) => ({
           id: `deal-ready:${deal.id}`,
           kind: "deal_ready_to_activate" as const,
           severity: "info" as const,
@@ -279,7 +357,7 @@ export function createOperationsCockpitReadRepository(
         }))
       ]
         .sort(compareAttentionItems)
-        .slice(0, 25);
+        .slice(0, attentionLimit);
 
       return {
         generatedAt,
@@ -288,23 +366,31 @@ export function createOperationsCockpitReadRepository(
           tenantId: input.tenantId
         },
         indicators: {
-          activeProjects: activeProjects.length,
-          overdueProjects: overdueProjects.length,
-          activeTasks: activeTasks.length,
-          overdueTasks: overdueTasks.length,
-          waitingTasks: waitingTasks.length,
-          criticalTasks: criticalTasks.length,
-          openDeals: opportunityRows.length,
-          readyToActivateDeals: readyToActivateDeals.length
+          activeProjects: projectIndicators[0]?.activeProjects ?? 0,
+          overdueProjects: projectIndicators[0]?.overdueProjects ?? 0,
+          activeTasks: taskIndicators[0]?.activeTasks ?? 0,
+          overdueTasks: taskIndicators[0]?.overdueTasks ?? 0,
+          waitingTasks: taskIndicators[0]?.waitingTasks ?? 0,
+          criticalTasks: taskIndicators[0]?.criticalTasks ?? 0,
+          openDeals: dealIndicators?.openDeals ?? 0,
+          readyToActivateDeals: dealIndicators?.readyToActivateDeals ?? 0
         },
         attentionItems,
         workloadHints: {
           byPerson: input.includeWorkloadHints
-            ? [...workloadByUser.values()].sort(compareWorkloadHints).slice(0, 20)
+            ? workloadRows.map((row) => ({
+                userId: row.userId,
+                name: row.name ?? row.userId,
+                positionName: row.positionName ?? null,
+                activeTaskCount: row.activeTaskCount,
+                overdueTaskCount: row.overdueTaskCount,
+                criticalTaskCount: row.criticalTaskCount,
+                plannedWorkHours: row.plannedWorkHours
+              }))
             : []
         },
         pipelinePressure: {
-          deals: opportunityRows.slice(0, 20).map((deal) => ({
+          deals: pipelinePressureRows.map((deal) => ({
             id: deal.id,
             title: deal.title,
             clientName: deal.clientName,
@@ -369,18 +455,6 @@ function compareAttentionItems(
   const severityDiff = severityOrder[left.severity] - severityOrder[right.severity];
   if (severityDiff !== 0) return severityDiff;
   return (left.dueDate ?? "").localeCompare(right.dueDate ?? "");
-}
-
-function compareWorkloadHints(
-  left: OperationsCockpitPersonWorkloadHint,
-  right: OperationsCockpitPersonWorkloadHint
-): number {
-  return (
-    right.overdueTaskCount - left.overdueTaskCount ||
-    right.criticalTaskCount - left.criticalTaskCount ||
-    right.plannedWorkHours - left.plannedWorkHours ||
-    left.name.localeCompare(right.name)
-  );
 }
 
 function toIsoDate(value: Date): string {
