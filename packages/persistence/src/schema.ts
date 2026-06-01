@@ -1746,6 +1746,68 @@ export const workspaceAgentMessages = pgTable(
   ]
 );
 
+export const workspaceAgentProposals = pgTable(
+  "workspace_agent_proposals",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").notNull(),
+    messageId: text("message_id").notNull(),
+    actionType: text("action_type").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    focusType: text("focus_type"),
+    focusId: text("focus_id"),
+    context: jsonb("context").$type<Record<string, unknown>>().notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull(),
+    auditEventId: text("audit_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true })
+  },
+  (table) => [
+    primaryKey({
+      name: "workspace_agent_proposals_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "workspace_agent_proposals_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "workspace_agent_proposals_message_fk",
+      columns: [table.tenantId, table.messageId],
+      foreignColumns: [workspaceAgentMessages.tenantId, workspaceAgentMessages.id]
+    }).onDelete("cascade"),
+    index("workspace_agent_proposals_context_created_idx").on(
+      table.tenantId,
+      table.focusType,
+      table.focusId,
+      table.createdAt,
+      table.id
+    ),
+    check(
+      "workspace_agent_proposals_focus_type_chk",
+      sql`${table.focusType} is null or ${table.focusType} in ('project', 'task', 'deal')`
+    ),
+    check(
+      "workspace_agent_proposals_focus_pair_chk",
+      sql`(
+        (${table.focusType} is null and ${table.focusId} is null)
+        or
+        (${table.focusType} is not null and ${table.focusId} is not null)
+      )`
+    ),
+    check(
+      "workspace_agent_proposals_status_chk",
+      sql`${table.status} in ('proposed', 'applied', 'rejected')`
+    )
+  ]
+);
+
 export type PersistenceTableName =
   | "tenants"
   | "access_profiles"
@@ -1795,7 +1857,8 @@ export type PersistenceTableName =
   | "user_credentials"
   | "user_sessions"
   | "audit_events"
-  | "workspace_agent_messages";
+  | "workspace_agent_messages"
+  | "workspace_agent_proposals";
 
 export type TenantOwnedTableName = Exclude<PersistenceTableName, "tenants">;
 
@@ -1853,7 +1916,8 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "user_credentials",
   "user_sessions",
   "audit_events",
-  "workspace_agent_messages"
+  "workspace_agent_messages",
+  "workspace_agent_proposals"
 ];
 
 export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
@@ -1904,7 +1968,8 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "user_credentials",
   "user_sessions",
   "audit_events",
-  "workspace_agent_messages"
+  "workspace_agent_messages",
+  "workspace_agent_proposals"
 ];
 
 const tableColumns = {
@@ -2450,6 +2515,23 @@ const tableColumns = {
     "body",
     "context",
     "created_at"
+  ],
+  workspace_agent_proposals: [
+    "id",
+    "tenant_id",
+    "actor_user_id",
+    "message_id",
+    "action_type",
+    "title",
+    "description",
+    "focus_type",
+    "focus_id",
+    "context",
+    "payload",
+    "status",
+    "audit_event_id",
+    "created_at",
+    "resolved_at"
   ]
 } as const satisfies Record<PersistenceTableName, readonly string[]>;
 

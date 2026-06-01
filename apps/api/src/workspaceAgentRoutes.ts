@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
+  WorkspaceAgentActionProposalRecord,
   WorkspaceAgentContextFocus,
   WorkspaceAgentFocusType,
   WorkspaceAgentMessageRecord,
@@ -57,10 +58,18 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       context: resolvedContext.context,
       limit: 100
     });
+    const proposals = deps.dataSource.listWorkspaceAgentProposals
+      ? await deps.dataSource.listWorkspaceAgentProposals({
+          tenantId: actor.tenantId,
+          context: resolvedContext.context,
+          limit: 20
+        })
+      : [];
 
     return context.json({
       context: resolvedContext.context,
-      messages: messages.map(serializeWorkspaceAgentMessage)
+      messages: messages.map(serializeWorkspaceAgentMessage),
+      proposals: proposals.map(serializeWorkspaceAgentProposal)
     });
   });
 
@@ -93,21 +102,120 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       context: resolvedContext.context,
       createdAt: new Date()
     });
+    const proposal =
+      deps.dataSource.createWorkspaceAgentProposal
+        ? await deps.dataSource.createWorkspaceAgentProposal(
+            buildWorkspaceAgentProposal(actor, message, resolvedContext.context)
+          )
+        : undefined;
 
     const messages = await deps.dataSource.listWorkspaceAgentMessages({
       tenantId: actor.tenantId,
       context: resolvedContext.context,
       limit: 100
     });
+    const proposals = deps.dataSource.listWorkspaceAgentProposals
+      ? await deps.dataSource.listWorkspaceAgentProposals({
+          tenantId: actor.tenantId,
+          context: resolvedContext.context,
+          limit: 20
+        })
+      : [];
 
     return context.json(
       {
         context: resolvedContext.context,
         message: serializeWorkspaceAgentMessage(message),
-        messages: messages.map(serializeWorkspaceAgentMessage)
+        proposal: proposal ? serializeWorkspaceAgentProposal(proposal) : undefined,
+        messages: messages.map(serializeWorkspaceAgentMessage),
+        proposals: proposals.map(serializeWorkspaceAgentProposal)
       },
       201
     );
+  });
+
+  app.post("/api/workspace/agent-thread/proposals/:proposalId/confirm", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+
+    const proposalId = context.req.param("proposalId");
+    if (!isId(proposalId)) return context.json({ error: "invalid_agent_proposal_id" }, 400);
+
+    if (
+      !deps.dataSource.findWorkspaceAgentProposal ||
+      !deps.dataSource.updateWorkspaceAgentProposalStatus ||
+      !deps.dataSource.listWorkspaceAgentMessages
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const bodyResult = await readLimitedJsonBody(context);
+    if (!bodyResult.ok) return context.json({ error: bodyResult.error }, bodyResult.status);
+    const decision = parseProposalDecision(bodyResult.value);
+    if (!decision.ok) return context.json({ error: decision.error }, 400);
+
+    const proposal = await deps.dataSource.findWorkspaceAgentProposal(actor.tenantId, proposalId);
+    if (!proposal) return context.json({ error: "agent_proposal_not_found" }, 404);
+    if (proposal.status !== "proposed") return context.json({ error: "agent_proposal_already_resolved" }, 409);
+
+    const resolvedContext = await resolveThreadContext(deps, actor, proposal.context.focus);
+    if (!resolvedContext.ok) {
+      return context.json({ error: resolvedContext.error }, resolvedContext.status);
+    }
+
+    const actionType =
+      decision.decision === "apply"
+        ? "workspace.agent_action.applied"
+        : "workspace.agent_action.rejected";
+    const auditEventId = await deps.appendManagementAuditEvent({
+      tenantId: actor.tenantId,
+      actorUserId: actor.id,
+      actionType,
+      sourceWorkflow: "workspace_agent_action",
+      sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
+      commandInput: {
+        proposalId: proposal.id,
+        decision: decision.decision,
+        actionType: proposal.actionType,
+        payload: proposal.payload
+      },
+      beforeState: { status: proposal.status },
+      afterState: { status: decision.decision === "apply" ? "applied" : "rejected" },
+      permissionResult: { allowed: true },
+      executionResult: {
+        status: decision.decision === "apply" ? "succeeded" : "rejected",
+        mutationApplied: false
+      }
+    });
+
+    const updatedProposal = await deps.dataSource.updateWorkspaceAgentProposalStatus({
+      tenantId: actor.tenantId,
+      proposalId: proposal.id,
+      status: decision.decision === "apply" ? "applied" : "rejected",
+      auditEventId,
+      resolvedAt: new Date()
+    });
+
+    const messages = await deps.dataSource.listWorkspaceAgentMessages({
+      tenantId: actor.tenantId,
+      context: resolvedContext.context,
+      limit: 100
+    });
+    const proposals = deps.dataSource.listWorkspaceAgentProposals
+      ? await deps.dataSource.listWorkspaceAgentProposals({
+          tenantId: actor.tenantId,
+          context: resolvedContext.context,
+          limit: 20
+        })
+      : [];
+
+    return context.json({
+      context: resolvedContext.context,
+      proposal: updatedProposal ? serializeWorkspaceAgentProposal(updatedProposal) : undefined,
+      messages: messages.map(serializeWorkspaceAgentMessage),
+      proposals: proposals.map(serializeWorkspaceAgentProposal),
+      auditEventId
+    });
   });
 }
 
@@ -299,6 +407,54 @@ function serializeWorkspaceAgentMessage(message: WorkspaceAgentMessageRecord) {
     context: message.context,
     createdAt: message.createdAt.toISOString()
   };
+}
+
+function serializeWorkspaceAgentProposal(proposal: WorkspaceAgentActionProposalRecord) {
+  return {
+    id: proposal.id,
+    messageId: proposal.messageId,
+    actionType: proposal.actionType,
+    title: proposal.title,
+    description: proposal.description,
+    context: proposal.context,
+    payload: proposal.payload,
+    status: proposal.status,
+    auditEventId: proposal.auditEventId,
+    createdAt: proposal.createdAt.toISOString(),
+    resolvedAt: proposal.resolvedAt?.toISOString() ?? null
+  };
+}
+
+function buildWorkspaceAgentProposal(
+  actor: TenantUser,
+  message: WorkspaceAgentMessageRecord,
+  context: WorkspaceAgentThreadContext
+): WorkspaceAgentActionProposalRecord {
+  return {
+    id: `workspace-agent-proposal-${randomUUID()}`,
+    tenantId: actor.tenantId,
+    actorUserId: actor.id,
+    messageId: message.id,
+    actionType: "workspace.agent.review_request",
+    title: "Зафиксировать управленческое поручение",
+    description: "Генри подготовил безопасное действие: записать поручение без изменения проектов, задач или сделок.",
+    context,
+    payload: {
+      messageBody: message.body,
+      context
+    },
+    status: "proposed",
+    auditEventId: null,
+    createdAt: new Date(),
+    resolvedAt: null
+  };
+}
+
+function parseProposalDecision(value: unknown): { ok: true; decision: "apply" | "reject" } | { ok: false; error: string } {
+  if (!isRecord(value)) return { ok: false, error: "invalid_agent_proposal_decision" };
+  return value.decision === "apply" || value.decision === "reject"
+    ? { ok: true, decision: value.decision }
+    : { ok: false, error: "invalid_agent_proposal_decision" };
 }
 
 function parseContextId(value: string, error: string): { ok: true; value: string } | { ok: false; error: string } {

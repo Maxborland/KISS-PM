@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/query-keys";
 import {
+  confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
@@ -127,6 +128,13 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
       readModel.refetchAll();
     }
   });
+  const confirmWorkspaceAgentAction = useMutation({
+    mutationFn: confirmWorkspaceAgentProposal,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      readModel.refetchAll();
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем дашборд…" />;
@@ -150,6 +158,11 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
       isSendingWorkspaceAgentMessage={sendWorkspaceAgentMessage.isPending}
       workspaceAgentMessageError={sendWorkspaceAgentMessage.error}
       onSendWorkspaceAgentMessage={(body) => sendWorkspaceAgentMessage.mutateAsync(body)}
+      isConfirmingWorkspaceAgentAction={confirmWorkspaceAgentAction.isPending}
+      workspaceAgentActionError={confirmWorkspaceAgentAction.error}
+      onConfirmWorkspaceAgentAction={(proposalId, decision) =>
+        confirmWorkspaceAgentAction.mutateAsync({ proposalId, decision })
+      }
     />
   ) : null;
 }

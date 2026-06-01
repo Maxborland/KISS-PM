@@ -25,6 +25,7 @@ import type {
   PlanningSolverRunRecord,
   ActionExecutionInput,
   ActionExecutionRecord,
+  WorkspaceAgentActionProposalRecord,
   TaskActivityInput,
   TaskActivityRecord,
   TaskMetadataInput,
@@ -33,6 +34,8 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+
+export type { WorkspaceAgentActionProposalRecord } from "@kiss-pm/persistence";
 
 export type AccessProfileRecord = AccessProfile & {
   tenantId: TenantId;
@@ -619,6 +622,25 @@ export type ApiTenantDataSource = {
     limit?: number;
   }): Promise<WorkspaceAgentMessageRecord[]>;
   createWorkspaceAgentMessage?(input: WorkspaceAgentMessageRecord): Promise<WorkspaceAgentMessageRecord>;
+  listWorkspaceAgentProposals?(input: {
+    tenantId: TenantId;
+    context: WorkspaceAgentThreadContext;
+    limit?: number;
+  }): Promise<WorkspaceAgentActionProposalRecord[]>;
+  createWorkspaceAgentProposal?(
+    input: WorkspaceAgentActionProposalRecord
+  ): Promise<WorkspaceAgentActionProposalRecord>;
+  findWorkspaceAgentProposal?(
+    tenantId: TenantId,
+    proposalId: string
+  ): Promise<WorkspaceAgentActionProposalRecord | undefined>;
+  updateWorkspaceAgentProposalStatus?(input: {
+    tenantId: TenantId;
+    proposalId: string;
+    status: WorkspaceAgentActionProposalRecord["status"];
+    auditEventId: string | null;
+    resolvedAt: Date;
+  }): Promise<WorkspaceAgentActionProposalRecord | undefined>;
 };
 
 export type CreateAppOptions = {

@@ -9,6 +9,7 @@ import {
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
   fetchWorkspaceDealStages,
+  confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
   fetchWorkspaceProjects,
@@ -55,10 +56,13 @@ describe("runtime read model API", () => {
         return json({ dealStages: [{ id: "lead" }] });
       }
       if (path === "/api/workspace/agent-thread") {
-        return json({ context: {}, messages: [{ id: "agent-message-1" }] });
+        return json({ context: {}, messages: [{ id: "agent-message-1" }], proposals: [] });
       }
       if (path === "/api/workspace/agent-thread/messages") {
-        return json({ context: {}, messages: [{ id: "agent-message-2" }] }, 201);
+        return json({ context: {}, messages: [{ id: "agent-message-2" }], proposals: [{ id: "proposal-1" }] }, 201);
+      }
+      if (path === "/api/workspace/agent-thread/proposals/proposal-1/confirm") {
+        return json({ context: {}, messages: [], proposals: [{ id: "proposal-1", status: "applied" }] });
       }
       if (
         path ===
@@ -75,11 +79,18 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
     await expect(fetchWorkspaceAgentThread()).resolves.toEqual({
       context: {},
-      messages: [{ id: "agent-message-1" }]
+      messages: [{ id: "agent-message-1" }],
+      proposals: []
     });
     await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toEqual({
       context: {},
-      messages: [{ id: "agent-message-2" }]
+      messages: [{ id: "agent-message-2" }],
+      proposals: [{ id: "proposal-1" }]
+    });
+    await expect(confirmWorkspaceAgentProposal({ proposalId: "proposal-1", decision: "apply" })).resolves.toEqual({
+      context: {},
+      messages: [],
+      proposals: [{ id: "proposal-1", status: "applied" }]
     });
     await expect(
       fetchTenantCurrentScheduledTasks({
@@ -96,11 +107,16 @@ describe("runtime read model API", () => {
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
       "/api/workspace/agent-thread/messages",
+      "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
     expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
+    });
+    expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ decision: "apply" })
     });
     for (const [, init] of fetchMock.mock.calls) {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
@@ -177,7 +193,7 @@ describe("runtime read model API", () => {
         return json({ tasks: [{ id: "scheduled-1" }] });
       }
       if (path === "/api/workspace/agent-thread") {
-        return json({ context: {}, messages: [{ id: "agent-message-1", body: "Runtime only" }] });
+        return json({ context: {}, messages: [{ id: "agent-message-1", body: "Runtime only" }], proposals: [] });
       }
       return json({ error: "not_found" }, 404);
     });

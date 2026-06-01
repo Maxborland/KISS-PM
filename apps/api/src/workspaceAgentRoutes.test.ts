@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import type {
   ApiTenantDataSource,
+  ManagementAuditEventInput,
   OpportunityRecord,
   ProjectRecord,
+  WorkspaceAgentActionProposalRecord,
   WorkspaceAgentMessageRecord,
   WorkspaceAgentThreadContext
 } from "./apiTypes";
@@ -71,7 +73,14 @@ describe("workspace agent routes", () => {
     await expect(post.json()).resolves.toMatchObject({
       context: { focus: { type: "project", id: "project-alpha", title: "Проект Альфа" } },
       message: { body: "Что горит по проекту?" },
-      messages: [{ body: "Что горит по проекту?" }]
+      messages: [{ body: "Что горит по проекту?" }],
+      proposals: [
+        {
+          actionType: "workspace.agent.review_request",
+          status: "proposed",
+          title: "Зафиксировать управленческое поручение"
+        }
+      ]
     });
 
     const get = await app.request("/api/workspace/agent-thread?projectId=project-alpha", requestOptions());
@@ -79,6 +88,78 @@ describe("workspace agent routes", () => {
     await expect(get.json()).resolves.toMatchObject({
       messages: [{ body: "Что горит по проекту?" }]
     });
+  });
+
+  it("applies an agent proposal only through explicit confirmation and writes audit", async () => {
+    const fixture = createFixture();
+    const app = createRouteApp(fixture);
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Зафиксируй риск по срокам")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(200);
+    await expect(confirmed.json()).resolves.toMatchObject({
+      proposal: {
+        id: body.proposal.id,
+        status: "applied",
+        auditEventId: "audit-agent-action-1"
+      },
+      auditEventId: "audit-agent-action-1"
+    });
+    expect(fixture.audits).toEqual([
+      expect.objectContaining({
+        actionType: "workspace.agent_action.applied",
+        commandInput: expect.objectContaining({
+          proposalId: body.proposal.id,
+          decision: "apply"
+        }),
+        executionResult: expect.objectContaining({
+          mutationApplied: false,
+          status: "succeeded"
+        })
+      })
+    ]);
+  });
+
+  it("rejects repeat confirmation for already resolved proposal", async () => {
+    const fixture = createFixture();
+    const app = createRouteApp(fixture);
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Отклони потом")
+    });
+    const body = (await post.json()) as { proposal: { id: string } };
+
+    const first = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "reject" })
+    });
+    expect(first.status).toBe(200);
+
+    const repeated = await app.request(`/api/workspace/agent-thread/proposals/${body.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(repeated.status).toBe(409);
+    await expect(repeated.json()).resolves.toEqual({ error: "agent_proposal_already_resolved" });
   });
 
   it("accepts legacy string message body", async () => {
@@ -161,13 +242,18 @@ function createRouteApp(
     dataSource: fixture.dataSource,
     getActorProfile: async () => fixture.profile,
     getSessionActorFromHeaders: async () => (options.actor === null ? undefined : options.actor ?? actor),
-    appendManagementAuditEvent: async () => "audit-agent-denied"
+    appendManagementAuditEvent: async (event) => {
+      fixture.audits.push(event);
+      return `audit-agent-action-${fixture.audits.length}`;
+    }
   });
   return app;
 }
 
 function createFixture(input: { profile?: AccessProfile } = {}) {
   const messages: WorkspaceAgentMessageRecord[] = [];
+  const proposals: WorkspaceAgentActionProposalRecord[] = [];
+  const audits: ManagementAuditEventInput[] = [];
   const projectRecord = project("project-alpha", "Проект Альфа");
   const taskRecord = task("task-alpha", "Задача Альфа", projectRecord.id);
   const dealRecord = deal("deal-alpha", "Сделка Альфа");
@@ -204,10 +290,40 @@ function createFixture(input: { profile?: AccessProfile } = {}) {
     async createWorkspaceAgentMessage(input) {
       messages.push(input);
       return input;
+    },
+    async listWorkspaceAgentProposals(input) {
+      return proposals.filter(
+        (candidate) =>
+          candidate.tenantId === input.tenantId &&
+          contextKey(candidate.context) === contextKey(input.context)
+      );
+    },
+    async createWorkspaceAgentProposal(input) {
+      proposals.push(input);
+      return input;
+    },
+    async findWorkspaceAgentProposal(tenantId, proposalId) {
+      return proposals.find((proposal) => proposal.tenantId === tenantId && proposal.id === proposalId);
+    },
+    async updateWorkspaceAgentProposalStatus(input) {
+      const index = proposals.findIndex(
+        (proposal) => proposal.tenantId === input.tenantId && proposal.id === input.proposalId
+      );
+      if (index < 0) return undefined;
+      const current = proposals[index];
+      if (!current) return undefined;
+      const updated = {
+        ...current,
+        status: input.status,
+        auditEventId: input.auditEventId,
+        resolvedAt: input.resolvedAt
+      };
+      proposals[index] = updated;
+      return updated;
     }
   } satisfies ApiTenantDataSource;
 
-  return { dataSource, messages, profile: input.profile ?? readerProfile };
+  return { audits, dataSource, messages, profile: input.profile ?? readerProfile };
 }
 
 function requestOptions() {

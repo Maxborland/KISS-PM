@@ -31,14 +31,20 @@ export function RuntimeDashboardScreen({
   data,
   currentUserId,
   isSendingWorkspaceAgentMessage = false,
+  isConfirmingWorkspaceAgentAction = false,
   workspaceAgentMessageError = null,
-  onSendWorkspaceAgentMessage
+  workspaceAgentActionError = null,
+  onSendWorkspaceAgentMessage,
+  onConfirmWorkspaceAgentAction
 }: {
   data: DashboardReadModel;
   currentUserId?: string;
   isSendingWorkspaceAgentMessage?: boolean;
+  isConfirmingWorkspaceAgentAction?: boolean;
   workspaceAgentMessageError?: unknown;
+  workspaceAgentActionError?: unknown;
   onSendWorkspaceAgentMessage?: (body: string) => Promise<unknown>;
+  onConfirmWorkspaceAgentAction?: (proposalId: string, decision: "apply" | "reject") => Promise<unknown>;
 }) {
   const [agentInput, setAgentInput] = useState("");
   const activeProjects = data.projects.filter((project) => project.status === "active");
@@ -237,23 +243,67 @@ export function RuntimeDashboardScreen({
                   <ShieldCheck aria-hidden />
                   <div>
                     <span>Сверка изменений</span>
-                    <strong>0 предложений</strong>
+                    <strong>{data.workspaceAgentThread.proposals.length} предложений</strong>
                   </div>
                 </header>
-                <div className="runtime-agent-review__list">
-                  <div className="runtime-agent-review__step is-done">
-                    <CheckCircle2 aria-hidden />
-                    <span>Контекст рабочей области подключен</span>
+                {data.workspaceAgentThread.proposals.length === 0 ? (
+                  <>
+                    <div className="runtime-agent-review__list">
+                      <div className="runtime-agent-review__step is-done">
+                        <CheckCircle2 aria-hidden />
+                        <span>Контекст рабочей области подключен</span>
+                      </div>
+                      <div className="runtime-agent-review__step">
+                        <Clock3 aria-hidden />
+                        <span>Отправьте запрос, чтобы Генри подготовил действие</span>
+                      </div>
+                    </div>
+                    <p>Генри не меняет данные без подтверждения. Предложение появится здесь после сообщения.</p>
+                  </>
+                ) : (
+                  <div className="runtime-agent-review__list">
+                    {data.workspaceAgentThread.proposals.slice(-4).map((proposal) => (
+                      <article key={proposal.id} className="runtime-agent-proposal">
+                        <div className="runtime-agent-proposal__head">
+                          <strong>{proposal.title}</strong>
+                          <span data-status={proposal.status}>{agentProposalStatusLabel(proposal.status)}</span>
+                        </div>
+                        <p>{proposal.description}</p>
+                        {proposal.auditEventId ? (
+                          <div className="runtime-agent-proposal__audit">
+                            <CheckCircle2 aria-hidden />
+                            Аудит: {proposal.auditEventId}
+                          </div>
+                        ) : null}
+                        {proposal.status === "proposed" ? (
+                          <div className="runtime-agent-proposal__actions">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="primary"
+                              disabled={isConfirmingWorkspaceAgentAction || !onConfirmWorkspaceAgentAction}
+                              onClick={() => void onConfirmWorkspaceAgentAction?.(proposal.id, "apply")}
+                            >
+                              Применить
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={isConfirmingWorkspaceAgentAction || !onConfirmWorkspaceAgentAction}
+                              onClick={() => void onConfirmWorkspaceAgentAction?.(proposal.id, "reject")}
+                            >
+                              Отклонить
+                            </Button>
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
                   </div>
-                  <div className="runtime-agent-review__step">
-                    <Clock3 aria-hidden />
-                    <span>Action proposal API будет подключен отдельным slice</span>
-                  </div>
-                </div>
-                <p>
-                  Генри пока сохраняет сообщения и читает контекст. Изменения появятся здесь только после
-                  backend-контракта подтверждаемых действий.
-                </p>
+                )}
+                {workspaceAgentActionError ? (
+                  <p className="runtime-agent__error">Не удалось подтвердить действие агента.</p>
+                ) : null}
               </aside>
             </div>
           </CardPanel>
@@ -265,4 +315,10 @@ export function RuntimeDashboardScreen({
 
 function isPastDate(value: string): boolean {
   return value.slice(0, 10) < getRuntimeTodayIsoDate();
+}
+
+function agentProposalStatusLabel(status: string): string {
+  if (status === "applied") return "применено";
+  if (status === "rejected") return "отклонено";
+  return "ожидает";
 }

@@ -14,10 +14,12 @@ const readModelHooks = vi.hoisted(() => ({
   deals: vi.fn(),
   myWork: vi.fn(),
   projects: vi.fn(),
+  confirmWorkspaceAgentProposal: vi.fn(),
   postWorkspaceAgentMessage: vi.fn()
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
+  confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
@@ -28,20 +30,29 @@ vi.mock("@/lib/api/read-models", () => ({
 vi.mock("@/shell/runtime-dashboard-screen", () => ({
   RuntimeDashboardScreen: ({
     data,
+    onConfirmWorkspaceAgentAction,
     onSendWorkspaceAgentMessage
   }: {
-    data: { tasks: { title: string }[]; workspaceAgentThread?: { messages: { body: string }[] } };
+    data: {
+      tasks: { title: string }[];
+      workspaceAgentThread?: { messages: { body: string }[]; proposals?: { id: string; title: string }[] };
+    };
+    onConfirmWorkspaceAgentAction?: (proposalId: string, decision: "apply" | "reject") => Promise<unknown>;
     onSendWorkspaceAgentMessage?: (body: string) => Promise<unknown>;
   }) =>
     createElement(
       "button",
       {
         "data-testid": "runtime-dashboard",
-        onClick: () => void onSendWorkspaceAgentMessage?.("Что горит?")
+        onClick: () => {
+          void onSendWorkspaceAgentMessage?.("Что горит?");
+          void onConfirmWorkspaceAgentAction?.("proposal-runtime", "apply");
+        }
       },
       [
         data.tasks.map((task) => task.title).join(", "),
-        data.workspaceAgentThread?.messages.map((message) => message.body).join(", ")
+        data.workspaceAgentThread?.messages.map((message) => message.body).join(", "),
+        data.workspaceAgentThread?.proposals?.map((proposal) => proposal.title).join(", ")
       ].join(" ")
     )
 }));
@@ -78,13 +89,14 @@ describe("RuntimeDataScreen permission gate", () => {
         projects: [],
         tasks: [],
         scheduledTasks: [],
-        workspaceAgentThread: { context: {}, messages: [] }
+        workspaceAgentThread: { context: {}, messages: [], proposals: [] }
       })
     );
     readModelHooks.deals.mockReturnValue(successReadModel({ opportunities: [], dealStages: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue({ data: { projects: [] }, error: null, isPending: false, isFetching: false });
-    readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [] });
+    readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
+    readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
@@ -116,7 +128,8 @@ describe("RuntimeDataScreen permission gate", () => {
         scheduledTasks: [],
         workspaceAgentThread: {
           context: {},
-          messages: [{ id: "agent-runtime", body: "Runtime agent message" }]
+          messages: [{ id: "agent-runtime", body: "Runtime agent message" }],
+          proposals: [{ id: "proposal-runtime", title: "Runtime proposal" }]
         }
       })
     );
@@ -131,6 +144,7 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(host.textContent).toContain("Runtime dashboard task");
     expect(host.textContent).toContain("Runtime agent message");
+    expect(host.textContent).toContain("Runtime proposal");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.dashboard).toHaveBeenCalledWith({ assigneeUserId: "usr-1" });
   });
@@ -150,6 +164,10 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(readModelHooks.postWorkspaceAgentMessage).toHaveBeenCalled();
     expect(readModelHooks.postWorkspaceAgentMessage.mock.calls[0]?.[0]).toBe("Что горит?");
+    expect(readModelHooks.confirmWorkspaceAgentProposal).toHaveBeenCalledWith(
+      { proposalId: "proposal-runtime", decision: "apply" },
+      expect.anything()
+    );
   });
 
   it("renders my work from runtime read models without fixture fallback", async () => {

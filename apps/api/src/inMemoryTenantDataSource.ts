@@ -4,6 +4,7 @@ import type {
   AccessProfileRecord,
   ApiTenantDataSource,
   AuditEventListItem,
+  WorkspaceAgentActionProposalRecord,
   WorkspaceAgentMessageRecord,
   WorkspaceAgentThreadContext
 } from "./apiTypes";
@@ -19,6 +20,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
   }));
   const auditEvents: AuditEventListItem[] = [];
   const workspaceAgentMessages: WorkspaceAgentMessageRecord[] = [];
+  const workspaceAgentProposals: WorkspaceAgentActionProposalRecord[] = [];
 
   return {
     async listDevUsers() {
@@ -66,6 +68,39 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
     async createWorkspaceAgentMessage(input) {
       workspaceAgentMessages.push(input);
       return input;
+    },
+    async listWorkspaceAgentProposals(input) {
+      return workspaceAgentProposals
+        .filter(
+          (proposal) =>
+            proposal.tenantId === input.tenantId &&
+            workspaceAgentContextKey(proposal.context) === workspaceAgentContextKey(input.context)
+        )
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(-(input.limit ?? 20));
+    },
+    async createWorkspaceAgentProposal(input) {
+      workspaceAgentProposals.push(input);
+      return input;
+    },
+    async findWorkspaceAgentProposal(tenantId, proposalId) {
+      return workspaceAgentProposals.find((proposal) => proposal.tenantId === tenantId && proposal.id === proposalId);
+    },
+    async updateWorkspaceAgentProposalStatus(input) {
+      const index = workspaceAgentProposals.findIndex(
+        (proposal) => proposal.tenantId === input.tenantId && proposal.id === input.proposalId
+      );
+      if (index < 0) return undefined;
+      const current = workspaceAgentProposals[index];
+      if (!current) return undefined;
+      const updated = {
+        ...current,
+        status: input.status,
+        auditEventId: input.auditEventId,
+        resolvedAt: input.resolvedAt
+      };
+      workspaceAgentProposals[index] = updated;
+      return updated;
     }
   };
 }

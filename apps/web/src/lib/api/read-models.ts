@@ -49,9 +49,26 @@ export type WorkspaceAgentMessage = {
   createdAt: string;
 };
 
+export type WorkspaceAgentProposalStatus = "proposed" | "applied" | "rejected";
+
+export type WorkspaceAgentActionProposal = {
+  id: string;
+  messageId: string;
+  actionType: string;
+  title: string;
+  description: string;
+  context: WorkspaceAgentThreadContext;
+  payload: Record<string, unknown>;
+  status: WorkspaceAgentProposalStatus;
+  auditEventId: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+};
+
 export type WorkspaceAgentThread = {
   context: WorkspaceAgentThreadContext;
   messages: WorkspaceAgentMessage[];
+  proposals: WorkspaceAgentActionProposal[];
 };
 
 export type ScheduledTasksQueryInput = {
@@ -117,6 +134,19 @@ export async function postWorkspaceAgentMessage(body: string): Promise<Workspace
     method: "POST",
     json: body
   });
+}
+
+export async function confirmWorkspaceAgentProposal(input: {
+  proposalId: string;
+  decision: "apply" | "reject";
+}): Promise<WorkspaceAgentThread> {
+  return apiFetch<WorkspaceAgentThread>(
+    `/api/workspace/agent-thread/proposals/${input.proposalId}/confirm`,
+    {
+      method: "POST",
+      json: { decision: input.decision }
+    }
+  );
 }
 
 export function useProjectsListReadModelQuery() {
