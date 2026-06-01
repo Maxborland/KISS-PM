@@ -154,6 +154,13 @@ const workspaceAgentApplyingStatusMigration = readFileSync(
   ),
   "utf8"
 );
+const workspaceAgentMessageAuthorTypeMigration = readFileSync(
+  new URL(
+    "../migrations/0044_workspace_agent_message_author_type.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -271,6 +278,15 @@ describe("Workspace agent action proposal SQL migrations", () => {
     );
     expect(workspaceAgentApplyingStatusMigration).toContain(
       "CHECK (\"status\" IN ('proposed', 'applying', 'applied', 'rejected'))"
+    );
+  });
+
+  it("stores persisted agent replies separately from user messages", () => {
+    expect(workspaceAgentMessageAuthorTypeMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "author_type" text NOT NULL DEFAULT \'user\''
+    );
+    expect(workspaceAgentMessageAuthorTypeMigration).toContain(
+      "CHECK (\"author_type\" IN ('user', 'agent'))"
     );
   });
 });

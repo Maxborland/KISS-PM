@@ -99,6 +99,7 @@ export type WorkspaceAgentThreadContext = {
 export type WorkspaceAgentMessage = {
   id: string;
   authorUserId: string;
+  authorType: "user" | "agent";
   body: string;
   context: WorkspaceAgentThreadContext;
   createdAt: string;

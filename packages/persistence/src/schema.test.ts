@@ -204,6 +204,7 @@ describe("PostgreSQL persistence schema", () => {
       "id",
       "tenant_id",
       "author_user_id",
+      "author_type",
       "focus_type",
       "focus_id",
       "body",
