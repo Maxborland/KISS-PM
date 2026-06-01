@@ -112,6 +112,9 @@ describe("AgentCockpitBlock", () => {
       expect(host.textContent).toContain("Создана задача: Проверить просроченный этап");
       expect(host.textContent).toContain("Изменение применено");
       expect(host.textContent).toContain("Task:task-agent-result · Проверить просроченный этап");
+      expect(host.querySelector('a[href="/my-work?taskId=task-agent-result"]')?.textContent).toContain(
+        "Task:task-agent-result"
+      );
       expect(host.textContent).toContain("Записано в аудит: audit-hidden");
       expect(host.textContent).toContain("Результат применен и записан в аудит рабочей области.");
 

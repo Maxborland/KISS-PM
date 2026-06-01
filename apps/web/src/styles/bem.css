@@ -2116,8 +2116,15 @@ a:hover { color: var(--accent-hover); }
 }
 
 .runtime-agent-proposal__result span,
+.runtime-agent-proposal__result a,
 .runtime-agent-proposal__result code {
   overflow-wrap: anywhere;
+}
+
+.runtime-agent-proposal__result a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .runtime-agent-proposal__result code {

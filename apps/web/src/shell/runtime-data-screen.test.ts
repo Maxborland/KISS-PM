@@ -62,15 +62,21 @@ vi.mock("@/shell/runtime-dashboard-screen", () => ({
 
 vi.mock("@/views/blocks/my-work-block", () => ({
   RuntimeMyWorkBlock: ({
+    initialOpenTaskId,
     readOnly,
     tasks
   }: {
+    initialOpenTaskId?: string;
     readOnly?: boolean;
     tasks: { title: string }[];
   }) =>
     createElement(
       "div",
-      { "data-testid": "runtime-my-work", "data-read-only": String(readOnly) },
+      {
+        "data-initial-open-task-id": initialOpenTaskId ?? "",
+        "data-testid": "runtime-my-work",
+        "data-read-only": String(readOnly)
+      },
       tasks.map((task) => task.title).join(", ")
     )
 }));
@@ -308,6 +314,29 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime my work task");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.myWork).toHaveBeenCalledWith({ assigneeUserId: "usr-1" });
+  });
+
+  it("passes the agent task deep link into runtime my work", async () => {
+    readModelHooks.myWork.mockReturnValue(
+      successReadModel({
+        tasks: [{ id: "task-agent-result", title: "Runtime task from agent" }],
+        scheduledTasks: []
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1",
+        initialTaskId: "task-agent-result"
+      })
+    );
+
+    expect(host.querySelector("[data-testid='runtime-my-work']")?.getAttribute("data-initial-open-task-id")).toBe(
+      "task-agent-result"
+    );
+    expect(host.textContent).toContain("Runtime task from agent");
   });
 });
 

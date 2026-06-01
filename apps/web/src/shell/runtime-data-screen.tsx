@@ -40,11 +40,13 @@ export function canOpenStaticRuntimeScreen(
 export function RuntimeDataScreen({
   screenId,
   permissions = [],
-  currentUserId
+  currentUserId,
+  initialTaskId
 }: {
   screenId: ScreenId;
   permissions?: readonly string[];
   currentUserId?: string | undefined;
+  initialTaskId?: string | undefined;
 }) {
   if (!canOpenStaticRuntimeScreen(screenId, permissions)) {
     return (
@@ -69,7 +71,7 @@ export function RuntimeDataScreen({
     if (!currentUserId) return <RuntimeMissingUserState />;
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeMyWorkScreen currentUserId={currentUserId} />
+        <RuntimeMyWorkScreen currentUserId={currentUserId} initialTaskId={initialTaskId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -177,7 +179,13 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
   ) : null;
 }
 
-function RuntimeMyWorkScreen({ currentUserId }: { currentUserId: string }) {
+function RuntimeMyWorkScreen({
+  currentUserId,
+  initialTaskId
+}: {
+  currentUserId: string;
+  initialTaskId?: string | undefined;
+}) {
   const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
 
   if (readModel.isPending || readModel.isFetching) {
@@ -199,6 +207,7 @@ function RuntimeMyWorkScreen({ currentUserId }: { currentUserId: string }) {
     <RuntimeMyWorkBlock
       tasks={readModel.data.tasks}
       scheduledTasks={readModel.data.scheduledTasks}
+      initialOpenTaskId={initialTaskId}
       readOnly
     />
   ) : null;

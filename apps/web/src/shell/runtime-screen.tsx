@@ -13,15 +13,27 @@ import type { ScreenId } from "@/views/catalog";
 import { RuntimeDataScreen } from "@/shell/runtime-data-screen";
 import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
-export function RuntimeScreen({ screenId }: { screenId: ScreenId }) {
+export function RuntimeScreen({
+  screenId,
+  initialTaskId
+}: {
+  screenId: ScreenId;
+  initialTaskId?: string | undefined;
+}) {
   if (screenId === "19-login") {
     return <RuntimeLoginScreen mode="login-route" />;
   }
 
-  return <AuthenticatedRuntimeScreen screenId={screenId} />;
+  return <AuthenticatedRuntimeScreen screenId={screenId} initialTaskId={initialTaskId} />;
 }
 
-function AuthenticatedRuntimeScreen({ screenId }: { screenId: ScreenId }) {
+function AuthenticatedRuntimeScreen({
+  screenId,
+  initialTaskId
+}: {
+  screenId: ScreenId;
+  initialTaskId?: string | undefined;
+}) {
   const authQuery = useAuthMeQuery();
   const bootstrapQueries = useWorkspaceBootstrapQueries({
     enabled: authQuery.isSuccess,
@@ -97,6 +109,7 @@ function AuthenticatedRuntimeScreen({ screenId }: { screenId: ScreenId }) {
       screenId={screenId}
       permissions={authQuery.data?.permissions ?? []}
       currentUserId={authQuery.data.user.id}
+      initialTaskId={initialTaskId}
     />
   );
 }

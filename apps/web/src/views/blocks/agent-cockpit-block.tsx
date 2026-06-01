@@ -364,6 +364,10 @@ function AgentProposalResult({
   summary: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>;
 }) {
   const ResultIcon = workspaceAgentResultStatusIcon(summary.status);
+  const changedEntityHref = workspaceAgentChangedEntityHref(summary.changedEntity);
+  const changedEntityLabel = summary.changedEntity
+    ? `${summary.changedEntity.type}:${summary.changedEntity.id} · ${summary.changedEntity.title}`
+    : null;
 
   return (
     <div className="runtime-agent-proposal__result" data-status={summary.status}>
@@ -371,8 +375,12 @@ function AgentProposalResult({
       <div>
         <strong>{workspaceAgentResultStatusLabel(summary.status)}</strong>
         <span>{summary.description}</span>
-        {summary.changedEntity ? (
-          <code>{`${summary.changedEntity.type}:${summary.changedEntity.id} · ${summary.changedEntity.title}`}</code>
+        {changedEntityHref && changedEntityLabel ? (
+          <a href={changedEntityHref} aria-label={`Открыть результат действия: ${changedEntityLabel}`}>
+            <code>{changedEntityLabel}</code>
+          </a>
+        ) : changedEntityLabel ? (
+          <code>{changedEntityLabel}</code>
         ) : null}
       </div>
     </div>
@@ -396,6 +404,15 @@ function workspaceAgentResultStatusIcon(status: NonNullable<WorkspaceAgentAction
   if (status === "succeeded") return CheckCircle2;
   if (status === "rejected") return AlertTriangle;
   return Clock3;
+}
+
+function workspaceAgentChangedEntityHref(
+  entity: NonNullable<WorkspaceAgentActionProposal["resultSummary"]>["changedEntity"]
+): string | null {
+  if (entity?.type === "Task") {
+    return `/my-work?taskId=${encodeURIComponent(entity.id)}`;
+  }
+  return null;
 }
 
 function workspaceAgentProposalEffectLabel(proposal: WorkspaceAgentActionProposal): string | null {
