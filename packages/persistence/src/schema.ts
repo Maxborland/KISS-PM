@@ -1803,7 +1803,7 @@ export const workspaceAgentProposals = pgTable(
     ),
     check(
       "workspace_agent_proposals_status_chk",
-      sql`${table.status} in ('proposed', 'applied', 'rejected')`
+      sql`${table.status} in ('proposed', 'applying', 'applied', 'rejected')`
     )
   ]
 );
