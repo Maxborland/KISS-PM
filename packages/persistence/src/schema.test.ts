@@ -57,7 +57,8 @@ describe("PostgreSQL persistence schema", () => {
       "user_credentials",
       "user_sessions",
       "audit_events",
-      "workspace_agent_messages"
+      "workspace_agent_messages",
+      "workspace_agent_proposals"
     ]);
   });
 
@@ -110,7 +111,8 @@ describe("PostgreSQL persistence schema", () => {
       "user_credentials",
       "user_sessions",
       "audit_events",
-      "workspace_agent_messages"
+      "workspace_agent_messages",
+      "workspace_agent_proposals"
     ]);
 
     for (const tableName of tenantOwnedTableNames) {
@@ -207,6 +209,26 @@ describe("PostgreSQL persistence schema", () => {
       "body",
       "context",
       "created_at"
+    ]);
+  });
+
+  it("stores workspace agent action proposals for explicit confirmation", () => {
+    expect(getPersistenceTableColumns("workspace_agent_proposals")).toEqual([
+      "id",
+      "tenant_id",
+      "actor_user_id",
+      "message_id",
+      "action_type",
+      "title",
+      "description",
+      "focus_type",
+      "focus_id",
+      "context",
+      "payload",
+      "status",
+      "audit_event_id",
+      "created_at",
+      "resolved_at"
     ]);
   });
 

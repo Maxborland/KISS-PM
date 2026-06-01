@@ -58,6 +58,7 @@ describe("RuntimeDashboardScreen", () => {
     document.body.append(host);
     const root = createRoot(host);
     const sent: string[] = [];
+    const confirmed: Array<[string, "apply" | "reject"]> = [];
 
     try {
       await act(async () => {
@@ -67,27 +68,45 @@ describe("RuntimeDashboardScreen", () => {
             {
               meta: getScreenRoute("01-dashboard"),
               children: createElement(RuntimeDashboardScreen, {
+                currentUserId: "usr-1",
                 data: {
                   projects: [],
-                  tasks: [],
                   scheduledTasks: [],
+                  tasks: [],
                   workspaceAgentThread: {
                     context: {},
                     messages: [
                       {
-                        id: "message-runtime",
                         authorUserId: "usr-1",
                         body: "Проверить просроченные задачи",
                         context: {},
-                        createdAt: "2026-06-01T00:00:00.000Z"
+                        createdAt: "2026-06-01T00:00:00.000Z",
+                        id: "message-runtime"
+                      }
+                    ],
+                    proposals: [
+                      {
+                        actionType: "workspace.agent.review_request",
+                        auditEventId: null,
+                        context: {},
+                        createdAt: "2026-06-01T00:01:00.000Z",
+                        description: "Записать поручение без изменения проектов.",
+                        id: "proposal-runtime",
+                        messageId: "message-runtime",
+                        payload: {},
+                        resolvedAt: null,
+                        status: "proposed",
+                        title: "Зафиксировать управленческое поручение"
                       }
                     ]
                   }
-              } as never,
-              currentUserId: "usr-1",
-              onSendWorkspaceAgentMessage: async (body) => {
-                sent.push(body);
-              }
+                } as never,
+                onConfirmWorkspaceAgentAction: async (proposalId, decision) => {
+                  confirmed.push([proposalId, decision]);
+                },
+                onSendWorkspaceAgentMessage: async (body) => {
+                  sent.push(body);
+                }
               })
             }
           )
@@ -99,7 +118,8 @@ describe("RuntimeDashboardScreen", () => {
       expect(host.textContent).toContain("Сверка изменений");
       expect(host.textContent).toContain("Ждет подтверждения перед изменениями");
       expect(host.textContent).toContain("Проверить просроченные задачи");
-      expect(host.textContent).not.toContain("Применить выбранное");
+      expect(host.textContent).toContain("Зафиксировать управленческое поручение");
+      expect(host.textContent).toContain("Применить");
 
       const textarea = host.querySelector("textarea");
       expect(textarea).not.toBeNull();
@@ -113,6 +133,12 @@ describe("RuntimeDashboardScreen", () => {
       });
 
       expect(sent).toEqual(["Что горит сегодня?"]);
+      await act(async () => {
+        Array.from(host.querySelectorAll("button"))
+          .find((button) => button.textContent?.includes("Применить"))
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(confirmed).toEqual([["proposal-runtime", "apply"]]);
     } finally {
       act(() => root.unmount());
       host.remove();
