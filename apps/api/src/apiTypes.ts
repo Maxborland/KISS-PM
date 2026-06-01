@@ -17,6 +17,7 @@ import type {
   CrmActivityRecord,
   CrmActivityTransitionResult,
   CrmActivityUpdateInput,
+  OperationsCockpitReadModel,
   PlanningCommandIdempotencyInput,
   PlanningCommandIdempotencyRecord,
   PlanningScenarioRunInput,
@@ -548,6 +549,12 @@ export type ApiTenantDataSource = {
   createCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
   updateCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
   listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
+  getOperationsCockpitReadModel?(input: {
+    tenantId: TenantId;
+    now: Date;
+    includePipelinePressure: boolean;
+    includeWorkloadHints: boolean;
+  }): Promise<OperationsCockpitReadModel>;
   createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
   listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
   getPlanSnapshot?(tenantId: TenantId, projectId: string): Promise<PlanSnapshot | undefined>;
