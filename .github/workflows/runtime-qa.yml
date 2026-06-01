@@ -1,0 +1,96 @@
+name: Runtime QA
+
+on:
+  push:
+    paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "e2e/runtime/**"
+      - "docs/beta/**"
+      - "packages/**"
+      - "scripts/run-runtime-qa.mjs"
+      - "scripts/seed-dev.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "playwright.config.ts"
+      - ".github/workflows/runtime-qa.yml"
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "e2e/runtime/**"
+      - "docs/beta/**"
+      - "packages/**"
+      - "scripts/run-runtime-qa.mjs"
+      - "scripts/seed-dev.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "playwright.config.ts"
+      - ".github/workflows/runtime-qa.yml"
+
+concurrency:
+  group: runtime-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kiss_pm
+          POSTGRES_USER: kiss_pm
+          POSTGRES_PASSWORD: kiss_pm_dev_password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiss_pm -d kiss_pm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      CI: "true"
+      DATABASE_URL: postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm
+      E2E_API_PORT: "4100"
+      E2E_WEB_PORT: "3100"
+      STORYBOOK_PORT: "6006"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Runtime QA foundation
+        run: pnpm qa:runtime
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-qa-playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
