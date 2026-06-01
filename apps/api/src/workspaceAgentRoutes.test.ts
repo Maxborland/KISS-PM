@@ -1,6 +1,11 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { TaskActivityRecord, TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
+import type {
+  OperationsCockpitReadModel,
+  TaskActivityRecord,
+  TaskRecord,
+  TaskStatusRecord
+} from "@kiss-pm/persistence";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -30,6 +35,11 @@ const confirmingActor = {
 const readerProfile = {
   id: "profile-alpha",
   permissions: ["tenant.projects.read", "tenant.opportunities.read"]
+} as AccessProfile;
+
+const crmOnlyProfile = {
+  id: "profile-alpha",
+  permissions: ["tenant.opportunities.read"]
 } as AccessProfile;
 
 const taskCreatorProfile = {
@@ -98,6 +108,114 @@ describe("workspace agent routes", () => {
     await expect(get.json()).resolves.toMatchObject({
       messages: [{ body: "Что горит по проекту?" }]
     });
+  });
+
+  it("injects operations cockpit context into proposed agent actions", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Что требует внимания сегодня?")
+    });
+
+    expect(post.status).toBe(201);
+    await expect(post.json()).resolves.toMatchObject({
+      proposal: {
+        actionType: "workspace.agent.review_request",
+        description: expect.stringContaining("Учтён cockpit: 2 активных проектов"),
+        payload: {
+          agentContext: {
+            operationsCockpit: {
+              status: "available",
+              indicators: {
+                activeProjects: 2,
+                overdueTasks: 3,
+                criticalTasks: 1,
+                openDeals: 4
+              },
+              attentionItems: [
+                {
+                  id: "attention-overdue",
+                  title: "Просрочен раздел АР"
+                }
+              ]
+            }
+          }
+        }
+      }
+    });
+    expect(fixture.operationsCockpitRequests).toEqual([
+      expect.objectContaining({
+        tenantId: "tenant-alpha",
+        includePipelinePressure: true,
+        includeWorkloadHints: false
+      })
+    ]);
+    expect(fixture.audits).toEqual([]);
+  });
+
+  it("keeps proposals explicit when operations cockpit persistence is unavailable", async () => {
+    const fixture = createFixture({ operationsCockpit: "missing" });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Что требует внимания сегодня?")
+    });
+
+    expect(post.status).toBe(201);
+    await expect(post.json()).resolves.toMatchObject({
+      proposal: {
+        description: expect.stringContaining("Операционный контекст сейчас недоступен."),
+        payload: {
+          agentContext: {
+            operationsCockpit: {
+              status: "unavailable",
+              reason: "persistence_not_configured"
+            }
+          }
+        },
+        status: "proposed"
+      }
+    });
+    expect(fixture.audits).toEqual([]);
+  });
+
+  it("does not leak operations cockpit data into deal-only agent threads", async () => {
+    const fixture = createFixture({ profile: crmOnlyProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        body: "Что с этой сделкой?",
+        context: { dealId: "deal-alpha" }
+      })
+    });
+
+    expect(post.status).toBe(201);
+    await expect(post.json()).resolves.toMatchObject({
+      context: { focus: { type: "deal", id: "deal-alpha", title: "Сделка Альфа" } },
+      proposal: {
+        payload: {
+          agentContext: {
+            operationsCockpit: {
+              status: "unavailable",
+              reason: "permission_missing"
+            }
+          }
+        },
+        status: "proposed"
+      }
+    });
+    expect(fixture.operationsCockpitRequests).toEqual([]);
   });
 
   it("applies an agent proposal only through explicit confirmation and writes audit", async () => {
@@ -550,11 +668,18 @@ function createFixture(
     profile?: AccessProfile;
     forceNonMutatingResolutionConflict?: boolean;
     forceProposalClaimConflict?: boolean;
+    operationsCockpit?: "available" | "missing";
   } = {}
 ) {
   const messages: WorkspaceAgentMessageRecord[] = [];
   const proposals: WorkspaceAgentActionProposalRecord[] = [];
   const audits: ManagementAuditEventInput[] = [];
+  const operationsCockpitRequests: Array<{
+    tenantId: string;
+    now: Date;
+    includePipelinePressure: boolean;
+    includeWorkloadHints: boolean;
+  }> = [];
   const proposalStatusUpdates: Array<{ expectedStatus: string | undefined; status: string }> = [];
   let planningCommandCount = 0;
   let planningCommandCountAtProposalClaim: number | undefined;
@@ -682,6 +807,19 @@ function createFixture(
     async findOpportunityById() {
       return dealRecord;
     },
+    ...(options.operationsCockpit === "missing"
+      ? {}
+      : {
+          async getOperationsCockpitReadModel(input: {
+            tenantId: string;
+            now: Date;
+            includePipelinePressure: boolean;
+            includeWorkloadHints: boolean;
+          }) {
+            operationsCockpitRequests.push(input);
+            return operationsCockpitReadModel(input.tenantId);
+          }
+        }),
     async listWorkspaceAgentMessages(input) {
       return messages.filter(
         (candidate) =>
@@ -749,6 +887,7 @@ function createFixture(
       return planningCommandCountAtProposalClaim;
     },
     profile: options.profile ?? readerProfile,
+    operationsCockpitRequests,
     proposalStatusUpdates,
     taskActivities,
     tasks
@@ -841,6 +980,45 @@ function taskStatus(id: string, name: string): TaskStatusRecord {
     isSystem: true,
     createdAt: new Date("2026-06-01T00:00:00.000Z"),
     updatedAt: new Date("2026-06-01T00:00:00.000Z")
+  };
+}
+
+function operationsCockpitReadModel(tenantId: string): OperationsCockpitReadModel {
+  return {
+    generatedAt: "2026-06-01T00:00:00.000Z",
+    scope: { type: "workspace", tenantId },
+    indicators: {
+      activeProjects: 2,
+      overdueProjects: 1,
+      activeTasks: 8,
+      overdueTasks: 3,
+      waitingTasks: 1,
+      criticalTasks: 1,
+      openDeals: 4,
+      readyToActivateDeals: 1
+    },
+    attentionItems: [
+      {
+        id: "attention-overdue",
+        kind: "task_overdue",
+        severity: "critical",
+        title: "Просрочен раздел АР",
+        reason: "Плановая дата прошла.",
+        entity: { type: "task", id: "task-alpha", title: "Задача Альфа" },
+        projectId: "project-alpha",
+        ownerUserId: actor.id,
+        dueDate: "2026-05-30"
+      }
+    ],
+    workloadHints: { byPerson: [] },
+    pipelinePressure: { deals: [] },
+    agentContext: {
+      contextType: "operations_cockpit",
+      focus: { type: "workspace", tenantId },
+      generatedAt: "2026-06-01T00:00:00.000Z",
+      sourceEntityTypes: ["Project", "Task", "Opportunity", "TenantUser"],
+      unavailableSources: []
+    }
   };
 }
 
