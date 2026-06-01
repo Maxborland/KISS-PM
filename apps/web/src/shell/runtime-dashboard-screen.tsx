@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
-import type { DashboardReadModel } from "@/lib/api/read-models";
+import type { DashboardReadModel, WorkspaceAgentActionProposal } from "@/lib/api/read-models";
 import { formatDate, formatDateRange } from "@/lib/mock-data/format";
 import { getRuntimeTodayIsoDate, getScheduledTaskDailyWorkMinutes } from "@/lib/scheduled-tasks";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -269,6 +269,12 @@ export function RuntimeDashboardScreen({
                           <span data-status={proposal.status}>{agentProposalStatusLabel(proposal.status)}</span>
                         </div>
                         <p>{proposal.description}</p>
+                        {workspaceAgentProposalEffectLabel(proposal) ? (
+                          <div className="runtime-agent-proposal__effect">
+                            <CheckCircle2 aria-hidden />
+                            {workspaceAgentProposalEffectLabel(proposal)}
+                          </div>
+                        ) : null}
                         {proposal.auditEventId ? (
                           <div className="runtime-agent-proposal__audit">
                             <CheckCircle2 aria-hidden />
@@ -321,4 +327,17 @@ function agentProposalStatusLabel(status: string): string {
   if (status === "applied") return "применено";
   if (status === "rejected") return "отклонено";
   return "ожидает";
+}
+
+function workspaceAgentProposalEffectLabel(proposal: WorkspaceAgentActionProposal): string | null {
+  if (proposal.actionType !== "workspace.agent.create_task") return null;
+  const task = proposal.payload.task;
+  if (!isRecord(task) || typeof task.title !== "string") return null;
+  if (proposal.status === "applied") return `Создана задача: ${task.title}`;
+  if (proposal.status === "rejected") return `Задача не создана: ${task.title}`;
+  return `Будет создана задача: ${task.title}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
