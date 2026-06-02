@@ -7,6 +7,7 @@ import {
   Sheet,
   SheetBody,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle
 } from "@/components/ui/sheet";
@@ -50,6 +51,11 @@ export function TaskDetailDrawer({
           <>
             <SheetHeader className="task-drawer__head">
               <SheetTitle className="sr-only">{task.title}</SheetTitle>
+              <SheetDescription className="sr-only">
+                {subtitle
+                  ? `Карточка задачи ${task.title}: ${subtitle}.`
+                  : `Карточка задачи ${task.title}.`}
+              </SheetDescription>
               {taskHref ? (
                 <Button
                   asChild
