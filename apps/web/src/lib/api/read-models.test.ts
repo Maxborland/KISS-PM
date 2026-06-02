@@ -23,6 +23,7 @@ import {
   useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
+import type { OperationsCockpitReadModel } from "@/lib/api-types";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -416,7 +417,8 @@ describe("runtime read model API", () => {
       return json({ error: "not_found" }, 404);
     });
 
-    await expect(fetchWorkspaceOperationsCockpit()).resolves.toMatchObject({
+    const fallback = await fetchWorkspaceOperationsCockpit();
+    expect(fallback).toMatchObject({
       indicators: {
         activeProjects: 0,
         activeTasks: 0,
@@ -433,7 +435,50 @@ describe("runtime read model API", () => {
         ]
       }
     });
+    expect(fallback.agentContext.unavailableSources).toEqual([
+      {
+        source: "operations_cockpit",
+        reason: "persistence_not_configured"
+      }
+    ]);
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/operations-cockpit"]);
+  });
+
+  it("preserves unavailableSources from operations cockpit payload exactly", async () => {
+    const fixture = operationsCockpitFixture();
+    const payload: OperationsCockpitReadModel = {
+      ...fixture,
+      generatedAt: "2026-06-02T10:00:00.000Z",
+      indicators: {
+        ...fixture.indicators,
+        openDeals: 7
+      },
+      agentContext: {
+        contextType: "operations_cockpit",
+        focus: {
+          type: "workspace",
+          tenantId: "tenant-alpha"
+        },
+        generatedAt: "2026-06-02T10:00:00.000Z",
+        sourceEntityTypes: ["Project", "Task", "Opportunity"],
+        unavailableSources: [
+          { source: "resource_workload", reason: "unavailable_source" },
+          { source: "opportunity_pipeline", reason: "feature_hidden" }
+        ]
+      }
+    };
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({ cockpit: payload });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    const readModel = await fetchWorkspaceOperationsCockpit();
+    expect(readModel).toEqual(payload);
+    expect(readModel.agentContext.unavailableSources).toEqual(payload.agentContext.unavailableSources);
   });
 
   it("does not hide operations cockpit permission errors", async () => {
@@ -599,6 +644,76 @@ describe("runtime read model API", () => {
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status });
+}
+
+function operationsCockpitFallback(): OperationsCockpitReadModel {
+  return {
+    generatedAt: "",
+    scope: {
+      type: "workspace",
+      tenantId: ""
+    },
+    indicators: {
+      activeProjects: 0,
+      overdueProjects: 0,
+      activeTasks: 0,
+      overdueTasks: 0,
+      waitingTasks: 0,
+      criticalTasks: 0,
+      openDeals: 0,
+      readyToActivateDeals: 0
+    },
+    attentionItems: [],
+    workloadHints: {
+      byPerson: []
+    },
+    pipelinePressure: {
+      deals: []
+    },
+    agentContext: {
+      contextType: "operations_cockpit",
+      focus: {
+        type: "workspace",
+        tenantId: ""
+      },
+      generatedAt: "",
+      sourceEntityTypes: [],
+      unavailableSources: [
+        {
+          source: "operations_cockpit",
+          reason: "persistence_not_configured"
+        }
+      ]
+    }
+  };
+}
+
+function operationsCockpitFixture(overrides: Partial<OperationsCockpitReadModel> = {}): OperationsCockpitReadModel {
+  const base = operationsCockpitFallback();
+  return {
+    ...base,
+    ...overrides,
+    indicators: {
+      ...base.indicators,
+      ...overrides.indicators
+    },
+    workloadHints: {
+      ...base.workloadHints,
+      ...overrides.workloadHints
+    },
+    pipelinePressure: {
+      ...base.pipelinePressure,
+      ...overrides.pipelinePressure
+    },
+    agentContext: {
+      ...base.agentContext,
+      ...overrides.agentContext
+    },
+    scope: {
+      ...base.scope,
+      ...overrides.scope
+    }
+  };
 }
 
 function agentThreadPayload(overrides: Partial<Record<"context" | "messages" | "proposals", unknown>> = {}) {
