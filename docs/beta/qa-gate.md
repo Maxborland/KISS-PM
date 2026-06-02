@@ -22,7 +22,7 @@ pnpm qa:runtime
 
 - `e2e/runtime/runtimeQaFixtures.ts` включает guard на неожиданные `pageerror`, `console.error`, failed `document/script/fetch/xhr` requests и 4xx/5xx responses;
 - `e2e/runtime/runtime-foundation.spec.ts` логинится seeded admin пользователем, открывает runtime root, проверяет redirect на `/dashboard`, делает desktop и narrow screenshots;
-- `e2e/runtime/runtime-foundation.spec.ts` также открывает `/dashboard`, `/my-work`, `/projects`, `/deals` и проверяет, что route не blank, не forbidden/error и не даёт горизонтальный overflow на desktop/narrow;
+- `e2e/runtime/runtime-foundation.spec.ts` также открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals` и проверяет, что route не blank, не forbidden/error и не даёт горизонтальный overflow на desktop/narrow;
 - `e2e/runtime/storybook-visual-smoke.spec.ts` запускается только при `KISS_PM_STORYBOOK_QA=1`, открывает стабильные Storybook stories через `iframe.html?id=...` и снимает desktop/narrow screenshots approved design-v3 stories.
 
 ## Runtime-артефакты
@@ -40,12 +40,16 @@ pnpm qa:runtime
 - `runtime-dashboard-narrow.png`;
 - `runtime-my-work-desktop.png`;
 - `runtime-my-work-narrow.png`;
+- `runtime-agent-desktop.png`;
+- `runtime-agent-narrow.png`;
 - `runtime-projects-desktop.png`;
 - `runtime-projects-narrow.png`;
 - `runtime-deals-desktop.png`;
 - `runtime-deals-narrow.png`;
 - `tokens-desktop.png`;
 - `tokens-narrow.png`;
+- `agent-cockpit-desktop.png`;
+- `agent-cockpit-narrow.png`;
 - `deals-desktop.png`;
 - `deals-narrow.png`;
 - `settings-desktop.png`;
@@ -58,7 +62,7 @@ CI workflow `.github/workflows/runtime-qa.yml` загружает `playwright-re
 - `e2e/a11y/**` не входит в `pnpm qa:runtime`.
 - Бизнес-flow acceptance, RBAC mutation journeys и agent confirmation loop не считаются покрытыми этим foundation.
 - Runtime UI code, backend code, lockfile, marketing и storage не меняются этим gate.
-- `/agent` route и agent cockpit Storybook smoke добавляются следующим gate после merge runtime agent cockpit slice.
+- Agent confirmation loop acceptance, RBAC mutation journeys и audit assertions остаются отдельным beta gate поверх foundation smoke.
 
 ## Ожидание перед PR
 

@@ -49,6 +49,7 @@ test("authenticated beta runtime routes open without blank or error states", asy
   for (const route of [
     { path: "/dashboard", marker: "Runtime-сводка по проектам" },
     { path: "/my-work", marker: "Моя работа" },
+    { path: "/agent", marker: "Генри Гантт" },
     { path: "/projects", marker: "Проекты" },
     { path: "/deals", marker: "Сделки" }
   ] as const) {
@@ -69,6 +70,10 @@ test("authenticated beta runtime routes open without blank or error states", asy
     await expect(page.locator("body")).toContainText(route.marker);
     if (route.path === "/dashboard") {
       await expect(page.getByRole("link", { name: "Агент" })).toBeVisible();
+    }
+    if (route.path === "/agent") {
+      await expect(page.getByLabel("Единый управленческий агент")).toBeVisible();
+      await expect(page.getByText("Сверка изменений")).toBeVisible();
     }
     if (route.path === "/projects") {
       await expect(page.getByRole("link", { name: "Гант" })).toBeVisible();
