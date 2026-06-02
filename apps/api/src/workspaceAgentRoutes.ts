@@ -77,6 +77,27 @@ type WorkspaceAgentActionResultSummary = {
   description: string;
 };
 
+type WorkspaceAgentThreadDescriptor = {
+  kind: "workspace_agent_cockpit";
+  scope: { type: "workspace"; tenantId: string };
+  context: WorkspaceAgentThreadContext;
+};
+
+type WorkspaceAgentMutationPolicy = {
+  mode: "confirmation_required";
+  messagePostMutatesWorkspace: false;
+  mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm";
+  allowedDecisions: Array<"apply" | "reject">;
+};
+
+type WorkspaceAgentProposalConfirmation = {
+  required: true;
+  status: "available" | "closed";
+  endpoint: string;
+  allowedDecisions: Array<"apply" | "reject">;
+  mutationOnlyOnApply: true;
+};
+
 type CreateTaskProposalPayload = {
   id: string;
   title: string;
@@ -91,6 +112,12 @@ type CreateTaskProposalPayload = {
 };
 
 const maxAgentMessageLength = 4000;
+const workspaceAgentMutationPolicy: WorkspaceAgentMutationPolicy = {
+  mode: "confirmation_required",
+  messagePostMutatesWorkspace: false,
+  mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm",
+  allowedDecisions: ["apply", "reject"]
+};
 
 export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRouteDeps) {
   app.get("/api/workspace/agent-thread", async (context) => {
@@ -125,6 +152,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       : [];
 
     return context.json({
+      ...buildWorkspaceAgentContract(actor, resolvedContext.context),
       context: resolvedContext.context,
       messages: messages.map(serializeWorkspaceAgentMessage),
       proposals: proposals.map(serializeWorkspaceAgentProposal)
@@ -193,6 +221,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
 
     return context.json(
       {
+        ...buildWorkspaceAgentContract(actor, resolvedContext.context),
         context: resolvedContext.context,
         message: serializeWorkspaceAgentMessage(message),
         agentMessage: serializeWorkspaceAgentMessage(agentMessage),
@@ -255,6 +284,7 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       : [];
 
     return context.json({
+      ...buildWorkspaceAgentContract(actor, resolvedContext.context),
       context: resolvedContext.context,
       proposal: serializeWorkspaceAgentProposal(resolvedProposal.proposal),
       messages: messages.map(serializeWorkspaceAgentMessage),
@@ -262,6 +292,24 @@ export function registerWorkspaceAgentRoutes(app: ApiApp, deps: WorkspaceAgentRo
       auditEventId: resolvedProposal.auditEventId
     });
   });
+}
+
+function buildWorkspaceAgentContract(actor: TenantUser, context: WorkspaceAgentThreadContext) {
+  return {
+    thread: buildWorkspaceAgentThreadDescriptor(actor, context),
+    mutationPolicy: workspaceAgentMutationPolicy
+  };
+}
+
+function buildWorkspaceAgentThreadDescriptor(
+  actor: TenantUser,
+  context: WorkspaceAgentThreadContext
+): WorkspaceAgentThreadDescriptor {
+  return {
+    kind: "workspace_agent_cockpit",
+    scope: { type: "workspace", tenantId: actor.tenantId },
+    context
+  };
 }
 
 function parseQueryContext(query: Record<string, string | undefined>): ContextParseResult {
@@ -466,9 +514,23 @@ function serializeWorkspaceAgentProposal(proposal: WorkspaceAgentActionProposalR
     payload: proposal.payload,
     status: proposal.status,
     auditEventId: proposal.auditEventId,
+    confirmation: buildWorkspaceAgentProposalConfirmation(proposal),
     resultSummary: buildWorkspaceAgentResultSummary(proposal),
     createdAt: proposal.createdAt.toISOString(),
     resolvedAt: proposal.resolvedAt?.toISOString() ?? null
+  };
+}
+
+function buildWorkspaceAgentProposalConfirmation(
+  proposal: WorkspaceAgentActionProposalRecord
+): WorkspaceAgentProposalConfirmation {
+  const isAvailable = proposal.status === "proposed";
+  return {
+    required: true,
+    status: isAvailable ? "available" : "closed",
+    endpoint: `/api/workspace/agent-thread/proposals/${proposal.id}/confirm`,
+    allowedDecisions: isAvailable ? ["apply", "reject"] : [],
+    mutationOnlyOnApply: true
   };
 }
 
