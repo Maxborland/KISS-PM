@@ -49,6 +49,49 @@ describe("RuntimeMyWorkBlock", () => {
     expect(host?.querySelector('a[aria-label="Открыть карточку задачи как страницу"]')).toBeNull();
   });
 
+  it("opens a runtime task drawer from an agent deep link when the task is in the read model", async () => {
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-agent-result", title: "Runtime task from agent" })],
+      { initialOpenTaskId: "task-agent-result" }
+    );
+
+    expect(document.body.querySelector(".task-drawer")).not.toBeNull();
+    expect(document.body.textContent).toContain("Runtime task from agent");
+    expect(document.body.textContent).toContain("task-agent-result");
+    expect(document.body.querySelector('a[aria-label="Открыть карточку задачи как страницу"]')).toBeNull();
+  });
+
+  it("consumes the agent deep link after the first successful drawer open", async () => {
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-agent-result", title: "Runtime task from agent" })],
+      { initialOpenTaskId: "task-agent-result" }
+    );
+    expect(document.body.querySelector(".task-drawer")).not.toBeNull();
+
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('button[aria-label="Закрыть"]')?.click();
+    });
+    expect(document.body.querySelector(".task-drawer")).toBeNull();
+
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-agent-result", title: "Runtime task after refresh" })],
+      { initialOpenTaskId: "task-agent-result" }
+    );
+
+    expect(document.body.querySelector(".task-drawer")).toBeNull();
+    expect(host?.textContent).toContain("Runtime task after refresh");
+  });
+
+  it("does not open a runtime task drawer when the agent deep link target is not loaded", async () => {
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-other", title: "Another runtime task" })],
+      { initialOpenTaskId: "task-missing" }
+    );
+
+    expect(document.body.querySelector(".task-drawer")).toBeNull();
+    expect(document.body.textContent).not.toContain("task-missing");
+  });
+
   it("shows today's daily work slice for multi-day scheduled tasks", async () => {
     const today = isoDateOffset(0);
     const finish = isoDateOffset(4);
@@ -73,6 +116,7 @@ describe("RuntimeMyWorkBlock", () => {
     tasks: Task[],
     options: {
       initialMode?: "kanban" | "list";
+      initialOpenTaskId?: string;
       scheduledTasks?: ScheduledTask[];
     } = {}
   ) {
@@ -87,6 +131,7 @@ describe("RuntimeMyWorkBlock", () => {
         <ScreenRouteProvider meta={getScreenRoute("02-my-work")}>
           <RuntimeMyWorkBlock
             initialMode={options.initialMode ?? "list"}
+            initialOpenTaskId={options.initialOpenTaskId}
             readOnly
             scheduledTasks={options.scheduledTasks ?? []}
             tasks={tasks}

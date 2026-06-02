@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
@@ -123,6 +123,7 @@ export type MyWorkBlockProps = {
 export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   tasks?: Task[];
   scheduledTasks?: ScheduledTask[];
+  initialOpenTaskId?: string | undefined;
   readOnly?: boolean;
 };
 
@@ -147,6 +148,7 @@ function FixtureMyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
 
 export function RuntimeMyWorkBlock({
   initialMode = "kanban",
+  initialOpenTaskId,
   tasks = [],
   scheduledTasks = [],
   readOnly = true
@@ -157,6 +159,7 @@ export function RuntimeMyWorkBlock({
       initialMode={initialMode}
       tasks={tasks}
       scheduledTasks={scheduledTasks}
+      initialOpenTaskId={initialOpenTaskId}
       readOnly={readOnly}
       fetchPhase="success"
       scenario="default"
@@ -169,6 +172,7 @@ function MyWorkBlockInner({
   initialMode = "kanban",
   tasks,
   scheduledTasks,
+  initialOpenTaskId,
   readOnly = false,
   fetchPhase,
   errorMessage,
@@ -189,6 +193,7 @@ function MyWorkBlockInner({
   const [mode, setMode] = useState<"kanban" | "list">(initialMode);
   const [cards, setCards] = useState<CardModel[]>(initialCards);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const consumedInitialOpenTaskIdRef = useRef<string | null>(null);
   const [columnSort, setColumnSort] = useState<KanbanColumnSortState<ColumnId>>({});
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
   const [retryCount, setRetryCount] = useState(0);
@@ -197,10 +202,18 @@ function MyWorkBlockInner({
     if (!runtime) return;
 
     setCards(initialCards);
-    setOpenCardId((current) =>
-      current && initialCards.some((card) => card.id === current) ? current : null
-    );
-  }, [initialCards, runtime]);
+    setOpenCardId((current) => {
+      if (
+        initialOpenTaskId &&
+        consumedInitialOpenTaskIdRef.current !== initialOpenTaskId &&
+        initialCards.some((card) => card.id === initialOpenTaskId)
+      ) {
+        consumedInitialOpenTaskIdRef.current = initialOpenTaskId;
+        return initialOpenTaskId;
+      }
+      return current && initialCards.some((card) => card.id === current) ? current : null;
+    });
+  }, [initialCards, initialOpenTaskId, runtime]);
 
   const cardsOrdered = useMemo(() => flattenByColumns(cards), [cards]);
   const isEmpty = (!runtime && scenario === "empty") || cardsOrdered.length === 0;
