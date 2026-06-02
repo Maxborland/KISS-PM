@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { OperationsCockpitReadModel } from "@/lib/api-types";
 import type {
   WorkspaceAgentActionProposal,
+  WorkspaceAgentConfirmationDecision,
   WorkspaceAgentProposalStatus,
   WorkspaceAgentThread
 } from "@/lib/api/read-models";
@@ -34,7 +35,7 @@ export type AgentCockpitBlockProps = {
   messageError?: unknown;
   actionError?: unknown;
   onSendMessage?: ((body: string) => Promise<unknown>) | undefined;
-  onConfirmProposal?: ((proposalId: string, decision: "apply" | "reject") => Promise<unknown>) | undefined;
+  onConfirmProposal?: ((proposalId: string, decision: WorkspaceAgentConfirmationDecision) => Promise<unknown>) | undefined;
   variant?: "embedded" | "surface";
 };
 
@@ -79,7 +80,7 @@ export function AgentCockpitBlock({
           </div>
           <div className="runtime-agent__status">
             <span className="dot dot--success" />
-            Ждет подтверждения перед изменениями
+            {workspaceAgentMutationPolicyLabel(thread)}
           </div>
         </header>
 
@@ -290,10 +291,13 @@ function AgentProposalCard({
 }: {
   proposal: WorkspaceAgentActionProposal;
   isConfirming: boolean;
-  onConfirmProposal?: ((proposalId: string, decision: "apply" | "reject") => Promise<unknown>) | undefined;
+  onConfirmProposal?: ((proposalId: string, decision: WorkspaceAgentConfirmationDecision) => Promise<unknown>) | undefined;
 }) {
   const effectLabel = workspaceAgentProposalEffectLabel(proposal);
   const diffRows = workspaceAgentProposalDiffRows(proposal);
+  const applyAvailable = workspaceAgentProposalAllowsDecision(proposal, "apply");
+  const rejectAvailable = workspaceAgentProposalAllowsDecision(proposal, "reject");
+  const hasAvailableDecision = applyAvailable || rejectAvailable;
 
   return (
     <article className="runtime-agent-proposal">
@@ -317,6 +321,12 @@ function AgentProposalCard({
           ))}
         </div>
       ) : null}
+      {proposal.confirmation ? (
+        <div className="runtime-agent-review__step">
+          <ShieldCheck aria-hidden />
+          <span>{workspaceAgentProposalConfirmationLabel(proposal)}</span>
+        </div>
+      ) : null}
       {effectLabel ? (
         <div className="runtime-agent-proposal__effect">
           <CheckCircle2 aria-hidden />
@@ -333,26 +343,34 @@ function AgentProposalCard({
         </div>
       ) : null}
       {proposal.status === "proposed" ? (
-        <div className="runtime-agent-proposal__actions">
-          <Button
-            type="button"
-            size="sm"
-            variant="primary"
-            disabled={isConfirming || !onConfirmProposal}
-            onClick={() => void onConfirmProposal?.(proposal.id, "apply")}
-          >
-            Применить
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={isConfirming || !onConfirmProposal}
-            onClick={() => void onConfirmProposal?.(proposal.id, "reject")}
-          >
-            Отклонить
-          </Button>
-        </div>
+        hasAvailableDecision ? (
+          <div className="runtime-agent-proposal__actions">
+            {applyAvailable ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                disabled={isConfirming || !onConfirmProposal}
+                onClick={() => void onConfirmProposal?.(proposal.id, "apply")}
+              >
+                Применить
+              </Button>
+            ) : null}
+            {rejectAvailable ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={isConfirming || !onConfirmProposal}
+                onClick={() => void onConfirmProposal?.(proposal.id, "reject")}
+              >
+                Отклонить
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <p>Подтверждение недоступно для этого предложения.</p>
+        )
       ) : null}
     </article>
   );
@@ -416,6 +434,37 @@ function workspaceAgentChangedEntityHref(
     return `/my-work?taskId=${encodeURIComponent(entity.id)}`;
   }
   return null;
+}
+
+function workspaceAgentMutationPolicyLabel(thread: WorkspaceAgentThread): string {
+  if (
+    thread.thread?.kind === "workspace_agent_cockpit" &&
+    thread.mutationPolicy?.mode === "confirmation_required" &&
+    thread.mutationPolicy.messagePostMutatesWorkspace === false
+  ) {
+    return "Сообщения не меняют данные";
+  }
+  return "Ждет подтверждения перед изменениями";
+}
+
+function workspaceAgentProposalAllowsDecision(
+  proposal: WorkspaceAgentActionProposal,
+  decision: WorkspaceAgentConfirmationDecision
+): boolean {
+  if (proposal.status !== "proposed") return false;
+  if (!proposal.confirmation) return true;
+  return (
+    proposal.confirmation.required &&
+    proposal.confirmation.status === "available" &&
+    proposal.confirmation.mutationOnlyOnApply &&
+    proposal.confirmation.allowedDecisions.includes(decision)
+  );
+}
+
+function workspaceAgentProposalConfirmationLabel(proposal: WorkspaceAgentActionProposal): string {
+  if (!proposal.confirmation) return "Перед изменением нужна явная сверка пользователя.";
+  if (proposal.confirmation.status === "closed") return "Подтверждение закрыто сервером.";
+  return "Изменение доступно только после подтверждения.";
 }
 
 function workspaceAgentProposalEffectLabel(proposal: WorkspaceAgentActionProposal): string | null {

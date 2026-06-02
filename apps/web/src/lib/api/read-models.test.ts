@@ -65,7 +65,7 @@ describe("runtime read model API", () => {
         return json({ dealStages: [{ id: "lead" }] });
       }
       if (path === "/api/workspace/agent-thread") {
-        return json({ context: {}, messages: [{ id: "agent-message-1" }], proposals: [] });
+        return json(agentThreadPayload({ messages: [{ id: "agent-message-1" }] }));
       }
       if (path === "/api/workspace/operations-cockpit") {
         return json({
@@ -77,10 +77,21 @@ describe("runtime read model API", () => {
         });
       }
       if (path === "/api/workspace/agent-thread/messages") {
-        return json({ context: {}, messages: [{ id: "agent-message-2" }], proposals: [{ id: "proposal-1" }] }, 201);
+        return json(
+          agentThreadPayload({
+            messages: [{ id: "agent-message-2" }],
+            proposals: [{ id: "proposal-1", confirmation: availableConfirmation("proposal-1") }]
+          }),
+          201
+        );
       }
       if (path === "/api/workspace/agent-thread/proposals/proposal-1/confirm") {
-        return json({ context: {}, messages: [], proposals: [{ id: "proposal-1", status: "applied" }] });
+        return json(
+          agentThreadPayload({
+            messages: [],
+            proposals: [{ id: "proposal-1", status: "applied", confirmation: closedConfirmation("proposal-1") }]
+          })
+        );
       }
       if (
         path ===
@@ -96,7 +107,18 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
-    await expect(fetchWorkspaceAgentThread()).resolves.toEqual({
+    await expect(fetchWorkspaceAgentThread()).resolves.toMatchObject({
+      thread: {
+        kind: "workspace_agent_cockpit",
+        scope: { type: "workspace", tenantId: "tenant-alpha" },
+        context: {}
+      },
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false,
+        mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm",
+        allowedDecisions: ["apply", "reject"]
+      },
       context: {},
       messages: [{ id: "agent-message-1" }],
       proposals: []
@@ -106,15 +128,46 @@ describe("runtime read model API", () => {
       attentionItems: [],
       agentContext: { unavailableSources: [] }
     });
-    await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toEqual({
+    await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toMatchObject({
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false
+      },
       context: {},
       messages: [{ id: "agent-message-2" }],
-      proposals: [{ id: "proposal-1" }]
+      proposals: [
+        {
+          id: "proposal-1",
+          confirmation: {
+            required: true,
+            status: "available",
+            endpoint: "/api/workspace/agent-thread/proposals/proposal-1/confirm",
+            allowedDecisions: ["apply", "reject"],
+            mutationOnlyOnApply: true
+          }
+        }
+      ]
     });
-    await expect(confirmWorkspaceAgentProposal({ proposalId: "proposal-1", decision: "apply" })).resolves.toEqual({
+    await expect(confirmWorkspaceAgentProposal({ proposalId: "proposal-1", decision: "apply" })).resolves.toMatchObject({
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false
+      },
       context: {},
       messages: [],
-      proposals: [{ id: "proposal-1", status: "applied" }]
+      proposals: [
+        {
+          id: "proposal-1",
+          status: "applied",
+          confirmation: {
+            required: true,
+            status: "closed",
+            endpoint: "/api/workspace/agent-thread/proposals/proposal-1/confirm",
+            allowedDecisions: [],
+            mutationOnlyOnApply: true
+          }
+        }
+      ]
     });
     await expect(
       fetchTenantCurrentScheduledTasks({
@@ -310,7 +363,7 @@ describe("runtime read model API", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === "/api/workspace/agent-thread") {
-        return json({ context: {}, messages: [{ id: "agent-message-1" }], proposals: [] });
+        return json(agentThreadPayload({ messages: [{ id: "agent-message-1" }], proposals: [] }));
       }
       if (path === "/api/workspace/operations-cockpit") {
         return json({
@@ -416,7 +469,12 @@ describe("runtime read model API", () => {
         return json({ tasks: [{ id: "scheduled-1" }] });
       }
       if (path === "/api/workspace/agent-thread") {
-        return json({ context: {}, messages: [{ id: "agent-message-1", body: "Runtime only" }], proposals: [] });
+        return json(
+          agentThreadPayload({
+            messages: [{ id: "agent-message-1", body: "Runtime only" }],
+            proposals: []
+          })
+        );
       }
       return json({ error: "not_found" }, 404);
     });
@@ -529,4 +587,42 @@ describe("runtime read model API", () => {
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status });
+}
+
+function agentThreadPayload(overrides: Partial<Record<"context" | "messages" | "proposals", unknown>> = {}) {
+  const context = overrides.context ?? {};
+  return {
+    thread: {
+      kind: "workspace_agent_cockpit",
+      scope: { type: "workspace", tenantId: "tenant-alpha" },
+      context
+    },
+    mutationPolicy: {
+      mode: "confirmation_required",
+      messagePostMutatesWorkspace: false,
+      mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm",
+      allowedDecisions: ["apply", "reject"]
+    },
+    context,
+    messages: overrides.messages ?? [],
+    proposals: overrides.proposals ?? []
+  };
+}
+
+function availableConfirmation(proposalId: string) {
+  return {
+    required: true,
+    status: "available",
+    endpoint: `/api/workspace/agent-thread/proposals/${proposalId}/confirm`,
+    allowedDecisions: ["apply", "reject"],
+    mutationOnlyOnApply: true
+  };
+}
+
+function closedConfirmation(proposalId: string) {
+  return {
+    ...availableConfirmation(proposalId),
+    status: "closed",
+    allowedDecisions: []
+  };
 }

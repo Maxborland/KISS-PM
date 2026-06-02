@@ -2,13 +2,134 @@
 
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AgentCockpitBlock } from "@/views/blocks/agent-cockpit-block";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("AgentCockpitBlock", () => {
+  it("uses backend mutation policy and confirmation metadata for proposal actions", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const onConfirmProposal = vi.fn(async () => undefined);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(AgentCockpitBlock, {
+            onConfirmProposal,
+            thread: {
+              thread: {
+                kind: "workspace_agent_cockpit",
+                scope: { type: "workspace", tenantId: "tenant-alpha" },
+                context: {}
+              },
+              mutationPolicy: {
+                mode: "confirmation_required",
+                messagePostMutatesWorkspace: false,
+                mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm",
+                allowedDecisions: ["apply", "reject"]
+              },
+              context: {},
+              messages: [],
+              proposals: [
+                {
+                  actionType: "workspace.agent.create_task",
+                  auditEventId: null,
+                  confirmation: {
+                    required: true,
+                    status: "available",
+                    endpoint: "/api/workspace/agent-thread/proposals/proposal-confirmable/confirm",
+                    allowedDecisions: ["apply"],
+                    mutationOnlyOnApply: true
+                  },
+                  context: {},
+                  createdAt: "2026-06-01T00:04:00.000Z",
+                  description: "Создать задачу только после подтверждения.",
+                  id: "proposal-confirmable",
+                  messageId: "message-runtime",
+                  payload: { task: { title: "Проверить доступность подрядчика" } },
+                  resolvedAt: null,
+                  status: "proposed",
+                  title: "Создать задачу"
+                }
+              ]
+            }
+          })
+        );
+      });
+
+      expect(host.textContent).toContain("Сообщения не меняют данные");
+      expect(host.textContent).toContain("Изменение доступно только после подтверждения.");
+
+      const buttons = Array.from(host.querySelectorAll("button"));
+      const applyButton = buttons.find((button) => button.textContent?.includes("Применить"));
+      const rejectButton = buttons.find((button) => button.textContent?.includes("Отклонить"));
+      expect(applyButton).toBeTruthy();
+      expect(rejectButton).toBeUndefined();
+
+      await act(async () => {
+        applyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(onConfirmProposal).toHaveBeenCalledWith("proposal-confirmable", "apply");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("does not render confirmation actions when backend closes a proposal confirmation", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(AgentCockpitBlock, {
+            onConfirmProposal: vi.fn(async () => undefined),
+            thread: {
+              context: {},
+              messages: [],
+              proposals: [
+                {
+                  actionType: "workspace.agent.review_request",
+                  auditEventId: null,
+                  confirmation: {
+                    required: true,
+                    status: "closed",
+                    endpoint: "/api/workspace/agent-thread/proposals/proposal-closed/confirm",
+                    allowedDecisions: [],
+                    mutationOnlyOnApply: true
+                  },
+                  context: {},
+                  createdAt: "2026-06-01T00:04:00.000Z",
+                  description: "Сервер закрыл подтверждение.",
+                  id: "proposal-closed",
+                  messageId: "message-runtime",
+                  payload: {},
+                  resolvedAt: null,
+                  status: "proposed",
+                  title: "Сверить поручение"
+                }
+              ]
+            }
+          })
+        );
+      });
+
+      expect(host.textContent).toContain("Подтверждение закрыто сервером.");
+      expect(host.textContent).toContain("Подтверждение недоступно для этого предложения.");
+      expect(host.textContent).not.toContain("Применить");
+      expect(host.textContent).not.toContain("Отклонить");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
   it("renders empty, thinking, review and applied audit states without fake enabled actions", async () => {
     const host = document.createElement("div");
     document.body.append(host);

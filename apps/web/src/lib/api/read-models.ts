@@ -108,6 +108,28 @@ export type WorkspaceAgentMessage = {
 };
 
 export type WorkspaceAgentProposalStatus = "proposed" | "applying" | "applied" | "rejected";
+export type WorkspaceAgentConfirmationDecision = "apply" | "reject";
+
+export type WorkspaceAgentThreadDescriptor = {
+  kind: "workspace_agent_cockpit";
+  scope: { type: "workspace"; tenantId: string };
+  context: WorkspaceAgentThreadContext;
+};
+
+export type WorkspaceAgentMutationPolicy = {
+  mode: "confirmation_required";
+  messagePostMutatesWorkspace: false;
+  mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm";
+  allowedDecisions: WorkspaceAgentConfirmationDecision[];
+};
+
+export type WorkspaceAgentProposalConfirmation = {
+  required: true;
+  status: "available" | "closed";
+  endpoint: string;
+  allowedDecisions: WorkspaceAgentConfirmationDecision[];
+  mutationOnlyOnApply: true;
+};
 
 export type WorkspaceAgentActionResultSummary = {
   status: "pending" | "succeeded" | "rejected";
@@ -127,12 +149,15 @@ export type WorkspaceAgentActionProposal = {
   payload: Record<string, unknown>;
   status: WorkspaceAgentProposalStatus;
   auditEventId: string | null;
+  confirmation?: WorkspaceAgentProposalConfirmation;
   resultSummary?: WorkspaceAgentActionResultSummary;
   createdAt: string;
   resolvedAt: string | null;
 };
 
 export type WorkspaceAgentThread = {
+  thread?: WorkspaceAgentThreadDescriptor;
+  mutationPolicy?: WorkspaceAgentMutationPolicy;
   context: WorkspaceAgentThreadContext;
   messages: WorkspaceAgentMessage[];
   proposals: WorkspaceAgentActionProposal[];
@@ -241,7 +266,7 @@ export async function postWorkspaceAgentMessage(body: string): Promise<Workspace
 
 export async function confirmWorkspaceAgentProposal(input: {
   proposalId: string;
-  decision: "apply" | "reject";
+  decision: WorkspaceAgentConfirmationDecision;
 }): Promise<WorkspaceAgentThread> {
   return apiFetch<WorkspaceAgentThread>(
     `/api/workspace/agent-thread/proposals/${input.proposalId}/confirm`,
