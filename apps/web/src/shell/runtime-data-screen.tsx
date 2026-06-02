@@ -226,12 +226,18 @@ function RuntimeProjectsListScreen() {
         error={query.error}
         title="Не удалось загрузить проекты"
         forbiddenTitle="Нет доступа к проектам"
-        onRetry={() => void query.refetch()}
+        onRetry={query.refetchAll}
       />
     );
   }
 
-  return <ProjectsListBlock projects={query.data.projects} projectTemplates={[]} readOnly />;
+  return query.data ? (
+    <ProjectsListBlock
+      projects={query.data.projects}
+      projectTemplates={query.data.projectTemplates}
+      readOnly
+    />
+  ) : null;
 }
 
 function RuntimeDealsScreen() {

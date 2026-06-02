@@ -22,4 +22,19 @@ describe("ProjectsListBlock data sources", () => {
       projectTemplates: fixtures.projectTemplates
     });
   });
+
+  it("keeps explicit runtime project templates instead of falling back to fixtures", () => {
+    const fixtures = getFixtureBundle("default");
+    const liveProjects = [{ ...fixtures.projects[0]!, id: "project-live" }];
+
+    expect(
+      resolveProjectsListSources(fixtures, {
+        projects: liveProjects,
+        projectTemplates: []
+      })
+    ).toEqual({
+      projects: liveProjects,
+      projectTemplates: []
+    });
+  });
 });

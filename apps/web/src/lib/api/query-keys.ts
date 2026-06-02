@@ -9,6 +9,7 @@ export const queryKeys = {
     accessRoles: ["workspace", "access-roles"] as const,
     customFields: ["workspace", "config", "custom-fields"] as const,
     projects: ["workspace", "projects"] as const,
+    projectTemplates: ["workspace", "config", "project-templates"] as const,
     operationsCockpit: ["workspace", "operations-cockpit"] as const,
     myWork: (userId: string) => ["workspace", "my-work", userId] as const,
     workspaceAgentThread: ["workspace", "agent-thread"] as const,

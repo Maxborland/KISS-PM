@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
@@ -8,6 +8,7 @@ import type {
   OperationsCockpitReadModel,
   Opportunity,
   Project,
+  ProjectTemplate,
   ScheduledTask,
   Task
 } from "@/lib/api-types";
@@ -60,6 +61,7 @@ const EMPTY_OPERATIONS_COCKPIT: OperationsCockpitReadModel = {
 
 export type ProjectsListReadModel = {
   projects: Project[];
+  projectTemplates: ProjectTemplate[];
 };
 
 export type DealsBoardReadModel = {
@@ -155,6 +157,23 @@ export async function fetchWorkspaceProjects(): Promise<Project[]> {
   return response.projects;
 }
 
+export async function fetchWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
+  const response = await apiFetch<ListResponse<"projectTemplates", ProjectTemplate>>(
+    "/api/workspace/config/project-templates",
+    { method: "GET" }
+  );
+  return response.projectTemplates;
+}
+
+async function fetchOptionalWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
+  try {
+    return await fetchWorkspaceProjectTemplates();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "forbidden") return [];
+    throw error;
+  }
+}
+
 export async function fetchWorkspaceMyWorkTasks(): Promise<Task[]> {
   const response = await apiFetch<ListResponse<"tasks", Task>>("/api/workspace/my-work", {
     method: "GET"
@@ -234,11 +253,29 @@ export async function confirmWorkspaceAgentProposal(input: {
 }
 
 export function useProjectsListReadModelQuery() {
-  return useQuery({
-    queryKey: queryKeys.workspace.projects,
-    queryFn: fetchWorkspaceProjects,
-    select: (projects): ProjectsListReadModel => ({ projects })
+  const queries = useQueries({
+    queries: [
+      {
+        queryKey: queryKeys.workspace.projects,
+        queryFn: fetchWorkspaceProjects
+      },
+      {
+        queryKey: queryKeys.workspace.projectTemplates,
+        queryFn: fetchOptionalWorkspaceProjectTemplates
+      }
+    ]
   });
+
+  const [projectsQuery, projectTemplatesQuery] = queries;
+  const data =
+    projectsQuery.data && projectTemplatesQuery.data
+      ? {
+          projects: projectsQuery.data as Project[],
+          projectTemplates: projectTemplatesQuery.data as ProjectTemplate[]
+        }
+      : undefined;
+
+  return aggregateQueries<ProjectsListReadModel>(queries, data);
 }
 
 export function useAgentCockpitReadModelQuery() {
