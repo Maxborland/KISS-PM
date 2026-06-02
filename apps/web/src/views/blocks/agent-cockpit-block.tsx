@@ -70,7 +70,11 @@ export function AgentCockpitBlock({
       className={cn("runtime-agent", "agent-cockpit", variant === "surface" && "agent-cockpit--surface")}
       aria-label="Единый управленческий агент"
     >
-      <AgentHistoryRail thread={thread} operationsCockpit={operationsCockpit} />
+      <AgentHistoryRail
+        thread={thread}
+        operationsCockpit={operationsCockpit}
+        currentUserId={currentUserId}
+      />
       <section className="runtime-agent__chat" aria-label="Чат с Генри Ганттом">
         <header className="runtime-agent__header">
           <div className="runtime-agent__title">
@@ -94,19 +98,19 @@ export function AgentCockpitBlock({
             />
           ) : (
             thread.messages.slice(-8).map((message) => {
-              const isOwnMessage =
-                message.authorType !== "agent" && (currentUserId ? message.authorUserId === currentUserId : true);
+              const authorLabel = workspaceAgentMessageAuthorLabel(message, currentUserId);
+              const isOwnMessage = authorLabel === "Вы";
               return (
                 <article
                   key={message.id}
                   className={cn("runtime-agent-message", isOwnMessage && "runtime-agent-message--user")}
                 >
                   <span className="runtime-agent-message__avatar" aria-hidden>
-                    {isOwnMessage ? "Вы" : <Bot aria-hidden />}
+                    {message.authorType === "agent" ? <Bot aria-hidden /> : authorLabel === "Вы" ? "Вы" : "У"}
                   </span>
                   <div className="runtime-agent-message__content">
                     <div className="runtime-agent-message__meta">
-                      <span>{isOwnMessage ? "Вы" : "Генри Гантт"}</span>
+                      <span>{authorLabel}</span>
                       <time>{formatDate(message.createdAt)}</time>
                     </div>
                     <p>{message.body}</p>
@@ -212,10 +216,12 @@ export function AgentCockpitBlock({
 
 function AgentHistoryRail({
   thread,
-  operationsCockpit
+  operationsCockpit,
+  currentUserId
 }: {
   thread: WorkspaceAgentThread;
   operationsCockpit?: OperationsCockpitReadModel | undefined;
+  currentUserId?: string | undefined;
 }) {
   const lastMessages = thread.messages.slice(-4).reverse();
   const focusTitle = workspaceAgentFocusTitle(thread);
@@ -268,7 +274,7 @@ function AgentHistoryRail({
           <ol className="agent-cockpit-history__messages">
             {lastMessages.map((message) => (
               <li key={message.id}>
-                <span>{message.authorType === "agent" ? "Генри" : "Вы"}</span>
+                <span>{workspaceAgentHistoryAuthorLabel(message, currentUserId)}</span>
                 <p>{message.body}</p>
               </li>
             ))}
@@ -531,6 +537,22 @@ function workspaceAgentFocusTitle(thread: WorkspaceAgentThread): string {
   if (focus.type === "project") return `Проект ${focus.id}`;
   if (focus.type === "task") return `Задача ${focus.id}`;
   return `Сделка ${focus.id}`;
+}
+
+function workspaceAgentHistoryAuthorLabel(
+  message: WorkspaceAgentThread["messages"][number],
+  currentUserId: string | undefined
+): string {
+  return workspaceAgentMessageAuthorLabel(message, currentUserId);
+}
+
+function workspaceAgentMessageAuthorLabel(
+  message: WorkspaceAgentThread["messages"][number],
+  currentUserId: string | undefined
+): string {
+  if (message.authorType === "agent") return "Генри";
+  if (currentUserId && message.authorUserId === currentUserId) return "Вы";
+  return "Участник";
 }
 
 function formatAgentCount(count: number, forms: [string, string, string]): string {

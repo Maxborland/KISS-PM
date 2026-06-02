@@ -362,6 +362,14 @@ describe("AgentCockpitBlock", () => {
                   body: "Подготовил действие. Без подтверждения ничего не изменю.",
                   context: {},
                   createdAt: "2026-06-01T00:01:00.000Z"
+                },
+                {
+                  id: "message-teammate",
+                  authorUserId: "user-beta",
+                  authorType: "user",
+                  body: "Комментарий архитектора по срокам.",
+                  context: {},
+                  createdAt: "2026-06-01T00:02:00.000Z"
                 }
               ],
               proposals: []
@@ -372,8 +380,10 @@ describe("AgentCockpitBlock", () => {
 
       expect(host.textContent).toContain("Вы");
       expect(host.textContent).toContain("Генри Гантт");
-      expect(host.textContent).toContain("2 сообщения · 0 предложений");
+      expect(host.textContent).toContain("Участник");
+      expect(host.textContent).toContain("3 сообщения · 0 предложений");
       expect(host.textContent).toContain("Подготовил действие. Без подтверждения ничего не изменю.");
+      expect(host.textContent).toContain("Комментарий архитектора по срокам.");
     } finally {
       act(() => root.unmount());
       host.remove();
