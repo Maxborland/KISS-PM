@@ -7,6 +7,7 @@ const storybookOrigin = `http://127.0.0.1:${process.env.STORYBOOK_PORT ?? "6006"
 const stableStories = [
   { id: "foundations-colors--palette", name: "tokens" },
   { id: "screens-дашборд--dashboard", name: "dashboard" },
+  { id: "flows-агент-рабочей-области--review-and-audit", name: "agent-cockpit" },
   { id: "screens-сделки--deals", name: "deals" },
   { id: "screens-администрирование--settings", name: "settings" }
 ] as const;

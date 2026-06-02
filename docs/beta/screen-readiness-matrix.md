@@ -23,13 +23,15 @@
 | Dashboard runtime root | `/` -> `/dashboard` | foundation smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-foundation-desktop.png`, `runtime-foundation-narrow.png` |
 | Dashboard route | `/dashboard` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-dashboard-desktop.png`, `runtime-dashboard-narrow.png` |
 | My Work route | `/my-work` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-my-work-desktop.png`, `runtime-my-work-narrow.png` |
+| Agent cockpit route | `/agent` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-agent-desktop.png`, `runtime-agent-narrow.png` |
 | Projects route | `/projects` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-projects-desktop.png`, `runtime-projects-narrow.png` |
 | Deals route | `/deals` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-deals-desktop.png`, `runtime-deals-narrow.png` |
 | Storybook tokens | `Foundations/Colors` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `tokens-desktop.png`, `tokens-narrow.png` |
 | Storybook dashboard | `Screens/Дашборд` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `dashboard-desktop.png`, `dashboard-narrow.png` |
+| Storybook agent cockpit | `Flows/Агент рабочей области` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `agent-cockpit-desktop.png`, `agent-cockpit-narrow.png` |
 | Storybook deals | `Screens/Сделки` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `deals-desktop.png`, `deals-narrow.png` |
 | Storybook settings | `Screens/Администрирование` / `Settings` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `settings-desktop.png`, `settings-narrow.png` |
 
 ## Известный разрыв
 
-Этот slice не переводит перечисленные screens в полную beta-ready категорию. Он добавляет clean QA gate, который будет блокировать blank screen, browser runtime errors, unexpected failed runtime requests и отсутствие screenshot evidence. `/agent` войдет в route matrix после merge отдельного runtime agent cockpit slice.
+Этот gate не переводит перечисленные screens в полную beta-ready категорию. Он блокирует blank screen, browser runtime errors, unexpected failed runtime requests и отсутствие screenshot evidence. `/agent` включен как единая runtime-поверхность агента, но его бизнес-flow acceptance и confirmation loop остаются отдельным beta-критичным доказательством.
