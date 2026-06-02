@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
-| My Work | `/my-work` | SPEC-01, SPEC-02 | wired/prototype | Нужны status/blocker/comment mutations и persistence proof | route smoke |
+| My Work | `/my-work` | SPEC-01, SPEC-02 | wired/prototype | Нужны статус/owner/due/comment actions по contract (`docs/beta/task-action-contract.md`) | route smoke |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/prototype | Нужны filters, open project flow, realistic empty/no-results states | route smoke |
 | Project detail | `/projects/demo` | PM-01, PM-02, LEAD-01 | prototype | Demo route; нужен runtime project detail by id, tasks, owners, blockers | нет beta proof |
 | Planning / Gantt | `/projects/demo/gantt` | PM-03 | prototype | Demo route; нужен runtime timeline data/update proof | нет beta proof |
@@ -25,8 +25,9 @@
 - Runtime QA локально сейчас не доказан в новом worktree: `pnpm qa:runtime` остановился на миграции, потому что Docker/Postgres недоступен (`127.0.0.1:55432` closed).
 - `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
 - `/projects/demo*` остаются prototype/demo routes; beta требует runtime project detail/planning/resource surfaces.
-- `/my-work` не доказывает реальные mutations: status, blocker, comment.
+- `/my-work` не доказывает реальные mutations для contract-сигнатур: status/owner/due/comment; blocker требует отдельного backend gap.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
+- В `docs/beta/task-action-contract.md` зафиксирован split: что есть, что отсутствует (`blocker` пока только как gap).
 
 ## P1 gaps
 
@@ -51,7 +52,7 @@
 | Agent cockpit block | needs-adaptation | Хорошая база; нужно grounded context, failure/result audit polish |
 | Deals block | needs-adaptation | Нужны mutations/stage persistence и handoff affordances |
 | Projects list block | needs-adaptation | Нужны filters/open/detail path and realistic empty states |
-| My Work block | needs-adaptation | Нужны status/blocker/comment actions |
+| My Work block | needs-adaptation | Нужны status/owner/due/comment actions по contract; blocker только как read-only gap/disabled reason |
 | Demo project planning blocks | outdated-for-runtime | Можно использовать визуальные паттерны, но не как runtime data contract |
 
 ## QA proof required
@@ -60,7 +61,7 @@
 | --- | --- |
 | `/dashboard` | Seeded risk/overdue/overload appears; no console/pageerror/API failures; desktop/narrow screenshots |
 | `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
-| `/my-work` | Assigned task visible; status/blocker/comment mutation persists; forbidden state |
+| `/my-work` | Assigned task visible; status/owner/due/comment mutation persists; blocker gap shown without fake mutation; forbidden state |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
 | Project detail | Open real project by id; add/update task; blocker visible; reload proof |
 | Timeline | Task renders in date range; date/status update persists |
@@ -83,7 +84,7 @@
    - Evidence: add/update task persists after reload.
 
 4. **My Work execution actions**
-   - Status update, blocker reason, comment/action result.
+   - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
    - Evidence: specialist flow persists and appears in PM attention surface.
 
 5. **Agent grounded context and audit hardening**
