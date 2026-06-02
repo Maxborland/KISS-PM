@@ -65,6 +65,7 @@ describe("AgentCockpitBlock", () => {
       expect(host.textContent).toContain("Единый центр");
       expect(host.textContent).toContain("Рабочая область");
       expect(host.textContent).toContain("0 сообщений · 1 предложение");
+      expect(host.textContent).toContain("Метрики контекста не загружены.");
       expect(host.textContent).toContain("Изменение доступно только после подтверждения.");
 
       const buttons = Array.from(host.querySelectorAll("button"));

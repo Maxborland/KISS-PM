@@ -252,20 +252,24 @@ function AgentHistoryRail({
 
       <section className="agent-cockpit-history__section" aria-label="Контекст рабочей области">
         <div className="agent-cockpit-history__eyebrow">Контекст</div>
-        <div className="agent-cockpit-history__facts">
-          <span>
-            <strong>{operationsCockpit?.indicators.activeProjects ?? 0}</strong>
-            проектов
-          </span>
-          <span>
-            <strong>{operationsCockpit?.indicators.overdueTasks ?? 0}</strong>
-            просрочено
-          </span>
-          <span>
-            <strong>{operationsCockpit?.indicators.openDeals ?? 0}</strong>
-            сделок
-          </span>
-        </div>
+        {operationsCockpit ? (
+          <div className="agent-cockpit-history__facts">
+            <span>
+              <strong>{operationsCockpit.indicators.activeProjects}</strong>
+              проектов
+            </span>
+            <span>
+              <strong>{operationsCockpit.indicators.overdueTasks}</strong>
+              просрочено
+            </span>
+            <span>
+              <strong>{operationsCockpit.indicators.openDeals}</strong>
+              сделок
+            </span>
+          </div>
+        ) : (
+          <p className="agent-cockpit-history__empty">Метрики контекста не загружены.</p>
+        )}
       </section>
 
       <section className="agent-cockpit-history__section" aria-label="Последние сообщения">
