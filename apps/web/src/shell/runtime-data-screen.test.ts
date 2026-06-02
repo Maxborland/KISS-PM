@@ -18,12 +18,14 @@ const readModelHooks = vi.hoisted(() => ({
   projects: vi.fn(),
   projectsBlock: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
-  postWorkspaceAgentMessage: vi.fn()
+  postWorkspaceAgentMessage: vi.fn(),
+  updateWorkspaceProjectTaskStatus: vi.fn()
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
+  updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
@@ -64,19 +66,28 @@ vi.mock("@/shell/runtime-dashboard-screen", () => ({
 vi.mock("@/views/blocks/my-work-block", () => ({
   RuntimeMyWorkBlock: ({
     initialOpenTaskId,
+    onMoveTaskStatus,
     readOnly,
     tasks
   }: {
     initialOpenTaskId?: string;
+    onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
     readOnly?: boolean;
     tasks: { title: string }[];
   }) =>
     createElement(
-      "div",
+      "button",
       {
         "data-initial-open-task-id": initialOpenTaskId ?? "",
         "data-testid": "runtime-my-work",
-        "data-read-only": String(readOnly)
+        "data-read-only": String(readOnly),
+        onClick: () => {
+          void onMoveTaskStatus?.({
+            projectId: "project-1",
+            taskId: "task-runtime",
+            statusId: "task-status-done"
+          });
+        }
       },
       tasks.map((task) => task.title).join(", ")
     )
@@ -154,6 +165,10 @@ describe("RuntimeDataScreen permission gate", () => {
     );
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
+    readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({
+      id: "task-runtime",
+      statusId: "task-status-done"
+    });
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
@@ -416,6 +431,49 @@ describe("RuntimeDataScreen permission gate", () => {
       "task-agent-result"
     );
     expect(host.textContent).toContain("Runtime task from agent");
+  });
+
+  it("updates my work task status through the runtime task-status action", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const refetchAll = vi.fn();
+    readModelHooks.myWork.mockReturnValue({
+      ...successReadModel({
+        tasks: [{ id: "task-runtime", title: "Runtime my work task" }],
+        scheduledTasks: [],
+        taskStatuses: [{ id: "task-status-done", category: "done", status: "active", sortOrder: 40 }]
+      }),
+      refetchAll
+    });
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceProjectTaskStatus).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceProjectTaskStatus).toHaveBeenCalledWith(
+      {
+        projectId: "project-1",
+        taskId: "task-runtime",
+        statusId: "task-status-done"
+      },
+      expect.anything()
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.workspaceAgentThread });
+    expect(refetchAll).toHaveBeenCalled();
+    invalidateSpy.mockRestore();
   });
 });
 

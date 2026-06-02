@@ -10,7 +10,7 @@ import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { ScheduledTask, Task } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskStatus } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
@@ -123,9 +123,44 @@ export type MyWorkBlockProps = {
 export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   tasks?: Task[];
   scheduledTasks?: ScheduledTask[];
+  taskStatuses?: TaskStatus[];
   initialOpenTaskId?: string | undefined;
   readOnly?: boolean;
+  isMovingTaskStatus?: boolean;
+  onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
 };
+
+export function resolveTaskStatusIdForColumn(
+  taskStatuses: readonly TaskStatus[],
+  columnId: ColumnId,
+  currentCategory: Task["statusCategory"]
+): string | null {
+  const targetCategories = resolveAllowedTargetCategories(columnId, currentCategory);
+  const status = taskStatuses
+    .filter((candidate) => candidate.status === "active" && targetCategories.includes(candidate.category))
+    .sort((a, b) => a.sortOrder - b.sortOrder)[0];
+  return status?.id ?? null;
+}
+
+function resolveAllowedTargetCategories(
+  columnId: ColumnId,
+  currentCategory: Task["statusCategory"]
+): Task["statusCategory"][] {
+  if (columnId === "new") {
+    if (currentCategory === "in_progress") return ["waiting"];
+    if (currentCategory === "new" || currentCategory === "waiting") return [currentCategory];
+    return [];
+  }
+
+  const allowedTransitions: Record<Task["statusCategory"], Task["statusCategory"][]> = {
+    new: ["waiting", "in_progress"],
+    waiting: ["in_progress"],
+    in_progress: ["waiting", "review", "done"],
+    review: ["in_progress", "done"],
+    done: []
+  };
+  return allowedTransitions[currentCategory].includes(columnId) ? [columnId] : [];
+}
 
 export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   return <FixtureMyWorkBlock initialMode={initialMode} />;
@@ -151,7 +186,10 @@ export function RuntimeMyWorkBlock({
   initialOpenTaskId,
   tasks = [],
   scheduledTasks = [],
-  readOnly = true
+  taskStatuses = [],
+  readOnly = true,
+  isMovingTaskStatus = false,
+  onMoveTaskStatus
 }: RuntimeMyWorkBlockProps = {}) {
   return (
     <MyWorkBlockInner
@@ -159,8 +197,11 @@ export function RuntimeMyWorkBlock({
       initialMode={initialMode}
       tasks={tasks}
       scheduledTasks={scheduledTasks}
+      taskStatuses={taskStatuses}
       initialOpenTaskId={initialOpenTaskId}
       readOnly={readOnly}
+      isMovingTaskStatus={isMovingTaskStatus}
+      {...(onMoveTaskStatus ? { onMoveTaskStatus } : {})}
       fetchPhase="success"
       scenario="default"
       runtime
@@ -172,8 +213,11 @@ function MyWorkBlockInner({
   initialMode = "kanban",
   tasks,
   scheduledTasks,
+  taskStatuses,
   initialOpenTaskId,
   readOnly = false,
+  isMovingTaskStatus = false,
+  onMoveTaskStatus,
   fetchPhase,
   errorMessage,
   scenario,
@@ -186,6 +230,7 @@ function MyWorkBlockInner({
 }) {
   const sourceTasks = tasks ?? [];
   const sourceScheduledTasks = scheduledTasks ?? [];
+  const sourceTaskStatuses = taskStatuses ?? [];
   const initialCards = useMemo(
     () => buildTaskKanbanCards(sourceTasks),
     [sourceTasks]
@@ -259,6 +304,48 @@ function MyWorkBlockInner({
       });
     }
     setCards((prev) => handleItemReorder(prev, columnId, fromIndex, toIndex, movingId, overId));
+  };
+
+  const handleRuntimeStatusMove = async (
+    id: string,
+    toColumnId: ColumnId,
+    toIndex: number,
+    overId?: string
+  ) => {
+    const currentCard = cards.find((card) => card.id === id);
+    const currentTask = sourceTasks.find((task) => task.id === id);
+    if (!currentCard || !currentTask || currentCard.columnId === toColumnId) return;
+
+    const statusId = resolveTaskStatusIdForColumn(
+      sourceTaskStatuses,
+      toColumnId,
+      currentTask.statusCategory
+    );
+    if (!statusId) {
+      toast.error("Статус недоступен", {
+        description: `Для колонки «${COLUMN_LABEL[toColumnId]}» нет активного статуса в рабочей области.`
+      });
+      return;
+    }
+
+    const previousCards = cards;
+    setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex, overId));
+
+    try {
+      await onMoveTaskStatus?.({
+        projectId: currentTask.projectId,
+        taskId: currentTask.id,
+        statusId
+      });
+      toast.success("Статус задачи обновлён", {
+        description: `${currentTask.title} → ${COLUMN_LABEL[toColumnId]}`
+      });
+    } catch {
+      setCards(previousCards);
+      toast.error("Не удалось изменить статус", {
+        description: "Проверьте права, допустимость перехода или доступность API."
+      });
+    }
   };
 
   const toolbar = (
@@ -350,8 +437,14 @@ function MyWorkBlockInner({
                 onOpen={setOpenCardId}
               />
             )}
-            disableDnd={readOnly}
-            {...(!readOnly
+            disableDnd={isMovingTaskStatus || (readOnly && !onMoveTaskStatus)}
+            {...(onMoveTaskStatus
+              ? {
+                  onItemMove: (id, toColumnId, toIndex, overId) => {
+                    void handleRuntimeStatusMove(id, toColumnId, toIndex, overId);
+                  }
+                }
+              : !readOnly
               ? {
                   onItemMove: (id, toColumnId, toIndex, overId) =>
                     setCards((prev) => handleItemMove(prev, id, toColumnId, toIndex, overId)),

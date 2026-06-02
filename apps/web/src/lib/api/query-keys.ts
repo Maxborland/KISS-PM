@@ -12,6 +12,7 @@ export const queryKeys = {
     projectTemplates: ["workspace", "config", "project-templates"] as const,
     operationsCockpit: ["workspace", "operations-cockpit"] as const,
     myWork: (userId: string) => ["workspace", "my-work", userId] as const,
+    taskStatuses: ["workspace", "task-statuses"] as const,
     workspaceAgentThread: ["workspace", "agent-thread"] as const,
     opportunities: ["workspace", "opportunities"] as const,
     dealStages: ["workspace", "deal-stages"] as const

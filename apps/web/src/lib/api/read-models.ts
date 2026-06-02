@@ -10,7 +10,8 @@ import type {
   Project,
   ProjectTemplate,
   ScheduledTask,
-  Task
+  Task,
+  TaskStatus
 } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -72,6 +73,7 @@ export type DealsBoardReadModel = {
 export type MyWorkReadModel = {
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
+  taskStatuses: TaskStatus[];
 };
 
 export type DashboardReadModel = {
@@ -205,6 +207,29 @@ export async function fetchWorkspaceMyWorkTasks(): Promise<Task[]> {
     method: "GET"
   });
   return response.tasks;
+}
+
+export async function fetchWorkspaceTaskStatuses(): Promise<TaskStatus[]> {
+  const response = await apiFetch<ListResponse<"taskStatuses", TaskStatus>>(
+    "/api/workspace/task-statuses",
+    { method: "GET" }
+  );
+  return response.taskStatuses;
+}
+
+export async function updateWorkspaceProjectTaskStatus(input: {
+  projectId: string;
+  taskId: string;
+  statusId: string;
+}): Promise<Task> {
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/projects/${input.projectId}/tasks/${input.taskId}/status`,
+    {
+      method: "PATCH",
+      json: { statusId: input.statusId }
+    }
+  );
+  return response.task;
 }
 
 export async function fetchTenantCurrentScheduledTasks({
@@ -379,16 +404,21 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
           scheduledInput.toDate
         ),
         queryFn: () => fetchTenantCurrentScheduledTasks(scheduledInput)
+      },
+      {
+        queryKey: queryKeys.workspace.taskStatuses,
+        queryFn: fetchWorkspaceTaskStatuses
       }
     ]
   });
 
-  const [tasksQuery, scheduledTasksQuery] = queries;
+  const [tasksQuery, scheduledTasksQuery, taskStatusesQuery] = queries;
   const data =
-    tasksQuery.data && scheduledTasksQuery.data
+    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data
       ? {
           tasks: tasksQuery.data as Task[],
-          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[]
+          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
+          taskStatuses: taskStatusesQuery.data as TaskStatus[]
         }
       : undefined;
 

@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ScheduledTask, Task } from "@/lib/api-types";
-import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
+import { RuntimeMyWorkBlock, resolveTaskStatusIdForColumn } from "@/views/blocks/my-work-block";
 import { ScreenRouteProvider } from "@/views/layout/screen-route-context";
 import { getScreenRoute } from "@/views/screens/screen-route";
 
@@ -112,6 +112,37 @@ describe("RuntimeMyWorkBlock", () => {
     expect(host?.textContent).not.toContain("40 ч");
   });
 
+  it("resolves runtime status moves to active workspace task statuses", () => {
+    expect(
+      resolveTaskStatusIdForColumn(
+        [
+          makeTaskStatus({ id: "task-status-done-archived", category: "done", status: "archived", sortOrder: 1 }),
+          makeTaskStatus({ id: "task-status-done-active", category: "done", status: "active", sortOrder: 2 })
+        ],
+        "done",
+        "in_progress"
+      )
+    ).toBe("task-status-done-active");
+    expect(
+      resolveTaskStatusIdForColumn(
+        [
+          makeTaskStatus({ id: "task-status-new", category: "new", status: "active", sortOrder: 1 }),
+          makeTaskStatus({ id: "task-status-waiting", category: "waiting", status: "active", sortOrder: 2 })
+        ],
+        "new",
+        "in_progress"
+      )
+    ).toBe("task-status-waiting");
+    expect(
+      resolveTaskStatusIdForColumn(
+        [makeTaskStatus({ id: "task-status-done", category: "done", status: "active", sortOrder: 4 })],
+        "done",
+        "new"
+      )
+    ).toBeNull();
+    expect(resolveTaskStatusIdForColumn([], "review", "in_progress")).toBeNull();
+  });
+
   async function renderRuntimeMyWork(
     tasks: Task[],
     options: {
@@ -191,6 +222,30 @@ function makeScheduledTask({
     workMinutes,
     createdAt: `${plannedStart}T00:00:00.000Z`,
     statusId: "task-status-in-progress"
+  };
+}
+
+function makeTaskStatus({
+  id,
+  category,
+  status,
+  sortOrder
+}: {
+  id: string;
+  category: "new" | "waiting" | "in_progress" | "review" | "done";
+  status: "active" | "archived";
+  sortOrder: number;
+}) {
+  return {
+    id,
+    tenantId: "tenant-1",
+    name: id,
+    category,
+    sortOrder,
+    status,
+    isSystem: true,
+    createdAt: "2026-05-30T00:00:00.000Z",
+    updatedAt: "2026-05-30T00:00:00.000Z"
   };
 }
 

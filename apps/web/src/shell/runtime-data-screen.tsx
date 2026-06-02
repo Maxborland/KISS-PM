@@ -11,6 +11,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import {
   confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage,
+  updateWorkspaceProjectTaskStatus,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -188,7 +189,18 @@ function RuntimeMyWorkScreen({
   currentUserId: string;
   initialTaskId?: string | undefined;
 }) {
+  const queryClient = useQueryClient();
   const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
+  const updateTaskStatus = useMutation({
+    mutationFn: updateWorkspaceProjectTaskStatus,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      readModel.refetchAll();
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем мою работу…" />;
@@ -209,8 +221,11 @@ function RuntimeMyWorkScreen({
     <RuntimeMyWorkBlock
       tasks={readModel.data.tasks}
       scheduledTasks={readModel.data.scheduledTasks}
+      taskStatuses={readModel.data.taskStatuses}
       initialOpenTaskId={initialTaskId}
       readOnly
+      isMovingTaskStatus={updateTaskStatus.isPending}
+      onMoveTaskStatus={(input) => updateTaskStatus.mutateAsync(input)}
     />
   ) : null;
 }
