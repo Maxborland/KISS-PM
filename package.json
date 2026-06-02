@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e:smoke": "pnpm db:migrate && pnpm db:seed:dev && playwright test --config playwright.config.ts",
-    "qa:runtime": "pnpm db:migrate && pnpm db:seed:dev && node scripts/run-runtime-qa.mjs",
+    "qa:runtime": "node scripts/check-runtime-qa-db.mjs && pnpm db:migrate && pnpm db:seed:dev && node scripts/run-runtime-qa.mjs",
     "typecheck": "tsc -b --pretty false",
     "build": "pnpm --filter @kiss-pm/web build && pnpm typecheck",
     "verify:storybook-contract": "pnpm --filter @kiss-pm/web verify:storybook-contract"
