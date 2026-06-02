@@ -300,8 +300,8 @@ describe("RuntimeDataScreen permission gate", () => {
       })
     );
 
-    expect(host.textContent).toContain("Единый управленческий cockpit");
-    expect(host.textContent).toContain("Контекст cockpit");
+    expect(host.textContent).toContain("Единый управленческий центр");
+    expect(host.textContent).toContain("Контекст агента");
     expect(host.textContent).toContain("2 активных проектов");
     expect(host.textContent).toContain("Просрочен авторский надзор");
     expect(host.textContent).toContain("Что требует внимания сегодня?");
