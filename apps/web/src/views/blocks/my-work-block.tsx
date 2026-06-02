@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
@@ -192,7 +192,8 @@ function MyWorkBlockInner({
   );
   const [mode, setMode] = useState<"kanban" | "list">(initialMode);
   const [cards, setCards] = useState<CardModel[]>(initialCards);
-  const [openCardId, setOpenCardId] = useState<string | null>(initialOpenTaskId ?? null);
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const consumedInitialOpenTaskIdRef = useRef<string | null>(null);
   const [columnSort, setColumnSort] = useState<KanbanColumnSortState<ColumnId>>({});
   const [cardView, setCardView] = useState(() => defaultTaskKanbanViewState());
   const [retryCount, setRetryCount] = useState(0);
@@ -202,7 +203,12 @@ function MyWorkBlockInner({
 
     setCards(initialCards);
     setOpenCardId((current) => {
-      if (initialOpenTaskId && initialCards.some((card) => card.id === initialOpenTaskId)) {
+      if (
+        initialOpenTaskId &&
+        consumedInitialOpenTaskIdRef.current !== initialOpenTaskId &&
+        initialCards.some((card) => card.id === initialOpenTaskId)
+      ) {
+        consumedInitialOpenTaskIdRef.current = initialOpenTaskId;
         return initialOpenTaskId;
       }
       return current && initialCards.some((card) => card.id === current) ? current : null;

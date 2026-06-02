@@ -61,6 +61,27 @@ describe("RuntimeMyWorkBlock", () => {
     expect(document.body.querySelector('a[aria-label="Открыть карточку задачи как страницу"]')).toBeNull();
   });
 
+  it("consumes the agent deep link after the first successful drawer open", async () => {
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-agent-result", title: "Runtime task from agent" })],
+      { initialOpenTaskId: "task-agent-result" }
+    );
+    expect(document.body.querySelector(".task-drawer")).not.toBeNull();
+
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('button[aria-label="Закрыть"]')?.click();
+    });
+    expect(document.body.querySelector(".task-drawer")).toBeNull();
+
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-agent-result", title: "Runtime task after refresh" })],
+      { initialOpenTaskId: "task-agent-result" }
+    );
+
+    expect(document.body.querySelector(".task-drawer")).toBeNull();
+    expect(host?.textContent).toContain("Runtime task after refresh");
+  });
+
   it("does not open a runtime task drawer when the agent deep link target is not loaded", async () => {
     await renderRuntimeMyWork(
       [makeTask({ id: "task-other", title: "Another runtime task" })],
