@@ -6,7 +6,7 @@
 
 | Экран | Route | Stories | Статус | Главный разрыв | QA proof сейчас |
 | --- | --- | --- | --- | --- | --- |
-| Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired | Нужны реальные risk/attention sections из operations context, filters/actions, role proof | `e2e/runtime/runtime-foundation.spec.ts` route smoke |
+| Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired/prototype | Нужны status/blocker/comment mutations и persistence proof | route smoke |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/prototype | Нужны filters, open project flow, realistic empty/no-results states | route smoke |
@@ -23,7 +23,7 @@
 ## P0 gaps
 
 - Runtime QA локально сейчас не доказан в новом worktree: `pnpm qa:runtime` остановился на миграции, потому что Docker/Postgres недоступен (`127.0.0.1:55432` closed).
-- `/dashboard` пока route-smoke, но не доказанный CEO attention cockpit: нет proof seeded risk/overdue/overload.
+- `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
 - `/projects/demo*` остаются prototype/demo routes; beta требует runtime project detail/planning/resource surfaces.
 - `/my-work` не доказывает реальные mutations: status, blocker, comment.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
@@ -75,8 +75,8 @@
    - Evidence: local pass or deterministic infra error message.
 
 2. **Dashboard attention cockpit**
-   - Use operations context/read-model for overdue, blockers, workload and pipeline pressure.
-   - Evidence: seeded risk appears in `/dashboard` runtime QA.
+   - Status: frontend read-model/UI slice done; remaining proof is full runtime QA screenshot and seeded-risk route assertion.
+   - Evidence: `RuntimeDashboardScreen` renders operations attention, workload and pipeline pressure from `/api/workspace/operations-cockpit`.
 
 3. **Project detail + task mutations**
    - Real `/projects/:id` route with tasks, owner, due date, status, blocker.

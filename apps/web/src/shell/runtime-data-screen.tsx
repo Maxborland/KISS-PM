@@ -137,6 +137,7 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
     mutationFn: postWorkspaceAgentMessage,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
       readModel.refetchAll();
     }
   });
@@ -144,6 +145,7 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
     mutationFn: confirmWorkspaceAgentProposal,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
       readModel.refetchAll();
     }
   });

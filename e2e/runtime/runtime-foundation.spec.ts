@@ -20,7 +20,7 @@ test("authenticated runtime root renders dashboard without runtime errors", asyn
 
   await expect(page).toHaveTitle(/KISS PM/);
   await expect(page.getByRole("heading", { name: "Добро пожаловать, Камил" })).toBeVisible();
-  await expect(page.getByText("Runtime-сводка по проектам и вашей работе")).toBeVisible();
+  await expect(page.getByText("Живая сводка по проектам")).toBeVisible();
 
   const desktopScreenshotPath = testInfo.outputPath("runtime-foundation-desktop.png");
   await page.screenshot({ fullPage: true, path: desktopScreenshotPath });
@@ -47,7 +47,7 @@ test("authenticated beta runtime routes open without blank or error states", asy
   expect(login.status()).toBe(200);
 
   for (const route of [
-    { path: "/dashboard", marker: "Runtime-сводка по проектам" },
+    { path: "/dashboard", marker: "Живая сводка по проектам" },
     { path: "/my-work", marker: "Моя работа" },
     { path: "/agent", marker: "Генри Гантт" },
     { path: "/projects", marker: "Проекты" },
