@@ -57,9 +57,97 @@ describe("workspace agent routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
+      thread: {
+        kind: "workspace_agent_cockpit",
+        scope: { type: "workspace", tenantId: actor.tenantId },
+        context: {}
+      },
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false,
+        mutationEndpoint: "/api/workspace/agent-thread/proposals/:proposalId/confirm",
+        allowedDecisions: ["apply", "reject"]
+      },
       context: {},
       messages: [{ id: "message-portfolio", body: "Портфельный обзор", context: {} }]
     });
+  });
+
+  it("exposes an explicit confirmation-only proposal contract", async () => {
+    const fixture = createFixture({ profile: taskCreatorProfile });
+    const app = createRouteApp(fixture);
+
+    const post = await app.request("/api/workspace/agent-thread/messages", {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify("Создай задачу: Проверить контракт агента")
+    });
+
+    expect(post.status).toBe(201);
+    const postBody = (await post.json()) as {
+      proposal: { id: string; payload: { task: { id: string } } };
+    };
+    expect(postBody).toMatchObject({
+      thread: {
+        kind: "workspace_agent_cockpit",
+        scope: { type: "workspace", tenantId: actor.tenantId },
+        context: {}
+      },
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false
+      },
+      proposal: {
+        status: "proposed",
+        confirmation: {
+          required: true,
+          status: "available",
+          endpoint: `/api/workspace/agent-thread/proposals/${postBody.proposal.id}/confirm`,
+          allowedDecisions: ["apply", "reject"],
+          mutationOnlyOnApply: true
+        },
+        resultSummary: {
+          status: "pending",
+          mutationApplied: false,
+          auditEventId: null
+        }
+      }
+    });
+    expect(fixture.tasks).toHaveLength(1);
+
+    const confirmed = await app.request(`/api/workspace/agent-thread/proposals/${postBody.proposal.id}/confirm`, {
+      ...requestOptions(),
+      method: "POST",
+      headers: { ...requestOptions().headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "apply" })
+    });
+
+    expect(confirmed.status).toBe(200);
+    await expect(confirmed.json()).resolves.toMatchObject({
+      mutationPolicy: {
+        mode: "confirmation_required",
+        messagePostMutatesWorkspace: false
+      },
+      proposal: {
+        id: postBody.proposal.id,
+        status: "applied",
+        confirmation: {
+          required: true,
+          status: "closed",
+          endpoint: `/api/workspace/agent-thread/proposals/${postBody.proposal.id}/confirm`,
+          allowedDecisions: [],
+          mutationOnlyOnApply: true
+        },
+        resultSummary: {
+          status: "succeeded",
+          mutationApplied: true,
+          auditEventId: "audit-agent-action-1"
+        }
+      },
+      auditEventId: "audit-agent-action-1"
+    });
+    expect(fixture.tasks).toHaveLength(2);
   });
 
   it.each([
