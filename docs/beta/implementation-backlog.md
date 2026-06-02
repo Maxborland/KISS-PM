@@ -15,9 +15,9 @@
 | Project resources | `/projects/demo/resources` | LEAD-01, HR-01, HR-02 | prototype | Demo route; нужен runtime workload/read-model proof | нет beta proof |
 | Deals pipeline | `/deals` | CEO-02, SALES-02 | wired | Нужны stage mutation, next action, persistence proof | route smoke + read-model contract tests |
 | Deal detail / handoff | `/deals/demo/DEAL-101` | SALES-03, FIN-01 | prototype | Demo route; нужен runtime deal detail and handoff flow | нет beta proof |
-| Clients | `/directories/clients` | SALES-01 | prototype/wired TBD | Нужно проверить runtime route/data/actions; create flow не доказан | нет beta proof |
-| Contacts | `/directories/contacts` | SALES-01 | prototype/wired TBD | Runtime usefulness не доказана | нет beta proof |
-| Settings/Admin | `/settings`, `/admin` | ADMIN-01 | wired/prototype | Permissions/read-only and dead controls audit incomplete | Storybook/settings visual smoke only |
+| Clients | `/directories/clients` | SALES-01 | hidden | Runtime route/data/actions не доказаны; скрыто из runtime-навигации до API-backed slice | `runtime-route-inventory.md` |
+| Contacts | `/directories/contacts` | SALES-01 | hidden | Runtime usefulness не доказана; скрыто из runtime-навигации | `runtime-route-inventory.md` |
+| Settings/Admin | `/settings`, `/admin` | ADMIN-01 | hidden | Settings/admin не считаются beta runtime, пока нет runtime data/action proof | `runtime-route-inventory.md` |
 | Finance | TBD | FIN-01 | deferred | Активный beta scope не подтвержден; не блокировать если finance hidden/deferred явно | нет |
 
 ## P0 gaps
@@ -25,6 +25,7 @@
 - Runtime QA локально сейчас не доказан в новом worktree: `pnpm qa:runtime` остановился на миграции, потому что Docker/Postgres недоступен (`127.0.0.1:55432` closed).
 - `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
 - `/projects/demo*` остаются prototype/demo routes; beta требует runtime project detail/planning/resource surfaces.
+- Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback, но сами runtime slices для project detail/planning/resources/clients/settings ещё не сделаны.
 - `/my-work` не доказывает реальные mutations для contract-сигнатур: status/owner/due/comment; blocker требует отдельного backend gap.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
 - В `docs/beta/task-action-contract.md` зафиксирован split: что есть, что отсутствует (`blocker` пока только как gap).
@@ -93,7 +94,10 @@
 
 ## Текущий evidence snapshot
 
-- `origin/design-v3`: `7512510` includes PR #69 unified workspace agent cockpit UI.
+- `origin/design-v3`: `6baa6cb` includes PR #72 and is the base for `codex/beta-foundation-qa`.
+- `docs/beta/runtime-route-inventory.md`: current beta runtime allowlist and hidden route list.
+- `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.
+- `runtime-data-screen.test.ts`: non-beta routes render `Раздел не включён в beta` and do not fall back to fixture screens.
 - `pnpm qa:runtime`: blocked locally in this worktree by missing Postgres/Docker, not by runtime assertion failure.
 - Existing runtime QA files are present: `e2e/runtime/runtimeQaFixtures.ts`, `runtime-foundation.spec.ts`, `agent-confirmation.spec.ts`, `storybook-visual-smoke.spec.ts`.
 - Existing beta docs present before this slice: `screen-readiness-matrix.md`, `component-readiness.md`, `qa-gate.md`.

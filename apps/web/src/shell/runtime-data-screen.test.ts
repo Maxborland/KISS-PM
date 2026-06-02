@@ -170,6 +170,22 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("08-entities-clients", ["tenant.clients.read"])).toBe(true);
   });
 
+  it("does not fall back to fixture screens for non-beta runtime routes", async () => {
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "10-settings",
+        permissions: ["tenant.workspace_config.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Раздел не включён в beta");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.dashboard).not.toHaveBeenCalled();
+    expect(readModelHooks.projects).not.toHaveBeenCalled();
+    expect(readModelHooks.deals).not.toHaveBeenCalled();
+  });
+
   it("requires project read access for dashboard and my work runtime routes", () => {
     expect(canOpenStaticRuntimeScreen("01-dashboard", [])).toBe(false);
     expect(canOpenStaticRuntimeScreen("20-agent-cockpit", [])).toBe(false);
