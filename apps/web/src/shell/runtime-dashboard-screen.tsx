@@ -42,6 +42,14 @@ export function RuntimeDashboardScreen({
   const activeProjects = data.projects.filter((project) => project.status === "active");
   const unfinishedTasks = data.tasks.filter((task) => task.statusCategory !== "done");
   const overdueTasks = unfinishedTasks.filter((task) => isPastDate(task.plannedFinish));
+  const operationsCockpitUnavailable = data.operationsCockpit.agentContext.unavailableSources.find(
+    (source) => source.source === "operations_cockpit"
+  );
+  const resourceWorkloadUnavailable = findUnavailableSource(data, "resource_workload");
+  const opportunityPipelineUnavailable = findUnavailableSource(data, "opportunity_pipeline");
+  const attentionItems = data.operationsCockpit.attentionItems.slice(0, 5);
+  const workloadHints = data.operationsCockpit.workloadHints.byPerson.slice(0, 4);
+  const pipelineDeals = data.operationsCockpit.pipelinePressure.deals.slice(0, 4);
   const today = getRuntimeTodayIsoDate();
   const todayWorkHours = Math.round(
     data.scheduledTasks.reduce((sum, task) => sum + getScheduledTaskDailyWorkMinutes(task, today), 0) / 60
@@ -51,7 +59,7 @@ export function RuntimeDashboardScreen({
   return (
     <>
       <RoutePageIntro
-        lead="Runtime-сводка по проектам и вашей работе. CRM/KPI виджеты подключатся после отдельного dashboard API."
+        lead="Живая сводка по проектам, срочным сигналам, загрузке и агентским предложениям рабочей области."
       />
 
       <div className="bento">
@@ -59,7 +67,7 @@ export function RuntimeDashboardScreen({
           <KpiTile
             label="Активные проекты"
             value={<NumericValue value={activeProjects.length} />}
-            meta={<span className="tile__foot"><FolderKanban className="size-4" aria-hidden /> live API</span>}
+            meta={<span className="tile__foot"><FolderKanban className="size-4" aria-hidden /> портфель</span>}
           />
         </div>
         <div className="bento__cell tile tile--metric">
@@ -72,8 +80,8 @@ export function RuntimeDashboardScreen({
         <div className="bento__cell tile tile--metric">
           <KpiTile
             label="Просрочено"
-            value={<NumericValue value={overdueTasks.length} />}
-            meta={<span className="tile__foot"><BriefcaseBusiness className="size-4" aria-hidden /> требует внимания</span>}
+            value={<NumericValue value={data.operationsCockpit.indicators.overdueTasks || overdueTasks.length} />}
+            meta={<span className="tile__foot"><BriefcaseBusiness className="size-4" aria-hidden /> задачи</span>}
           />
         </div>
         <div className="bento__cell tile tile--metric">
@@ -82,6 +90,97 @@ export function RuntimeDashboardScreen({
             value={<NumericValue value={todayWorkHours} suffix=" ч" />}
             meta={<span className="tile__foot"><CalendarClock className="size-4" aria-hidden /> scheduled tasks</span>}
           />
+        </div>
+
+        <div className="bento__cell bento__cell--8">
+          <CardPanel
+            title="Что требует внимания"
+            subtitle={operationsCockpitUnavailable ? "контекст недоступен" : `${attentionItems.length} сигналов`}
+            flush
+          >
+            {operationsCockpitUnavailable ? (
+              <EmptyState
+                title="Операционный контекст не подключен"
+                description={`Источник сигналов внимания недоступен: ${operationsCockpitUnavailable.reason}.`}
+              />
+            ) : attentionItems.length === 0 ? (
+              <EmptyState
+                title="Критичных сигналов нет"
+                description="В доступном runtime-контексте нет просрочек, блокеров или готовых к запуску сделок."
+              />
+            ) : (
+              <DataTable>
+                <thead>
+                  <tr>
+                    <th>Сигнал</th>
+                    <th>Причина</th>
+                    <th>Срок</th>
+                    <th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attentionItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <CellStack title={item.title} subtitle={item.entity.title} />
+                      </td>
+                      <td>{item.reason}</td>
+                      <td className="mono cell-muted">{item.dueDate ? formatDate(item.dueDate) : "без срока"}</td>
+                      <td>
+                        <Chip variant={item.severity === "critical" ? "danger" : "warning"}>
+                          {attentionSeverityLabel(item.severity)}
+                        </Chip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            )}
+          </CardPanel>
+        </div>
+
+        <div className="bento__cell bento__cell--4">
+          <CardPanel
+            title="Ресурсные риски"
+            subtitle={resourceWorkloadUnavailable ? "контекст скрыт" : `${workloadHints.length} человек`}
+            flush
+          >
+            {resourceWorkloadUnavailable ? (
+              <EmptyState
+                title="Загрузка недоступна"
+                description={`Источник ресурсной загрузки недоступен: ${resourceWorkloadUnavailable.reason}.`}
+              />
+            ) : workloadHints.length === 0 ? (
+              <EmptyState
+                title="Перегруз не найден"
+                description="В доступном контексте нет людей с критичной нагрузкой."
+              />
+            ) : (
+              <DataTable>
+                <thead>
+                  <tr>
+                    <th>Человек</th>
+                    <th>Нагрузка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {workloadHints.map((person) => (
+                    <tr key={person.userId}>
+                      <td>
+                        <CellStack title={person.name} subtitle={person.positionName ?? "роль не указана"} />
+                      </td>
+                      <td>
+                        <CellStack
+                          title={`${person.activeTaskCount} задач`}
+                          subtitle={`${person.plannedWorkHours} ч · ${person.overdueTaskCount} просрочено`}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            )}
+          </CardPanel>
         </div>
 
         <div className="bento__cell bento__cell--8">
@@ -153,9 +252,59 @@ export function RuntimeDashboardScreen({
         </div>
 
         <div className="bento__cell bento__cell--12">
+          <CardPanel
+            title="Давление воронки"
+            subtitle={opportunityPipelineUnavailable ? "контекст скрыт" : `${pipelineDeals.length} сделок`}
+            flush
+          >
+            {opportunityPipelineUnavailable ? (
+              <EmptyState
+                title="Воронка недоступна"
+                description={`Источник сделок недоступен: ${opportunityPipelineUnavailable.reason}.`}
+              />
+            ) : pipelineDeals.length === 0 ? (
+              <EmptyState
+                title="Pipeline не давит на портфель"
+                description="В доступном контексте нет сделок, которые уже нужно учитывать в загрузке."
+              />
+            ) : (
+              <DataTable>
+                <thead>
+                  <tr>
+                    <th>Сделка</th>
+                    <th>Клиент</th>
+                    <th>Вероятность</th>
+                    <th>План</th>
+                    <th>Реалистичность</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipelineDeals.map((deal) => (
+                    <tr key={deal.id}>
+                      <td>
+                        <CellStack title={deal.title} subtitle={`${deal.plannedHours} ч`} />
+                      </td>
+                      <td>{deal.clientName}</td>
+                      <td className="mono">{deal.probability}%</td>
+                      <td className="mono cell-muted">{formatDate(deal.plannedFinish)}</td>
+                      <td>
+                        <Chip variant={deal.feasibilityStatus === "at_risk" ? "warning" : "info"}>
+                          {feasibilityStatusLabel(deal.feasibilityStatus)}
+                        </Chip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            )}
+          </CardPanel>
+        </div>
+
+        <div className="bento__cell bento__cell--12">
           <CardPanel title="Управленческий агент" subtitle="Единый поток рабочей области" flush>
             <AgentCockpitBlock
               thread={data.workspaceAgentThread}
+              operationsCockpit={data.operationsCockpit}
               currentUserId={currentUserId}
               isSending={isSendingWorkspaceAgentMessage}
               isConfirming={isConfirmingWorkspaceAgentAction}
@@ -173,4 +322,21 @@ export function RuntimeDashboardScreen({
 
 function isPastDate(value: string): boolean {
   return value.slice(0, 10) < getRuntimeTodayIsoDate();
+}
+
+function findUnavailableSource(data: DashboardReadModel, source: string) {
+  return data.operationsCockpit.agentContext.unavailableSources.find((entry) => entry.source === source);
+}
+
+function attentionSeverityLabel(severity: "critical" | "warning" | "info"): string {
+  if (severity === "critical") return "критично";
+  if (severity === "warning") return "риск";
+  return "инфо";
+}
+
+function feasibilityStatusLabel(status: string | null): string {
+  if (status === "at_risk") return "есть риск";
+  if (status === "ready") return "готово";
+  if (status === "blocked") return "заблокировано";
+  return "не оценено";
 }

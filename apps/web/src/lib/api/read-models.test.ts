@@ -451,7 +451,7 @@ describe("runtime read model API", () => {
     });
   });
 
-  it("uses only project/task endpoints for the dashboard read model", async () => {
+  it("loads the dashboard read model from project, task, agent and operations endpoints", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const root = createRoot(host);
@@ -475,6 +475,17 @@ describe("runtime read model API", () => {
             proposals: []
           })
         );
+      }
+      if (path === "/api/workspace/operations-cockpit") {
+        return json({
+          cockpit: {
+            indicators: { activeProjects: 2, overdueTasks: 1 },
+            attentionItems: [{ id: "attention-dashboard", title: "Просрочен выпуск стадии П" }],
+            workloadHints: { byPerson: [] },
+            pipelinePressure: { deals: [] },
+            agentContext: { contextType: "operations_cockpit", unavailableSources: [] }
+          }
+        });
       }
       return json({ error: "not_found" }, 404);
     });
@@ -504,12 +515,13 @@ describe("runtime read model API", () => {
           "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30",
           "/api/workspace/agent-thread",
           "/api/workspace/my-work",
+          "/api/workspace/operations-cockpit",
           "/api/workspace/projects"
         ])
       );
-      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
-      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/deal-stages");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/dashboard-agent");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/operations-cockpit");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
     } finally {
       act(() => root.unmount());
       queryClient.clear();

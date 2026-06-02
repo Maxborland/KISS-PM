@@ -78,6 +78,7 @@ export type DashboardReadModel = {
   projects: Project[];
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
+  operationsCockpit: OperationsCockpitReadModel;
   workspaceAgentThread: WorkspaceAgentThread;
 };
 
@@ -417,18 +418,33 @@ export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
       {
         queryKey: queryKeys.workspace.workspaceAgentThread,
         queryFn: fetchWorkspaceAgentThread
+      },
+      {
+        queryKey: queryKeys.workspace.operationsCockpit,
+        queryFn: fetchWorkspaceOperationsCockpit
       }
     ]
   });
 
-  const [projectsQuery, tasksQuery, scheduledTasksQuery, workspaceAgentThreadQuery] = queries;
+  const [
+    projectsQuery,
+    tasksQuery,
+    scheduledTasksQuery,
+    workspaceAgentThreadQuery,
+    operationsCockpitQuery
+  ] = queries;
   const data =
-    projectsQuery.data && tasksQuery.data && scheduledTasksQuery.data && workspaceAgentThreadQuery.data
+    projectsQuery.data &&
+    tasksQuery.data &&
+    scheduledTasksQuery.data &&
+    workspaceAgentThreadQuery.data &&
+    operationsCockpitQuery.data
       ? {
           projects: projectsQuery.data as Project[],
           tasks: tasksQuery.data as Task[],
           scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
-          workspaceAgentThread: workspaceAgentThreadQuery.data as WorkspaceAgentThread
+          workspaceAgentThread: workspaceAgentThreadQuery.data as WorkspaceAgentThread,
+          operationsCockpit: operationsCockpitQuery.data as OperationsCockpitReadModel
         }
       : undefined;
 
