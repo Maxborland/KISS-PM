@@ -13,12 +13,14 @@ import {
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
+  fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
   useAgentCockpitReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
-  useMyWorkReadModelQueries
+  useMyWorkReadModelQueries,
+  useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -31,6 +33,7 @@ describe("runtime read model API", () => {
 
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
+    expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
@@ -51,6 +54,9 @@ describe("runtime read model API", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-1" }] });
+      if (path === "/api/workspace/config/project-templates") {
+        return json({ projectTemplates: [{ id: "template-1" }] });
+      }
       if (path === "/api/workspace/my-work") return json({ tasks: [{ id: "task-1" }] });
       if (path === "/api/workspace/opportunities") {
         return json({ opportunities: [{ id: "opp-1" }] });
@@ -86,6 +92,7 @@ describe("runtime read model API", () => {
     });
 
     await expect(fetchWorkspaceProjects()).resolves.toEqual([{ id: "project-1" }]);
+    await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
@@ -119,6 +126,7 @@ describe("runtime read model API", () => {
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
       "/api/workspace/projects",
+      "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
       "/api/workspace/deal-stages",
@@ -128,17 +136,116 @@ describe("runtime read model API", () => {
       "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
-    expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({
+    expect(fetchMock.mock.calls[7]?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
     });
-    expect(fetchMock.mock.calls[7]?.[1]).toMatchObject({
+    expect(fetchMock.mock.calls[8]?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
     });
     for (const [, init] of fetchMock.mock.calls) {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
+    }
+  });
+
+  it("loads the projects list from projects and project template endpoints", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-live" }] });
+      if (path === "/api/workspace/config/project-templates") {
+        return json({ projectTemplates: [{ id: "template-live" }] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    function ProjectsProbe() {
+      useProjectsListReadModelQuery();
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
+            "/api/workspace/config/project-templates",
+            "/api/workspace/projects"
+          ])
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/projects");
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keeps projects readable when project template catalog access is forbidden", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    let latestData: unknown;
+    let latestError: unknown;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-live" }] });
+      if (path === "/api/workspace/config/project-templates") return json({ error: "forbidden" }, 403);
+      return json({ error: "not_found" }, 404);
+    });
+
+    function ProjectsProbe() {
+      const readModel = useProjectsListReadModelQuery();
+      latestData = readModel.data;
+      latestError = readModel.error;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            projects: [{ id: "project-live" }],
+            projectTemplates: []
+          })
+        );
+      });
+      expect(latestError).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
     }
   });
 

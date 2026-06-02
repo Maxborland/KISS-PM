@@ -16,6 +16,7 @@ const readModelHooks = vi.hoisted(() => ({
   deals: vi.fn(),
   myWork: vi.fn(),
   projects: vi.fn(),
+  projectsBlock: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
   postWorkspaceAgentMessage: vi.fn()
 }));
@@ -81,6 +82,31 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/projects-list-block", () => ({
+  ProjectsListBlock: ({
+    projectTemplates,
+    projects,
+    readOnly
+  }: {
+    projectTemplates: { tenantLabel?: string }[];
+    projects: { title?: string }[];
+    readOnly?: boolean;
+  }) => {
+    readModelHooks.projectsBlock({ projectTemplates, projects, readOnly });
+    return createElement(
+      "div",
+      {
+        "data-testid": "runtime-projects",
+        "data-read-only": String(readOnly)
+      },
+      [
+        projects.map((project) => project.title).join(", "),
+        projectTemplates.map((template) => template.tenantLabel).join(", ")
+      ].join(" ")
+    );
+  }
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -120,7 +146,12 @@ describe("RuntimeDataScreen permission gate", () => {
       }
     );
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
-    readModelHooks.projects.mockReturnValue({ data: { projects: [] }, error: null, isPending: false, isFetching: false });
+    readModelHooks.projects.mockReturnValue(
+      successReadModel({
+        projects: [],
+        projectTemplates: []
+      })
+    );
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
   });
@@ -314,6 +345,54 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime my work task");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.myWork).toHaveBeenCalledWith({ assigneeUserId: "usr-1" });
+  });
+
+  it("renders projects from runtime projects and project templates without fixture fallback", async () => {
+    readModelHooks.projects.mockReturnValue(
+      successReadModel({
+        projects: [{ id: "project-runtime", title: "Runtime architecture project" }],
+        projectTemplates: [{ id: "template-runtime", tenantLabel: "Runtime template" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07-projects-list",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime architecture project");
+    expect(host.textContent).toContain("Runtime template");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      projects: [{ id: "project-runtime", title: "Runtime architecture project" }],
+      projectTemplates: [{ id: "template-runtime", tenantLabel: "Runtime template" }],
+      readOnly: true
+    });
+  });
+
+  it("keeps runtime projects explicit when project templates are unavailable", async () => {
+    readModelHooks.projects.mockReturnValue(
+      successReadModel({
+        projects: [{ id: "project-runtime", title: "Runtime project without templates" }],
+        projectTemplates: []
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07-projects-list",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime project without templates");
+    expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      projects: [{ id: "project-runtime", title: "Runtime project without templates" }],
+      projectTemplates: [],
+      readOnly: true
+    });
   });
 
   it("passes the agent task deep link into runtime my work", async () => {
