@@ -23,7 +23,7 @@
 | Dashboard runtime root | `/` -> `/dashboard` | foundation smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-foundation-desktop.png`, `runtime-foundation-narrow.png` |
 | Dashboard route | `/dashboard` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-dashboard-desktop.png`, `runtime-dashboard-narrow.png` |
 | My Work route | `/my-work` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-my-work-desktop.png`, `runtime-my-work-narrow.png` |
-| Agent cockpit route | `/agent` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-agent-desktop.png`, `runtime-agent-narrow.png` |
+| Agent cockpit route | `/agent` | route smoke + confirmation loop | `e2e/runtime/runtime-foundation.spec.ts`, `e2e/runtime/agent-confirmation.spec.ts` | `runtime-agent-desktop.png`, `runtime-agent-narrow.png`, `runtime-agent-confirmation-pending.png`, `runtime-agent-confirmation-applied.png` |
 | Projects route | `/projects` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-projects-desktop.png`, `runtime-projects-narrow.png` |
 | Deals route | `/deals` | route smoke | `e2e/runtime/runtime-foundation.spec.ts` | `runtime-deals-desktop.png`, `runtime-deals-narrow.png` |
 | Storybook tokens | `Foundations/Colors` | visual smoke only | `e2e/runtime/storybook-visual-smoke.spec.ts` | `tokens-desktop.png`, `tokens-narrow.png` |
@@ -34,4 +34,4 @@
 
 ## Известный разрыв
 
-Этот gate не переводит перечисленные screens в полную beta-ready категорию. Он блокирует blank screen, browser runtime errors, unexpected failed runtime requests и отсутствие screenshot evidence. `/agent` включен как единая runtime-поверхность агента, но его бизнес-flow acceptance и confirmation loop остаются отдельным beta-критичным доказательством.
+Этот gate не переводит перечисленные screens в полную beta-ready категорию. Он блокирует blank screen, browser runtime errors, unexpected failed runtime requests и отсутствие screenshot evidence. `/agent` дополнительно проверяет seeded confirmation loop: proposal не считается примененным до клика пользователя, а результат показывает audit marker и ссылку на созданную задачу.

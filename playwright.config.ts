@@ -38,7 +38,8 @@ const webServer = [
       {
         DATABASE_URL: databaseUrl,
         PORT: apiPort,
-        KISS_PM_E2E_TEST_HOOKS: "1"
+        KISS_PM_E2E_TEST_HOOKS: "1",
+        KISS_PM_TRUSTED_MUTATION_ORIGINS: webOrigin
       },
       `pnpm --dir '${configDir}' --filter @kiss-pm/api dev`
     ),

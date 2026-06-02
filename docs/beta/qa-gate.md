@@ -23,6 +23,7 @@ pnpm qa:runtime
 - `e2e/runtime/runtimeQaFixtures.ts` включает guard на неожиданные `pageerror`, `console.error`, failed `document/script/fetch/xhr` requests и 4xx/5xx responses;
 - `e2e/runtime/runtime-foundation.spec.ts` логинится seeded admin пользователем, открывает runtime root, проверяет redirect на `/dashboard`, делает desktop и narrow screenshots;
 - `e2e/runtime/runtime-foundation.spec.ts` также открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals` и проверяет, что route не blank, не forbidden/error и не даёт горизонтальный overflow на desktop/narrow;
+- `e2e/runtime/agent-confirmation.spec.ts` проверяет безопасный цикл агента: сообщение пользователя, proposal без silent mutation, явное `Применить`, result summary, audit marker и переход к созданной задаче в `/my-work`;
 - `e2e/runtime/storybook-visual-smoke.spec.ts` запускается только при `KISS_PM_STORYBOOK_QA=1`, открывает стабильные Storybook stories через `iframe.html?id=...` и снимает desktop/narrow screenshots approved design-v3 stories.
 
 ## Runtime-артефакты
@@ -42,6 +43,8 @@ pnpm qa:runtime
 - `runtime-my-work-narrow.png`;
 - `runtime-agent-desktop.png`;
 - `runtime-agent-narrow.png`;
+- `runtime-agent-confirmation-pending.png`;
+- `runtime-agent-confirmation-applied.png`;
 - `runtime-projects-desktop.png`;
 - `runtime-projects-narrow.png`;
 - `runtime-deals-desktop.png`;
@@ -60,9 +63,9 @@ CI workflow `.github/workflows/runtime-qa.yml` загружает `playwright-re
 ## Не входит в этот slice
 
 - `e2e/a11y/**` не входит в `pnpm qa:runtime`.
-- Бизнес-flow acceptance, RBAC mutation journeys и agent confirmation loop не считаются покрытыми этим foundation.
+- RBAC mutation journeys и расширенные бизнес-flow acceptance не считаются покрытыми этим foundation.
 - Runtime UI code, backend code, lockfile, marketing и storage не меняются этим gate.
-- Agent confirmation loop acceptance, RBAC mutation journeys и audit assertions остаются отдельным beta gate поверх foundation smoke.
+- Agent confirmation loop покрыт на уровне seeded admin runtime flow: apply требует явного клика, а результат показывает audit marker и ссылку на созданную задачу.
 
 ## Ожидание перед PR
 
