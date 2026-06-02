@@ -63,7 +63,7 @@ export function RuntimeAgentScreen({ currentUserId }: { currentUserId: string })
 
   return readModel.data ? (
     <div className="agent-cockpit-screen">
-      <RoutePageIntro lead="Единый управленческий cockpit рабочей области: вопросы по портфелю, сверка предложений и подтверждение действий через аудит." />
+      <RoutePageIntro lead="Единый управленческий центр рабочей области: вопросы по портфелю, сверка предложений и подтверждение действий через аудит." />
       <AgentCockpitBlock
         variant="surface"
         thread={readModel.data.workspaceAgentThread}

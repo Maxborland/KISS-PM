@@ -1739,7 +1739,7 @@ a:hover { color: var(--accent-hover); }
 .runtime-agent {
   min-height: 520px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(300px, 360px);
   background: var(--panel-subtle);
 }
 

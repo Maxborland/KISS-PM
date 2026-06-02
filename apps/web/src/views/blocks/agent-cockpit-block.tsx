@@ -9,6 +9,7 @@ import {
   Clock3,
   GitCompareArrows,
   LoaderCircle,
+  MessageSquare,
   SendHorizontal,
   ShieldCheck
 } from "lucide-react";
@@ -69,6 +70,7 @@ export function AgentCockpitBlock({
       className={cn("runtime-agent", "agent-cockpit", variant === "surface" && "agent-cockpit--surface")}
       aria-label="Единый управленческий агент"
     >
+      <AgentHistoryRail thread={thread} operationsCockpit={operationsCockpit} />
       <section className="runtime-agent__chat" aria-label="Чат с Генри Ганттом">
         <header className="runtime-agent__header">
           <div className="runtime-agent__title">
@@ -151,7 +153,11 @@ export function AgentCockpitBlock({
           <ShieldCheck aria-hidden />
           <div>
             <span>Сверка изменений</span>
-            <strong>{hasProposals ? `${proposals.length} предложений` : "Готова к ревью"}</strong>
+            <strong>
+              {hasProposals
+                ? formatAgentCount(proposals.length, ["предложение", "предложения", "предложений"])
+                : "Готова к ревью"}
+            </strong>
           </div>
         </header>
 
@@ -204,6 +210,77 @@ export function AgentCockpitBlock({
   );
 }
 
+function AgentHistoryRail({
+  thread,
+  operationsCockpit
+}: {
+  thread: WorkspaceAgentThread;
+  operationsCockpit?: OperationsCockpitReadModel | undefined;
+}) {
+  const lastMessages = thread.messages.slice(-4).reverse();
+  const focusTitle = workspaceAgentFocusTitle(thread);
+
+  return (
+    <aside className="agent-cockpit-history" aria-label="История агента">
+      <header className="agent-cockpit-history__header">
+        <span className="agent-cockpit-history__avatar" aria-hidden>ГГ</span>
+        <div>
+          <strong>Генри Гантт</strong>
+          <span>Единый центр</span>
+        </div>
+      </header>
+
+      <section className="agent-cockpit-history__section" aria-label="Текущий диалог">
+        <div className="agent-cockpit-history__eyebrow">Текущий диалог</div>
+        <article className="agent-cockpit-history__thread is-active">
+          <MessageSquare aria-hidden />
+          <div>
+            <strong>{focusTitle}</strong>
+            <span>
+              {formatAgentCount(thread.messages.length, ["сообщение", "сообщения", "сообщений"])} ·{" "}
+              {formatAgentCount(thread.proposals.length, ["предложение", "предложения", "предложений"])}
+            </span>
+          </div>
+        </article>
+      </section>
+
+      <section className="agent-cockpit-history__section" aria-label="Контекст рабочей области">
+        <div className="agent-cockpit-history__eyebrow">Контекст</div>
+        <div className="agent-cockpit-history__facts">
+          <span>
+            <strong>{operationsCockpit?.indicators.activeProjects ?? 0}</strong>
+            проектов
+          </span>
+          <span>
+            <strong>{operationsCockpit?.indicators.overdueTasks ?? 0}</strong>
+            просрочено
+          </span>
+          <span>
+            <strong>{operationsCockpit?.indicators.openDeals ?? 0}</strong>
+            сделок
+          </span>
+        </div>
+      </section>
+
+      <section className="agent-cockpit-history__section" aria-label="Последние сообщения">
+        <div className="agent-cockpit-history__eyebrow">История</div>
+        {lastMessages.length > 0 ? (
+          <ol className="agent-cockpit-history__messages">
+            {lastMessages.map((message) => (
+              <li key={message.id}>
+                <span>{message.authorType === "agent" ? "Генри" : "Вы"}</span>
+                <p>{message.body}</p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="agent-cockpit-history__empty">История появится после первого сообщения.</p>
+        )}
+      </section>
+    </aside>
+  );
+}
+
 function AgentOperationsContextPanel({ data }: { data: OperationsCockpitReadModel }) {
   const topAttention = data.attentionItems.slice(0, 3);
   const cockpitUnavailable = data.agentContext.unavailableSources.find(
@@ -218,7 +295,7 @@ function AgentOperationsContextPanel({ data }: { data: OperationsCockpitReadMode
       <div className="agent-cockpit-context__head">
         <BarChart3 aria-hidden />
         <div>
-          <span>Контекст cockpit</span>
+          <span>Контекст агента</span>
           <strong>{data.indicators.activeProjects} активных проектов</strong>
         </div>
       </div>
@@ -445,6 +522,22 @@ function workspaceAgentMutationPolicyLabel(thread: WorkspaceAgentThread): string
     return "Сообщения не меняют данные";
   }
   return "Ждет подтверждения перед изменениями";
+}
+
+function workspaceAgentFocusTitle(thread: WorkspaceAgentThread): string {
+  const focus = thread.thread?.context.focus ?? thread.context.focus;
+  if (!focus) return "Рабочая область";
+  if (focus.title) return focus.title;
+  if (focus.type === "project") return `Проект ${focus.id}`;
+  if (focus.type === "task") return `Задача ${focus.id}`;
+  return `Сделка ${focus.id}`;
+}
+
+function formatAgentCount(count: number, forms: [string, string, string]): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const form = mod10 === 1 && mod100 !== 11 ? forms[0] : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? forms[1] : forms[2];
+  return `${count} ${form}`;
 }
 
 function workspaceAgentProposalAllowsDecision(

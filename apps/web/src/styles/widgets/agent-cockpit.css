@@ -11,6 +11,160 @@
   overflow: hidden;
 }
 
+.agent-cockpit-history {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border-right: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--panel-subtle) 72%, var(--panel));
+}
+
+.agent-cockpit-history__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agent-cockpit-history__avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent-muted);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 750;
+  line-height: var(--lh-xs);
+}
+
+.agent-cockpit-history__header div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.agent-cockpit-history__header strong,
+.agent-cockpit-history__thread strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-cockpit-history__header span,
+.agent-cockpit-history__thread span,
+.agent-cockpit-history__messages span,
+.agent-cockpit-history__empty {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.agent-cockpit-history__section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-cockpit-history__eyebrow {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: var(--lh-xs);
+  text-transform: uppercase;
+}
+
+.agent-cockpit-history__thread {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-xs);
+}
+
+.agent-cockpit-history__thread.is-active {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.agent-cockpit-history__thread svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.agent-cockpit-history__thread div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.agent-cockpit-history__facts {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-cockpit-history__facts span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.agent-cockpit-history__facts strong {
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+}
+
+.agent-cockpit-history__messages {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-cockpit-history__messages li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.agent-cockpit-history__messages p,
+.agent-cockpit-history__empty {
+  margin: 0;
+}
+
+.agent-cockpit-history__messages p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .agent-cockpit-thinking {
   display: grid;
   gap: var(--space-2);
@@ -217,5 +371,11 @@
 
   .agent-cockpit-diff__row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .agent-cockpit-history {
+    display: none;
   }
 }

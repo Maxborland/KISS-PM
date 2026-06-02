@@ -62,6 +62,9 @@ describe("AgentCockpitBlock", () => {
       });
 
       expect(host.textContent).toContain("Сообщения не меняют данные");
+      expect(host.textContent).toContain("Единый центр");
+      expect(host.textContent).toContain("Рабочая область");
+      expect(host.textContent).toContain("0 сообщений · 1 предложение");
       expect(host.textContent).toContain("Изменение доступно только после подтверждения.");
 
       const buttons = Array.from(host.querySelectorAll("button"));
@@ -248,7 +251,8 @@ describe("AgentCockpitBlock", () => {
       });
 
       expect(host.textContent).toContain("История пуста");
-      expect(host.textContent).toContain("Контекст cockpit");
+      expect(host.querySelector('[aria-label="История агента"]')).toBeTruthy();
+      expect(host.textContent).toContain("Контекст агента");
       expect(host.textContent).toContain("3 активных проектов");
       expect(host.textContent).toContain("Проект требует решения");
       expect(host.textContent).toContain("Читает доступный контекст рабочей области");
@@ -368,6 +372,7 @@ describe("AgentCockpitBlock", () => {
 
       expect(host.textContent).toContain("Вы");
       expect(host.textContent).toContain("Генри Гантт");
+      expect(host.textContent).toContain("2 сообщения · 0 предложений");
       expect(host.textContent).toContain("Подготовил действие. Без подтверждения ничего не изменю.");
     } finally {
       act(() => root.unmount());
