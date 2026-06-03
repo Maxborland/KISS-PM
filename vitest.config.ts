@@ -15,7 +15,13 @@ export default defineConfig({
   },
   test: {
     globals: false,
-    include: ["packages/**/*.test.ts", "packages/**/*.test.tsx", "apps/**/*.test.ts", "apps/**/*.test.tsx"],
+    include: [
+      "packages/**/*.test.ts",
+      "packages/**/*.test.tsx",
+      "apps/**/*.test.ts",
+      "apps/**/*.test.tsx",
+      "scripts/**/*.test.ts"
+    ],
     exclude: ["**/node_modules/**", "**/*.db.test.ts"]
   }
 });
