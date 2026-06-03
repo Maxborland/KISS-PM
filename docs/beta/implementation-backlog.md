@@ -9,7 +9,7 @@
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention+visual | Operations attention, workload and pipeline pressure render from live read-model; pipeline clickthrough and desktop/narrow screenshots are proven; remaining gap is role-specific filters/actions | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, `dashboard-pipeline-clickthrough.spec.ts`, `pnpm qa:screenshots -- --routes /dashboard` |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired+grounded+failure-audit | Global workspace agent has grounded project focus proof, no-mutation-before-confirm, confirmed apply/result/audit, forbidden read failure and denied apply audit proof; remaining gap is broader grounded Q&A beyond create-task proposal | `agent-focused-context.spec.ts`, `agent-confirmation.spec.ts`, `agent-no-mutation-before-confirm.spec.ts`, `agent-forbidden.spec.ts`, `agent-apply-forbidden.spec.ts` |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap+readonly-proof | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; project-team participant read-only fields/comment flow is proven | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `pnpm qa:fast` |
-| Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
+| Projects list | `/projects` | PM-01, CEO-01 | wired+filters+visual | Runtime projects list filters live data, opens runtime detail, shows honest no-results state and passes desktop/narrow screenshots; remaining gap is create/edit flow | `projects-list-runtime.spec.ts`, `projects-list-block.test.ts`, `runtime-data-screen.test.ts`, `pnpm qa:screenshots -- --routes /projects` |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/date-action+visual | Live timeline renders real project tasks, zoom works, critical indicators are visible, due-date update persists to project detail, and desktop/narrow screenshots pass; dependency editing remains future scope | `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`, `pnpm qa:fast` route smoke |
 | Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only+visual | Runtime ResourceMatrix uses live project tasks/users/demand; missing role, high-load cells, disabled assignment reason and desktop/narrow screenshots are proven; true overload/conflict action remains pending | `project-resources.spec.ts`, `project-resources.test.ts`, `project-resources-runtime-block.test.tsx`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`, `pnpm qa:fast` route smoke |
@@ -63,7 +63,7 @@
 | `/dashboard` | Seeded risk/overdue/overload appears; pipeline pressure links to deal detail; no console/pageerror/API failures; desktop/narrow screenshots |
 | `/agent` | Grounded project focus references real entities; proposal has confirmation; no mutation before apply; apply mutates and shows result/audit; forbidden read and denied apply write audit |
 | `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; participant read-only state proven |
-| `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
+| `/projects` | Projects and templates load without permission trap; search filters live list; open project routes to runtime detail; honest no-results state; desktop/narrow screenshots |
 | Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation; desktop/narrow screenshots pass |
 | Timeline | Live tasks render in date range; day/week/month zoom works; critical indicators visible; due-date update persists to project detail; desktop/narrow screenshots pass; dependency editing remains future scope |
 | `/deals` | Pipeline loads with only used catalogs; stage move persists; read-only CRM users do not see broken DnD; no hidden clients/projectTypes dependency |
@@ -109,6 +109,11 @@
    - Evidence now: `admin-user-status.spec.ts`, `admin-role-permissions.spec.ts`, `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`.
    - Beta evidence still required: deeper role matrix/user filters and extra failure-state polish.
 
+9. **Projects list runtime evidence**
+   - Status: runtime projects list filters live data, opens runtime project detail, shows honest no-results state in read-only mode and has desktop/narrow screenshot evidence.
+   - Evidence now: `projects-list-runtime.spec.ts`, `projects-list-block.test.ts`, `runtime-data-screen.test.ts`, `pnpm qa:screenshots -- --routes /projects`.
+   - Beta evidence still required: create/edit flow and richer filter set.
+
 ## Текущий evidence snapshot
 
 - `dashboard-pipeline-clickthrough.spec.ts`: dashboard renders seeded attention/workload/pipeline sections and opens the live school renovation deal detail route.
@@ -118,6 +123,8 @@
 - `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.
 - `runtime-data-screen.test.ts`: non-beta routes render `Раздел не включён в beta` and do not fall back to fixture screens.
 - `runtime-data-screen.test.ts`: `/projects/:id` loads project/tasks from runtime read-model and does not fall back to Storybook fixtures.
+- `projects-list-runtime.spec.ts`: runtime `/projects` filters live project rows, opens the school renovation project detail route and shows an honest read-only no-results state.
+- `pnpm qa:screenshots -- --routes /projects`: projects list desktop and narrow screenshots pass.
 - `project-detail-task-actions.spec.ts`: seeded project task status changes through the runtime project detail UI, appears in task activity and remains changed after reload.
 - `project-detail-task-audit.spec.ts`: project detail status mutation appears in scoped `/api/tenant/current/audit-events?projectId=...` task audit projection and in the visible admin audit route.
 - `project-detail-create-task.spec.ts`: seeded project detail task create flow saves title and due date and remains visible after reload.
