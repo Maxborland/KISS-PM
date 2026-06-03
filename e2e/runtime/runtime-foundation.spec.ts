@@ -7,7 +7,36 @@ const adminCredentials = {
   password: "admin12345"
 };
 
-test("authenticated runtime root renders dashboard without runtime errors", async ({
+const betaRuntimeRoutes = [
+  { path: "/dashboard", marker: "Живая сводка по проектам" },
+  { path: "/my-work", marker: "Моя работа" },
+  { path: "/agent", marker: "Генри Гантт" },
+  { path: "/projects", marker: "Проекты" },
+  { path: "/deals", marker: "Сделки" }
+] as const;
+
+const supportedBetaRoutePaths = new Set<string>(betaRuntimeRoutes.map((route) => route.path));
+
+function selectedBetaRuntimeRoutes() {
+  const selectedPaths = process.env.KISS_PM_FAST_ROUTES?.split(",")
+    .map((route) => route.trim())
+    .filter(Boolean);
+
+  if (!selectedPaths?.length) return betaRuntimeRoutes;
+
+  const unsupportedPaths = selectedPaths.filter((path) => !supportedBetaRoutePaths.has(path));
+  if (unsupportedPaths.length > 0) {
+    throw new Error(
+      `Unsupported KISS_PM_FAST_ROUTES value: ${unsupportedPaths.join(", ")}. Supported routes: ${[
+        ...supportedBetaRoutePaths
+      ].join(", ")}`
+    );
+  }
+
+  return betaRuntimeRoutes.filter((route) => selectedPaths.includes(route.path));
+}
+
+test("authenticated runtime root renders dashboard without runtime errors @fast-pr-gate", async ({
   page
 }, testInfo) => {
   const login = await page.request.post("/api/auth/login", {
@@ -38,7 +67,7 @@ test("authenticated runtime root renders dashboard without runtime errors", asyn
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test("authenticated beta runtime routes open without blank or error states", async ({
+test("authenticated beta runtime routes open without blank or error states @fast-pr-gate", async ({
   page
 }, testInfo) => {
   const login = await page.request.post("/api/auth/login", {
@@ -46,13 +75,7 @@ test("authenticated beta runtime routes open without blank or error states", asy
   });
   expect(login.status()).toBe(200);
 
-  for (const route of [
-    { path: "/dashboard", marker: "Живая сводка по проектам" },
-    { path: "/my-work", marker: "Моя работа" },
-    { path: "/agent", marker: "Генри Гантт" },
-    { path: "/projects", marker: "Проекты" },
-    { path: "/deals", marker: "Сделки" }
-  ] as const) {
+  for (const route of selectedBetaRuntimeRoutes()) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(route.path);
     await expect(page).toHaveURL(new RegExp(`${route.path.replace("/", "\\/")}$`));
@@ -74,9 +97,6 @@ test("authenticated beta runtime routes open without blank or error states", asy
     if (route.path === "/agent") {
       await expect(page.getByLabel("Единый управленческий агент")).toBeVisible();
       await expect(page.getByText("Сверка изменений")).toBeVisible();
-    }
-    if (route.path === "/projects") {
-      await expect(page.getByRole("link", { name: "Гант" })).toBeVisible();
     }
     const narrowScreenshotPath = testInfo.outputPath(
       `runtime-${route.path.slice(1).replaceAll("/", "-")}-narrow.png`

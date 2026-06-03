@@ -18,6 +18,33 @@ pnpm qa:runtime
 - внутри runner запускает только `pnpm exec playwright test --config playwright.config.ts e2e/runtime`;
 - включает `KISS_PM_STORYBOOK_QA=1` только для этого runtime QA запуска.
 
+## Fast PR gate
+
+Команда:
+
+```bash
+pnpm qa:fast
+```
+
+Ограниченный route set для маленького PR:
+
+```bash
+pnpm qa:fast -- --routes=/dashboard,/my-work
+```
+
+Fast gate нужен для PR-sized beta slices, когда полный Storybook/VRT gate слишком тяжелый. Он выполняет локальный CI-эквивалент без Storybook:
+
+- `node scripts/check-runtime-qa-db.mjs`;
+- `pnpm db:migrate`;
+- `pnpm db:seed:dev`;
+- `pnpm db:seed:check`;
+- `pnpm typecheck`;
+- `pnpm --filter @kiss-pm/api test`;
+- `pnpm --filter @kiss-pm/web test`;
+- `pnpm exec playwright test --config playwright.config.ts e2e/runtime/runtime-foundation.spec.ts --grep @fast-pr-gate`.
+
+Route selection передается через `KISS_PM_FAST_ROUTES`; по умолчанию smoke открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals`.
+
 `e2e/runtime/**` сейчас покрывает foundation, а не весь beta regression:
 
 - `e2e/runtime/runtimeQaFixtures.ts` включает guard на неожиданные `pageerror`, `console.error`, failed `document/script/fetch/xhr` requests и 4xx/5xx responses;

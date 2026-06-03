@@ -73,8 +73,8 @@
 ## Top 5 implementation slices
 
 1. **Runtime QA environment hardening**
-   - Make `pnpm qa:runtime` either start/check Postgres clearly or fail with an explicit actionable blocker.
-   - Evidence: local pass or deterministic infra error message.
+   - Status: Wave 1 foundation split into fast PR gate and full runtime QA.
+   - Evidence: `pnpm qa:fast` is the local PR-sized CI-equivalent; `docs/beta/local-artifact-policy.md` documents GitHub billing blocker and local artifact policy.
 
 2. **Dashboard attention cockpit**
    - Status: frontend read-model/UI slice done; remaining proof is full runtime QA screenshot and seeded-risk route assertion.
@@ -94,10 +94,12 @@
 
 ## Текущий evidence snapshot
 
-- `origin/design-v3`: `6baa6cb` includes PR #72 and is the base for `codex/beta-foundation-qa`.
+- `origin/design-v3`: includes Wave 1 route inventory and beta seed/reset slices.
 - `docs/beta/runtime-route-inventory.md`: current beta runtime allowlist and hidden route list.
 - `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.
 - `runtime-data-screen.test.ts`: non-beta routes render `Раздел не включён в beta` and do not fall back to fixture screens.
-- `pnpm qa:runtime`: blocked locally in this worktree by missing Postgres/Docker, not by runtime assertion failure.
+- `pnpm db:reset:dev`: resets only the documented compose dev database by default, then seeds and checks beta fixture counts.
+- `pnpm qa:fast`: standardized as the default local PR gate for small beta slices.
+- `pnpm qa:runtime`: remains the broader runtime+Storybook foundation gate.
 - Existing runtime QA files are present: `e2e/runtime/runtimeQaFixtures.ts`, `runtime-foundation.spec.ts`, `agent-confirmation.spec.ts`, `storybook-visual-smoke.spec.ts`.
 - Existing beta docs present before this slice: `screen-readiness-matrix.md`, `component-readiness.md`, `qa-gate.md`.
