@@ -2,13 +2,13 @@
 
 ## Текущий blocker GitHub CI
 
-На PR #73, #74 и #75 GitHub jobs не стартуют из-за billing/account state:
+GitHub jobs для beta PR сейчас могут завершаться infra-red без фактического запуска runner-а: у job `steps: []`, а причина связана с billing/account state:
 
 ```txt
 The job was not started because recent account payments have failed or your spending limit needs to be increased.
 ```
 
-Это не означает runtime/test failure. До исправления billing красный GitHub CI не блокирует beta slices, если локальный эквивалент соответствующего gate зеленый и reviewer threads закрыты.
+Это не runtime/test failure. Пока GitHub CI не стартует с реальными steps, **локальный релевантный gate является SSSOT для beta PR**. Красный GitHub CI с `steps: []` не блокирует merge, если локальный gate зеленый и code-review blockers закрыты.
 
 ## Что считается доказательством для PR
 
@@ -58,4 +58,4 @@ pnpm qa:runtime
 pnpm verify:storybook-contract
 ```
 
-Если GitHub CI продолжает не стартовать из-за billing, решение о merge принимает владелец после локального green evidence и review acceptance.
+Если GitHub CI продолжает не стартовать из-за billing/`steps: []`, merge-решение принимается по локальному green evidence как SSSOT и review acceptance.

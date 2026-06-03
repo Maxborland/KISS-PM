@@ -55,25 +55,23 @@ The previous plan was useful as a scope map, but not good enough as the plan of 
 
 ## 2. Current critical blocker
 
-**GitHub CI does not start because of billing/spending limit.**
+**GitHub CI не стартует из-за billing/spending limit и может давать infra-red jobs с `steps: []`.**
 
 Implications:
 
-- PR #73 (`My Work status actions`) cannot be considered cleanly mergeable solely from GitHub.
-- Local green tests are useful evidence, not a replacement for CI unless Max explicitly approves a manual override.
-- Until billing is fixed, every PR needs a local artifact bundle:
-  - git SHA / branch name;
-  - commands run;
-  - test output summary;
-  - screenshots/traces path;
-  - known skipped checks;
-  - reviewer decision.
+- GitHub job с `steps: []` не является runtime/test failure и не опровергает локальный результат.
+- Пока GitHub CI не стартует с реальными steps, релевантный локальный gate является SSSOT для beta PR.
+- PR можно считать merge-ready только если:
+  - локальный gate, соответствующий slice, зеленый;
+  - в PR указаны branch/SHA, команды, summary результата, skipped checks и artifact paths, если были Playwright/screenshots;
+  - code-review blockers закрыты.
+- Если GitHub CI стартует с реальными steps, его failure снова считается обязательным blocker-ом до разбора.
 
-Allowed paths:
+Allowed path:
 
-1. **Preferred:** fix GitHub billing/spending limit → CI starts → merge normally.
-2. **Temporary:** continue development in integration branch with local gates and artifacts; merge to main only after CI returns.
-3. **Manual override:** only if Max explicitly approves; must include local artifact bundle and reviewer sign-off.
+1. Продолжать small beta PRs от чистого `origin/design-v3`.
+2. Для каждого PR запускать локальный релевантный gate и фиксировать evidence в PR body.
+3. Merge делать по локальному green evidence как SSSOT, игнорируя только GitHub infra-red/no-start jobs с `steps: []`.
 
 ---
 
