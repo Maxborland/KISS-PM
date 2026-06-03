@@ -4,7 +4,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Project } from "@/lib/api-types";
+import type { Project, Task } from "@/lib/api-types";
 import {
   ProjectTimelineBlock,
   resolveTimelineTaskHref
@@ -101,7 +101,62 @@ describe("ProjectTimelineBlock", () => {
     expect(host?.textContent).toContain("Runtime timeline task");
   });
 
-  async function renderTimeline(onOpenTask: (href: string) => void) {
+  it("submits a runtime task due-date update from the timeline", async () => {
+    const updates: Array<{ dueDate: string; taskId: string }> = [];
+    await renderTimeline(() => undefined, {
+      onUpdateTaskDueDate: async (task, dueDate) => {
+        updates.push({ dueDate, taskId: task.id });
+      }
+    });
+
+    const input = host?.querySelector<HTMLInputElement>("input[aria-label='Новый финиш задачи']");
+    expect(input?.value).toBe("2026-06-02");
+
+    await act(async () => {
+      if (!input) throw new Error("Date input not found");
+      setInputValue(input, "2026-06-05");
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      host?.querySelector<HTMLFormElement>("form[aria-label='Изменение срока задачи в план-графике']")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(updates).toEqual([{ dueDate: "2026-06-05", taskId: "task-runtime" }]);
+  });
+
+  it("keeps timeline date changes honest when update is unavailable or invalid", async () => {
+    await renderTimeline(() => undefined);
+
+    expect(host?.querySelector<HTMLButtonElement>("button[type='submit']")?.disabled).toBe(true);
+    expect(host?.textContent).toContain(
+      "Изменение сроков доступно пользователям с правом редактирования задач."
+    );
+
+    await renderTimeline(() => undefined, {
+      onUpdateTaskDueDate: async () => undefined
+    });
+
+    const input = host?.querySelector<HTMLInputElement>("input[aria-label='Новый финиш задачи']");
+    await act(async () => {
+      if (!input) throw new Error("Date input not found");
+      setInputValue(input, "2026-06-01");
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      host?.querySelector<HTMLFormElement>("form[aria-label='Изменение срока задачи в план-графике']")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(host?.textContent).toContain("Финиш не может быть раньше старта задачи.");
+  });
+
+  async function renderTimeline(
+    onOpenTask: (href: string) => void,
+    options: {
+      onUpdateTaskDueDate?: ((task: Task, dueDate: string) => Promise<unknown> | void) | undefined;
+    } = {}
+  ) {
+    if (root) {
+      act(() => root?.unmount());
+    }
+    host?.remove();
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -113,6 +168,8 @@ describe("ProjectTimelineBlock", () => {
             project={makeProject()}
             data={makeGanttData()}
             onOpenTask={onOpenTask}
+            onUpdateTaskDueDate={options.onUpdateTaskDueDate}
+            tasks={makeTasks()}
           />
         </ScreenRouteProvider>
       );
@@ -142,6 +199,38 @@ function makeProject(): Project {
   };
 }
 
+function makeTasks(): Task[] {
+  return [
+    {
+      actualWork: 0,
+      archivedAt: null,
+      createdAt: "2026-06-01T00:00:00.000Z",
+      description: null,
+      durationWorkingDays: 1,
+      id: "task-runtime",
+      ownerUserId: "usr-1",
+      participants: [{ role: "executor", userId: "usr-1" }],
+      plannedFinish: "2026-06-02T00:00:00.000Z",
+      plannedStart: "2026-06-02T00:00:00.000Z",
+      plannedWork: 8,
+      priority: "normal",
+      progress: 0,
+      projectId: "project-runtime",
+      requesterUserId: "usr-1",
+      requiresAcceptance: false,
+      source: "manual",
+      stageId: null,
+      status: "in_progress",
+      statusCategory: "in_progress",
+      statusId: "status-progress",
+      statusName: "В работе",
+      tenantId: "tenant-runtime",
+      title: "Runtime timeline task",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    }
+  ];
+}
+
 function makeGanttData(): GanttData {
   return {
     days: [
@@ -169,4 +258,9 @@ function makeGanttData(): GanttData {
       }
     ]
   };
+}
+
+function setInputValue(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, value);
 }

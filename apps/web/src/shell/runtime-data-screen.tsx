@@ -177,7 +177,11 @@ export function RuntimeDataScreen({
   if (screenId === "12-project-gantt") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions} projectId={projectId}>
-        <RuntimeProjectTimelineScreen projectId={projectId} />
+        <RuntimeProjectTimelineScreen
+          currentUserId={currentUserId}
+          permissions={permissions}
+          projectId={projectId}
+        />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -803,8 +807,32 @@ async function findProjectLinkedToOpportunity(opportunityId: string): Promise<Pr
   }
 }
 
-function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | undefined }) {
+function RuntimeProjectTimelineScreen({
+  currentUserId,
+  permissions,
+  projectId
+}: {
+  currentUserId?: string | undefined;
+  permissions: readonly string[];
+  projectId?: string | undefined;
+}) {
+  const queryClient = useQueryClient();
   const query = useProjectDetailReadModelQuery(projectId);
+  const canUpdateTaskDates =
+    hasPermission(permissions, "tenant.tasks.edit") ||
+    hasPermission(permissions, "tenant.projects.manage");
+  const updateTaskFields = useMutation({
+    mutationFn: updateWorkspaceTaskFields,
+    onSuccess: (task) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(task.projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      if (currentUserId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      }
+    }
+  });
 
   if (!projectId) {
     return (
@@ -851,6 +879,14 @@ function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | unde
     <ProjectTimelineBlock
       project={query.data.project}
       data={buildProjectTimelineGanttData(query.data)}
+      dateActionError={updateTaskFields.error}
+      dateActionPending={updateTaskFields.isPending}
+      tasks={query.data.tasks}
+      onUpdateTaskDueDate={
+        canUpdateTaskDates
+          ? (task, dueDate) => updateTaskFields.mutateAsync({ dueDate, task })
+          : undefined
+      }
     />
   );
 }
