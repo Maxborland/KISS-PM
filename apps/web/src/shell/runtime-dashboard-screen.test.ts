@@ -307,6 +307,10 @@ describe("RuntimeDashboardScreen", () => {
       expect(host.textContent).toContain("Что требует внимания");
       expect(host.textContent).toContain("Просрочен авторский надзор");
       expect(host.textContent).toContain("Срок задачи прошел вчера.");
+      const attentionLink = host.querySelector(
+        'a[href="/projects/project-1?taskId=task-1"][aria-label="Открыть сигнал: Просрочен авторский надзор"]'
+      );
+      expect(attentionLink?.textContent).toContain("Авторский надзор ЖК Север");
       expect(host.textContent).toContain("Ресурсные риски");
       expect(host.textContent).toContain("Анна Орлова");
       expect(host.textContent).toContain("46 ч · 2 просрочено");
