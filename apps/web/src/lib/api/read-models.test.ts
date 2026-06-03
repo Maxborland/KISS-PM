@@ -711,6 +711,8 @@ describe("runtime read model API", () => {
       method: "PATCH",
       body: expect.stringContaining('"next_action":"Созвониться с заказчиком"')
     });
+    expect(updateOpportunityCall?.[1]?.body).toContain('"plannedStart":"2026-06-01"');
+    expect(updateOpportunityCall?.[1]?.body).toContain('"plannedFinish":"2026-06-30"');
     const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
     expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });
     for (const [, init] of fetchMock.mock.calls) {

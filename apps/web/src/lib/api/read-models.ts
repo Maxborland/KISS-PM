@@ -526,7 +526,11 @@ export async function updateWorkspaceOpportunity(opportunity: Opportunity): Prom
     `/api/workspace/opportunities/${encodeURIComponent(opportunity.id)}`,
     {
       method: "PATCH",
-      json: opportunity
+      json: {
+        ...opportunity,
+        plannedStart: opportunity.plannedStart.slice(0, 10),
+        plannedFinish: opportunity.plannedFinish.slice(0, 10)
+      }
     }
   );
   return response.opportunity;
