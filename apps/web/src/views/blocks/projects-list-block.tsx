@@ -41,6 +41,7 @@ import { RoutePageIntro } from "@/views/layout/route-page-intro";
 export type ProjectsListBlockProps = {
   projects?: Project[];
   projectTemplates?: ProjectTemplate[];
+  getProjectHref?: (project: Project) => string;
   readOnly?: boolean;
 };
 
@@ -141,6 +142,7 @@ export function resolveProjectsListSources(
 export function ProjectsListBlock({
   projects,
   projectTemplates,
+  getProjectHref,
   readOnly = false
 }: ProjectsListBlockProps = {}) {
   const { fixtures } = useScenarioFixtures();
@@ -180,6 +182,15 @@ export function ProjectsListBlock({
     toast.success(`Проект «${createTitle.trim()}» создан (демо)`);
     setCreateTitle("");
     setCreateOpen(false);
+  };
+
+  const openProjectRow = (row: ProjectRow) => {
+    const href = getProjectHref?.(row);
+    if (href) {
+      window.location.assign(href);
+      return;
+    }
+    setOpenProjectId(row.id);
   };
 
   const intro = (
@@ -275,11 +286,11 @@ export function ProjectsListBlock({
                   "row-clickable",
                   index === 0 && filter === "active" && !query && "is-selected"
                 )}
-                onClick={() => setOpenProjectId(row.id)}
+                onClick={() => openProjectRow(row)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setOpenProjectId(row.id);
+                    openProjectRow(row);
                   }
                 }}
               >

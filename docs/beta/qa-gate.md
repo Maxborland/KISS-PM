@@ -43,13 +43,13 @@ Fast gate нужен для PR-sized beta slices, когда полный Storyb
 - `pnpm --filter @kiss-pm/web test`;
 - `pnpm exec playwright test --config playwright.config.ts e2e/runtime/runtime-foundation.spec.ts --grep @fast-pr-gate`.
 
-Route selection передается через `KISS_PM_FAST_ROUTES`; по умолчанию smoke открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals`.
+Route selection передается через `KISS_PM_FAST_ROUTES`; по умолчанию smoke открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/projects/project-beta-school-renovation`, `/deals`.
 
 `e2e/runtime/**` сейчас покрывает foundation, а не весь beta regression:
 
 - `e2e/runtime/runtimeQaFixtures.ts` включает guard на неожиданные `pageerror`, `console.error`, failed `document/script/fetch/xhr` requests и 4xx/5xx responses;
 - `e2e/runtime/runtime-foundation.spec.ts` логинится seeded admin пользователем, открывает runtime root, проверяет redirect на `/dashboard`, делает desktop и narrow screenshots;
-- `e2e/runtime/runtime-foundation.spec.ts` также открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals` и проверяет, что route не blank, не forbidden/error и не даёт горизонтальный overflow на desktop/narrow;
+- `e2e/runtime/runtime-foundation.spec.ts` также открывает `/dashboard`, `/my-work`, `/agent`, `/projects`, `/projects/project-beta-school-renovation`, `/deals` и проверяет, что route не blank, не forbidden/error и не даёт горизонтальный overflow на desktop/narrow;
 - `e2e/runtime/agent-confirmation.spec.ts` проверяет безопасный цикл агента: сообщение пользователя, proposal без silent mutation, явное `Применить`, result summary, audit marker и переход к созданной задаче в `/my-work`;
 - `e2e/runtime/storybook-visual-smoke.spec.ts` запускается только при `KISS_PM_STORYBOOK_QA=1`, открывает стабильные Storybook stories через `iframe.html?id=...` и снимает desktop/narrow screenshots approved design-v3 stories.
 
@@ -74,6 +74,8 @@ Route selection передается через `KISS_PM_FAST_ROUTES`; по ум
 - `runtime-agent-confirmation-applied.png`;
 - `runtime-projects-desktop.png`;
 - `runtime-projects-narrow.png`;
+- `runtime-projects-project-beta-school-renovation-desktop.png`;
+- `runtime-projects-project-beta-school-renovation-narrow.png`;
 - `runtime-deals-desktop.png`;
 - `runtime-deals-narrow.png`;
 - `tokens-desktop.png`;

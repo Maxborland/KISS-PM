@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { screenIdForPath } from "@/shell/navigation-registry";
+import { projectIdForRuntimePath, screenIdForPath } from "@/shell/navigation-registry";
 import { RuntimeScreen } from "@/shell/runtime-screen";
 
 export default async function RuntimePathPage({
@@ -12,7 +12,8 @@ export default async function RuntimePathPage({
 }) {
   const { runtimePath = [] } = await params;
   const resolvedSearchParams = await searchParams;
-  const screenId = screenIdForPath(`/${runtimePath.join("/")}`);
+  const runtimePathname = `/${runtimePath.join("/")}`;
+  const screenId = screenIdForPath(runtimePathname);
 
   if (!screenId) {
     notFound();
@@ -21,6 +22,7 @@ export default async function RuntimePathPage({
   return (
     <RuntimeScreen
       screenId={screenId}
+      projectId={projectIdForRuntimePath(runtimePathname) ?? undefined}
       initialTaskId={firstSearchParamValue(resolvedSearchParams?.taskId)}
     />
   );

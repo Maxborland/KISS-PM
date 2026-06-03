@@ -31,7 +31,8 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "20-agent-cockpit",
   "02-my-work",
   "05-deals",
-  "07-projects-list"
+  "07-projects-list",
+  "07b-project-detail"
 ] as const satisfies readonly ScreenId[];
 
 const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
@@ -280,12 +281,12 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   "07b-project-detail": route({
     id: "07b-project-detail",
     storyTitle: "07b Карточка проекта",
-    pageTitle: MOCK_PROJECT_CRM,
-    lead: "PRJ-2026-014 · ООО «Ромашка»",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }],
+    pageTitle: "Проект",
+    lead: "Живая карточка проекта: сроки, статус, задачи и ответственные.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта", current: true }],
     railSection: "projects",
     contextActiveItem: "Все проекты",
-    path: "/projects/demo",
+    path: "/projects/:projectId",
     requiredPermissions: ["tenant.projects.read"]
   }),
   "08-entities-clients": route({
@@ -503,7 +504,19 @@ export function normalizeRuntimePath(path: string): string {
 }
 
 export function screenIdForPath(path: string): ScreenId | null {
-  return SCREEN_ID_BY_PATH[normalizeRuntimePath(path)] ?? null;
+  const normalized = normalizeRuntimePath(path);
+  return SCREEN_ID_BY_PATH[normalized] ?? screenIdForDynamicRuntimePath(normalized);
+}
+
+export function projectIdForRuntimePath(path: string): string | null {
+  const [, section, projectId, ...rest] = normalizeRuntimePath(path).split("/");
+  if (section !== "projects" || rest.length > 0) return null;
+  if (!projectId || projectId === "demo" || projectId.startsWith(":")) return null;
+  return projectId;
+}
+
+function screenIdForDynamicRuntimePath(path: string): ScreenId | null {
+  return projectIdForRuntimePath(path) ? "07b-project-detail" : null;
 }
 
 export function pathForScreenId(id: ScreenId): string | null {
