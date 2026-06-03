@@ -18,16 +18,20 @@ test("project detail task create persists after reload", async ({ page }, testIn
   await page.goto("/projects/project-beta-school-renovation");
   await expect(page.getByRole("heading", { name: "Школа на 600 мест — реконструкция" })).toBeVisible();
 
-  await page.getByLabel("Название").fill(taskTitle);
-  await page.getByLabel("Срок").fill("2026-06-07");
-  await page.getByRole("button", { name: "Создать задачу" }).click();
+  await page.getByRole("textbox", { name: "Название *" }).fill(taskTitle);
+  await page.getByRole("textbox", { name: "Срок *" }).fill("2026-06-07");
+  await page.locator("form#project-task-create-form").getByRole("button", { name: "Создать задачу" }).click();
 
-  await expect(page.getByRole("row", { name: new RegExp(taskTitle) })).toBeVisible();
+  const createdRow = page.getByRole("row", { name: new RegExp(taskTitle) });
+  await expect(createdRow).toBeVisible();
+  await expect(createdRow.getByLabel(`Срок задачи ${taskTitle}`)).toHaveValue("2026-06-07");
 
   const createdScreenshotPath = testInfo.outputPath("runtime-project-detail-task-created.png");
   await page.screenshot({ fullPage: true, path: createdScreenshotPath });
   expect(statSync(createdScreenshotPath).size).toBeGreaterThan(8_000);
 
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(taskTitle) })).toBeVisible();
+  const reloadedRow = page.getByRole("row", { name: new RegExp(taskTitle) });
+  await expect(reloadedRow).toBeVisible();
+  await expect(reloadedRow.getByLabel(`Срок задачи ${taskTitle}`)).toHaveValue("2026-06-07");
 });
