@@ -34,6 +34,7 @@ const readModelHooks = vi.hoisted(() => ({
   createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
   postWorkspaceTaskComment: vi.fn(),
+  updateWorkspaceAccessRolePermission: vi.fn(),
   updateWorkspaceUserStatus: vi.fn(),
   updateWorkspaceTaskFields: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
@@ -47,6 +48,7 @@ vi.mock("@/lib/api/read-models", () => ({
   fetchWorkspaceProjects: readModelHooks.fetchWorkspaceProjects,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   postWorkspaceTaskComment: readModelHooks.postWorkspaceTaskComment,
+  updateWorkspaceAccessRolePermission: readModelHooks.updateWorkspaceAccessRolePermission,
   updateWorkspaceUserStatus: readModelHooks.updateWorkspaceUserStatus,
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
@@ -429,10 +431,42 @@ vi.mock("@/views/blocks/admin-users-runtime-block", () => ({
 }));
 
 vi.mock("@/views/blocks/admin-access-roles-runtime-block", () => ({
-  AdminAccessRolesRuntimeBlock: ({ accessRoles }: { accessRoles: { name: string }[] }) =>
+  AdminAccessRolesRuntimeBlock: ({
+    accessRoles,
+    currentAccessProfileId,
+    onChangeRolePermission,
+    permissionActionError,
+    permissionActionPending
+  }: {
+    accessRoles: { id: string; name: string; permissions?: string[] }[];
+    currentAccessProfileId?: string;
+    onChangeRolePermission?: (input: {
+      enabled: boolean;
+      permission: string;
+      role: { id: string; name: string; permissions?: string[] };
+    }) => Promise<unknown>;
+    permissionActionError?: unknown;
+    permissionActionPending?: boolean;
+  }) =>
     createElement(
-      "div",
-      { "data-testid": "runtime-admin-access-roles" },
+      "button",
+      {
+        "data-current-access-profile-id": currentAccessProfileId ?? "",
+        "data-error": permissionActionError ? "true" : "false",
+        "data-has-permission-action": String(Boolean(onChangeRolePermission)),
+        "data-pending": String(permissionActionPending),
+        "data-testid": "runtime-admin-access-roles",
+        onClick: () => {
+          const role = accessRoles[0];
+          if (role) {
+            void onChangeRolePermission?.({
+              role,
+              permission: "tenant.projects.read",
+              enabled: false
+            });
+          }
+        }
+      },
       accessRoles.map((role) => role.name).join(", ")
     )
 }));
@@ -529,6 +563,10 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.taskActivity.mockReturnValue(successQuery({ activities: [] }));
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.postWorkspaceTaskComment.mockResolvedValue({ id: "activity-runtime" });
+    readModelHooks.updateWorkspaceAccessRolePermission.mockResolvedValue({
+      id: "access-profile-alpha-project-team",
+      permissions: []
+    });
     readModelHooks.updateWorkspaceUserStatus.mockResolvedValue({ id: "usr-2", status: "inactive" });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({ id: "task-runtime" });
@@ -1240,13 +1278,73 @@ describe("RuntimeDataScreen permission gate", () => {
       createElement(RuntimeDataScreen, {
         screenId: "09-admin-roles",
         permissions: ["tenant.access_profiles.read"],
+        currentAccessProfileId: "access-profile-alpha-admin",
         currentUserId: "usr-1"
       })
     );
 
     expect(host.textContent).toContain("Runtime Role");
     expect(host.textContent).not.toContain("fixture fallback");
+    expect(
+      host.querySelector("[data-testid='runtime-admin-access-roles']")?.getAttribute("data-has-permission-action")
+    ).toBe("false");
     expect(readModelHooks.adminAccessRoles).toHaveBeenCalled();
+  });
+
+  it("updates admin role project access through the workspace access-role API and refreshes roles plus audit", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const refetch = vi.fn();
+    readModelHooks.adminAccessRoles.mockReturnValue(
+      successQuery(
+        {
+          accessRoles: [
+            {
+              id: "access-profile-alpha-project-team",
+              name: "Проектная команда",
+              permissions: ["tenant.projects.read"]
+            }
+          ]
+        },
+        { refetch }
+      )
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin-roles",
+        permissions: ["tenant.access_profiles.read", "tenant.access_profiles.manage"],
+        currentAccessProfileId: "access-profile-alpha-admin",
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(
+      host.querySelector("[data-testid='runtime-admin-access-roles']")?.getAttribute("data-current-access-profile-id")
+    ).toBe("access-profile-alpha-admin");
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-admin-access-roles']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceAccessRolePermission).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceAccessRolePermission).toHaveBeenCalledWith(
+      {
+        enabled: false,
+        permission: "tenant.projects.read",
+        role: {
+          id: "access-profile-alpha-project-team",
+          name: "Проектная команда",
+          permissions: ["tenant.projects.read"]
+        }
+      },
+      expect.anything()
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.accessRoles });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    expect(refetch).toHaveBeenCalled();
+    invalidateSpy.mockRestore();
   });
 
   it("renders clients from the runtime clients read model without fixture fallback", async () => {

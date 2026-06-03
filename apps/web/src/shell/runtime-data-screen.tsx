@@ -17,6 +17,7 @@ import {
   fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
   postWorkspaceTaskComment,
+  updateWorkspaceAccessRolePermission,
   updateWorkspaceUserStatus,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
@@ -81,6 +82,7 @@ export function RuntimeDataScreen({
   dealId,
   projectId,
   currentUserId,
+  currentAccessProfileId,
   initialTaskId
 }: {
   screenId: ScreenId;
@@ -88,6 +90,7 @@ export function RuntimeDataScreen({
   dealId?: string | undefined;
   projectId?: string | undefined;
   currentUserId?: string | undefined;
+  currentAccessProfileId?: string | undefined;
   initialTaskId?: string | undefined;
 }) {
   if (!canOpenStaticRuntimeScreen(screenId, permissions)) {
@@ -202,7 +205,10 @@ export function RuntimeDataScreen({
   if (screenId === "09-admin-roles") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeAdminAccessRolesScreen />
+        <RuntimeAdminAccessRolesScreen
+          currentAccessProfileId={currentAccessProfileId}
+          permissions={permissions}
+        />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -936,8 +942,24 @@ function RuntimeAdminUsersScreen({
   ) : null;
 }
 
-function RuntimeAdminAccessRolesScreen() {
+function RuntimeAdminAccessRolesScreen({
+  currentAccessProfileId,
+  permissions
+}: {
+  currentAccessProfileId?: string | undefined;
+  permissions: readonly string[];
+}) {
+  const queryClient = useQueryClient();
   const query = useAdminAccessRolesReadModelQuery();
+  const canManageAccessRoles = hasPermission(permissions, "tenant.access_profiles.manage");
+  const updateRolePermission = useMutation({
+    mutationFn: updateWorkspaceAccessRolePermission,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.accessRoles });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+      void query.refetch();
+    }
+  });
 
   if (query.isPending || query.isFetching) {
     return <LoadingState layout="table" level="L1" label="Загружаем роли…" />;
@@ -954,7 +976,19 @@ function RuntimeAdminAccessRolesScreen() {
     );
   }
 
-  return query.data ? <AdminAccessRolesRuntimeBlock accessRoles={query.data.accessRoles} /> : null;
+  return query.data ? (
+    <AdminAccessRolesRuntimeBlock
+      accessRoles={query.data.accessRoles}
+      currentAccessProfileId={currentAccessProfileId}
+      permissionActionError={updateRolePermission.error}
+      permissionActionPending={updateRolePermission.isPending}
+      {...(canManageAccessRoles
+        ? {
+            onChangeRolePermission: (input) => updateRolePermission.mutateAsync(input)
+          }
+        : {})}
+    />
+  ) : null;
 }
 
 function RuntimeClientsScreen() {
