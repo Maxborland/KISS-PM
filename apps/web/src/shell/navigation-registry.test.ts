@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canOpenRuntimePath,
   contextNavForSection,
+  dealIdForRuntimePath,
   pathForScreenId,
   RAIL_SECTIONS,
   railSectionsForPermissions,
@@ -43,6 +44,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/agent")).toBe("20-agent-cockpit");
     expect(screenIdForPath("/my-work")).toBe("02-my-work");
     expect(screenIdForPath("/deals")).toBe("05-deals");
+    expect(screenIdForPath("/deals/opportunity-alpha")).toBe("06-deal-card");
     expect(screenIdForPath("/directories/clients")).toBe("08-entities-clients");
     expect(screenIdForPath("/directories/contacts")).toBe("08-entities-contacts");
     expect(screenIdForPath("/directories/products")).toBe("08-entities-products");
@@ -59,6 +61,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
     expect(pathForScreenId("20-agent-cockpit")).toBe("/agent");
     expect(pathForScreenId("05-deals")).toBe("/deals");
+    expect(pathForScreenId("06-deal-card")).toBe("/deals/:dealId");
     expect(pathForScreenId("08-entities-clients")).toBe("/directories/clients");
     expect(pathForScreenId("08-entities-contacts")).toBe("/directories/contacts");
     expect(pathForScreenId("08-entities-products")).toBe("/directories/products");
@@ -86,7 +89,21 @@ describe("navigation-registry", () => {
     expect(canOpenRuntimePath("/showcase/spacing", ["tenant.projects.read"])).toBe(false);
     expect(canOpenRuntimePath("/projects/demo", ["tenant.projects.read"])).toBe(false);
     expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
+    expect(canOpenRuntimePath("/deals/demo/DEAL-101", ["tenant.opportunities.read", "tenant.deal_stages.read"])).toBe(false);
     expect(canOpenRuntimePath("/settings", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("extracts real deal ids from dynamic runtime paths", () => {
+    expect(dealIdForRuntimePath("/deals/opportunity-alpha")).toBe("opportunity-alpha");
+    expect(dealIdForRuntimePath("/deals/demo/DEAL-101")).toBeNull();
+    expect(dealIdForRuntimePath("/deals/:dealId")).toBeNull();
+  });
+
+  it("allows real deal detail paths only for opportunity and deal stage readers", () => {
+    expect(canOpenRuntimePath("/deals/opportunity-alpha", ["tenant.opportunities.read"])).toBe(false);
+    expect(
+      canOpenRuntimePath("/deals/opportunity-alpha", ["tenant.opportunities.read", "tenant.deal_stages.read"])
+    ).toBe(true);
   });
 
   it("allows real project detail paths for project readers", () => {

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { projectIdForRuntimePath, screenIdForPath } from "@/shell/navigation-registry";
+import { dealIdForRuntimePath, projectIdForRuntimePath, screenIdForPath } from "@/shell/navigation-registry";
 import { RuntimeScreen } from "@/shell/runtime-screen";
 
 export default async function RuntimePathPage({
@@ -22,6 +22,7 @@ export default async function RuntimePathPage({
   return (
     <RuntimeScreen
       screenId={screenId}
+      dealId={dealIdForRuntimePath(runtimePathname) ?? undefined}
       projectId={projectIdForRuntimePath(runtimePathname) ?? undefined}
       initialTaskId={firstSearchParamValue(resolvedSearchParams?.taskId)}
     />

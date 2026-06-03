@@ -21,6 +21,7 @@ import {
   useClientsReadModelQuery,
   useContactsReadModelQuery,
   useDashboardReadModelQueries,
+  useDealDetailReadModelQuery,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
   useProductsReadModelQuery,
@@ -35,6 +36,7 @@ import {
 import { buildProjectTimelineGanttData } from "@/lib/runtime/project-timeline";
 import { buildProjectResourceMatrixData } from "@/lib/runtime/project-resources";
 import { DealsBlock } from "@/views/blocks/deals-block";
+import { DealDetailRuntimeBlock } from "@/views/blocks/deal-detail-runtime-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import {
   ProjectDetailBlock,
@@ -70,12 +72,14 @@ export function canOpenStaticRuntimeScreen(
 export function RuntimeDataScreen({
   screenId,
   permissions = [],
+  dealId,
   projectId,
   currentUserId,
   initialTaskId
 }: {
   screenId: ScreenId;
   permissions?: readonly string[];
+  dealId?: string | undefined;
   projectId?: string | undefined;
   currentUserId?: string | undefined;
   initialTaskId?: string | undefined;
@@ -121,6 +125,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeAgentScreen currentUserId={currentUserId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "06-deal-card") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeDealDetailScreen dealId={dealId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -544,6 +556,48 @@ function RuntimeDealsScreen() {
   const deals = readModel.data ? buildFunnelDeals(readModel.data.opportunities) : [];
 
   return <DealsBlock initialDeals={deals} stages={stages} readOnly />;
+}
+
+function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
+  const query = useDealDetailReadModelQuery(dealId);
+
+  if (!dealId) {
+    return (
+      <ErrorState
+        level="L1"
+        title="Сделка не выбрана"
+        description="Откройте сделку из воронки или проверьте адрес страницы."
+      />
+    );
+  }
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем сделку…" />;
+  }
+
+  if (query.error) {
+    if (query.error instanceof ApiError && query.error.body.error === "opportunity_not_found") {
+      return (
+        <ErrorState
+          level="L1"
+          title="Сделка не найдена"
+          description="Проверьте ссылку или вернитесь к воронке сделок."
+          onRetry={() => void query.refetch()}
+        />
+      );
+    }
+
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить сделку"
+        forbiddenTitle="Нет доступа к сделке"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <DealDetailRuntimeBlock opportunity={query.data.opportunity} /> : null;
 }
 
 function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | undefined }) {

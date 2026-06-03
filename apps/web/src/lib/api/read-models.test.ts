@@ -17,6 +17,7 @@ import {
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
+  fetchWorkspaceOpportunity,
   fetchWorkspaceProjectDetail,
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
@@ -35,6 +36,7 @@ import {
   useContactsReadModelQuery,
   useProductsReadModelQuery,
   useDashboardReadModelQueries,
+  useDealDetailReadModelQuery,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
   useProjectDetailReadModelQuery,
@@ -66,6 +68,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
+    expect(queryKeys.workspace.opportunity("opp-1")).toEqual(["workspace", "opportunities", "opp-1"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
     expect(queryKeys.tenant.currentAuditEvents).toEqual(["tenant", "current", "audit-events"]);
     expect(queryKeys.tenant.currentScheduledTasks("usr-1", "2026-05-30", "2026-05-30")).toEqual([
@@ -165,6 +168,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/my-work") return json({ tasks: [{ id: "task-1" }] });
       if (path === "/api/workspace/opportunities") {
         return json({ opportunities: [{ id: "opp-1" }] });
+      }
+      if (path === "/api/workspace/opportunities/opp-1") {
+        return json({ opportunity: { id: "opp-1", title: "Runtime deal" } });
       }
       if (path === "/api/workspace/deal-stages") {
         return json({ dealStages: [{ id: "lead" }] });
@@ -319,6 +325,7 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
+    await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
     await expect(fetchWorkspaceAgentThread()).resolves.toMatchObject({
       thread: {
@@ -423,6 +430,7 @@ describe("runtime read model API", () => {
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
+      "/api/workspace/opportunities/opp-1",
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
       "/api/workspace/operations-cockpit",
@@ -829,6 +837,59 @@ describe("runtime read model API", () => {
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
         "/api/workspace/project-types"
       );
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads a deal detail from the workspace opportunity detail endpoint without board catalogs or fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/opportunities/opportunity-live") {
+        return json({ opportunity: { id: "opportunity-live", title: "Runtime detail deal" } });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function DealDetailProbe() {
+      const readModel = useDealDetailReadModelQuery("opportunity-live");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(DealDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            opportunity: { id: "opportunity-live", title: "Runtime detail deal" }
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        "/api/workspace/opportunities/opportunity-live"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/deals");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/deal-stages");
     } finally {
       act(() => root.unmount());
       queryClient.clear();

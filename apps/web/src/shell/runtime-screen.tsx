@@ -14,10 +14,12 @@ import { RuntimeDataScreen } from "@/shell/runtime-data-screen";
 import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
 export function RuntimeScreen({
+  dealId,
   screenId,
   projectId,
   initialTaskId
 }: {
+  dealId?: string | undefined;
   screenId: ScreenId;
   projectId?: string | undefined;
   initialTaskId?: string | undefined;
@@ -29,6 +31,7 @@ export function RuntimeScreen({
   return (
     <AuthenticatedRuntimeScreen
       screenId={screenId}
+      dealId={dealId}
       projectId={projectId}
       initialTaskId={initialTaskId}
     />
@@ -36,10 +39,12 @@ export function RuntimeScreen({
 }
 
 function AuthenticatedRuntimeScreen({
+  dealId,
   screenId,
   projectId,
   initialTaskId
 }: {
+  dealId?: string | undefined;
   screenId: ScreenId;
   projectId?: string | undefined;
   initialTaskId?: string | undefined;
@@ -117,6 +122,7 @@ function AuthenticatedRuntimeScreen({
   return (
     <RuntimeDataScreen
       screenId={screenId}
+      dealId={dealId}
       projectId={projectId}
       permissions={authQuery.data?.permissions ?? []}
       currentUserId={authQuery.data.user.id}

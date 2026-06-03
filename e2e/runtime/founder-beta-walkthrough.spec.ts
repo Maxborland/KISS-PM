@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: deal detail and handoff runtime flow is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, admin roles, clients, contacts and products, but still needs live deal detail/handoff proof."
+    "Current blocker: deal-to-project handoff action is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, admin roles, clients, contacts, products and live deal detail, but still needs activation/handoff proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -96,5 +96,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("deal detail must be a live runtime route for handoff proof", async () => {
     await page.goto("/deals/opportunity-beta-school-renovation");
     await expect(page.getByRole("heading", { name: /Сделка/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Школа на 600 мест/ })).toBeVisible();
+  });
+
+  await test.step("deal handoff must create or open a real project", async () => {
+    await expect(page.getByRole("button", { name: /Передать в проект/ })).toBeVisible();
   });
 });

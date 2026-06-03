@@ -19,6 +19,7 @@ const readModelHooks = vi.hoisted(() => ({
   clients: vi.fn(),
   contacts: vi.fn(),
   dashboard: vi.fn(),
+  dealDetail: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
   products: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock("@/lib/api/read-models", () => ({
   useClientsReadModelQuery: readModelHooks.clients,
   useContactsReadModelQuery: readModelHooks.contacts,
   useDashboardReadModelQueries: readModelHooks.dashboard,
+  useDealDetailReadModelQuery: readModelHooks.dealDetail,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
   useProductsReadModelQuery: readModelHooks.products,
@@ -105,6 +107,11 @@ vi.mock("@/views/blocks/my-work-block", () => ({
       },
       tasks.map((task) => task.title).join(", ")
     )
+}));
+
+vi.mock("@/views/blocks/deal-detail-runtime-block", () => ({
+  DealDetailRuntimeBlock: ({ opportunity }: { opportunity: { title: string } }) =>
+    createElement("div", { "data-testid": "runtime-deal-detail" }, opportunity.title)
 }));
 
 vi.mock("@/views/blocks/projects-list-block", () => ({
@@ -329,6 +336,7 @@ describe("RuntimeDataScreen permission gate", () => {
       })
     );
     readModelHooks.deals.mockReturnValue(successReadModel({ opportunities: [], dealStages: [] }));
+    readModelHooks.dealDetail.mockReturnValue(successQuery({ opportunity: { id: "opportunity-runtime", title: "Runtime deal" } }));
     readModelHooks.agent.mockReturnValue(
       {
         data: {
@@ -416,6 +424,30 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("01-dashboard", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("20-agent-cockpit", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("02-my-work", ["tenant.projects.read"])).toBe(true);
+  });
+
+  it("renders deal detail from the runtime opportunity detail read model without fixture fallback", async () => {
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime deal detail");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.dealDetail).toHaveBeenCalledWith("opportunity-runtime");
   });
 
   it("renders dashboard from runtime read models without fixture fallback", async () => {

@@ -88,6 +88,10 @@ export type DealsBoardReadModel = {
   dealStages: DealStage[];
 };
 
+export type DealDetailReadModel = {
+  opportunity: Opportunity;
+};
+
 export type MyWorkReadModel = {
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
@@ -441,6 +445,14 @@ export async function fetchWorkspaceOpportunities(): Promise<Opportunity[]> {
     { method: "GET" }
   );
   return response.opportunities;
+}
+
+export async function fetchWorkspaceOpportunity(opportunityId: string): Promise<Opportunity> {
+  const response = await apiFetch<{ opportunity: Opportunity }>(
+    `/api/workspace/opportunities/${encodeURIComponent(opportunityId)}`,
+    { method: "GET" }
+  );
+  return response.opportunity;
 }
 
 export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
@@ -864,4 +876,25 @@ export function useDealsBoardReadModelQueries() {
       : undefined;
 
   return aggregateQueries<DealsBoardReadModel>(queries, data);
+}
+
+export function useDealDetailReadModelQuery(opportunityId: string | undefined) {
+  const query = useQuery({
+    enabled: Boolean(opportunityId),
+    queryKey: opportunityId ? queryKeys.workspace.opportunity(opportunityId) : queryKeys.workspace.opportunity(""),
+    queryFn: () => {
+      if (!opportunityId) throw new Error("opportunity_id_required");
+      return fetchWorkspaceOpportunity(opportunityId);
+    }
+  });
+
+  return {
+    data: query.data ? { opportunity: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
 }
