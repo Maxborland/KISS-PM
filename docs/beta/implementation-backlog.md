@@ -17,7 +17,7 @@
 | Deal detail / handoff | `/deals/:id` | SALES-03, FIN-01 | wired+handoff | Runtime detail и handoff есть; нужны client/deal create/edit, better failure UX и screenshots | `runtime-data-screen.test.ts`, route smoke |
 | Clients | `/directories/clients` | SALES-01 | wired/read-only | Runtime list есть; нужны create/update/duplicate/validation flows | `pnpm qa:fast` route smoke |
 | Contacts | `/directories/contacts` | SALES-01 | wired/read-only | Runtime list есть; нужны create/update/link-to-client flows | `pnpm qa:fast` route smoke |
-| Admin | `/admin/users`, `/admin/roles`, `/admin/audit` | ADMIN-01 | wired/read-only | Runtime lists есть; нужны mutations proving roles affect behavior and audit/admin screenshots | `pnpm qa:fast` route smoke |
+| Admin | `/admin/users`, `/admin/roles`, `/admin/audit` | ADMIN-01 | wired+mutations+visual | User deactivate/reactivate persists, role permission mutation changes runtime access and audit, admin desktop/narrow screenshots pass; remaining gap is deeper role matrix/user filters | `admin-user-status.spec.ts`, `admin-role-permissions.spec.ts`, `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`, `pnpm qa:fast` route smoke |
 | Finance | TBD | FIN-01 | deferred | Активный beta scope не подтвержден; не блокировать если finance hidden/deferred явно | нет |
 
 ## P0 gaps
@@ -104,6 +104,11 @@
    - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
    - Evidence: negative no-mutation-before-confirm and positive confirmed mutation proof.
 
+8. **Admin mutations and audit surfaces**
+   - Status: runtime admin users/roles/audit routes have live mutation proof and desktop/narrow screenshot evidence.
+   - Evidence now: `admin-user-status.spec.ts`, `admin-role-permissions.spec.ts`, `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`.
+   - Beta evidence still required: deeper role matrix/user filters and extra failure-state polish.
+
 ## Текущий evidence snapshot
 
 - `origin/design-v3` `846434f`: includes Wave 1 route inventory, beta seed/reset, fast gate, deal stage mutation, PR #73 My Work status action, owner/due/comment proof and blocker-gap proof slices.
@@ -123,6 +128,9 @@
 - `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`: resources desktop and narrow screenshots pass using shared ResourceMatrix core.
 - `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `deal-stage-mutation.spec.ts`: seeded deal stage changes through runtime `/deals` DnD and remains changed after reload.
+- `admin-user-status.spec.ts`: admin deactivates a workspace user, status persists after reload, and action remains reversible.
+- `admin-role-permissions.spec.ts`: admin removes `tenant.projects.read` from the project-team role, architect loses `/projects` access after relogin, and audit captures the permission update.
+- `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`: admin users, roles, and audit routes pass desktop and narrow screenshot capture.
 - `runtime-data-screen.test.ts`: read-only `/deals` users do not receive the stage mutation handler unless they have `tenant.opportunities.manage`.
 - `pnpm db:reset:dev`: resets only the documented compose dev database by default, then seeds and checks beta fixture counts.
 - `my-work-block.test.tsx`: status DnD is exposed only for transition-capable roles or `tenant.projects.manage`; `approver`/`observer` cards remain visible but not draggable.
