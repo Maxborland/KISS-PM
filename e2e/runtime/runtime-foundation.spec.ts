@@ -1,4 +1,5 @@
 import { statSync } from "node:fs";
+import type { Page } from "@playwright/test";
 
 import { expect, test } from "./runtimeQaFixtures";
 import { betaRuntimeRoutes } from "../../scripts/beta-runtime-routes.mjs";
@@ -43,6 +44,7 @@ test("authenticated runtime root renders dashboard without runtime errors @fast-
   await expect(page).toHaveTitle(/KISS PM/);
   await expect(page.getByRole("heading", { name: "Добро пожаловать, Камил" })).toBeVisible();
   await expect(page.getByText("Живая сводка по проектам")).toBeVisible();
+  await expectSeededDashboardAttention(page);
 
   const desktopScreenshotPath = testInfo.outputPath("runtime-foundation-desktop.png");
   await page.screenshot({ fullPage: true, path: desktopScreenshotPath });
@@ -100,6 +102,7 @@ test("authenticated beta runtime routes open without blank or error states @fast
     await expect(page.locator("body")).toContainText(route.marker);
     if (route.path === "/dashboard") {
       await expect(page.getByRole("link", { name: "Агент", exact: true })).toBeVisible();
+      await expectSeededDashboardAttention(page);
     }
     if (route.path === "/agent") {
       await expect(page.getByLabel("Единый управленческий агент")).toBeVisible();
@@ -117,3 +120,12 @@ test("authenticated beta runtime routes open without blank or error states @fast
     expect(hasHorizontalOverflow, route.path).toBe(false);
   }
 });
+
+async function expectSeededDashboardAttention(page: Page) {
+  await expect(page.getByText("Что требует внимания").first()).toBeVisible();
+  await expect(page.getByText("Ресурсные риски").first()).toBeVisible();
+  await expect(page.getByText("Давление воронки").first()).toBeVisible();
+  await expect(page.getByText("Школа на 600 мест — реконструкция").first()).toBeVisible();
+  await expect(page.getByText("Согласовать пожарные требования").first()).toBeVisible();
+  await expect(page.getByText("ГК Северный квартал").first()).toBeVisible();
+}
