@@ -143,6 +143,7 @@ export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   commentActionPending?: boolean;
   taskFieldActionError?: unknown;
   taskFieldActionPending?: boolean;
+  taskStatusActionError?: unknown;
   isMovingTaskStatus?: boolean;
   onAddTaskComment?: (input: { taskId: string; body: string }) => Promise<unknown> | void;
   onOpenTaskChange?: (taskId: string | undefined) => void;
@@ -234,6 +235,7 @@ export function RuntimeMyWorkBlock({
   commentActionPending = false,
   taskFieldActionError,
   taskFieldActionPending = false,
+  taskStatusActionError,
   isMovingTaskStatus = false,
   onAddTaskComment,
   onOpenTaskChange,
@@ -259,6 +261,7 @@ export function RuntimeMyWorkBlock({
       commentActionPending={commentActionPending}
       taskFieldActionError={taskFieldActionError}
       taskFieldActionPending={taskFieldActionPending}
+      taskStatusActionError={taskStatusActionError}
       isMovingTaskStatus={isMovingTaskStatus}
       {...(onAddTaskComment ? { onAddTaskComment } : {})}
       {...(onOpenTaskChange ? { onOpenTaskChange } : {})}
@@ -288,6 +291,7 @@ function MyWorkBlockInner({
   commentActionPending = false,
   taskFieldActionError,
   taskFieldActionPending = false,
+  taskStatusActionError,
   isMovingTaskStatus = false,
   onAddTaskComment,
   onOpenTaskChange,
@@ -565,6 +569,7 @@ function MyWorkBlockInner({
                 ownerUserId: openTask?.ownerUserId,
                 plannedFinish: openTask?.plannedFinish,
                 statusCategory: openTask?.statusCategory,
+                statusId: openTask?.statusId,
                 statusName: openTask?.statusName,
                 ...(openCard.meta?.find((meta) => meta.label.startsWith("Проект:"))?.label.replace("Проект: ", "")
                   ? {
@@ -588,6 +593,10 @@ function MyWorkBlockInner({
         canEditTaskFields={runtime && canManageProjectTasks}
         fieldActionError={runtime ? taskFieldActionError : undefined}
         fieldActionPending={runtime ? taskFieldActionPending : undefined}
+        canEditTaskStatus={runtime && canManageProjectTasks}
+        statusActionError={runtime ? taskStatusActionError : undefined}
+        statusActionPending={runtime ? isMovingTaskStatus : undefined}
+        taskStatuses={runtime ? sourceTaskStatuses : undefined}
         workspaceUsers={runtime ? workspaceUsers : undefined}
         {...(runtime && onAddTaskComment && openCard
           ? {
@@ -598,6 +607,16 @@ function MyWorkBlockInner({
           ? {
               onUpdateTaskFields: (fields: { dueDate?: string | undefined; ownerUserId?: string | undefined }) =>
                 onUpdateTaskFields(openTask, fields)
+            }
+          : {})}
+        {...(runtime && onMoveTaskStatus && openTask
+          ? {
+              onUpdateTaskStatus: (statusId: string) =>
+                onMoveTaskStatus({
+                  projectId: openTask.projectId,
+                  taskId: openTask.id,
+                  statusId
+                })
             }
           : {})}
       />

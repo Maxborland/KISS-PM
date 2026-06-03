@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ScheduledTask, Task, TaskActivity, WorkspaceUser } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskActivity, TaskStatus, WorkspaceUser } from "@/lib/api-types";
 import {
   RuntimeMyWorkBlock,
   canTransitionTaskStatus,
@@ -235,6 +235,27 @@ describe("RuntimeMyWorkBlock", () => {
     expect(comments).toEqual([{ body: "Runtime drawer comment", taskId: "task-comment" }]);
   });
 
+  it("exposes a runtime status action in the task drawer when project task management is allowed", async () => {
+    await renderRuntimeMyWork([makeTask({ id: "task-status-action", title: "Runtime status task" })], {
+      canManageProjectTasks: true,
+      onMoveTaskStatus: async () => undefined,
+      taskStatuses: [
+        makeTaskStatus({ id: "task-status-in-progress", category: "in_progress", status: "active", sortOrder: 2 }),
+        makeTaskStatus({ id: "task-status-review", category: "review", status: "active", sortOrder: 3 })
+      ]
+    });
+
+    await act(async () => {
+      host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-status-action"]')?.click();
+    });
+
+    expect(
+      document.body.querySelector<HTMLButtonElement>('button[aria-label="Статус задачи Runtime status task"]')
+    ).not.toBeNull();
+    expect(document.body.textContent).not.toContain("Согласовать ТЗ");
+    expect(document.body.textContent).not.toContain("DataHub KPI");
+  });
+
   it("exposes owner and due actions in the runtime task drawer only for project managers", async () => {
     const updates: Array<{
       taskId: string;
@@ -347,6 +368,7 @@ describe("RuntimeMyWorkBlock", () => {
       onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
       scheduledTasks?: ScheduledTask[];
       taskActivities?: TaskActivity[];
+      taskStatuses?: TaskStatus[];
       workspaceUsers?: WorkspaceUser[];
     } = {}
   ) {
@@ -365,6 +387,7 @@ describe("RuntimeMyWorkBlock", () => {
             readOnly
             scheduledTasks={options.scheduledTasks ?? []}
             taskActivities={options.taskActivities ?? []}
+            taskStatuses={options.taskStatuses ?? []}
             tasks={tasks}
             workspaceUsers={options.workspaceUsers ?? []}
             currentUserId={options.currentUserId}

@@ -417,6 +417,7 @@ function RuntimeMyWorkScreen({
       commentActionPending={postTaskComment.isPending}
       taskFieldActionError={updateTaskFields.error}
       taskFieldActionPending={updateTaskFields.isPending}
+      taskStatusActionError={updateTaskStatus.error}
       isMovingTaskStatus={updateTaskStatus.isPending}
       onAddTaskComment={(input) => postTaskComment.mutateAsync(input)}
       onOpenTaskChange={setActivityTaskId}

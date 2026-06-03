@@ -24,7 +24,7 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaskActivity, TaskStatusCategory, WorkspaceUser } from "@/lib/api-types";
+import type { TaskActivity, TaskStatus, TaskStatusCategory, WorkspaceUser } from "@/lib/api-types";
 import { EntityDetailBlock } from "@/views/blocks/entity-detail-block";
 import { mockTaskProjectRef } from "@/views/catalog";
 
@@ -35,6 +35,7 @@ export type TaskDetailTask = {
   ownerUserId?: string | undefined;
   plannedFinish?: string | undefined;
   statusCategory?: TaskStatusCategory | undefined;
+  statusId?: string | undefined;
   statusName?: string | undefined;
   stage?: { label: string; tone?: "info" | "violet" | "success" | "warning" };
   project?: string | undefined;
@@ -57,8 +58,13 @@ export type TaskDetailDrawerProps = {
   canEditTaskFields?: boolean | undefined;
   fieldActionError?: unknown;
   fieldActionPending?: boolean | undefined;
+  canEditTaskStatus?: boolean | undefined;
+  statusActionError?: unknown;
+  statusActionPending?: boolean | undefined;
   onAddComment?: ((body: string) => Promise<unknown> | void) | undefined;
+  onUpdateTaskStatus?: ((statusId: string) => Promise<unknown> | void) | undefined;
   onUpdateTaskFields?: ((fields: TaskDetailFieldsUpdateInput) => Promise<unknown> | void) | undefined;
+  taskStatuses?: TaskStatus[] | undefined;
   workspaceUsers?: WorkspaceUser[] | undefined;
   /**
    * Маршрут на полноценную страницу карточки задачи. В Storybook ведёт на
@@ -78,10 +84,15 @@ export function TaskDetailDrawer({
   commentError,
   commentPending = false,
   canEditTaskFields = false,
+  canEditTaskStatus = false,
   fieldActionError,
   fieldActionPending = false,
+  statusActionError,
+  statusActionPending = false,
   onAddComment,
+  onUpdateTaskStatus,
   onUpdateTaskFields,
+  taskStatuses = [],
   task,
   open,
   onOpenChange,
@@ -137,8 +148,13 @@ export function TaskDetailDrawer({
                         canEdit={canEditTaskFields && Boolean(onUpdateTaskFields)}
                         error={fieldActionError}
                         isPending={fieldActionPending}
+                        statusActionError={statusActionError}
+                        statusActionPending={statusActionPending}
+                        canEditStatus={canEditTaskStatus && Boolean(onUpdateTaskStatus)}
+                        onUpdateStatus={onUpdateTaskStatus}
                         onUpdate={onUpdateTaskFields}
                         task={task}
+                        taskStatuses={taskStatuses}
                         workspaceUsers={workspaceUsers}
                       />
                     </>
@@ -170,27 +186,69 @@ function RuntimeTaskFieldsPanel({
   canEdit,
   error,
   isPending,
+  statusActionError,
+  statusActionPending,
+  canEditStatus,
+  onUpdateStatus,
   onUpdate,
   task,
+  taskStatuses,
   workspaceUsers
 }: {
   canEdit: boolean;
   error: unknown;
   isPending: boolean;
+  statusActionError: unknown;
+  statusActionPending: boolean;
+  canEditStatus: boolean;
+  onUpdateStatus?: ((statusId: string) => Promise<unknown> | void) | undefined;
   onUpdate?: ((fields: TaskDetailFieldsUpdateInput) => Promise<unknown> | void) | undefined;
   task: TaskDetailTask;
+  taskStatuses: TaskStatus[];
   workspaceUsers: WorkspaceUser[];
 }) {
   const activeUsers = workspaceUsers.filter((user) => user.status !== "inactive");
+  const activeStatuses = taskStatuses
+    .filter((status) => status.status === "active")
+    .sort((a, b) => a.sortOrder - b.sortOrder);
   const usersById = new Map(workspaceUsers.map((user) => [user.id, user.name]));
   const dueDate = getDateInputValue(task.plannedFinish);
   const ownerName = task.ownerUserId ? usersById.get(task.ownerUserId) ?? task.ownerUserId : "Не назначен";
   const canEditOwner = canEdit && activeUsers.length > 0 && Boolean(task.ownerUserId);
   const canEditDue = canEdit && Boolean(dueDate);
+  const canEditCurrentStatus = canEditStatus && activeStatuses.length > 0 && Boolean(task.statusId);
 
   return (
-    <CardPanel title="Параметры" subtitle="Ответственный, срок и блокер" className="u-mt-3">
+    <CardPanel title="Параметры" subtitle="Статус, ответственный, срок и блокер" className="u-mt-3">
       <FormGrid columns={2}>
+        <Field label="Статус">
+          {canEditCurrentStatus ? (
+            <Select
+              value={task.statusId ?? ""}
+              disabled={statusActionPending}
+              onValueChange={(statusId) => {
+                if (statusId === task.statusId) return;
+                void onUpdateStatus?.(statusId);
+              }}
+            >
+              <SelectTrigger aria-label={`Статус задачи ${task.title}`} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {activeStatuses.map((status) => (
+                  <SelectItem key={status.id} value={status.id}>
+                    {status.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="u-text-body">{task.statusName ?? "Не задан"}</p>
+          )}
+          {statusActionError ? (
+            <p className="u-text-xs u-text-danger">Не удалось изменить статус задачи.</p>
+          ) : null}
+        </Field>
         <Field label="Ответственный">
           {canEditOwner ? (
             <Select
