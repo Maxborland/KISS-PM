@@ -19,6 +19,7 @@ import {
   fetchWorkspaceTaskStatuses,
   createWorkspaceProjectTask,
   postWorkspaceAgentMessage,
+  updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
   useDashboardReadModelQueries,
@@ -28,7 +29,7 @@ import {
   useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { OperationsCockpitReadModel } from "@/lib/api-types";
+import type { OperationsCockpitReadModel, Task } from "@/lib/api-types";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -77,6 +78,9 @@ describe("runtime read model API", () => {
       }
       if (path === "/api/workspace/projects/project-1/tasks") {
         return json({ task: { id: "task-created", title: "Runtime created task" } }, 201);
+      }
+      if (path === "/api/workspace/tasks/task-1") {
+        return json({ task: { id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" } });
       }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
@@ -150,6 +154,19 @@ describe("runtime read model API", () => {
         title: "Runtime created task"
       })
     ).resolves.toEqual({ id: "task-created", title: "Runtime created task" });
+    await expect(
+      updateWorkspaceTaskFields({
+        dueDate: "2026-06-09",
+        ownerUserId: "usr-2",
+        task: taskFixture({
+          id: "task-1",
+          participants: [
+            { role: "executor", userId: "usr-1" },
+            { role: "observer", userId: "usr-3" }
+          ]
+        })
+      })
+    ).resolves.toEqual({ id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
@@ -230,6 +247,7 @@ describe("runtime read model API", () => {
       "/api/workspace/task-statuses",
       "/api/workspace/projects/project-1/tasks/task-1/status",
       "/api/workspace/projects/project-1/tasks",
+      "/api/workspace/tasks/task-1",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
@@ -248,6 +266,9 @@ describe("runtime read model API", () => {
     );
     const createTaskCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/projects/project-1/tasks"
+    );
+    const updateTaskFieldsCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/tasks/task-1"
     );
     const confirmProposalCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
@@ -273,6 +294,25 @@ describe("runtime read model API", () => {
         requiresAcceptance: false,
         statusId: "task-status-in-progress",
         title: "Runtime created task"
+      })
+    });
+    expect(updateTaskFieldsCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({
+        clientUpdatedAt: "2026-06-01T10:00:00.000Z",
+        description: null,
+        durationWorkingDays: 1,
+        participants: [
+          { role: "executor", userId: "usr-2" },
+          { role: "observer", userId: "usr-3" }
+        ],
+        plannedFinish: "2026-06-09",
+        plannedStart: "2026-06-01",
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: "task-status-new",
+        title: "Runtime task"
       })
     });
     expect(confirmProposalCall?.[1]).toMatchObject({
@@ -960,5 +1000,36 @@ function closedConfirmation(proposalId: string) {
     ...availableConfirmation(proposalId),
     status: "closed",
     allowedDecisions: []
+  };
+}
+
+function taskFixture(overrides: Partial<Task> = {}): Task {
+  return {
+    actualWork: 0,
+    archivedAt: null,
+    createdAt: "2026-06-01T09:00:00.000Z",
+    description: null,
+    durationWorkingDays: 1,
+    id: "task-runtime",
+    ownerUserId: "usr-1",
+    participants: [{ role: "executor", userId: "usr-1" }],
+    plannedFinish: "2026-06-02T00:00:00.000Z",
+    plannedStart: "2026-06-01T00:00:00.000Z",
+    plannedWork: 1,
+    priority: "normal",
+    progress: 0,
+    projectId: "project-1",
+    requesterUserId: "usr-1",
+    requiresAcceptance: false,
+    source: "manual",
+    stageId: null,
+    status: "new",
+    statusCategory: "new",
+    statusId: "task-status-new",
+    statusName: "Новая",
+    tenantId: "tenant-alpha",
+    title: "Runtime task",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    ...overrides
   };
 }
