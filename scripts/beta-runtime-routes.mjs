@@ -7,6 +7,7 @@ export const betaRuntimeRoutes = [
   { path: "/projects/project-beta-school-renovation/timeline", marker: "Обмерить существующие классы" },
   { path: "/projects/project-beta-school-renovation/resources", marker: "Ресурсная загрузка" },
   { path: "/deals", marker: "Сделки" },
+  { path: "/deals/opportunity-beta-school-renovation", marker: "Школа на 600 мест" },
   { path: "/directories/clients", marker: "Клиенты" },
   { path: "/directories/contacts", marker: "Контакты" },
   { path: "/directories/products", marker: "Продукты" },

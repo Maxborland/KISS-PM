@@ -31,6 +31,7 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "20-agent-cockpit",
   "02-my-work",
   "05-deals",
+  "06-deal-card",
   "07-projects-list",
   "07b-project-detail",
   "08-entities-clients",
@@ -272,7 +273,7 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "CRM" }, { label: "Сделки" }, { label: "Ромашка", current: true }],
     railSection: "crm",
     contextActiveItem: "Сделки",
-    path: "/deals/demo/DEAL-101",
+    path: "/deals/:dealId",
     requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
     requiredPermissionMode: "all"
   }),
@@ -534,9 +535,18 @@ export function projectIdForRuntimePath(path: string): string | null {
   return projectId;
 }
 
+export function dealIdForRuntimePath(path: string): string | null {
+  const [, section, dealId, ...rest] = normalizeRuntimePath(path).split("/");
+  if (section !== "deals") return null;
+  if (rest.length > 0) return null;
+  if (!dealId || dealId === "demo" || dealId.startsWith(":")) return null;
+  return dealId;
+}
+
 function screenIdForDynamicRuntimePath(path: string): ScreenId | null {
   const normalized = normalizeRuntimePath(path);
   const [, section, , view] = normalized.split("/");
+  if (dealIdForRuntimePath(path)) return "06-deal-card";
   if (section === "projects" && view === "timeline" && projectIdForRuntimePath(path)) {
     return "12-project-gantt";
   }
