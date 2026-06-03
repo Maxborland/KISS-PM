@@ -14,9 +14,9 @@ Wave 1 цель: создать clean beta foundation, чтобы дальней
 | PR #73 My Work review mapping | done | PR #73 merged into `design-v3` at `54f0ecf`; maps to MW2 status action slice and leaves owner/due/comment/blocker follow-ups |
 | Runtime route inventory / beta allowlist | done in PR #74 | `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals`; non-beta runtime routes disabled instead of fixture fallback |
 | Beta seed/reset | done in PR #75 | `pnpm db:reset:dev`, `pnpm db:seed:check`, API smoke over clients/deals/projects/my-work/operations-cockpit/audit |
-| Fast PR gate | done | `pnpm qa:fast` standardizes local CI-equivalent without Storybook/VRT; green on current `origin/design-v3` at `d12b838` |
+| Fast PR gate | done | `pnpm qa:fast` standardizes local CI-equivalent without Storybook/VRT; green on last verified runtime base `d12b838` |
 | GitHub CI billing/local artifact policy | done | `docs/beta/local-artifact-policy.md`; GitHub jobs with `steps: []`/no runner are infra failures, not product test failures; local relevant gate is SSSOT while CI does not start |
-| Current integration base | done | `origin/design-v3` includes PRs #73 and #96-#132; dirty root is not used as the beta base |
+| Current integration base | done | Clean beta work starts from `origin/design-v3`; dirty root is not used as the beta base |
 
 ## PR #73 mapping
 
@@ -44,7 +44,7 @@ GitHub CI red from billing/spending-limit with `steps: []` is not treated as pro
 
 Command: `pnpm qa:fast`
 
-Result on `origin/design-v3` `d12b838`: pass.
+Result on runtime base `d12b838`: pass. Later Wave 1 status/policy doc-only PRs do not change runtime code; rerun `pnpm qa:fast` before the next code slice.
 
 Coverage summary:
 
@@ -56,7 +56,7 @@ Coverage summary:
 
 ## Wave 1 exit
 
-Wave 1 foundation is complete on current `origin/design-v3` `d12b838` after PR #132.
+Wave 1 foundation is complete. Latest runtime gate evidence is from `origin/design-v3` `d12b838`; status/policy doc-only updates after that preserve the same runtime base.
 
 Next work continues in PR-sized slices from clean `origin/design-v3`:
 
