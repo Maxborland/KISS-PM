@@ -262,6 +262,10 @@ export function ProjectDetailBlock({
                           ) : (
                             <Chip variant={taskStatusVariant(task.status)}>{task.statusName}</Chip>
                           )}
+                          <ProjectTaskBlockerHint
+                            canChangeTaskStatus={canChangeTaskStatus}
+                            task={task}
+                          />
                         </td>
                         <td>
                           {canChangeTaskDueDate ? (
@@ -313,6 +317,24 @@ export function ProjectDetailBlock({
       </div>
     </>
   );
+}
+
+function ProjectTaskBlockerHint({
+  canChangeTaskStatus,
+  task
+}: {
+  canChangeTaskStatus: boolean;
+  task: Task;
+}) {
+  if (task.statusCategory === "waiting") {
+    return <p className="field__hint">Блокер: задача уже во внимании.</p>;
+  }
+
+  if (canChangeTaskStatus) {
+    return <p className="field__hint">Блокер: используйте статус «Ожидает».</p>;
+  }
+
+  return <p className="field__hint">Блокер: отдельное поле причины не хранится в текущих данных.</p>;
 }
 
 function ProjectTaskActivityPanel({
