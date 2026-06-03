@@ -310,7 +310,7 @@ function DealsBlockInner({
   const handleColumnAction = (columnId: StageId, action: KanbanColumnAction) => {
     if (readOnly) return;
     toast.info(`${STAGE_ACTION_LABEL[action]} — ${stageLabel[columnId]}`, {
-      description: "Демо Storybook: действие зафиксировано локально."
+      description: "Действие зафиксировано локально."
     });
   };
 
@@ -364,7 +364,7 @@ function DealsBlockInner({
               onChange={setCardView}
             />
           ) : null}
-          <Button variant="secondary" size="sm" disabled title="Демо Storybook: фильтр подключится к API">
+          <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
             <Filter className="size-4" aria-hidden />
             Фильтр
           </Button>
