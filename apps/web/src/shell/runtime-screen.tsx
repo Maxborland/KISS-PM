@@ -126,6 +126,7 @@ function AuthenticatedRuntimeScreen({
       projectId={projectId}
       permissions={authQuery.data?.permissions ?? []}
       currentUserId={authQuery.data.user.id}
+      currentAccessProfileId={authQuery.data.user.accessProfileId}
       initialTaskId={initialTaskId}
     />
   );

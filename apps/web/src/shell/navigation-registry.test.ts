@@ -107,6 +107,8 @@ describe("navigation-registry", () => {
   });
 
   it("allows real project detail paths for project readers", () => {
+    expect(canOpenRuntimePath("/projects", ["tenant.projects.read"])).toBe(true);
+    expect(canOpenRuntimePath("/projects", ["tenant.workspace_config.read"])).toBe(false);
     expect(canOpenRuntimePath("/projects/project-alpha", ["tenant.projects.read"])).toBe(true);
     expect(canOpenRuntimePath("/projects/project-alpha", [])).toBe(false);
   });

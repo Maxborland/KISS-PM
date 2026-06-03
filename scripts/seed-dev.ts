@@ -40,7 +40,20 @@ const dataset: SeedTenantDataset = {
           : "access-profile-beta-admin",
       tenantId: tenant.id
     })
-  ),
+  ).concat([
+    {
+      id: "access-profile-alpha-project-team",
+      tenantId: "tenant-alpha",
+      name: "Проектная команда",
+      permissions: [
+        "tenant.projects.read",
+        "tenant.workspace_config.read",
+        "tenant.resource_feasibility.read",
+        "profile.read",
+        "profile.update"
+      ]
+    }
+  ]),
   positions: [
     {
       id: "position-project-manager",
@@ -243,7 +256,7 @@ const dataset: SeedTenantDataset = {
       id: "user-alpha-architect",
       tenantId: "tenant-alpha",
       name: "Сергей Архитектор",
-      accessProfileId: "access-profile-alpha-admin",
+      accessProfileId: "access-profile-alpha-project-team",
       email: "architect@kiss-pm.local",
       positionId: "position-architect",
       password: "architect12345"

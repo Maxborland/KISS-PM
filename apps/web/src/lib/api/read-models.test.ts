@@ -29,6 +29,7 @@ import {
   createWorkspaceProjectTask,
   postWorkspaceTaskComment,
   postWorkspaceAgentMessage,
+  updateWorkspaceAccessRolePermission,
   updateWorkspaceTaskFields,
   updateWorkspaceUserStatus,
   updateWorkspaceProjectTaskStatus,
@@ -101,6 +102,15 @@ describe("runtime read model API", () => {
       }
       if (path === "/api/workspace/users/usr-2") {
         return json({ user: { id: "usr-2", name: "Мария", status: "inactive" } });
+      }
+      if (path === "/api/workspace/access-roles/access-profile-alpha-project-team") {
+        return json({
+          accessRole: {
+            id: "access-profile-alpha-project-team",
+            name: "Проектная команда",
+            permissions: ["tenant.resource_feasibility.read", "profile.read"]
+          }
+        });
       }
       if (path === "/api/workspace/clients") {
         return json({
@@ -336,6 +346,21 @@ describe("runtime read model API", () => {
       name: "Мария",
       status: "inactive"
     });
+    await expect(
+      updateWorkspaceAccessRolePermission({
+        role: {
+          id: "access-profile-alpha-project-team",
+          name: "Проектная команда",
+          permissions: ["tenant.projects.read", "tenant.resource_feasibility.read", "profile.read"]
+        },
+        permission: "tenant.projects.read",
+        enabled: false
+      })
+    ).resolves.toEqual({
+      id: "access-profile-alpha-project-team",
+      name: "Проектная команда",
+      permissions: ["tenant.resource_feasibility.read", "profile.read"]
+    });
     await expect(fetchWorkspaceTaskActivity("task-1")).resolves.toEqual([
       { id: "activity-1", body: "Runtime activity" }
     ]);
@@ -466,6 +491,7 @@ describe("runtime read model API", () => {
       "/api/workspace/projects/project-1/tasks",
       "/api/workspace/tasks/task-1",
       "/api/workspace/users/usr-2",
+      "/api/workspace/access-roles/access-profile-alpha-project-team",
       "/api/workspace/tasks/task-1/activity",
       "/api/workspace/tasks/task-1/comments",
       "/api/workspace/config/project-templates",
@@ -497,6 +523,9 @@ describe("runtime read model API", () => {
     );
     const updateUserStatusCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/users/usr-2"
+    );
+    const updateAccessRolePermissionCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/access-roles/access-profile-alpha-project-team"
     );
     const postTaskCommentCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/tasks/task-1/comments"
@@ -555,6 +584,13 @@ describe("runtime read model API", () => {
     expect(updateUserStatusCall?.[1]).toMatchObject({
       method: "PATCH",
       body: JSON.stringify({ status: "inactive" })
+    });
+    expect(updateAccessRolePermissionCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Проектная команда",
+        permissions: ["tenant.resource_feasibility.read", "profile.read"]
+      })
     });
     expect(postTaskCommentCall?.[1]).toMatchObject({
       method: "POST",

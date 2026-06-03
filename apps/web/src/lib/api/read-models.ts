@@ -249,6 +249,12 @@ export type WorkspaceUserStatusUpdateInput = {
   status: "active" | "inactive";
 };
 
+export type UpdateWorkspaceAccessRolePermissionInput = {
+  role: AccessRole;
+  permission: string;
+  enabled: boolean;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
@@ -390,6 +396,25 @@ export async function updateWorkspaceUserStatus(
     }
   );
   return response.user;
+}
+
+export async function updateWorkspaceAccessRolePermission(
+  input: UpdateWorkspaceAccessRolePermissionInput
+): Promise<AccessRole> {
+  const permissions = input.enabled
+    ? Array.from(new Set([...input.role.permissions, input.permission]))
+    : input.role.permissions.filter((permission) => permission !== input.permission);
+  const response = await apiFetch<{ accessRole: AccessRole }>(
+    `/api/workspace/access-roles/${encodeURIComponent(input.role.id)}`,
+    {
+      method: "PATCH",
+      json: {
+        name: input.role.name,
+        permissions
+      }
+    }
+  );
+  return response.accessRole;
 }
 
 export async function fetchWorkspaceClients(): Promise<Client[]> {
