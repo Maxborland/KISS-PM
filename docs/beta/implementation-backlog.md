@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
-| My Work | `/my-work` | SPEC-01, SPEC-02 | wired+status-action | Status action merged in PR #73 with participant-role DnD gate; owner/due/comment remain separate slices; blocker remains backend gap | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `pnpm qa:fast` |
+| My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions | Status, owner, due date and comment actions are runtime-proven; blocker remains explicit backend gap; forbidden/read-only proof still needs a dedicated route/user slice | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/status-action | Нужны create task, owner/due/comment/blocker/activity, resources/timeline links | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-task-actions.spec.ts`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/read-only | Runtime timeline route есть; нужны planning mutations/date dependency proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
@@ -26,7 +26,7 @@
 - `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
 - `/projects/:id`, `/projects/:id/timeline` и `/projects/:id/resources` теперь runtime routes; mutation depth и screenshot proof still required.
 - Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback; settings/profile and deeper create/edit flows ещё не сделаны.
-- `/my-work` доказывает status mutation only: PR #73 merged and gates DnD by `tenant.projects.manage` or task roles `requester/executor/co_executor/controller`; owner/due/comment остаются отдельными slices; blocker требует отдельного backend gap.
+- `/my-work` доказывает status/owner/due-date/comment mutations: PR #73 gates status DnD by `tenant.projects.manage` or task roles `requester/executor/co_executor/controller`; `my-work-task-fields.spec.ts` proves owner+due date persistence; `my-work-task-comments.spec.ts` proves comment activity persistence; blocker remains explicit backend gap.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
 - В `docs/beta/task-action-contract.md` зафиксирован split: что есть, что отсутствует (`blocker` пока только как gap).
 
@@ -62,7 +62,7 @@
 | --- | --- |
 | `/dashboard` | Seeded risk/overdue/overload appears; no console/pageerror/API failures; desktop/narrow screenshots |
 | `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
-| `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; forbidden state |
+| `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; forbidden/read-only state remains required |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
 | Project detail | Open real project by id; task list visible without fixture fallback; status update persists; add task, owner/due/comment and blocker/activity proof still required |
 | Timeline | Task renders in date range; date/status update persists; dependency/resource conflicts visible |
@@ -87,8 +87,8 @@
 
 4. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
-   - Status: status action done in PR #73; next slices are owner/due/comment and blocker gap UX.
-   - Evidence target: specialist flow persists and appears in PM attention surface.
+   - Status: status action done in PR #73; owner/due date/comment are runtime-proven by targeted Playwright specs; next slice is blocker gap UX + forbidden/read-only proof.
+   - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-block.test.tsx`.
 
 5. **Agent grounded context and audit hardening**
    - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
@@ -108,6 +108,8 @@
 - `pnpm db:reset:dev`: resets only the documented compose dev database by default, then seeds and checks beta fixture counts.
 - `my-work-block.test.tsx`: status DnD is exposed only for transition-capable roles or `tenant.projects.manage`; `approver`/`observer` cards remain visible but not draggable.
 - `runtime-data-screen.test.ts`: My Work receives the current user and project manage permission flag for task status actions.
+- `my-work-task-fields.spec.ts`: seeded My Work task owner and due date change through runtime UI and remain changed after reload.
+- `my-work-task-comments.spec.ts`: seeded My Work task comment is created through runtime UI and remains visible in task activity after reload.
 - `pnpm qa:fast`: standardized as the default local PR gate for small beta slices; pass on `design-v3` `54f0ecf`.
 - `pnpm qa:runtime`: remains the broader runtime+Storybook foundation gate.
 - Existing runtime QA files are present: `e2e/runtime/runtimeQaFixtures.ts`, `runtime-foundation.spec.ts`, `agent-confirmation.spec.ts`, `storybook-visual-smoke.spec.ts`.

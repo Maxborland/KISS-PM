@@ -101,7 +101,9 @@
 - После confirm показывать:
   1) `resultSummary.mutationApplied`/`status`
   2) `auditEventId` из confirm response/proposal result (для `applied`/`rejected` всегда должен приходить; для `pending` — null только в `proposal.resultSummary`)
-- Рекомендуемый следующий runtime-slice:
-  1) контрактная реализация /my-work actions (`status`, `due date`, `owner`, `comment`) на существующих API
-  2) blocker UX как read-only placeholder с explicit blocker gap
-  3) agent confirmation result surface с audit marker
+- Runtime evidence после My Work action slice:
+  1) `/my-work` status action доказан в `my-work-status-action.spec.ts`
+  2) `/my-work` due date + owner changes доказаны в `my-work-task-fields.spec.ts`
+  3) `/my-work` comments доказаны в `my-work-task-comments.spec.ts`
+  4) blocker UX остается read-only backend gap; fake blocker mutation без dedicated endpoint запрещён
+- Рекомендуемый следующий runtime-slice: agent confirmation result surface с audit marker.
