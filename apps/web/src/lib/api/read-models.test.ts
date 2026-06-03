@@ -11,6 +11,7 @@ import {
   fetchTenantCurrentScheduledTasks,
   fetchTenantCurrentAuditEvents,
   fetchWorkspaceClients,
+  fetchWorkspaceContacts,
   fetchWorkspaceDealStages,
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
@@ -29,6 +30,7 @@ import {
   useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useClientsReadModelQuery,
+  useContactsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -53,6 +55,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.users).toEqual(["workspace", "users"]);
     expect(queryKeys.workspace.clients).toEqual(["workspace", "clients"]);
+    expect(queryKeys.workspace.contacts).toEqual(["workspace", "contacts"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
@@ -92,6 +95,25 @@ describe("runtime read model API", () => {
               tenantId: "tenant-alpha",
               name: "Runtime client",
               description: "Client from API",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      if (path === "/api/workspace/contacts") {
+        return json({
+          contacts: [
+            {
+              id: "contact-1",
+              tenantId: "tenant-alpha",
+              clientId: "client-1",
+              name: "Runtime contact",
+              email: "contact@kiss-pm.local",
+              phone: null,
+              telegram: null,
+              role: "Заказчик",
               status: "active",
               createdAt: "2026-06-01T09:00:00.000Z",
               updatedAt: "2026-06-01T10:00:00.000Z"
@@ -198,6 +220,21 @@ describe("runtime read model API", () => {
         tenantId: "tenant-alpha",
         name: "Runtime client",
         description: "Client from API",
+        status: "active",
+        createdAt: "2026-06-01T09:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z"
+      }
+    ]);
+    await expect(fetchWorkspaceContacts()).resolves.toEqual([
+      {
+        id: "contact-1",
+        tenantId: "tenant-alpha",
+        clientId: "client-1",
+        name: "Runtime contact",
+        email: "contact@kiss-pm.local",
+        phone: null,
+        telegram: null,
+        role: "Заказчик",
         status: "active",
         createdAt: "2026-06-01T09:00:00.000Z",
         updatedAt: "2026-06-01T10:00:00.000Z"
@@ -338,6 +375,7 @@ describe("runtime read model API", () => {
       "/api/workspace/projects/project-1",
       "/api/workspace/task-statuses",
       "/api/workspace/clients",
+      "/api/workspace/contacts",
       "/api/workspace/projects/project-1/tasks/task-1/status",
       "/api/workspace/projects/project-1/tasks",
       "/api/workspace/tasks/task-1",
@@ -1047,6 +1085,87 @@ describe("runtime read model API", () => {
       expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/clients"]);
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/clients");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/contacts");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/products");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads contacts from the workspace contacts endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/contacts") {
+        return json({
+          contacts: [
+            {
+              id: "contact-live",
+              tenantId: "tenant-alpha",
+              clientId: "client-live",
+              name: "Runtime Contact",
+              email: "contact@kiss-pm.local",
+              phone: null,
+              telegram: null,
+              role: "Заказчик",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ContactsProbe() {
+      const readModel = useContactsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ContactsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            contacts: [
+              {
+                id: "contact-live",
+                tenantId: "tenant-alpha",
+                clientId: "client-live",
+                name: "Runtime Contact",
+                email: "contact@kiss-pm.local",
+                phone: null,
+                telegram: null,
+                role: "Заказчик",
+                status: "active",
+                createdAt: "2026-06-01T09:00:00.000Z",
+                updatedAt: "2026-06-01T10:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/contacts"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/contacts");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/clients");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/products");
     } finally {
       act(() => root.unmount());

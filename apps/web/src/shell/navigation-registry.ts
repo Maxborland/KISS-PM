@@ -34,6 +34,7 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "07-projects-list",
   "07b-project-detail",
   "08-entities-clients",
+  "08-entities-contacts",
   "09-admin",
   "12-project-gantt",
   "13-project-resources",
