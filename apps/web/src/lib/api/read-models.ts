@@ -5,6 +5,7 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
   AuditEventListItem,
+  Client,
   DealStage,
   OperationsCockpitReadModel,
   Opportunity,
@@ -108,6 +109,10 @@ export type AuditEventsReadModel = {
 
 export type AdminUsersReadModel = {
   users: WorkspaceUser[];
+};
+
+export type ClientsReadModel = {
+  clients: Client[];
 };
 
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
@@ -346,6 +351,13 @@ export async function fetchWorkspaceUsers(): Promise<WorkspaceUser[]> {
     method: "GET"
   });
   return response.users;
+}
+
+export async function fetchWorkspaceClients(): Promise<Client[]> {
+  const response = await apiFetch<ListResponse<"clients", Client>>("/api/workspace/clients", {
+    method: "GET"
+  });
+  return response.clients;
 }
 
 async function fetchOptionalWorkspaceUsers(): Promise<WorkspaceUser[]> {
@@ -601,6 +613,23 @@ export function useAdminUsersReadModelQuery() {
 
   return {
     data: query.data ? { users: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useClientsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.clients,
+    queryFn: fetchWorkspaceClients
+  });
+
+  return {
+    data: query.data ? { clients: query.data } : undefined,
     error: query.error,
     isPending: query.isPending,
     isFetching: query.isFetching,
