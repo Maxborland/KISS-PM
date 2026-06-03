@@ -26,6 +26,7 @@ import {
   buildFunnelDeals,
   buildFunnelStagesFromDealStages
 } from "@/lib/mock-data/scenario-presenters";
+import { buildProjectTimelineGanttData } from "@/lib/runtime/project-timeline";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import {
@@ -33,6 +34,7 @@ import {
   type ProjectTaskCommentInput,
   type ProjectTaskCreateInput
 } from "@/views/blocks/project-detail-block";
+import { ProjectTimelineBlock } from "@/views/blocks/project-timeline-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import {
@@ -121,6 +123,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeProjectDetailScreen projectId={projectId} currentUserId={currentUserId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "12-project-gantt") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeProjectTimelineScreen projectId={projectId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -464,6 +474,58 @@ function RuntimeDealsScreen() {
   const deals = readModel.data ? buildFunnelDeals(readModel.data.opportunities) : [];
 
   return <DealsBlock initialDeals={deals} stages={stages} readOnly />;
+}
+
+function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | undefined }) {
+  const query = useProjectDetailReadModelQuery(projectId);
+
+  if (!projectId) {
+    return (
+      <ErrorState
+        level="L1"
+        title="Проект не выбран"
+        description="Откройте план-график из карточки проекта или проверьте адрес страницы."
+      />
+    );
+  }
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем план-график проекта…" />;
+  }
+
+  if (query.error) {
+    if (
+      query.error instanceof ApiError &&
+      query.error.body.error === "project_not_found"
+    ) {
+      return (
+        <ErrorState
+          level="L1"
+          title="Проект не найден"
+          description="Проверьте ссылку или вернитесь к списку проектов."
+          onRetry={() => void query.refetch()}
+        />
+      );
+    }
+
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить план-график проекта"
+        forbiddenTitle="Нет доступа к план-графику проекта"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  if (!query.data) return null;
+
+  return (
+    <ProjectTimelineBlock
+      project={query.data.project}
+      data={buildProjectTimelineGanttData(query.data)}
+    />
+  );
 }
 
 function RuntimeReadModelError({

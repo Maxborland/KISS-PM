@@ -16,6 +16,7 @@ import type {
   GanttColumnConfig,
   GanttColumnId,
   GanttContextTarget,
+  GanttDayHeader,
   GanttEditSession,
   GanttFocusCell,
   GanttCellRange,
@@ -44,6 +45,13 @@ function pctLabel(progress: number | undefined) {
 function durationLabel(row: GanttRow) {
   if (row.kind === "milestone") return "0д";
   return `${row.durationDays}д`;
+}
+
+function runtimeDateLabel(days: GanttDayHeader[], dayIndex: number): string {
+  const isoDate = days[Math.max(0, dayIndex)]?.isoDate;
+  if (!isoDate) return dayIndexToDateLabel(dayIndex);
+  const [year, month, day] = isoDate.split("-");
+  return year && month && day ? `${day}.${month}.${year}` : dayIndexToDateLabel(dayIndex);
 }
 
 function NameCellContent({ row, onToggleCollapse }: { row: GanttRow; onToggleCollapse?: () => void }) {
@@ -80,6 +88,7 @@ function IssueBadge({ row }: { row: GanttRow }) {
 
 export function GanttWbsGrid({
   rows,
+  days = [],
   rowOrder,
   columns,
   interactive,
@@ -101,6 +110,7 @@ export function GanttWbsGrid({
   cellProps
 }: {
   rows: GanttRow[];
+  days?: GanttDayHeader[];
   rowOrder: string[];
   columns: GanttColumnConfig[];
   interactive: boolean;
@@ -299,7 +309,7 @@ export function GanttWbsGrid({
             {...cellBind(row, "start")}
             {...cellProps}
           >
-            {dayIndexToDateLabel(row.startDay)}
+            {runtimeDateLabel(days, row.startDay)}
           </GanttGridCell>
         );
       case "finish":
@@ -315,7 +325,7 @@ export function GanttWbsGrid({
             {...cellBind(row, "finish")}
             {...cellProps}
           >
-            {dayIndexToDateLabel(finishDayIndex(row))}
+            {runtimeDateLabel(days, finishDayIndex(row))}
           </GanttGridCell>
         );
       case "predecessors":
