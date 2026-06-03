@@ -3,6 +3,7 @@
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { fetchWorkspaceAccessRoles, type AccessRole } from "@/lib/api/bootstrap";
 import type {
   AuditEventListItem,
   Client,
@@ -111,6 +112,10 @@ export type AuditEventsReadModel = {
 
 export type AdminUsersReadModel = {
   users: WorkspaceUser[];
+};
+
+export type AdminAccessRolesReadModel = {
+  accessRoles: AccessRole[];
 };
 
 export type ClientsReadModel = {
@@ -637,6 +642,23 @@ export function useAdminUsersReadModelQuery() {
 
   return {
     data: query.data ? { users: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useAdminAccessRolesReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.accessRoles,
+    queryFn: fetchWorkspaceAccessRoles
+  });
+
+  return {
+    data: query.data ? { accessRoles: query.data } : undefined,
     error: query.error,
     isPending: query.isPending,
     isFetching: query.isFetching,

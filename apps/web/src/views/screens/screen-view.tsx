@@ -59,6 +59,7 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
   "08-entities-contacts": () => <EntitiesBlock kind="contacts" />,
   "08-entities-products": () => <EntitiesBlock kind="products" />,
   "09-admin": () => <AdminBlock />,
+  "09-admin-roles": () => <AdminBlock />,
   "10-settings": () => <SettingsBlock />,
   "11-avatar-menu": () => <AvatarMenuBlock />,
   "12-project-gantt": () => (

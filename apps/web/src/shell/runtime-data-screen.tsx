@@ -15,6 +15,7 @@ import {
   postWorkspaceTaskComment,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
+  useAdminAccessRolesReadModelQuery,
   useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useClientsReadModelQuery,
@@ -53,6 +54,7 @@ import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { RuntimeAgentScreen } from "@/shell/runtime-agent-screen";
 import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
 import { AuditEventsRuntimeBlock } from "@/views/blocks/audit-events-runtime-block";
+import { AdminAccessRolesRuntimeBlock } from "@/views/blocks/admin-access-roles-runtime-block";
 import { AdminUsersRuntimeBlock } from "@/views/blocks/admin-users-runtime-block";
 import { ClientsRuntimeBlock } from "@/views/blocks/clients-runtime-block";
 import { ContactsRuntimeBlock } from "@/views/blocks/contacts-runtime-block";
@@ -167,6 +169,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeAdminUsersScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "09-admin-roles") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeAdminAccessRolesScreen />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -680,6 +690,27 @@ function RuntimeAdminUsersScreen() {
   }
 
   return query.data ? <AdminUsersRuntimeBlock users={query.data.users} /> : null;
+}
+
+function RuntimeAdminAccessRolesScreen() {
+  const query = useAdminAccessRolesReadModelQuery();
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем роли…" />;
+  }
+
+  if (query.error) {
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить роли"
+        forbiddenTitle="Нет доступа к ролям"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <AdminAccessRolesRuntimeBlock accessRoles={query.data.accessRoles} /> : null;
 }
 
 function RuntimeClientsScreen() {

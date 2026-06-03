@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: admin roles runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, clients, contacts and products, but still needs RBAC role-management proof."
+    "Current blocker: deal detail and handoff runtime flow is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, admin roles, clients, contacts and products, but still needs live deal detail/handoff proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -91,5 +91,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("admin roles must be a live runtime route for RBAC proof", async () => {
     await page.goto("/admin/roles");
     await expect(page.getByRole("heading", { name: /Роли/ })).toBeVisible();
+  });
+
+  await test.step("deal detail must be a live runtime route for handoff proof", async () => {
+    await page.goto("/deals/opportunity-beta-school-renovation");
+    await expect(page.getByRole("heading", { name: /Сделка/ })).toBeVisible();
   });
 });

@@ -37,6 +37,7 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "08-entities-contacts",
   "08-entities-products",
   "09-admin",
+  "09-admin-roles",
   "12-project-gantt",
   "13-project-resources",
   "17-project-audit"
@@ -146,6 +147,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
       items: [
         { label: "Рабочая область", href: "/settings" },
         { label: "Пользователи", href: "/admin/users" },
+        { label: "Роли", href: "/admin/roles" },
         { label: "Аудит", href: "/admin/audit" },
         { label: "Интеграции" }
       ]
@@ -340,6 +342,17 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     contextActiveItem: "Пользователи",
     path: "/admin/users",
     requiredPermissions: ["tenant.users.read"]
+  }),
+  "09-admin-roles": route({
+    id: "09-admin-roles",
+    storyTitle: "09 Роли",
+    pageTitle: "Роли",
+    lead: "Профили доступа и разрешения рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Роли", current: true }],
+    railSection: "settings",
+    contextActiveItem: "Роли",
+    path: "/admin/roles",
+    requiredPermissions: ["tenant.access_profiles.read"]
   }),
   "10-settings": route({
     id: "10-settings",

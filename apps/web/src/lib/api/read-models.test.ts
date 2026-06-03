@@ -28,6 +28,7 @@ import {
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
+  useAdminAccessRolesReadModelQuery,
   useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useClientsReadModelQuery,
@@ -1050,6 +1051,73 @@ describe("runtime read model API", () => {
       expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/users"]);
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/admin-users");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/access-roles");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/positions");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads admin access roles from the workspace access roles endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/access-roles") {
+        return json({
+          accessRoles: [
+            {
+              id: "role-runtime-admin",
+              tenantId: "tenant-alpha",
+              name: "Администратор",
+              permissions: ["tenant.users.read", "tenant.access_profiles.read"]
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AdminAccessRolesProbe() {
+      const readModel = useAdminAccessRolesReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AdminAccessRolesProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            accessRoles: [
+              {
+                id: "role-runtime-admin",
+                tenantId: "tenant-alpha",
+                name: "Администратор",
+                permissions: ["tenant.users.read", "tenant.access_profiles.read"]
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/access-roles"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/access-roles");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/positions");
     } finally {
       act(() => root.unmount());
