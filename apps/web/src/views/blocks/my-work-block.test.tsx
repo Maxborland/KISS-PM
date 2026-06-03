@@ -5,7 +5,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ScheduledTask, Task } from "@/lib/api-types";
-import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
+import {
+  RuntimeMyWorkBlock,
+  canTransitionTaskStatus,
+  resolveTaskStatusIdForColumn
+} from "@/views/blocks/my-work-block";
 import { ScreenRouteProvider } from "@/views/layout/screen-route-context";
 import { getScreenRoute } from "@/views/screens/screen-route";
 
@@ -112,11 +116,87 @@ describe("RuntimeMyWorkBlock", () => {
     expect(host?.textContent).not.toContain("40 ч");
   });
 
+  it("resolves runtime status moves to active workspace task statuses", () => {
+    expect(
+      resolveTaskStatusIdForColumn(
+        [
+          makeTaskStatus({ id: "task-status-done-archived", category: "done", status: "archived", sortOrder: 1 }),
+          makeTaskStatus({ id: "task-status-done-active", category: "done", status: "active", sortOrder: 2 })
+        ],
+        "done",
+        "in_progress"
+      )
+    ).toBe("task-status-done-active");
+    expect(
+      resolveTaskStatusIdForColumn(
+        [
+          makeTaskStatus({ id: "task-status-new", category: "new", status: "active", sortOrder: 1 }),
+          makeTaskStatus({ id: "task-status-waiting", category: "waiting", status: "active", sortOrder: 2 })
+        ],
+        "new",
+        "in_progress"
+      )
+    ).toBe("task-status-waiting");
+    expect(
+      resolveTaskStatusIdForColumn(
+        [makeTaskStatus({ id: "task-status-done", category: "done", status: "active", sortOrder: 4 })],
+        "done",
+        "new"
+      )
+    ).toBeNull();
+    expect(resolveTaskStatusIdForColumn([], "review", "in_progress")).toBeNull();
+  });
+
+  it("enables runtime status drag only for transition-capable task participants", async () => {
+    const executorTask = makeTask({
+      id: "task-executor",
+      participants: [{ userId: "usr-1", role: "executor" }],
+      title: "Executor task"
+    });
+    const observerTask = makeTask({
+      id: "task-observer",
+      participants: [{ userId: "usr-1", role: "observer" }],
+      title: "Observer task"
+    });
+    const approverTask = makeTask({
+      id: "task-approver",
+      participants: [{ userId: "usr-1", role: "approver" }],
+      title: "Approver task"
+    });
+
+    await renderRuntimeMyWork([executorTask, observerTask, approverTask], {
+      currentUserId: "usr-1",
+      initialMode: "kanban",
+      onMoveTaskStatus: async () => undefined
+    });
+
+    expect(host?.querySelector('[data-card-id="task-executor"]')?.getAttribute("data-dnd-active")).toBe(
+      "true"
+    );
+    expect(host?.querySelector('[data-card-id="task-observer"]')?.getAttribute("data-dnd-active")).toBeNull();
+    expect(host?.querySelector('[data-card-id="task-approver"]')?.getAttribute("data-dnd-active")).toBeNull();
+
+    await renderRuntimeMyWork([observerTask], {
+      canManageProjectTasks: true,
+      currentUserId: "usr-1",
+      initialMode: "kanban",
+      onMoveTaskStatus: async () => undefined
+    });
+
+    expect(canTransitionTaskStatus(observerTask, "usr-1", true)).toBe(true);
+    expect(host?.querySelector('[data-card-id="task-observer"]')?.getAttribute("data-dnd-active")).toBe(
+      "true"
+    );
+  });
+
   async function renderRuntimeMyWork(
     tasks: Task[],
     options: {
+      canManageProjectTasks?: boolean;
+      currentUserId?: string;
       initialMode?: "kanban" | "list";
       initialOpenTaskId?: string;
+      onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
       scheduledTasks?: ScheduledTask[];
     } = {}
   ) {
@@ -135,6 +215,9 @@ describe("RuntimeMyWorkBlock", () => {
             readOnly
             scheduledTasks={options.scheduledTasks ?? []}
             tasks={tasks}
+            currentUserId={options.currentUserId}
+            canManageProjectTasks={options.canManageProjectTasks ?? false}
+            {...(options.onMoveTaskStatus ? { onMoveTaskStatus: options.onMoveTaskStatus } : {})}
           />
         </ScreenRouteProvider>
       );
@@ -142,7 +225,15 @@ describe("RuntimeMyWorkBlock", () => {
   }
 });
 
-function makeTask({ id, title }: { id: string; title: string }): Task {
+function makeTask({
+  id,
+  participants = [{ userId: "usr-1", role: "executor" }],
+  title
+}: {
+  id: string;
+  participants?: Task["participants"];
+  title: string;
+}): Task {
   return {
     id,
     tenantId: "tenant-1",
@@ -168,7 +259,7 @@ function makeTask({ id, title }: { id: string; title: string }): Task {
     createdAt: "2026-05-30T00:00:00.000Z",
     updatedAt: "2026-05-30T00:00:00.000Z",
     archivedAt: null,
-    participants: [{ userId: "usr-1", role: "executor" }]
+    participants
   };
 }
 
@@ -191,6 +282,30 @@ function makeScheduledTask({
     workMinutes,
     createdAt: `${plannedStart}T00:00:00.000Z`,
     statusId: "task-status-in-progress"
+  };
+}
+
+function makeTaskStatus({
+  id,
+  category,
+  status,
+  sortOrder
+}: {
+  id: string;
+  category: "new" | "waiting" | "in_progress" | "review" | "done";
+  status: "active" | "archived";
+  sortOrder: number;
+}) {
+  return {
+    id,
+    tenantId: "tenant-1",
+    name: id,
+    category,
+    sortOrder,
+    status,
+    isSystem: true,
+    createdAt: "2026-05-30T00:00:00.000Z",
+    updatedAt: "2026-05-30T00:00:00.000Z"
   };
 }
 

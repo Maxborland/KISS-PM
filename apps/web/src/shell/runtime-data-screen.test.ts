@@ -129,20 +129,35 @@ vi.mock("@/shell/runtime-dashboard-screen", () => ({
 
 vi.mock("@/views/blocks/my-work-block", () => ({
   RuntimeMyWorkBlock: ({
+    canManageProjectTasks,
+    currentUserId,
     initialOpenTaskId,
+    onMoveTaskStatus,
     readOnly,
     tasks
   }: {
+    canManageProjectTasks?: boolean;
+    currentUserId?: string;
     initialOpenTaskId?: string;
+    onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
     readOnly?: boolean;
     tasks: { title: string }[];
   }) =>
     createElement(
-      "div",
+      "button",
       {
+        "data-can-manage-project-tasks": String(canManageProjectTasks),
+        "data-current-user-id": currentUserId ?? "",
         "data-initial-open-task-id": initialOpenTaskId ?? "",
         "data-testid": "runtime-my-work",
-        "data-read-only": String(readOnly)
+        "data-read-only": String(readOnly),
+        onClick: () => {
+          void onMoveTaskStatus?.({
+            projectId: "project-1",
+            taskId: "task-runtime",
+            statusId: "task-status-done"
+          });
+        }
       },
       tasks.map((task) => task.title).join(", ")
     )
@@ -1348,7 +1363,89 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.querySelector("[data-testid='runtime-my-work']")?.getAttribute("data-initial-open-task-id")).toBe(
       "task-agent-result"
     );
+    expect(host.querySelector("[data-testid='runtime-my-work']")?.getAttribute("data-current-user-id")).toBe(
+      "usr-1"
+    );
     expect(host.textContent).toContain("Runtime task from agent");
+  });
+
+  it("passes project manage permission into My Work task status actions", async () => {
+    readModelHooks.myWork.mockReturnValue(
+      successReadModel({
+        scheduledTasks: [],
+        taskStatuses: [],
+        tasks: [{ id: "task-runtime", title: "Runtime my work task" }]
+      })
+    );
+
+    const projectReaderHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      projectReaderHost
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.getAttribute("data-can-manage-project-tasks")
+    ).toBe("false");
+
+    const managerHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read", "tenant.projects.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      managerHost
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.getAttribute("data-can-manage-project-tasks")
+    ).toBe("true");
+  });
+
+  it("updates my work task status through the runtime task-status action", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const refetchAll = vi.fn();
+    readModelHooks.myWork.mockReturnValue({
+      ...successReadModel({
+        tasks: [{ id: "task-runtime", title: "Runtime my work task" }],
+        scheduledTasks: [],
+        taskStatuses: [{ id: "task-status-done", category: "done", status: "active", sortOrder: 40 }]
+      }),
+      refetchAll
+    });
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceProjectTaskStatus).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceProjectTaskStatus).toHaveBeenCalledWith(
+      {
+        projectId: "project-1",
+        taskId: "task-runtime",
+        statusId: "task-status-done"
+      },
+      expect.anything()
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.workspaceAgentThread });
+    expect(refetchAll).toHaveBeenCalled();
+    invalidateSpy.mockRestore();
   });
 });
 

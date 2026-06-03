@@ -68,6 +68,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
+    expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
     expect(queryKeys.workspace.opportunity("opp-1")).toEqual(["workspace", "opportunities", "opp-1"]);
@@ -168,6 +169,9 @@ describe("runtime read model API", () => {
         return json({ projectTemplates: [{ id: "template-1" }] });
       }
       if (path === "/api/workspace/my-work") return json({ tasks: [{ id: "task-1" }] });
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-done" }] });
+      }
       if (path === "/api/workspace/opportunities") {
         return json({ opportunities: [{ id: "opp-1" }] });
       }
@@ -332,6 +336,7 @@ describe("runtime read model API", () => {
     ).resolves.toEqual({ id: "activity-comment", body: "Runtime comment" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
+    await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
     await expect(
@@ -452,6 +457,7 @@ describe("runtime read model API", () => {
       "/api/workspace/tasks/task-1/comments",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
+      "/api/workspace/task-statuses",
       "/api/workspace/opportunities",
       "/api/workspace/opportunities/opp-1",
       "/api/workspace/opportunities/opp-1/stage",
@@ -552,6 +558,33 @@ describe("runtime read model API", () => {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
     }
+  });
+
+  it("updates my-work status through the project-scoped transition endpoint only", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects/project-1/tasks/task-1/status") {
+        return json({ task: { id: "task-1", statusId: "task-status-done" } });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    await expect(
+      updateWorkspaceProjectTaskStatus({
+        projectId: "project-1",
+        taskId: "task-1",
+        statusId: "task-status-done"
+      })
+    ).resolves.toEqual({ id: "task-1", statusId: "task-status-done" });
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/workspace/projects/project-1/tasks/task-1/status"
+    ]);
+    expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/tasks/task-1");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ statusId: "task-status-done" })
+    });
   });
 
   it("loads the projects list from projects and project template endpoints", async () => {
@@ -1639,6 +1672,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/my-work") {
         return json({ tasks: [{ id: `task-${fetchMock.mock.calls.length}` }] });
       }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
+      }
       if (
         path ===
           "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30" ||
@@ -1687,6 +1723,7 @@ describe("runtime read model API", () => {
       await vi.waitFor(() =>
         expect(fetchMock.mock.calls.filter((call) => call[0] === "/api/workspace/my-work")).toHaveLength(2)
       );
+      expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/workspace/task-statuses");
     } finally {
       act(() => root.unmount());
       queryClient.clear();

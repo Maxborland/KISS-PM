@@ -120,7 +120,11 @@ export function RuntimeDataScreen({
     if (!currentUserId) return <RuntimeMissingUserState />;
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeMyWorkScreen currentUserId={currentUserId} initialTaskId={initialTaskId} />
+        <RuntimeMyWorkScreen
+          currentUserId={currentUserId}
+          initialTaskId={initialTaskId}
+          permissions={permissions}
+        />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -322,12 +326,26 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
 
 function RuntimeMyWorkScreen({
   currentUserId,
-  initialTaskId
+  initialTaskId,
+  permissions
 }: {
   currentUserId: string;
   initialTaskId?: string | undefined;
+  permissions: readonly string[];
 }) {
+  const queryClient = useQueryClient();
   const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
+  const canManageProjectTasks = hasPermission(permissions, "tenant.projects.manage");
+  const updateTaskStatus = useMutation({
+    mutationFn: updateWorkspaceProjectTaskStatus,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      readModel.refetchAll();
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем мою работу…" />;
@@ -348,8 +366,13 @@ function RuntimeMyWorkScreen({
     <RuntimeMyWorkBlock
       tasks={readModel.data.tasks}
       scheduledTasks={readModel.data.scheduledTasks}
+      taskStatuses={readModel.data.taskStatuses}
+      currentUserId={currentUserId}
+      canManageProjectTasks={canManageProjectTasks}
       initialOpenTaskId={initialTaskId}
       readOnly
+      isMovingTaskStatus={updateTaskStatus.isPending}
+      onMoveTaskStatus={(input) => updateTaskStatus.mutateAsync(input)}
     />
   ) : null;
 }

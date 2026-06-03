@@ -95,6 +95,7 @@ export type DealDetailReadModel = {
 export type MyWorkReadModel = {
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
+  taskStatuses: TaskStatus[];
 };
 
 export type DashboardReadModel = {
@@ -808,16 +809,21 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
           scheduledInput.toDate
         ),
         queryFn: () => fetchTenantCurrentScheduledTasks(scheduledInput)
+      },
+      {
+        queryKey: queryKeys.workspace.taskStatuses,
+        queryFn: fetchWorkspaceTaskStatuses
       }
     ]
   });
 
-  const [tasksQuery, scheduledTasksQuery] = queries;
+  const [tasksQuery, scheduledTasksQuery, taskStatusesQuery] = queries;
   const data =
-    tasksQuery.data && scheduledTasksQuery.data
+    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data
       ? {
           tasks: tasksQuery.data as Task[],
-          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[]
+          scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
+          taskStatuses: taskStatusesQuery.data as TaskStatus[]
         }
       : undefined;
 

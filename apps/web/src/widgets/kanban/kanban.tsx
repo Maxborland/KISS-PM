@@ -95,6 +95,7 @@ export function Kanban<T extends KanbanItem<C>, C extends string = string>({
   renderColumnFooter,
   renderColumnEmpty,
   onItemMove,
+  isItemDragDisabled,
   onItemReorder,
   onColumnAction,
   sortOptions,
@@ -218,6 +219,7 @@ export function Kanban<T extends KanbanItem<C>, C extends string = string>({
           sortKey={columnSort?.[column.id] ?? "manual"}
           {...(onColumnSortChange ? { onColumnSortChange } : {})}
           visibleFields={visible}
+          {...(isItemDragDisabled ? { isItemDragDisabled } : {})}
           disableDnd={!dndEnabled}
           showCount={showCount}
           isOverColumn={overColumnId === column.id}
@@ -255,6 +257,7 @@ type KanbanColumnViewProps<T extends KanbanItem<C>, C extends string> = {
   renderColumnFooter?: KanbanProps<T, C>["renderColumnFooter"];
   renderColumnEmpty?: KanbanProps<T, C>["renderColumnEmpty"];
   onColumnAction?: KanbanProps<T, C>["onColumnAction"];
+  isItemDragDisabled?: KanbanProps<T, C>["isItemDragDisabled"];
   sortOptions?: KanbanSortOption[];
   sortKey: KanbanColumnSortKey;
   onColumnSortChange?: (columnId: C, key: KanbanColumnSortKey) => void;
@@ -272,6 +275,7 @@ function KanbanColumnView<T extends KanbanItem<C>, C extends string>({
   renderColumnFooter,
   renderColumnEmpty,
   onColumnAction,
+  isItemDragDisabled,
   sortOptions,
   sortKey,
   onColumnSortChange,
@@ -334,6 +338,7 @@ function KanbanColumnView<T extends KanbanItem<C>, C extends string>({
                 key={item.id}
                 item={item}
                 disableDnd={disableDnd}
+                {...(isItemDragDisabled ? { isItemDragDisabled } : {})}
                 renderCard={renderCard}
                 visibleFields={visibleFields}
               />
@@ -349,21 +354,24 @@ function KanbanColumnView<T extends KanbanItem<C>, C extends string>({
 function KanbanSortableItem<T extends KanbanItem<C>, C extends string>({
   item,
   disableDnd,
+  isItemDragDisabled,
   renderCard,
   visibleFields
 }: {
   item: T;
   disableDnd: boolean;
+  isItemDragDisabled?: (item: T) => boolean;
   renderCard: (item: T, ctx: KanbanCardRenderContext) => ReactNode;
   visibleFields: ReadonlySet<string>;
 }) {
+  const itemDragDisabled = disableDnd || Boolean(isItemDragDisabled?.(item));
   const sortable = useSortable({
     id: item.id,
     data: { type: "item", columnId: item.columnId } satisfies KanbanDragItemData<C>,
-    disabled: disableDnd
+    disabled: itemDragDisabled
   });
 
-  const style = disableDnd
+  const style = itemDragDisabled
     ? undefined
     : {
         transform: CSS.Transform.toString(sortable.transform),
@@ -377,11 +385,11 @@ function KanbanSortableItem<T extends KanbanItem<C>, C extends string>({
       style={style}
       data-item-id={item.id}
       data-dragging={sortable.isDragging ? "true" : undefined}
-      {...(disableDnd ? {} : sortable.attributes)}
-      {...(disableDnd ? {} : sortable.listeners)}
+      {...(itemDragDisabled ? {} : sortable.attributes)}
+      {...(itemDragDisabled ? {} : sortable.listeners)}
     >
       {renderCard(item, {
-        draggable: !disableDnd,
+        draggable: !itemDragDisabled,
         isDragging: sortable.isDragging,
         visibleFields
       })}
