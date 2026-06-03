@@ -82,6 +82,7 @@ export type GanttColumnConfig = {
 export type GanttDayHeader = {
   day: number;
   weekdayShort: string;
+  isoDate?: string;
   weekend?: boolean;
   today?: boolean;
 };

@@ -32,7 +32,8 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "02-my-work",
   "05-deals",
   "07-projects-list",
-  "07b-project-detail"
+  "07b-project-detail",
+  "12-project-gantt"
 ] as const satisfies readonly ScreenId[];
 
 const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
@@ -103,7 +104,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Текущий проект",
       items: [
-        { label: "Гант", nested: true, href: "/projects/demo/gantt" },
+        { label: "Гант", nested: true },
         { label: "Ресурсы", nested: true, href: "/projects/demo/resources" },
         { label: "Базовый план", nested: true, href: "/projects/demo/baseline" },
         { label: "Сценарии", nested: true, href: "/projects/demo/scenarios" },
@@ -361,13 +362,13 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   "12-project-gantt": route({
     id: "12-project-gantt",
     storyTitle: "12 Гант проекта",
-    pageTitle: mockProjectScreenTitle("Гант"),
-    lead: "План-факт и WBS проекта.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Гант", current: true }],
+    pageTitle: "Гант проекта",
+    lead: "План-график проекта на живых задачах и сроках.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта" }, { label: "Гант", current: true }],
     railSection: "projects",
     contextActiveItem: "Гант",
-    pageIntroActions: "create-export",
-    path: "/projects/demo/gantt",
+    pageIntroActions: "none",
+    path: "/projects/:projectId/timeline",
     requiredPermissions: ["tenant.project_plan.read"]
   }),
   "13-project-resources": route({
@@ -510,12 +511,19 @@ export function screenIdForPath(path: string): ScreenId | null {
 
 export function projectIdForRuntimePath(path: string): string | null {
   const [, section, projectId, ...rest] = normalizeRuntimePath(path).split("/");
-  if (section !== "projects" || rest.length > 0) return null;
+  if (section !== "projects") return null;
+  if (rest.length > 1) return null;
+  if (rest.length === 1 && rest[0] !== "timeline") return null;
   if (!projectId || projectId === "demo" || projectId.startsWith(":")) return null;
   return projectId;
 }
 
 function screenIdForDynamicRuntimePath(path: string): ScreenId | null {
+  const normalized = normalizeRuntimePath(path);
+  const [, section, , view] = normalized.split("/");
+  if (section === "projects" && view === "timeline" && projectIdForRuntimePath(path)) {
+    return "12-project-gantt";
+  }
   return projectIdForRuntimePath(path) ? "07b-project-detail" : null;
 }
 

@@ -222,6 +222,21 @@ vi.mock("@/views/blocks/project-detail-block", () => ({
     ])
 }));
 
+vi.mock("@/views/blocks/project-timeline-block", () => ({
+  ProjectTimelineBlock: ({
+    data,
+    project
+  }: {
+    data: { rows: { name: string }[] };
+    project: { title?: string };
+  }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-project-timeline" },
+      [project.title, data.rows.map((row) => row.name).join(", ")].join(" ")
+    )
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -570,6 +585,65 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
     expect(readModelHooks.taskActivity).toHaveBeenCalledWith("task-runtime");
+  });
+
+  it("renders project timeline from the runtime project read model without fixture fallback", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: {
+          id: "project-runtime",
+          title: "Runtime project timeline",
+          tenantId: "tenant-runtime",
+          clientName: "Runtime client",
+          plannedStart: "2026-06-01T00:00:00.000Z",
+          plannedFinish: "2026-06-12T00:00:00.000Z",
+          plannedHours: 120
+        },
+        taskStatuses: [
+          {
+            category: "in_progress",
+            id: "task-status-progress",
+            name: "В работе"
+          }
+        ],
+        tasks: [
+          {
+            actualWork: 0,
+            archivedAt: null,
+            id: "task-runtime",
+            ownerUserId: "usr-1",
+            plannedFinish: "2026-06-04T00:00:00.000Z",
+            plannedStart: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            priority: "normal",
+            progress: 0.5,
+            projectId: "project-runtime",
+            requesterUserId: "usr-1",
+            stageId: null,
+            statusCategory: "in_progress",
+            statusId: "task-status-progress",
+            statusName: "В работе",
+            tenantId: "tenant-runtime",
+            title: "Runtime timeline task"
+          }
+        ],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "12-project-gantt",
+        projectId: "project-runtime",
+        permissions: ["tenant.project_plan.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime project timeline");
+    expect(host.textContent).toContain("Runtime timeline task");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(host.textContent).not.toContain("Разработать концепцию");
+    expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
   });
 
   it("updates task status from project detail through the project-scoped task status API", async () => {

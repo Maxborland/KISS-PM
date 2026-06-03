@@ -44,7 +44,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/my-work")).toBe("02-my-work");
     expect(screenIdForPath("/deals")).toBe("05-deals");
     expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
-    expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
+    expect(screenIdForPath("/projects/project-alpha/timeline")).toBe("12-project-gantt");
     expect(screenIdForPath("/settings")).toBe("10-settings");
     expect(screenIdForPath("/login")).toBe("19-login");
   });
@@ -54,7 +54,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("20-agent-cockpit")).toBe("/agent");
     expect(pathForScreenId("05-deals")).toBe("/deals");
     expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
-    expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
+    expect(pathForScreenId("12-project-gantt")).toBe("/projects/:projectId/timeline");
   });
 
   it("provides real hrefs for primary rail entries", () => {
@@ -79,6 +79,12 @@ describe("navigation-registry", () => {
   it("allows real project detail paths for project readers", () => {
     expect(canOpenRuntimePath("/projects/project-alpha", ["tenant.projects.read"])).toBe(true);
     expect(canOpenRuntimePath("/projects/project-alpha", [])).toBe(false);
+  });
+
+  it("allows real project timeline paths only for project plan readers", () => {
+    expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.project_plan.read"])).toBe(true);
+    expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
   });
 
   it("exposes the workspace agent as an overview surface", () => {
