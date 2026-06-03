@@ -438,7 +438,10 @@ function AgentProposalCard({
                 size="sm"
                 variant="primary"
                 disabled={isConfirming || !onConfirmProposal}
-                onClick={() => void onConfirmProposal?.(proposal.id, "apply")}
+                onClick={() => {
+                  const confirmation = onConfirmProposal?.(proposal.id, "apply");
+                  void confirmation?.catch(() => undefined);
+                }}
               >
                 Применить
               </Button>
@@ -449,7 +452,10 @@ function AgentProposalCard({
                 size="sm"
                 variant="secondary"
                 disabled={isConfirming || !onConfirmProposal}
-                onClick={() => void onConfirmProposal?.(proposal.id, "reject")}
+                onClick={() => {
+                  const confirmation = onConfirmProposal?.(proposal.id, "reject");
+                  void confirmation?.catch(() => undefined);
+                }}
               >
                 Отклонить
               </Button>

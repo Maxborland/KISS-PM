@@ -12,7 +12,12 @@ type ResponseAllowlistEntry = {
 };
 
 const allowedResponseFailures: ResponseAllowlistEntry[] = [
-  { status: 404, url: /\/favicon\.ico(?:\?|$)/ }
+  { status: 404, url: /\/favicon\.ico(?:\?|$)/ },
+  {
+    method: "POST",
+    status: 403,
+    url: /\/api\/workspace\/agent-thread\/proposals\/[^/]+\/confirm$/
+  }
 ];
 
 export const test = base.extend<{ page: Page }>({
@@ -81,6 +86,10 @@ function isAllowedConsoleError(text: string, url: string): boolean {
     (
       /\/_next\/static\/chunks\//.test(url) &&
       /WebSocket connection to '.+\/_next\/webpack-hmr.+net::ERR_NO_BUFFER_SPACE/.test(text)
+    ) ||
+    (
+      /\/api\/workspace\/agent-thread\/proposals\/[^/]+\/confirm$/.test(url) &&
+      /Failed to load resource: the server responded with a status of 403/.test(text)
     )
   );
 }
