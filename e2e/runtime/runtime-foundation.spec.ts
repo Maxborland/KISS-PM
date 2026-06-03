@@ -75,6 +75,9 @@ test("authenticated beta runtime routes open without blank or error states @fast
     await expect(page.locator("body")).toContainText(route.marker);
     await expect(page.locator("body")).not.toContainText("Не удалось");
     await expect(page.locator("body")).not.toContainText("Нет доступа");
+    await expect(page.locator(".app-context-sidebar a[aria-disabled='true']")).toHaveCount(0);
+    await expect(page.locator('.app-context-sidebar a[href*="/demo"]')).toHaveCount(0);
+    await expect(page.locator('.app-context-sidebar a[href="/tasks/new"]')).toHaveCount(0);
 
     const desktopScreenshotPath = testInfo.outputPath(
       `runtime-${route.path.slice(1).replaceAll("/", "-")}-desktop.png`

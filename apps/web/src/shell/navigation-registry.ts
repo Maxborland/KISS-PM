@@ -169,7 +169,7 @@ export function contextNavForSection(
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => !item.href || canOpenRuntimePath(item.href, permissions))
+        .filter((item) => item.href && canOpenRuntimePath(item.href, permissions))
         .map((item) => ({
           ...item,
           active: item.label === activeItem
