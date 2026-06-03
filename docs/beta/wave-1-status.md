@@ -14,8 +14,9 @@ Wave 1 цель: создать clean beta foundation, чтобы дальней
 | PR #73 My Work review mapping | done | PR #73 maps to My Work status action slice; leaves owner/due/comment/blocker follow-ups |
 | Runtime route inventory / beta allowlist | done in PR #74 | `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals`; non-beta runtime routes disabled instead of fixture fallback |
 | Beta seed/reset | done in PR #75 | `pnpm db:reset:dev`, `pnpm db:seed:check`, API smoke over clients/deals/projects/my-work/operations-cockpit/audit |
-| Fast PR gate | current slice | `pnpm qa:fast` standardizes local CI-equivalent without Storybook/VRT |
-| GitHub CI billing/local artifact policy | current slice | `docs/beta/local-artifact-policy.md` |
+| Fast PR gate | done | `pnpm qa:fast` standardizes local CI-equivalent without Storybook/VRT; green on `design-v3` at `ce5c58c` |
+| GitHub CI billing/local artifact policy | done | `docs/beta/local-artifact-policy.md`; GitHub jobs with no steps/runner are infra failures, not product test failures |
+| Current integration base | done | `origin/design-v3` includes PRs #96, #97, #98; local `pnpm qa:fast` green after #98 |
 
 ## PR #73 mapping
 
@@ -37,3 +38,16 @@ These remain separate My Work slices.
 ## Remote CI rule for Wave 1
 
 GitHub CI red from billing/spending-limit is documented and not treated as product/test failure. Code review threads still must be resolved. Local matching gate must be green before considering merge/override.
+
+## Latest local gate
+
+Command: `pnpm qa:fast`
+
+Result on `design-v3` `ce5c58c`: pass.
+
+Coverage summary:
+
+- seed check: 3 clients, 5 deals, 4 projects, 26 tasks, 6 users, 13 audit events;
+- API unit tests: 120 passed, 1 skipped;
+- web unit tests: 352 passed;
+- runtime smoke: 15 beta routes opened without blank/error states.
