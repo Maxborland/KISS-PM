@@ -15,6 +15,7 @@ Wave 1 цель: создать clean beta foundation, чтобы дальней
 | Runtime route inventory / beta allowlist | done in PR #74 | `/dashboard`, `/my-work`, `/agent`, `/projects`, `/deals`; non-beta runtime routes disabled instead of fixture fallback |
 | Beta seed/reset | done in PR #75 | `pnpm db:reset:dev`, `pnpm db:seed:check`, API smoke over clients/deals/projects/my-work/operations-cockpit/audit |
 | Fast PR gate | done | `pnpm qa:fast` standardizes local CI-equivalent without Storybook/VRT; green on last verified runtime base `d12b838` |
+| Product screenshot harness | done | `pnpm qa:screenshots -- --routes /dashboard,/my-work` generated desktop+narrow artifacts for dashboard and My Work; manifest `test-results/beta-runtime-screenshots-manifest.json` allPass=true |
 | GitHub CI billing/local artifact policy | done | `docs/beta/local-artifact-policy.md`; GitHub jobs with `steps: []`/no runner are infra failures, not product test failures; local relevant gate is SSSOT while CI does not start |
 | Current integration base | done | Clean beta work starts from `origin/design-v3`; dirty root is not used as the beta base |
 
@@ -53,6 +54,21 @@ Coverage summary:
 - API unit tests: 120 passed, 1 skipped;
 - web unit tests: 391 passed;
 - runtime smoke: 15 beta routes opened without blank/error states.
+
+## Latest screenshot evidence
+
+Command: `pnpm db:migrate && pnpm db:seed:dev && pnpm qa:screenshots -- --routes /dashboard,/my-work`
+
+Result on `origin/design-v3` `d4aaae4`: pass. Manifest: `test-results/beta-runtime-screenshots-manifest.json`.
+
+Artifacts:
+
+- `/dashboard` desktop: `runtime-dashboard-desktop.png`, 967127 bytes;
+- `/dashboard` narrow: `runtime-dashboard-narrow.png`, 759607 bytes;
+- `/my-work` desktop: `runtime-my-work-desktop.png`, 122166 bytes;
+- `/my-work` narrow: `runtime-my-work-narrow.png`, 479305 bytes.
+
+Known environment note: local Next dev could not download Google Fonts and used fallback fonts; this is infra/network noise, not a route failure.
 
 ## Wave 1 exit
 
