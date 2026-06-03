@@ -1,0 +1,16 @@
+@media (max-width: 720px) {
+  .projects-list__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .projects-list__filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .projects-list__search {
+    width: 100%;
+    min-width: 0;
+  }
+}

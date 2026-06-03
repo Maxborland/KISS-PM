@@ -214,7 +214,7 @@ export function ProjectsListBlock({
       errorTitle="Не удалось загрузить проекты"
       forbiddenTitle="Нет доступа к проектам"
     >
-      <div className="view-toolbar">
+      <div className="view-toolbar projects-list__toolbar">
         <Segmented
           name="projects-filter"
           value={filter}
@@ -225,10 +225,10 @@ export function ProjectsListBlock({
             { value: "templates", label: "Шаблоны" }
           ]}
         />
-        <div className="view-toolbar__filters">
+        <div className="view-toolbar__filters projects-list__filters">
           <SearchPill
             placeholder="Код или название"
-            className="u-w-240"
+            className="projects-list__search"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
@@ -246,7 +246,9 @@ export function ProjectsListBlock({
           title={filter === "active" ? "Нет проектов по запросу" : filter === "archive" ? "Архив пуст" : "Нет шаблонов"}
           description={
             filter === "active"
-              ? "Измените поиск или создайте новый проект."
+              ? readOnly
+                ? "Измените поиск, чтобы увидеть проекты из runtime API."
+                : "Измените поиск или создайте новый проект."
               : filter === "archive"
                 ? "Закрытые проекты появятся здесь после архивации."
                 : "Сохраните проект как шаблон, чтобы переиспользовать структуру."

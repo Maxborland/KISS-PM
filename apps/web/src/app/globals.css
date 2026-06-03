@@ -13,6 +13,7 @@
 @import "../styles/widgets/my-work.css" layer(components);
 @import "../styles/widgets/agent-cockpit.css" layer(components);
 @import "../styles/widgets/project-detail.css" layer(components);
+@import "../styles/widgets/projects-list.css" layer(components);
 @import "../styles/widgets/landing-agent-demo.css" layer(components);
 
 @theme inline {
