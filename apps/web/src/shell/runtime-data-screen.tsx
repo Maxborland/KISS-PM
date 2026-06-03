@@ -27,6 +27,7 @@ import {
   buildFunnelStagesFromDealStages
 } from "@/lib/mock-data/scenario-presenters";
 import { buildProjectTimelineGanttData } from "@/lib/runtime/project-timeline";
+import { buildProjectResourceMatrixData } from "@/lib/runtime/project-resources";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import {
@@ -35,6 +36,7 @@ import {
   type ProjectTaskCreateInput
 } from "@/views/blocks/project-detail-block";
 import { ProjectTimelineBlock } from "@/views/blocks/project-timeline-block";
+import { ProjectResourcesRuntimeBlock } from "@/views/blocks/project-resources-runtime-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import {
@@ -131,6 +133,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeProjectTimelineScreen projectId={projectId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "13-project-resources") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeProjectResourcesScreen projectId={projectId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -524,6 +534,58 @@ function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | unde
     <ProjectTimelineBlock
       project={query.data.project}
       data={buildProjectTimelineGanttData(query.data)}
+    />
+  );
+}
+
+function RuntimeProjectResourcesScreen({ projectId }: { projectId?: string | undefined }) {
+  const query = useProjectDetailReadModelQuery(projectId);
+
+  if (!projectId) {
+    return (
+      <ErrorState
+        level="L1"
+        title="Проект не выбран"
+        description="Откройте ресурсы из карточки проекта или проверьте адрес страницы."
+      />
+    );
+  }
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем ресурсы проекта…" />;
+  }
+
+  if (query.error) {
+    if (
+      query.error instanceof ApiError &&
+      query.error.body.error === "project_not_found"
+    ) {
+      return (
+        <ErrorState
+          level="L1"
+          title="Проект не найден"
+          description="Проверьте ссылку или вернитесь к списку проектов."
+          onRetry={() => void query.refetch()}
+        />
+      );
+    }
+
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить ресурсы проекта"
+        forbiddenTitle="Нет доступа к ресурсам проекта"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  if (!query.data) return null;
+
+  return (
+    <ProjectResourcesRuntimeBlock
+      project={query.data.project}
+      matrix={buildProjectResourceMatrixData(query.data)}
     />
   );
 }

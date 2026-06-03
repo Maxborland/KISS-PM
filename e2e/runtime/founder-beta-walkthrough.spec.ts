@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: project resources runtime route is not wired. Founder-beta walkthrough needs project resources/workload after dashboard -> project/task -> Gantt/My Work/agent can be verified."
+    "Current blocker: runtime audit route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent and resources, but still needs audit proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -61,5 +61,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("project resources must be a live runtime route for workload proof", async () => {
     await page.goto("/projects/project-beta-school-renovation/resources");
     await expect(page.getByRole("heading", { name: /Ресурсы/ })).toBeVisible();
+  });
+
+  await test.step("audit must be a live runtime route for mutation proof", async () => {
+    await page.goto("/admin/audit");
+    await expect(page.getByRole("heading", { name: /Аудит/ })).toBeVisible();
   });
 });
