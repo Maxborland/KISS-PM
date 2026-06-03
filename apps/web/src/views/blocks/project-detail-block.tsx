@@ -6,21 +6,44 @@ import { DataTable } from "@/components/domain/data-table";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import type { Project, Task } from "@/lib/api-types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import type { Project, Task, TaskStatus } from "@/lib/api-types";
 import { formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 export type ProjectDetailBlockProps = {
   project: Project;
+  taskActionError?: unknown;
+  taskActionPending?: boolean;
+  taskStatuses?: TaskStatus[];
   tasks: Task[];
+  onChangeTaskStatus?: (task: Task, statusId: string) => Promise<unknown> | void;
   readOnly?: boolean;
 };
 
-export function ProjectDetailBlock({ project, tasks, readOnly = false }: ProjectDetailBlockProps) {
+export function ProjectDetailBlock({
+  onChangeTaskStatus,
+  project,
+  taskActionError,
+  taskActionPending = false,
+  taskStatuses = [],
+  tasks,
+  readOnly = false
+}: ProjectDetailBlockProps) {
   const activeTasks = tasks.filter((task) => task.archivedAt == null);
   const overdueTasks = activeTasks.filter((task) => isOverdueTask(task));
   const blockedTasks = activeTasks.filter((task) => task.status === "waiting");
   const completion = resolveCompletion(activeTasks);
+  const activeTaskStatuses = taskStatuses
+    .filter((status) => status.status === "active")
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const canChangeTaskStatus = Boolean(onChangeTaskStatus && activeTaskStatuses.length > 0);
   const editDisabledReason = readOnly
     ? "Изменение проекта будет подключено в следующем API-срезе"
     : "Сохранение проекта пока не подключено к API";
@@ -73,34 +96,66 @@ export function ProjectDetailBlock({ project, tasks, readOnly = false }: Project
                 description="Когда команда создаст задачи проекта, они появятся здесь без демо-данных."
               />
             ) : (
-              <DataTable compact>
-                <thead>
-                  <tr>
-                    <th>Задача</th>
-                    <th>Ответственный</th>
-                    <th>Статус</th>
-                    <th>Срок</th>
-                    <th>План</th>
-                    <th>Прогресс</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeTasks.map((task) => (
-                    <tr key={task.id}>
-                      <td>
-                        <CellStack title={task.title} subtitle={task.id} />
-                      </td>
-                      <td>{task.ownerUserId}</td>
-                      <td>
-                        <Chip variant={taskStatusVariant(task.status)}>{task.statusName}</Chip>
-                      </td>
-                      <td>{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
-                      <td className="mono">{formatHours(task.plannedWork)}</td>
-                      <td className="mono">{task.progress}%</td>
+              <>
+                <DataTable compact>
+                  <thead>
+                    <tr>
+                      <th>Задача</th>
+                      <th>Ответственный</th>
+                      <th>Статус</th>
+                      <th>Срок</th>
+                      <th>План</th>
+                      <th>Прогресс</th>
                     </tr>
-                  ))}
-                </tbody>
-              </DataTable>
+                  </thead>
+                  <tbody>
+                    {activeTasks.map((task) => (
+                      <tr key={task.id}>
+                        <td>
+                          <CellStack title={task.title} subtitle={task.id} />
+                        </td>
+                        <td>{task.ownerUserId}</td>
+                        <td>
+                          {canChangeTaskStatus ? (
+                            <Select
+                              value={task.statusId}
+                              disabled={taskActionPending}
+                              onValueChange={(statusId) => {
+                                if (statusId === task.statusId) return;
+                                void onChangeTaskStatus?.(task, statusId);
+                              }}
+                            >
+                              <SelectTrigger
+                                aria-label={`Статус задачи ${task.title}`}
+                                size="sm"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {activeTaskStatuses.map((status) => (
+                                  <SelectItem key={status.id} value={status.id}>
+                                    {status.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Chip variant={taskStatusVariant(task.status)}>{task.statusName}</Chip>
+                          )}
+                        </td>
+                        <td>{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
+                        <td className="mono">{formatHours(task.plannedWork)}</td>
+                        <td className="mono">{task.progress}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+                {taskActionError ? (
+                  <p className="field__error" role="alert">
+                    Не удалось обновить статус задачи. Проверьте права или допустимый переход статуса.
+                  </p>
+                ) : null}
+              </>
             )}
           </CardPanel>
         </div>
