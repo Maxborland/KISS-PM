@@ -44,3 +44,27 @@ test("project timeline task bars open project detail task context", async ({ pag
     "Обмерить существующие классы"
   );
 });
+
+test("project timeline zoom switches between day week and month views", async ({ page }, testInfo) => {
+  const login = await page.request.post("/api/auth/login", {
+    data: adminCredentials
+  });
+  expect(login.status()).toBe(200);
+
+  await page.goto("/projects/project-beta-school-renovation/timeline");
+
+  const gantt = page.getByRole("grid", { name: /Диаграмма Ганта/ });
+  await expect(gantt).toHaveAttribute("data-gantt-zoom", "day");
+  await expect(page.getByText("Обмерить существующие классы")).toBeVisible();
+
+  await page.getByText("Неделя", { exact: true }).click();
+  await expect(gantt).toHaveAttribute("data-gantt-zoom", "week");
+
+  await page.getByText("Месяц", { exact: true }).click();
+  await expect(gantt).toHaveAttribute("data-gantt-zoom", "month");
+  await expect(page.getByText("Обмерить существующие классы")).toBeVisible();
+
+  const screenshotPath = testInfo.outputPath("runtime-project-timeline-zoom.png");
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+  expect(statSync(screenshotPath).size).toBeGreaterThan(8_000);
+});
