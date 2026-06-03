@@ -104,6 +104,51 @@
   box-sizing: content-box;
 }
 
+@media (max-width: 720px) {
+  .gantt2 {
+    max-height: none;
+  }
+
+  .gantt2__split {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .gantt2__wbs {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .gantt2__wbs .gantt2__row--wbs {
+    grid-template-columns: 32px 36px 52px minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .gantt2__wbs .gantt2__cell:nth-child(n + 5) {
+    display: none;
+  }
+
+  .gantt2__wbs .gantt2__cell--name {
+    white-space: normal;
+  }
+
+  .gantt2__wbs .wbs-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gantt2__chart-scroll {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 360px;
+    overflow: auto;
+  }
+}
+
 .gantt2__deps {
   position: absolute;
   top: 0;
