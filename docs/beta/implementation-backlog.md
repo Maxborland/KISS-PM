@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
-| My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions | Status, owner, due date and comment actions are runtime-proven; blocker remains explicit backend gap; forbidden/read-only proof still needs a dedicated route/user slice | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `pnpm qa:fast` |
+| My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; forbidden/read-only proof still needs a dedicated route/user slice | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/status-action | Нужны create task, owner/due/comment/blocker/activity, resources/timeline links | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-task-actions.spec.ts`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/read-only | Runtime timeline route есть; нужны planning mutations/date dependency proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
@@ -26,7 +26,7 @@
 - `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
 - `/projects/:id`, `/projects/:id/timeline` и `/projects/:id/resources` теперь runtime routes; mutation depth и screenshot proof still required.
 - Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback; settings/profile and deeper create/edit flows ещё не сделаны.
-- `/my-work` доказывает status/owner/due-date/comment mutations: PR #73 gates status DnD by `tenant.projects.manage` or task roles `requester/executor/co_executor/controller`; `my-work-task-fields.spec.ts` proves owner+due date persistence; `my-work-task-comments.spec.ts` proves comment activity persistence; blocker remains explicit backend gap.
+- `/my-work` доказывает status/owner/due-date/comment mutations: PR #73 gates status DnD by `tenant.projects.manage` or task roles `requester/executor/co_executor/controller`; `my-work-task-fields.spec.ts` proves owner+due date persistence; `my-work-task-comments.spec.ts` proves comment activity persistence; `my-work-blocker-gap.spec.ts` proves blocker is an explicit disabled backend gap without fake mutation.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
 - В `docs/beta/task-action-contract.md` зафиксирован split: что есть, что отсутствует (`blocker` пока только как gap).
 
@@ -87,8 +87,8 @@
 
 4. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
-   - Status: status action done in PR #73; owner/due date/comment are runtime-proven by targeted Playwright specs; next slice is blocker gap UX + forbidden/read-only proof.
-   - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-block.test.tsx`.
+   - Status: status action done in PR #73; owner/due date/comment are runtime-proven by targeted Playwright specs; blocker gap UX is proven without fake mutation.
+   - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-block.test.tsx`.
 
 5. **Agent grounded context and audit hardening**
    - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
@@ -110,6 +110,7 @@
 - `runtime-data-screen.test.ts`: My Work receives the current user and project manage permission flag for task status actions.
 - `my-work-task-fields.spec.ts`: seeded My Work task owner and due date change through runtime UI and remain changed after reload.
 - `my-work-task-comments.spec.ts`: seeded My Work task comment is created through runtime UI and remains visible in task activity after reload.
+- `my-work-blocker-gap.spec.ts`: My Work blocker control is disabled with explicit data-contract gap copy; waiting-status task shows attention copy instead of fake blocker mutation.
 - `pnpm qa:fast`: standardized as the default local PR gate for small beta slices; pass on `design-v3` `54f0ecf`.
 - `pnpm qa:runtime`: remains the broader runtime+Storybook foundation gate.
 - Existing runtime QA files are present: `e2e/runtime/runtimeQaFixtures.ts`, `runtime-foundation.spec.ts`, `agent-confirmation.spec.ts`, `storybook-visual-smoke.spec.ts`.
