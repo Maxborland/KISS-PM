@@ -15,6 +15,7 @@ import {
   postWorkspaceTaskComment,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
+  useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
@@ -49,6 +50,7 @@ import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { RuntimeAgentScreen } from "@/shell/runtime-agent-screen";
 import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
 import { AuditEventsRuntimeBlock } from "@/views/blocks/audit-events-runtime-block";
+import { AdminUsersRuntimeBlock } from "@/views/blocks/admin-users-runtime-block";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,
@@ -151,6 +153,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeAuditEventsScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "09-admin") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeAdminUsersScreen />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -619,6 +629,27 @@ function RuntimeAuditEventsScreen() {
   }
 
   return query.data ? <AuditEventsRuntimeBlock auditEvents={query.data.auditEvents} /> : null;
+}
+
+function RuntimeAdminUsersScreen() {
+  const query = useAdminUsersReadModelQuery();
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем пользователей…" />;
+  }
+
+  if (query.error) {
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить пользователей"
+        forbiddenTitle="Нет доступа к пользователям"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <AdminUsersRuntimeBlock users={query.data.users} /> : null;
 }
 
 function RuntimeReadModelError({

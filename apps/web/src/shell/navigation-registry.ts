@@ -33,6 +33,7 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "05-deals",
   "07-projects-list",
   "07b-project-detail",
+  "09-admin",
   "12-project-gantt",
   "13-project-resources",
   "17-project-audit"
@@ -141,7 +142,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
       title: "Настройки",
       items: [
         { label: "Рабочая область", href: "/settings" },
-        { label: "Администрирование", href: "/admin" },
+        { label: "Пользователи", href: "/admin/users" },
         { label: "Аудит", href: "/admin/audit" },
         { label: "Интеграции" }
       ]
@@ -328,18 +329,14 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   }),
   "09-admin": route({
     id: "09-admin",
-    storyTitle: "09 Администрирование",
-    pageTitle: "Администрирование",
-    lead: "Пользователи, роли и политики рабочей области.",
-    breadcrumb: [{ label: "Настройки" }, { label: "Администрирование", current: true }],
+    storyTitle: "09 Пользователи",
+    pageTitle: "Пользователи",
+    lead: "Пользователи и профили доступа рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Пользователи", current: true }],
     railSection: "settings",
-    contextActiveItem: "Администрирование",
-    path: "/admin",
-    requiredPermissions: [
-      "tenant.users.read",
-      "tenant.access_profiles.read",
-      "tenant.positions.read"
-    ]
+    contextActiveItem: "Пользователи",
+    path: "/admin/users",
+    requiredPermissions: ["tenant.users.read"]
   }),
   "10-settings": route({
     id: "10-settings",

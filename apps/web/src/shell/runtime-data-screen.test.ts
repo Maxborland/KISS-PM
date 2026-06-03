@@ -13,6 +13,7 @@ import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-d
 
 const readModelHooks = vi.hoisted(() => ({
   agent: vi.fn(),
+  adminUsers: vi.fn(),
   audit: vi.fn(),
   dashboard: vi.fn(),
   deals: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("@/lib/api/read-models", () => ({
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
+  useAdminUsersReadModelQuery: readModelHooks.adminUsers,
   useAuditEventsReadModelQuery: readModelHooks.audit,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
@@ -248,6 +250,15 @@ vi.mock("@/views/blocks/audit-events-runtime-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/admin-users-runtime-block", () => ({
+  AdminUsersRuntimeBlock: ({ users }: { users: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-admin-users" },
+      users.map((user) => user.name).join(", ")
+    )
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -286,6 +297,7 @@ describe("RuntimeDataScreen permission gate", () => {
         refetch: vi.fn()
       }
     );
+    readModelHooks.adminUsers.mockReturnValue(successQuery({ users: [] }));
     readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue(
@@ -682,6 +694,31 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("workspace.agent.proposal.apply");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.audit).toHaveBeenCalled();
+  });
+
+  it("renders admin users from the runtime users read model without fixture fallback", async () => {
+    readModelHooks.adminUsers.mockReturnValue(
+      successQuery({
+        users: [
+          {
+            id: "usr-admin",
+            name: "Runtime Admin"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin",
+        permissions: ["tenant.users.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Admin");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.adminUsers).toHaveBeenCalled();
   });
 
   it("updates task status from project detail through the project-scoped task status API", async () => {

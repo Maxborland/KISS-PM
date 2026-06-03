@@ -25,6 +25,7 @@ import {
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
+  useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
@@ -861,6 +862,89 @@ describe("runtime read model API", () => {
       expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/tenant/current/audit-events"]);
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/audit-events");
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads admin users from the workspace users endpoint without fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/users") {
+        return json({
+          users: [
+            {
+              id: "usr-admin",
+              tenantId: "tenant-alpha",
+              name: "Администратор",
+              accessProfileId: "tenant-admin-alpha",
+              email: "admin@kiss-pm.local",
+              positionId: null,
+              positionName: null,
+              phone: null,
+              telegram: null,
+              status: "active",
+              theme: "light",
+              accentColor: "c1"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AdminUsersProbe() {
+      const readModel = useAdminUsersReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AdminUsersProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            users: [
+              {
+                id: "usr-admin",
+                tenantId: "tenant-alpha",
+                name: "Администратор",
+                accessProfileId: "tenant-admin-alpha",
+                email: "admin@kiss-pm.local",
+                positionId: null,
+                positionName: null,
+                phone: null,
+                telegram: null,
+                status: "active",
+                theme: "light",
+                accentColor: "c1"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/users"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/admin-users");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/access-roles");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/positions");
     } finally {
       act(() => root.unmount());
       queryClient.clear();
