@@ -12,6 +12,7 @@ import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-d
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const readModelHooks = vi.hoisted(() => ({
+  adminAccessRoles: vi.fn(),
   agent: vi.fn(),
   adminUsers: vi.fn(),
   audit: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@/lib/api/read-models", () => ({
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
+  useAdminAccessRolesReadModelQuery: readModelHooks.adminAccessRoles,
   useAdminUsersReadModelQuery: readModelHooks.adminUsers,
   useAuditEventsReadModelQuery: readModelHooks.audit,
   useClientsReadModelQuery: readModelHooks.clients,
@@ -265,6 +267,15 @@ vi.mock("@/views/blocks/admin-users-runtime-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/admin-access-roles-runtime-block", () => ({
+  AdminAccessRolesRuntimeBlock: ({ accessRoles }: { accessRoles: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-admin-access-roles" },
+      accessRoles.map((role) => role.name).join(", ")
+    )
+}));
+
 vi.mock("@/views/blocks/clients-runtime-block", () => ({
   ClientsRuntimeBlock: ({ clients }: { clients: { name: string }[] }) =>
     createElement(
@@ -331,6 +342,7 @@ describe("RuntimeDataScreen permission gate", () => {
       }
     );
     readModelHooks.adminUsers.mockReturnValue(successQuery({ users: [] }));
+    readModelHooks.adminAccessRoles.mockReturnValue(successQuery({ accessRoles: [] }));
     readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
     readModelHooks.clients.mockReturnValue(successQuery({ clients: [] }));
     readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
@@ -366,6 +378,7 @@ describe("RuntimeDataScreen permission gate", () => {
     const permissions = ["tenant.projects.read"];
 
     expect(canOpenStaticRuntimeScreen("09-admin", permissions)).toBe(false);
+    expect(canOpenStaticRuntimeScreen("09-admin-roles", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("10-settings", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("08-entities-products", permissions)).toBe(false);
@@ -373,6 +386,7 @@ describe("RuntimeDataScreen permission gate", () => {
 
   it("allows static runtime screens when the matching read permission is present", () => {
     expect(canOpenStaticRuntimeScreen("09-admin", ["tenant.users.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("09-admin-roles", ["tenant.access_profiles.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("10-settings", ["tenant.workspace_config.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", ["tenant.clients.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("08-entities-products", ["tenant.products.read"])).toBe(true);
@@ -757,6 +771,31 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime Admin");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.adminUsers).toHaveBeenCalled();
+  });
+
+  it("renders admin access roles from the runtime access roles read model without fixture fallback", async () => {
+    readModelHooks.adminAccessRoles.mockReturnValue(
+      successQuery({
+        accessRoles: [
+          {
+            id: "role-runtime",
+            name: "Runtime Role"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin-roles",
+        permissions: ["tenant.access_profiles.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Role");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.adminAccessRoles).toHaveBeenCalled();
   });
 
   it("renders clients from the runtime clients read model without fixture fallback", async () => {

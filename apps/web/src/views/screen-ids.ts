@@ -12,6 +12,7 @@ export const SCREEN_IDS = [
   "08-entities-contacts",
   "08-entities-products",
   "09-admin",
+  "09-admin-roles",
   "10-settings",
   "11-avatar-menu",
   "12-project-gantt",

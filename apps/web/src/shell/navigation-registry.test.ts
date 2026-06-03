@@ -49,6 +49,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
     expect(screenIdForPath("/projects/project-alpha/timeline")).toBe("12-project-gantt");
     expect(screenIdForPath("/admin/users")).toBe("09-admin");
+    expect(screenIdForPath("/admin/roles")).toBe("09-admin-roles");
     expect(screenIdForPath("/admin/audit")).toBe("17-project-audit");
     expect(screenIdForPath("/settings")).toBe("10-settings");
     expect(screenIdForPath("/login")).toBe("19-login");
@@ -64,6 +65,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
     expect(pathForScreenId("12-project-gantt")).toBe("/projects/:projectId/timeline");
     expect(pathForScreenId("09-admin")).toBe("/admin/users");
+    expect(pathForScreenId("09-admin-roles")).toBe("/admin/roles");
     expect(pathForScreenId("17-project-audit")).toBe("/admin/audit");
   });
 
@@ -106,6 +108,11 @@ describe("navigation-registry", () => {
   it("allows admin users runtime path only for user readers", () => {
     expect(canOpenRuntimePath("/admin/users", ["tenant.users.read"])).toBe(true);
     expect(canOpenRuntimePath("/admin/users", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("allows admin roles runtime path only for access profile readers", () => {
+    expect(canOpenRuntimePath("/admin/roles", ["tenant.access_profiles.read"])).toBe(true);
+    expect(canOpenRuntimePath("/admin/roles", ["tenant.users.read"])).toBe(false);
   });
 
   it("allows clients runtime path only for client readers", () => {
@@ -202,6 +209,12 @@ describe("navigation-registry", () => {
         group.items.map((item) => item.href ?? null)
       )
     ).toEqual(["/admin/users", null]);
+
+    expect(
+      contextNavForSection("settings", "Роли", ["tenant.access_profiles.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/admin/roles", null]);
 
     expect(
       contextNavForSection("settings", "Аудит", ["tenant.audit_events.read"]).flatMap((group) =>
