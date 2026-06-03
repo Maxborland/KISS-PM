@@ -9,9 +9,20 @@ import type { GanttData } from "@/widgets/gantt";
 export type ProjectTimelineBlockProps = {
   project: Project;
   data: GanttData;
+  onOpenTask?: (href: string) => void;
 };
 
-export function ProjectTimelineBlock({ project, data }: ProjectTimelineBlockProps) {
+export function ProjectTimelineBlock({
+  project,
+  data,
+  onOpenTask = (href) => window.location.assign(href)
+}: ProjectTimelineBlockProps) {
+  const handleTimelineRowOpen = (rowId: string) => {
+    const href = resolveTimelineTaskHref(project, data, rowId);
+    if (!href) return;
+    onOpenTask(href);
+  };
+
   return (
     <div className="gantt-workspace" data-runtime-surface="project-timeline">
       <RoutePageIntro
@@ -31,10 +42,24 @@ export function ProjectTimelineBlock({ project, data }: ProjectTimelineBlockProp
           showBaseline={false}
           showCriticalPath
           showDependencies={false}
+          onBarClick={handleTimelineRowOpen}
+          onBarDoubleClick={handleTimelineRowOpen}
         />
       )}
     </div>
   );
+}
+
+export function resolveTimelineTaskHref(
+  project: Project,
+  data: GanttData,
+  rowId: string
+): string | null {
+  const row = data.rows.find((item) => item.id === rowId);
+  if (!row || row.kind === "summary") return null;
+
+  const projectId = row.projectId ?? project.id;
+  return `/projects/${encodeURIComponent(projectId)}?taskId=${encodeURIComponent(row.id)}`;
 }
 
 function formatDate(value: string): string {

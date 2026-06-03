@@ -1005,6 +1005,36 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(readModelHooks.taskActivity).toHaveBeenCalledWith("task-runtime");
   });
 
+  it("passes timeline task deep links into project detail activity context", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-review", name: "На проверке" }],
+        tasks: [
+          { id: "task-first", title: "First runtime task" },
+          { id: "task-from-timeline", title: "Timeline target task" }
+        ],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        initialTaskId: "task-from-timeline"
+      })
+    );
+
+    expect(
+      host
+        .querySelector("[data-testid='runtime-project-comment-action']")
+        ?.getAttribute("data-activity-task-id")
+    ).toBe("task-from-timeline");
+    expect(readModelHooks.taskActivity).toHaveBeenCalledWith("task-from-timeline");
+  });
+
   it("renders project timeline from the runtime project read model without fixture fallback", async () => {
     readModelHooks.projectDetail.mockReturnValue(
       successQuery({

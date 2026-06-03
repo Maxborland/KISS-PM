@@ -25,3 +25,22 @@ test("project timeline renders live project tasks without demo fallback", async 
   await page.screenshot({ fullPage: true, path: screenshotPath });
   expect(statSync(screenshotPath).size).toBeGreaterThan(8_000);
 });
+
+test("project timeline task bars open project detail task context", async ({ page }) => {
+  const login = await page.request.post("/api/auth/login", {
+    data: adminCredentials
+  });
+  expect(login.status()).toBe(200);
+
+  await page.goto("/projects/project-beta-school-renovation/timeline");
+
+  await page.locator('[data-gantt-row-id="task-beta-school-survey"]').click();
+
+  await expect(page).toHaveURL(
+    /\/projects\/project-beta-school-renovation\?taskId=task-beta-school-survey$/
+  );
+  await expect(page.getByRole("heading", { name: /Школа на 600 мест/ })).toBeVisible();
+  await expect(page.getByLabel("Задача для активности")).toContainText(
+    "Обмерить существующие классы"
+  );
+});
