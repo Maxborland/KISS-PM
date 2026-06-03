@@ -20,7 +20,7 @@ export const RAIL_SECTIONS = [
   { id: "crm", label: "CRM", shortLabel: "CRM", icon: Briefcase, href: "/deals" },
   { id: "projects", label: "Проекты", shortLabel: "Проекты", icon: FolderKanban, href: "/projects" },
   { id: "directories", label: "Справочники", shortLabel: "Спр.", icon: BookOpen, href: "/directories/clients" },
-  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3, href: "/projects/demo/kpi" },
+  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3, href: "/reports" },
   { id: "settings", label: "Настройки", shortLabel: "Настр.", icon: Settings, href: "/settings" }
 ] as const;
 

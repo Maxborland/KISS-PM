@@ -2,11 +2,11 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { defaultFastPrGateRoutes } from "./beta-runtime-routes.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
-const routes =
-  readOption("routes") ??
-  "/dashboard,/my-work,/agent,/projects,/projects/project-beta-school-renovation,/deals";
+const routes = readOption("routes") ?? defaultFastPrGateRoutes;
 const skipDb = args.includes("--skip-db");
 const skipUnit = args.includes("--skip-unit");
 const skipRouteSmoke = args.includes("--skip-route-smoke");

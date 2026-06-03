@@ -64,9 +64,10 @@ describe("navigation-registry", () => {
       "/deals",
       "/projects",
       "/directories/clients",
-      "/projects/demo/kpi",
+      "/reports",
       "/settings"
     ]);
+    expect(RAIL_SECTIONS.map((section) => section.href).some((href) => href.includes("/demo"))).toBe(false);
   });
 
   it("hides non-beta runtime paths from navigation until they are API-backed", () => {
