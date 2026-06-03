@@ -463,3 +463,14 @@
   flex: 1;
   min-width: 0;
 }
+
+.rmatrix__status-badge {
+  flex-shrink: 0;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger-text);
+  background: var(--danger-soft);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+}

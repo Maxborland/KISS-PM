@@ -856,6 +856,12 @@ async function seedBetaPortfolioData(
       },
       {
         tenantId: "tenant-alpha",
+        projectId: "project-beta-school-renovation",
+        positionId: "position-interior-designer",
+        requiredHours: 40
+      },
+      {
+        tenantId: "tenant-alpha",
         projectId: "project-beta-hotel-interiors",
         positionId: "position-interior-designer",
         requiredHours: 140

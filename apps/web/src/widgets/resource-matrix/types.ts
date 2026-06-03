@@ -41,6 +41,9 @@ export type MatrixRow = {
   percent?: MatrixPercent;
   /** Норма часов в рабочий день (person) — для агрегатов роль/мастерская. */
   dailyNormHours?: number;
+  /** Runtime indicator for demand rows that do not have an assigned person yet. */
+  status?: "missing-role";
+  requiredHours?: number;
   /** Можно ли свернуть (для group rows). */
   collapsible?: boolean;
   /** Ячейки за каждый день месяца, длина равна `days.length`. */

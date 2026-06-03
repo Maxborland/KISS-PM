@@ -6,7 +6,13 @@ import type { Project, Task, WorkspaceUser } from "@/lib/api-types";
 describe("buildProjectResourceMatrixData", () => {
   it("builds a read-only resource matrix from live project tasks and users", () => {
     const data = buildProjectResourceMatrixData({
-      project: project(),
+      project: project({
+        demand: [
+          { positionId: "position-architect", requiredHours: 120 },
+          { positionId: "position-bim-coordinator", requiredHours: 60 },
+          { positionId: "position-interior-designer", requiredHours: 40 }
+        ]
+      }),
       tasks: [
         task({
           id: "task-a",
@@ -25,8 +31,8 @@ describe("buildProjectResourceMatrixData", () => {
         })
       ],
       workspaceUsers: [
-        user("usr-architect", "Анна Архитектор", "Архитектор"),
-        user("usr-bim", "Ольга BIM", "BIM-координатор")
+        user("usr-architect", "Анна Архитектор", "Архитектор", "position-architect"),
+        user("usr-bim", "Ольга BIM", "BIM-координатор", "position-bim-coordinator")
       ],
       now: new Date("2026-06-02T00:00:00.000Z")
     });
@@ -37,8 +43,14 @@ describe("buildProjectResourceMatrixData", () => {
       "архитектор",
       "Анна Архитектор",
       "bim координатор",
-      "Ольга BIM"
+      "Ольга BIM",
+      "Дизайнер интерьеров"
     ]);
+    expect(data.rows.find((row) => row.id === "role-missing-position-interior-designer")).toMatchObject({
+      kind: "role",
+      status: "missing-role",
+      requiredHours: 40
+    });
     expect(data.stats.employees).toBe(2);
     expect(data.stats.assignedHours).toBe(26);
     expect(data.rows.find((row) => row.id === "usr-bim")?.cells[1]).toMatchObject({
@@ -103,7 +115,7 @@ function task(overrides: Partial<Task>): Task {
   };
 }
 
-function user(id: string, name: string, positionName: string): WorkspaceUser {
+function user(id: string, name: string, positionName: string, positionId = `pos-${id}`): WorkspaceUser {
   return {
     accentColor: "c1",
     accessProfileId: "profile",
@@ -111,7 +123,7 @@ function user(id: string, name: string, positionName: string): WorkspaceUser {
     id,
     name,
     phone: null,
-    positionId: `pos-${id}`,
+    positionId,
     positionName,
     status: "active",
     telegram: null,
