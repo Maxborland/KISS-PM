@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
@@ -11,6 +11,7 @@ import type {
   ProjectTemplate,
   ScheduledTask,
   Task,
+  TaskActivity,
   TaskStatus,
   WorkspaceUser
 } from "@/lib/api-types";
@@ -71,6 +72,10 @@ export type ProjectDetailReadModel = {
   taskStatuses: TaskStatus[];
   tasks: Task[];
   workspaceUsers: WorkspaceUser[];
+};
+
+export type TaskActivityReadModel = {
+  activities: TaskActivity[];
 };
 
 export type DealsBoardReadModel = {
@@ -199,6 +204,11 @@ export type UpdateWorkspaceTaskFieldsInput = {
   dueDate?: string | undefined;
 };
 
+export type PostWorkspaceTaskCommentInput = {
+  taskId: string;
+  body: string;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
@@ -224,6 +234,14 @@ export async function fetchWorkspaceTaskStatuses(): Promise<TaskStatus[]> {
     { method: "GET" }
   );
   return response.taskStatuses;
+}
+
+export async function fetchWorkspaceTaskActivity(taskId: string): Promise<TaskActivity[]> {
+  const response = await apiFetch<ListResponse<"activities", TaskActivity>>(
+    `/api/workspace/tasks/${encodeURIComponent(taskId)}/activity`,
+    { method: "GET" }
+  );
+  return response.activities;
 }
 
 export async function updateWorkspaceProjectTaskStatus(input: {
@@ -291,6 +309,19 @@ export async function updateWorkspaceTaskFields(
     }
   );
   return response.task;
+}
+
+export async function postWorkspaceTaskComment(
+  input: PostWorkspaceTaskCommentInput
+): Promise<TaskActivity> {
+  const response = await apiFetch<{ activity: TaskActivity }>(
+    `/api/workspace/tasks/${encodeURIComponent(input.taskId)}/comments`,
+    {
+      method: "POST",
+      json: { body: input.body.trim() }
+    }
+  );
+  return response.activity;
 }
 
 function upsertTaskExecutor(
@@ -477,6 +508,27 @@ export function useProjectDetailReadModelQuery(projectId: string | undefined) {
       void projectDetailQuery.refetch();
       void taskStatusesQuery.refetch();
       void workspaceUsersQuery.refetch();
+    }
+  };
+}
+
+export function useTaskActivityReadModelQuery(taskId: string | undefined) {
+  const query = useQuery({
+    enabled: Boolean(taskId),
+    queryKey: taskId ? queryKeys.workspace.taskActivity(taskId) : queryKeys.workspace.taskActivity(""),
+    queryFn: () => {
+      if (!taskId) throw new Error("task_id_required");
+      return fetchWorkspaceTaskActivity(taskId);
+    }
+  });
+
+  return {
+    data: query.data ? { activities: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
     }
   };
 }

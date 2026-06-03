@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
@@ -12,13 +12,15 @@ import {
   confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask,
   postWorkspaceAgentMessage,
+  postWorkspaceTaskComment,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
   useProjectDetailReadModelQuery,
-  useProjectsListReadModelQuery
+  useProjectsListReadModelQuery,
+  useTaskActivityReadModelQuery
 } from "@/lib/api/read-models";
 import {
   buildFunnelDeals,
@@ -26,7 +28,11 @@ import {
 } from "@/lib/mock-data/scenario-presenters";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
-import { ProjectDetailBlock, type ProjectTaskCreateInput } from "@/views/blocks/project-detail-block";
+import {
+  ProjectDetailBlock,
+  type ProjectTaskCommentInput,
+  type ProjectTaskCreateInput
+} from "@/views/blocks/project-detail-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import {
@@ -288,6 +294,23 @@ function RuntimeProjectDetailScreen({
 }) {
   const queryClient = useQueryClient();
   const query = useProjectDetailReadModelQuery(projectId);
+  const [activityTaskId, setActivityTaskId] = useState<string | undefined>(undefined);
+  const projectTasks = query.data?.tasks.filter((task) => task.archivedAt == null) ?? [];
+  const projectTaskIds = projectTasks.map((task) => task.id).join("|");
+  const defaultActivityTaskId = projectTasks[0]?.id;
+  const resolvedActivityTaskId = activityTaskId ?? defaultActivityTaskId;
+  const taskActivity = useTaskActivityReadModelQuery(resolvedActivityTaskId);
+
+  useEffect(() => {
+    if (!defaultActivityTaskId) {
+      if (activityTaskId) setActivityTaskId(undefined);
+      return;
+    }
+    if (!activityTaskId || !projectTaskIds.split("|").includes(activityTaskId)) {
+      setActivityTaskId(defaultActivityTaskId);
+    }
+  }, [activityTaskId, defaultActivityTaskId, projectTaskIds]);
+
   const createTask = useMutation({
     mutationFn: createWorkspaceProjectTask,
     onSuccess: (_task, input) => {
@@ -298,6 +321,16 @@ function RuntimeProjectDetailScreen({
       if (currentUserId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
       }
+    }
+  });
+  const postTaskComment = useMutation({
+    mutationFn: postWorkspaceTaskComment,
+    onSuccess: (_activity, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.taskActivity(input.taskId) });
+      if (projectId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(projectId) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
     }
   });
   const updateTaskStatus = useMutation({
@@ -368,10 +401,16 @@ function RuntimeProjectDetailScreen({
 
   return (
     <ProjectDetailBlock
+      activityTaskId={resolvedActivityTaskId}
+      commentActionError={postTaskComment.error}
+      commentActionPending={postTaskComment.isPending}
       createTaskError={createTask.error}
       createTaskPending={createTask.isPending}
       currentUserId={currentUserId}
       project={projectDetail.project}
+      taskActivities={taskActivity.data?.activities ?? []}
+      taskActivityError={taskActivity.error}
+      taskActivityPending={taskActivity.isPending || taskActivity.isFetching}
       taskActionError={updateTaskStatus.error ?? updateTaskFields.error}
       taskActionPending={updateTaskStatus.isPending || updateTaskFields.isPending}
       taskStatuses={projectDetail.taskStatuses}
@@ -383,6 +422,8 @@ function RuntimeProjectDetailScreen({
           projectId: projectDetail.project.id
         })
       }
+      onAddTaskComment={(input: ProjectTaskCommentInput) => postTaskComment.mutateAsync(input)}
+      onSelectActivityTask={setActivityTaskId}
       onChangeTaskStatus={(task, statusId) =>
         updateTaskStatus.mutateAsync({
           projectId: projectDetail.project.id,
