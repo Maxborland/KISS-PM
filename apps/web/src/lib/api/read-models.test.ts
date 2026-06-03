@@ -16,6 +16,7 @@ import {
   fetchWorkspaceContacts,
   fetchWorkspaceDealStages,
   fetchWorkspaceProducts,
+  fetchWorkspaceUsers,
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
@@ -29,6 +30,7 @@ import {
   postWorkspaceTaskComment,
   postWorkspaceAgentMessage,
   updateWorkspaceTaskFields,
+  updateWorkspaceUserStatus,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
   useAdminAccessRolesReadModelQuery,
@@ -95,7 +97,10 @@ describe("runtime read model API", () => {
         return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
       }
       if (path === "/api/workspace/users") {
-        return json({ users: [{ id: "usr-1", name: "Камил" }] });
+        return json({ users: [{ id: "usr-1", name: "Камил", status: "active" }] });
+      }
+      if (path === "/api/workspace/users/usr-2") {
+        return json({ user: { id: "usr-2", name: "Мария", status: "inactive" } });
       }
       if (path === "/api/workspace/clients") {
         return json({
@@ -255,6 +260,7 @@ describe("runtime read model API", () => {
       workspaceUsers: []
     });
     await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
+    await expect(fetchWorkspaceUsers()).resolves.toEqual([{ id: "usr-1", name: "Камил", status: "active" }]);
     await expect(fetchWorkspaceClients()).resolves.toEqual([
       {
         id: "client-1",
@@ -325,6 +331,11 @@ describe("runtime read model API", () => {
         })
       })
     ).resolves.toEqual({ id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" });
+    await expect(updateWorkspaceUserStatus({ userId: "usr-2", status: "inactive" })).resolves.toEqual({
+      id: "usr-2",
+      name: "Мария",
+      status: "inactive"
+    });
     await expect(fetchWorkspaceTaskActivity("task-1")).resolves.toEqual([
       { id: "activity-1", body: "Runtime activity" }
     ]);
@@ -447,12 +458,14 @@ describe("runtime read model API", () => {
       "/api/workspace/projects",
       "/api/workspace/projects/project-1",
       "/api/workspace/task-statuses",
+      "/api/workspace/users",
       "/api/workspace/clients",
       "/api/workspace/contacts",
       "/api/workspace/products",
       "/api/workspace/projects/project-1/tasks/task-1/status",
       "/api/workspace/projects/project-1/tasks",
       "/api/workspace/tasks/task-1",
+      "/api/workspace/users/usr-2",
       "/api/workspace/tasks/task-1/activity",
       "/api/workspace/tasks/task-1/comments",
       "/api/workspace/config/project-templates",
@@ -481,6 +494,9 @@ describe("runtime read model API", () => {
     );
     const updateTaskFieldsCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/tasks/task-1"
+    );
+    const updateUserStatusCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/users/usr-2"
     );
     const postTaskCommentCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/tasks/task-1/comments"
@@ -535,6 +551,10 @@ describe("runtime read model API", () => {
         statusId: "task-status-new",
         title: "Runtime task"
       })
+    });
+    expect(updateUserStatusCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ status: "inactive" })
     });
     expect(postTaskCommentCall?.[1]).toMatchObject({
       method: "POST",

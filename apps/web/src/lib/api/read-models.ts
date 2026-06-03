@@ -244,6 +244,11 @@ export type PostWorkspaceTaskCommentInput = {
   body: string;
 };
 
+export type WorkspaceUserStatusUpdateInput = {
+  userId: string;
+  status: "active" | "inactive";
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
@@ -372,6 +377,19 @@ export async function fetchWorkspaceUsers(): Promise<WorkspaceUser[]> {
     method: "GET"
   });
   return response.users;
+}
+
+export async function updateWorkspaceUserStatus(
+  input: WorkspaceUserStatusUpdateInput
+): Promise<WorkspaceUser> {
+  const response = await apiFetch<{ user: WorkspaceUser }>(
+    `/api/workspace/users/${encodeURIComponent(input.userId)}`,
+    {
+      method: "PATCH",
+      json: { status: input.status }
+    }
+  );
+  return response.user;
 }
 
 export async function fetchWorkspaceClients(): Promise<Client[]> {
