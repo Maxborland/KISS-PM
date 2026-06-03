@@ -647,7 +647,30 @@ describe("workspace agent routes", () => {
     await expect(confirmed.json()).resolves.toEqual({ error: "permission_missing" });
     expect(fixture.tasks).toHaveLength(1);
     expect(fixture.taskActivities).toEqual([]);
-    expect(fixture.audits).toEqual([]);
+    expect(fixture.proposals.find((proposal) => proposal.id === body.proposal.id)).toMatchObject({
+      status: "proposed",
+      auditEventId: null,
+      resolvedAt: null
+    });
+    expect(fixture.audits).toEqual([
+      expect.objectContaining({
+        actionType: "workspace.agent_action.denied",
+        commandInput: expect.objectContaining({
+          proposalId: body.proposal.id,
+          decision: "apply",
+          actionType: "workspace.agent.create_task"
+        }),
+        permissionResult: expect.objectContaining({
+          allowed: false,
+          permission: "tenant.tasks.create",
+          reason: "permission_missing"
+        }),
+        executionResult: expect.objectContaining({
+          status: "denied",
+          mutationApplied: false
+        })
+      })
+    ]);
   });
 
   it("rejects repeat confirmation for already resolved proposal", async () => {
