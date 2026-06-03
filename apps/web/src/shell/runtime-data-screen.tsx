@@ -12,6 +12,7 @@ import {
   confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask,
   postWorkspaceAgentMessage,
+  updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
@@ -310,6 +311,18 @@ function RuntimeProjectDetailScreen({
       }
     }
   });
+  const updateTaskFields = useMutation({
+    mutationFn: updateWorkspaceTaskFields,
+    onSuccess: (task) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(task.projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      if (currentUserId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      }
+    }
+  });
 
   if (!projectId) {
     return (
@@ -359,8 +372,8 @@ function RuntimeProjectDetailScreen({
       createTaskPending={createTask.isPending}
       currentUserId={currentUserId}
       project={projectDetail.project}
-      taskActionError={updateTaskStatus.error}
-      taskActionPending={updateTaskStatus.isPending}
+      taskActionError={updateTaskStatus.error ?? updateTaskFields.error}
+      taskActionPending={updateTaskStatus.isPending || updateTaskFields.isPending}
       taskStatuses={projectDetail.taskStatuses}
       tasks={projectDetail.tasks}
       workspaceUsers={projectDetail.workspaceUsers}
@@ -375,6 +388,12 @@ function RuntimeProjectDetailScreen({
           projectId: projectDetail.project.id,
           statusId,
           taskId: task.id
+        })
+      }
+      onUpdateTaskFields={(task, fields) =>
+        updateTaskFields.mutateAsync({
+          ...fields,
+          task
         })
       }
       readOnly

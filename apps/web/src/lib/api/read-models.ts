@@ -193,6 +193,12 @@ export type CreateWorkspaceProjectTaskInput = {
   statusId?: string | undefined;
 };
 
+export type UpdateWorkspaceTaskFieldsInput = {
+  task: Task;
+  ownerUserId?: string | undefined;
+  dueDate?: string | undefined;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
@@ -257,6 +263,42 @@ export async function createWorkspaceProjectTask(
     }
   );
   return response.task;
+}
+
+export async function updateWorkspaceTaskFields(
+  input: UpdateWorkspaceTaskFieldsInput
+): Promise<Task> {
+  const ownerUserId = input.ownerUserId ?? input.task.ownerUserId;
+  const plannedFinish = input.dueDate ?? input.task.plannedFinish.slice(0, 10);
+  const participants = upsertTaskExecutor(input.task.participants, ownerUserId);
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/tasks/${encodeURIComponent(input.task.id)}`,
+    {
+      method: "PATCH",
+      json: {
+        clientUpdatedAt: input.task.updatedAt,
+        description: input.task.description,
+        durationWorkingDays: input.task.durationWorkingDays,
+        participants,
+        plannedFinish,
+        plannedStart: input.task.plannedStart.slice(0, 10),
+        plannedWork: input.task.plannedWork,
+        priority: input.task.priority,
+        requiresAcceptance: input.task.requiresAcceptance,
+        statusId: input.task.statusId,
+        title: input.task.title
+      }
+    }
+  );
+  return response.task;
+}
+
+function upsertTaskExecutor(
+  participants: Task["participants"],
+  ownerUserId: string
+): Task["participants"] {
+  const withoutExecutor = participants.filter((participant) => participant.role !== "executor");
+  return [{ role: "executor", userId: ownerUserId }, ...withoutExecutor];
 }
 
 export async function fetchWorkspaceUsers(): Promise<WorkspaceUser[]> {

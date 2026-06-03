@@ -29,6 +29,11 @@ export type ProjectTaskCreateInput = {
   statusId: string;
 };
 
+export type ProjectTaskFieldsUpdateInput = {
+  ownerUserId?: string | undefined;
+  dueDate?: string | undefined;
+};
+
 export type ProjectDetailBlockProps = {
   createTaskError?: unknown;
   createTaskPending?: boolean;
@@ -40,6 +45,7 @@ export type ProjectDetailBlockProps = {
   taskStatuses?: TaskStatus[];
   tasks: Task[];
   onChangeTaskStatus?: (task: Task, statusId: string) => Promise<unknown> | void;
+  onUpdateTaskFields?: (task: Task, fields: ProjectTaskFieldsUpdateInput) => Promise<unknown> | void;
   readOnly?: boolean;
   workspaceUsers?: WorkspaceUser[];
 };
@@ -50,6 +56,7 @@ export function ProjectDetailBlock({
   currentUserId,
   onCreateTask,
   onChangeTaskStatus,
+  onUpdateTaskFields,
   project,
   taskActionError,
   taskActionPending = false,
@@ -66,6 +73,9 @@ export function ProjectDetailBlock({
     .filter((status) => status.status === "active")
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const canChangeTaskStatus = Boolean(onChangeTaskStatus && activeTaskStatuses.length > 0);
+  const activeWorkspaceUsers = workspaceUsers.filter((user) => user.status !== "inactive");
+  const canChangeTaskOwner = Boolean(onUpdateTaskFields && activeWorkspaceUsers.length > 0);
+  const canChangeTaskDueDate = Boolean(onUpdateTaskFields);
   const defaultStatusId = resolveDefaultStatusId(activeTaskStatuses);
   const canCreateTask = Boolean(onCreateTask && currentUserId && defaultStatusId);
   const createDisabledReason = resolveCreateDisabledReason({
@@ -174,7 +184,34 @@ export function ProjectDetailBlock({
                         <td>
                           <CellStack title={task.title} subtitle={task.id} />
                         </td>
-                        <td>{userNameById.get(task.ownerUserId) ?? task.ownerUserId}</td>
+                        <td>
+                          {canChangeTaskOwner ? (
+                            <Select
+                              value={task.ownerUserId}
+                              disabled={taskActionPending}
+                              onValueChange={(ownerUserId) => {
+                                if (ownerUserId === task.ownerUserId) return;
+                                void onUpdateTaskFields?.(task, { ownerUserId });
+                              }}
+                            >
+                              <SelectTrigger
+                                aria-label={`Ответственный задачи ${task.title}`}
+                                size="sm"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {activeWorkspaceUsers.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            userNameById.get(task.ownerUserId) ?? task.ownerUserId
+                          )}
+                        </td>
                         <td>
                           {canChangeTaskStatus ? (
                             <Select
@@ -203,7 +240,24 @@ export function ProjectDetailBlock({
                             <Chip variant={taskStatusVariant(task.status)}>{task.statusName}</Chip>
                           )}
                         </td>
-                        <td>{formatDateRange(task.plannedStart, task.plannedFinish)}</td>
+                        <td>
+                          {canChangeTaskDueDate ? (
+                            <Input
+                              aria-label={`Срок задачи ${task.title}`}
+                              className="input--sm"
+                              defaultValue={getDateInputValue(new Date(task.plannedFinish))}
+                              disabled={taskActionPending}
+                              type="date"
+                              onBlur={(event) => {
+                                const dueDate = event.currentTarget.value;
+                                if (!dueDate || dueDate === getDateInputValue(new Date(task.plannedFinish))) return;
+                                void onUpdateTaskFields?.(task, { dueDate });
+                              }}
+                            />
+                          ) : (
+                            formatDateRange(task.plannedStart, task.plannedFinish)
+                          )}
+                        </td>
                         <td className="mono">{formatHours(task.plannedWork)}</td>
                         <td className="mono">{task.progress}%</td>
                       </tr>
@@ -212,7 +266,7 @@ export function ProjectDetailBlock({
                 </DataTable>
                 {taskActionError ? (
                   <p className="field__error" role="alert">
-                    Не удалось обновить статус задачи. Проверьте права или допустимый переход статуса.
+                    Не удалось обновить задачу. Проверьте права, срок, ответственного или допустимый переход статуса.
                   </p>
                 ) : null}
               </>

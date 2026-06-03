@@ -22,6 +22,7 @@ const readModelHooks = vi.hoisted(() => ({
   confirmWorkspaceAgentProposal: vi.fn(),
   createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
+  updateWorkspaceTaskFields: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
 }));
 
@@ -29,6 +30,7 @@ vi.mock("@/lib/api/read-models", () => ({
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask: readModelHooks.createWorkspaceProjectTask,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
+  updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
   useDashboardReadModelQueries: readModelHooks.dashboard,
@@ -121,6 +123,7 @@ vi.mock("@/views/blocks/project-detail-block", () => ({
     currentUserId,
     onCreateTask,
     onChangeTaskStatus,
+    onUpdateTaskFields,
     project,
     readOnly,
     taskStatuses,
@@ -135,6 +138,10 @@ vi.mock("@/views/blocks/project-detail-block", () => ({
       title: string;
     }) => Promise<unknown>;
     onChangeTaskStatus?: (task: { id: string }, statusId: string) => Promise<unknown>;
+    onUpdateTaskFields?: (
+      task: { id: string },
+      fields: { dueDate?: string; ownerUserId?: string }
+    ) => Promise<unknown>;
     project: { title?: string };
     readOnly?: boolean;
     taskStatuses?: { id: string; name: string }[];
@@ -154,6 +161,18 @@ vi.mock("@/views/blocks/project-detail-block", () => ({
           }
         },
         "update status"
+      ),
+      createElement(
+        "button",
+        {
+          key: "fields",
+          "data-testid": "runtime-project-fields-action",
+          onClick: () => {
+            const firstTask = tasks[0];
+            if (firstTask) void onUpdateTaskFields?.(firstTask, { dueDate: "2026-06-09", ownerUserId: "usr-2" });
+          }
+        },
+        "update fields"
       ),
       createElement(
         "button",
@@ -232,6 +251,10 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({ id: "task-runtime" });
+    readModelHooks.updateWorkspaceTaskFields.mockResolvedValue({
+      id: "task-runtime",
+      projectId: "project-runtime"
+    });
     readModelHooks.createWorkspaceProjectTask.mockResolvedValue({ id: "task-created" });
   });
 
@@ -555,6 +578,50 @@ describe("RuntimeDataScreen permission gate", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
+  });
+
+  it("updates task owner and due date from project detail through the full task update API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-new", name: "Новая" }],
+        tasks: [{ id: "task-runtime", projectId: "project-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [
+          { id: "usr-1", name: "Runtime User" },
+          { id: "usr-2", name: "Runtime Lead" }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-fields-action']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(readModelHooks.updateWorkspaceTaskFields.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-09",
+      ownerUserId: "usr-2",
+      task: { id: "task-runtime", projectId: "project-runtime", title: "Runtime task detail" }
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
     invalidateSpy.mockRestore();
   });
