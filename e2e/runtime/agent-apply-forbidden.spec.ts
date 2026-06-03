@@ -4,6 +4,11 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./runtimeQaFixtures";
 
+const adminCredentials = {
+  email: "admin@kiss-pm.local",
+  password: "admin12345"
+};
+
 const architectCredentials = {
   email: "architect@kiss-pm.local",
   password: "architect12345"
@@ -45,9 +50,42 @@ test("workspace agent keeps denied apply safe when user lacks task create permis
   await expect(proposal.getByRole("link", { name: /Открыть результат действия/ })).toHaveCount(0);
   await expectMyWorkTask(page, taskTitle, false);
 
-  const screenshotPath = testInfo.outputPath("runtime-agent-apply-forbidden.png");
-  await page.screenshot({ fullPage: true, path: screenshotPath });
-  expect(statSync(screenshotPath).size).toBeGreaterThan(8_000);
+  const deniedAgentScreenshotPath = testInfo.outputPath("runtime-agent-apply-forbidden.png");
+  await page.screenshot({ fullPage: true, path: deniedAgentScreenshotPath });
+  expect(statSync(deniedAgentScreenshotPath).size).toBeGreaterThan(8_000);
+
+  await login(page, adminCredentials);
+  const auditResponse = await page.request.get("/api/tenant/current/audit-events");
+  expect(auditResponse.status()).toBe(200);
+  const auditBody = (await auditResponse.json()) as {
+    auditEvents?: Array<{
+      actionType?: string;
+      executionResult?: { status?: string };
+      permissionResult?: { allowed?: boolean; reason?: string };
+    }>;
+  };
+  expect(auditBody.auditEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        actionType: "workspace.agent_action.denied",
+        executionResult: expect.objectContaining({ status: "denied" }),
+        permissionResult: expect.objectContaining({
+          allowed: false,
+          reason: "permission_missing"
+        })
+      })
+    ])
+  );
+  await page.goto("/admin/audit");
+  const deniedAuditItem = page.locator(".audit-list__item").filter({
+    hasText: "workspace.agent_action.denied"
+  });
+  await expect(deniedAuditItem.first()).toContainText("отклонено");
+  await expect(deniedAuditItem.first()).toContainText("запрещено");
+
+  const auditScreenshotPath = testInfo.outputPath("runtime-agent-apply-forbidden-audit.png");
+  await page.screenshot({ fullPage: true, path: auditScreenshotPath });
+  expect(statSync(auditScreenshotPath).size).toBeGreaterThan(8_000);
 });
 
 async function login(page: Page, credentials: { email: string; password: string }) {

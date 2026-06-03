@@ -7,7 +7,7 @@
 | Экран | Route | Stories | Статус | Главный разрыв | QA proof сейчас |
 | --- | --- | --- | --- | --- | --- |
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention+visual | Operations attention, workload and pipeline pressure render from live read-model; pipeline clickthrough and desktop/narrow screenshots are proven; remaining gap is role-specific filters/actions | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, `dashboard-pipeline-clickthrough.spec.ts`, `pnpm qa:screenshots -- --routes /dashboard` |
-| Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
+| Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired+grounded+failure-audit | Global workspace agent has grounded project focus proof, no-mutation-before-confirm, confirmed apply/result/audit, forbidden read failure and denied apply audit proof; remaining gap is broader grounded Q&A beyond create-task proposal | `agent-focused-context.spec.ts`, `agent-confirmation.spec.ts`, `agent-no-mutation-before-confirm.spec.ts`, `agent-forbidden.spec.ts`, `agent-apply-forbidden.spec.ts` |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap+readonly-proof | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; project-team participant read-only fields/comment flow is proven | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
@@ -61,7 +61,7 @@
 | Screen | Required proof before beta-ready |
 | --- | --- |
 | `/dashboard` | Seeded risk/overdue/overload appears; pipeline pressure links to deal detail; no console/pageerror/API failures; desktop/narrow screenshots |
-| `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
+| `/agent` | Grounded project focus references real entities; proposal has confirmation; no mutation before apply; apply mutates and shows result/audit; forbidden read and denied apply write audit |
 | `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; participant read-only state proven |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
 | Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation; desktop/narrow screenshots pass |
@@ -101,8 +101,8 @@
    - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `my-work-block.test.tsx`.
 
 7. **Agent grounded context and audit hardening**
-   - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
-   - Evidence: negative no-mutation-before-confirm and positive confirmed mutation proof.
+   - Status: global workspace agent reads focused project context without becoming project-specific, requires confirmation before mutation, shows applied result/audit, handles forbidden read and denied apply audit.
+   - Evidence: `agent-focused-context.spec.ts`, `agent-confirmation.spec.ts`, `agent-no-mutation-before-confirm.spec.ts`, `agent-forbidden.spec.ts`, `agent-apply-forbidden.spec.ts`.
 
 8. **Admin mutations and audit surfaces**
    - Status: runtime admin users/roles/audit routes have live mutation proof and desktop/narrow screenshot evidence.
@@ -133,6 +133,10 @@
 - `admin-user-status.spec.ts`: admin deactivates a workspace user, status persists after reload, and action remains reversible.
 - `admin-role-permissions.spec.ts`: admin removes `tenant.projects.read` from the project-team role, architect loses `/projects` access after relogin, and audit captures the permission update.
 - `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`: admin users, roles, and audit routes pass desktop and narrow screenshot capture.
+- `agent-focused-context.spec.ts`: `/agent?projectId=...` remains the global workspace agent while grounding proposal context in the real school renovation project.
+- `agent-confirmation.spec.ts`: agent proposal does not mutate before human confirmation; applying creates a task, result link and audit marker.
+- `agent-apply-forbidden.spec.ts`: denied apply does not create a task and writes `workspace.agent_action.denied` audit with `permission_missing`.
+- `agent-forbidden.spec.ts`: project-team user without project read permission sees forbidden state and denied audit.
 - `runtime-data-screen.test.ts`: read-only `/deals` users do not receive the stage mutation handler unless they have `tenant.opportunities.manage`.
 - `pnpm db:reset:dev`: resets only the documented compose dev database by default, then seeds and checks beta fixture counts.
 - `my-work-block.test.tsx`: status DnD is exposed only for transition-capable roles or `tenant.projects.manage`; `approver`/`observer` cards remain visible but not draggable.
