@@ -260,6 +260,21 @@ describe("RuntimeDashboardScreen", () => {
                         projectId: "project-1",
                         ownerUserId: "usr-2",
                         dueDate: "2026-05-31"
+                      },
+                      {
+                        id: "attention-2",
+                        kind: "deal_ready_to_activate",
+                        severity: "info",
+                        title: "Сделка готова к проекту",
+                        reason: "Нужно передать в проект.",
+                        entity: {
+                          type: "deal",
+                          id: "deal-1",
+                          title: "Бизнес-центр на Ленина"
+                        },
+                        projectId: null,
+                        ownerUserId: "usr-3",
+                        dueDate: "2026-06-10"
                       }
                     ],
                     workloadHints: {
@@ -311,6 +326,10 @@ describe("RuntimeDashboardScreen", () => {
         'a[href="/projects/project-1?taskId=task-1"][aria-label="Открыть сигнал: Просрочен авторский надзор"]'
       );
       expect(attentionLink?.textContent).toContain("Авторский надзор ЖК Север");
+      const dealAttentionLink = host.querySelector(
+        'a[href="/deals/deal-1"][aria-label="Открыть сигнал: Сделка готова к проекту"]'
+      );
+      expect(dealAttentionLink?.textContent).toContain("Бизнес-центр на Ленина");
       expect(host.textContent).toContain("Ресурсные риски");
       expect(host.textContent).toContain("Анна Орлова");
       expect(host.textContent).toContain("46 ч · 2 просрочено");
@@ -318,6 +337,10 @@ describe("RuntimeDashboardScreen", () => {
       expect(host.textContent).toContain("Бизнес-центр на Ленина");
       expect(host.textContent).toContain("ООО Север");
       expect(host.textContent).toContain("есть риск");
+      const pipelineLink = host.querySelector(
+        'a[href="/deals/deal-1"][aria-label="Открыть сделку: Бизнес-центр на Ленина"]'
+      );
+      expect(pipelineLink?.textContent).toContain("320 ч");
     } finally {
       act(() => root.unmount());
       host.remove();

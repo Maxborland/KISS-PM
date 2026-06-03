@@ -284,7 +284,9 @@ export function RuntimeDashboardScreen({
                   {pipelineDeals.map((deal) => (
                     <tr key={deal.id}>
                       <td>
-                        <CellStack title={deal.title} subtitle={`${deal.plannedHours} ч`} />
+                        <a href={`/deals/${deal.id}`} aria-label={`Открыть сделку: ${deal.title}`}>
+                          <CellStack title={deal.title} subtitle={`${deal.plannedHours} ч`} />
+                        </a>
                       </td>
                       <td>{deal.clientName}</td>
                       <td className="mono">{deal.probability}%</td>
@@ -338,7 +340,7 @@ function resolveAttentionEntityHref(
     const projectPath = item.projectId ? `/projects/${item.projectId}` : "/my-work";
     return `${projectPath}?taskId=${item.entity.id}`;
   }
-  return `/deals?dealId=${item.entity.id}`;
+  return `/deals/${item.entity.id}`;
 }
 
 function attentionSeverityLabel(severity: "critical" | "warning" | "info"): string {
