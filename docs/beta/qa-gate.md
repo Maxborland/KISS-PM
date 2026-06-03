@@ -18,6 +18,16 @@ pnpm qa:runtime
 - внутри runner запускает только `pnpm exec playwright test --config playwright.config.ts e2e/runtime`;
 - включает `KISS_PM_STORYBOOK_QA=1` только для этого runtime QA запуска.
 
+## GitHub no-start / local SSSOT
+
+Пока GitHub Runtime QA jobs падают без запуска runner-а (`steps: []`, billing/spending-limit), remote red считается infra-red, а не test failure. Для small beta PR source of truth — локальный релевантный gate:
+
+- `pnpm qa:fast` для обычного PR-sized slice;
+- targeted unit/API/web/e2e команда для узкого backend/frontend slice;
+- `pnpm qa:runtime` или screenshot harness только когда slice меняет runtime route/screenshot acceptance.
+
+PR body должен фиксировать branch/SHA, точные команды, pass/fail summary, skipped checks и Playwright artifact paths, если они создавались. Code-review blockers остаются blockers независимо от локального green.
+
 ## Fast PR gate
 
 Команда:
