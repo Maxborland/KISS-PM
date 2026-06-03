@@ -12,7 +12,7 @@
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/date-action+visual | Live timeline renders real project tasks, zoom works, critical indicators are visible, due-date update persists to project detail, and desktop/narrow screenshots pass; dependency editing remains future scope | `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`, `pnpm qa:fast` route smoke |
-| Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only | Runtime workload route есть; нужны conflict/resource actions, role proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
+| Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only+visual | Runtime ResourceMatrix uses live project tasks/users/demand; missing role, high-load cells, disabled assignment reason and desktop/narrow screenshots are proven; true overload/conflict action remains pending | `project-resources.spec.ts`, `project-resources.test.ts`, `project-resources-runtime-block.test.tsx`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`, `pnpm qa:fast` route smoke |
 | Deals pipeline | `/deals` | CEO-02, SALES-02 | wired+stage-action | Stage move persists; нужны create/edit/client flows, filters/empty states и role-specific polish | `deal-stage-mutation.spec.ts`, route smoke + read-model contract tests |
 | Deal detail / handoff | `/deals/:id` | SALES-03, FIN-01 | wired+handoff | Runtime detail и handoff есть; нужны client/deal create/edit, better failure UX и screenshots | `runtime-data-screen.test.ts`, route smoke |
 | Clients | `/directories/clients` | SALES-01 | wired/read-only | Runtime list есть; нужны create/update/duplicate/validation flows | `pnpm qa:fast` route smoke |
@@ -68,7 +68,7 @@
 | Timeline | Live tasks render in date range; day/week/month zoom works; critical indicators visible; due-date update persists to project detail; desktop/narrow screenshots pass; dependency editing remains future scope |
 | `/deals` | Pipeline loads with only used catalogs; stage move persists; read-only CRM users do not see broken DnD; no hidden clients/projectTypes dependency |
 | Clients/create | Client/deal create, duplicate/validation/save error |
-| Resources | Seeded overload and missing role visible |
+| Resources | Live resource matrix renders seeded project people, high-load cells and missing role; assignment change is honestly disabled; desktop/narrow screenshots pass; true overload/conflict action remains required |
 
 ## Implementation slices
 
@@ -90,12 +90,17 @@
    - Evidence now: `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`.
    - Beta evidence still required: dependency editing/conflict action beyond visible critical indicators.
 
-5. **My Work execution actions**
+5. **Resources / workload foundation**
+   - Status: runtime resources route uses the shared Storybook `ResourceMatrix` core with live project data. Missing role, high-load cells, disabled assignment reason and desktop/narrow screenshots are proven.
+   - Evidence now: `project-resources.spec.ts`, `project-resources.test.ts`, `project-resources-runtime-block.test.tsx`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`.
+   - Beta evidence still required: true overload/conflict/action proof beyond high-load/missing-role foundation.
+
+6. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
    - Status: status action done in PR #73; owner/due date/comment are runtime-proven by targeted Playwright specs; blocker gap UX is proven without fake mutation; project-team participant read-only fields/comment flow is proven.
    - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `my-work-block.test.tsx`.
 
-6. **Agent grounded context and audit hardening**
+7. **Agent grounded context and audit hardening**
    - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
    - Evidence: negative no-mutation-before-confirm and positive confirmed mutation proof.
 
@@ -114,6 +119,8 @@
 - `project-timeline.spec.ts`: timeline renders live project tasks without demo fallback, switches day/week/month zoom, opens task context and shows critical indicators for seeded overdue/waiting tasks.
 - `project-timeline-date-action.spec.ts`: timeline due-date update for the seeded survey task persists after reload and appears in project detail.
 - `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`: timeline desktop and narrow screenshots pass; narrow Gantt stacks WBS and chart sections without page overflow.
+- `project-resources.spec.ts`: project resources route renders live missing role demand, high-load matrix cells, disabled assignment action with reason and no demo fallback.
+- `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`: resources desktop and narrow screenshots pass using shared ResourceMatrix core.
 - `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `deal-stage-mutation.spec.ts`: seeded deal stage changes through runtime `/deals` DnD and remains changed after reload.
 - `runtime-data-screen.test.ts`: read-only `/deals` users do not receive the stage mutation handler unless they have `tenant.opportunities.manage`.
