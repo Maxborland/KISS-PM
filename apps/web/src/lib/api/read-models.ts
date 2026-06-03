@@ -148,6 +148,12 @@ export type WorkspaceAgentThreadContext = {
   focus?: WorkspaceAgentContextFocus;
 };
 
+export type WorkspaceAgentContextInput = {
+  dealId?: string | undefined;
+  projectId?: string | undefined;
+  taskId?: string | undefined;
+};
+
 export type WorkspaceAgentMessage = {
   id: string;
   authorUserId: string;
@@ -535,8 +541,11 @@ export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
   return response.dealStages;
 }
 
-export async function fetchWorkspaceAgentThread(): Promise<WorkspaceAgentThread> {
-  return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread", { method: "GET" });
+export async function fetchWorkspaceAgentThread(
+  context?: WorkspaceAgentContextInput | undefined
+): Promise<WorkspaceAgentThread> {
+  const query = workspaceAgentContextSearchParams(context);
+  return apiFetch<WorkspaceAgentThread>(`/api/workspace/agent-thread${query}`, { method: "GET" });
 }
 
 export async function fetchWorkspaceOperationsCockpit(): Promise<OperationsCockpitReadModel> {
@@ -566,10 +575,13 @@ export async function fetchTenantCurrentAuditEvents(): Promise<AuditEventListIte
   return response.auditEvents;
 }
 
-export async function postWorkspaceAgentMessage(body: string): Promise<WorkspaceAgentThread> {
+export async function postWorkspaceAgentMessage(
+  body: string,
+  context?: WorkspaceAgentContextInput | undefined
+): Promise<WorkspaceAgentThread> {
   return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread/messages", {
     method: "POST",
-    json: body
+    json: hasWorkspaceAgentContext(context) ? { body, context } : body
   });
 }
 
@@ -676,12 +688,15 @@ export function useTaskActivityReadModelQuery(taskId: string | undefined) {
   };
 }
 
-export function useAgentCockpitReadModelQuery() {
+export function useAgentCockpitReadModelQuery(context?: WorkspaceAgentContextInput | undefined) {
+  const agentThreadQueryKey = hasWorkspaceAgentContext(context)
+    ? queryKeys.workspace.workspaceAgentThreadContext(workspaceAgentContextKey(context))
+    : queryKeys.workspace.workspaceAgentThread;
   const queries = useQueries({
     queries: [
       {
-        queryKey: queryKeys.workspace.workspaceAgentThread,
-        queryFn: fetchWorkspaceAgentThread
+        queryKey: agentThreadQueryKey,
+        queryFn: () => fetchWorkspaceAgentThread(context)
       },
       {
         queryKey: queryKeys.workspace.operationsCockpit,
@@ -700,6 +715,39 @@ export function useAgentCockpitReadModelQuery() {
       : undefined;
 
   return aggregateQueries<AgentCockpitReadModel>(queries, data);
+}
+
+function workspaceAgentContextSearchParams(context?: WorkspaceAgentContextInput | undefined): string {
+  if (!hasWorkspaceAgentContext(context)) return "";
+  const searchParams = new URLSearchParams();
+  appendWorkspaceAgentContextParam(searchParams, "dealId", context.dealId);
+  appendWorkspaceAgentContextParam(searchParams, "projectId", context.projectId);
+  appendWorkspaceAgentContextParam(searchParams, "taskId", context.taskId);
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function workspaceAgentContextKey(context: WorkspaceAgentContextInput): string {
+  return [
+    `deal:${context.dealId?.trim() ?? ""}`,
+    `project:${context.projectId?.trim() ?? ""}`,
+    `task:${context.taskId?.trim() ?? ""}`
+  ].join("|");
+}
+
+function appendWorkspaceAgentContextParam(
+  searchParams: URLSearchParams,
+  key: keyof WorkspaceAgentContextInput,
+  value: string | undefined
+) {
+  const trimmed = value?.trim();
+  if (trimmed) searchParams.set(key, trimmed);
+}
+
+function hasWorkspaceAgentContext(
+  context: WorkspaceAgentContextInput | undefined
+): context is WorkspaceAgentContextInput {
+  return Boolean(context?.dealId?.trim() || context?.projectId?.trim() || context?.taskId?.trim());
 }
 
 export function useAuditEventsReadModelQuery() {
@@ -901,7 +949,7 @@ export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
       },
       {
         queryKey: queryKeys.workspace.workspaceAgentThread,
-        queryFn: fetchWorkspaceAgentThread
+        queryFn: () => fetchWorkspaceAgentThread()
       },
       {
         queryKey: queryKeys.workspace.operationsCockpit,

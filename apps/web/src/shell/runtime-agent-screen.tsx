@@ -10,16 +10,23 @@ import { queryKeys } from "@/lib/api/query-keys";
 import {
   confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage,
+  type WorkspaceAgentContextInput,
   useAgentCockpitReadModelQuery
 } from "@/lib/api/read-models";
 import { AgentCockpitBlock } from "@/views/blocks/agent-cockpit-block";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
-export function RuntimeAgentScreen({ currentUserId }: { currentUserId: string }) {
+export function RuntimeAgentScreen({
+  agentContext,
+  currentUserId
+}: {
+  agentContext?: WorkspaceAgentContextInput | undefined;
+  currentUserId: string;
+}) {
   const queryClient = useQueryClient();
-  const readModel = useAgentCockpitReadModelQuery();
+  const readModel = useAgentCockpitReadModelQuery(agentContext);
   const sendWorkspaceAgentMessage = useMutation({
-    mutationFn: postWorkspaceAgentMessage,
+    mutationFn: (body: string) => postWorkspaceAgentMessage(body, agentContext),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });

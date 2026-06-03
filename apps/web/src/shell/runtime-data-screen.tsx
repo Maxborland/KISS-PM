@@ -33,7 +33,8 @@ import {
   useProductsReadModelQuery,
   useProjectDetailReadModelQuery,
   useProjectsListReadModelQuery,
-  useTaskActivityReadModelQuery
+  useTaskActivityReadModelQuery,
+  type WorkspaceAgentContextInput
 } from "@/lib/api/read-models";
 import type { Opportunity, Project } from "@/lib/api-types";
 import {
@@ -83,6 +84,7 @@ export function RuntimeDataScreen({
   projectId,
   currentUserId,
   currentAccessProfileId,
+  agentContext,
   initialTaskId
 }: {
   screenId: ScreenId;
@@ -91,6 +93,7 @@ export function RuntimeDataScreen({
   projectId?: string | undefined;
   currentUserId?: string | undefined;
   currentAccessProfileId?: string | undefined;
+  agentContext?: WorkspaceAgentContextInput | undefined;
   initialTaskId?: string | undefined;
 }) {
   if (!canOpenStaticRuntimeScreen(screenId, permissions)) {
@@ -137,7 +140,7 @@ export function RuntimeDataScreen({
     if (!currentUserId) return <RuntimeMissingUserState />;
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeAgentScreen currentUserId={currentUserId} />
+        <RuntimeAgentScreen agentContext={agentContext} currentUserId={currentUserId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -290,7 +293,7 @@ function RuntimeDashboardDataScreen({ currentUserId }: { currentUserId: string }
   const queryClient = useQueryClient();
   const readModel = useDashboardReadModelQueries({ assigneeUserId: currentUserId });
   const sendWorkspaceAgentMessage = useMutation({
-    mutationFn: postWorkspaceAgentMessage,
+    mutationFn: (body: string) => postWorkspaceAgentMessage(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });

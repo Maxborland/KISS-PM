@@ -22,6 +22,11 @@ export default async function RuntimePathPage({
   return (
     <RuntimeScreen
       screenId={screenId}
+      agentContext={{
+        dealId: firstSearchParamValue(resolvedSearchParams?.dealId),
+        projectId: firstSearchParamValue(resolvedSearchParams?.projectId),
+        taskId: firstSearchParamValue(resolvedSearchParams?.taskId)
+      }}
       dealId={dealIdForRuntimePath(runtimePathname) ?? undefined}
       projectId={projectIdForRuntimePath(runtimePathname) ?? undefined}
       initialTaskId={firstSearchParamValue(resolvedSearchParams?.taskId)}

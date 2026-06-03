@@ -900,12 +900,12 @@ describe("RuntimeDataScreen permission gate", () => {
             ]
           },
           workspaceAgentThread: {
-            context: {},
+            context: { focus: { type: "project", id: "project-runtime", title: "Runtime project" } },
             messages: [
               {
                 authorUserId: "usr-1",
                 body: "Что требует внимания сегодня?",
-                context: {},
+                context: { focus: { type: "project", id: "project-runtime", title: "Runtime project" } },
                 createdAt: "2026-06-01T00:00:00.000Z",
                 id: "agent-message"
               }
@@ -914,7 +914,7 @@ describe("RuntimeDataScreen permission gate", () => {
               {
                 actionType: "workspace.agent.create_task",
                 auditEventId: null,
-                context: {},
+                context: { focus: { type: "project", id: "project-runtime", title: "Runtime project" } },
                 createdAt: "2026-06-01T00:01:00.000Z",
                 description: "Создать задачу восстановления срока.",
                 id: "agent-proposal",
@@ -937,13 +937,16 @@ describe("RuntimeDataScreen permission gate", () => {
     const host = await renderRuntime(
       createElement(RuntimeDataScreen, {
         screenId: "20-agent-cockpit",
+        agentContext: { projectId: "project-runtime" },
         permissions: ["tenant.projects.read"],
         currentUserId: "usr-1"
       })
     );
 
+    expect(readModelHooks.agent).toHaveBeenCalledWith({ projectId: "project-runtime" });
     expect(host.textContent).toContain("Единый управленческий центр");
     expect(host.textContent).toContain("Контекст агента");
+    expect(host.textContent).toContain("Runtime project");
     expect(host.textContent).toContain("2 активных проектов");
     expect(host.textContent).toContain("Просрочен авторский надзор");
     expect(host.textContent).toContain("Что требует внимания сегодня?");
