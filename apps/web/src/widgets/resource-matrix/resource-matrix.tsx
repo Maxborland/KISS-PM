@@ -79,6 +79,11 @@ function NameCell({
         />
       ) : null}
       <span className="rmatrix__name-text">{row.name}</span>
+      {row.status === "missing-role" ? (
+        <span className="rmatrix__status-badge" title={`${row.requiredHours ?? 0} ч не закрыто`}>
+          Не закрыта
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -121,6 +126,7 @@ export function ResourceMatrix({ data, className }: ResourceMatrixProps) {
             )}
             role="row"
             data-row-id={row.id}
+            data-row-status={row.status}
             data-depth={depth}
             style={{ gridTemplateColumns: gridCols }}
           >

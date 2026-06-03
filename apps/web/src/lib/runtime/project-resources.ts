@@ -47,6 +47,11 @@ export function buildProjectResourceMatrixData({
   const usersById = new Map(workspaceUsers.map((user) => [user.id, user]));
   const tasksByOwner = groupTasksByOwner(activeTasks);
   const workshopId = `project-resources-${project.id}`;
+  const assignedPositionIds = new Set(
+    Array.from(tasksByOwner.keys())
+      .map((userId) => usersById.get(userId)?.positionId)
+      .filter((positionId): positionId is string => Boolean(positionId))
+  );
   const personRows = Array.from(tasksByOwner.entries()).map(([userId, ownerTasks], index) =>
     personRow({
       days,
@@ -57,6 +62,7 @@ export function buildProjectResourceMatrixData({
     })
   );
   const roleRows = buildRoleRows(personRows, days, workshopId);
+  const missingDemandRows = buildMissingDemandRows(project.demand, assignedPositionIds, days, workshopId);
   const workshopRow: MatrixRow = {
     id: workshopId,
     kind: "workshop",
@@ -69,7 +75,14 @@ export function buildProjectResourceMatrixData({
 
   return {
     days,
-    rows: personRows.length ? [workshopRow, ...roleRows.flatMap(({ role, people }) => [role, ...people])] : [],
+    rows:
+      personRows.length || missingDemandRows.length
+        ? [
+            workshopRow,
+            ...roleRows.flatMap(({ role, people }) => [role, ...people]),
+            ...missingDemandRows
+          ]
+        : [],
     stats: computeMatrixStats(personRows, days)
   };
 }
@@ -140,6 +153,26 @@ function buildRoleRows(personRows: MatrixRow[], days: RuntimeResourceDayHeader[]
   });
 }
 
+function buildMissingDemandRows(
+  demand: Project["demand"],
+  assignedPositionIds: ReadonlySet<string>,
+  days: RuntimeResourceDayHeader[],
+  workshopId: string
+): MatrixRow[] {
+  return demand
+    .filter((item) => item.requiredHours > 0 && !assignedPositionIds.has(item.positionId))
+    .map((item) => ({
+      id: `role-missing-${item.positionId}`,
+      kind: "role",
+      parentId: workshopId,
+      indent: 1,
+      name: positionLabel(item.positionId),
+      requiredHours: item.requiredHours,
+      status: "missing-role",
+      cells: days.map((day) => (day.weekend ? { kind: "weekend" as const } : { kind: "zero" as const }))
+    }));
+}
+
 function dayCellForTasks(day: RuntimeResourceDayHeader, tasks: Task[]): DayCell {
   if (day.weekend) return { kind: "weekend" };
   const iso = day.isoDate;
@@ -185,6 +218,18 @@ function roleId(positionName: string | null | undefined): string {
 
 function roleName(id: string): string {
   return id === roleId(null) ? "Роль не указана" : id.replace(/^role-/, "").replaceAll("-", " ");
+}
+
+function positionLabel(positionId: string): string {
+  const known: Record<string, string> = {
+    "position-architect": "Архитектор",
+    "position-bim-coordinator": "BIM-координатор",
+    "position-engineer": "Инженер",
+    "position-estimator": "Сметчик",
+    "position-interior-designer": "Дизайнер интерьеров",
+    "position-lead-architect": "Главный архитектор"
+  };
+  return known[positionId] ?? positionId.replace(/^position-/, "").replaceAll("-", " ");
 }
 
 function initialsFromName(name: string): string {
