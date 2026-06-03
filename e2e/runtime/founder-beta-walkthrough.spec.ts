@@ -24,7 +24,7 @@ test("founder-beta management walkthrough covers the current runtime spine throu
   });
 
   await test.step("attention cockpit must link the user into the affected entity", async () => {
-    const attentionRow = page.getByRole("row", { name: /Обмерить существующие классы/ });
+    const attentionRow = page.getByRole("row", { name: /Открыть сигнал: Обмерить существующие классы/ });
     await expect(attentionRow).toBeVisible();
 
     const screenshotPath = testInfo.outputPath("founder-beta-walkthrough-dashboard-attention-linked.png");
