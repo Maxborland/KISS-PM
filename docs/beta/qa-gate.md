@@ -61,6 +61,12 @@ Route selection передается через `KISS_PM_FAST_ROUTES`; по ум
 - `test-results/`;
 - `playwright-report/`.
 
+Команда `pnpm qa:screenshots -- --routes beta` запускает screenshot smoke по полному beta route set и пишет manifest:
+
+- `test-results/beta-runtime-screenshots-manifest.json`.
+
+Manifest содержит route, viewport, marker, screenshot path, file size и `allPass`. Он не коммитится, а служит локальным/CI evidence artifact.
+
 Ожидаемые screenshot artifacts внутри Playwright output:
 
 - `runtime-foundation-desktop.png`;
