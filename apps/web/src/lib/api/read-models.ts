@@ -96,6 +96,7 @@ export type MyWorkReadModel = {
   tasks: Task[];
   scheduledTasks: ScheduledTask[];
   taskStatuses: TaskStatus[];
+  workspaceUsers: WorkspaceUser[];
 };
 
 export type DashboardReadModel = {
@@ -813,17 +814,22 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
       {
         queryKey: queryKeys.workspace.taskStatuses,
         queryFn: fetchWorkspaceTaskStatuses
+      },
+      {
+        queryKey: queryKeys.workspace.users,
+        queryFn: fetchOptionalWorkspaceUsers
       }
     ]
   });
 
-  const [tasksQuery, scheduledTasksQuery, taskStatusesQuery] = queries;
+  const [tasksQuery, scheduledTasksQuery, taskStatusesQuery, workspaceUsersQuery] = queries;
   const data =
-    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data
+    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data && workspaceUsersQuery.data
       ? {
           tasks: tasksQuery.data as Task[],
           scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
-          taskStatuses: taskStatusesQuery.data as TaskStatus[]
+          taskStatuses: taskStatusesQuery.data as TaskStatus[],
+          workspaceUsers: workspaceUsersQuery.data as WorkspaceUser[]
         }
       : undefined;
 

@@ -5,7 +5,16 @@ import { useState, type ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CardPanel } from "@/components/domain/card-panel";
+import { Field, FormGrid } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetBody,
@@ -15,7 +24,7 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaskActivity } from "@/lib/api-types";
+import type { TaskActivity, WorkspaceUser } from "@/lib/api-types";
 import { EntityDetailBlock } from "@/views/blocks/entity-detail-block";
 import { mockTaskProjectRef } from "@/views/catalog";
 
@@ -23,8 +32,15 @@ export type TaskDetailTask = {
   id: string;
   title: string;
   description?: string | null | undefined;
+  ownerUserId?: string | undefined;
+  plannedFinish?: string | undefined;
   stage?: { label: string; tone?: "info" | "violet" | "success" | "warning" };
   project?: string | undefined;
+};
+
+export type TaskDetailFieldsUpdateInput = {
+  dueDate?: string | undefined;
+  ownerUserId?: string | undefined;
 };
 
 export type TaskDetailDrawerProps = {
@@ -36,7 +52,12 @@ export type TaskDetailDrawerProps = {
   activityPending?: boolean | undefined;
   commentError?: unknown;
   commentPending?: boolean | undefined;
+  canEditTaskFields?: boolean | undefined;
+  fieldActionError?: unknown;
+  fieldActionPending?: boolean | undefined;
   onAddComment?: ((body: string) => Promise<unknown> | void) | undefined;
+  onUpdateTaskFields?: ((fields: TaskDetailFieldsUpdateInput) => Promise<unknown> | void) | undefined;
+  workspaceUsers?: WorkspaceUser[] | undefined;
   /**
    * Маршрут на полноценную страницу карточки задачи. В Storybook ведёт на
    * историю `screens-задачи--task-card`; в продукте подставляется реальный
@@ -54,11 +75,16 @@ export function TaskDetailDrawer({
   activityPending = false,
   commentError,
   commentPending = false,
+  canEditTaskFields = false,
+  fieldActionError,
+  fieldActionPending = false,
   onAddComment,
+  onUpdateTaskFields,
   task,
   open,
   onOpenChange,
-  taskHref = DEFAULT_STORYBOOK_TASK_HREF
+  taskHref = DEFAULT_STORYBOOK_TASK_HREF,
+  workspaceUsers = []
 }: TaskDetailDrawerProps) {
   const subtitle = task ? (task.project ? `${task.id} · ${task.project}` : mockTaskProjectRef(task.id)) : "";
   const hasRuntimeActivity = activities != null || Boolean(onAddComment);
@@ -101,9 +127,19 @@ export function TaskDetailDrawer({
                 variant="task"
                 primary={
                   hasRuntimeActivity ? (
-                    <CardPanel title="Описание" subtitle="Контекст задачи">
-                      <p className="u-text-body">{task.description?.trim() || "Описание не заполнено."}</p>
-                    </CardPanel>
+                    <>
+                      <CardPanel title="Описание" subtitle="Контекст задачи">
+                        <p className="u-text-body">{task.description?.trim() || "Описание не заполнено."}</p>
+                      </CardPanel>
+                      <RuntimeTaskFieldsPanel
+                        canEdit={canEditTaskFields && Boolean(onUpdateTaskFields)}
+                        error={fieldActionError}
+                        isPending={fieldActionPending}
+                        onUpdate={onUpdateTaskFields}
+                        task={task}
+                        workspaceUsers={workspaceUsers}
+                      />
+                    </>
                   ) : undefined
                 }
                 headerActions={hasRuntimeActivity ? null : undefined}
@@ -125,6 +161,92 @@ export function TaskDetailDrawer({
         ) : null}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function RuntimeTaskFieldsPanel({
+  canEdit,
+  error,
+  isPending,
+  onUpdate,
+  task,
+  workspaceUsers
+}: {
+  canEdit: boolean;
+  error: unknown;
+  isPending: boolean;
+  onUpdate?: ((fields: TaskDetailFieldsUpdateInput) => Promise<unknown> | void) | undefined;
+  task: TaskDetailTask;
+  workspaceUsers: WorkspaceUser[];
+}) {
+  const activeUsers = workspaceUsers.filter((user) => user.status !== "inactive");
+  const usersById = new Map(workspaceUsers.map((user) => [user.id, user.name]));
+  const dueDate = getDateInputValue(task.plannedFinish);
+  const ownerName = task.ownerUserId ? usersById.get(task.ownerUserId) ?? task.ownerUserId : "Не назначен";
+  const canEditOwner = canEdit && activeUsers.length > 0 && Boolean(task.ownerUserId);
+  const canEditDue = canEdit && Boolean(dueDate);
+
+  return (
+    <CardPanel title="Параметры" subtitle="Ответственный и срок" className="u-mt-3">
+      <FormGrid columns={2}>
+        <Field label="Ответственный">
+          {canEditOwner ? (
+            <Select
+              value={task.ownerUserId ?? ""}
+              disabled={isPending}
+              onValueChange={(ownerUserId) => {
+                if (ownerUserId === task.ownerUserId) return;
+                void onUpdate?.({ ownerUserId });
+              }}
+            >
+              <SelectTrigger aria-label={`Ответственный задачи ${task.title}`} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {activeUsers.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="u-text-body">{ownerName}</p>
+          )}
+          {canEdit && activeUsers.length === 0 ? (
+            <p className="u-text-xs u-text-muted">Список пользователей недоступен.</p>
+          ) : null}
+        </Field>
+        <Field label="Срок">
+          {canEditDue ? (
+            <Input
+              aria-label={`Срок задачи ${task.title}`}
+              className="input--sm"
+              defaultValue={dueDate}
+              disabled={isPending}
+              type="date"
+              onBlur={(event) => {
+                const nextDueDate = event.currentTarget.value;
+                if (!nextDueDate || nextDueDate === dueDate) return;
+                void onUpdate?.({ dueDate: nextDueDate });
+              }}
+            />
+          ) : (
+            <p className="u-text-body">{dueDate || "Не задан"}</p>
+          )}
+        </Field>
+      </FormGrid>
+      {!canEdit ? (
+        <p className="u-text-xs u-text-muted u-mt-2">
+          Ответственного и срок меняет руководитель проекта.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="field__error u-mt-2" role="alert">
+          Не удалось обновить задачу. Проверьте права, срок, ответственного или актуальность данных.
+        </p>
+      ) : null}
+    </CardPanel>
   );
 }
 
@@ -185,6 +307,13 @@ function initialsFromUserId(userId: string): string {
     .map((part) => part[0]?.toUpperCase())
     .join("")
     .slice(0, 2) || "??";
+}
+
+function getDateInputValue(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toISOString().slice(0, 10);
 }
 
 function TaskCommentComposer({

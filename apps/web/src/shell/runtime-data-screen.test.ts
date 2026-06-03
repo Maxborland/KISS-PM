@@ -135,8 +135,10 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     onAddTaskComment,
     onMoveTaskStatus,
     onOpenTaskChange,
+    onUpdateTaskFields,
     readOnly,
-    tasks
+    tasks,
+    workspaceUsers
   }: {
     canManageProjectTasks?: boolean;
     currentUserId?: string;
@@ -144,8 +146,13 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     onAddTaskComment?: (input: { body: string; taskId: string }) => Promise<unknown>;
     onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
     onOpenTaskChange?: (taskId: string | undefined) => void;
+    onUpdateTaskFields?: (
+      task: { id: string; projectId?: string; title: string },
+      fields: { dueDate?: string; ownerUserId?: string }
+    ) => Promise<unknown>;
     readOnly?: boolean;
-    tasks: { title: string }[];
+    tasks: { id: string; projectId?: string; title: string }[];
+    workspaceUsers?: { id: string; name: string }[];
   }) =>
     createElement(
       "div",
@@ -194,6 +201,24 @@ vi.mock("@/views/blocks/my-work-block", () => ({
             }
           },
           "comment"
+        ),
+        createElement(
+          "button",
+          {
+            key: "fields",
+            "data-testid": "runtime-my-work-fields-action",
+            "data-users-count": String(workspaceUsers?.length ?? 0),
+            onClick: () => {
+              const firstTask = tasks[0];
+              if (firstTask) {
+                void onUpdateTaskFields?.(firstTask, {
+                  dueDate: "2026-06-09",
+                  ownerUserId: "usr-2"
+                });
+              }
+            }
+          },
+          "fields"
         ),
         tasks.map((task) => task.title).join(", ")
       ]
@@ -462,7 +487,7 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
     readModelHooks.products.mockReturnValue(successQuery({ products: [] }));
     readModelHooks.myWork.mockReturnValue(
-      successReadModel({ scheduledTasks: [], taskStatuses: [], tasks: [] })
+      successReadModel({ scheduledTasks: [], taskStatuses: [], tasks: [], workspaceUsers: [] })
     );
     readModelHooks.projects.mockReturnValue(
       successReadModel({
@@ -1533,6 +1558,63 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("updates my work task owner and due date through the safe full task update API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const refetchAll = vi.fn();
+    readModelHooks.updateWorkspaceTaskFields.mockResolvedValue({
+      id: "task-runtime",
+      projectId: "project-runtime"
+    });
+    readModelHooks.myWork.mockReturnValue({
+      ...successReadModel({
+        tasks: [{ id: "task-runtime", projectId: "project-runtime", title: "Runtime my work task" }],
+        scheduledTasks: [],
+        taskStatuses: [],
+        workspaceUsers: [
+          { id: "usr-1", name: "Runtime User" },
+          { id: "usr-2", name: "Runtime Lead" }
+        ]
+      }),
+      refetchAll
+    });
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read", "tenant.projects.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(
+      host
+        .querySelector("[data-testid='runtime-my-work-fields-action']")
+        ?.getAttribute("data-users-count")
+    ).toBe("2");
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-my-work-fields-action']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceTaskFields).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceTaskFields.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-09",
+      ownerUserId: "usr-2",
+      task: { id: "task-runtime", projectId: "project-runtime", title: "Runtime my work task" }
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-runtime") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.workspaceAgentThread });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    expect(refetchAll).toHaveBeenCalled();
     invalidateSpy.mockRestore();
   });
 });
