@@ -17,7 +17,7 @@ test("project timeline renders live project tasks without demo fallback", async 
 
   await expect(page.getByRole("heading", { name: /Гант · Школа на 600 мест/ })).toBeVisible();
   await expect(page.getByRole("grid", { name: /Диаграмма Ганта/ })).toBeVisible();
-  await expect(page.getByText("Обмерить существующие классы")).toBeVisible();
+  await expect(page.getByLabel("Таблица WBS").getByText("Обмерить существующие классы")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("Разработать концепцию");
   await expect(page.locator("body")).not.toContainText("mock");
 
@@ -55,14 +55,14 @@ test("project timeline zoom switches between day week and month views", async ({
 
   const gantt = page.getByRole("grid", { name: /Диаграмма Ганта/ });
   await expect(gantt).toHaveAttribute("data-gantt-zoom", "day");
-  await expect(page.getByText("Обмерить существующие классы")).toBeVisible();
+  await expect(page.getByLabel("Таблица WBS").getByText("Обмерить существующие классы")).toBeVisible();
 
   await page.getByText("Неделя", { exact: true }).click();
   await expect(gantt).toHaveAttribute("data-gantt-zoom", "week");
 
   await page.getByText("Месяц", { exact: true }).click();
   await expect(gantt).toHaveAttribute("data-gantt-zoom", "month");
-  await expect(page.getByText("Обмерить существующие классы")).toBeVisible();
+  await expect(page.getByLabel("Таблица WBS").getByText("Обмерить существующие классы")).toBeVisible();
 
   const screenshotPath = testInfo.outputPath("runtime-project-timeline-zoom.png");
   await page.screenshot({ fullPage: true, path: screenshotPath });

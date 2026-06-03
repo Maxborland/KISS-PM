@@ -11,7 +11,7 @@
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap+readonly-proof | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; project-team participant read-only fields/comment flow is proven | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
-| Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/read-only | Runtime timeline route есть; нужны planning mutations/date dependency proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
+| Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/date-action+visual | Live timeline renders real project tasks, zoom works, critical indicators are visible, due-date update persists to project detail, and desktop/narrow screenshots pass; dependency editing remains future scope | `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`, `pnpm qa:fast` route smoke |
 | Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only | Runtime workload route есть; нужны conflict/resource actions, role proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
 | Deals pipeline | `/deals` | CEO-02, SALES-02 | wired+stage-action | Stage move persists; нужны create/edit/client flows, filters/empty states и role-specific polish | `deal-stage-mutation.spec.ts`, route smoke + read-model contract tests |
 | Deal detail / handoff | `/deals/:id` | SALES-03, FIN-01 | wired+handoff | Runtime detail и handoff есть; нужны client/deal create/edit, better failure UX и screenshots | `runtime-data-screen.test.ts`, route smoke |
@@ -65,12 +65,12 @@
 | `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; participant read-only state proven |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
 | Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation; desktop/narrow screenshots pass |
-| Timeline | Task renders in date range; date/status update persists; dependency/resource conflicts visible |
+| Timeline | Live tasks render in date range; day/week/month zoom works; critical indicators visible; due-date update persists to project detail; desktop/narrow screenshots pass; dependency editing remains future scope |
 | `/deals` | Pipeline loads with only used catalogs; stage move persists; read-only CRM users do not see broken DnD; no hidden clients/projectTypes dependency |
 | Clients/create | Client/deal create, duplicate/validation/save error |
 | Resources | Seeded overload and missing role visible |
 
-## Top 5 implementation slices
+## Implementation slices
 
 1. **Runtime QA environment hardening**
    - Status: Wave 1 foundation split into fast PR gate and full runtime QA.
@@ -85,12 +85,17 @@
    - Evidence now: project detail API/query tests, runtime route tests, `/projects/project-beta-school-renovation` in `pnpm qa:fast`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`.
    - Beta evidence still required: none for Project detail; continue timeline/resources foundations.
 
-4. **My Work execution actions**
+4. **Timeline / Gantt foundation**
+   - Status: runtime timeline renders live project tasks, supports day/week/month zoom, shows critical indicators, persists due-date changes back to project detail and has desktop/narrow screenshot evidence.
+   - Evidence now: `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`.
+   - Beta evidence still required: dependency editing/conflict action beyond visible critical indicators.
+
+5. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
    - Status: status action done in PR #73; owner/due date/comment are runtime-proven by targeted Playwright specs; blocker gap UX is proven without fake mutation; project-team participant read-only fields/comment flow is proven.
    - Evidence: `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `my-work-block.test.tsx`.
 
-5. **Agent grounded context and audit hardening**
+6. **Agent grounded context and audit hardening**
    - Agent reads current workspace/project/task context, proposes action, confirms, mutates, shows result/audit/failure.
    - Evidence: negative no-mutation-before-confirm and positive confirmed mutation proof.
 
@@ -106,6 +111,9 @@
 - `project-detail-create-task.spec.ts`: seeded project detail task create flow saves title and due date and remains visible after reload.
 - `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`: project detail owner/due/comment mutations and blocker-gap UX are covered by targeted Playwright specs.
 - `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`: project detail desktop and narrow screenshots pass; narrow task/activity tables render as labeled cards instead of squeezed columns.
+- `project-timeline.spec.ts`: timeline renders live project tasks without demo fallback, switches day/week/month zoom, opens task context and shows critical indicators for seeded overdue/waiting tasks.
+- `project-timeline-date-action.spec.ts`: timeline due-date update for the seeded survey task persists after reload and appears in project detail.
+- `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`: timeline desktop and narrow screenshots pass; narrow Gantt stacks WBS and chart sections without page overflow.
 - `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `deal-stage-mutation.spec.ts`: seeded deal stage changes through runtime `/deals` DnD and remains changed after reload.
 - `runtime-data-screen.test.ts`: read-only `/deals` users do not receive the stage mutation handler unless they have `tenant.opportunities.manage`.

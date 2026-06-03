@@ -16,7 +16,11 @@ test("project timeline task due date update persists after reload", async ({ pag
   await page.goto("/projects/project-beta-school-renovation/timeline");
   await expect(page.getByRole("heading", { name: "Гант · Школа на 600 мест — реконструкция" })).toBeVisible();
 
+  await page.getByLabel("Задача для изменения срока").click();
+  await page.getByRole("option", { name: "Обмерить существующие классы" }).click();
+
   const dueDateInput = page.getByLabel("Новый финиш задачи");
+  await expect(dueDateInput).toHaveValue(/2026-05-0[8-9]|2026-05-10/);
   await expect(dueDateInput).toBeVisible();
 
   const currentDueDate = await dueDateInput.inputValue();
@@ -30,6 +34,8 @@ test("project timeline task due date update persists after reload", async ({ pag
   await page.getByRole("button", { name: "Обновить срок" }).click();
   expect((await updateResponse).status()).toBe(200);
 
+  await page.getByLabel("Задача для изменения срока").click();
+  await page.getByRole("option", { name: "Обмерить существующие классы" }).click();
   await expect(dueDateInput).toHaveValue(targetDueDate);
 
   const changedScreenshotPath = testInfo.outputPath("runtime-project-timeline-date-changed.png");
@@ -37,6 +43,8 @@ test("project timeline task due date update persists after reload", async ({ pag
   expect(statSync(changedScreenshotPath).size).toBeGreaterThan(8_000);
 
   await page.reload();
+  await page.getByLabel("Задача для изменения срока").click();
+  await page.getByRole("option", { name: "Обмерить существующие классы" }).click();
   await expect(page.getByLabel("Новый финиш задачи")).toHaveValue(targetDueDate);
 
   await page.goto("/projects/project-beta-school-renovation");
