@@ -6,7 +6,8 @@ export const betaRuntimeRoutes = [
   { path: "/projects/project-beta-school-renovation", marker: "Школа на 600 мест" },
   { path: "/projects/project-beta-school-renovation/timeline", marker: "Обмерить существующие классы" },
   { path: "/projects/project-beta-school-renovation/resources", marker: "Ресурсная загрузка" },
-  { path: "/deals", marker: "Сделки" }
+  { path: "/deals", marker: "Сделки" },
+  { path: "/admin/audit", marker: "Аудит действий" }
 ];
 
 export const betaRuntimeRoutePaths = betaRuntimeRoutes.map((route) => route.path);

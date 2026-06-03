@@ -9,3 +9,4 @@ export type * from "./projects";
 export type * from "./tasks";
 export type * from "./users";
 export type * from "./workspace-config";
+export type * from "./audit";
