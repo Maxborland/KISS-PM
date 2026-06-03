@@ -18,6 +18,8 @@ test("project detail task status update persists after reload", async ({ page },
 
   const taskRow = page.getByRole("row", { name: /Обмерить существующие классы/ });
   await expect(taskRow).toBeVisible();
+  await page.getByLabel("Задача для активности").click();
+  await page.getByRole("option", { name: "Обмерить существующие классы" }).click();
 
   const currentText = await taskRow.textContent();
   const targetStatus = currentText?.includes("На контроле") ? "В работе" : "На контроле";
@@ -25,6 +27,7 @@ test("project detail task status update persists after reload", async ({ page },
   await page.getByRole("option", { name: targetStatus }).click();
 
   await expect(taskRow).toContainText(targetStatus);
+  await expect(page.getByText("Статус задачи изменен").first()).toBeVisible();
 
   const changedScreenshotPath = testInfo.outputPath("runtime-project-detail-task-status-changed.png");
   await page.screenshot({ fullPage: true, path: changedScreenshotPath });
@@ -32,4 +35,7 @@ test("project detail task status update persists after reload", async ({ page },
 
   await page.reload();
   await expect(page.getByRole("row", { name: /Обмерить существующие классы/ })).toContainText(targetStatus);
+  await page.getByLabel("Задача для активности").click();
+  await page.getByRole("option", { name: "Обмерить существующие классы" }).click();
+  await expect(page.getByText("Статус задачи изменен").first()).toBeVisible();
 });

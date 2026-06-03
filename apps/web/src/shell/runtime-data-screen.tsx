@@ -529,6 +529,7 @@ function RuntimeProjectDetailScreen({
   const updateTaskStatus = useMutation({
     mutationFn: updateWorkspaceProjectTaskStatus,
     onSuccess: (_task, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.taskActivity(input.taskId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(input.projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
@@ -540,6 +541,7 @@ function RuntimeProjectDetailScreen({
   const updateTaskFields = useMutation({
     mutationFn: updateWorkspaceTaskFields,
     onSuccess: (task) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.taskActivity(task.id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(task.projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
