@@ -9,6 +9,7 @@ export const queryKeys = {
     accessRoles: ["workspace", "access-roles"] as const,
     customFields: ["workspace", "config", "custom-fields"] as const,
     clients: ["workspace", "clients"] as const,
+    contacts: ["workspace", "contacts"] as const,
     projects: ["workspace", "projects"] as const,
     project: (projectId: string) => ["workspace", "projects", projectId] as const,
     taskActivity: (taskId: string) => ["workspace", "tasks", taskId, "activity"] as const,

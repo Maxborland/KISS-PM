@@ -18,6 +18,7 @@ import {
   useAdminUsersReadModelQuery,
   useAuditEventsReadModelQuery,
   useClientsReadModelQuery,
+  useContactsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -53,6 +54,7 @@ import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
 import { AuditEventsRuntimeBlock } from "@/views/blocks/audit-events-runtime-block";
 import { AdminUsersRuntimeBlock } from "@/views/blocks/admin-users-runtime-block";
 import { ClientsRuntimeBlock } from "@/views/blocks/clients-runtime-block";
+import { ContactsRuntimeBlock } from "@/views/blocks/contacts-runtime-block";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,
@@ -171,6 +173,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeClientsScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "08-entities-contacts") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeContactsScreen />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -681,6 +691,27 @@ function RuntimeClientsScreen() {
   }
 
   return query.data ? <ClientsRuntimeBlock clients={query.data.clients} /> : null;
+}
+
+function RuntimeContactsScreen() {
+  const query = useContactsReadModelQuery();
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем контакты…" />;
+  }
+
+  if (query.error) {
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить контакты"
+        forbiddenTitle="Нет доступа к контактам"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <ContactsRuntimeBlock contacts={query.data.contacts} /> : null;
 }
 
 function RuntimeReadModelError({

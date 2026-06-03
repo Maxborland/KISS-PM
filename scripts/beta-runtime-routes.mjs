@@ -8,6 +8,7 @@ export const betaRuntimeRoutes = [
   { path: "/projects/project-beta-school-renovation/resources", marker: "Ресурсная загрузка" },
   { path: "/deals", marker: "Сделки" },
   { path: "/directories/clients", marker: "Клиенты" },
+  { path: "/directories/contacts", marker: "Контакты" },
   { path: "/admin/audit", marker: "Аудит действий" },
   { path: "/admin/users", marker: "Пользователи" }
 ];

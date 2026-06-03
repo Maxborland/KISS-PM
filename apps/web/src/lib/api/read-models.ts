@@ -6,6 +6,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import type {
   AuditEventListItem,
   Client,
+  Contact,
   DealStage,
   OperationsCockpitReadModel,
   Opportunity,
@@ -113,6 +114,10 @@ export type AdminUsersReadModel = {
 
 export type ClientsReadModel = {
   clients: Client[];
+};
+
+export type ContactsReadModel = {
+  contacts: Contact[];
 };
 
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
@@ -358,6 +363,13 @@ export async function fetchWorkspaceClients(): Promise<Client[]> {
     method: "GET"
   });
   return response.clients;
+}
+
+export async function fetchWorkspaceContacts(): Promise<Contact[]> {
+  const response = await apiFetch<ListResponse<"contacts", Contact>>("/api/workspace/contacts", {
+    method: "GET"
+  });
+  return response.contacts;
 }
 
 async function fetchOptionalWorkspaceUsers(): Promise<WorkspaceUser[]> {
@@ -630,6 +642,23 @@ export function useClientsReadModelQuery() {
 
   return {
     data: query.data ? { clients: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useContactsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.contacts,
+    queryFn: fetchWorkspaceContacts
+  });
+
+  return {
+    data: query.data ? { contacts: query.data } : undefined,
     error: query.error,
     isPending: query.isPending,
     isFetching: query.isFetching,

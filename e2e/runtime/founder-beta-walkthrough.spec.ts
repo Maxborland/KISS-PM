@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: contact directory runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users and clients, but still needs live contact/deal handoff proof."
+    "Current blocker: products directory runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, clients and contacts, but still needs live product/deal handoff proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -81,5 +81,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("contact directory must be live runtime data for deal handoff proof", async () => {
     await page.goto("/directories/contacts");
     await expect(page.getByRole("heading", { name: /Контакты/ })).toBeVisible();
+  });
+
+  await test.step("products directory must be live runtime data for deal handoff proof", async () => {
+    await page.goto("/directories/products");
+    await expect(page.getByRole("heading", { name: /Продукты/ })).toBeVisible();
   });
 });

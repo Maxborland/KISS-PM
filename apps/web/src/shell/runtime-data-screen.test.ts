@@ -16,6 +16,7 @@ const readModelHooks = vi.hoisted(() => ({
   adminUsers: vi.fn(),
   audit: vi.fn(),
   clients: vi.fn(),
+  contacts: vi.fn(),
   dashboard: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("@/lib/api/read-models", () => ({
   useAdminUsersReadModelQuery: readModelHooks.adminUsers,
   useAuditEventsReadModelQuery: readModelHooks.audit,
   useClientsReadModelQuery: readModelHooks.clients,
+  useContactsReadModelQuery: readModelHooks.contacts,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
@@ -270,6 +272,15 @@ vi.mock("@/views/blocks/clients-runtime-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/contacts-runtime-block", () => ({
+  ContactsRuntimeBlock: ({ contacts }: { contacts: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-contacts" },
+      contacts.map((contact) => contact.name).join(", ")
+    )
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -311,6 +322,7 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.adminUsers.mockReturnValue(successQuery({ users: [] }));
     readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
     readModelHooks.clients.mockReturnValue(successQuery({ clients: [] }));
+    readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue(
       successReadModel({
@@ -756,6 +768,31 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime Client");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.clients).toHaveBeenCalled();
+  });
+
+  it("renders contacts from the runtime contacts read model without fixture fallback", async () => {
+    readModelHooks.contacts.mockReturnValue(
+      successQuery({
+        contacts: [
+          {
+            id: "contact-runtime",
+            name: "Runtime Contact"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "08-entities-contacts",
+        permissions: ["tenant.contacts.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Contact");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.contacts).toHaveBeenCalled();
   });
 
   it("updates task status from project detail through the project-scoped task status API", async () => {
