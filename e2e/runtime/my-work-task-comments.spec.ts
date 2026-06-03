@@ -28,10 +28,9 @@ test("my work task comment persists in task activity after reload", async ({ pag
 
   const createdComment = taskDrawer.getByText(comment);
   await expect(createdComment).toBeVisible();
-  await createdComment.scrollIntoViewIfNeeded();
 
   const screenshotPath = testInfo.outputPath("runtime-my-work-task-comment-created.png");
-  await taskDrawer.screenshot({ path: screenshotPath });
+  await page.screenshot({ fullPage: true, path: screenshotPath });
   expect(statSync(screenshotPath).size).toBeGreaterThan(8_000);
 
   await page.reload();

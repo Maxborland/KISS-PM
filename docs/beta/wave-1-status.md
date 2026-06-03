@@ -76,7 +76,7 @@ Wave 1 foundation is complete. Latest runtime gate evidence is from `origin/desi
 
 Next work continues in PR-sized slices from clean `origin/design-v3`:
 
-- My Work: owner/due/comment actions; blocker remains a documented gap until backend contract exists.
+- My Work: status/owner/due/comment actions are runtime-proven; next My Work slice is blocker gap UX plus forbidden/read-only proof.
 - Project detail: create task, owner/due/comment, blocker/activity proof.
 - Timeline/resources: move from read-only runtime foundations toward interaction/proof slices.
 - Agent: grounded context and confirmation/audit hardening after task/deal/project contracts stabilize.
