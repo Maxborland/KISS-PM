@@ -60,6 +60,23 @@ test("admin role project access change affects runtime project access after relo
     await roleRow.screenshot({ path: screenshotPath });
     expect(statSync(screenshotPath).size).toBeGreaterThan(4_000);
 
+    const auditFetch = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/tenant/current/audit-events") &&
+        response.request().method() === "GET" &&
+        response.ok()
+    );
+    await page.goto("/admin/audit");
+    await auditFetch;
+    const auditItem = page.locator(".audit-list__item").filter({
+      hasText: "AccessProfile:access-profile-alpha-project-team"
+    });
+    await expect(auditItem.first()).toContainText("tenant.access_profile.updated");
+    await expect(auditItem.first()).toContainText("single_workspace_access_roles");
+    await expect(auditItem.first()).toContainText("user-alpha-admin");
+    await expect(auditItem.first()).toContainText("разрешено");
+    await expect(auditItem.first()).toContainText("выполнено");
+
     await login(page, architectCredentials);
     await expectCurrentPermissions(page, [], ["tenant.projects.read"]);
     await page.goto("/projects");

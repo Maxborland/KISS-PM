@@ -32,6 +32,9 @@ export function AuditEventsRuntimeBlock({
                     <Chip variant={isAllowed(event.permissionResult) ? "success" : "warning"}>
                       {isAllowed(event.permissionResult) ? "разрешено" : "отклонено"}
                     </Chip>
+                    <Chip variant={executionVariant(event.executionResult)}>
+                      {executionLabel(event.executionResult)}
+                    </Chip>
                   </div>
                   <p className="u-text-body u-text-muted">
                     {event.sourceWorkflow ?? "workspace"} · {entityLabel(event.sourceEntity)}
@@ -57,6 +60,24 @@ function formatAuditDate(value: string): string {
 
 function isAllowed(permissionResult: Record<string, unknown>): boolean {
   return permissionResult.allowed === true;
+}
+
+function executionLabel(executionResult: Record<string, unknown>): string {
+  const status = typeof executionResult.status === "string" ? executionResult.status : "unknown";
+  if (status === "succeeded" || status === "applied") return "выполнено";
+  if (status === "denied") return "запрещено";
+  if (status === "failed") return "ошибка";
+  if (status === "conflict") return "конфликт";
+  if (status === "previewed") return "просмотрено";
+  return status;
+}
+
+function executionVariant(executionResult: Record<string, unknown>): "success" | "warning" | "danger" | "info" {
+  const status = typeof executionResult.status === "string" ? executionResult.status : "unknown";
+  if (status === "succeeded" || status === "applied") return "success";
+  if (status === "denied" || status === "conflict" || status === "previewed") return "warning";
+  if (status === "failed") return "danger";
+  return "info";
 }
 
 function entityLabel(sourceEntity: Record<string, unknown>): string {
