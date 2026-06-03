@@ -159,6 +159,11 @@ function dealStatusLabel(value: string | null | undefined): string {
   return value ?? "—";
 }
 
+function formatStageActionError(error: unknown): string {
+  if (error instanceof Error) return `Не удалось изменить стадию сделки: ${error.message}`;
+  return "Не удалось изменить стадию сделки. Проверьте права и попробуйте снова.";
+}
+
 function customFieldLabel(key: string): string {
   if (key === "priority") return "Приоритет";
   if (key === "source") return "Источник";
@@ -171,6 +176,9 @@ export type DealsBlockProps = {
   initialDeals?: FunnelDeal[];
   stages?: FunnelStage[];
   readOnly?: boolean;
+  stageActionError?: unknown;
+  stageActionPending?: boolean;
+  onChangeDealStage?: (dealId: string, stageId: string) => Promise<unknown>;
 };
 
 export function DealsBlock(props: DealsBlockProps = {}) {
@@ -181,6 +189,9 @@ export function DealsBlock(props: DealsBlockProps = {}) {
 function DealsBlockInner({
   initialMode = "kanban",
   initialDeals: initialDealsOverride,
+  onChangeDealStage,
+  stageActionError,
+  stageActionPending = false,
   stages: stagesOverride,
   readOnly = false
 }: DealsBlockProps = {}) {
@@ -234,6 +245,7 @@ function DealsBlockInner({
     () => resolveVisibleFields(DEAL_KANBAN_VIEW_PROFILE, cardView),
     [cardView]
   );
+  const canMoveDeals = Boolean(onChangeDealStage) && !stageActionPending;
 
   const openDeal = useMemo(() => deals.find((d) => d.id === openDealId) ?? null, [deals, openDealId]);
 
@@ -303,8 +315,10 @@ function DealsBlockInner({
   };
 
   const handleItemMove = (id: string, toColumnId: StageId, toIndex: number, overId?: string) => {
-    if (readOnly) return;
-    moveDeal(id, toColumnId, toIndex, overId);
+    if (!onChangeDealStage || stageActionPending) return;
+    void onChangeDealStage(id, toColumnId)
+      .then(() => moveDeal(id, toColumnId, toIndex, overId))
+      .catch(() => undefined);
   };
 
   const handleColumnAction = (columnId: StageId, action: KanbanColumnAction) => {
@@ -372,32 +386,39 @@ function DealsBlockInner({
       </div>
 
       {mode === "kanban" ? (
-        <Kanban<DealKanbanItem<StageId>, StageId>
-          boardVariant="funnel"
-          columns={dealColumns}
-          items={sortedItems}
-          visibleFields={visibleFields}
-          sortOptions={DEAL_KANBAN_SORT_OPTIONS}
-          columnSort={columnSort}
-          onColumnSortChange={handleColumnSortChange}
-          renderCard={(item, ctx) => (
-            <DealKanbanCard
-              item={item}
-              draggable={ctx.draggable}
-              isDragging={ctx.isDragging}
-              visibleFields={ctx.visibleFields}
-              onOpen={setOpenDealId}
-            />
-          )}
-          disableDnd={readOnly}
-          {...(readOnly
-            ? {}
-            : {
-                onItemMove: handleItemMove,
-                onItemReorder: handleItemReorder,
-                onColumnAction: handleColumnAction
-              })}
-        />
+        <>
+          {stageActionError ? (
+            <div role="alert" className="field__error">
+              {formatStageActionError(stageActionError)}
+            </div>
+          ) : null}
+          <Kanban<DealKanbanItem<StageId>, StageId>
+            boardVariant="funnel"
+            columns={dealColumns}
+            items={sortedItems}
+            visibleFields={visibleFields}
+            sortOptions={DEAL_KANBAN_SORT_OPTIONS}
+            columnSort={columnSort}
+            onColumnSortChange={handleColumnSortChange}
+            renderCard={(item, ctx) => (
+              <DealKanbanCard
+                item={item}
+                draggable={ctx.draggable}
+                isDragging={ctx.isDragging}
+                visibleFields={ctx.visibleFields}
+                onOpen={setOpenDealId}
+              />
+            )}
+            disableDnd={!canMoveDeals}
+            {...(canMoveDeals ? { onItemMove: handleItemMove } : {})}
+            {...(readOnly
+              ? {}
+              : {
+                  onItemReorder: handleItemReorder,
+                  onColumnAction: handleColumnAction
+                })}
+          />
+        </>
       ) : null}
 
       {mode === "list" ? (

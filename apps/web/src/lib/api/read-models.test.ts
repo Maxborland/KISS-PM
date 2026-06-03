@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   activateWorkspaceOpportunityProject,
+  changeWorkspaceOpportunityStage,
   fetchWorkspaceOperationsCockpit,
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
@@ -173,6 +174,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/opportunities/opp-1") {
         return json({ opportunity: { id: "opp-1", title: "Runtime deal" } });
       }
+      if (path === "/api/workspace/opportunities/opp-1/stage") {
+        return json({ opportunity: { id: "opp-1", stageId: "deal-stage-contract" } });
+      }
       if (path === "/api/workspace/opportunities/opp-1/activate") {
         return json({ project: { id: "project-from-opp", sourceOpportunityId: "opp-1" } }, 201);
       }
@@ -331,6 +335,12 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
     await expect(
+      changeWorkspaceOpportunityStage({
+        opportunityId: "opp-1",
+        stageId: "deal-stage-contract"
+      })
+    ).resolves.toEqual({ id: "opp-1", stageId: "deal-stage-contract" });
+    await expect(
       activateWorkspaceOpportunityProject({
         acceptedRiskReason: "Риск принят",
         opportunityId: "opp-1"
@@ -444,6 +454,7 @@ describe("runtime read model API", () => {
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
       "/api/workspace/opportunities/opp-1",
+      "/api/workspace/opportunities/opp-1/stage",
       "/api/workspace/opportunities/opp-1/activate",
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
@@ -473,6 +484,9 @@ describe("runtime read model API", () => {
     );
     const activateOpportunityCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/opportunities/opp-1/activate"
+    );
+    const changeOpportunityStageCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/opportunities/opp-1/stage"
     );
     expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
@@ -527,6 +541,10 @@ describe("runtime read model API", () => {
     expect(activateOpportunityCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ acceptedRiskReason: "Риск принят" })
+    });
+    expect(changeOpportunityStageCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ stageId: "deal-stage-contract" })
     });
     const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
     expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });

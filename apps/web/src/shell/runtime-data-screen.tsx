@@ -8,8 +8,10 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/query-keys";
+import { hasPermission } from "@/lib/permissions";
 import {
   activateWorkspaceOpportunityProject,
+  changeWorkspaceOpportunityStage,
   confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask,
   fetchWorkspaceProjects,
@@ -223,7 +225,7 @@ export function RuntimeDataScreen({
   if (screenId === "05-deals") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeDealsScreen />
+        <RuntimeDealsScreen permissions={permissions} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -537,8 +539,19 @@ function RuntimeProjectDetailScreen({
   );
 }
 
-function RuntimeDealsScreen() {
+function RuntimeDealsScreen({ permissions }: { permissions: readonly string[] }) {
   const readModel = useDealsBoardReadModelQueries();
+  const queryClient = useQueryClient();
+  const canManageOpportunities = hasPermission(permissions, "tenant.opportunities.manage");
+  const changeStage = useMutation({
+    mutationFn: changeWorkspaceOpportunityStage,
+    onSuccess: (opportunity) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunities });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunity(opportunity.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем воронку сделок…" />;
@@ -558,7 +571,21 @@ function RuntimeDealsScreen() {
   const stages = readModel.data ? buildFunnelStagesFromDealStages(readModel.data.dealStages) : [];
   const deals = readModel.data ? buildFunnelDeals(readModel.data.opportunities) : [];
 
-  return <DealsBlock initialDeals={deals} stages={stages} readOnly />;
+  return (
+    <DealsBlock
+      initialDeals={deals}
+      stages={stages}
+      readOnly
+      stageActionError={changeStage.error}
+      stageActionPending={changeStage.isPending}
+      {...(canManageOpportunities
+        ? {
+            onChangeDealStage: (opportunityId: string, stageId: string) =>
+              changeStage.mutateAsync({ opportunityId, stageId })
+          }
+        : {})}
+    />
+  );
 }
 
 function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
