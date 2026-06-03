@@ -20,6 +20,7 @@ const readModelHooks = vi.hoisted(() => ({
   dashboard: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
+  products: vi.fn(),
   projectDetail: vi.fn(),
   projects: vi.fn(),
   projectsBlock: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("@/lib/api/read-models", () => ({
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
+  useProductsReadModelQuery: readModelHooks.products,
   useProjectDetailReadModelQuery: readModelHooks.projectDetail,
   useProjectsListReadModelQuery: readModelHooks.projects,
   useTaskActivityReadModelQuery: readModelHooks.taskActivity
@@ -281,6 +283,15 @@ vi.mock("@/views/blocks/contacts-runtime-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/products-runtime-block", () => ({
+  ProductsRuntimeBlock: ({ products }: { products: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-products" },
+      products.map((product) => product.name).join(", ")
+    )
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -323,6 +334,7 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
     readModelHooks.clients.mockReturnValue(successQuery({ clients: [] }));
     readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
+    readModelHooks.products.mockReturnValue(successQuery({ products: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue(
       successReadModel({
@@ -356,12 +368,14 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("09-admin", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("10-settings", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", permissions)).toBe(false);
+    expect(canOpenStaticRuntimeScreen("08-entities-products", permissions)).toBe(false);
   });
 
   it("allows static runtime screens when the matching read permission is present", () => {
     expect(canOpenStaticRuntimeScreen("09-admin", ["tenant.users.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("10-settings", ["tenant.workspace_config.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", ["tenant.clients.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("08-entities-products", ["tenant.products.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("17-project-audit", ["tenant.audit_events.read"])).toBe(true);
   });
 
@@ -793,6 +807,31 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime Contact");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.contacts).toHaveBeenCalled();
+  });
+
+  it("renders products from the runtime products read model without fixture fallback", async () => {
+    readModelHooks.products.mockReturnValue(
+      successQuery({
+        products: [
+          {
+            id: "product-runtime",
+            name: "Runtime Product"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "08-entities-products",
+        permissions: ["tenant.products.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Product");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.products).toHaveBeenCalled();
   });
 
   it("updates task status from project detail through the project-scoped task status API", async () => {

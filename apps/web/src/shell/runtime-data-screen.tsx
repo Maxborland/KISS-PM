@@ -22,6 +22,7 @@ import {
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
+  useProductsReadModelQuery,
   useProjectDetailReadModelQuery,
   useProjectsListReadModelQuery,
   useTaskActivityReadModelQuery
@@ -55,6 +56,7 @@ import { AuditEventsRuntimeBlock } from "@/views/blocks/audit-events-runtime-blo
 import { AdminUsersRuntimeBlock } from "@/views/blocks/admin-users-runtime-block";
 import { ClientsRuntimeBlock } from "@/views/blocks/clients-runtime-block";
 import { ContactsRuntimeBlock } from "@/views/blocks/contacts-runtime-block";
+import { ProductsRuntimeBlock } from "@/views/blocks/products-runtime-block";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,
@@ -181,6 +183,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeContactsScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "08-entities-products") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeProductsScreen />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -712,6 +722,27 @@ function RuntimeContactsScreen() {
   }
 
   return query.data ? <ContactsRuntimeBlock contacts={query.data.contacts} /> : null;
+}
+
+function RuntimeProductsScreen() {
+  const query = useProductsReadModelQuery();
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем продукты…" />;
+  }
+
+  if (query.error) {
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить продукты"
+        forbiddenTitle="Нет доступа к продуктам"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <ProductsRuntimeBlock products={query.data.products} /> : null;
 }
 
 function RuntimeReadModelError({
