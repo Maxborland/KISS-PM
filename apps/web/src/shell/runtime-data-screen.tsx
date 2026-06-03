@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/query-keys";
 import {
   confirmWorkspaceAgentProposal,
+  createWorkspaceProjectTask,
   postWorkspaceAgentMessage,
   updateWorkspaceProjectTaskStatus,
   useDashboardReadModelQueries,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/mock-data/scenario-presenters";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
-import { ProjectDetailBlock } from "@/views/blocks/project-detail-block";
+import { ProjectDetailBlock, type ProjectTaskCreateInput } from "@/views/blocks/project-detail-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import {
@@ -286,6 +287,18 @@ function RuntimeProjectDetailScreen({
 }) {
   const queryClient = useQueryClient();
   const query = useProjectDetailReadModelQuery(projectId);
+  const createTask = useMutation({
+    mutationFn: createWorkspaceProjectTask,
+    onSuccess: (_task, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(input.projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      if (currentUserId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      }
+    }
+  });
   const updateTaskStatus = useMutation({
     mutationFn: updateWorkspaceProjectTaskStatus,
     onSuccess: (_task, input) => {
@@ -342,11 +355,21 @@ function RuntimeProjectDetailScreen({
 
   return (
     <ProjectDetailBlock
+      createTaskError={createTask.error}
+      createTaskPending={createTask.isPending}
+      currentUserId={currentUserId}
       project={projectDetail.project}
       taskActionError={updateTaskStatus.error}
       taskActionPending={updateTaskStatus.isPending}
       taskStatuses={projectDetail.taskStatuses}
       tasks={projectDetail.tasks}
+      workspaceUsers={projectDetail.workspaceUsers}
+      onCreateTask={(input: ProjectTaskCreateInput) =>
+        createTask.mutateAsync({
+          ...input,
+          projectId: projectDetail.project.id
+        })
+      }
       onChangeTaskStatus={(task, statusId) =>
         updateTaskStatus.mutateAsync({
           projectId: projectDetail.project.id,

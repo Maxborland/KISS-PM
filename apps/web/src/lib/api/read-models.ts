@@ -11,7 +11,8 @@ import type {
   ProjectTemplate,
   ScheduledTask,
   Task,
-  TaskStatus
+  TaskStatus,
+  WorkspaceUser
 } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -69,6 +70,7 @@ export type ProjectDetailReadModel = {
   project: Project;
   taskStatuses: TaskStatus[];
   tasks: Task[];
+  workspaceUsers: WorkspaceUser[];
 };
 
 export type DealsBoardReadModel = {
@@ -183,6 +185,14 @@ export type RuntimeTaskReadModelInput = {
   toDate?: string;
 };
 
+export type CreateWorkspaceProjectTaskInput = {
+  projectId: string;
+  title: string;
+  ownerUserId: string;
+  dueDate: string;
+  statusId?: string | undefined;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
@@ -191,13 +201,14 @@ export async function fetchWorkspaceProjects(): Promise<Project[]> {
 }
 
 export async function fetchWorkspaceProjectDetail(projectId: string): Promise<ProjectDetailReadModel> {
-  const response = await apiFetch<Omit<ProjectDetailReadModel, "taskStatuses">>(
+  const response = await apiFetch<Omit<ProjectDetailReadModel, "taskStatuses" | "workspaceUsers">>(
     `/api/workspace/projects/${encodeURIComponent(projectId)}`,
     { method: "GET" }
   );
   return {
     ...response,
-    taskStatuses: []
+    taskStatuses: [],
+    workspaceUsers: []
   };
 }
 
@@ -222,6 +233,46 @@ export async function updateWorkspaceProjectTaskStatus(input: {
     }
   );
   return response.task;
+}
+
+export async function createWorkspaceProjectTask(
+  input: CreateWorkspaceProjectTaskInput
+): Promise<Task> {
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/projects/${encodeURIComponent(input.projectId)}/tasks`,
+    {
+      method: "POST",
+      json: {
+        description: null,
+        durationWorkingDays: 1,
+        participants: [{ role: "executor", userId: input.ownerUserId }],
+        plannedFinish: input.dueDate,
+        plannedStart: input.dueDate,
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: input.statusId,
+        title: input.title.trim()
+      }
+    }
+  );
+  return response.task;
+}
+
+export async function fetchWorkspaceUsers(): Promise<WorkspaceUser[]> {
+  const response = await apiFetch<ListResponse<"users", WorkspaceUser>>("/api/workspace/users", {
+    method: "GET"
+  });
+  return response.users;
+}
+
+async function fetchOptionalWorkspaceUsers(): Promise<WorkspaceUser[]> {
+  try {
+    return await fetchWorkspaceUsers();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "forbidden") return [];
+    throw error;
+  }
 }
 
 export async function fetchWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
@@ -360,15 +411,21 @@ export function useProjectDetailReadModelQuery(projectId: string | undefined) {
         enabled: Boolean(projectId),
         queryKey: queryKeys.workspace.taskStatuses,
         queryFn: fetchWorkspaceTaskStatuses
+      },
+      {
+        enabled: Boolean(projectId),
+        queryKey: queryKeys.workspace.users,
+        queryFn: fetchOptionalWorkspaceUsers
       }
     ]
   });
-  const [projectDetailQuery, taskStatusesQuery] = queries;
+  const [projectDetailQuery, taskStatusesQuery, workspaceUsersQuery] = queries;
   const data =
-    projectDetailQuery.data && taskStatusesQuery.data
+    projectDetailQuery.data && taskStatusesQuery.data && workspaceUsersQuery.data
       ? {
           ...(projectDetailQuery.data as ProjectDetailReadModel),
-          taskStatuses: taskStatusesQuery.data as TaskStatus[]
+          taskStatuses: taskStatusesQuery.data as TaskStatus[],
+          workspaceUsers: workspaceUsersQuery.data as WorkspaceUser[]
         }
       : undefined;
 
@@ -377,6 +434,7 @@ export function useProjectDetailReadModelQuery(projectId: string | undefined) {
     refetch: () => {
       void projectDetailQuery.refetch();
       void taskStatusesQuery.refetch();
+      void workspaceUsersQuery.refetch();
     }
   };
 }
