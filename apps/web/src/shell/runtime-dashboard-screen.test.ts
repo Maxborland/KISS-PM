@@ -275,6 +275,21 @@ describe("RuntimeDashboardScreen", () => {
                         projectId: null,
                         ownerUserId: "usr-3",
                         dueDate: "2026-06-10"
+                      },
+                      {
+                        id: "attention-3",
+                        kind: "deal_missing_next_action",
+                        severity: "warning",
+                        title: "Сделка без следующего действия",
+                        reason: "У сделки не задано следующее действие для клиента.",
+                        entity: {
+                          type: "deal",
+                          id: "deal-without-next-action",
+                          title: "Квартал на Садовой"
+                        },
+                        projectId: null,
+                        ownerUserId: "usr-3",
+                        dueDate: "2026-06-12"
                       }
                     ],
                     workloadHints: {
@@ -330,6 +345,11 @@ describe("RuntimeDashboardScreen", () => {
         'a[href="/deals/deal-1"][aria-label="Открыть сигнал: Сделка готова к проекту"]'
       );
       expect(dealAttentionLink?.textContent).toContain("Бизнес-центр на Ленина");
+      expect(host.textContent).toContain("У сделки не задано следующее действие для клиента.");
+      const missingNextActionLink = host.querySelector(
+        'a[href="/deals/deal-without-next-action"][aria-label="Открыть сигнал: Сделка без следующего действия"]'
+      );
+      expect(missingNextActionLink?.textContent).toContain("Квартал на Садовой");
       expect(host.textContent).toContain("Ресурсные риски");
       expect(host.textContent).toContain("Анна Орлова");
       expect(host.textContent).toContain("46 ч · 2 просрочено");

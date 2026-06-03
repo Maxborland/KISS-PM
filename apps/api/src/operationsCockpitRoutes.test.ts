@@ -46,6 +46,21 @@ describe("operations cockpit routes", () => {
             projectId: "project-alpha",
             ownerUserId: "user-alpha",
             dueDate: "2026-05-31"
+          },
+          {
+            id: "deal-missing-next-action:deal-alpha",
+            kind: "deal_missing_next_action",
+            severity: "warning",
+            title: "БЦ Север",
+            reason: "У сделки не задано следующее действие для клиента.",
+            entity: {
+              type: "deal",
+              id: "deal-alpha",
+              title: "БЦ Север"
+            },
+            projectId: null,
+            ownerUserId: "user-alpha",
+            dueDate: "2026-06-20"
           }
         ],
         workloadHints: {
@@ -107,6 +122,11 @@ describe("operations cockpit routes", () => {
           expect.objectContaining({
             kind: "task_overdue",
             entity: { type: "task", id: "task-alpha", title: "Подготовить график" }
+          }),
+          expect.objectContaining({
+            kind: "deal_missing_next_action",
+            entity: { type: "deal", id: "deal-alpha", title: "БЦ Север" },
+            reason: "У сделки не задано следующее действие для клиента."
           })
         ],
         agentContext: {
