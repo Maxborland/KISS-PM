@@ -330,17 +330,15 @@ function DealsBlockInner({
 
   const intro = (
     <RoutePageIntro
-      actions={
+      actions={!readOnly ? (
         <Button
           variant="primary"
           onClick={() => setCreateOpen(true)}
-          disabled={readOnly}
-          title={readOnly ? "Создание сделки будет подключено в следующем API-срезе" : undefined}
         >
           <Plus className="size-4" aria-hidden />
           Сделка
         </Button>
-      }
+      ) : undefined}
     />
   );
 
@@ -378,10 +376,12 @@ function DealsBlockInner({
               onChange={setCardView}
             />
           ) : null}
-          <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
-            <Filter className="size-4" aria-hidden />
-            Фильтр
-          </Button>
+          {!readOnly ? (
+            <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
+              <Filter className="size-4" aria-hidden />
+              Фильтр
+            </Button>
+          ) : null}
         </div>
       </div>
 

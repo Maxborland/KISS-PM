@@ -282,8 +282,9 @@ function RuntimeWorkspaceFrame({
   projectId?: string | undefined;
   children: ReactNode;
 }) {
+  const meta = getScreenRoute(screenId);
   return (
-    <WorkspaceChrome meta={getScreenRoute(screenId)} permissions={permissions} projectId={projectId}>
+    <WorkspaceChrome meta={{ ...meta, pageIntroActions: "none" }} permissions={permissions} projectId={projectId}>
       {children}
     </WorkspaceChrome>
   );
