@@ -228,6 +228,7 @@ export type ScheduledTasksQueryInput = {
 export type RuntimeTaskReadModelInput = {
   assigneeUserId: string;
   fromDate?: string;
+  canReadWorkspaceUsers?: boolean;
   toDate?: string;
 };
 
@@ -898,6 +899,7 @@ function aggregateQueries<TData>(
 }
 
 export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
+  const canReadWorkspaceUsers = input.canReadWorkspaceUsers ?? true;
   const scheduledInput = resolveRuntimeTaskReadModelInput(input);
   const queries = useQueries({
     queries: [
@@ -918,6 +920,7 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
         queryFn: fetchWorkspaceTaskStatuses
       },
       {
+        enabled: canReadWorkspaceUsers,
         queryKey: queryKeys.workspace.users,
         queryFn: fetchOptionalWorkspaceUsers
       }
@@ -925,17 +928,19 @@ export function useMyWorkReadModelQueries(input: RuntimeTaskReadModelInput) {
   });
 
   const [tasksQuery, scheduledTasksQuery, taskStatusesQuery, workspaceUsersQuery] = queries;
+  const aggregateSourceQueries = canReadWorkspaceUsers ? queries : [tasksQuery, scheduledTasksQuery, taskStatusesQuery];
+  const workspaceUsers = canReadWorkspaceUsers ? workspaceUsersQuery.data : [];
   const data =
-    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data && workspaceUsersQuery.data
+    tasksQuery.data && scheduledTasksQuery.data && taskStatusesQuery.data && workspaceUsers
       ? {
           tasks: tasksQuery.data as Task[],
           scheduledTasks: scheduledTasksQuery.data as ScheduledTask[],
           taskStatuses: taskStatusesQuery.data as TaskStatus[],
-          workspaceUsers: workspaceUsersQuery.data as WorkspaceUser[]
+          workspaceUsers: workspaceUsers as WorkspaceUser[]
         }
       : undefined;
 
-  return aggregateQueries<MyWorkReadModel>(queries, data);
+  return aggregateQueries<MyWorkReadModel>(aggregateSourceQueries, data);
 }
 
 export function useDashboardReadModelQueries(input: RuntimeTaskReadModelInput) {
