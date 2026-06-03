@@ -385,6 +385,14 @@
 .gbar--critical {
   background: color-mix(in srgb, var(--danger) 14%, var(--success));
 }
+.gbar--critical::after {
+  content: "";
+  position: absolute;
+  inset: -3px -2px;
+  border: 1px solid var(--danger);
+  border-radius: 5px;
+  pointer-events: none;
+}
 .gbar--at-risk {
   background: color-mix(in srgb, var(--danger) 18%, var(--success));
 }
