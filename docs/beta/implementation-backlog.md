@@ -13,7 +13,7 @@
 | Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/date-action+visual | Live timeline renders real project tasks, zoom works, critical indicators are visible, due-date update persists to project detail, and desktop/narrow screenshots pass; dependency editing remains future scope | `project-timeline.spec.ts`, `project-timeline-date-action.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/timeline`, `pnpm qa:fast` route smoke |
 | Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only+visual | Runtime ResourceMatrix uses live project tasks/users/demand; missing role, high-load cells, disabled assignment reason and desktop/narrow screenshots are proven; true overload/conflict action remains pending | `project-resources.spec.ts`, `project-resources.test.ts`, `project-resources-runtime-block.test.tsx`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`, `pnpm qa:fast` route smoke |
-| Deals pipeline | `/deals` | CEO-02, SALES-02 | wired+stage-action | Stage move persists; нужны create/edit/client flows, filters/empty states и role-specific polish | `deal-stage-mutation.spec.ts`, route smoke + read-model contract tests |
+| Deals pipeline | `/deals` | CEO-02, SALES-02 | wired+stage-action+filters+visual | Stage move persists; runtime pipeline filters live deals, opens live detail sheet, shows honest no-results state and passes desktop/narrow screenshots; remaining gap is create/edit/client flows and role-specific polish | `deal-stage-mutation.spec.ts`, `deals-runtime-evidence.spec.ts`, `deals-block.test.ts`, `runtime-data-screen.test.ts`, `pnpm qa:screenshots -- --routes /deals` |
 | Deal detail / handoff | `/deals/:id` | SALES-03, FIN-01 | wired+handoff | Runtime detail и handoff есть; нужны client/deal create/edit, better failure UX и screenshots | `runtime-data-screen.test.ts`, route smoke |
 | Clients | `/directories/clients` | SALES-01 | wired/read-only | Runtime list есть; нужны create/update/duplicate/validation flows | `pnpm qa:fast` route smoke |
 | Contacts | `/directories/contacts` | SALES-01 | wired/read-only | Runtime list есть; нужны create/update/link-to-client flows | `pnpm qa:fast` route smoke |
@@ -66,7 +66,7 @@
 | `/projects` | Projects and templates load without permission trap; search filters live list; open project routes to runtime detail; honest no-results state; desktop/narrow screenshots |
 | Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation; desktop/narrow screenshots pass |
 | Timeline | Live tasks render in date range; day/week/month zoom works; critical indicators visible; due-date update persists to project detail; desktop/narrow screenshots pass; dependency editing remains future scope |
-| `/deals` | Pipeline loads with only used catalogs; stage move persists; read-only CRM users do not see broken DnD; no hidden clients/projectTypes dependency |
+| `/deals` | Pipeline loads with only used catalogs; stage move persists; search filters live deals; detail sheet opens; honest no-results state; desktop/narrow screenshots; read-only CRM users do not see broken DnD |
 | Clients/create | Client/deal create, duplicate/validation/save error |
 | Resources | Live resource matrix renders seeded project people, high-load cells and missing role; assignment change is honestly disabled; desktop/narrow screenshots pass; true overload/conflict action remains required |
 
@@ -114,6 +114,11 @@
    - Evidence now: `projects-list-runtime.spec.ts`, `projects-list-block.test.ts`, `runtime-data-screen.test.ts`, `pnpm qa:screenshots -- --routes /projects`.
    - Beta evidence still required: create/edit flow and richer filter set.
 
+10. **Deals pipeline runtime evidence**
+   - Status: runtime deals pipeline persists stage changes, filters live deals, opens live detail sheet, shows honest no-results state and has desktop/narrow screenshot evidence.
+   - Evidence now: `deal-stage-mutation.spec.ts`, `deals-runtime-evidence.spec.ts`, `deals-block.test.ts`, `runtime-data-screen.test.ts`, `pnpm qa:screenshots -- --routes /deals`.
+   - Beta evidence still required: create/edit/client flows and deeper role-specific polish.
+
 ## Текущий evidence snapshot
 
 - `dashboard-pipeline-clickthrough.spec.ts`: dashboard renders seeded attention/workload/pipeline sections and opens the live school renovation deal detail route.
@@ -137,6 +142,8 @@
 - `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation/resources`: resources desktop and narrow screenshots pass using shared ResourceMatrix core.
 - `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `deal-stage-mutation.spec.ts`: seeded deal stage changes through runtime `/deals` DnD and remains changed after reload.
+- `deals-runtime-evidence.spec.ts`: runtime `/deals` filters live deals in list mode, opens the author supervision detail sheet and shows an honest no-results state.
+- `pnpm qa:screenshots -- --routes /deals`: deals pipeline desktop and narrow screenshots pass.
 - `admin-user-status.spec.ts`: admin deactivates a workspace user, status persists after reload, and action remains reversible.
 - `admin-role-permissions.spec.ts`: admin removes `tenant.projects.read` from the project-team role, architect loses `/projects` access after relogin, and audit captures the permission update.
 - `pnpm qa:screenshots -- --routes /admin/users,/admin/roles,/admin/audit`: admin users, roles, and audit routes pass desktop and narrow screenshot capture.

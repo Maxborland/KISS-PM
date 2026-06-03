@@ -351,7 +351,7 @@ function DealsBlockInner({
       errorTitle="Не удалось загрузить сделки"
       forbiddenTitle="Нет доступа к сделкам"
     >
-      <div className="view-toolbar">
+      <div className="view-toolbar deals-block__toolbar">
         <Segmented
           name="deals-mode"
           value={mode}
@@ -362,10 +362,10 @@ function DealsBlockInner({
             { value: "forecast", label: "Прогноз" }
           ]}
         />
-        <div className="view-toolbar__filters">
+        <div className="view-toolbar__filters deals-block__filters">
           <SearchPill
             placeholder="Сделки, клиенты…"
-            className="u-w-240"
+            className="deals-block__search"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
@@ -659,7 +659,7 @@ function DealsList({
   onOpen: (id: string) => void;
 }) {
   if (deals.length === 0) {
-    return <p className="u-text-sm u-text-muted">Ничего не найдено.</p>;
+    return <p className="u-text-sm u-text-muted">Ничего не найдено по текущему поиску.</p>;
   }
   return (
     <DataTable>
