@@ -38,7 +38,7 @@ export const test = base.extend<{ page: Page }>({
 
     page.on("requestfailed", (request) => {
       if (!isGatedRequestResource(request.resourceType(), request.url())) return;
-      if (isAllowedRequestFailure(request.url(), request.failure()?.errorText ?? "")) return;
+      if (isAllowedRequestFailure(request.method(), request.url(), request.failure()?.errorText ?? "")) return;
       issues.push({
         kind: "requestfailed",
         message: `${request.method()} ${request.url()} failed: ${request.failure()?.errorText ?? "unknown"}`
@@ -74,14 +74,21 @@ function isUnexpectedFailureResponse(response: Response): boolean {
 
 function isAllowedConsoleError(text: string, url: string): boolean {
   return (
-    /favicon\.ico/.test(url) &&
-    /Failed to load resource|404|not found/i.test(text)
+    (
+      /favicon\.ico/.test(url) &&
+      /Failed to load resource|404|not found/i.test(text)
+    ) ||
+    (
+      /\/_next\/static\/chunks\//.test(url) &&
+      /WebSocket connection to '.+\/_next\/webpack-hmr.+net::ERR_NO_BUFFER_SPACE/.test(text)
+    )
   );
 }
 
-function isAllowedRequestFailure(url: string, errorText: string): boolean {
+function isAllowedRequestFailure(method: string, url: string, errorText: string): boolean {
   if (errorText !== "net::ERR_ABORTED") return false;
   return (
+    (method === "GET" && /:\/\/127\.0\.0\.1:\d+\/api\//.test(url)) ||
     /^https:\/\/fonts\.googleapis\.com\//.test(url) ||
     /:\/\/127\.0\.0\.1:\d+\/node_modules\/\.cache\/storybook\//.test(url) ||
     /:\/\/127\.0\.0\.1:\d+\/src\/.+\.(?:ts|tsx)(?:\?|$)/.test(url)

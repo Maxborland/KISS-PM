@@ -455,6 +455,20 @@ export async function fetchWorkspaceOpportunity(opportunityId: string): Promise<
   return response.opportunity;
 }
 
+export async function activateWorkspaceOpportunityProject(input: {
+  acceptedRiskReason?: string | null;
+  opportunityId: string;
+}): Promise<Project> {
+  const response = await apiFetch<{ project: Project }>(
+    `/api/workspace/opportunities/${encodeURIComponent(input.opportunityId)}/activate`,
+    {
+      method: "POST",
+      json: { acceptedRiskReason: input.acceptedRiskReason ?? null }
+    }
+  );
+  return response.project;
+}
+
 export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
   const response = await apiFetch<ListResponse<"dealStages", DealStage>>("/api/workspace/deal-stages", {
     method: "GET"

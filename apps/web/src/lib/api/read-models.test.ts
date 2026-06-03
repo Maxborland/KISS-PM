@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  activateWorkspaceOpportunityProject,
   fetchWorkspaceOperationsCockpit,
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
@@ -172,6 +173,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/opportunities/opp-1") {
         return json({ opportunity: { id: "opp-1", title: "Runtime deal" } });
       }
+      if (path === "/api/workspace/opportunities/opp-1/activate") {
+        return json({ project: { id: "project-from-opp", sourceOpportunityId: "opp-1" } }, 201);
+      }
       if (path === "/api/workspace/deal-stages") {
         return json({ dealStages: [{ id: "lead" }] });
       }
@@ -326,6 +330,15 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
+    await expect(
+      activateWorkspaceOpportunityProject({
+        acceptedRiskReason: "Риск принят",
+        opportunityId: "opp-1"
+      })
+    ).resolves.toEqual({
+      id: "project-from-opp",
+      sourceOpportunityId: "opp-1"
+    });
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
     await expect(fetchWorkspaceAgentThread()).resolves.toMatchObject({
       thread: {
@@ -431,6 +444,7 @@ describe("runtime read model API", () => {
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
       "/api/workspace/opportunities/opp-1",
+      "/api/workspace/opportunities/opp-1/activate",
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
       "/api/workspace/operations-cockpit",
@@ -456,6 +470,9 @@ describe("runtime read model API", () => {
     );
     const confirmProposalCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
+    );
+    const activateOpportunityCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/opportunities/opp-1/activate"
     );
     expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
@@ -506,6 +523,10 @@ describe("runtime read model API", () => {
     expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
+    });
+    expect(activateOpportunityCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ acceptedRiskReason: "Риск принят" })
     });
     const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
     expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });

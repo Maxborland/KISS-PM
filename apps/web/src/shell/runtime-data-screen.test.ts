@@ -12,6 +12,7 @@ import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-d
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const readModelHooks = vi.hoisted(() => ({
+  activateWorkspaceOpportunityProject: vi.fn(),
   adminAccessRoles: vi.fn(),
   agent: vi.fn(),
   adminUsers: vi.fn(),
@@ -21,6 +22,7 @@ const readModelHooks = vi.hoisted(() => ({
   dashboard: vi.fn(),
   dealDetail: vi.fn(),
   deals: vi.fn(),
+  fetchWorkspaceProjects: vi.fn(),
   myWork: vi.fn(),
   products: vi.fn(),
   projectDetail: vi.fn(),
@@ -36,8 +38,10 @@ const readModelHooks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
+  activateWorkspaceOpportunityProject: readModelHooks.activateWorkspaceOpportunityProject,
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask: readModelHooks.createWorkspaceProjectTask,
+  fetchWorkspaceProjects: readModelHooks.fetchWorkspaceProjects,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   postWorkspaceTaskComment: readModelHooks.postWorkspaceTaskComment,
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
@@ -110,8 +114,23 @@ vi.mock("@/views/blocks/my-work-block", () => ({
 }));
 
 vi.mock("@/views/blocks/deal-detail-runtime-block", () => ({
-  DealDetailRuntimeBlock: ({ opportunity }: { opportunity: { title: string } }) =>
-    createElement("div", { "data-testid": "runtime-deal-detail" }, opportunity.title)
+  DealDetailRuntimeBlock: ({
+    onActivateProject,
+    opportunity
+  }: {
+    onActivateProject?: () => Promise<unknown>;
+    opportunity: { title: string };
+  }) =>
+    createElement(
+      "button",
+      {
+        "data-testid": "runtime-deal-detail",
+        onClick: () => {
+          void onActivateProject?.();
+        }
+      },
+      opportunity.title
+    )
 }));
 
 vi.mock("@/views/blocks/projects-list-block", () => ({
@@ -380,6 +399,12 @@ describe("RuntimeDataScreen permission gate", () => {
       projectId: "project-runtime"
     });
     readModelHooks.createWorkspaceProjectTask.mockResolvedValue({ id: "task-created" });
+    readModelHooks.activateWorkspaceOpportunityProject.mockResolvedValue({
+      id: "project-activated",
+      sourceOpportunityId: "opportunity-runtime",
+      title: "Runtime activated project"
+    });
+    readModelHooks.fetchWorkspaceProjects.mockResolvedValue([]);
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
@@ -448,6 +473,89 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime deal detail");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.dealDetail).toHaveBeenCalledWith("opportunity-runtime");
+  });
+
+  it("activates a deal into a project through the runtime opportunity API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          status: "ready_to_activate",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+    });
+
+    expect(readModelHooks.activateWorkspaceOpportunityProject).toHaveBeenCalledWith({
+      acceptedRiskReason: "Риск принят пользователем при передаче сделки в проект из runtime карточки.",
+      opportunityId: "opportunity-runtime"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.opportunity("opportunity-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.opportunities });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-activated") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("opens the existing project when backend reports that the opportunity was already activated", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          status: "ready_to_activate",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+    readModelHooks.activateWorkspaceOpportunityProject.mockRejectedValue(
+      new ApiError(409, "conflict", "source_opportunity_already_activated", {
+        error: "source_opportunity_already_activated"
+      })
+    );
+    readModelHooks.fetchWorkspaceProjects.mockResolvedValue([
+      {
+        id: "project-existing",
+        sourceOpportunityId: "opportunity-runtime",
+        title: "Already activated project"
+      }
+    ]);
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+    });
+
+    expect(readModelHooks.fetchWorkspaceProjects).toHaveBeenCalled();
+    expect(readModelHooks.activateWorkspaceOpportunityProject).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-existing") });
+    invalidateSpy.mockRestore();
   });
 
   it("renders dashboard from runtime read models without fixture fallback", async () => {
