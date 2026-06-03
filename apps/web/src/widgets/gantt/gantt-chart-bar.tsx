@@ -88,6 +88,7 @@ export function GanttChartBar({
         onPointerDown={interactive ? onPointerDownMove : undefined}
         role="img"
         aria-label={row.name}
+        data-gantt-row-id={row.id}
       >
         <span className={cn("gmile", barIssueClass(row))} />
         {showEndpoints ? (
@@ -145,6 +146,7 @@ export function GanttChartBar({
         style={col}
         role="img"
         aria-label={row.name}
+        data-gantt-row-id={row.id}
         data-gantt-bar-selected={selected ? "true" : undefined}
         onPointerDown={interactive && row.kind === "task" ? onPointerDownMove : undefined}
       >

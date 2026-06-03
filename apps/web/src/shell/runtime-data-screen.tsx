@@ -157,7 +157,11 @@ export function RuntimeDataScreen({
   if (screenId === "07b-project-detail") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeProjectDetailScreen projectId={projectId} currentUserId={currentUserId} />
+        <RuntimeProjectDetailScreen
+          projectId={projectId}
+          currentUserId={currentUserId}
+          initialTaskId={initialTaskId}
+        />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -448,18 +452,23 @@ function RuntimeProjectsListScreen() {
 
 function RuntimeProjectDetailScreen({
   projectId,
-  currentUserId
+  currentUserId,
+  initialTaskId
 }: {
   projectId?: string | undefined;
   currentUserId?: string | undefined;
+  initialTaskId?: string | undefined;
 }) {
   const queryClient = useQueryClient();
   const query = useProjectDetailReadModelQuery(projectId);
   const [activityTaskId, setActivityTaskId] = useState<string | undefined>(undefined);
   const projectTasks = query.data?.tasks.filter((task) => task.archivedAt == null) ?? [];
   const projectTaskIds = projectTasks.map((task) => task.id).join("|");
+  const initialActivityTaskId = projectTasks.some((task) => task.id === initialTaskId)
+    ? initialTaskId
+    : undefined;
   const defaultActivityTaskId = projectTasks[0]?.id;
-  const resolvedActivityTaskId = activityTaskId ?? defaultActivityTaskId;
+  const resolvedActivityTaskId = activityTaskId ?? initialActivityTaskId ?? defaultActivityTaskId;
   const taskActivity = useTaskActivityReadModelQuery(resolvedActivityTaskId);
 
   useEffect(() => {
@@ -467,7 +476,7 @@ function RuntimeProjectDetailScreen({
       if (activityTaskId) setActivityTaskId(undefined);
       return;
     }
-    if (!activityTaskId || !projectTaskIds.split("|").includes(activityTaskId)) {
+    if (activityTaskId && !projectTaskIds.split("|").includes(activityTaskId)) {
       setActivityTaskId(defaultActivityTaskId);
     }
   }, [activityTaskId, defaultActivityTaskId, projectTaskIds]);
