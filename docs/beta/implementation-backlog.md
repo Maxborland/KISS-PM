@@ -10,7 +10,7 @@
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap+readonly-proof | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; project-team participant read-only fields/comment flow is proven | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
-| Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh and scoped task-audit projection are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:fast` route smoke |
+| Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/task-actions+activity+audit-proof+visual | Create task, status, owner, due date, comment, blocker-gap UX, task activity refresh, scoped task-audit projection and desktop/narrow visual pass are runtime-proven | `read-models.test.ts`, `runtime-data-screen.test.ts`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/:id/timeline` | PM-03 | wired/read-only | Runtime timeline route есть; нужны planning mutations/date dependency proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
 | Project resources | `/projects/:id/resources` | LEAD-01, HR-01, HR-02 | wired/read-only | Runtime workload route есть; нужны conflict/resource actions, role proof и desktop/narrow screenshots | `pnpm qa:fast` route smoke |
 | Deals pipeline | `/deals` | CEO-02, SALES-02 | wired+stage-action | Stage move persists; нужны create/edit/client flows, filters/empty states и role-specific polish | `deal-stage-mutation.spec.ts`, route smoke + read-model contract tests |
@@ -64,7 +64,7 @@
 | `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
 | `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; participant read-only state proven |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
-| Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation |
+| Project detail | Open real project by id; task list visible without fixture fallback; create task persists; status/owner/due/comment persist; status mutation appears in task activity before/after reload and in scoped audit projection; blocker gap shown without fake mutation; desktop/narrow screenshots pass |
 | Timeline | Task renders in date range; date/status update persists; dependency/resource conflicts visible |
 | `/deals` | Pipeline loads with only used catalogs; stage move persists; read-only CRM users do not see broken DnD; no hidden clients/projectTypes dependency |
 | Clients/create | Client/deal create, duplicate/validation/save error |
@@ -81,9 +81,9 @@
    - Evidence: `RuntimeDashboardScreen` renders operations attention, workload and pipeline pressure from `/api/workspace/operations-cockpit`.
 
 3. **Project detail + task mutations**
-   - Status: runtime project detail task action matrix is proven for create/status/owner/due/comment plus blocker-gap UX; task activity refresh and scoped audit projection after status mutation are proven.
-   - Evidence now: project detail API/query tests, runtime route tests, `/projects/project-beta-school-renovation` in `pnpm qa:fast`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`.
-   - Beta evidence still required: project page visual pass.
+   - Status: runtime project detail task action matrix is proven for create/status/owner/due/comment plus blocker-gap UX; task activity refresh, scoped audit projection and desktop/narrow screenshot evidence are proven.
+   - Evidence now: project detail API/query tests, runtime route tests, `/projects/project-beta-school-renovation` in `pnpm qa:fast`, `project-detail-create-task.spec.ts`, `project-detail-task-actions.spec.ts`, `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`, `project-detail-task-audit.spec.ts`, `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`.
+   - Beta evidence still required: none for Project detail; continue timeline/resources foundations.
 
 4. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
@@ -105,6 +105,7 @@
 - `project-detail-task-audit.spec.ts`: project detail status mutation appears in scoped `/api/tenant/current/audit-events?projectId=...` task audit projection and in the visible admin audit route.
 - `project-detail-create-task.spec.ts`: seeded project detail task create flow saves title and due date and remains visible after reload.
 - `project-detail-task-owner.spec.ts`, `project-detail-task-fields.spec.ts`, `project-detail-task-comments.spec.ts`, `project-detail-blocker-gap.spec.ts`: project detail owner/due/comment mutations and blocker-gap UX are covered by targeted Playwright specs.
+- `pnpm qa:screenshots -- --routes /projects/project-beta-school-renovation`: project detail desktop and narrow screenshots pass; narrow task/activity tables render as labeled cards instead of squeezed columns.
 - `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `deal-stage-mutation.spec.ts`: seeded deal stage changes through runtime `/deals` DnD and remains changed after reload.
 - `runtime-data-screen.test.ts`: read-only `/deals` users do not receive the stage mutation handler unless they have `tenant.opportunities.manage`.

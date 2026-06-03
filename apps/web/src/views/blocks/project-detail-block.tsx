@@ -145,7 +145,7 @@ export function ProjectDetailBlock({
         }
       />
 
-      <div className="bento">
+      <div className="bento project-detail">
         <div className="bento__cell bento__cell--4">
           <CardPanel title="Сводка" subtitle="Ключевые параметры проекта">
             <div className="fact-list">
@@ -192,7 +192,7 @@ export function ProjectDetailBlock({
               />
             ) : (
               <>
-                <DataTable compact>
+                <DataTable className="project-detail__tasks-table" compact>
                   <thead>
                     <tr>
                       <th>Задача</th>
@@ -206,10 +206,10 @@ export function ProjectDetailBlock({
                   <tbody>
                     {activeTasks.map((task) => (
                       <tr key={task.id}>
-                        <td>
+                        <td data-label="Задача">
                           <CellStack title={task.title} subtitle={task.id} />
                         </td>
-                        <td>
+                        <td data-label="Ответственный">
                           {canChangeTaskOwner ? (
                             <Select
                               value={task.ownerUserId}
@@ -237,7 +237,7 @@ export function ProjectDetailBlock({
                             userNameById.get(task.ownerUserId) ?? task.ownerUserId
                           )}
                         </td>
-                        <td>
+                        <td data-label="Статус">
                           {canChangeTaskStatus ? (
                             <Select
                               value={task.statusId}
@@ -269,7 +269,7 @@ export function ProjectDetailBlock({
                             task={task}
                           />
                         </td>
-                        <td>
+                        <td data-label="Срок">
                           {canChangeTaskDueDate ? (
                             <Input
                               aria-label={`Срок задачи ${task.title}`}
@@ -287,8 +287,8 @@ export function ProjectDetailBlock({
                             formatDateRange(task.plannedStart, task.plannedFinish)
                           )}
                         </td>
-                        <td className="mono">{formatHours(task.plannedWork)}</td>
-                        <td className="mono">{task.progress}%</td>
+                        <td className="mono" data-label="План">{formatHours(task.plannedWork)}</td>
+                        <td className="mono" data-label="Прогресс">{task.progress}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -442,7 +442,7 @@ function ProjectTaskActivityPanel({
               description="Комментарии и системные события по выбранной задаче появятся здесь."
             />
           ) : (
-            <DataTable compact>
+            <DataTable className="project-detail__activity-table" compact>
               <thead>
                 <tr>
                   <th>Событие</th>
@@ -453,14 +453,14 @@ function ProjectTaskActivityPanel({
               <tbody>
                 {activities.map((activity) => (
                   <tr key={activity.id}>
-                    <td>
+                    <td data-label="Событие">
                       <CellStack
                         title={activity.title ?? activity.body ?? activity.type}
                         subtitle={activity.body && activity.title ? activity.body : activity.id}
                       />
                     </td>
-                    <td>{userNameById.get(activity.authorUserId) ?? activity.authorUserId}</td>
-                    <td className="mono">{formatDate(activity.createdAt)}</td>
+                    <td data-label="Автор">{userNameById.get(activity.authorUserId) ?? activity.authorUserId}</td>
+                    <td className="mono" data-label="Дата">{formatDate(activity.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
