@@ -45,6 +45,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/deals")).toBe("05-deals");
     expect(screenIdForPath("/directories/clients")).toBe("08-entities-clients");
     expect(screenIdForPath("/directories/contacts")).toBe("08-entities-contacts");
+    expect(screenIdForPath("/directories/products")).toBe("08-entities-products");
     expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
     expect(screenIdForPath("/projects/project-alpha/timeline")).toBe("12-project-gantt");
     expect(screenIdForPath("/admin/users")).toBe("09-admin");
@@ -59,6 +60,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("05-deals")).toBe("/deals");
     expect(pathForScreenId("08-entities-clients")).toBe("/directories/clients");
     expect(pathForScreenId("08-entities-contacts")).toBe("/directories/contacts");
+    expect(pathForScreenId("08-entities-products")).toBe("/directories/products");
     expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
     expect(pathForScreenId("12-project-gantt")).toBe("/projects/:projectId/timeline");
     expect(pathForScreenId("09-admin")).toBe("/admin/users");
@@ -116,6 +118,11 @@ describe("navigation-registry", () => {
     expect(canOpenRuntimePath("/directories/contacts", ["tenant.clients.read"])).toBe(false);
   });
 
+  it("allows products runtime path only for product readers", () => {
+    expect(canOpenRuntimePath("/directories/products", ["tenant.products.read"])).toBe(true);
+    expect(canOpenRuntimePath("/directories/products", ["tenant.contacts.read"])).toBe(false);
+  });
+
   it("exposes the workspace agent as an overview surface", () => {
     const agent = SCREEN_ROUTE_BY_ID["20-agent-cockpit"];
     expect(agent.railSection).toBe("overview");
@@ -142,6 +149,7 @@ describe("navigation-registry", () => {
         "tenant.deal_stages.read",
         "tenant.clients.read",
         "tenant.contacts.read",
+        "tenant.products.read",
         "tenant.workspace_config.read"
       ]).map((section) => section.href)
     ).toEqual(["/dashboard", "/my-work", "/deals", "/projects", "/directories/clients"]);
@@ -176,6 +184,12 @@ describe("navigation-registry", () => {
         group.items.map((item) => item.href ?? null)
       )
     ).toEqual(["/directories/contacts"]);
+
+    expect(
+      contextNavForSection("directories", "Продукты", ["tenant.products.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/directories/products"]);
 
     expect(
       contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(

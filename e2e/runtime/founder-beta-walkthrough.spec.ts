@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: products directory runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, clients and contacts, but still needs live product/deal handoff proof."
+    "Current blocker: admin roles runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, clients, contacts and products, but still needs RBAC role-management proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -86,5 +86,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("products directory must be live runtime data for deal handoff proof", async () => {
     await page.goto("/directories/products");
     await expect(page.getByRole("heading", { name: /Продукты/ })).toBeVisible();
+  });
+
+  await test.step("admin roles must be a live runtime route for RBAC proof", async () => {
+    await page.goto("/admin/roles");
+    await expect(page.getByRole("heading", { name: /Роли/ })).toBeVisible();
   });
 });

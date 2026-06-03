@@ -10,6 +10,7 @@ import type {
   DealStage,
   OperationsCockpitReadModel,
   Opportunity,
+  Product,
   Project,
   ProjectTemplate,
   ScheduledTask,
@@ -118,6 +119,10 @@ export type ClientsReadModel = {
 
 export type ContactsReadModel = {
   contacts: Contact[];
+};
+
+export type ProductsReadModel = {
+  products: Product[];
 };
 
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
@@ -370,6 +375,13 @@ export async function fetchWorkspaceContacts(): Promise<Contact[]> {
     method: "GET"
   });
   return response.contacts;
+}
+
+export async function fetchWorkspaceProducts(): Promise<Product[]> {
+  const response = await apiFetch<ListResponse<"products", Product>>("/api/workspace/products", {
+    method: "GET"
+  });
+  return response.products;
 }
 
 async function fetchOptionalWorkspaceUsers(): Promise<WorkspaceUser[]> {
@@ -659,6 +671,23 @@ export function useContactsReadModelQuery() {
 
   return {
     data: query.data ? { contacts: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useProductsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.products,
+    queryFn: fetchWorkspaceProducts
+  });
+
+  return {
+    data: query.data ? { products: query.data } : undefined,
     error: query.error,
     isPending: query.isPending,
     isFetching: query.isFetching,

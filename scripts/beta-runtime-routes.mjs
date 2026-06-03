@@ -9,6 +9,7 @@ export const betaRuntimeRoutes = [
   { path: "/deals", marker: "Сделки" },
   { path: "/directories/clients", marker: "Клиенты" },
   { path: "/directories/contacts", marker: "Контакты" },
+  { path: "/directories/products", marker: "Продукты" },
   { path: "/admin/audit", marker: "Аудит действий" },
   { path: "/admin/users", marker: "Пользователи" }
 ];
