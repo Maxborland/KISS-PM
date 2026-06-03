@@ -156,7 +156,7 @@ export function RuntimeDataScreen({
 
   if (screenId === "07b-project-detail") {
     return (
-      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions} projectId={projectId}>
         <RuntimeProjectDetailScreen
           projectId={projectId}
           currentUserId={currentUserId}
@@ -168,7 +168,7 @@ export function RuntimeDataScreen({
 
   if (screenId === "12-project-gantt") {
     return (
-      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions} projectId={projectId}>
         <RuntimeProjectTimelineScreen projectId={projectId} />
       </RuntimeWorkspaceFrame>
     );
@@ -176,7 +176,7 @@ export function RuntimeDataScreen({
 
   if (screenId === "13-project-resources") {
     return (
-      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions} projectId={projectId}>
         <RuntimeProjectResourcesScreen projectId={projectId} />
       </RuntimeWorkspaceFrame>
     );
@@ -264,14 +264,16 @@ function RuntimeDisabledBetaRouteState() {
 function RuntimeWorkspaceFrame({
   screenId,
   permissions,
+  projectId,
   children
 }: {
   screenId: ScreenId;
   permissions: readonly string[];
+  projectId?: string | undefined;
   children: ReactNode;
 }) {
   return (
-    <WorkspaceChrome meta={getScreenRoute(screenId)} permissions={permissions}>
+    <WorkspaceChrome meta={getScreenRoute(screenId)} permissions={permissions} projectId={projectId}>
       {children}
     </WorkspaceChrome>
   );

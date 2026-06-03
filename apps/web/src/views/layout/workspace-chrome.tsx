@@ -15,13 +15,15 @@ export type WorkspaceChromeProps = {
   children: ReactNode;
   topbarActions?: ReactNode;
   permissions?: readonly string[] | undefined;
+  projectId?: string | undefined;
 };
 
 export function WorkspaceChrome({
   meta,
   children,
   topbarActions,
-  permissions
+  permissions,
+  projectId
 }: WorkspaceChromeProps) {
   const topbarExtras =
     topbarActions ??
@@ -42,7 +44,8 @@ export function WorkspaceChrome({
             groups={contextNavForSection(
               meta.railSection,
               meta.contextActiveItem,
-              permissions
+              permissions,
+              { projectId }
             )}
             user={DEFAULT_USER}
           />
