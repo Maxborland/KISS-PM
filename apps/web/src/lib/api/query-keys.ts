@@ -10,6 +10,7 @@ export const queryKeys = {
     customFields: ["workspace", "config", "custom-fields"] as const,
     projects: ["workspace", "projects"] as const,
     project: (projectId: string) => ["workspace", "projects", projectId] as const,
+    taskActivity: (taskId: string) => ["workspace", "tasks", taskId, "activity"] as const,
     taskStatuses: ["workspace", "task-statuses"] as const,
     projectTemplates: ["workspace", "config", "project-templates"] as const,
     operationsCockpit: ["workspace", "operations-cockpit"] as const,

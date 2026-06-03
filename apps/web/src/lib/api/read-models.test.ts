@@ -16,8 +16,10 @@ import {
   fetchWorkspaceProjectDetail,
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
+  fetchWorkspaceTaskActivity,
   fetchWorkspaceTaskStatuses,
   createWorkspaceProjectTask,
+  postWorkspaceTaskComment,
   postWorkspaceAgentMessage,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
@@ -26,7 +28,8 @@ import {
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
   useProjectDetailReadModelQuery,
-  useProjectsListReadModelQuery
+  useProjectsListReadModelQuery,
+  useTaskActivityReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { OperationsCockpitReadModel, Task } from "@/lib/api-types";
@@ -41,6 +44,7 @@ describe("runtime read model API", () => {
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
     expect(queryKeys.workspace.project("project-alpha")).toEqual(["workspace", "projects", "project-alpha"]);
+    expect(queryKeys.workspace.taskActivity("task-alpha")).toEqual(["workspace", "tasks", "task-alpha", "activity"]);
     expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.users).toEqual(["workspace", "users"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
@@ -81,6 +85,12 @@ describe("runtime read model API", () => {
       }
       if (path === "/api/workspace/tasks/task-1") {
         return json({ task: { id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" } });
+      }
+      if (path === "/api/workspace/tasks/task-1/activity") {
+        return json({ activities: [{ id: "activity-1", body: "Runtime activity" }] });
+      }
+      if (path === "/api/workspace/tasks/task-1/comments") {
+        return json({ activity: { id: "activity-comment", body: "Runtime comment" } }, 201);
       }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
@@ -167,6 +177,15 @@ describe("runtime read model API", () => {
         })
       })
     ).resolves.toEqual({ id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" });
+    await expect(fetchWorkspaceTaskActivity("task-1")).resolves.toEqual([
+      { id: "activity-1", body: "Runtime activity" }
+    ]);
+    await expect(
+      postWorkspaceTaskComment({
+        body: " Runtime comment ",
+        taskId: "task-1"
+      })
+    ).resolves.toEqual({ id: "activity-comment", body: "Runtime comment" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
@@ -248,6 +267,8 @@ describe("runtime read model API", () => {
       "/api/workspace/projects/project-1/tasks/task-1/status",
       "/api/workspace/projects/project-1/tasks",
       "/api/workspace/tasks/task-1",
+      "/api/workspace/tasks/task-1/activity",
+      "/api/workspace/tasks/task-1/comments",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
@@ -269,6 +290,9 @@ describe("runtime read model API", () => {
     );
     const updateTaskFieldsCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/tasks/task-1"
+    );
+    const postTaskCommentCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/tasks/task-1/comments"
     );
     const confirmProposalCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
@@ -314,6 +338,10 @@ describe("runtime read model API", () => {
         statusId: "task-status-new",
         title: "Runtime task"
       })
+    });
+    expect(postTaskCommentCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ body: "Runtime comment" })
     });
     expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
@@ -545,6 +573,57 @@ describe("runtime read model API", () => {
         );
       });
       expect(latestError).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads task activity through the task activity endpoint without fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/tasks/task-runtime/activity") {
+        return json({ activities: [{ id: "activity-runtime", body: "Runtime comment" }] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function TaskActivityProbe() {
+      const readModel = useTaskActivityReadModelQuery("task-runtime");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(TaskActivityProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            activities: [{ id: "activity-runtime", body: "Runtime comment" }]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        "/api/workspace/tasks/task-runtime/activity"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/tasks/task-runtime");
     } finally {
       await act(async () => root.unmount());
       queryClient.clear();

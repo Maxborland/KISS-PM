@@ -11,6 +11,7 @@ import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,8 +19,8 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import type { Project, Task, TaskStatus, WorkspaceUser } from "@/lib/api-types";
-import { formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
+import type { Project, Task, TaskActivity, TaskStatus, WorkspaceUser } from "@/lib/api-types";
+import { formatDate, formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
 export type ProjectTaskCreateInput = {
@@ -34,12 +35,25 @@ export type ProjectTaskFieldsUpdateInput = {
   dueDate?: string | undefined;
 };
 
+export type ProjectTaskCommentInput = {
+  body: string;
+  taskId: string;
+};
+
 export type ProjectDetailBlockProps = {
+  activityTaskId?: string | undefined;
+  commentActionError?: unknown;
+  commentActionPending?: boolean;
   createTaskError?: unknown;
   createTaskPending?: boolean;
   currentUserId?: string | undefined;
   onCreateTask?: ((input: ProjectTaskCreateInput) => Promise<unknown> | void) | undefined;
+  onAddTaskComment?: ((input: ProjectTaskCommentInput) => Promise<unknown> | void) | undefined;
+  onSelectActivityTask?: ((taskId: string) => void) | undefined;
   project: Project;
+  taskActivities?: TaskActivity[];
+  taskActivityError?: unknown;
+  taskActivityPending?: boolean;
   taskActionError?: unknown;
   taskActionPending?: boolean;
   taskStatuses?: TaskStatus[];
@@ -51,13 +65,21 @@ export type ProjectDetailBlockProps = {
 };
 
 export function ProjectDetailBlock({
+  activityTaskId,
+  commentActionError,
+  commentActionPending = false,
   createTaskError,
   createTaskPending = false,
   currentUserId,
+  onAddTaskComment,
   onCreateTask,
   onChangeTaskStatus,
+  onSelectActivityTask,
   onUpdateTaskFields,
   project,
+  taskActivities = [],
+  taskActivityError,
+  taskActivityPending = false,
   taskActionError,
   taskActionPending = false,
   taskStatuses = [],
@@ -88,6 +110,7 @@ export function ProjectDetailBlock({
     () => new Map(workspaceUsers.map((user) => [user.id, user.name])),
     [workspaceUsers]
   );
+  const resolvedActivityTaskId = activityTaskId ?? activeTasks[0]?.id ?? "";
   const editDisabledReason = readOnly
     ? "Изменение проекта будет подключено в следующем API-срезе"
     : "Сохранение проекта пока не подключено к API";
@@ -273,8 +296,155 @@ export function ProjectDetailBlock({
             )}
           </CardPanel>
         </div>
+
+        <div className="bento__cell bento__cell--12">
+          <ProjectTaskActivityPanel
+            activities={taskActivities}
+            currentTaskId={resolvedActivityTaskId}
+            error={taskActivityError ?? commentActionError}
+            isCommentPending={commentActionPending}
+            isPending={taskActivityPending}
+            onAddTaskComment={onAddTaskComment}
+            onSelectTask={onSelectActivityTask}
+            tasks={activeTasks}
+            userNameById={userNameById}
+          />
+        </div>
       </div>
     </>
+  );
+}
+
+function ProjectTaskActivityPanel({
+  activities,
+  currentTaskId,
+  error,
+  isCommentPending,
+  isPending,
+  onAddTaskComment,
+  onSelectTask,
+  tasks,
+  userNameById
+}: {
+  activities: TaskActivity[];
+  currentTaskId: string;
+  error: unknown;
+  isCommentPending: boolean;
+  isPending: boolean;
+  onAddTaskComment?: ((input: ProjectTaskCommentInput) => Promise<unknown> | void) | undefined;
+  onSelectTask?: ((taskId: string) => void) | undefined;
+  tasks: Task[];
+  userNameById: Map<string, string>;
+}) {
+  const [commentBody, setCommentBody] = useState("");
+  const canComment = Boolean(onAddTaskComment && currentTaskId);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = commentBody.trim();
+    if (!body || !canComment) return;
+
+    try {
+      await onAddTaskComment?.({ body, taskId: currentTaskId });
+    } catch {
+      return;
+    }
+    setCommentBody("");
+  }
+
+  return (
+    <CardPanel title="Активность задачи" subtitle="Комментарии и системные события по выбранной задаче">
+      {tasks.length === 0 ? (
+        <EmptyState
+          title="Нет задачи для активности"
+          description="Создайте первую задачу проекта, чтобы фиксировать комментарии и события."
+        />
+      ) : (
+        <>
+          <FormSection title="Комментарий" lead="Добавьте рабочий контекст к выбранной задаче.">
+            <form onSubmit={(event) => void handleSubmit(event)}>
+              <FormGrid columns={2}>
+                <Field label="Задача" required>
+                  <Select
+                    value={currentTaskId}
+                    disabled={!onSelectTask || isPending || isCommentPending}
+                    onValueChange={(taskId) => onSelectTask?.(taskId)}
+                  >
+                    <SelectTrigger aria-label="Задача для активности">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Текст" required>
+                  <Textarea
+                    value={commentBody}
+                    disabled={!canComment || isCommentPending}
+                    placeholder="Например, согласовали с ГИПом перенос срока."
+                    aria-label="Комментарий к задаче"
+                    onChange={(event) => setCommentBody(event.target.value)}
+                  />
+                </Field>
+              </FormGrid>
+              <FormActions align="start">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={!canComment || isCommentPending || !commentBody.trim()}
+                >
+                  {isCommentPending ? "Сохраняем…" : "Добавить комментарий"}
+                </Button>
+              </FormActions>
+            </form>
+          </FormSection>
+
+          {error ? (
+            <p className="field__error" role="alert">
+              Не удалось загрузить или сохранить активность задачи. Проверьте права и доступность API.
+            </p>
+          ) : null}
+
+          {isPending ? (
+            <p className="field__hint">Загружаем активность задачи…</p>
+          ) : activities.length === 0 ? (
+            <EmptyState
+              title="Активности пока нет"
+              description="Комментарии и системные события по выбранной задаче появятся здесь."
+            />
+          ) : (
+            <DataTable compact>
+              <thead>
+                <tr>
+                  <th>Событие</th>
+                  <th>Автор</th>
+                  <th>Дата</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map((activity) => (
+                  <tr key={activity.id}>
+                    <td>
+                      <CellStack
+                        title={activity.title ?? activity.body ?? activity.type}
+                        subtitle={activity.body && activity.title ? activity.body : activity.id}
+                      />
+                    </td>
+                    <td>{userNameById.get(activity.authorUserId) ?? activity.authorUserId}</td>
+                    <td className="mono">{formatDate(activity.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          )}
+        </>
+      )}
+    </CardPanel>
   );
 }
 
