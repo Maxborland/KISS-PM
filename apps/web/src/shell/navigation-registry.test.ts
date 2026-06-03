@@ -219,24 +219,49 @@ describe("navigation-registry", () => {
       contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(
         (group) => group.items.map((item) => item.href ?? null)
       )
-    ).toEqual([null]);
+    ).toEqual([]);
 
     expect(
       contextNavForSection("settings", "Пользователи", ["tenant.users.read"]).flatMap((group) =>
         group.items.map((item) => item.href ?? null)
       )
-    ).toEqual(["/admin/users", null]);
+    ).toEqual(["/admin/users"]);
 
     expect(
       contextNavForSection("settings", "Роли", ["tenant.access_profiles.read"]).flatMap((group) =>
         group.items.map((item) => item.href ?? null)
       )
-    ).toEqual(["/admin/roles", null]);
+    ).toEqual(["/admin/roles"]);
 
     expect(
       contextNavForSection("settings", "Аудит", ["tenant.audit_events.read"]).flatMap((group) =>
         group.items.map((item) => item.href ?? null)
       )
-    ).toEqual(["/admin/audit", null]);
+    ).toEqual(["/admin/audit"]);
+  });
+
+  it("does not expose disabled or demo context navigation entries in beta runtime", () => {
+    const permissions = [
+      "tenant.projects.read",
+      "tenant.project_plan.read",
+      "tenant.project_resources.read",
+      "tenant.opportunities.read",
+      "tenant.deal_stages.read",
+      "tenant.clients.read",
+      "tenant.contacts.read",
+      "tenant.products.read",
+      "tenant.users.read",
+      "tenant.access_profiles.read",
+      "tenant.audit_events.read",
+      "tenant.workspace_config.read"
+    ];
+    const hrefs = (["overview", "tasks", "crm", "projects", "directories", "reports", "settings"] as const)
+      .flatMap((section) => contextNavForSection(section, "", permissions))
+      .flatMap((group) => group.items.map((item) => item.href));
+
+    expect(hrefs.every(Boolean)).toBe(true);
+    expect(hrefs.some((href) => href?.includes("/demo"))).toBe(false);
+    expect(hrefs.some((href) => href === "/tasks/new")).toBe(false);
+    expect(hrefs.some((href) => href === "/showcase/spacing")).toBe(false);
   });
 });
