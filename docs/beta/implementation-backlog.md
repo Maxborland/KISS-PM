@@ -96,7 +96,7 @@
 
 ## Текущий evidence snapshot
 
-- `origin/design-v3`: includes Wave 1 route inventory, beta seed/reset, fast gate, deal stage mutation, and PR #73 My Work status action slices.
+- `origin/design-v3` `846434f`: includes Wave 1 route inventory, beta seed/reset, fast gate, deal stage mutation, PR #73 My Work status action, owner/due/comment proof and blocker-gap proof slices.
 - `docs/beta/runtime-route-inventory.md`: current beta runtime allowlist and hidden route list.
 - `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.
 - `runtime-data-screen.test.ts`: non-beta routes render `Раздел не включён в beta` and do not fall back to fixture screens.
@@ -111,7 +111,7 @@
 - `my-work-task-fields.spec.ts`: seeded My Work task owner and due date change through runtime UI and remain changed after reload.
 - `my-work-task-comments.spec.ts`: seeded My Work task comment is created through runtime UI and remains visible in task activity after reload.
 - `my-work-blocker-gap.spec.ts`: My Work blocker control is disabled with explicit data-contract gap copy; waiting-status task shows attention copy instead of fake blocker mutation.
-- `pnpm qa:fast`: standardized as the default local PR gate for small beta slices; pass on `design-v3` `54f0ecf`.
+- `pnpm qa:fast`: standardized as the default local PR gate for small beta slices; pass on current `origin/design-v3` `846434f`.
 - `pnpm qa:runtime`: remains the broader runtime+Storybook foundation gate.
 - Existing runtime QA files are present: `e2e/runtime/runtimeQaFixtures.ts`, `runtime-foundation.spec.ts`, `agent-confirmation.spec.ts`, `storybook-visual-smoke.spec.ts`.
 - Existing beta docs present before this slice: `screen-readiness-matrix.md`, `component-readiness.md`, `qa-gate.md`.
