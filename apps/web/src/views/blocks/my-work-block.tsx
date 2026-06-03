@@ -564,6 +564,8 @@ function MyWorkBlockInner({
                 description: openTask?.description,
                 ownerUserId: openTask?.ownerUserId,
                 plannedFinish: openTask?.plannedFinish,
+                statusCategory: openTask?.statusCategory,
+                statusName: openTask?.statusName,
                 ...(openCard.meta?.find((meta) => meta.label.startsWith("Проект:"))?.label.replace("Проект: ", "")
                   ? {
                       project: openCard.meta
