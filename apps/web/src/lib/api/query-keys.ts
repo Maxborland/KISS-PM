@@ -8,16 +8,23 @@ export const queryKeys = {
     positions: ["workspace", "positions"] as const,
     accessRoles: ["workspace", "access-roles"] as const,
     customFields: ["workspace", "config", "custom-fields"] as const,
+    clients: ["workspace", "clients"] as const,
+    contacts: ["workspace", "contacts"] as const,
+    products: ["workspace", "products"] as const,
     projects: ["workspace", "projects"] as const,
+    project: (projectId: string) => ["workspace", "projects", projectId] as const,
+    taskActivity: (taskId: string) => ["workspace", "tasks", taskId, "activity"] as const,
+    taskStatuses: ["workspace", "task-statuses"] as const,
     projectTemplates: ["workspace", "config", "project-templates"] as const,
     operationsCockpit: ["workspace", "operations-cockpit"] as const,
     myWork: (userId: string) => ["workspace", "my-work", userId] as const,
-    taskStatuses: ["workspace", "task-statuses"] as const,
     workspaceAgentThread: ["workspace", "agent-thread"] as const,
     opportunities: ["workspace", "opportunities"] as const,
+    opportunity: (opportunityId: string) => ["workspace", "opportunities", opportunityId] as const,
     dealStages: ["workspace", "deal-stages"] as const
   },
   tenant: {
+    currentAuditEvents: ["tenant", "current", "audit-events"] as const,
     currentScheduledTasksRoot: ["tenant", "current", "scheduled-tasks"] as const,
     currentScheduledTasks: (assigneeUserId: string, fromDate: string, toDate: string) =>
       ["tenant", "current", "scheduled-tasks", assigneeUserId, fromDate, toDate] as const

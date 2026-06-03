@@ -5,32 +5,96 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/api/query-keys";
 import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-data-screen";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const readModelHooks = vi.hoisted(() => ({
+  activateWorkspaceOpportunityProject: vi.fn(),
+  adminAccessRoles: vi.fn(),
   agent: vi.fn(),
+  adminUsers: vi.fn(),
+  audit: vi.fn(),
+  clients: vi.fn(),
+  contacts: vi.fn(),
   dashboard: vi.fn(),
+  dealDetail: vi.fn(),
   deals: vi.fn(),
+  fetchWorkspaceProjects: vi.fn(),
   myWork: vi.fn(),
+  products: vi.fn(),
+  projectDetail: vi.fn(),
   projects: vi.fn(),
   projectsBlock: vi.fn(),
+  taskActivity: vi.fn(),
+  changeWorkspaceOpportunityStage: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
+  createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
+  postWorkspaceTaskComment: vi.fn(),
+  updateWorkspaceTaskFields: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
+  activateWorkspaceOpportunityProject: readModelHooks.activateWorkspaceOpportunityProject,
+  changeWorkspaceOpportunityStage: readModelHooks.changeWorkspaceOpportunityStage,
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
+  createWorkspaceProjectTask: readModelHooks.createWorkspaceProjectTask,
+  fetchWorkspaceProjects: readModelHooks.fetchWorkspaceProjects,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
+  postWorkspaceTaskComment: readModelHooks.postWorkspaceTaskComment,
+  updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
+  useAdminAccessRolesReadModelQuery: readModelHooks.adminAccessRoles,
+  useAdminUsersReadModelQuery: readModelHooks.adminUsers,
+  useAuditEventsReadModelQuery: readModelHooks.audit,
+  useClientsReadModelQuery: readModelHooks.clients,
+  useContactsReadModelQuery: readModelHooks.contacts,
   useDashboardReadModelQueries: readModelHooks.dashboard,
+  useDealDetailReadModelQuery: readModelHooks.dealDetail,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
-  useProjectsListReadModelQuery: readModelHooks.projects
+  useProductsReadModelQuery: readModelHooks.products,
+  useProjectDetailReadModelQuery: readModelHooks.projectDetail,
+  useProjectsListReadModelQuery: readModelHooks.projects,
+  useTaskActivityReadModelQuery: readModelHooks.taskActivity
+}));
+
+vi.mock("@/views/blocks/deals-block", () => ({
+  DealsBlock: ({
+    initialDeals,
+    onChangeDealStage,
+    readOnly,
+    stages,
+    stageActionError,
+    stageActionPending
+  }: {
+    initialDeals: { id: string; title?: string }[];
+    onChangeDealStage?: (dealId: string, stageId: string) => Promise<unknown>;
+    readOnly?: boolean;
+    stages: { id: string; title?: string }[];
+    stageActionError?: unknown;
+    stageActionPending?: boolean;
+  }) =>
+    createElement(
+      "button",
+      {
+        "data-error": stageActionError ? "true" : "false",
+        "data-has-stage-action": String(Boolean(onChangeDealStage)),
+        "data-pending": String(stageActionPending),
+        "data-read-only": String(readOnly),
+        "data-stage-count": String(stages.length),
+        "data-testid": "runtime-deals",
+        onClick: () => {
+          void onChangeDealStage?.(initialDeals[0]?.id ?? "opportunity-runtime", "deal-stage-contract");
+        }
+      },
+      initialDeals.map((deal) => deal.title).join(", ")
+    )
 }));
 
 vi.mock("@/shell/runtime-dashboard-screen", () => ({
@@ -65,11 +129,15 @@ vi.mock("@/shell/runtime-dashboard-screen", () => ({
 
 vi.mock("@/views/blocks/my-work-block", () => ({
   RuntimeMyWorkBlock: ({
+    canManageProjectTasks,
+    currentUserId,
     initialOpenTaskId,
     onMoveTaskStatus,
     readOnly,
     tasks
   }: {
+    canManageProjectTasks?: boolean;
+    currentUserId?: string;
     initialOpenTaskId?: string;
     onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
     readOnly?: boolean;
@@ -78,6 +146,8 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     createElement(
       "button",
       {
+        "data-can-manage-project-tasks": String(canManageProjectTasks),
+        "data-current-user-id": currentUserId ?? "",
         "data-initial-open-task-id": initialOpenTaskId ?? "",
         "data-testid": "runtime-my-work",
         "data-read-only": String(readOnly),
@@ -93,17 +163,39 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/deal-detail-runtime-block", () => ({
+  DealDetailRuntimeBlock: ({
+    onActivateProject,
+    opportunity
+  }: {
+    onActivateProject?: () => Promise<unknown>;
+    opportunity: { title: string };
+  }) =>
+    createElement(
+      "button",
+      {
+        "data-testid": "runtime-deal-detail",
+        onClick: () => {
+          void onActivateProject?.();
+        }
+      },
+      opportunity.title
+    )
+}));
+
 vi.mock("@/views/blocks/projects-list-block", () => ({
   ProjectsListBlock: ({
+    getProjectHref,
     projectTemplates,
     projects,
     readOnly
   }: {
+    getProjectHref?: (project: { id: string }) => string;
     projectTemplates: { tenantLabel?: string }[];
-    projects: { title?: string }[];
+    projects: { id: string; title?: string }[];
     readOnly?: boolean;
   }) => {
-    readModelHooks.projectsBlock({ projectTemplates, projects, readOnly });
+    readModelHooks.projectsBlock({ getProjectHref, projectTemplates, projects, readOnly });
     return createElement(
       "div",
       {
@@ -116,6 +208,175 @@ vi.mock("@/views/blocks/projects-list-block", () => ({
       ].join(" ")
     );
   }
+}));
+
+vi.mock("@/views/blocks/project-detail-block", () => ({
+  ProjectDetailBlock: ({
+    activityTaskId,
+    currentUserId,
+    onAddTaskComment,
+    onCreateTask,
+    onChangeTaskStatus,
+    onUpdateTaskFields,
+    project,
+    readOnly,
+    taskStatuses,
+    tasks,
+    taskActivities,
+    workspaceUsers
+  }: {
+    activityTaskId?: string;
+    currentUserId?: string;
+    onAddTaskComment?: (input: {
+      body: string;
+      taskId: string;
+    }) => Promise<unknown>;
+    onCreateTask?: (input: {
+      dueDate: string;
+      ownerUserId: string;
+      statusId: string;
+      title: string;
+    }) => Promise<unknown>;
+    onChangeTaskStatus?: (task: { id: string }, statusId: string) => Promise<unknown>;
+    onUpdateTaskFields?: (
+      task: { id: string },
+      fields: { dueDate?: string; ownerUserId?: string }
+    ) => Promise<unknown>;
+    project: { title?: string };
+    readOnly?: boolean;
+    taskActivities?: { body?: string | null; id: string }[];
+    taskStatuses?: { id: string; name: string }[];
+    tasks: { id: string; title?: string }[];
+    workspaceUsers?: { id: string; name: string }[];
+  }) =>
+    createElement("div", { "data-testid": "runtime-project-detail", "data-read-only": String(readOnly) }, [
+      createElement(
+        "button",
+        {
+          key: "comment",
+          "data-activity-task-id": activityTaskId ?? "",
+          "data-testid": "runtime-project-comment-action",
+          onClick: () =>
+            void onAddTaskComment?.({
+              body: "Runtime project comment",
+              taskId: activityTaskId ?? tasks[0]?.id ?? "task-runtime"
+            })
+        },
+        "comment task"
+      ),
+      createElement(
+        "button",
+        {
+          key: "status",
+          "data-testid": "runtime-project-status-action",
+          onClick: () => {
+            const firstTask = tasks[0];
+            const firstStatus = taskStatuses?.[0];
+            if (firstTask && firstStatus) void onChangeTaskStatus?.(firstTask, firstStatus.id);
+          }
+        },
+        "update status"
+      ),
+      createElement(
+        "button",
+        {
+          key: "fields",
+          "data-testid": "runtime-project-fields-action",
+          onClick: () => {
+            const firstTask = tasks[0];
+            if (firstTask) void onUpdateTaskFields?.(firstTask, { dueDate: "2026-06-09", ownerUserId: "usr-2" });
+          }
+        },
+        "update fields"
+      ),
+      createElement(
+        "button",
+        {
+          key: "create",
+          "data-current-user-id": currentUserId ?? "",
+          "data-testid": "runtime-project-create-task",
+          "data-users-count": String(workspaceUsers?.length ?? 0),
+          onClick: () =>
+            void onCreateTask?.({
+              dueDate: "2026-06-04",
+              ownerUserId: workspaceUsers?.[0]?.id ?? currentUserId ?? "usr-1",
+              statusId: taskStatuses?.[0]?.id ?? "task-status-new",
+              title: "Runtime created task"
+            })
+        },
+        "create task"
+      ),
+      [project.title, tasks.map((task) => task.title).join(", "), taskActivities?.map((activity) => activity.body).join(", ")].join(" ")
+    ])
+}));
+
+vi.mock("@/views/blocks/project-timeline-block", () => ({
+  ProjectTimelineBlock: ({
+    data,
+    project
+  }: {
+    data: { rows: { name: string }[] };
+    project: { title?: string };
+  }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-project-timeline" },
+      [project.title, data.rows.map((row) => row.name).join(", ")].join(" ")
+    )
+}));
+
+vi.mock("@/views/blocks/audit-events-runtime-block", () => ({
+  AuditEventsRuntimeBlock: ({ auditEvents }: { auditEvents: { actionType: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-audit-events" },
+      auditEvents.map((event) => event.actionType).join(", ")
+    )
+}));
+
+vi.mock("@/views/blocks/admin-users-runtime-block", () => ({
+  AdminUsersRuntimeBlock: ({ users }: { users: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-admin-users" },
+      users.map((user) => user.name).join(", ")
+    )
+}));
+
+vi.mock("@/views/blocks/admin-access-roles-runtime-block", () => ({
+  AdminAccessRolesRuntimeBlock: ({ accessRoles }: { accessRoles: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-admin-access-roles" },
+      accessRoles.map((role) => role.name).join(", ")
+    )
+}));
+
+vi.mock("@/views/blocks/clients-runtime-block", () => ({
+  ClientsRuntimeBlock: ({ clients }: { clients: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-clients" },
+      clients.map((client) => client.name).join(", ")
+    )
+}));
+
+vi.mock("@/views/blocks/contacts-runtime-block", () => ({
+  ContactsRuntimeBlock: ({ contacts }: { contacts: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-contacts" },
+      contacts.map((contact) => contact.name).join(", ")
+    )
+}));
+
+vi.mock("@/views/blocks/products-runtime-block", () => ({
+  ProductsRuntimeBlock: ({ products }: { products: { name: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-products" },
+      products.map((product) => product.name).join(", ")
+    )
 }));
 
 vi.mock("@/views/layout/workspace-chrome", () => ({
@@ -144,6 +405,7 @@ describe("RuntimeDataScreen permission gate", () => {
       })
     );
     readModelHooks.deals.mockReturnValue(successReadModel({ opportunities: [], dealStages: [] }));
+    readModelHooks.dealDetail.mockReturnValue(successQuery({ opportunity: { id: "opportunity-runtime", title: "Runtime deal" } }));
     readModelHooks.agent.mockReturnValue(
       {
         data: {
@@ -156,6 +418,12 @@ describe("RuntimeDataScreen permission gate", () => {
         refetch: vi.fn()
       }
     );
+    readModelHooks.adminUsers.mockReturnValue(successQuery({ users: [] }));
+    readModelHooks.adminAccessRoles.mockReturnValue(successQuery({ accessRoles: [] }));
+    readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
+    readModelHooks.clients.mockReturnValue(successQuery({ clients: [] }));
+    readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
+    readModelHooks.products.mockReturnValue(successQuery({ products: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue(
       successReadModel({
@@ -163,26 +431,69 @@ describe("RuntimeDataScreen permission gate", () => {
         projectTemplates: []
       })
     );
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [],
+        tasks: [],
+        workspaceUsers: []
+      })
+    );
+    readModelHooks.taskActivity.mockReturnValue(successQuery({ activities: [] }));
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
+    readModelHooks.postWorkspaceTaskComment.mockResolvedValue({ id: "activity-runtime" });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
-    readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({
+    readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({ id: "task-runtime" });
+    readModelHooks.updateWorkspaceTaskFields.mockResolvedValue({
       id: "task-runtime",
-      statusId: "task-status-done"
+      projectId: "project-runtime"
     });
+    readModelHooks.createWorkspaceProjectTask.mockResolvedValue({ id: "task-created" });
+    readModelHooks.changeWorkspaceOpportunityStage.mockResolvedValue({
+      id: "opportunity-runtime",
+      stageId: "deal-stage-contract"
+    });
+    readModelHooks.activateWorkspaceOpportunityProject.mockResolvedValue({
+      id: "project-activated",
+      sourceOpportunityId: "opportunity-runtime",
+      title: "Runtime activated project"
+    });
+    readModelHooks.fetchWorkspaceProjects.mockResolvedValue([]);
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
     const permissions = ["tenant.projects.read"];
 
     expect(canOpenStaticRuntimeScreen("09-admin", permissions)).toBe(false);
+    expect(canOpenStaticRuntimeScreen("09-admin-roles", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("10-settings", permissions)).toBe(false);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", permissions)).toBe(false);
+    expect(canOpenStaticRuntimeScreen("08-entities-products", permissions)).toBe(false);
   });
 
   it("allows static runtime screens when the matching read permission is present", () => {
     expect(canOpenStaticRuntimeScreen("09-admin", ["tenant.users.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("09-admin-roles", ["tenant.access_profiles.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("10-settings", ["tenant.workspace_config.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", ["tenant.clients.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("08-entities-products", ["tenant.products.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("17-project-audit", ["tenant.audit_events.read"])).toBe(true);
+  });
+
+  it("does not fall back to fixture screens for non-beta runtime routes", async () => {
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "10-settings",
+        permissions: ["tenant.workspace_config.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Раздел не включён в beta");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.dashboard).not.toHaveBeenCalled();
+    expect(readModelHooks.projects).not.toHaveBeenCalled();
+    expect(readModelHooks.deals).not.toHaveBeenCalled();
   });
 
   it("requires project read access for dashboard and my work runtime routes", () => {
@@ -192,6 +503,196 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("01-dashboard", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("20-agent-cockpit", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("02-my-work", ["tenant.projects.read"])).toBe(true);
+  });
+
+  it("changes deal stage through the runtime opportunity stage API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.deals.mockReturnValue(
+      successReadModel({
+        dealStages: [{ id: "deal-stage-contract", name: "Договор", sortOrder: 1 }],
+        opportunities: [
+          {
+            clientName: "Runtime client",
+            contractValue: 100000,
+            id: "opportunity-runtime",
+            ownerUserId: "usr-1",
+            stageId: "deal-stage-new",
+            title: "Runtime deal"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "05-deals",
+        permissions: [
+          "tenant.opportunities.read",
+          "tenant.deal_stages.read",
+          "tenant.opportunities.manage"
+        ],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deals']")?.click();
+    });
+
+    expect(readModelHooks.changeWorkspaceOpportunityStage).toHaveBeenCalled();
+    expect(readModelHooks.changeWorkspaceOpportunityStage.mock.calls[0]?.[0]).toEqual({
+      opportunityId: "opportunity-runtime",
+      stageId: "deal-stage-contract"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.opportunities });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.opportunity("opportunity-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("keeps deal stage changes disabled for read-only opportunity users", async () => {
+    readModelHooks.deals.mockReturnValue(
+      successReadModel({
+        dealStages: [{ id: "deal-stage-contract", name: "Договор", sortOrder: 1 }],
+        opportunities: [
+          {
+            clientName: "Runtime client",
+            contractValue: 100000,
+            id: "opportunity-runtime",
+            ownerUserId: "usr-1",
+            stageId: "deal-stage-new",
+            title: "Runtime deal"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "05-deals",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    const dealsButton = host.querySelector<HTMLButtonElement>("[data-testid='runtime-deals']");
+    expect(dealsButton?.dataset.hasStageAction).toBe("false");
+
+    await act(async () => {
+      dealsButton?.click();
+    });
+
+    expect(readModelHooks.changeWorkspaceOpportunityStage).not.toHaveBeenCalled();
+  });
+
+  it("renders deal detail from the runtime opportunity detail read model without fixture fallback", async () => {
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime deal detail");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.dealDetail).toHaveBeenCalledWith("opportunity-runtime");
+  });
+
+  it("activates a deal into a project through the runtime opportunity API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          status: "ready_to_activate",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+    });
+
+    expect(readModelHooks.activateWorkspaceOpportunityProject).toHaveBeenCalledWith({
+      acceptedRiskReason: "Риск принят пользователем при передаче сделки в проект из runtime карточки.",
+      opportunityId: "opportunity-runtime"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.opportunity("opportunity-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.opportunities });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-activated") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("opens the existing project when backend reports that the opportunity was already activated", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          status: "ready_to_activate",
+          title: "Runtime deal detail"
+        }
+      })
+    );
+    readModelHooks.activateWorkspaceOpportunityProject.mockRejectedValue(
+      new ApiError(409, "conflict", "source_opportunity_already_activated", {
+        error: "source_opportunity_already_activated"
+      })
+    );
+    readModelHooks.fetchWorkspaceProjects.mockResolvedValue([
+      {
+        id: "project-existing",
+        sourceOpportunityId: "opportunity-runtime",
+        title: "Already activated project"
+      }
+    ]);
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+    });
+
+    expect(readModelHooks.fetchWorkspaceProjects).toHaveBeenCalled();
+    expect(readModelHooks.activateWorkspaceOpportunityProject).not.toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-existing") });
+    invalidateSpy.mockRestore();
   });
 
   it("renders dashboard from runtime read models without fixture fallback", async () => {
@@ -381,10 +882,14 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime template");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      getProjectHref: expect.any(Function),
       projects: [{ id: "project-runtime", title: "Runtime architecture project" }],
       projectTemplates: [{ id: "template-runtime", tenantLabel: "Runtime template" }],
       readOnly: true
     });
+    expect(readModelHooks.projectsBlock.mock.calls[0]?.[0].getProjectHref({ id: "project-runtime" })).toBe(
+      "/projects/project-runtime"
+    );
   });
 
   it("keeps runtime projects explicit when project templates are unavailable", async () => {
@@ -404,10 +909,438 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(host.textContent).toContain("Runtime project without templates");
     expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      getProjectHref: expect.any(Function),
       projects: [{ id: "project-runtime", title: "Runtime project without templates" }],
       projectTemplates: [],
       readOnly: true
     });
+  });
+
+  it("renders project detail from the runtime project read model", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-review", name: "На проверке" }],
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime project detail");
+    expect(host.textContent).toContain("Runtime task detail");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
+    expect(readModelHooks.taskActivity).toHaveBeenCalledWith("task-runtime");
+  });
+
+  it("renders project timeline from the runtime project read model without fixture fallback", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: {
+          id: "project-runtime",
+          title: "Runtime project timeline",
+          tenantId: "tenant-runtime",
+          clientName: "Runtime client",
+          plannedStart: "2026-06-01T00:00:00.000Z",
+          plannedFinish: "2026-06-12T00:00:00.000Z",
+          plannedHours: 120
+        },
+        taskStatuses: [
+          {
+            category: "in_progress",
+            id: "task-status-progress",
+            name: "В работе"
+          }
+        ],
+        tasks: [
+          {
+            actualWork: 0,
+            archivedAt: null,
+            id: "task-runtime",
+            ownerUserId: "usr-1",
+            plannedFinish: "2026-06-04T00:00:00.000Z",
+            plannedStart: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            priority: "normal",
+            progress: 0.5,
+            projectId: "project-runtime",
+            requesterUserId: "usr-1",
+            stageId: null,
+            statusCategory: "in_progress",
+            statusId: "task-status-progress",
+            statusName: "В работе",
+            tenantId: "tenant-runtime",
+            title: "Runtime timeline task"
+          }
+        ],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "12-project-gantt",
+        projectId: "project-runtime",
+        permissions: ["tenant.project_plan.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime project timeline");
+    expect(host.textContent).toContain("Runtime timeline task");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(host.textContent).not.toContain("Разработать концепцию");
+    expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
+  });
+
+  it("renders audit from the runtime audit read model without fixture fallback", async () => {
+    readModelHooks.audit.mockReturnValue(
+      successQuery({
+        auditEvents: [
+          {
+            actionType: "workspace.agent.proposal.apply",
+            id: "audit-runtime"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "17-project-audit",
+        permissions: ["tenant.audit_events.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("workspace.agent.proposal.apply");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.audit).toHaveBeenCalled();
+  });
+
+  it("renders admin users from the runtime users read model without fixture fallback", async () => {
+    readModelHooks.adminUsers.mockReturnValue(
+      successQuery({
+        users: [
+          {
+            id: "usr-admin",
+            name: "Runtime Admin"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin",
+        permissions: ["tenant.users.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Admin");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.adminUsers).toHaveBeenCalled();
+  });
+
+  it("renders admin access roles from the runtime access roles read model without fixture fallback", async () => {
+    readModelHooks.adminAccessRoles.mockReturnValue(
+      successQuery({
+        accessRoles: [
+          {
+            id: "role-runtime",
+            name: "Runtime Role"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin-roles",
+        permissions: ["tenant.access_profiles.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Role");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.adminAccessRoles).toHaveBeenCalled();
+  });
+
+  it("renders clients from the runtime clients read model without fixture fallback", async () => {
+    readModelHooks.clients.mockReturnValue(
+      successQuery({
+        clients: [
+          {
+            id: "client-runtime",
+            name: "Runtime Client"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "08-entities-clients",
+        permissions: ["tenant.clients.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Client");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.clients).toHaveBeenCalled();
+  });
+
+  it("renders contacts from the runtime contacts read model without fixture fallback", async () => {
+    readModelHooks.contacts.mockReturnValue(
+      successQuery({
+        contacts: [
+          {
+            id: "contact-runtime",
+            name: "Runtime Contact"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "08-entities-contacts",
+        permissions: ["tenant.contacts.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Contact");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.contacts).toHaveBeenCalled();
+  });
+
+  it("renders products from the runtime products read model without fixture fallback", async () => {
+    readModelHooks.products.mockReturnValue(
+      successQuery({
+        products: [
+          {
+            id: "product-runtime",
+            name: "Runtime Product"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "08-entities-products",
+        permissions: ["tenant.products.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime Product");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.products).toHaveBeenCalled();
+  });
+
+  it("updates task status from project detail through the project-scoped task status API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-review", name: "На проверке" }],
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: []
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-status-action']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(readModelHooks.updateWorkspaceProjectTaskStatus.mock.calls[0]?.[0]).toEqual({
+      projectId: "project-runtime",
+      statusId: "task-status-review",
+      taskId: "task-runtime"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
+  });
+
+  it("updates task owner and due date from project detail through the full task update API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-new", name: "Новая" }],
+        tasks: [{ id: "task-runtime", projectId: "project-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [
+          { id: "usr-1", name: "Runtime User" },
+          { id: "usr-2", name: "Runtime Lead" }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-fields-action']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(readModelHooks.updateWorkspaceTaskFields.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-09",
+      ownerUserId: "usr-2",
+      task: { id: "task-runtime", projectId: "project-runtime", title: "Runtime task detail" }
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
+  });
+
+  it("creates project tasks through the project-scoped runtime task API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-new", name: "Новая" }],
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-create-task']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(readModelHooks.createWorkspaceProjectTask.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-04",
+      ownerUserId: "usr-1",
+      projectId: "project-runtime",
+      statusId: "task-status-new",
+      title: "Runtime created task"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
+  });
+
+  it("adds task comments from project detail and refreshes task activity", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-new", name: "Новая" }],
+        tasks: [{ id: "task-runtime", projectId: "project-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+    readModelHooks.taskActivity.mockReturnValue(
+      successQuery({
+        activities: [{ id: "activity-runtime", body: "Existing runtime comment" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-comment-action']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(host.textContent).toContain("Existing runtime comment");
+    expect(readModelHooks.postWorkspaceTaskComment.mock.calls[0]?.[0]).toEqual({
+      body: "Runtime project comment",
+      taskId: "task-runtime"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.taskActivity("task-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    invalidateSpy.mockRestore();
+  });
+
+  it("shows not-found state for unknown runtime project ids", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery(undefined, {
+        error: new ApiError(404, "not_found", "project_not_found", {
+          error: "project_not_found"
+        })
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-missing",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Проект не найден");
   });
 
   it("passes the agent task deep link into runtime my work", async () => {
@@ -430,7 +1363,46 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.querySelector("[data-testid='runtime-my-work']")?.getAttribute("data-initial-open-task-id")).toBe(
       "task-agent-result"
     );
+    expect(host.querySelector("[data-testid='runtime-my-work']")?.getAttribute("data-current-user-id")).toBe(
+      "usr-1"
+    );
     expect(host.textContent).toContain("Runtime task from agent");
+  });
+
+  it("passes project manage permission into My Work task status actions", async () => {
+    readModelHooks.myWork.mockReturnValue(
+      successReadModel({
+        scheduledTasks: [],
+        taskStatuses: [],
+        tasks: [{ id: "task-runtime", title: "Runtime my work task" }]
+      })
+    );
+
+    const projectReaderHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      projectReaderHost
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.getAttribute("data-can-manage-project-tasks")
+    ).toBe("false");
+
+    const managerHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read", "tenant.projects.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      managerHost
+        .querySelector("[data-testid='runtime-my-work']")
+        ?.getAttribute("data-can-manage-project-tasks")
+    ).toBe("true");
   });
 
   it("updates my work task status through the runtime task-status action", async () => {
@@ -484,6 +1456,26 @@ function successReadModel<T>(data: T) {
     isPending: false,
     isFetching: false,
     refetchAll: vi.fn()
+  };
+}
+
+function successQuery<T>(
+  data: T,
+  overrides: Partial<{
+    data: T;
+    error: unknown;
+    isPending: boolean;
+    isFetching: boolean;
+    refetch: ReturnType<typeof vi.fn>;
+  }> = {}
+) {
+  return {
+    data,
+    error: null,
+    isPending: false,
+    isFetching: false,
+    refetch: vi.fn(),
+    ...overrides
   };
 }
 

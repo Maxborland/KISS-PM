@@ -20,11 +20,35 @@ export const RAIL_SECTIONS = [
   { id: "crm", label: "CRM", shortLabel: "CRM", icon: Briefcase, href: "/deals" },
   { id: "projects", label: "Проекты", shortLabel: "Проекты", icon: FolderKanban, href: "/projects" },
   { id: "directories", label: "Справочники", shortLabel: "Спр.", icon: BookOpen, href: "/directories/clients" },
-  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3, href: "/projects/demo/kpi" },
+  { id: "reports", label: "Отчёты", shortLabel: "Отчёты", icon: BarChart3, href: "/reports" },
   { id: "settings", label: "Настройки", shortLabel: "Настр.", icon: Settings, href: "/settings" }
 ] as const;
 
 export type RailSectionId = (typeof RAIL_SECTIONS)[number]["id"];
+
+export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
+  "01-dashboard",
+  "20-agent-cockpit",
+  "02-my-work",
+  "05-deals",
+  "06-deal-card",
+  "07-projects-list",
+  "07b-project-detail",
+  "08-entities-clients",
+  "08-entities-contacts",
+  "08-entities-products",
+  "09-admin",
+  "09-admin-roles",
+  "12-project-gantt",
+  "13-project-resources",
+  "17-project-audit"
+] as const satisfies readonly ScreenId[];
+
+const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
+
+export function isCurrentBetaRuntimeScreen(screenId: ScreenId): boolean {
+  return CURRENT_BETA_RUNTIME_SCREEN_ID_SET.has(screenId);
+}
 
 export type ScreenRouteMeta = {
   id: ScreenId;
@@ -88,7 +112,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Текущий проект",
       items: [
-        { label: "Гант", nested: true, href: "/projects/demo/gantt" },
+        { label: "Гант", nested: true },
         { label: "Ресурсы", nested: true, href: "/projects/demo/resources" },
         { label: "Базовый план", nested: true, href: "/projects/demo/baseline" },
         { label: "Сценарии", nested: true, href: "/projects/demo/scenarios" },
@@ -123,7 +147,9 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
       title: "Настройки",
       items: [
         { label: "Рабочая область", href: "/settings" },
-        { label: "Администрирование", href: "/admin" },
+        { label: "Пользователи", href: "/admin/users" },
+        { label: "Роли", href: "/admin/roles" },
+        { label: "Аудит", href: "/admin/audit" },
         { label: "Интеграции" }
       ]
     }
@@ -247,7 +273,7 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     breadcrumb: [{ label: "CRM" }, { label: "Сделки" }, { label: "Ромашка", current: true }],
     railSection: "crm",
     contextActiveItem: "Сделки",
-    path: "/deals/demo/DEAL-101",
+    path: "/deals/:dealId",
     requiredPermissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
     requiredPermissionMode: "all"
   }),
@@ -266,12 +292,12 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   "07b-project-detail": route({
     id: "07b-project-detail",
     storyTitle: "07b Карточка проекта",
-    pageTitle: MOCK_PROJECT_CRM,
-    lead: "PRJ-2026-014 · ООО «Ромашка»",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }],
+    pageTitle: "Проект",
+    lead: "Живая карточка проекта: сроки, статус, задачи и ответственные.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта", current: true }],
     railSection: "projects",
     contextActiveItem: "Все проекты",
-    path: "/projects/demo",
+    path: "/projects/:projectId",
     requiredPermissions: ["tenant.projects.read"]
   }),
   "08-entities-clients": route({
@@ -309,18 +335,25 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   }),
   "09-admin": route({
     id: "09-admin",
-    storyTitle: "09 Администрирование",
-    pageTitle: "Администрирование",
-    lead: "Пользователи, роли и политики рабочей области.",
-    breadcrumb: [{ label: "Настройки" }, { label: "Администрирование", current: true }],
+    storyTitle: "09 Пользователи",
+    pageTitle: "Пользователи",
+    lead: "Пользователи и профили доступа рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Пользователи", current: true }],
     railSection: "settings",
-    contextActiveItem: "Администрирование",
-    path: "/admin",
-    requiredPermissions: [
-      "tenant.users.read",
-      "tenant.access_profiles.read",
-      "tenant.positions.read"
-    ]
+    contextActiveItem: "Пользователи",
+    path: "/admin/users",
+    requiredPermissions: ["tenant.users.read"]
+  }),
+  "09-admin-roles": route({
+    id: "09-admin-roles",
+    storyTitle: "09 Роли",
+    pageTitle: "Роли",
+    lead: "Профили доступа и разрешения рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Роли", current: true }],
+    railSection: "settings",
+    contextActiveItem: "Роли",
+    path: "/admin/roles",
+    requiredPermissions: ["tenant.access_profiles.read"]
   }),
   "10-settings": route({
     id: "10-settings",
@@ -346,24 +379,24 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   "12-project-gantt": route({
     id: "12-project-gantt",
     storyTitle: "12 Гант проекта",
-    pageTitle: mockProjectScreenTitle("Гант"),
-    lead: "План-факт и WBS проекта.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Гант", current: true }],
+    pageTitle: "Гант проекта",
+    lead: "План-график проекта на живых задачах и сроках.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта" }, { label: "Гант", current: true }],
     railSection: "projects",
     contextActiveItem: "Гант",
-    pageIntroActions: "create-export",
-    path: "/projects/demo/gantt",
+    pageIntroActions: "none",
+    path: "/projects/:projectId/timeline",
     requiredPermissions: ["tenant.project_plan.read"]
   }),
   "13-project-resources": route({
     id: "13-project-resources",
     storyTitle: "13 Ресурсы проекта",
-    pageTitle: mockProjectScreenTitle("Ресурсы"),
-    lead: "Матрица загрузки и назначения.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Ресурсы", current: true }],
+    pageTitle: "Ресурсы проекта",
+    lead: "Живая матрица загрузки и назначений проекта.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта" }, { label: "Ресурсы", current: true }],
     railSection: "projects",
     contextActiveItem: "Ресурсы",
-    path: "/projects/demo/resources",
+    path: "/projects/:projectId/resources",
     requiredPermissions: ["tenant.project_resources.read"]
   }),
   "14-project-baseline": route({
@@ -401,13 +434,13 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   }),
   "17-project-audit": route({
     id: "17-project-audit",
-    storyTitle: "17 Аудит проекта",
-    pageTitle: mockProjectScreenTitle("Аудит"),
-    lead: "Журнал управленческих действий.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Аудит", current: true }],
-    railSection: "projects",
+    storyTitle: "17 Аудит",
+    pageTitle: "Аудит действий",
+    lead: "Журнал управленческих действий рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Аудит", current: true }],
+    railSection: "settings",
     contextActiveItem: "Аудит",
-    path: "/projects/demo/audit",
+    path: "/admin/audit",
     requiredPermissions: ["tenant.audit_events.read"]
   }),
   "18-project-calendars": route({
@@ -489,7 +522,38 @@ export function normalizeRuntimePath(path: string): string {
 }
 
 export function screenIdForPath(path: string): ScreenId | null {
-  return SCREEN_ID_BY_PATH[normalizeRuntimePath(path)] ?? null;
+  const normalized = normalizeRuntimePath(path);
+  return SCREEN_ID_BY_PATH[normalized] ?? screenIdForDynamicRuntimePath(normalized);
+}
+
+export function projectIdForRuntimePath(path: string): string | null {
+  const [, section, projectId, ...rest] = normalizeRuntimePath(path).split("/");
+  if (section !== "projects") return null;
+  if (rest.length > 1) return null;
+  if (rest.length === 1 && !["timeline", "resources"].includes(rest[0] ?? "")) return null;
+  if (!projectId || projectId === "demo" || projectId.startsWith(":")) return null;
+  return projectId;
+}
+
+export function dealIdForRuntimePath(path: string): string | null {
+  const [, section, dealId, ...rest] = normalizeRuntimePath(path).split("/");
+  if (section !== "deals") return null;
+  if (rest.length > 0) return null;
+  if (!dealId || dealId === "demo" || dealId.startsWith(":")) return null;
+  return dealId;
+}
+
+function screenIdForDynamicRuntimePath(path: string): ScreenId | null {
+  const normalized = normalizeRuntimePath(path);
+  const [, section, , view] = normalized.split("/");
+  if (dealIdForRuntimePath(path)) return "06-deal-card";
+  if (section === "projects" && view === "timeline" && projectIdForRuntimePath(path)) {
+    return "12-project-gantt";
+  }
+  if (section === "projects" && view === "resources" && projectIdForRuntimePath(path)) {
+    return "13-project-resources";
+  }
+  return projectIdForRuntimePath(path) ? "07b-project-detail" : null;
 }
 
 export function pathForScreenId(id: ScreenId): string | null {
@@ -510,7 +574,7 @@ export function canOpenScreenRoute(
 
 export function canOpenRuntimePath(path: string, permissions?: readonly string[]): boolean {
   const screenId = screenIdForPath(path);
-  if (!screenId) return true;
+  if (!screenId || !isCurrentBetaRuntimeScreen(screenId)) return false;
   return canOpenScreenRoute(SCREEN_ROUTE_BY_ID[screenId], permissions);
 }
 

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canOpenRuntimePath,
   contextNavForSection,
+  dealIdForRuntimePath,
   pathForScreenId,
   RAIL_SECTIONS,
   railSectionsForPermissions,
@@ -42,7 +44,15 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/agent")).toBe("20-agent-cockpit");
     expect(screenIdForPath("/my-work")).toBe("02-my-work");
     expect(screenIdForPath("/deals")).toBe("05-deals");
-    expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
+    expect(screenIdForPath("/deals/opportunity-alpha")).toBe("06-deal-card");
+    expect(screenIdForPath("/directories/clients")).toBe("08-entities-clients");
+    expect(screenIdForPath("/directories/contacts")).toBe("08-entities-contacts");
+    expect(screenIdForPath("/directories/products")).toBe("08-entities-products");
+    expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
+    expect(screenIdForPath("/projects/project-alpha/timeline")).toBe("12-project-gantt");
+    expect(screenIdForPath("/admin/users")).toBe("09-admin");
+    expect(screenIdForPath("/admin/roles")).toBe("09-admin-roles");
+    expect(screenIdForPath("/admin/audit")).toBe("17-project-audit");
     expect(screenIdForPath("/settings")).toBe("10-settings");
     expect(screenIdForPath("/login")).toBe("19-login");
   });
@@ -51,7 +61,15 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
     expect(pathForScreenId("20-agent-cockpit")).toBe("/agent");
     expect(pathForScreenId("05-deals")).toBe("/deals");
-    expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
+    expect(pathForScreenId("06-deal-card")).toBe("/deals/:dealId");
+    expect(pathForScreenId("08-entities-clients")).toBe("/directories/clients");
+    expect(pathForScreenId("08-entities-contacts")).toBe("/directories/contacts");
+    expect(pathForScreenId("08-entities-products")).toBe("/directories/products");
+    expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
+    expect(pathForScreenId("12-project-gantt")).toBe("/projects/:projectId/timeline");
+    expect(pathForScreenId("09-admin")).toBe("/admin/users");
+    expect(pathForScreenId("09-admin-roles")).toBe("/admin/roles");
+    expect(pathForScreenId("17-project-audit")).toBe("/admin/audit");
   });
 
   it("provides real hrefs for primary rail entries", () => {
@@ -61,9 +79,72 @@ describe("navigation-registry", () => {
       "/deals",
       "/projects",
       "/directories/clients",
-      "/projects/demo/kpi",
+      "/reports",
       "/settings"
     ]);
+    expect(RAIL_SECTIONS.map((section) => section.href).some((href) => href.includes("/demo"))).toBe(false);
+  });
+
+  it("hides non-beta runtime paths from navigation until they are API-backed", () => {
+    expect(canOpenRuntimePath("/showcase/spacing", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
+    expect(canOpenRuntimePath("/deals/demo/DEAL-101", ["tenant.opportunities.read", "tenant.deal_stages.read"])).toBe(false);
+    expect(canOpenRuntimePath("/settings", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("extracts real deal ids from dynamic runtime paths", () => {
+    expect(dealIdForRuntimePath("/deals/opportunity-alpha")).toBe("opportunity-alpha");
+    expect(dealIdForRuntimePath("/deals/demo/DEAL-101")).toBeNull();
+    expect(dealIdForRuntimePath("/deals/:dealId")).toBeNull();
+  });
+
+  it("allows real deal detail paths only for opportunity and deal stage readers", () => {
+    expect(canOpenRuntimePath("/deals/opportunity-alpha", ["tenant.opportunities.read"])).toBe(false);
+    expect(
+      canOpenRuntimePath("/deals/opportunity-alpha", ["tenant.opportunities.read", "tenant.deal_stages.read"])
+    ).toBe(true);
+  });
+
+  it("allows real project detail paths for project readers", () => {
+    expect(canOpenRuntimePath("/projects/project-alpha", ["tenant.projects.read"])).toBe(true);
+    expect(canOpenRuntimePath("/projects/project-alpha", [])).toBe(false);
+  });
+
+  it("allows real project timeline paths only for project plan readers", () => {
+    expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.project_plan.read"])).toBe(true);
+    expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
+  });
+
+  it("allows audit runtime path only for audit readers", () => {
+    expect(canOpenRuntimePath("/admin/audit", ["tenant.audit_events.read"])).toBe(true);
+    expect(canOpenRuntimePath("/admin/audit", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("allows admin users runtime path only for user readers", () => {
+    expect(canOpenRuntimePath("/admin/users", ["tenant.users.read"])).toBe(true);
+    expect(canOpenRuntimePath("/admin/users", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("allows admin roles runtime path only for access profile readers", () => {
+    expect(canOpenRuntimePath("/admin/roles", ["tenant.access_profiles.read"])).toBe(true);
+    expect(canOpenRuntimePath("/admin/roles", ["tenant.users.read"])).toBe(false);
+  });
+
+  it("allows clients runtime path only for client readers", () => {
+    expect(canOpenRuntimePath("/directories/clients", ["tenant.clients.read"])).toBe(true);
+    expect(canOpenRuntimePath("/directories/clients", ["tenant.projects.read"])).toBe(false);
+  });
+
+  it("allows contacts runtime path only for contact readers", () => {
+    expect(canOpenRuntimePath("/directories/contacts", ["tenant.contacts.read"])).toBe(true);
+    expect(canOpenRuntimePath("/directories/contacts", ["tenant.clients.read"])).toBe(false);
+  });
+
+  it("allows products runtime path only for product readers", () => {
+    expect(canOpenRuntimePath("/directories/products", ["tenant.products.read"])).toBe(true);
+    expect(canOpenRuntimePath("/directories/products", ["tenant.contacts.read"])).toBe(false);
   });
 
   it("exposes the workspace agent as an overview surface", () => {
@@ -91,9 +172,11 @@ describe("navigation-registry", () => {
         "tenant.opportunities.read",
         "tenant.deal_stages.read",
         "tenant.clients.read",
+        "tenant.contacts.read",
+        "tenant.products.read",
         "tenant.workspace_config.read"
       ]).map((section) => section.href)
-    ).toEqual(["/dashboard", "/my-work", "/deals", "/projects", "/directories/clients", "/settings"]);
+    ).toEqual(["/dashboard", "/my-work", "/deals", "/projects", "/directories/clients"]);
   });
 
   it("requires both opportunities and deal stages for the deals route", () => {
@@ -115,9 +198,45 @@ describe("navigation-registry", () => {
     ).toEqual(["/projects"]);
 
     expect(
+      contextNavForSection("directories", "Клиенты", ["tenant.clients.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/directories/clients"]);
+
+    expect(
+      contextNavForSection("directories", "Контакты", ["tenant.contacts.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/directories/contacts"]);
+
+    expect(
+      contextNavForSection("directories", "Продукты", ["tenant.products.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/directories/products"]);
+
+    expect(
       contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(
         (group) => group.items.map((item) => item.href ?? null)
       )
-    ).toEqual(["/settings", null]);
+    ).toEqual([null]);
+
+    expect(
+      contextNavForSection("settings", "Пользователи", ["tenant.users.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/admin/users", null]);
+
+    expect(
+      contextNavForSection("settings", "Роли", ["tenant.access_profiles.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/admin/roles", null]);
+
+    expect(
+      contextNavForSection("settings", "Аудит", ["tenant.audit_events.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/admin/audit", null]);
   });
 });

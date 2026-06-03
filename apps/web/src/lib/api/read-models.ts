@@ -1,17 +1,24 @@
 "use client";
 
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { fetchWorkspaceAccessRoles, type AccessRole } from "@/lib/api/bootstrap";
 import type {
+  AuditEventListItem,
+  Client,
+  Contact,
   DealStage,
   OperationsCockpitReadModel,
   Opportunity,
+  Product,
   Project,
   ProjectTemplate,
   ScheduledTask,
   Task,
-  TaskStatus
+  TaskActivity,
+  TaskStatus,
+  WorkspaceUser
 } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -65,9 +72,24 @@ export type ProjectsListReadModel = {
   projectTemplates: ProjectTemplate[];
 };
 
+export type ProjectDetailReadModel = {
+  project: Project;
+  taskStatuses: TaskStatus[];
+  tasks: Task[];
+  workspaceUsers: WorkspaceUser[];
+};
+
+export type TaskActivityReadModel = {
+  activities: TaskActivity[];
+};
+
 export type DealsBoardReadModel = {
   opportunities: Opportunity[];
   dealStages: DealStage[];
+};
+
+export type DealDetailReadModel = {
+  opportunity: Opportunity;
 };
 
 export type MyWorkReadModel = {
@@ -87,6 +109,30 @@ export type DashboardReadModel = {
 export type AgentCockpitReadModel = {
   operationsCockpit: OperationsCockpitReadModel;
   workspaceAgentThread: WorkspaceAgentThread;
+};
+
+export type AuditEventsReadModel = {
+  auditEvents: AuditEventListItem[];
+};
+
+export type AdminUsersReadModel = {
+  users: WorkspaceUser[];
+};
+
+export type AdminAccessRolesReadModel = {
+  accessRoles: AccessRole[];
+};
+
+export type ClientsReadModel = {
+  clients: Client[];
+};
+
+export type ContactsReadModel = {
+  contacts: Contact[];
+};
+
+export type ProductsReadModel = {
+  products: Product[];
 };
 
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
@@ -178,11 +224,183 @@ export type RuntimeTaskReadModelInput = {
   toDate?: string;
 };
 
+export type CreateWorkspaceProjectTaskInput = {
+  projectId: string;
+  title: string;
+  ownerUserId: string;
+  dueDate: string;
+  statusId?: string | undefined;
+};
+
+export type UpdateWorkspaceTaskFieldsInput = {
+  task: Task;
+  ownerUserId?: string | undefined;
+  dueDate?: string | undefined;
+};
+
+export type PostWorkspaceTaskCommentInput = {
+  taskId: string;
+  body: string;
+};
+
 export async function fetchWorkspaceProjects(): Promise<Project[]> {
   const response = await apiFetch<ListResponse<"projects", Project>>("/api/workspace/projects", {
     method: "GET"
   });
   return response.projects;
+}
+
+export async function fetchWorkspaceProjectDetail(projectId: string): Promise<ProjectDetailReadModel> {
+  const response = await apiFetch<Omit<ProjectDetailReadModel, "taskStatuses" | "workspaceUsers">>(
+    `/api/workspace/projects/${encodeURIComponent(projectId)}`,
+    { method: "GET" }
+  );
+  return {
+    ...response,
+    taskStatuses: [],
+    workspaceUsers: []
+  };
+}
+
+export async function fetchWorkspaceTaskStatuses(): Promise<TaskStatus[]> {
+  const response = await apiFetch<ListResponse<"taskStatuses", TaskStatus>>(
+    "/api/workspace/task-statuses",
+    { method: "GET" }
+  );
+  return response.taskStatuses;
+}
+
+export async function fetchWorkspaceTaskActivity(taskId: string): Promise<TaskActivity[]> {
+  const response = await apiFetch<ListResponse<"activities", TaskActivity>>(
+    `/api/workspace/tasks/${encodeURIComponent(taskId)}/activity`,
+    { method: "GET" }
+  );
+  return response.activities;
+}
+
+export async function updateWorkspaceProjectTaskStatus(input: {
+  projectId: string;
+  taskId: string;
+  statusId: string;
+}): Promise<Task> {
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/projects/${encodeURIComponent(input.projectId)}/tasks/${encodeURIComponent(input.taskId)}/status`,
+    {
+      method: "PATCH",
+      json: { statusId: input.statusId }
+    }
+  );
+  return response.task;
+}
+
+export async function createWorkspaceProjectTask(
+  input: CreateWorkspaceProjectTaskInput
+): Promise<Task> {
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/projects/${encodeURIComponent(input.projectId)}/tasks`,
+    {
+      method: "POST",
+      json: {
+        description: null,
+        durationWorkingDays: 1,
+        participants: [{ role: "executor", userId: input.ownerUserId }],
+        plannedFinish: input.dueDate,
+        plannedStart: input.dueDate,
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: input.statusId,
+        title: input.title.trim()
+      }
+    }
+  );
+  return response.task;
+}
+
+export async function updateWorkspaceTaskFields(
+  input: UpdateWorkspaceTaskFieldsInput
+): Promise<Task> {
+  const ownerUserId = input.ownerUserId ?? input.task.ownerUserId;
+  const plannedFinish = input.dueDate ?? input.task.plannedFinish.slice(0, 10);
+  const participants = upsertTaskExecutor(input.task.participants, ownerUserId);
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/tasks/${encodeURIComponent(input.task.id)}`,
+    {
+      method: "PATCH",
+      json: {
+        clientUpdatedAt: input.task.updatedAt,
+        description: input.task.description,
+        durationWorkingDays: input.task.durationWorkingDays,
+        participants,
+        plannedFinish,
+        plannedStart: input.task.plannedStart.slice(0, 10),
+        plannedWork: input.task.plannedWork,
+        priority: input.task.priority,
+        requiresAcceptance: input.task.requiresAcceptance,
+        statusId: input.task.statusId,
+        title: input.task.title
+      }
+    }
+  );
+  return response.task;
+}
+
+export async function postWorkspaceTaskComment(
+  input: PostWorkspaceTaskCommentInput
+): Promise<TaskActivity> {
+  const response = await apiFetch<{ activity: TaskActivity }>(
+    `/api/workspace/tasks/${encodeURIComponent(input.taskId)}/comments`,
+    {
+      method: "POST",
+      json: { body: input.body.trim() }
+    }
+  );
+  return response.activity;
+}
+
+function upsertTaskExecutor(
+  participants: Task["participants"],
+  ownerUserId: string
+): Task["participants"] {
+  const withoutExecutor = participants.filter((participant) => participant.role !== "executor");
+  return [{ role: "executor", userId: ownerUserId }, ...withoutExecutor];
+}
+
+export async function fetchWorkspaceUsers(): Promise<WorkspaceUser[]> {
+  const response = await apiFetch<ListResponse<"users", WorkspaceUser>>("/api/workspace/users", {
+    method: "GET"
+  });
+  return response.users;
+}
+
+export async function fetchWorkspaceClients(): Promise<Client[]> {
+  const response = await apiFetch<ListResponse<"clients", Client>>("/api/workspace/clients", {
+    method: "GET"
+  });
+  return response.clients;
+}
+
+export async function fetchWorkspaceContacts(): Promise<Contact[]> {
+  const response = await apiFetch<ListResponse<"contacts", Contact>>("/api/workspace/contacts", {
+    method: "GET"
+  });
+  return response.contacts;
+}
+
+export async function fetchWorkspaceProducts(): Promise<Product[]> {
+  const response = await apiFetch<ListResponse<"products", Product>>("/api/workspace/products", {
+    method: "GET"
+  });
+  return response.products;
+}
+
+async function fetchOptionalWorkspaceUsers(): Promise<WorkspaceUser[]> {
+  try {
+    return await fetchWorkspaceUsers();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "forbidden") return [];
+    throw error;
+  }
 }
 
 export async function fetchWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
@@ -209,29 +427,6 @@ export async function fetchWorkspaceMyWorkTasks(): Promise<Task[]> {
   return response.tasks;
 }
 
-export async function fetchWorkspaceTaskStatuses(): Promise<TaskStatus[]> {
-  const response = await apiFetch<ListResponse<"taskStatuses", TaskStatus>>(
-    "/api/workspace/task-statuses",
-    { method: "GET" }
-  );
-  return response.taskStatuses;
-}
-
-export async function updateWorkspaceProjectTaskStatus(input: {
-  projectId: string;
-  taskId: string;
-  statusId: string;
-}): Promise<Task> {
-  const response = await apiFetch<{ task: Task }>(
-    `/api/workspace/projects/${input.projectId}/tasks/${input.taskId}/status`,
-    {
-      method: "PATCH",
-      json: { statusId: input.statusId }
-    }
-  );
-  return response.task;
-}
-
 export async function fetchTenantCurrentScheduledTasks({
   assigneeUserId,
   fromDate,
@@ -251,6 +446,42 @@ export async function fetchWorkspaceOpportunities(): Promise<Opportunity[]> {
     { method: "GET" }
   );
   return response.opportunities;
+}
+
+export async function fetchWorkspaceOpportunity(opportunityId: string): Promise<Opportunity> {
+  const response = await apiFetch<{ opportunity: Opportunity }>(
+    `/api/workspace/opportunities/${encodeURIComponent(opportunityId)}`,
+    { method: "GET" }
+  );
+  return response.opportunity;
+}
+
+export async function changeWorkspaceOpportunityStage(input: {
+  opportunityId: string;
+  stageId: string;
+}): Promise<Opportunity> {
+  const response = await apiFetch<{ opportunity: Opportunity }>(
+    `/api/workspace/opportunities/${encodeURIComponent(input.opportunityId)}/stage`,
+    {
+      method: "PATCH",
+      json: { stageId: input.stageId }
+    }
+  );
+  return response.opportunity;
+}
+
+export async function activateWorkspaceOpportunityProject(input: {
+  acceptedRiskReason?: string | null;
+  opportunityId: string;
+}): Promise<Project> {
+  const response = await apiFetch<{ project: Project }>(
+    `/api/workspace/opportunities/${encodeURIComponent(input.opportunityId)}/activate`,
+    {
+      method: "POST",
+      json: { acceptedRiskReason: input.acceptedRiskReason ?? null }
+    }
+  );
+  return response.project;
 }
 
 export async function fetchWorkspaceDealStages(): Promise<DealStage[]> {
@@ -281,6 +512,14 @@ export async function fetchWorkspaceOperationsCockpit(): Promise<OperationsCockp
     }
     throw error;
   }
+}
+
+export async function fetchTenantCurrentAuditEvents(): Promise<AuditEventListItem[]> {
+  const response = await apiFetch<ListResponse<"auditEvents", AuditEventListItem>>(
+    "/api/tenant/current/audit-events",
+    { method: "GET" }
+  );
+  return response.auditEvents;
 }
 
 export async function postWorkspaceAgentMessage(body: string): Promise<WorkspaceAgentThread> {
@@ -329,6 +568,70 @@ export function useProjectsListReadModelQuery() {
   return aggregateQueries<ProjectsListReadModel>(queries, data);
 }
 
+export function useProjectDetailReadModelQuery(projectId: string | undefined) {
+  const queries = useQueries({
+    queries: [
+      {
+        enabled: Boolean(projectId),
+        queryKey: projectId ? queryKeys.workspace.project(projectId) : queryKeys.workspace.project(""),
+        queryFn: () => {
+          if (!projectId) throw new Error("project_id_required");
+          return fetchWorkspaceProjectDetail(projectId);
+        }
+      },
+      {
+        enabled: Boolean(projectId),
+        queryKey: queryKeys.workspace.taskStatuses,
+        queryFn: fetchWorkspaceTaskStatuses
+      },
+      {
+        enabled: Boolean(projectId),
+        queryKey: queryKeys.workspace.users,
+        queryFn: fetchOptionalWorkspaceUsers
+      }
+    ]
+  });
+  const [projectDetailQuery, taskStatusesQuery, workspaceUsersQuery] = queries;
+  const data =
+    projectDetailQuery.data && taskStatusesQuery.data && workspaceUsersQuery.data
+      ? {
+          ...(projectDetailQuery.data as ProjectDetailReadModel),
+          taskStatuses: taskStatusesQuery.data as TaskStatus[],
+          workspaceUsers: workspaceUsersQuery.data as WorkspaceUser[]
+        }
+      : undefined;
+
+  return {
+    ...aggregateQueries<ProjectDetailReadModel>(queries, data),
+    refetch: () => {
+      void projectDetailQuery.refetch();
+      void taskStatusesQuery.refetch();
+      void workspaceUsersQuery.refetch();
+    }
+  };
+}
+
+export function useTaskActivityReadModelQuery(taskId: string | undefined) {
+  const query = useQuery({
+    enabled: Boolean(taskId),
+    queryKey: taskId ? queryKeys.workspace.taskActivity(taskId) : queryKeys.workspace.taskActivity(""),
+    queryFn: () => {
+      if (!taskId) throw new Error("task_id_required");
+      return fetchWorkspaceTaskActivity(taskId);
+    }
+  });
+
+  return {
+    data: query.data ? { activities: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
 export function useAgentCockpitReadModelQuery() {
   const queries = useQueries({
     queries: [
@@ -353,6 +656,108 @@ export function useAgentCockpitReadModelQuery() {
       : undefined;
 
   return aggregateQueries<AgentCockpitReadModel>(queries, data);
+}
+
+export function useAuditEventsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.tenant.currentAuditEvents,
+    queryFn: fetchTenantCurrentAuditEvents
+  });
+
+  return {
+    data: query.data ? { auditEvents: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useAdminUsersReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.users,
+    queryFn: fetchWorkspaceUsers
+  });
+
+  return {
+    data: query.data ? { users: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useAdminAccessRolesReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.accessRoles,
+    queryFn: fetchWorkspaceAccessRoles
+  });
+
+  return {
+    data: query.data ? { accessRoles: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useClientsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.clients,
+    queryFn: fetchWorkspaceClients
+  });
+
+  return {
+    data: query.data ? { clients: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useContactsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.contacts,
+    queryFn: fetchWorkspaceContacts
+  });
+
+  return {
+    data: query.data ? { contacts: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useProductsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.products,
+    queryFn: fetchWorkspaceProducts
+  });
+
+  return {
+    data: query.data ? { products: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
 }
 
 export function getRuntimeTodayIsoDate(now = new Date()): string {
@@ -505,4 +910,25 @@ export function useDealsBoardReadModelQueries() {
       : undefined;
 
   return aggregateQueries<DealsBoardReadModel>(queries, data);
+}
+
+export function useDealDetailReadModelQuery(opportunityId: string | undefined) {
+  const query = useQuery({
+    enabled: Boolean(opportunityId),
+    queryKey: opportunityId ? queryKeys.workspace.opportunity(opportunityId) : queryKeys.workspace.opportunity(""),
+    queryFn: () => {
+      if (!opportunityId) throw new Error("opportunity_id_required");
+      return fetchWorkspaceOpportunity(opportunityId);
+    }
+  });
+
+  return {
+    data: query.data ? { opportunity: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
 }

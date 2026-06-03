@@ -6,26 +6,47 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  activateWorkspaceOpportunityProject,
+  changeWorkspaceOpportunityStage,
   fetchWorkspaceOperationsCockpit,
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
+  fetchTenantCurrentAuditEvents,
+  fetchWorkspaceClients,
+  fetchWorkspaceContacts,
   fetchWorkspaceDealStages,
+  fetchWorkspaceProducts,
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
+  fetchWorkspaceOpportunity,
+  fetchWorkspaceProjectDetail,
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
+  fetchWorkspaceTaskActivity,
   fetchWorkspaceTaskStatuses,
+  createWorkspaceProjectTask,
+  postWorkspaceTaskComment,
   postWorkspaceAgentMessage,
+  updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
+  useAdminAccessRolesReadModelQuery,
+  useAdminUsersReadModelQuery,
+  useAuditEventsReadModelQuery,
+  useClientsReadModelQuery,
+  useContactsReadModelQuery,
+  useProductsReadModelQuery,
   useDashboardReadModelQueries,
+  useDealDetailReadModelQuery,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
-  useProjectsListReadModelQuery
+  useProjectDetailReadModelQuery,
+  useProjectsListReadModelQuery,
+  useTaskActivityReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { OperationsCockpitReadModel } from "@/lib/api-types";
+import type { OperationsCockpitReadModel, Task } from "@/lib/api-types";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -36,6 +57,13 @@ describe("runtime read model API", () => {
 
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
+    expect(queryKeys.workspace.project("project-alpha")).toEqual(["workspace", "projects", "project-alpha"]);
+    expect(queryKeys.workspace.taskActivity("task-alpha")).toEqual(["workspace", "tasks", "task-alpha", "activity"]);
+    expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
+    expect(queryKeys.workspace.users).toEqual(["workspace", "users"]);
+    expect(queryKeys.workspace.clients).toEqual(["workspace", "clients"]);
+    expect(queryKeys.workspace.contacts).toEqual(["workspace", "contacts"]);
+    expect(queryKeys.workspace.products).toEqual(["workspace", "products"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
@@ -43,7 +71,9 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
+    expect(queryKeys.workspace.opportunity("opp-1")).toEqual(["workspace", "opportunities", "opp-1"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
+    expect(queryKeys.tenant.currentAuditEvents).toEqual(["tenant", "current", "audit-events"]);
     expect(queryKeys.tenant.currentScheduledTasks("usr-1", "2026-05-30", "2026-05-30")).toEqual([
       "tenant",
       "current",
@@ -58,6 +88,83 @@ describe("runtime read model API", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-1" }] });
+      if (path === "/api/workspace/projects/project-1") {
+        return json({ project: { id: "project-1" }, tasks: [{ id: "task-1" }] });
+      }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
+      }
+      if (path === "/api/workspace/users") {
+        return json({ users: [{ id: "usr-1", name: "Камил" }] });
+      }
+      if (path === "/api/workspace/clients") {
+        return json({
+          clients: [
+            {
+              id: "client-1",
+              tenantId: "tenant-alpha",
+              name: "Runtime client",
+              description: "Client from API",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      if (path === "/api/workspace/contacts") {
+        return json({
+          contacts: [
+            {
+              id: "contact-1",
+              tenantId: "tenant-alpha",
+              clientId: "client-1",
+              name: "Runtime contact",
+              email: "contact@kiss-pm.local",
+              phone: null,
+              telegram: null,
+              role: "Заказчик",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      if (path === "/api/workspace/products") {
+        return json({
+          products: [
+            {
+              id: "product-1",
+              tenantId: "tenant-alpha",
+              name: "Runtime product",
+              sku: "ARCH-001",
+              type: "service",
+              unit: "hour",
+              price: 5500,
+              description: "Product from API",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      if (path === "/api/workspace/projects/project-1/tasks/task-1/status") {
+        return json({ task: { id: "task-1", statusId: "task-status-review" } });
+      }
+      if (path === "/api/workspace/projects/project-1/tasks") {
+        return json({ task: { id: "task-created", title: "Runtime created task" } }, 201);
+      }
+      if (path === "/api/workspace/tasks/task-1") {
+        return json({ task: { id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" } });
+      }
+      if (path === "/api/workspace/tasks/task-1/activity") {
+        return json({ activities: [{ id: "activity-1", body: "Runtime activity" }] });
+      }
+      if (path === "/api/workspace/tasks/task-1/comments") {
+        return json({ activity: { id: "activity-comment", body: "Runtime comment" } }, 201);
+      }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
       }
@@ -67,6 +174,15 @@ describe("runtime read model API", () => {
       }
       if (path === "/api/workspace/opportunities") {
         return json({ opportunities: [{ id: "opp-1" }] });
+      }
+      if (path === "/api/workspace/opportunities/opp-1") {
+        return json({ opportunity: { id: "opp-1", title: "Runtime deal" } });
+      }
+      if (path === "/api/workspace/opportunities/opp-1/stage") {
+        return json({ opportunity: { id: "opp-1", stageId: "deal-stage-contract" } });
+      }
+      if (path === "/api/workspace/opportunities/opp-1/activate") {
+        return json({ project: { id: "project-from-opp", sourceOpportunityId: "opp-1" } }, 201);
       }
       if (path === "/api/workspace/deal-stages") {
         return json({ dealStages: [{ id: "lead" }] });
@@ -100,6 +216,28 @@ describe("runtime read model API", () => {
           })
         );
       }
+      if (path === "/api/tenant/current/audit-events") {
+        return json({
+          auditEvents: [
+            {
+              id: "audit-1",
+              tenantId: "tenant-alpha",
+              actorUserId: "usr-1",
+              actionType: "workspace.task.update",
+              sourceSurfaceId: null,
+              sourceWorkflow: "project_detail",
+              sourceEntity: { type: "Task", id: "task-1" },
+              input: {},
+              beforeState: null,
+              afterState: null,
+              permissionResult: { allowed: true },
+              executionResult: { status: "applied" },
+              correlationId: "corr-1",
+              createdAt: "2026-06-01T09:00:00.000Z"
+            }
+          ]
+        });
+      }
       if (
         path ===
         "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
@@ -110,10 +248,112 @@ describe("runtime read model API", () => {
     });
 
     await expect(fetchWorkspaceProjects()).resolves.toEqual([{ id: "project-1" }]);
+    await expect(fetchWorkspaceProjectDetail("project-1")).resolves.toEqual({
+      project: { id: "project-1" },
+      taskStatuses: [],
+      tasks: [{ id: "task-1" }],
+      workspaceUsers: []
+    });
+    await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
+    await expect(fetchWorkspaceClients()).resolves.toEqual([
+      {
+        id: "client-1",
+        tenantId: "tenant-alpha",
+        name: "Runtime client",
+        description: "Client from API",
+        status: "active",
+        createdAt: "2026-06-01T09:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z"
+      }
+    ]);
+    await expect(fetchWorkspaceContacts()).resolves.toEqual([
+      {
+        id: "contact-1",
+        tenantId: "tenant-alpha",
+        clientId: "client-1",
+        name: "Runtime contact",
+        email: "contact@kiss-pm.local",
+        phone: null,
+        telegram: null,
+        role: "Заказчик",
+        status: "active",
+        createdAt: "2026-06-01T09:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z"
+      }
+    ]);
+    await expect(fetchWorkspaceProducts()).resolves.toEqual([
+      {
+        id: "product-1",
+        tenantId: "tenant-alpha",
+        name: "Runtime product",
+        sku: "ARCH-001",
+        type: "service",
+        unit: "hour",
+        price: 5500,
+        description: "Product from API",
+        status: "active",
+        createdAt: "2026-06-01T09:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z"
+      }
+    ]);
+    await expect(
+      updateWorkspaceProjectTaskStatus({
+        projectId: "project-1",
+        taskId: "task-1",
+        statusId: "task-status-review"
+      })
+    ).resolves.toEqual({ id: "task-1", statusId: "task-status-review" });
+    await expect(
+      createWorkspaceProjectTask({
+        dueDate: "2026-06-04",
+        ownerUserId: "usr-1",
+        projectId: "project-1",
+        statusId: "task-status-in-progress",
+        title: "Runtime created task"
+      })
+    ).resolves.toEqual({ id: "task-created", title: "Runtime created task" });
+    await expect(
+      updateWorkspaceTaskFields({
+        dueDate: "2026-06-09",
+        ownerUserId: "usr-2",
+        task: taskFixture({
+          id: "task-1",
+          participants: [
+            { role: "executor", userId: "usr-1" },
+            { role: "observer", userId: "usr-3" }
+          ]
+        })
+      })
+    ).resolves.toEqual({ id: "task-1", ownerUserId: "usr-2", plannedFinish: "2026-06-09" });
+    await expect(fetchWorkspaceTaskActivity("task-1")).resolves.toEqual([
+      { id: "activity-1", body: "Runtime activity" }
+    ]);
+    await expect(
+      postWorkspaceTaskComment({
+        body: " Runtime comment ",
+        taskId: "task-1"
+      })
+    ).resolves.toEqual({ id: "activity-comment", body: "Runtime comment" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
-    await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-done" }]);
+    await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
+    await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
+    await expect(
+      changeWorkspaceOpportunityStage({
+        opportunityId: "opp-1",
+        stageId: "deal-stage-contract"
+      })
+    ).resolves.toEqual({ id: "opp-1", stageId: "deal-stage-contract" });
+    await expect(
+      activateWorkspaceOpportunityProject({
+        acceptedRiskReason: "Риск принят",
+        opportunityId: "opp-1"
+      })
+    ).resolves.toEqual({
+      id: "project-from-opp",
+      sourceOpportunityId: "opp-1"
+    });
     await expect(fetchWorkspaceDealStages()).resolves.toEqual([{ id: "lead" }]);
     await expect(fetchWorkspaceAgentThread()).resolves.toMatchObject({
       thread: {
@@ -136,6 +376,24 @@ describe("runtime read model API", () => {
       attentionItems: [],
       agentContext: { unavailableSources: [] }
     });
+    await expect(fetchTenantCurrentAuditEvents()).resolves.toEqual([
+      {
+        id: "audit-1",
+        tenantId: "tenant-alpha",
+        actorUserId: "usr-1",
+        actionType: "workspace.task.update",
+        sourceSurfaceId: null,
+        sourceWorkflow: "project_detail",
+        sourceEntity: { type: "Task", id: "task-1" },
+        input: {},
+        beforeState: null,
+        afterState: null,
+        permissionResult: { allowed: true },
+        executionResult: { status: "applied" },
+        correlationId: "corr-1",
+        createdAt: "2026-06-01T09:00:00.000Z"
+      }
+    ]);
     await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toMatchObject({
       mutationPolicy: {
         mode: "confirmation_required",
@@ -187,25 +445,115 @@ describe("runtime read model API", () => {
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
       "/api/workspace/projects",
+      "/api/workspace/projects/project-1",
+      "/api/workspace/task-statuses",
+      "/api/workspace/clients",
+      "/api/workspace/contacts",
+      "/api/workspace/products",
+      "/api/workspace/projects/project-1/tasks/task-1/status",
+      "/api/workspace/projects/project-1/tasks",
+      "/api/workspace/tasks/task-1",
+      "/api/workspace/tasks/task-1/activity",
+      "/api/workspace/tasks/task-1/comments",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/task-statuses",
       "/api/workspace/opportunities",
+      "/api/workspace/opportunities/opp-1",
+      "/api/workspace/opportunities/opp-1/stage",
+      "/api/workspace/opportunities/opp-1/activate",
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
       "/api/workspace/operations-cockpit",
+      "/api/tenant/current/audit-events",
       "/api/workspace/agent-thread/messages",
       "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
-    expect(fetchMock.mock.calls[8]?.[1]).toMatchObject({
+    const postMessageCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/agent-thread/messages"
+    );
+    const updateTaskStatusCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/projects/project-1/tasks/task-1/status"
+    );
+    const createTaskCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/projects/project-1/tasks"
+    );
+    const updateTaskFieldsCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/tasks/task-1"
+    );
+    const postTaskCommentCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/tasks/task-1/comments"
+    );
+    const confirmProposalCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
+    );
+    const activateOpportunityCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/opportunities/opp-1/activate"
+    );
+    const changeOpportunityStageCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/opportunities/opp-1/stage"
+    );
+    expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
     });
-    expect(fetchMock.mock.calls[9]?.[1]).toMatchObject({
+    expect(updateTaskStatusCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ statusId: "task-status-review" })
+    });
+    expect(createTaskCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        description: null,
+        durationWorkingDays: 1,
+        participants: [{ role: "executor", userId: "usr-1" }],
+        plannedFinish: "2026-06-04",
+        plannedStart: "2026-06-04",
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: "task-status-in-progress",
+        title: "Runtime created task"
+      })
+    });
+    expect(updateTaskFieldsCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({
+        clientUpdatedAt: "2026-06-01T10:00:00.000Z",
+        description: null,
+        durationWorkingDays: 1,
+        participants: [
+          { role: "executor", userId: "usr-2" },
+          { role: "observer", userId: "usr-3" }
+        ],
+        plannedFinish: "2026-06-09",
+        plannedStart: "2026-06-01",
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: "task-status-new",
+        title: "Runtime task"
+      })
+    });
+    expect(postTaskCommentCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ body: "Runtime comment" })
+    });
+    expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
     });
+    expect(activateOpportunityCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ acceptedRiskReason: "Риск принят" })
+    });
+    expect(changeOpportunityStageCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ stageId: "deal-stage-contract" })
+    });
+    const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
+    expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });
     for (const [, init] of fetchMock.mock.calls) {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
@@ -338,6 +686,185 @@ describe("runtime read model API", () => {
     }
   });
 
+  it("loads project detail by real project id without storybook fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects/project-runtime") {
+        return json({
+          project: { id: "project-runtime", title: "Runtime project detail" },
+          tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        });
+      }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-runtime", name: "В работе" }] });
+      }
+      if (path === "/api/workspace/users") {
+        return json({ users: [{ id: "usr-runtime", name: "Runtime User" }] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ProjectDetailProbe() {
+      const readModel = useProjectDetailReadModelQuery("project-runtime");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            project: { id: "project-runtime", title: "Runtime project detail" },
+            taskStatuses: [{ id: "task-status-runtime", name: "В работе" }],
+            tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+            workspaceUsers: [{ id: "usr-runtime", name: "Runtime User" }]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
+        "/api/workspace/projects/project-runtime",
+        "/api/workspace/task-statuses",
+        "/api/workspace/users"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
+        "/api/storybook/projects/project-runtime"
+      );
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keeps project detail readable when workspace users access is forbidden", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    let latestData: unknown;
+    let latestError: unknown;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects/project-runtime") {
+        return json({
+          project: { id: "project-runtime", title: "Runtime project detail" },
+          tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        });
+      }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-runtime", name: "В работе" }] });
+      }
+      if (path === "/api/workspace/users") return json({ error: "forbidden" }, 403);
+      return json({ error: "not_found" }, 404);
+    });
+
+    function ProjectDetailProbe() {
+      const readModel = useProjectDetailReadModelQuery("project-runtime");
+      latestData = readModel.data;
+      latestError = readModel.error;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            project: { id: "project-runtime", title: "Runtime project detail" },
+            taskStatuses: [{ id: "task-status-runtime", name: "В работе" }],
+            tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+            workspaceUsers: []
+          })
+        );
+      });
+      expect(latestError).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads task activity through the task activity endpoint without fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/tasks/task-runtime/activity") {
+        return json({ activities: [{ id: "activity-runtime", body: "Runtime comment" }] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function TaskActivityProbe() {
+      const readModel = useTaskActivityReadModelQuery("task-runtime");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(TaskActivityProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            activities: [{ id: "activity-runtime", body: "Runtime comment" }]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        "/api/workspace/tasks/task-runtime/activity"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/tasks/task-runtime");
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
   it("does not fetch unused client or project type catalogs for the deals board", async () => {
     const host = document.createElement("div");
     document.body.append(host);
@@ -382,6 +909,59 @@ describe("runtime read model API", () => {
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
         "/api/workspace/project-types"
       );
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads a deal detail from the workspace opportunity detail endpoint without board catalogs or fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/opportunities/opportunity-live") {
+        return json({ opportunity: { id: "opportunity-live", title: "Runtime detail deal" } });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function DealDetailProbe() {
+      const readModel = useDealDetailReadModelQuery("opportunity-live");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(DealDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            opportunity: { id: "opportunity-live", title: "Runtime detail deal" }
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        "/api/workspace/opportunities/opportunity-live"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/deals");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/opportunities");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/deal-stages");
     } finally {
       act(() => root.unmount());
       queryClient.clear();
@@ -436,6 +1016,477 @@ describe("runtime read model API", () => {
         ])
       );
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/agent");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads audit events from the tenant audit endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/tenant/current/audit-events") {
+        return json({
+          auditEvents: [
+            {
+              id: "audit-live",
+              tenantId: "tenant-alpha",
+              actorUserId: "usr-1",
+              actionType: "workspace.agent.proposal.apply",
+              sourceSurfaceId: null,
+              sourceWorkflow: "agent_cockpit",
+              sourceEntity: { type: "AgentProposal", id: "proposal-1" },
+              input: {},
+              beforeState: null,
+              afterState: null,
+              permissionResult: { allowed: true },
+              executionResult: { status: "applied" },
+              correlationId: "corr-live",
+              createdAt: "2026-06-01T09:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AuditProbe() {
+      const readModel = useAuditEventsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AuditProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            auditEvents: [
+              {
+                id: "audit-live",
+                tenantId: "tenant-alpha",
+                actorUserId: "usr-1",
+                actionType: "workspace.agent.proposal.apply",
+                sourceSurfaceId: null,
+                sourceWorkflow: "agent_cockpit",
+                sourceEntity: { type: "AgentProposal", id: "proposal-1" },
+                input: {},
+                beforeState: null,
+                afterState: null,
+                permissionResult: { allowed: true },
+                executionResult: { status: "applied" },
+                correlationId: "corr-live",
+                createdAt: "2026-06-01T09:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/tenant/current/audit-events"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/audit-events");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads admin users from the workspace users endpoint without fixture fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/users") {
+        return json({
+          users: [
+            {
+              id: "usr-admin",
+              tenantId: "tenant-alpha",
+              name: "Администратор",
+              accessProfileId: "tenant-admin-alpha",
+              email: "admin@kiss-pm.local",
+              positionId: null,
+              positionName: null,
+              phone: null,
+              telegram: null,
+              status: "active",
+              theme: "light",
+              accentColor: "c1"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AdminUsersProbe() {
+      const readModel = useAdminUsersReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AdminUsersProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            users: [
+              {
+                id: "usr-admin",
+                tenantId: "tenant-alpha",
+                name: "Администратор",
+                accessProfileId: "tenant-admin-alpha",
+                email: "admin@kiss-pm.local",
+                positionId: null,
+                positionName: null,
+                phone: null,
+                telegram: null,
+                status: "active",
+                theme: "light",
+                accentColor: "c1"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/users"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/admin-users");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/access-roles");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/positions");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads admin access roles from the workspace access roles endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/access-roles") {
+        return json({
+          accessRoles: [
+            {
+              id: "role-runtime-admin",
+              tenantId: "tenant-alpha",
+              name: "Администратор",
+              permissions: ["tenant.users.read", "tenant.access_profiles.read"]
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AdminAccessRolesProbe() {
+      const readModel = useAdminAccessRolesReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AdminAccessRolesProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            accessRoles: [
+              {
+                id: "role-runtime-admin",
+                tenantId: "tenant-alpha",
+                name: "Администратор",
+                permissions: ["tenant.users.read", "tenant.access_profiles.read"]
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/access-roles"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/access-roles");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/positions");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads clients from the workspace clients endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/clients") {
+        return json({
+          clients: [
+            {
+              id: "client-live",
+              tenantId: "tenant-alpha",
+              name: "Runtime Client",
+              description: "Live client",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ClientsProbe() {
+      const readModel = useClientsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ClientsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            clients: [
+              {
+                id: "client-live",
+                tenantId: "tenant-alpha",
+                name: "Runtime Client",
+                description: "Live client",
+                status: "active",
+                createdAt: "2026-06-01T09:00:00.000Z",
+                updatedAt: "2026-06-01T10:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/clients"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/clients");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/contacts");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/products");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads contacts from the workspace contacts endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/contacts") {
+        return json({
+          contacts: [
+            {
+              id: "contact-live",
+              tenantId: "tenant-alpha",
+              clientId: "client-live",
+              name: "Runtime Contact",
+              email: "contact@kiss-pm.local",
+              phone: null,
+              telegram: null,
+              role: "Заказчик",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ContactsProbe() {
+      const readModel = useContactsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ContactsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            contacts: [
+              {
+                id: "contact-live",
+                tenantId: "tenant-alpha",
+                clientId: "client-live",
+                name: "Runtime Contact",
+                email: "contact@kiss-pm.local",
+                phone: null,
+                telegram: null,
+                role: "Заказчик",
+                status: "active",
+                createdAt: "2026-06-01T09:00:00.000Z",
+                updatedAt: "2026-06-01T10:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/contacts"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/contacts");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/clients");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/products");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads products from the workspace products endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/products") {
+        return json({
+          products: [
+            {
+              id: "product-live",
+              tenantId: "tenant-alpha",
+              name: "Runtime Product",
+              sku: "ARCH-001",
+              type: "service",
+              unit: "hour",
+              price: 5500,
+              description: "Live product",
+              status: "active",
+              createdAt: "2026-06-01T09:00:00.000Z",
+              updatedAt: "2026-06-01T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ProductsProbe() {
+      const readModel = useProductsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProductsProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            products: [
+              {
+                id: "product-live",
+                tenantId: "tenant-alpha",
+                name: "Runtime Product",
+                sku: "ARCH-001",
+                type: "service",
+                unit: "hour",
+                price: 5500,
+                description: "Live product",
+                status: "active",
+                createdAt: "2026-06-01T09:00:00.000Z",
+                updatedAt: "2026-06-01T10:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/workspace/products"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/products");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/clients");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/contacts");
     } finally {
       act(() => root.unmount());
       queryClient.clear();
@@ -790,5 +1841,36 @@ function closedConfirmation(proposalId: string) {
     ...availableConfirmation(proposalId),
     status: "closed",
     allowedDecisions: []
+  };
+}
+
+function taskFixture(overrides: Partial<Task> = {}): Task {
+  return {
+    actualWork: 0,
+    archivedAt: null,
+    createdAt: "2026-06-01T09:00:00.000Z",
+    description: null,
+    durationWorkingDays: 1,
+    id: "task-runtime",
+    ownerUserId: "usr-1",
+    participants: [{ role: "executor", userId: "usr-1" }],
+    plannedFinish: "2026-06-02T00:00:00.000Z",
+    plannedStart: "2026-06-01T00:00:00.000Z",
+    plannedWork: 1,
+    priority: "normal",
+    progress: 0,
+    projectId: "project-1",
+    requesterUserId: "usr-1",
+    requiresAcceptance: false,
+    source: "manual",
+    stageId: null,
+    status: "new",
+    statusCategory: "new",
+    statusId: "task-status-new",
+    statusName: "Новая",
+    tenantId: "tenant-alpha",
+    title: "Runtime task",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    ...overrides
   };
 }

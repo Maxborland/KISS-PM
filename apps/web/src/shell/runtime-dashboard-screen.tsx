@@ -122,7 +122,9 @@ export function RuntimeDashboardScreen({
                   {attentionItems.map((item) => (
                     <tr key={item.id}>
                       <td>
-                        <CellStack title={item.title} subtitle={item.entity.title} />
+                        <a href={resolveAttentionEntityHref(item)} aria-label={`Открыть сигнал: ${item.title}`}>
+                          <CellStack title={item.title} subtitle={item.entity.title} />
+                        </a>
                       </td>
                       <td>{item.reason}</td>
                       <td className="mono cell-muted">{item.dueDate ? formatDate(item.dueDate) : "без срока"}</td>
@@ -326,6 +328,17 @@ function isPastDate(value: string): boolean {
 
 function findUnavailableSource(data: DashboardReadModel, source: string) {
   return data.operationsCockpit.agentContext.unavailableSources.find((entry) => entry.source === source);
+}
+
+function resolveAttentionEntityHref(
+  item: DashboardReadModel["operationsCockpit"]["attentionItems"][number]
+): string {
+  if (item.entity.type === "project") return `/projects/${item.entity.id}`;
+  if (item.entity.type === "task") {
+    const projectPath = item.projectId ? `/projects/${item.projectId}` : "/my-work";
+    return `${projectPath}?taskId=${item.entity.id}`;
+  }
+  return `/deals?dealId=${item.entity.id}`;
 }
 
 function attentionSeverityLabel(severity: "critical" | "warning" | "info"): string {

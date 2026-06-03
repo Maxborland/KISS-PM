@@ -41,6 +41,7 @@ import { RoutePageIntro } from "@/views/layout/route-page-intro";
 export type ProjectsListBlockProps = {
   projects?: Project[];
   projectTemplates?: ProjectTemplate[];
+  getProjectHref?: (project: Project) => string;
   readOnly?: boolean;
 };
 
@@ -141,6 +142,7 @@ export function resolveProjectsListSources(
 export function ProjectsListBlock({
   projects,
   projectTemplates,
+  getProjectHref,
   readOnly = false
 }: ProjectsListBlockProps = {}) {
   const { fixtures } = useScenarioFixtures();
@@ -177,9 +179,18 @@ export function ProjectsListBlock({
 
   const handleCreate = () => {
     if (!createTitle.trim()) return;
-    toast.success(`Проект «${createTitle.trim()}» создан (демо)`);
+    toast.success(`Проект «${createTitle.trim()}» создан локально`);
     setCreateTitle("");
     setCreateOpen(false);
+  };
+
+  const openProjectRow = (row: ProjectRow) => {
+    const href = getProjectHref?.(row);
+    if (href) {
+      window.location.assign(href);
+      return;
+    }
+    setOpenProjectId(row.id);
   };
 
   const intro = (
@@ -223,7 +234,7 @@ export function ProjectsListBlock({
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
-          <Button variant="secondary" size="sm" disabled title="Демо Storybook: фильтр подключится к API">
+          <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
             <Filter className="size-4" aria-hidden />
             Фильтр
           </Button>
@@ -275,11 +286,11 @@ export function ProjectsListBlock({
                   "row-clickable",
                   index === 0 && filter === "active" && !query && "is-selected"
                 )}
-                onClick={() => setOpenProjectId(row.id)}
+                onClick={() => openProjectRow(row)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setOpenProjectId(row.id);
+                    openProjectRow(row);
                   }
                 }}
               >
@@ -365,7 +376,7 @@ export function ProjectsListBlock({
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Новый проект</SheetTitle>
-            <SheetDescription>Демо Storybook: черновик без сохранения в API.</SheetDescription>
+            <SheetDescription>Черновик без сохранения в API.</SheetDescription>
           </SheetHeader>
           <SheetBody>
             <label className="field">

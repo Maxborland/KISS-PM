@@ -63,6 +63,7 @@ export type KanbanProps<T extends KanbanItem<C>, C extends string = string> = {
   renderColumnEmpty?: (column: KanbanColumnDef<C>) => ReactNode;
   onItemOpen?: (id: string) => void;
   onItemMove?: (id: string, toColumnId: C, toIndex: number, overId?: string) => void;
+  isItemDragDisabled?: (item: T) => boolean;
   onItemReorder?: (
     columnId: C,
     fromIndex: number,

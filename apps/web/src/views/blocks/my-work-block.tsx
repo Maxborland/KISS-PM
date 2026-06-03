@@ -10,7 +10,7 @@ import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { ScheduledTask, Task, TaskStatus } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskParticipantRole, TaskStatus } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
@@ -71,6 +71,13 @@ const COLUMN_DRAWER_TONE: Record<ColumnId, "info" | "violet" | "success" | "warn
   done: "success"
 };
 
+const TASK_STATUS_TRANSITION_ROLES: ReadonlySet<TaskParticipantRole> = new Set([
+  "requester",
+  "executor",
+  "co_executor",
+  "controller"
+]);
+
 function flattenByColumns(items: CardModel[]): CardModel[] {
   return KANBAN_COLUMNS.flatMap((col) => items.filter((c) => c.columnId === col.id));
 }
@@ -126,6 +133,8 @@ export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   taskStatuses?: TaskStatus[];
   initialOpenTaskId?: string | undefined;
   readOnly?: boolean;
+  currentUserId?: string | undefined;
+  canManageProjectTasks?: boolean;
   isMovingTaskStatus?: boolean;
   onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
 };
@@ -162,6 +171,19 @@ function resolveAllowedTargetCategories(
   return allowedTransitions[currentCategory].includes(columnId) ? [columnId] : [];
 }
 
+export function canTransitionTaskStatus(
+  task: Task,
+  currentUserId: string | undefined,
+  canManageProjectTasks: boolean
+): boolean {
+  if (canManageProjectTasks) return true;
+  if (!currentUserId) return false;
+  return task.participants.some(
+    (participant) =>
+      participant.userId === currentUserId && TASK_STATUS_TRANSITION_ROLES.has(participant.role)
+  );
+}
+
 export function MyWorkBlock({ initialMode = "kanban" }: MyWorkBlockProps = {}) {
   return <FixtureMyWorkBlock initialMode={initialMode} />;
 }
@@ -188,6 +210,8 @@ export function RuntimeMyWorkBlock({
   scheduledTasks = [],
   taskStatuses = [],
   readOnly = true,
+  currentUserId,
+  canManageProjectTasks = false,
   isMovingTaskStatus = false,
   onMoveTaskStatus
 }: RuntimeMyWorkBlockProps = {}) {
@@ -200,6 +224,8 @@ export function RuntimeMyWorkBlock({
       taskStatuses={taskStatuses}
       initialOpenTaskId={initialOpenTaskId}
       readOnly={readOnly}
+      currentUserId={currentUserId}
+      canManageProjectTasks={canManageProjectTasks}
       isMovingTaskStatus={isMovingTaskStatus}
       {...(onMoveTaskStatus ? { onMoveTaskStatus } : {})}
       fetchPhase="success"
@@ -216,6 +242,8 @@ function MyWorkBlockInner({
   taskStatuses,
   initialOpenTaskId,
   readOnly = false,
+  currentUserId,
+  canManageProjectTasks = false,
   isMovingTaskStatus = false,
   onMoveTaskStatus,
   fetchPhase,
@@ -274,6 +302,14 @@ function MyWorkBlockInner({
     () => cards.find((c) => c.id === openCardId) ?? null,
     [cards, openCardId]
   );
+  const sourceTasksById = useMemo(
+    () => new Map(sourceTasks.map((task) => [task.id, task])),
+    [sourceTasks]
+  );
+  const canMoveRuntimeTaskStatus = (taskId: string): boolean => {
+    const task = sourceTasksById.get(taskId);
+    return task ? canTransitionTaskStatus(task, currentUserId, canManageProjectTasks) : false;
+  };
 
   const handleColumnAction = (columnId: ColumnId, action: KanbanColumnAction) => {
     const labels: Record<KanbanColumnAction, string> = {
@@ -282,7 +318,7 @@ function MyWorkBlockInner({
       add: "Добавление карточки"
     };
     toast.info(`${labels[action]} — ${COLUMN_LABEL[columnId]}`, {
-      description: runtime ? "Runtime read-only: изменение будет подключено отдельным срезом." : "Демо Storybook: действие зафиксировано локально."
+      description: runtime ? "Runtime read-only: изменение будет подключено отдельным срезом." : "Действие зафиксировано локально."
     });
   };
 
@@ -315,6 +351,12 @@ function MyWorkBlockInner({
     const currentCard = cards.find((card) => card.id === id);
     const currentTask = sourceTasks.find((task) => task.id === id);
     if (!currentCard || !currentTask || currentCard.columnId === toColumnId) return;
+    if (!canTransitionTaskStatus(currentTask, currentUserId, canManageProjectTasks)) {
+      toast.error("Статус нельзя изменить", {
+        description: "Изменение статуса доступно ответственным, постановщикам, контролерам или администраторам проекта."
+      });
+      return;
+    }
 
     const statusId = resolveTaskStatusIdForColumn(
       sourceTaskStatuses,
@@ -440,6 +482,7 @@ function MyWorkBlockInner({
             disableDnd={isMovingTaskStatus || (readOnly && !onMoveTaskStatus)}
             {...(onMoveTaskStatus
               ? {
+                  isItemDragDisabled: (item) => !canMoveRuntimeTaskStatus(item.id),
                   onItemMove: (id, toColumnId, toIndex, overId) => {
                     void handleRuntimeStatusMove(id, toColumnId, toIndex, overId);
                   }

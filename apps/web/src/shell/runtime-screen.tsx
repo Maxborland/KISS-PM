@@ -14,24 +14,39 @@ import { RuntimeDataScreen } from "@/shell/runtime-data-screen";
 import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
 export function RuntimeScreen({
+  dealId,
   screenId,
+  projectId,
   initialTaskId
 }: {
+  dealId?: string | undefined;
   screenId: ScreenId;
+  projectId?: string | undefined;
   initialTaskId?: string | undefined;
 }) {
   if (screenId === "19-login") {
     return <RuntimeLoginScreen mode="login-route" />;
   }
 
-  return <AuthenticatedRuntimeScreen screenId={screenId} initialTaskId={initialTaskId} />;
+  return (
+    <AuthenticatedRuntimeScreen
+      screenId={screenId}
+      dealId={dealId}
+      projectId={projectId}
+      initialTaskId={initialTaskId}
+    />
+  );
 }
 
 function AuthenticatedRuntimeScreen({
+  dealId,
   screenId,
+  projectId,
   initialTaskId
 }: {
+  dealId?: string | undefined;
   screenId: ScreenId;
+  projectId?: string | undefined;
   initialTaskId?: string | undefined;
 }) {
   const authQuery = useAuthMeQuery();
@@ -107,6 +122,8 @@ function AuthenticatedRuntimeScreen({
   return (
     <RuntimeDataScreen
       screenId={screenId}
+      dealId={dealId}
+      projectId={projectId}
       permissions={authQuery.data?.permissions ?? []}
       currentUserId={authQuery.data.user.id}
       initialTaskId={initialTaskId}

@@ -50,8 +50,8 @@ function ChartHead1({ days, monthLabel }: { days: GanttDayHeader[]; monthLabel?:
 function ChartHead2({ days }: { days: GanttDayHeader[] }) {
   return (
     <>
-      {days.map((d) => (
-        <div key={d.day} className={cn("gantt2__chart-day", d.weekend && "gantt2__chart-day--weekend")}>
+      {days.map((d, index) => (
+        <div key={d.isoDate ?? index} className={cn("gantt2__chart-day", d.weekend && "gantt2__chart-day--weekend")}>
           {d.day}
         </div>
       ))}
@@ -311,6 +311,7 @@ export function GanttView({
       <div className="gantt2__split">
         <GanttWbsGrid
           rows={data.rows}
+          days={data.days}
           rowOrder={rowOrder}
           columns={columns}
           interactive={interactive}
