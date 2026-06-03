@@ -106,6 +106,10 @@ export type AuditEventsReadModel = {
   auditEvents: AuditEventListItem[];
 };
 
+export type AdminUsersReadModel = {
+  users: WorkspaceUser[];
+};
+
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
 
 export type WorkspaceAgentContextFocus = {
@@ -580,6 +584,23 @@ export function useAuditEventsReadModelQuery() {
 
   return {
     data: query.data ? { auditEvents: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
+}
+
+export function useAdminUsersReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.workspace.users,
+    queryFn: fetchWorkspaceUsers
+  });
+
+  return {
+    data: query.data ? { users: query.data } : undefined,
     error: query.error,
     isPending: query.isPending,
     isFetching: query.isFetching,
