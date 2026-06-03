@@ -1675,6 +1675,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/task-statuses") {
         return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
       }
+      if (path === "/api/workspace/users") {
+        return json({ users: [{ id: "usr-runtime", name: "Runtime User" }] });
+      }
       if (
         path ===
           "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30" ||
@@ -1724,6 +1727,68 @@ describe("runtime read model API", () => {
         expect(fetchMock.mock.calls.filter((call) => call[0] === "/api/workspace/my-work")).toHaveLength(2)
       );
       expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/workspace/task-statuses");
+      expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/workspace/users");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keeps my-work usable when workspace users are forbidden", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/my-work") return json({ tasks: [{ id: "task-1" }] });
+      if (path === "/api/workspace/task-statuses") return json({ taskStatuses: [{ id: "task-status-1" }] });
+      if (path === "/api/workspace/users") return json({ error: "forbidden" }, 403);
+      if (
+        path ===
+        "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
+      ) {
+        return json({ tasks: [] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function MyWorkProbe() {
+      const readModel = useMyWorkReadModelQueries({
+        assigneeUserId: "usr-1",
+        fromDate: "2026-05-30",
+        toDate: "2026-05-30"
+      });
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(MyWorkProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            scheduledTasks: [],
+            tasks: [{ id: "task-1" }],
+            taskStatuses: [{ id: "task-status-1" }],
+            workspaceUsers: []
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/workspace/users");
     } finally {
       act(() => root.unmount());
       queryClient.clear();

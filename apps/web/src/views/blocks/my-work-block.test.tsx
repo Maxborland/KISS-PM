@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ScheduledTask, Task, TaskActivity } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskActivity, WorkspaceUser } from "@/lib/api-types";
 import {
   RuntimeMyWorkBlock,
   canTransitionTaskStatus,
@@ -235,6 +235,54 @@ describe("RuntimeMyWorkBlock", () => {
     expect(comments).toEqual([{ body: "Runtime drawer comment", taskId: "task-comment" }]);
   });
 
+  it("exposes owner and due actions in the runtime task drawer only for project managers", async () => {
+    const updates: Array<{
+      taskId: string;
+      fields: { dueDate?: string | undefined; ownerUserId?: string | undefined };
+    }> = [];
+    const task = makeTask({ id: "task-fields", title: "Runtime task fields" });
+
+    await renderRuntimeMyWork([task], {
+      canManageProjectTasks: false,
+      onUpdateTaskFields: async (updatedTask, fields) => {
+        updates.push({ fields, taskId: updatedTask.id });
+      },
+      workspaceUsers: makeWorkspaceUsers()
+    });
+
+    await act(async () => {
+      host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-fields"]')?.click();
+    });
+
+    expect(document.body.textContent).toContain("Ответственного и срок меняет руководитель проекта.");
+    expect(document.body.querySelector('input[aria-label="Срок задачи Runtime task fields"]')).toBeNull();
+
+    await renderRuntimeMyWork([task], {
+      canManageProjectTasks: true,
+      onUpdateTaskFields: async (updatedTask, fields) => {
+        updates.push({ fields, taskId: updatedTask.id });
+      },
+      workspaceUsers: makeWorkspaceUsers()
+    });
+
+    await act(async () => {
+      host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-fields"]')?.click();
+    });
+
+    const dueInput = document.body.querySelector<HTMLInputElement>('input[aria-label="Срок задачи Runtime task fields"]');
+    expect(dueInput).not.toBeNull();
+
+    await act(async () => {
+      if (!dueInput) return;
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      valueSetter?.call(dueInput, "2026-06-09");
+      dueInput.dispatchEvent(new Event("input", { bubbles: true }));
+      dueInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+
+    expect(updates).toContainEqual({ fields: { dueDate: "2026-06-09" }, taskId: "task-fields" });
+  });
+
   async function renderRuntimeMyWork(
     tasks: Task[],
     options: {
@@ -243,9 +291,14 @@ describe("RuntimeMyWorkBlock", () => {
       initialMode?: "kanban" | "list";
       initialOpenTaskId?: string;
       onAddTaskComment?: (input: { body: string; taskId: string }) => Promise<unknown> | void;
+      onUpdateTaskFields?: (
+        task: Task,
+        fields: { dueDate?: string | undefined; ownerUserId?: string | undefined }
+      ) => Promise<unknown> | void;
       onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
       scheduledTasks?: ScheduledTask[];
       taskActivities?: TaskActivity[];
+      workspaceUsers?: WorkspaceUser[];
     } = {}
   ) {
     if (!host) {
@@ -264,9 +317,11 @@ describe("RuntimeMyWorkBlock", () => {
             scheduledTasks={options.scheduledTasks ?? []}
             taskActivities={options.taskActivities ?? []}
             tasks={tasks}
+            workspaceUsers={options.workspaceUsers ?? []}
             currentUserId={options.currentUserId}
             canManageProjectTasks={options.canManageProjectTasks ?? false}
             {...(options.onAddTaskComment ? { onAddTaskComment: options.onAddTaskComment } : {})}
+            {...(options.onUpdateTaskFields ? { onUpdateTaskFields: options.onUpdateTaskFields } : {})}
             {...(options.onMoveTaskStatus ? { onMoveTaskStatus: options.onMoveTaskStatus } : {})}
           />
         </ScreenRouteProvider>
@@ -333,6 +388,39 @@ function makeScheduledTask({
     createdAt: `${plannedStart}T00:00:00.000Z`,
     statusId: "task-status-in-progress"
   };
+}
+
+function makeWorkspaceUsers(): WorkspaceUser[] {
+  return [
+    {
+      id: "usr-1",
+      tenantId: "tenant-1",
+      name: "Runtime User",
+      accessProfileId: "access-profile-1",
+      email: "runtime.user@example.test",
+      positionId: null,
+      positionName: null,
+      phone: null,
+      status: "active",
+      telegram: null,
+      theme: "system",
+      accentColor: "blue"
+    },
+    {
+      id: "usr-2",
+      tenantId: "tenant-1",
+      name: "Runtime Lead",
+      accessProfileId: "access-profile-1",
+      email: "runtime.lead@example.test",
+      positionId: null,
+      positionName: null,
+      phone: null,
+      status: "active",
+      telegram: null,
+      theme: "system",
+      accentColor: "blue"
+    }
+  ];
 }
 
 function makeTaskActivity({

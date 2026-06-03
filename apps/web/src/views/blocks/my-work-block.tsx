@@ -10,7 +10,7 @@ import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { ScheduledTask, Task, TaskActivity, TaskParticipantRole, TaskStatus } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskActivity, TaskParticipantRole, TaskStatus, WorkspaceUser } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
@@ -134,15 +134,22 @@ export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   taskActivities?: TaskActivity[];
   taskActivityError?: unknown;
   taskActivityPending?: boolean;
+  workspaceUsers?: WorkspaceUser[];
   initialOpenTaskId?: string | undefined;
   readOnly?: boolean;
   currentUserId?: string | undefined;
   canManageProjectTasks?: boolean;
   commentActionError?: unknown;
   commentActionPending?: boolean;
+  taskFieldActionError?: unknown;
+  taskFieldActionPending?: boolean;
   isMovingTaskStatus?: boolean;
   onAddTaskComment?: (input: { taskId: string; body: string }) => Promise<unknown> | void;
   onOpenTaskChange?: (taskId: string | undefined) => void;
+  onUpdateTaskFields?: (
+    task: Task,
+    fields: { dueDate?: string | undefined; ownerUserId?: string | undefined }
+  ) => Promise<unknown> | void;
   onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
 };
 
@@ -219,14 +226,18 @@ export function RuntimeMyWorkBlock({
   taskActivities = [],
   taskActivityError,
   taskActivityPending = false,
+  workspaceUsers = [],
   readOnly = true,
   currentUserId,
   canManageProjectTasks = false,
   commentActionError,
   commentActionPending = false,
+  taskFieldActionError,
+  taskFieldActionPending = false,
   isMovingTaskStatus = false,
   onAddTaskComment,
   onOpenTaskChange,
+  onUpdateTaskFields,
   onMoveTaskStatus
 }: RuntimeMyWorkBlockProps = {}) {
   return (
@@ -239,15 +250,19 @@ export function RuntimeMyWorkBlock({
       taskActivities={taskActivities}
       taskActivityError={taskActivityError}
       taskActivityPending={taskActivityPending}
+      workspaceUsers={workspaceUsers}
       initialOpenTaskId={initialOpenTaskId}
       readOnly={readOnly}
       currentUserId={currentUserId}
       canManageProjectTasks={canManageProjectTasks}
       commentActionError={commentActionError}
       commentActionPending={commentActionPending}
+      taskFieldActionError={taskFieldActionError}
+      taskFieldActionPending={taskFieldActionPending}
       isMovingTaskStatus={isMovingTaskStatus}
       {...(onAddTaskComment ? { onAddTaskComment } : {})}
       {...(onOpenTaskChange ? { onOpenTaskChange } : {})}
+      {...(onUpdateTaskFields ? { onUpdateTaskFields } : {})}
       {...(onMoveTaskStatus ? { onMoveTaskStatus } : {})}
       fetchPhase="success"
       scenario="default"
@@ -264,15 +279,19 @@ function MyWorkBlockInner({
   taskActivities,
   taskActivityError,
   taskActivityPending = false,
+  workspaceUsers = [],
   initialOpenTaskId,
   readOnly = false,
   currentUserId,
   canManageProjectTasks = false,
   commentActionError,
   commentActionPending = false,
+  taskFieldActionError,
+  taskFieldActionPending = false,
   isMovingTaskStatus = false,
   onAddTaskComment,
   onOpenTaskChange,
+  onUpdateTaskFields,
   onMoveTaskStatus,
   fetchPhase,
   errorMessage,
@@ -343,6 +362,7 @@ function MyWorkBlockInner({
     const task = sourceTasksById.get(taskId);
     return task ? canTransitionTaskStatus(task, currentUserId, canManageProjectTasks) : false;
   };
+  const openTask = openCard ? sourceTasksById.get(openCard.id) : undefined;
 
   const handleColumnAction = (columnId: ColumnId, action: KanbanColumnAction) => {
     const labels: Record<KanbanColumnAction, string> = {
@@ -541,7 +561,9 @@ function MyWorkBlockInner({
             ? {
                 id: openCard.id,
                 title: openCard.title,
-                description: sourceTasksById.get(openCard.id)?.description,
+                description: openTask?.description,
+                ownerUserId: openTask?.ownerUserId,
+                plannedFinish: openTask?.plannedFinish,
                 ...(openCard.meta?.find((meta) => meta.label.startsWith("Проект:"))?.label.replace("Проект: ", "")
                   ? {
                       project: openCard.meta
@@ -561,9 +583,19 @@ function MyWorkBlockInner({
         activityPending={runtime ? taskActivityPending : undefined}
         commentError={runtime ? commentActionError : undefined}
         commentPending={runtime ? commentActionPending : undefined}
+        canEditTaskFields={runtime && canManageProjectTasks}
+        fieldActionError={runtime ? taskFieldActionError : undefined}
+        fieldActionPending={runtime ? taskFieldActionPending : undefined}
+        workspaceUsers={runtime ? workspaceUsers : undefined}
         {...(runtime && onAddTaskComment && openCard
           ? {
               onAddComment: (body: string) => onAddTaskComment({ body, taskId: openCard.id })
+            }
+          : {})}
+        {...(runtime && onUpdateTaskFields && openTask
+          ? {
+              onUpdateTaskFields: (fields: { dueDate?: string | undefined; ownerUserId?: string | undefined }) =>
+                onUpdateTaskFields(openTask, fields)
             }
           : {})}
       />

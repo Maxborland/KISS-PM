@@ -358,6 +358,19 @@ function RuntimeMyWorkScreen({
       taskActivity.refetch();
     }
   });
+  const updateTaskFields = useMutation({
+    mutationFn: updateWorkspaceTaskFields,
+    onSuccess: (task) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(task.projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+      readModel.refetchAll();
+    }
+  });
 
   if (readModel.isPending || readModel.isFetching) {
     return <LoadingState layout="bento" level="L1" label="Загружаем мою работу…" />;
@@ -382,15 +395,24 @@ function RuntimeMyWorkScreen({
       taskActivities={taskActivity.data?.activities ?? []}
       taskActivityError={taskActivity.error}
       taskActivityPending={taskActivity.isPending || taskActivity.isFetching}
+      workspaceUsers={readModel.data.workspaceUsers}
       currentUserId={currentUserId}
       canManageProjectTasks={canManageProjectTasks}
       initialOpenTaskId={initialTaskId}
       readOnly
       commentActionError={postTaskComment.error}
       commentActionPending={postTaskComment.isPending}
+      taskFieldActionError={updateTaskFields.error}
+      taskFieldActionPending={updateTaskFields.isPending}
       isMovingTaskStatus={updateTaskStatus.isPending}
       onAddTaskComment={(input) => postTaskComment.mutateAsync(input)}
       onOpenTaskChange={setActivityTaskId}
+      onUpdateTaskFields={(task, fields) =>
+        updateTaskFields.mutateAsync({
+          ...fields,
+          task
+        })
+      }
       onMoveTaskStatus={(input) => updateTaskStatus.mutateAsync(input)}
     />
   ) : null;
