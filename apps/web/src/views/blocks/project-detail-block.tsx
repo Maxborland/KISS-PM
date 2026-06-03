@@ -1,11 +1,16 @@
 "use client";
 
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Plus } from "lucide-react";
+
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
+import { Field, FormActions, FormGrid, FormSection } from "@/components/domain/form-layout";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,11 +18,22 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import type { Project, Task, TaskStatus } from "@/lib/api-types";
+import type { Project, Task, TaskStatus, WorkspaceUser } from "@/lib/api-types";
 import { formatDateRange, formatHours, formatRub } from "@/lib/mock-data/format";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
+export type ProjectTaskCreateInput = {
+  title: string;
+  ownerUserId: string;
+  dueDate: string;
+  statusId: string;
+};
+
 export type ProjectDetailBlockProps = {
+  createTaskError?: unknown;
+  createTaskPending?: boolean;
+  currentUserId?: string | undefined;
+  onCreateTask?: ((input: ProjectTaskCreateInput) => Promise<unknown> | void) | undefined;
   project: Project;
   taskActionError?: unknown;
   taskActionPending?: boolean;
@@ -25,16 +41,22 @@ export type ProjectDetailBlockProps = {
   tasks: Task[];
   onChangeTaskStatus?: (task: Task, statusId: string) => Promise<unknown> | void;
   readOnly?: boolean;
+  workspaceUsers?: WorkspaceUser[];
 };
 
 export function ProjectDetailBlock({
+  createTaskError,
+  createTaskPending = false,
+  currentUserId,
+  onCreateTask,
   onChangeTaskStatus,
   project,
   taskActionError,
   taskActionPending = false,
   taskStatuses = [],
   tasks,
-  readOnly = false
+  readOnly = false,
+  workspaceUsers = []
 }: ProjectDetailBlockProps) {
   const activeTasks = tasks.filter((task) => task.archivedAt == null);
   const overdueTasks = activeTasks.filter((task) => isOverdueTask(task));
@@ -44,6 +66,18 @@ export function ProjectDetailBlock({
     .filter((status) => status.status === "active")
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const canChangeTaskStatus = Boolean(onChangeTaskStatus && activeTaskStatuses.length > 0);
+  const defaultStatusId = resolveDefaultStatusId(activeTaskStatuses);
+  const canCreateTask = Boolean(onCreateTask && currentUserId && defaultStatusId);
+  const createDisabledReason = resolveCreateDisabledReason({
+    canCreateTask,
+    currentUserId,
+    hasCreateHandler: Boolean(onCreateTask),
+    hasStatuses: Boolean(defaultStatusId)
+  });
+  const userNameById = useMemo(
+    () => new Map(workspaceUsers.map((user) => [user.id, user.name])),
+    [workspaceUsers]
+  );
   const editDisabledReason = readOnly
     ? "Изменение проекта будет подключено в следующем API-срезе"
     : "Сохранение проекта пока не подключено к API";
@@ -54,13 +88,25 @@ export function ProjectDetailBlock({
         title={project.title}
         lead={`${project.id} · ${project.clientName} · ${formatDateRange(project.plannedStart, project.plannedFinish)}`}
         actions={
-          <Button
-            variant="primary"
-            disabled
-            title={editDisabledReason}
-          >
-            Обновить проект
-          </Button>
+          <>
+            <Button
+              variant="primary"
+              disabled
+              title={editDisabledReason}
+            >
+              Обновить проект
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!canCreateTask}
+              title={createDisabledReason}
+              form="project-task-create-form"
+              type="submit"
+            >
+              <Plus aria-hidden />
+              Добавить задачу
+            </Button>
+          </>
         }
       />
 
@@ -90,6 +136,20 @@ export function ProjectDetailBlock({
 
         <div className="bento__cell bento__cell--12">
           <CardPanel title="Задачи проекта" subtitle="Текущий контур работ" flush>
+            <ProjectTaskCreateForm
+              currentUserId={currentUserId}
+              disabledReason={createDisabledReason}
+              isPending={createTaskPending}
+              onCreateTask={canCreateTask ? onCreateTask : undefined}
+              statusId={defaultStatusId}
+              taskStatuses={activeTaskStatuses}
+              workspaceUsers={workspaceUsers}
+            />
+            {createTaskError ? (
+              <p className="field__error" role="alert">
+                Не удалось создать задачу. Проверьте права, ответственного и допустимый статус.
+              </p>
+            ) : null}
             {activeTasks.length === 0 ? (
               <EmptyState
                 title="Задач пока нет"
@@ -114,7 +174,7 @@ export function ProjectDetailBlock({
                         <td>
                           <CellStack title={task.title} subtitle={task.id} />
                         </td>
-                        <td>{task.ownerUserId}</td>
+                        <td>{userNameById.get(task.ownerUserId) ?? task.ownerUserId}</td>
                         <td>
                           {canChangeTaskStatus ? (
                             <Select
@@ -162,6 +222,218 @@ export function ProjectDetailBlock({
       </div>
     </>
   );
+}
+
+function ProjectTaskCreateForm({
+  currentUserId,
+  disabledReason,
+  isPending,
+  onCreateTask,
+  statusId,
+  taskStatuses,
+  workspaceUsers
+}: {
+  currentUserId?: string | undefined;
+  disabledReason: string;
+  isPending: boolean;
+  onCreateTask?: ((input: ProjectTaskCreateInput) => Promise<unknown> | void) | undefined;
+  statusId: string;
+  taskStatuses: TaskStatus[];
+  workspaceUsers: WorkspaceUser[];
+}) {
+  const ownerOptions = workspaceUsers.filter((user) => user.status !== "inactive");
+  const [title, setTitle] = useState("");
+  const [ownerUserId, setOwnerUserId] = useState(currentUserId ?? "");
+  const [dueDate, setDueDate] = useState(() => getDateInputValue(new Date()));
+  const [selectedStatusId, setSelectedStatusId] = useState(statusId);
+  const [localError, setLocalError] = useState("");
+  const canSelectOwner = ownerOptions.length > 0;
+
+  useEffect(() => {
+    if (!ownerUserId && currentUserId) setOwnerUserId(currentUserId);
+  }, [currentUserId, ownerUserId]);
+
+  useEffect(() => {
+    if (statusId && !selectedStatusId) setSelectedStatusId(statusId);
+  }, [selectedStatusId, statusId]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLocalError("");
+    const trimmedTitle = title.trim();
+    const nextOwnerUserId = ownerUserId || currentUserId;
+    if (!onCreateTask) {
+      setLocalError(disabledReason);
+      return;
+    }
+    if (!trimmedTitle) {
+      setLocalError("Укажите название задачи.");
+      return;
+    }
+    if (!nextOwnerUserId) {
+      setLocalError("Не удалось определить ответственного.");
+      return;
+    }
+    if (!dueDate) {
+      setLocalError("Укажите срок задачи.");
+      return;
+    }
+    if (!selectedStatusId) {
+      setLocalError("Не удалось определить стартовый статус задачи.");
+      return;
+    }
+
+    try {
+      await onCreateTask({
+        dueDate,
+        ownerUserId: nextOwnerUserId,
+        statusId: selectedStatusId,
+        title: trimmedTitle
+      });
+    } catch {
+      return;
+    }
+    setTitle("");
+    setDueDate(getDateInputValue(new Date()));
+    setOwnerUserId(currentUserId ?? "");
+    setSelectedStatusId(statusId);
+  }
+
+  return (
+    <FormSection
+      title="Новая задача"
+      lead="Создайте рабочую задачу с ответственным, сроком и стартовым статусом."
+    >
+      <form id="project-task-create-form" onSubmit={(event) => void handleSubmit(event)}>
+        <FormGrid columns={3}>
+          <Field
+            label="Название"
+            htmlFor="project-task-create-title"
+            required
+          >
+            <Input
+              id="project-task-create-title"
+              value={title}
+              placeholder="Например, проверить раздел АР"
+              disabled={!onCreateTask || isPending}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </Field>
+          <Field
+            label="Ответственный"
+            {...(canSelectOwner
+              ? {}
+              : {
+                  hint: "Каталог пользователей недоступен: задача будет назначена текущему пользователю."
+                })}
+            required
+          >
+            {canSelectOwner ? (
+              <Select
+                value={ownerUserId}
+                disabled={!onCreateTask || isPending}
+                onValueChange={setOwnerUserId}
+              >
+                <SelectTrigger aria-label="Ответственный за новую задачу">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ownerOptions.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={currentUserId ?? ""}
+                disabled
+                aria-label="Ответственный за новую задачу"
+              />
+            )}
+          </Field>
+          <Field
+            label="Срок"
+            htmlFor="project-task-create-due"
+            required
+          >
+            <Input
+              id="project-task-create-due"
+              type="date"
+              value={dueDate}
+              disabled={!onCreateTask || isPending}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          </Field>
+          <Field label="Стартовый статус" required>
+            <Select
+              value={selectedStatusId}
+              disabled={!onCreateTask || isPending || taskStatuses.length === 0}
+              onValueChange={setSelectedStatusId}
+            >
+              <SelectTrigger aria-label="Стартовый статус новой задачи">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {taskStatuses.map((status) => (
+                  <SelectItem key={status.id} value={status.id}>
+                    {status.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </FormGrid>
+        {localError ? (
+          <p className="field__error" role="alert">
+            {localError}
+          </p>
+        ) : null}
+        <FormActions align="start">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!onCreateTask || isPending}
+            title={disabledReason}
+          >
+            <Plus aria-hidden />
+            {isPending ? "Создаём…" : "Создать задачу"}
+          </Button>
+        </FormActions>
+      </form>
+    </FormSection>
+  );
+}
+
+function resolveDefaultStatusId(statuses: TaskStatus[]): string {
+  return (
+    statuses.find((status) => status.category === "new")?.id ??
+    statuses[0]?.id ??
+    ""
+  );
+}
+
+function resolveCreateDisabledReason({
+  canCreateTask,
+  currentUserId,
+  hasCreateHandler,
+  hasStatuses
+}: {
+  canCreateTask: boolean;
+  currentUserId?: string | undefined;
+  hasCreateHandler: boolean;
+  hasStatuses: boolean;
+}): string {
+  if (canCreateTask) return "Создать задачу в проекте";
+  if (!hasCreateHandler) return "Создание задач не подключено для этого runtime-экрана";
+  if (!currentUserId) return "Сессия не вернула текущего пользователя";
+  if (!hasStatuses) return "Нет активного стартового статуса задачи";
+  return "Создание задачи временно недоступно";
+}
+
+function getDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 function projectStatusLabel(status: string): string {

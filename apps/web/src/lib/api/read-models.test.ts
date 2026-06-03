@@ -17,6 +17,7 @@ import {
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
   fetchWorkspaceTaskStatuses,
+  createWorkspaceProjectTask,
   postWorkspaceAgentMessage,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
@@ -40,6 +41,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
     expect(queryKeys.workspace.project("project-alpha")).toEqual(["workspace", "projects", "project-alpha"]);
     expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
+    expect(queryKeys.workspace.users).toEqual(["workspace", "users"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
@@ -67,8 +69,14 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/task-statuses") {
         return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
       }
+      if (path === "/api/workspace/users") {
+        return json({ users: [{ id: "usr-1", name: "Камил" }] });
+      }
       if (path === "/api/workspace/projects/project-1/tasks/task-1/status") {
         return json({ task: { id: "task-1", statusId: "task-status-review" } });
+      }
+      if (path === "/api/workspace/projects/project-1/tasks") {
+        return json({ task: { id: "task-created", title: "Runtime created task" } }, 201);
       }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
@@ -122,7 +130,8 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceProjectDetail("project-1")).resolves.toEqual({
       project: { id: "project-1" },
       taskStatuses: [],
-      tasks: [{ id: "task-1" }]
+      tasks: [{ id: "task-1" }],
+      workspaceUsers: []
     });
     await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
     await expect(
@@ -132,6 +141,15 @@ describe("runtime read model API", () => {
         statusId: "task-status-review"
       })
     ).resolves.toEqual({ id: "task-1", statusId: "task-status-review" });
+    await expect(
+      createWorkspaceProjectTask({
+        dueDate: "2026-06-04",
+        ownerUserId: "usr-1",
+        projectId: "project-1",
+        statusId: "task-status-in-progress",
+        title: "Runtime created task"
+      })
+    ).resolves.toEqual({ id: "task-created", title: "Runtime created task" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
@@ -211,6 +229,7 @@ describe("runtime read model API", () => {
       "/api/workspace/projects/project-1",
       "/api/workspace/task-statuses",
       "/api/workspace/projects/project-1/tasks/task-1/status",
+      "/api/workspace/projects/project-1/tasks",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
@@ -227,6 +246,9 @@ describe("runtime read model API", () => {
     const updateTaskStatusCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/projects/project-1/tasks/task-1/status"
     );
+    const createTaskCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/projects/project-1/tasks"
+    );
     const confirmProposalCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
     );
@@ -237,6 +259,21 @@ describe("runtime read model API", () => {
     expect(updateTaskStatusCall?.[1]).toMatchObject({
       method: "PATCH",
       body: JSON.stringify({ statusId: "task-status-review" })
+    });
+    expect(createTaskCall?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        description: null,
+        durationWorkingDays: 1,
+        participants: [{ role: "executor", userId: "usr-1" }],
+        plannedFinish: "2026-06-04",
+        plannedStart: "2026-06-04",
+        plannedWork: 1,
+        priority: "normal",
+        requiresAcceptance: false,
+        statusId: "task-status-in-progress",
+        title: "Runtime created task"
+      })
     });
     expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
@@ -365,6 +402,9 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/task-statuses") {
         return json({ taskStatuses: [{ id: "task-status-runtime", name: "В работе" }] });
       }
+      if (path === "/api/workspace/users") {
+        return json({ users: [{ id: "usr-runtime", name: "Runtime User" }] });
+      }
       return json({ error: "not_found" }, 404);
     });
     let latestData: unknown;
@@ -391,17 +431,80 @@ describe("runtime read model API", () => {
           expect(latestData).toEqual({
             project: { id: "project-runtime", title: "Runtime project detail" },
             taskStatuses: [{ id: "task-status-runtime", name: "В работе" }],
-            tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+            tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+            workspaceUsers: [{ id: "usr-runtime", name: "Runtime User" }]
           })
         );
       });
       expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
         "/api/workspace/projects/project-runtime",
-        "/api/workspace/task-statuses"
+        "/api/workspace/task-statuses",
+        "/api/workspace/users"
       ]);
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
         "/api/storybook/projects/project-runtime"
       );
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("keeps project detail readable when workspace users access is forbidden", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    let latestData: unknown;
+    let latestError: unknown;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects/project-runtime") {
+        return json({
+          project: { id: "project-runtime", title: "Runtime project detail" },
+          tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        });
+      }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-runtime", name: "В работе" }] });
+      }
+      if (path === "/api/workspace/users") return json({ error: "forbidden" }, 403);
+      return json({ error: "not_found" }, 404);
+    });
+
+    function ProjectDetailProbe() {
+      const readModel = useProjectDetailReadModelQuery("project-runtime");
+      latestData = readModel.data;
+      latestError = readModel.error;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            project: { id: "project-runtime", title: "Runtime project detail" },
+            taskStatuses: [{ id: "task-status-runtime", name: "В работе" }],
+            tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+            workspaceUsers: []
+          })
+        );
+      });
+      expect(latestError).toBeNull();
     } finally {
       await act(async () => root.unmount());
       queryClient.clear();

@@ -20,12 +20,14 @@ const readModelHooks = vi.hoisted(() => ({
   projects: vi.fn(),
   projectsBlock: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
+  createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
 }));
 
 vi.mock("@/lib/api/read-models", () => ({
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
+  createWorkspaceProjectTask: readModelHooks.createWorkspaceProjectTask,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
@@ -116,31 +118,62 @@ vi.mock("@/views/blocks/projects-list-block", () => ({
 
 vi.mock("@/views/blocks/project-detail-block", () => ({
   ProjectDetailBlock: ({
+    currentUserId,
+    onCreateTask,
     onChangeTaskStatus,
     project,
     readOnly,
     taskStatuses,
-    tasks
+    tasks,
+    workspaceUsers
   }: {
+    currentUserId?: string;
+    onCreateTask?: (input: {
+      dueDate: string;
+      ownerUserId: string;
+      statusId: string;
+      title: string;
+    }) => Promise<unknown>;
     onChangeTaskStatus?: (task: { id: string }, statusId: string) => Promise<unknown>;
     project: { title?: string };
     readOnly?: boolean;
     taskStatuses?: { id: string; name: string }[];
     tasks: { id: string; title?: string }[];
+    workspaceUsers?: { id: string; name: string }[];
   }) =>
-    createElement(
-      "button",
-      {
-        "data-testid": "runtime-project-detail",
-        "data-read-only": String(readOnly),
-        onClick: () => {
-          const firstTask = tasks[0];
-          const firstStatus = taskStatuses?.[0];
-          if (firstTask && firstStatus) void onChangeTaskStatus?.(firstTask, firstStatus.id);
-        }
-      },
+    createElement("div", { "data-testid": "runtime-project-detail", "data-read-only": String(readOnly) }, [
+      createElement(
+        "button",
+        {
+          key: "status",
+          "data-testid": "runtime-project-status-action",
+          onClick: () => {
+            const firstTask = tasks[0];
+            const firstStatus = taskStatuses?.[0];
+            if (firstTask && firstStatus) void onChangeTaskStatus?.(firstTask, firstStatus.id);
+          }
+        },
+        "update status"
+      ),
+      createElement(
+        "button",
+        {
+          key: "create",
+          "data-current-user-id": currentUserId ?? "",
+          "data-testid": "runtime-project-create-task",
+          "data-users-count": String(workspaceUsers?.length ?? 0),
+          onClick: () =>
+            void onCreateTask?.({
+              dueDate: "2026-06-04",
+              ownerUserId: workspaceUsers?.[0]?.id ?? currentUserId ?? "usr-1",
+              statusId: taskStatuses?.[0]?.id ?? "task-status-new",
+              title: "Runtime created task"
+            })
+        },
+        "create task"
+      ),
       [project.title, tasks.map((task) => task.title).join(", ")].join(" ")
-    )
+    ])
 }));
 
 vi.mock("@/views/layout/workspace-chrome", () => ({
@@ -192,12 +225,14 @@ describe("RuntimeDataScreen permission gate", () => {
       successQuery({
         project: { id: "project-runtime", title: "Runtime project detail" },
         taskStatuses: [],
-        tasks: []
+        tasks: [],
+        workspaceUsers: []
       })
     );
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({ id: "task-runtime" });
+    readModelHooks.createWorkspaceProjectTask.mockResolvedValue({ id: "task-created" });
   });
 
   it("blocks static admin, settings and catalog screens for project-only users", () => {
@@ -465,7 +500,8 @@ describe("RuntimeDataScreen permission gate", () => {
       successQuery({
         project: { id: "project-runtime", title: "Runtime project detail" },
         taskStatuses: [{ id: "task-status-review", name: "На проверке" }],
-        tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
       })
     );
 
@@ -489,7 +525,8 @@ describe("RuntimeDataScreen permission gate", () => {
       successQuery({
         project: { id: "project-runtime", title: "Runtime project detail" },
         taskStatuses: [{ id: "task-status-review", name: "На проверке" }],
-        tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: []
       })
     );
 
@@ -503,7 +540,7 @@ describe("RuntimeDataScreen permission gate", () => {
     );
 
     await act(async () => {
-      host.querySelector("[data-testid='runtime-project-detail']")?.dispatchEvent(
+      host.querySelector("[data-testid='runtime-project-status-action']")?.dispatchEvent(
         new MouseEvent("click", { bubbles: true })
       );
     });
@@ -518,6 +555,49 @@ describe("RuntimeDataScreen permission gate", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
+  });
+
+  it("creates project tasks through the project-scoped runtime task API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        taskStatuses: [{ id: "task-status-new", name: "Новая" }],
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }],
+        workspaceUsers: [{ id: "usr-1", name: "Runtime User" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector("[data-testid='runtime-project-create-task']")?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+
+    expect(readModelHooks.createWorkspaceProjectTask.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-04",
+      ownerUserId: "usr-1",
+      projectId: "project-runtime",
+      statusId: "task-status-new",
+      title: "Runtime created task"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.project("project-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
     invalidateSpy.mockRestore();
   });
