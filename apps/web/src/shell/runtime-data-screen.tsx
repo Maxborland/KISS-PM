@@ -11,6 +11,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import {
   confirmWorkspaceAgentProposal,
   postWorkspaceAgentMessage,
+  updateWorkspaceProjectTaskStatus,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -111,7 +112,7 @@ export function RuntimeDataScreen({
   if (screenId === "07b-project-detail") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeProjectDetailScreen projectId={projectId} />
+        <RuntimeProjectDetailScreen projectId={projectId} currentUserId={currentUserId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -276,8 +277,26 @@ function RuntimeProjectsListScreen() {
   ) : null;
 }
 
-function RuntimeProjectDetailScreen({ projectId }: { projectId?: string | undefined }) {
+function RuntimeProjectDetailScreen({
+  projectId,
+  currentUserId
+}: {
+  projectId?: string | undefined;
+  currentUserId?: string | undefined;
+}) {
+  const queryClient = useQueryClient();
   const query = useProjectDetailReadModelQuery(projectId);
+  const updateTaskStatus = useMutation({
+    mutationFn: updateWorkspaceProjectTaskStatus,
+    onSuccess: (_task, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(input.projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      if (currentUserId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      }
+    }
+  });
 
   if (!projectId) {
     return (
@@ -318,7 +337,26 @@ function RuntimeProjectDetailScreen({ projectId }: { projectId?: string | undefi
     );
   }
 
-  return query.data ? <ProjectDetailBlock project={query.data.project} tasks={query.data.tasks} readOnly /> : null;
+  const projectDetail = query.data;
+  if (!projectDetail) return null;
+
+  return (
+    <ProjectDetailBlock
+      project={projectDetail.project}
+      taskActionError={updateTaskStatus.error}
+      taskActionPending={updateTaskStatus.isPending}
+      taskStatuses={projectDetail.taskStatuses}
+      tasks={projectDetail.tasks}
+      onChangeTaskStatus={(task, statusId) =>
+        updateTaskStatus.mutateAsync({
+          projectId: projectDetail.project.id,
+          statusId,
+          taskId: task.id
+        })
+      }
+      readOnly
+    />
+  );
 }
 
 function RuntimeDealsScreen() {

@@ -16,7 +16,9 @@ import {
   fetchWorkspaceProjectDetail,
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
+  fetchWorkspaceTaskStatuses,
   postWorkspaceAgentMessage,
+  updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
@@ -37,6 +39,7 @@ describe("runtime read model API", () => {
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
     expect(queryKeys.workspace.project("project-alpha")).toEqual(["workspace", "projects", "project-alpha"]);
+    expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
@@ -60,6 +63,12 @@ describe("runtime read model API", () => {
       if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-1" }] });
       if (path === "/api/workspace/projects/project-1") {
         return json({ project: { id: "project-1" }, tasks: [{ id: "task-1" }] });
+      }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-in-progress" }] });
+      }
+      if (path === "/api/workspace/projects/project-1/tasks/task-1/status") {
+        return json({ task: { id: "task-1", statusId: "task-status-review" } });
       }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
@@ -112,8 +121,17 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceProjects()).resolves.toEqual([{ id: "project-1" }]);
     await expect(fetchWorkspaceProjectDetail("project-1")).resolves.toEqual({
       project: { id: "project-1" },
+      taskStatuses: [],
       tasks: [{ id: "task-1" }]
     });
+    await expect(fetchWorkspaceTaskStatuses()).resolves.toEqual([{ id: "task-status-in-progress" }]);
+    await expect(
+      updateWorkspaceProjectTaskStatus({
+        projectId: "project-1",
+        taskId: "task-1",
+        statusId: "task-status-review"
+      })
+    ).resolves.toEqual({ id: "task-1", statusId: "task-status-review" });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
@@ -191,6 +209,8 @@ describe("runtime read model API", () => {
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
       "/api/workspace/projects",
       "/api/workspace/projects/project-1",
+      "/api/workspace/task-statuses",
+      "/api/workspace/projects/project-1/tasks/task-1/status",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
@@ -204,12 +224,19 @@ describe("runtime read model API", () => {
     const postMessageCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/messages"
     );
+    const updateTaskStatusCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/projects/project-1/tasks/task-1/status"
+    );
     const confirmProposalCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
     );
     expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
+    });
+    expect(updateTaskStatusCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ statusId: "task-status-review" })
     });
     expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
@@ -335,6 +362,9 @@ describe("runtime read model API", () => {
           tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
         });
       }
+      if (path === "/api/workspace/task-statuses") {
+        return json({ taskStatuses: [{ id: "task-status-runtime", name: "В работе" }] });
+      }
       return json({ error: "not_found" }, 404);
     });
     let latestData: unknown;
@@ -360,12 +390,14 @@ describe("runtime read model API", () => {
         await vi.waitFor(() =>
           expect(latestData).toEqual({
             project: { id: "project-runtime", title: "Runtime project detail" },
+            taskStatuses: [{ id: "task-status-runtime", name: "В работе" }],
             tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
           })
         );
       });
-      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
-        "/api/workspace/projects/project-runtime"
+      expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
+        "/api/workspace/projects/project-runtime",
+        "/api/workspace/task-statuses"
       ]);
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
         "/api/storybook/projects/project-runtime"

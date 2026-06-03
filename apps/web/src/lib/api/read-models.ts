@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
@@ -10,7 +10,8 @@ import type {
   Project,
   ProjectTemplate,
   ScheduledTask,
-  Task
+  Task,
+  TaskStatus
 } from "@/lib/api-types";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -66,6 +67,7 @@ export type ProjectsListReadModel = {
 
 export type ProjectDetailReadModel = {
   project: Project;
+  taskStatuses: TaskStatus[];
   tasks: Task[];
 };
 
@@ -189,10 +191,37 @@ export async function fetchWorkspaceProjects(): Promise<Project[]> {
 }
 
 export async function fetchWorkspaceProjectDetail(projectId: string): Promise<ProjectDetailReadModel> {
-  return apiFetch<ProjectDetailReadModel>(
+  const response = await apiFetch<Omit<ProjectDetailReadModel, "taskStatuses">>(
     `/api/workspace/projects/${encodeURIComponent(projectId)}`,
     { method: "GET" }
   );
+  return {
+    ...response,
+    taskStatuses: []
+  };
+}
+
+export async function fetchWorkspaceTaskStatuses(): Promise<TaskStatus[]> {
+  const response = await apiFetch<ListResponse<"taskStatuses", TaskStatus>>(
+    "/api/workspace/task-statuses",
+    { method: "GET" }
+  );
+  return response.taskStatuses;
+}
+
+export async function updateWorkspaceProjectTaskStatus(input: {
+  projectId: string;
+  taskId: string;
+  statusId: string;
+}): Promise<Task> {
+  const response = await apiFetch<{ task: Task }>(
+    `/api/workspace/projects/${encodeURIComponent(input.projectId)}/tasks/${encodeURIComponent(input.taskId)}/status`,
+    {
+      method: "PATCH",
+      json: { statusId: input.statusId }
+    }
+  );
+  return response.task;
 }
 
 export async function fetchWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
@@ -317,14 +346,39 @@ export function useProjectsListReadModelQuery() {
 }
 
 export function useProjectDetailReadModelQuery(projectId: string | undefined) {
-  return useQuery({
-    enabled: Boolean(projectId),
-    queryKey: projectId ? queryKeys.workspace.project(projectId) : queryKeys.workspace.project(""),
-    queryFn: () => {
-      if (!projectId) throw new Error("project_id_required");
-      return fetchWorkspaceProjectDetail(projectId);
-    }
+  const queries = useQueries({
+    queries: [
+      {
+        enabled: Boolean(projectId),
+        queryKey: projectId ? queryKeys.workspace.project(projectId) : queryKeys.workspace.project(""),
+        queryFn: () => {
+          if (!projectId) throw new Error("project_id_required");
+          return fetchWorkspaceProjectDetail(projectId);
+        }
+      },
+      {
+        enabled: Boolean(projectId),
+        queryKey: queryKeys.workspace.taskStatuses,
+        queryFn: fetchWorkspaceTaskStatuses
+      }
+    ]
   });
+  const [projectDetailQuery, taskStatusesQuery] = queries;
+  const data =
+    projectDetailQuery.data && taskStatusesQuery.data
+      ? {
+          ...(projectDetailQuery.data as ProjectDetailReadModel),
+          taskStatuses: taskStatusesQuery.data as TaskStatus[]
+        }
+      : undefined;
+
+  return {
+    ...aggregateQueries<ProjectDetailReadModel>(queries, data),
+    refetch: () => {
+      void projectDetailQuery.refetch();
+      void taskStatusesQuery.refetch();
+    }
+  };
 }
 
 export function useAgentCockpitReadModelQuery() {
