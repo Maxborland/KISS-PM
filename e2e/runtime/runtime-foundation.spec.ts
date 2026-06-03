@@ -78,6 +78,17 @@ test("authenticated beta runtime routes open without blank or error states @fast
     await expect(page.locator(".app-context-sidebar a[aria-disabled='true']")).toHaveCount(0);
     await expect(page.locator('.app-context-sidebar a[href*="/demo"]')).toHaveCount(0);
     await expect(page.locator('.app-context-sidebar a[href="/tasks/new"]')).toHaveCount(0);
+    if (route.path.startsWith("/projects/project-beta-school-renovation")) {
+      await expect(
+        page.locator('.app-context-sidebar a[href="/projects/project-beta-school-renovation"]')
+      ).toContainText("Карточка");
+      await expect(
+        page.locator('.app-context-sidebar a[href="/projects/project-beta-school-renovation/timeline"]')
+      ).toContainText("Гант");
+      await expect(
+        page.locator('.app-context-sidebar a[href="/projects/project-beta-school-renovation/resources"]')
+      ).toContainText("Ресурсы");
+    }
 
     const desktopScreenshotPath = testInfo.outputPath(
       `runtime-${route.path.slice(1).replaceAll("/", "-")}-desktop.png`

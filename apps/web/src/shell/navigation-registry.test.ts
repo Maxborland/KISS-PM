@@ -240,6 +240,34 @@ describe("navigation-registry", () => {
     ).toEqual(["/admin/audit"]);
   });
 
+  it("builds current project context links from the real runtime project id", () => {
+    expect(
+      contextNavForSection(
+        "projects",
+        "Ресурсы",
+        [
+          "tenant.projects.read",
+          "tenant.project_plan.read",
+          "tenant.project_resources.read",
+          "tenant.audit_events.read"
+        ],
+        { projectId: "project-alpha" }
+      ).flatMap((group) => group.items.map((item) => [item.label, item.href, item.active]))
+    ).toEqual([
+      ["Все проекты", "/projects", false],
+      ["Карточка", "/projects/project-alpha", false],
+      ["Гант", "/projects/project-alpha/timeline", false],
+      ["Ресурсы", "/projects/project-alpha/resources", true],
+      ["Аудит", "/admin/audit", false]
+    ]);
+
+    expect(
+      contextNavForSection("projects", "Карточка", ["tenant.projects.read"], {
+        projectId: "project-alpha"
+      }).flatMap((group) => group.items.map((item) => item.href))
+    ).toEqual(["/projects", "/projects/project-alpha"]);
+  });
+
   it("does not expose disabled or demo context navigation entries in beta runtime", () => {
     const permissions = [
       "tenant.projects.read",

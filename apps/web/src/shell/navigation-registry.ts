@@ -66,6 +66,10 @@ export type ScreenRouteMeta = {
   requiredPermissionMode?: "any" | "all";
 };
 
+export type ContextNavOptions = {
+  projectId?: string | undefined;
+};
+
 export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
   overview: [
     {
@@ -108,18 +112,6 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
         { label: "Активные", badge: "14" },
         { label: "На ревью", badge: "3" }
       ]
-    },
-    {
-      title: "Текущий проект",
-      items: [
-        { label: "Гант", nested: true },
-        { label: "Ресурсы", nested: true, href: "/projects/demo/resources" },
-        { label: "Базовый план", nested: true, href: "/projects/demo/baseline" },
-        { label: "Сценарии", nested: true, href: "/projects/demo/scenarios" },
-        { label: "KPI", nested: true, href: "/projects/demo/kpi" },
-        { label: "Аудит", nested: true, href: "/projects/demo/audit" },
-        { label: "Календари", nested: true, href: "/projects/demo/calendars" }
-      ]
     }
   ],
   directories: [
@@ -136,9 +128,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
     {
       title: "Отчёты",
       items: [
-        { label: "Сводка портфеля", href: "/dashboard" },
-        { label: "Загрузка ресурсов", href: "/projects/demo/resources" },
-        { label: "KPI арендатора", href: "/projects/demo/kpi" }
+        { label: "Сводка портфеля", href: "/dashboard" }
       ]
     }
   ],
@@ -163,9 +153,10 @@ export function railSectionIcon(id: RailSectionId): LucideIcon {
 export function contextNavForSection(
   section: RailSectionId,
   activeItem: string,
-  permissions?: readonly string[]
+  permissions?: readonly string[],
+  options: ContextNavOptions = {}
 ): SidebarGroup[] {
-  return CONTEXT_NAV[section]
+  return withRuntimeContextGroups(CONTEXT_NAV[section], section, options)
     .map((group) => ({
       ...group,
       items: group.items
@@ -176,6 +167,27 @@ export function contextNavForSection(
         }))
     }))
     .filter((group) => group.items.length > 0);
+}
+
+function withRuntimeContextGroups(
+  groups: SidebarGroup[],
+  section: RailSectionId,
+  options: ContextNavOptions
+): SidebarGroup[] {
+  if (section !== "projects" || !options.projectId) return groups;
+  const projectBase = `/projects/${options.projectId}`;
+  return [
+    ...groups,
+    {
+      title: "Текущий проект",
+      items: [
+        { label: "Карточка", href: projectBase, nested: true },
+        { label: "Гант", href: `${projectBase}/timeline`, nested: true },
+        { label: "Ресурсы", href: `${projectBase}/resources`, nested: true },
+        { label: "Аудит", href: "/admin/audit", nested: true }
+      ]
+    }
+  ];
 }
 
 function route(
@@ -296,7 +308,7 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
     lead: "Живая карточка проекта: сроки, статус, задачи и ответственные.",
     breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта", current: true }],
     railSection: "projects",
-    contextActiveItem: "Все проекты",
+    contextActiveItem: "Карточка",
     path: "/projects/:projectId",
     requiredPermissions: ["tenant.projects.read"]
   }),
