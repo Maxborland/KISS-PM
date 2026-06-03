@@ -520,6 +520,17 @@ export async function changeWorkspaceOpportunityStage(input: {
   return response.opportunity;
 }
 
+export async function updateWorkspaceOpportunity(opportunity: Opportunity): Promise<Opportunity> {
+  const response = await apiFetch<{ opportunity: Opportunity }>(
+    `/api/workspace/opportunities/${encodeURIComponent(opportunity.id)}`,
+    {
+      method: "PATCH",
+      json: opportunity
+    }
+  );
+  return response.opportunity;
+}
+
 export async function activateWorkspaceOpportunityProject(input: {
   acceptedRiskReason?: string | null;
   opportunityId: string;

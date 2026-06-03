@@ -18,6 +18,7 @@ import {
   postWorkspaceAgentMessage,
   postWorkspaceTaskComment,
   updateWorkspaceAccessRolePermission,
+  updateWorkspaceOpportunity,
   updateWorkspaceUserStatus,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
@@ -148,7 +149,7 @@ export function RuntimeDataScreen({
   if (screenId === "06-deal-card") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeDealDetailScreen dealId={dealId} />
+        <RuntimeDealDetailScreen dealId={dealId} permissions={permissions} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -675,10 +676,17 @@ function RuntimeDealsScreen({ permissions }: { permissions: readonly string[] })
   );
 }
 
-function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
+function RuntimeDealDetailScreen({
+  dealId,
+  permissions
+}: {
+  dealId?: string | undefined;
+  permissions: readonly string[];
+}) {
   const query = useDealDetailReadModelQuery(dealId);
   const queryClient = useQueryClient();
   const [activatedProject, setActivatedProject] = useState<Project | null>(null);
+  const canManageOpportunities = hasPermission(permissions, "tenant.opportunities.manage");
   const activateProject = useMutation({
     mutationFn: (opportunity: Opportunity) => activateOrResolveProjectFromOpportunity(opportunity),
     onSuccess: (project, opportunity) => {
@@ -689,6 +697,16 @@ function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(project.id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+    }
+  });
+  const updateOpportunity = useMutation({
+    mutationFn: updateWorkspaceOpportunity,
+    onSuccess: (opportunity) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunity(opportunity.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunities });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+      void query.refetch();
     }
   });
 
@@ -735,8 +753,20 @@ function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
       activatedProject={activatedProject}
       activationError={activateProject.error}
       activationPending={activateProject.isPending}
+      canUpdateNextAction={canManageOpportunities}
+      nextActionError={updateOpportunity.error}
+      nextActionPending={updateOpportunity.isPending}
       opportunity={dealDetail.opportunity}
       onActivateProject={() => activateProject.mutateAsync(dealDetail.opportunity)}
+      onUpdateNextAction={(nextAction) =>
+        updateOpportunity.mutateAsync({
+          ...dealDetail.opportunity,
+          customFieldValues: {
+            ...(dealDetail.opportunity.customFieldValues ?? {}),
+            next_action: nextAction
+          }
+        })
+      }
     />
   ) : null;
 }

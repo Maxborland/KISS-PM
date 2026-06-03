@@ -79,6 +79,27 @@ try {
     ) overloaded
   `;
 
+  const [dealNextAction] = await client<{
+    nextActionFields: number;
+    dealsWithNextAction: number;
+  }[]>`
+    select
+      (
+        select count(*)::int
+        from custom_field_definitions
+        where tenant_id = 'tenant-alpha'
+          and id = 'next_action'
+          and target_entity = 'opportunity'
+          and status = 'active'
+      ) as "nextActionFields",
+      (
+        select count(*)::int
+        from opportunities
+        where tenant_id = 'tenant-alpha'
+          and coalesce(custom_field_values ->> 'next_action', '') <> ''
+      ) as "dealsWithNextAction"
+  `;
+
   assertRange("clients", counts.clients, expected.clientsMin);
   assertRange("deals", counts.deals, expected.dealsMin);
   assertRange("projects", counts.projects, expected.projectsMin);
@@ -90,11 +111,15 @@ try {
   assertRange("waitingTasks", counts.waitingTasks, 1);
   assertRange("missingRoleDemandCount", missingRole.missingRoleDemandCount, 1);
   assertRange("overloadBuckets", overload.overloadBuckets, 1);
+  assertRange("nextActionFields", dealNextAction.nextActionFields, 1, 1);
+  assertRange("dealsWithNextAction", dealNextAction.dealsWithNextAction, 2);
 
   console.log("[db:seed:check] Beta seed OK", {
     ...counts,
     missingRoleDemandCount: missingRole.missingRoleDemandCount,
-    overloadBuckets: overload.overloadBuckets
+    overloadBuckets: overload.overloadBuckets,
+    nextActionFields: dealNextAction.nextActionFields,
+    dealsWithNextAction: dealNextAction.dealsWithNextAction
   });
 } finally {
   await client.end();

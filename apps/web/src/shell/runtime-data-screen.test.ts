@@ -35,6 +35,7 @@ const readModelHooks = vi.hoisted(() => ({
   postWorkspaceAgentMessage: vi.fn(),
   postWorkspaceTaskComment: vi.fn(),
   updateWorkspaceAccessRolePermission: vi.fn(),
+  updateWorkspaceOpportunity: vi.fn(),
   updateWorkspaceUserStatus: vi.fn(),
   updateWorkspaceTaskFields: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
@@ -49,6 +50,7 @@ vi.mock("@/lib/api/read-models", () => ({
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   postWorkspaceTaskComment: readModelHooks.postWorkspaceTaskComment,
   updateWorkspaceAccessRolePermission: readModelHooks.updateWorkspaceAccessRolePermission,
+  updateWorkspaceOpportunity: readModelHooks.updateWorkspaceOpportunity,
   updateWorkspaceUserStatus: readModelHooks.updateWorkspaceUserStatus,
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
@@ -231,21 +233,49 @@ vi.mock("@/views/blocks/my-work-block", () => ({
 
 vi.mock("@/views/blocks/deal-detail-runtime-block", () => ({
   DealDetailRuntimeBlock: ({
+    canUpdateNextAction,
     onActivateProject,
+    onUpdateNextAction,
     opportunity
   }: {
+    canUpdateNextAction?: boolean;
     onActivateProject?: () => Promise<unknown>;
+    onUpdateNextAction?: (nextAction: string) => Promise<unknown>;
     opportunity: { title: string };
   }) =>
     createElement(
-      "button",
+      "div",
       {
-        "data-testid": "runtime-deal-detail",
-        onClick: () => {
-          void onActivateProject?.();
-        }
+        "data-can-update-next-action": String(canUpdateNextAction),
+        "data-testid": "runtime-deal-detail"
       },
-      opportunity.title
+      [
+        createElement(
+          "button",
+          {
+            key: "handoff",
+            "data-testid": "runtime-deal-handoff",
+            onClick: () => {
+              void onActivateProject?.();
+            }
+          },
+          "handoff"
+        ),
+        createElement(
+          "button",
+          {
+            key: "next-action",
+            "data-testid": "runtime-deal-next-action",
+            onClick: () => {
+              if (canUpdateNextAction) {
+                void onUpdateNextAction?.("Созвониться с заказчиком");
+              }
+            }
+          },
+          "next action"
+        ),
+        opportunity.title
+      ]
     )
 }));
 
@@ -579,6 +609,10 @@ describe("RuntimeDataScreen permission gate", () => {
       id: "opportunity-runtime",
       stageId: "deal-stage-contract"
     });
+    readModelHooks.updateWorkspaceOpportunity.mockResolvedValue({
+      id: "opportunity-runtime",
+      customFieldValues: { next_action: "Созвониться с заказчиком" }
+    });
     readModelHooks.activateWorkspaceOpportunityProject.mockResolvedValue({
       id: "project-activated",
       sourceOpportunityId: "opportunity-runtime",
@@ -738,6 +772,84 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(readModelHooks.dealDetail).toHaveBeenCalledWith("opportunity-runtime");
   });
 
+  it("updates deal next action through the runtime opportunity update API for managers", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          customFieldValues: { next_action: "Старый шаг" },
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: [
+          "tenant.opportunities.read",
+          "tenant.deal_stages.read",
+          "tenant.opportunities.manage"
+        ],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.querySelector<HTMLElement>("[data-testid='runtime-deal-detail']")?.dataset.canUpdateNextAction).toBe(
+      "true"
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-next-action']")?.click();
+    });
+
+    expect(readModelHooks.updateWorkspaceOpportunity.mock.calls[0]?.[0]).toEqual({
+      id: "opportunity-runtime",
+      customFieldValues: { next_action: "Созвониться с заказчиком" },
+      title: "Runtime deal detail"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.opportunity("opportunity-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.opportunities });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("keeps deal next action disabled for read-only opportunity users", async () => {
+    readModelHooks.dealDetail.mockReturnValue(
+      successQuery({
+        opportunity: {
+          id: "opportunity-runtime",
+          customFieldValues: { next_action: "Старый шаг" },
+          title: "Runtime deal detail"
+        }
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "06-deal-card",
+        dealId: "opportunity-runtime",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.querySelector<HTMLElement>("[data-testid='runtime-deal-detail']")?.dataset.canUpdateNextAction).toBe(
+      "false"
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-next-action']")?.click();
+    });
+
+    expect(readModelHooks.updateWorkspaceOpportunity).not.toHaveBeenCalled();
+  });
+
   it("activates a deal into a project through the runtime opportunity API", async () => {
     const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
     readModelHooks.dealDetail.mockReturnValue(
@@ -760,7 +872,7 @@ describe("RuntimeDataScreen permission gate", () => {
     );
 
     await act(async () => {
-      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-handoff']")?.click();
     });
 
     expect(readModelHooks.activateWorkspaceOpportunityProject).toHaveBeenCalledWith({
@@ -812,7 +924,7 @@ describe("RuntimeDataScreen permission gate", () => {
     );
 
     await act(async () => {
-      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-detail']")?.click();
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deal-handoff']")?.click();
     });
 
     expect(readModelHooks.fetchWorkspaceProjects).toHaveBeenCalled();

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
 import type { Opportunity, Project } from "@/lib/api-types";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
 
@@ -22,17 +23,34 @@ export function DealDetailRuntimeBlock({
   activatedProject = null,
   activationError,
   activationPending = false,
+  canUpdateNextAction = false,
+  nextActionError,
+  nextActionPending = false,
   onActivateProject,
+  onUpdateNextAction,
   opportunity
 }: {
   activatedProject?: Project | null;
   activationError?: unknown;
   activationPending?: boolean;
+  canUpdateNextAction?: boolean;
+  nextActionError?: unknown;
+  nextActionPending?: boolean;
   onActivateProject?: () => Promise<Project>;
+  onUpdateNextAction?: (nextAction: string) => Promise<Opportunity>;
   opportunity: Opportunity;
 }) {
   const [confirmingActivation, setConfirmingActivation] = useState(false);
+  const [nextActionDraft, setNextActionDraft] = useState(() => nextActionValue(opportunity));
   const canActivate = opportunity.status === "ready_to_activate";
+  const canSaveNextAction = canUpdateNextAction && Boolean(onUpdateNextAction);
+  const nextActionDisabledReason = canUpdateNextAction
+    ? "Сохранение следующего действия временно недоступно."
+    : "Недостаточно прав для изменения сделки.";
+
+  useEffect(() => {
+    setNextActionDraft(nextActionValue(opportunity));
+  }, [opportunity]);
 
   async function handleConfirmActivation() {
     if (!onActivateProject) return;
@@ -42,6 +60,11 @@ export function DealDetailRuntimeBlock({
     } catch {
       // Mutation error is rendered from activationError; keep the confirmation open for retry.
     }
+  }
+
+  async function handleSaveNextAction() {
+    if (!canSaveNextAction || !onUpdateNextAction) return;
+    await onUpdateNextAction(nextActionDraft.trim());
   }
 
   return (
@@ -124,6 +147,44 @@ export function DealDetailRuntimeBlock({
           </tbody>
         </DataTable>
       </CardPanel>
+      <CardPanel title="Следующее действие" subtitle="Что должно произойти с клиентом дальше">
+        <form
+          className="u-flex u-flex-col u-gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSaveNextAction();
+          }}
+        >
+          <CellStack
+            title={nextActionValue(opportunity) || "Следующее действие не задано"}
+            subtitle={canSaveNextAction ? "Обновляется в карточке сделки и попадает в аудит." : nextActionDisabledReason}
+          />
+          <div className="u-flex u-flex-wrap u-gap-2 u-items-center">
+            <Input
+              aria-label="Следующее действие по сделке"
+              className="u-w-320"
+              disabled={!canSaveNextAction || nextActionPending}
+              placeholder="Например, согласовать состав альбома с заказчиком"
+              value={nextActionDraft}
+              onChange={(event) => setNextActionDraft(event.currentTarget.value)}
+            />
+            <Button
+              disabled={!canSaveNextAction || nextActionPending}
+              title={!canSaveNextAction ? nextActionDisabledReason : undefined}
+              type="submit"
+              variant="primary"
+            >
+              {nextActionPending ? "Сохраняем…" : "Сохранить"}
+            </Button>
+          </div>
+          {!canSaveNextAction ? <span className="u-text-xs u-text-muted">{nextActionDisabledReason}</span> : null}
+          {nextActionError ? (
+            <div role="alert" className="field__error">
+              {formatNextActionError(nextActionError)}
+            </div>
+          ) : null}
+        </form>
+      </CardPanel>
       <CardPanel title="Передача в проект" subtitle="Явное подтверждение перед изменением данных">
         <div className="u-flex u-flex-col u-gap-3">
           <CellStack
@@ -172,6 +233,10 @@ export function DealDetailRuntimeBlock({
   );
 }
 
+function nextActionValue(opportunity: Opportunity): string {
+  return opportunity.customFieldValues?.next_action ?? "";
+}
+
 function formatDateRange(start: string, finish: string): string {
   const formatter = new Intl.DateTimeFormat("ru-RU");
   return `${formatter.format(new Date(start))} — ${formatter.format(new Date(finish))}`;
@@ -180,4 +245,9 @@ function formatDateRange(start: string, finish: string): string {
 function formatActivationError(error: unknown): string {
   if (error instanceof Error) return `Не удалось передать сделку: ${error.message}`;
   return "Не удалось передать сделку. Проверьте права и попробуйте снова.";
+}
+
+function formatNextActionError(error: unknown): string {
+  if (error instanceof Error) return `Не удалось сохранить следующее действие: ${error.message}`;
+  return "Не удалось сохранить следующее действие. Проверьте права и попробуйте снова.";
 }

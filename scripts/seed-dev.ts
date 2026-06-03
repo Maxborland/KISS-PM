@@ -6,6 +6,7 @@ import {
   createTenantAdminSeedProfile,
   seedTenantDataset,
   auditEvents,
+  customFieldDefinitions,
   opportunityDemands,
   opportunities,
   planVersions,
@@ -603,6 +604,21 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
     }
 
     await seedDemoPlanningData(transaction, createdAt);
+    await transaction
+      .insert(customFieldDefinitions)
+      .values({
+        id: "next_action",
+        tenantId: "tenant-alpha",
+        systemKey: "next_action",
+        tenantLabel: "Следующее действие",
+        targetEntity: "opportunity",
+        fieldType: "text",
+        required: false,
+        status: "active",
+        createdAt,
+        updatedAt: createdAt
+      })
+      .onConflictDoNothing();
     await seedBetaPortfolioData(transaction, createdAt);
   });
 }
@@ -636,7 +652,7 @@ async function seedBetaPortfolioData(
       feasibilityStatus: "warning",
       feasibilityResult: { blockers: ["missing_position_capacity"], warnings: ["architect_overload"] },
       feasibilityCheckedAt: createdAt,
-      customFieldValues: {},
+      customFieldValues: { next_action: "Подтвердить риск по ресурсам и передать в проект" },
       createdAt,
       updatedAt: createdAt
     },
@@ -664,7 +680,7 @@ async function seedBetaPortfolioData(
       feasibilityStatus: "sufficient",
       feasibilityResult: { warnings: [] },
       feasibilityCheckedAt: createdAt,
-      customFieldValues: {},
+      customFieldValues: { next_action: "Назначить встречу по составу предпроектного альбома" },
       createdAt,
       updatedAt: createdAt
     },
@@ -738,6 +754,7 @@ async function seedBetaPortfolioData(
           status: opportunity.status,
           probability: opportunity.probability,
           plannedFinish: opportunity.plannedFinish,
+          customFieldValues: opportunity.customFieldValues,
           feasibilityStatus: opportunity.feasibilityStatus,
           feasibilityResult: opportunity.feasibilityResult,
           updatedAt: createdAt
