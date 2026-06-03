@@ -237,7 +237,7 @@ function MyWorkBlockInner({
       add: "Добавление карточки"
     };
     toast.info(`${labels[action]} — ${COLUMN_LABEL[columnId]}`, {
-      description: runtime ? "Runtime read-only: изменение будет подключено отдельным срезом." : "Демо Storybook: действие зафиксировано локально."
+      description: runtime ? "Runtime read-only: изменение будет подключено отдельным срезом." : "Действие зафиксировано локально."
     });
   };
 

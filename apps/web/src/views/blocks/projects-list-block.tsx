@@ -179,7 +179,7 @@ export function ProjectsListBlock({
 
   const handleCreate = () => {
     if (!createTitle.trim()) return;
-    toast.success(`Проект «${createTitle.trim()}» создан (демо)`);
+    toast.success(`Проект «${createTitle.trim()}» создан локально`);
     setCreateTitle("");
     setCreateOpen(false);
   };
@@ -234,7 +234,7 @@ export function ProjectsListBlock({
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
-          <Button variant="secondary" size="sm" disabled title="Демо Storybook: фильтр подключится к API">
+          <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
             <Filter className="size-4" aria-hidden />
             Фильтр
           </Button>
@@ -376,7 +376,7 @@ export function ProjectsListBlock({
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Новый проект</SheetTitle>
-            <SheetDescription>Демо Storybook: черновик без сохранения в API.</SheetDescription>
+            <SheetDescription>Черновик без сохранения в API.</SheetDescription>
           </SheetHeader>
           <SheetBody>
             <label className="field">
