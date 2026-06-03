@@ -23,6 +23,9 @@ test("project resources shows live missing role demand without demo fallback", a
   await expect(page.locator('[data-row-id="role-missing-position-interior-designer"]')).toContainText(
     "Не закрыта"
   );
+  await expect(page.locator(".rmatrix__cell--load-high").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Изменить назначения" })).toBeDisabled();
+  await expect(page.getByText("Изменение назначений пока недоступно")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("mock");
 
   const screenshotPath = testInfo.outputPath("runtime-project-resources-missing-role.png");
