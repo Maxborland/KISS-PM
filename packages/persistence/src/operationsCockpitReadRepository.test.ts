@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isBeforeDateOnly,
-  isNonTerminalProjectStatus
+  isNonTerminalProjectStatus,
+  isOpportunityMissingNextAction
 } from "./operationsCockpitReadRepository";
 
 describe("operations cockpit read repository", () => {
@@ -31,5 +32,12 @@ describe("operations cockpit read repository", () => {
     expect(isNonTerminalProjectStatus("closed")).toBe(false);
     expect(isNonTerminalProjectStatus("cancelled")).toBe(false);
     expect(isNonTerminalProjectStatus(null)).toBe(false);
+  });
+
+  it("treats missing or blank deal next action as an attention condition", () => {
+    expect(isOpportunityMissingNextAction({})).toBe(true);
+    expect(isOpportunityMissingNextAction({ next_action: "" })).toBe(true);
+    expect(isOpportunityMissingNextAction({ next_action: "   " })).toBe(true);
+    expect(isOpportunityMissingNextAction({ next_action: "Созвониться с заказчиком" })).toBe(false);
   });
 });

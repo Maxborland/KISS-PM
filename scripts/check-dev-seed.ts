@@ -81,6 +81,7 @@ try {
 
   const [dealNextAction] = await client<{
     nextActionFields: number;
+    dealsMissingNextAction: number;
     dealsWithNextAction: number;
   }[]>`
     select
@@ -92,6 +93,12 @@ try {
           and target_entity = 'opportunity'
           and status = 'active'
       ) as "nextActionFields",
+      (
+        select count(*)::int
+        from opportunities
+        where tenant_id = 'tenant-alpha'
+          and coalesce(nullif(trim(custom_field_values ->> 'next_action'), ''), '') = ''
+      ) as "dealsMissingNextAction",
       (
         select count(*)::int
         from opportunities
@@ -112,6 +119,7 @@ try {
   assertRange("missingRoleDemandCount", missingRole.missingRoleDemandCount, 1);
   assertRange("overloadBuckets", overload.overloadBuckets, 1);
   assertRange("nextActionFields", dealNextAction.nextActionFields, 1, 1);
+  assertRange("dealsMissingNextAction", dealNextAction.dealsMissingNextAction, 1);
   assertRange("dealsWithNextAction", dealNextAction.dealsWithNextAction, 2);
 
   console.log("[db:seed:check] Beta seed OK", {
@@ -119,6 +127,7 @@ try {
     missingRoleDemandCount: missingRole.missingRoleDemandCount,
     overloadBuckets: overload.overloadBuckets,
     nextActionFields: dealNextAction.nextActionFields,
+    dealsMissingNextAction: dealNextAction.dealsMissingNextAction,
     dealsWithNextAction: dealNextAction.dealsWithNextAction
   });
 } finally {

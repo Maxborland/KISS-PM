@@ -9,6 +9,7 @@ export type OperationsCockpitAttentionItem = {
     | "task_overdue"
     | "task_waiting"
     | "critical_task"
+    | "deal_missing_next_action"
     | "deal_ready_to_activate";
   severity: OperationsCockpitSeverity;
   title: string;

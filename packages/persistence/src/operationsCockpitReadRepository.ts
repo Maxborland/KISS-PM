@@ -26,6 +26,7 @@ export type OperationsCockpitAttentionItem = {
     | "task_overdue"
     | "task_waiting"
     | "critical_task"
+    | "deal_missing_next_action"
     | "deal_ready_to_activate";
   severity: OperationsCockpitSeverity;
   title: string;
@@ -126,6 +127,7 @@ export function createOperationsCockpitReadRepository(
       const activeTaskStatus = inArray(taskCategory, activeTaskCategories);
       const overdueProject = sql`${projects.plannedFinish}::date < ${today}::date`;
       const overdueTask = sql`${tasks.plannedFinish}::date < ${today}::date`;
+      const opportunityMissingNextAction = sql`coalesce(nullif(trim(${opportunities.customFieldValues}->>'next_action'), ''), '') = ''`;
       const baseActiveTaskScope = and(
         eq(tasks.tenantId, input.tenantId),
         isNull(tasks.archivedAt),
@@ -227,6 +229,20 @@ export function createOperationsCockpitReadRepository(
               and(
                 eq(opportunities.tenantId, input.tenantId),
                 eq(opportunities.status, "ready_to_activate")
+              )
+            )
+            .orderBy(asc(opportunities.plannedFinish), desc(opportunities.updatedAt), desc(opportunities.id))
+            .limit(attentionLimit)
+        : [];
+      const missingNextActionDealRows = input.includePipelinePressure
+        ? await db
+            .select()
+            .from(opportunities)
+            .where(
+              and(
+                eq(opportunities.tenantId, input.tenantId),
+                notInArray(opportunities.status, finalOpportunityStatuses),
+                opportunityMissingNextAction
               )
             )
             .orderBy(asc(opportunities.plannedFinish), desc(opportunities.updatedAt), desc(opportunities.id))
@@ -344,6 +360,17 @@ export function createOperationsCockpitReadRepository(
             ownerUserId: row.task.ownerUserId,
             dueDate: toIsoDate(row.task.plannedFinish)
           })),
+        ...missingNextActionDealRows.map((deal) => ({
+          id: `deal-missing-next-action:${deal.id}`,
+          kind: "deal_missing_next_action" as const,
+          severity: "warning" as const,
+          title: deal.title,
+          reason: "У сделки не задано следующее действие для клиента.",
+          entity: { type: "deal" as const, id: deal.id, title: deal.title },
+          projectId: null,
+          ownerUserId: deal.ownerUserId,
+          dueDate: toIsoDate(deal.plannedFinish)
+        })),
         ...readyDealAttentionRows.map((deal) => ({
           id: `deal-ready:${deal.id}`,
           kind: "deal_ready_to_activate" as const,
@@ -467,4 +494,10 @@ export function isBeforeDateOnly(value: Date, now: Date): boolean {
 
 export function isNonTerminalProjectStatus(status: string | null): boolean {
   return Boolean(status && activeProjectStatuses.includes(status));
+}
+
+export function isOpportunityMissingNextAction(
+  customFieldValues: Record<string, string>
+): boolean {
+  return (customFieldValues.next_action ?? "").trim() === "";
 }
