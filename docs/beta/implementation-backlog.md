@@ -6,7 +6,7 @@
 
 | Экран | Route | Stories | Статус | Главный разрыв | QA proof сейчас |
 | --- | --- | --- | --- | --- | --- |
-| Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
+| Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention+visual | Operations attention, workload and pipeline pressure render from live read-model; pipeline clickthrough and desktop/narrow screenshots are proven; remaining gap is role-specific filters/actions | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, `dashboard-pipeline-clickthrough.spec.ts`, `pnpm qa:screenshots -- --routes /dashboard` |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired+actions+blocker-gap+readonly-proof | Status, owner, due date and comment actions are runtime-proven; blocker is explicitly disabled as backend gap without fake mutation; project-team participant read-only fields/comment flow is proven | route smoke, `my-work-block.test.tsx`, `runtime-data-screen.test.ts`, `my-work-status-action.spec.ts`, `my-work-task-fields.spec.ts`, `my-work-task-comments.spec.ts`, `my-work-blocker-gap.spec.ts`, `my-work-readonly-participant.spec.ts`, `pnpm qa:fast` |
 | Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
@@ -23,7 +23,7 @@
 ## P0 gaps
 
 - Fast runtime QA доказан на `design-v3` `ce5c58c`: `pnpm qa:fast` pass. Полный `pnpm qa:runtime` остается broader/nightly gate, не per-PR blocker.
-- `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
+- `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections из live read-model; pipeline clickthrough and desktop/narrow screenshot evidence are proven. Остаются role-specific filters/actions.
 - `/projects/:id`, `/projects/:id/timeline` и `/projects/:id/resources` теперь runtime routes; mutation depth и screenshot proof still required.
 - Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback; settings/profile and deeper create/edit flows ещё не сделаны.
 - `/my-work` доказывает status/owner/due-date/comment mutations: PR #73 gates status DnD by `tenant.projects.manage` or task roles `requester/executor/co_executor/controller`; `my-work-task-fields.spec.ts` proves owner+due date persistence; `my-work-task-comments.spec.ts` proves comment activity persistence; `my-work-blocker-gap.spec.ts` proves blocker is an explicit disabled backend gap without fake mutation; `my-work-readonly-participant.spec.ts` proves project-team participants see PM-owned fields as read-only but can still add activity comments.
@@ -60,7 +60,7 @@
 
 | Screen | Required proof before beta-ready |
 | --- | --- |
-| `/dashboard` | Seeded risk/overdue/overload appears; no console/pageerror/API failures; desktop/narrow screenshots |
+| `/dashboard` | Seeded risk/overdue/overload appears; pipeline pressure links to deal detail; no console/pageerror/API failures; desktop/narrow screenshots |
 | `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
 | `/my-work` | Assigned task visible; status mutation persists with role-gated DnD; owner/due/comment mutation persists; blocker gap shown without fake mutation; participant read-only state proven |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
@@ -77,8 +77,8 @@
    - Evidence: `pnpm qa:fast` is the local PR-sized CI-equivalent; `docs/beta/local-artifact-policy.md` documents GitHub billing blocker and local artifact policy.
 
 2. **Dashboard attention cockpit**
-   - Status: frontend read-model/UI slice done; remaining proof is full runtime QA screenshot and seeded-risk route assertion.
-   - Evidence: `RuntimeDashboardScreen` renders operations attention, workload and pipeline pressure from `/api/workspace/operations-cockpit`.
+   - Status: seeded-risk route assertion, workload/pipeline sections, pipeline clickthrough and desktop/narrow screenshot evidence are proven.
+   - Evidence: `RuntimeDashboardScreen` renders operations attention, workload and pipeline pressure from `/api/workspace/operations-cockpit`; `dashboard-pipeline-clickthrough.spec.ts`; `pnpm qa:screenshots -- --routes /dashboard`.
 
 3. **Project detail + task mutations**
    - Status: runtime project detail task action matrix is proven for create/status/owner/due/comment plus blocker-gap UX; task activity refresh, scoped audit projection and desktop/narrow screenshot evidence are proven.
@@ -111,6 +111,8 @@
 
 ## Текущий evidence snapshot
 
+- `dashboard-pipeline-clickthrough.spec.ts`: dashboard renders seeded attention/workload/pipeline sections and opens the live school renovation deal detail route.
+- `pnpm qa:screenshots -- --routes /dashboard`: dashboard desktop and narrow screenshots pass.
 - `origin/design-v3` `846434f`: includes Wave 1 route inventory, beta seed/reset, fast gate, deal stage mutation, PR #73 My Work status action, owner/due/comment proof and blocker-gap proof slices.
 - `docs/beta/runtime-route-inventory.md`: current beta runtime allowlist and hidden route list.
 - `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.

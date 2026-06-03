@@ -14,6 +14,12 @@ test("dashboard pipeline pressure links to the live deal detail route", async ({
   expect(login.status()).toBe(200);
 
   await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { level: 1, name: /Добро пожаловать/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Что требует внимания" })).toBeVisible();
+  await expect(page.getByText("Обмерить существующие классы").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ресурсные риски" })).toBeVisible();
+  await expect(page.getByText("Сергей Архитектор")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Давление воронки" })).toBeVisible();
 
   const pipelineLink = page.getByRole("link", {
     name: "Открыть сделку: Школа на 600 мест — реконструкция"
