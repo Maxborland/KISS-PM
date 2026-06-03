@@ -29,6 +29,7 @@ const readModelHooks = vi.hoisted(() => ({
   projects: vi.fn(),
   projectsBlock: vi.fn(),
   taskActivity: vi.fn(),
+  changeWorkspaceOpportunityStage: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
   createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
@@ -39,6 +40,7 @@ const readModelHooks = vi.hoisted(() => ({
 
 vi.mock("@/lib/api/read-models", () => ({
   activateWorkspaceOpportunityProject: readModelHooks.activateWorkspaceOpportunityProject,
+  changeWorkspaceOpportunityStage: readModelHooks.changeWorkspaceOpportunityStage,
   confirmWorkspaceAgentProposal: readModelHooks.confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask: readModelHooks.createWorkspaceProjectTask,
   fetchWorkspaceProjects: readModelHooks.fetchWorkspaceProjects,
@@ -60,6 +62,39 @@ vi.mock("@/lib/api/read-models", () => ({
   useProjectDetailReadModelQuery: readModelHooks.projectDetail,
   useProjectsListReadModelQuery: readModelHooks.projects,
   useTaskActivityReadModelQuery: readModelHooks.taskActivity
+}));
+
+vi.mock("@/views/blocks/deals-block", () => ({
+  DealsBlock: ({
+    initialDeals,
+    onChangeDealStage,
+    readOnly,
+    stages,
+    stageActionError,
+    stageActionPending
+  }: {
+    initialDeals: { id: string; title?: string }[];
+    onChangeDealStage?: (dealId: string, stageId: string) => Promise<unknown>;
+    readOnly?: boolean;
+    stages: { id: string; title?: string }[];
+    stageActionError?: unknown;
+    stageActionPending?: boolean;
+  }) =>
+    createElement(
+      "button",
+      {
+        "data-error": stageActionError ? "true" : "false",
+        "data-has-stage-action": String(Boolean(onChangeDealStage)),
+        "data-pending": String(stageActionPending),
+        "data-read-only": String(readOnly),
+        "data-stage-count": String(stages.length),
+        "data-testid": "runtime-deals",
+        onClick: () => {
+          void onChangeDealStage?.(initialDeals[0]?.id ?? "opportunity-runtime", "deal-stage-contract");
+        }
+      },
+      initialDeals.map((deal) => deal.title).join(", ")
+    )
 }));
 
 vi.mock("@/shell/runtime-dashboard-screen", () => ({
@@ -399,6 +434,10 @@ describe("RuntimeDataScreen permission gate", () => {
       projectId: "project-runtime"
     });
     readModelHooks.createWorkspaceProjectTask.mockResolvedValue({ id: "task-created" });
+    readModelHooks.changeWorkspaceOpportunityStage.mockResolvedValue({
+      id: "opportunity-runtime",
+      stageId: "deal-stage-contract"
+    });
     readModelHooks.activateWorkspaceOpportunityProject.mockResolvedValue({
       id: "project-activated",
       sourceOpportunityId: "opportunity-runtime",
@@ -449,6 +488,89 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("01-dashboard", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("20-agent-cockpit", ["tenant.projects.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("02-my-work", ["tenant.projects.read"])).toBe(true);
+  });
+
+  it("changes deal stage through the runtime opportunity stage API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.deals.mockReturnValue(
+      successReadModel({
+        dealStages: [{ id: "deal-stage-contract", name: "Договор", sortOrder: 1 }],
+        opportunities: [
+          {
+            clientName: "Runtime client",
+            contractValue: 100000,
+            id: "opportunity-runtime",
+            ownerUserId: "usr-1",
+            stageId: "deal-stage-new",
+            title: "Runtime deal"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "05-deals",
+        permissions: [
+          "tenant.opportunities.read",
+          "tenant.deal_stages.read",
+          "tenant.opportunities.manage"
+        ],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[data-testid='runtime-deals']")?.click();
+    });
+
+    expect(readModelHooks.changeWorkspaceOpportunityStage).toHaveBeenCalled();
+    expect(readModelHooks.changeWorkspaceOpportunityStage.mock.calls[0]?.[0]).toEqual({
+      opportunityId: "opportunity-runtime",
+      stageId: "deal-stage-contract"
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.opportunities });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.opportunity("opportunity-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    invalidateSpy.mockRestore();
+  });
+
+  it("keeps deal stage changes disabled for read-only opportunity users", async () => {
+    readModelHooks.deals.mockReturnValue(
+      successReadModel({
+        dealStages: [{ id: "deal-stage-contract", name: "Договор", sortOrder: 1 }],
+        opportunities: [
+          {
+            clientName: "Runtime client",
+            contractValue: 100000,
+            id: "opportunity-runtime",
+            ownerUserId: "usr-1",
+            stageId: "deal-stage-new",
+            title: "Runtime deal"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "05-deals",
+        permissions: ["tenant.opportunities.read", "tenant.deal_stages.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    const dealsButton = host.querySelector<HTMLButtonElement>("[data-testid='runtime-deals']");
+    expect(dealsButton?.dataset.hasStageAction).toBe("false");
+
+    await act(async () => {
+      dealsButton?.click();
+    });
+
+    expect(readModelHooks.changeWorkspaceOpportunityStage).not.toHaveBeenCalled();
   });
 
   it("renders deal detail from the runtime opportunity detail read model without fixture fallback", async () => {

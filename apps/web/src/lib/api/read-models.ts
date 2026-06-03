@@ -455,6 +455,20 @@ export async function fetchWorkspaceOpportunity(opportunityId: string): Promise<
   return response.opportunity;
 }
 
+export async function changeWorkspaceOpportunityStage(input: {
+  opportunityId: string;
+  stageId: string;
+}): Promise<Opportunity> {
+  const response = await apiFetch<{ opportunity: Opportunity }>(
+    `/api/workspace/opportunities/${encodeURIComponent(input.opportunityId)}/stage`,
+    {
+      method: "PATCH",
+      json: { stageId: input.stageId }
+    }
+  );
+  return response.opportunity;
+}
+
 export async function activateWorkspaceOpportunityProject(input: {
   acceptedRiskReason?: string | null;
   opportunityId: string;
