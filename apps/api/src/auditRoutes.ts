@@ -31,10 +31,7 @@ export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const projectId = context.req.query("projectId");
     const auditEvents = await dataSource.listAuditEventsByTenantId(actor.tenantId);
     const filtered = projectId
-      ? auditEvents.filter(
-          (event) =>
-            event.sourceEntity?.type === "Project" && event.sourceEntity.id === projectId
-        )
+      ? await filterAuditEventsByProject(dataSource, actor.tenantId, projectId, auditEvents)
       : auditEvents;
 
     return context.json({
@@ -43,5 +40,21 @@ export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
         createdAt: event.createdAt.toISOString()
       }))
     });
+  });
+}
+
+async function filterAuditEventsByProject(
+  dataSource: ApiRouteDeps["dataSource"],
+  tenantId: string,
+  projectId: string,
+  auditEvents: Awaited<ReturnType<NonNullable<ApiRouteDeps["dataSource"]["listAuditEventsByTenantId"]>>>
+) {
+  const projectTasks = (await dataSource.listProjectTasks?.(tenantId, projectId)) ?? [];
+  const projectTaskIds = new Set(projectTasks.map((task) => task.id));
+  return auditEvents.filter((event) => {
+    if (event.sourceEntity?.type === "Project" && event.sourceEntity.id === projectId) {
+      return true;
+    }
+    return event.sourceEntity?.type === "Task" && projectTaskIds.has(String(event.sourceEntity.id));
   });
 }
