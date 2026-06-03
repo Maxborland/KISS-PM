@@ -1,6 +1,7 @@
 "use client";
 
 import { CardPanel } from "@/components/domain/card-panel";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Project } from "@/lib/api-types";
 import { RoutePageIntro } from "@/views/layout/route-page-intro";
@@ -22,6 +23,22 @@ export function ProjectResourcesRuntimeBlock({
     <>
       <RoutePageIntro
         lead={`Живая ресурсная матрица проекта «${project.title}»: ответственные, плановые часы и перегруз по дням.`}
+        actions={
+          <div className="u-flex u-flex-wrap u-items-center u-gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled
+              title="Сохранение назначений пока не подключено. Используйте задачи проекта для смены ответственных."
+            >
+              Изменить назначения
+            </Button>
+            <span className="u-text-xs u-text-muted">
+              Изменение назначений пока недоступно: нет серверной команды для сохранения.
+            </span>
+          </div>
+        }
       />
       <CardPanel title="Ресурсная загрузка" subtitle={project.clientName} flush>
         {matrix.rows.length === 0 ? (
