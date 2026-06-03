@@ -28,14 +28,14 @@ Decision: PR #73 is merged and accepted as the My Work task-status action slice.
 - regression proof that My Work does not fall back to full `/api/workspace/tasks/:taskId` update.
 - role-gated DnD: `approver`/`observer` cards are not draggable unless the user has `tenant.projects.manage`.
 
-It does not cover:
+It was originally limited to status actions. Later separate My Work slices added runtime proof for:
 
 - owner update;
 - due date update;
 - comment action;
-- blocker mutation.
+- blocker gap UX without fake mutation.
 
-These remain separate My Work slices.
+Remaining My Work follow-up: forbidden/read-only proof.
 
 ## Remote CI rule for Wave 1
 
@@ -45,11 +45,11 @@ GitHub CI red from billing/spending-limit with `steps: []` is not treated as pro
 
 Command: `pnpm qa:fast`
 
-Result on runtime base `d12b838`: pass. Later Wave 1 status/policy doc-only PRs do not change runtime code; rerun `pnpm qa:fast` before the next code slice.
+Result on current `origin/design-v3` `846434f`: pass.
 
 Coverage summary:
 
-- seed check: 3 clients, 5 deals, 5 projects, 27 tasks, 6 users, 26 audit events;
+- seed check: 3 clients, 5 deals, 5 projects, 27 tasks, 6 users, 36 audit events;
 - beta seed includes overload, missing-role demand, overdue/waiting tasks and deal next-action coverage;
 - API unit tests: 120 passed, 1 skipped;
 - web unit tests: 391 passed;
@@ -72,7 +72,7 @@ Known environment note: local Next dev could not download Google Fonts and used 
 
 ## Wave 1 exit
 
-Wave 1 foundation is complete. Latest runtime gate evidence is from `origin/design-v3` `d12b838`; status/policy doc-only updates after that preserve the same runtime base.
+Wave 1 foundation is complete on current `origin/design-v3` `846434f` with fresh `pnpm qa:fast` evidence.
 
 Next work continues in PR-sized slices from clean `origin/design-v3`:
 
