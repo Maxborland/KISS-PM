@@ -9,6 +9,7 @@ import {
   fetchWorkspaceOperationsCockpit,
   fetchWorkspaceAgentThread,
   fetchTenantCurrentScheduledTasks,
+  fetchTenantCurrentAuditEvents,
   fetchWorkspaceDealStages,
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
@@ -24,6 +25,7 @@ import {
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery,
+  useAuditEventsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -54,6 +56,7 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
+    expect(queryKeys.tenant.currentAuditEvents).toEqual(["tenant", "current", "audit-events"]);
     expect(queryKeys.tenant.currentScheduledTasks("usr-1", "2026-05-30", "2026-05-30")).toEqual([
       "tenant",
       "current",
@@ -130,6 +133,28 @@ describe("runtime read model API", () => {
             proposals: [{ id: "proposal-1", status: "applied", confirmation: closedConfirmation("proposal-1") }]
           })
         );
+      }
+      if (path === "/api/tenant/current/audit-events") {
+        return json({
+          auditEvents: [
+            {
+              id: "audit-1",
+              tenantId: "tenant-alpha",
+              actorUserId: "usr-1",
+              actionType: "workspace.task.update",
+              sourceSurfaceId: null,
+              sourceWorkflow: "project_detail",
+              sourceEntity: { type: "Task", id: "task-1" },
+              input: {},
+              beforeState: null,
+              afterState: null,
+              permissionResult: { allowed: true },
+              executionResult: { status: "applied" },
+              correlationId: "corr-1",
+              createdAt: "2026-06-01T09:00:00.000Z"
+            }
+          ]
+        });
       }
       if (
         path ===
@@ -211,6 +236,24 @@ describe("runtime read model API", () => {
       attentionItems: [],
       agentContext: { unavailableSources: [] }
     });
+    await expect(fetchTenantCurrentAuditEvents()).resolves.toEqual([
+      {
+        id: "audit-1",
+        tenantId: "tenant-alpha",
+        actorUserId: "usr-1",
+        actionType: "workspace.task.update",
+        sourceSurfaceId: null,
+        sourceWorkflow: "project_detail",
+        sourceEntity: { type: "Task", id: "task-1" },
+        input: {},
+        beforeState: null,
+        afterState: null,
+        permissionResult: { allowed: true },
+        executionResult: { status: "applied" },
+        correlationId: "corr-1",
+        createdAt: "2026-06-01T09:00:00.000Z"
+      }
+    ]);
     await expect(postWorkspaceAgentMessage("Что горит?")).resolves.toMatchObject({
       mutationPolicy: {
         mode: "confirmation_required",
@@ -275,6 +318,7 @@ describe("runtime read model API", () => {
       "/api/workspace/deal-stages",
       "/api/workspace/agent-thread",
       "/api/workspace/operations-cockpit",
+      "/api/tenant/current/audit-events",
       "/api/workspace/agent-thread/messages",
       "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
@@ -347,6 +391,8 @@ describe("runtime read model API", () => {
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
     });
+    const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
+    expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });
     for (const [, init] of fetchMock.mock.calls) {
       expect((init?.headers as Headers).get("x-kiss-pm-action")).toBe("same-origin");
       expect(init?.credentials).toBe("same-origin");
@@ -729,6 +775,92 @@ describe("runtime read model API", () => {
         ])
       );
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/agent");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads audit events from the tenant audit endpoint without fixture fallback or extra catalogs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/tenant/current/audit-events") {
+        return json({
+          auditEvents: [
+            {
+              id: "audit-live",
+              tenantId: "tenant-alpha",
+              actorUserId: "usr-1",
+              actionType: "workspace.agent.proposal.apply",
+              sourceSurfaceId: null,
+              sourceWorkflow: "agent_cockpit",
+              sourceEntity: { type: "AgentProposal", id: "proposal-1" },
+              input: {},
+              beforeState: null,
+              afterState: null,
+              permissionResult: { allowed: true },
+              executionResult: { status: "applied" },
+              correlationId: "corr-live",
+              createdAt: "2026-06-01T09:00:00.000Z"
+            }
+          ]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function AuditProbe() {
+      const readModel = useAuditEventsReadModelQuery();
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(AuditProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            auditEvents: [
+              {
+                id: "audit-live",
+                tenantId: "tenant-alpha",
+                actorUserId: "usr-1",
+                actionType: "workspace.agent.proposal.apply",
+                sourceSurfaceId: null,
+                sourceWorkflow: "agent_cockpit",
+                sourceEntity: { type: "AgentProposal", id: "proposal-1" },
+                input: {},
+                beforeState: null,
+                afterState: null,
+                permissionResult: { allowed: true },
+                executionResult: { status: "applied" },
+                correlationId: "corr-live",
+                createdAt: "2026-06-01T09:00:00.000Z"
+              }
+            ]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/tenant/current/audit-events"]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/audit-events");
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
     } finally {
       act(() => root.unmount());
       queryClient.clear();

@@ -4,6 +4,7 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
+  AuditEventListItem,
   DealStage,
   OperationsCockpitReadModel,
   Opportunity,
@@ -99,6 +100,10 @@ export type DashboardReadModel = {
 export type AgentCockpitReadModel = {
   operationsCockpit: OperationsCockpitReadModel;
   workspaceAgentThread: WorkspaceAgentThread;
+};
+
+export type AuditEventsReadModel = {
+  auditEvents: AuditEventListItem[];
 };
 
 export type WorkspaceAgentFocusType = "project" | "task" | "deal";
@@ -423,6 +428,14 @@ export async function fetchWorkspaceOperationsCockpit(): Promise<OperationsCockp
   }
 }
 
+export async function fetchTenantCurrentAuditEvents(): Promise<AuditEventListItem[]> {
+  const response = await apiFetch<ListResponse<"auditEvents", AuditEventListItem>>(
+    "/api/tenant/current/audit-events",
+    { method: "GET" }
+  );
+  return response.auditEvents;
+}
+
 export async function postWorkspaceAgentMessage(body: string): Promise<WorkspaceAgentThread> {
   return apiFetch<WorkspaceAgentThread>("/api/workspace/agent-thread/messages", {
     method: "POST",
@@ -557,6 +570,23 @@ export function useAgentCockpitReadModelQuery() {
       : undefined;
 
   return aggregateQueries<AgentCockpitReadModel>(queries, data);
+}
+
+export function useAuditEventsReadModelQuery() {
+  const query = useQuery({
+    queryKey: queryKeys.tenant.currentAuditEvents,
+    queryFn: fetchTenantCurrentAuditEvents
+  });
+
+  return {
+    data: query.data ? { auditEvents: query.data } : undefined,
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: () => {
+      void query.refetch();
+    }
+  };
 }
 
 export function getRuntimeTodayIsoDate(now = new Date()): string {

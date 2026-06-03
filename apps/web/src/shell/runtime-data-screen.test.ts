@@ -13,6 +13,7 @@ import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-d
 
 const readModelHooks = vi.hoisted(() => ({
   agent: vi.fn(),
+  audit: vi.fn(),
   dashboard: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("@/lib/api/read-models", () => ({
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
+  useAuditEventsReadModelQuery: readModelHooks.audit,
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
@@ -237,6 +239,15 @@ vi.mock("@/views/blocks/project-timeline-block", () => ({
     )
 }));
 
+vi.mock("@/views/blocks/audit-events-runtime-block", () => ({
+  AuditEventsRuntimeBlock: ({ auditEvents }: { auditEvents: { actionType: string }[] }) =>
+    createElement(
+      "div",
+      { "data-testid": "runtime-audit-events" },
+      auditEvents.map((event) => event.actionType).join(", ")
+    )
+}));
+
 vi.mock("@/views/layout/workspace-chrome", () => ({
   WorkspaceChrome: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "workspace-chrome" }, children)
@@ -275,6 +286,7 @@ describe("RuntimeDataScreen permission gate", () => {
         refetch: vi.fn()
       }
     );
+    readModelHooks.audit.mockReturnValue(successQuery({ auditEvents: [] }));
     readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
     readModelHooks.projects.mockReturnValue(
       successReadModel({
@@ -314,6 +326,7 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(canOpenStaticRuntimeScreen("09-admin", ["tenant.users.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("10-settings", ["tenant.workspace_config.read"])).toBe(true);
     expect(canOpenStaticRuntimeScreen("08-entities-clients", ["tenant.clients.read"])).toBe(true);
+    expect(canOpenStaticRuntimeScreen("17-project-audit", ["tenant.audit_events.read"])).toBe(true);
   });
 
   it("does not fall back to fixture screens for non-beta runtime routes", async () => {
@@ -644,6 +657,31 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).not.toContain("fixture fallback");
     expect(host.textContent).not.toContain("Разработать концепцию");
     expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
+  });
+
+  it("renders audit from the runtime audit read model without fixture fallback", async () => {
+    readModelHooks.audit.mockReturnValue(
+      successQuery({
+        auditEvents: [
+          {
+            actionType: "workspace.agent.proposal.apply",
+            id: "audit-runtime"
+          }
+        ]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "17-project-audit",
+        permissions: ["tenant.audit_events.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.textContent).toContain("workspace.agent.proposal.apply");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.audit).toHaveBeenCalled();
   });
 
   it("updates task status from project detail through the project-scoped task status API", async () => {

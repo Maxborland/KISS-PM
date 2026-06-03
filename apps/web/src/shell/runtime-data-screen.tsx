@@ -15,6 +15,7 @@ import {
   postWorkspaceTaskComment,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
+  useAuditEventsReadModelQuery,
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
@@ -47,6 +48,7 @@ import {
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { RuntimeAgentScreen } from "@/shell/runtime-agent-screen";
 import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
+import { AuditEventsRuntimeBlock } from "@/views/blocks/audit-events-runtime-block";
 
 export function canOpenStaticRuntimeScreen(
   screenId: ScreenId,
@@ -141,6 +143,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeProjectResourcesScreen projectId={projectId} />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "17-project-audit") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeAuditEventsScreen />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -588,6 +598,27 @@ function RuntimeProjectResourcesScreen({ projectId }: { projectId?: string | und
       matrix={buildProjectResourceMatrixData(query.data)}
     />
   );
+}
+
+function RuntimeAuditEventsScreen() {
+  const query = useAuditEventsReadModelQuery();
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем аудит действий…" />;
+  }
+
+  if (query.error) {
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить аудит действий"
+        forbiddenTitle="Нет доступа к аудиту"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <AuditEventsRuntimeBlock auditEvents={query.data.auditEvents} /> : null;
 }
 
 function RuntimeReadModelError({

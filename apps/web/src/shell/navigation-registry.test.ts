@@ -45,6 +45,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/deals")).toBe("05-deals");
     expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
     expect(screenIdForPath("/projects/project-alpha/timeline")).toBe("12-project-gantt");
+    expect(screenIdForPath("/admin/audit")).toBe("17-project-audit");
     expect(screenIdForPath("/settings")).toBe("10-settings");
     expect(screenIdForPath("/login")).toBe("19-login");
   });
@@ -55,6 +56,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("05-deals")).toBe("/deals");
     expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
     expect(pathForScreenId("12-project-gantt")).toBe("/projects/:projectId/timeline");
+    expect(pathForScreenId("17-project-audit")).toBe("/admin/audit");
   });
 
   it("provides real hrefs for primary rail entries", () => {
@@ -86,6 +88,11 @@ describe("navigation-registry", () => {
     expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.project_plan.read"])).toBe(true);
     expect(canOpenRuntimePath("/projects/project-alpha/timeline", ["tenant.projects.read"])).toBe(false);
     expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
+  });
+
+  it("allows audit runtime path only for audit readers", () => {
+    expect(canOpenRuntimePath("/admin/audit", ["tenant.audit_events.read"])).toBe(true);
+    expect(canOpenRuntimePath("/admin/audit", ["tenant.workspace_config.read"])).toBe(false);
   });
 
   it("exposes the workspace agent as an overview surface", () => {
@@ -141,5 +148,11 @@ describe("navigation-registry", () => {
         (group) => group.items.map((item) => item.href ?? null)
       )
     ).toEqual([null]);
+
+    expect(
+      contextNavForSection("settings", "Аудит", ["tenant.audit_events.read"]).flatMap((group) =>
+        group.items.map((item) => item.href ?? null)
+      )
+    ).toEqual(["/admin/audit", null]);
   });
 });

@@ -12,7 +12,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 }, testInfo) => {
   test.fail(
     true,
-    "Current blocker: runtime audit route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent and resources, but still needs audit proof."
+    "Current blocker: admin users runtime route is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources and audit, but still needs admin user management proof."
   );
 
   const login = await page.request.post("/api/auth/login", {
@@ -66,5 +66,10 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
   await test.step("audit must be a live runtime route for mutation proof", async () => {
     await page.goto("/admin/audit");
     await expect(page.getByRole("heading", { name: /Аудит/ })).toBeVisible();
+  });
+
+  await test.step("admin users must be a live runtime route for RBAC proof", async () => {
+    await page.goto("/admin/users");
+    await expect(page.getByRole("heading", { name: /Пользователи/ })).toBeVisible();
   });
 });

@@ -34,7 +34,8 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "07-projects-list",
   "07b-project-detail",
   "12-project-gantt",
-  "13-project-resources"
+  "13-project-resources",
+  "17-project-audit"
 ] as const satisfies readonly ScreenId[];
 
 const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
@@ -141,6 +142,7 @@ export const CONTEXT_NAV: Record<RailSectionId, SidebarGroup[]> = {
       items: [
         { label: "Рабочая область", href: "/settings" },
         { label: "Администрирование", href: "/admin" },
+        { label: "Аудит", href: "/admin/audit" },
         { label: "Интеграции" }
       ]
     }
@@ -418,13 +420,13 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   }),
   "17-project-audit": route({
     id: "17-project-audit",
-    storyTitle: "17 Аудит проекта",
-    pageTitle: mockProjectScreenTitle("Аудит"),
-    lead: "Журнал управленческих действий.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Аудит", current: true }],
-    railSection: "projects",
+    storyTitle: "17 Аудит",
+    pageTitle: "Аудит действий",
+    lead: "Журнал управленческих действий рабочей области.",
+    breadcrumb: [{ label: "Настройки" }, { label: "Аудит", current: true }],
+    railSection: "settings",
     contextActiveItem: "Аудит",
-    path: "/projects/demo/audit",
+    path: "/admin/audit",
     requiredPermissions: ["tenant.audit_events.read"]
   }),
   "18-project-calendars": route({
