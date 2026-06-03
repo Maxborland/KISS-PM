@@ -11,13 +11,7 @@ export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; classN
       {items.map((item, i) => (
         <span key={item.label} className="inline-flex items-center gap-2">
           {i > 0 ? <ChevronRight className="crumb-sep size-3.5" aria-hidden /> : null}
-          {item.current ? (
-            <span className="u-text-strong">{item.label}</span>
-          ) : (
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              {item.label}
-            </a>
-          )}
+          <span className={item.current ? "u-text-strong" : undefined}>{item.label}</span>
         </span>
       ))}
     </nav>

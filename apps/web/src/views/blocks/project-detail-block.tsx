@@ -122,13 +122,15 @@ export function ProjectDetailBlock({
         lead={`${project.id} · ${project.clientName} · ${formatDateRange(project.plannedStart, project.plannedFinish)}`}
         actions={
           <>
-            <Button
-              variant="primary"
-              disabled
-              title={editDisabledReason}
-            >
-              Обновить проект
-            </Button>
+            {!readOnly ? (
+              <Button
+                variant="primary"
+                disabled
+                title={editDisabledReason}
+              >
+                Обновить проект
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
               disabled={!canCreateTask}

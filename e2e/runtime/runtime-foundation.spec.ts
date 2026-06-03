@@ -80,6 +80,7 @@ test("authenticated beta runtime routes open without blank or error states @fast
     await expect(page.locator(".app-context-sidebar a[aria-disabled='true']")).toHaveCount(0);
     await expect(page.locator('.app-context-sidebar a[href*="/demo"]')).toHaveCount(0);
     await expect(page.locator('.app-context-sidebar a[href="/tasks/new"]')).toHaveCount(0);
+    await expectNoDeadRuntimeControls(page);
     if (route.path.startsWith("/projects/project-beta-school-renovation")) {
       await expect(
         page.locator('.app-context-sidebar a[href="/projects/project-beta-school-renovation"]')
@@ -108,6 +109,7 @@ test("authenticated beta runtime routes open without blank or error states @fast
       await expect(page.getByLabel("Единый управленческий агент")).toBeVisible();
       await expect(page.getByText("Сверка изменений")).toBeVisible();
     }
+    await expectNoDeadRuntimeControls(page);
     const narrowScreenshotPath = testInfo.outputPath(
       `runtime-${route.path.slice(1).replaceAll("/", "-")}-narrow.png`
     );
@@ -128,4 +130,11 @@ async function expectSeededDashboardAttention(page: Page) {
   await expect(page.getByText("Школа на 600 мест — реконструкция").first()).toBeVisible();
   await expect(page.getByText("Согласовать пожарные требования").first()).toBeVisible();
   await expect(page.getByText("ГК Северный квартал").first()).toBeVisible();
+}
+
+async function expectNoDeadRuntimeControls(page: Page) {
+  await expect(page.locator('a[href="#"]')).toHaveCount(0);
+  await expect(page.locator('button[title*="Демо Storybook"]')).toHaveCount(0);
+  await expect(page.locator('button[title*="будет подключ"]')).toHaveCount(0);
+  await expect(page.getByText(/ScreenPlaceholderBlock|TODO runtime|Coming soon|Демо Storybook/i)).toHaveCount(0);
 }

@@ -195,17 +195,15 @@ export function ProjectsListBlock({
 
   const intro = (
     <RoutePageIntro
-      actions={
+      actions={!readOnly ? (
         <Button
           variant="primary"
           onClick={() => setCreateOpen(true)}
-          disabled={readOnly}
-          title={readOnly ? "Создание проекта будет подключено в следующем API-срезе" : undefined}
         >
           <Plus className="size-4" aria-hidden />
           Проект
         </Button>
-      }
+      ) : undefined}
     />
   );
 
@@ -234,10 +232,12 @@ export function ProjectsListBlock({
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
-          <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
-            <Filter className="size-4" aria-hidden />
-            Фильтр
-          </Button>
+          {!readOnly ? (
+            <Button variant="secondary" size="sm" disabled title="Фильтр будет подключён к API в отдельном срезе">
+              <Filter className="size-4" aria-hidden />
+              Фильтр
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -252,13 +252,8 @@ export function ProjectsListBlock({
                 : "Сохраните проект как шаблон, чтобы переиспользовать структуру."
           }
           action={
-            filter === "active" ? (
-              <Button
-                variant="primary"
-                onClick={() => setCreateOpen(true)}
-                disabled={readOnly}
-                title={readOnly ? "Создание проекта будет подключено в следующем API-срезе" : undefined}
-              >
+            filter === "active" && !readOnly ? (
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 Создать проект
               </Button>
             ) : undefined
@@ -273,7 +268,7 @@ export function ProjectsListBlock({
               <th>Ответственный</th>
               <th>Статус</th>
               <th>План / экономика</th>
-              <th />
+              {!readOnly ? <th /> : null}
             </tr>
           </thead>
           <tbody>
@@ -317,9 +312,11 @@ export function ProjectsListBlock({
                     subtitle={`${formatRub(row.contractValue)} · ${formatHours(row.plannedHours)}`}
                   />
                 </td>
-                <td className="cell-actions" onClick={(event) => event.stopPropagation()}>
-                  <ProjectRowMenu project={row} readOnly={readOnly} />
-                </td>
+                {!readOnly ? (
+                  <td className="cell-actions" onClick={(event) => event.stopPropagation()}>
+                    <ProjectRowMenu project={row} />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -402,7 +399,7 @@ export function ProjectsListBlock({
   );
 }
 
-function ProjectRowMenu({ project, readOnly }: { project: ProjectRow; readOnly: boolean }) {
+function ProjectRowMenu({ project }: { project: ProjectRow }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -410,8 +407,6 @@ function ProjectRowMenu({ project, readOnly }: { project: ProjectRow; readOnly: 
           variant="ghost"
           size="icon-sm"
           aria-label={`Действия: ${project.title}`}
-          disabled={readOnly}
-          title={readOnly ? "Изменение проектов будет подключено в следующем API-срезе" : undefined}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
