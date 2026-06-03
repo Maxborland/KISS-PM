@@ -1177,6 +1177,7 @@ a:hover { color: var(--accent-hover); }
 /* Lock entity-grid to 2-col inside the wide drawer; below 900px sheet
    width Tailwind max-w-[96vw] kicks in and we stack via base media query. */
 .task-drawer .entity-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+.task-drawer .entity-grid--main-only { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 960px) {
   .task-drawer .entity-grid { grid-template-columns: 1fr; }
 }

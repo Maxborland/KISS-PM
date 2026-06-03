@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ScheduledTask, Task } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskActivity } from "@/lib/api-types";
 import {
   RuntimeMyWorkBlock,
   canTransitionTaskStatus,
@@ -189,6 +189,52 @@ describe("RuntimeMyWorkBlock", () => {
     );
   });
 
+  it("posts comments from the runtime task drawer through the provided action", async () => {
+    const comments: Array<{ body: string; taskId: string }> = [];
+    await renderRuntimeMyWork(
+      [makeTask({ id: "task-comment", title: "Runtime task with comments" })],
+      {
+        onAddTaskComment: async (input) => {
+          comments.push(input);
+        },
+        taskActivities: [
+          makeTaskActivity({
+            body: "Existing runtime comment",
+            id: "activity-existing",
+            taskId: "task-comment"
+          })
+        ]
+      }
+    );
+
+    const row = host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-comment"]');
+    expect(row).not.toBeNull();
+
+    await act(async () => {
+      row?.click();
+    });
+
+    expect(document.body.textContent).toContain("Existing runtime comment");
+    expect(document.body.textContent).not.toContain("Подготовила черновик КП");
+    expect(document.body.textContent).not.toContain("Согласовать ТЗ");
+    expect(document.body.textContent).not.toContain("DataHub KPI");
+
+    const textarea = document.body.querySelector<HTMLTextAreaElement>('textarea[placeholder="Написать комментарий…"]');
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      if (!textarea) return;
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      valueSetter?.call(textarea, " Runtime drawer comment ");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(".feed__compose-actions button")?.click();
+    });
+
+    expect(comments).toEqual([{ body: "Runtime drawer comment", taskId: "task-comment" }]);
+  });
+
   async function renderRuntimeMyWork(
     tasks: Task[],
     options: {
@@ -196,8 +242,10 @@ describe("RuntimeMyWorkBlock", () => {
       currentUserId?: string;
       initialMode?: "kanban" | "list";
       initialOpenTaskId?: string;
+      onAddTaskComment?: (input: { body: string; taskId: string }) => Promise<unknown> | void;
       onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
       scheduledTasks?: ScheduledTask[];
+      taskActivities?: TaskActivity[];
     } = {}
   ) {
     if (!host) {
@@ -214,9 +262,11 @@ describe("RuntimeMyWorkBlock", () => {
             initialOpenTaskId={options.initialOpenTaskId}
             readOnly
             scheduledTasks={options.scheduledTasks ?? []}
+            taskActivities={options.taskActivities ?? []}
             tasks={tasks}
             currentUserId={options.currentUserId}
             canManageProjectTasks={options.canManageProjectTasks ?? false}
+            {...(options.onAddTaskComment ? { onAddTaskComment: options.onAddTaskComment } : {})}
             {...(options.onMoveTaskStatus ? { onMoveTaskStatus: options.onMoveTaskStatus } : {})}
           />
         </ScreenRouteProvider>
@@ -282,6 +332,31 @@ function makeScheduledTask({
     workMinutes,
     createdAt: `${plannedStart}T00:00:00.000Z`,
     statusId: "task-status-in-progress"
+  };
+}
+
+function makeTaskActivity({
+  body,
+  id,
+  taskId
+}: {
+  body: string;
+  id: string;
+  taskId: string;
+}): TaskActivity {
+  return {
+    id,
+    tenantId: "tenant-1",
+    taskId,
+    type: "comment",
+    body,
+    title: null,
+    fileUrl: null,
+    fileSizeBytes: null,
+    mimeType: null,
+    authorUserId: "usr-1",
+    createdAt: "2026-05-30T10:00:00.000Z",
+    updatedAt: "2026-05-30T10:00:00.000Z"
   };
 }
 

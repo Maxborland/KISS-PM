@@ -132,34 +132,71 @@ vi.mock("@/views/blocks/my-work-block", () => ({
     canManageProjectTasks,
     currentUserId,
     initialOpenTaskId,
+    onAddTaskComment,
     onMoveTaskStatus,
+    onOpenTaskChange,
     readOnly,
     tasks
   }: {
     canManageProjectTasks?: boolean;
     currentUserId?: string;
     initialOpenTaskId?: string;
+    onAddTaskComment?: (input: { body: string; taskId: string }) => Promise<unknown>;
     onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
+    onOpenTaskChange?: (taskId: string | undefined) => void;
     readOnly?: boolean;
     tasks: { title: string }[];
   }) =>
     createElement(
-      "button",
+      "div",
       {
         "data-can-manage-project-tasks": String(canManageProjectTasks),
         "data-current-user-id": currentUserId ?? "",
         "data-initial-open-task-id": initialOpenTaskId ?? "",
         "data-testid": "runtime-my-work",
-        "data-read-only": String(readOnly),
-        onClick: () => {
-          void onMoveTaskStatus?.({
-            projectId: "project-1",
-            taskId: "task-runtime",
-            statusId: "task-status-done"
-          });
-        }
+        "data-read-only": String(readOnly)
       },
-      tasks.map((task) => task.title).join(", ")
+      [
+        createElement(
+          "button",
+          {
+            key: "status",
+            "data-testid": "runtime-my-work-status-action",
+            onClick: () => {
+              void onMoveTaskStatus?.({
+                projectId: "project-1",
+                taskId: "task-runtime",
+                statusId: "task-status-done"
+              });
+            }
+          },
+          "status"
+        ),
+        createElement(
+          "button",
+          {
+            key: "open",
+            "data-testid": "runtime-my-work-open-task",
+            onClick: () => onOpenTaskChange?.("task-runtime")
+          },
+          "open"
+        ),
+        createElement(
+          "button",
+          {
+            key: "comment",
+            "data-testid": "runtime-my-work-comment-action",
+            onClick: () => {
+              void onAddTaskComment?.({
+                body: "Runtime my work comment",
+                taskId: "task-runtime"
+              });
+            }
+          },
+          "comment"
+        ),
+        tasks.map((task) => task.title).join(", ")
+      ]
     )
 }));
 
@@ -424,7 +461,9 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.clients.mockReturnValue(successQuery({ clients: [] }));
     readModelHooks.contacts.mockReturnValue(successQuery({ contacts: [] }));
     readModelHooks.products.mockReturnValue(successQuery({ products: [] }));
-    readModelHooks.myWork.mockReturnValue(successReadModel({ tasks: [], scheduledTasks: [] }));
+    readModelHooks.myWork.mockReturnValue(
+      successReadModel({ scheduledTasks: [], taskStatuses: [], tasks: [] })
+    );
     readModelHooks.projects.mockReturnValue(
       successReadModel({
         projects: [],
@@ -1427,7 +1466,7 @@ describe("RuntimeDataScreen permission gate", () => {
 
     await act(async () => {
       host
-        .querySelector("[data-testid='runtime-my-work']")
+        .querySelector("[data-testid='runtime-my-work-status-action']")
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await vi.waitFor(() => expect(readModelHooks.updateWorkspaceProjectTaskStatus).toHaveBeenCalled());
     });
@@ -1445,6 +1484,55 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.workspaceAgentThread });
     expect(refetchAll).toHaveBeenCalled();
+    invalidateSpy.mockRestore();
+  });
+
+  it("adds my work task comments through the runtime task comments API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.myWork.mockReturnValue(
+      successReadModel({
+        tasks: [{ id: "task-runtime", title: "Runtime my work task" }],
+        scheduledTasks: [],
+        taskStatuses: []
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "02-my-work",
+        permissions: ["tenant.projects.read"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-my-work-open-task']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(readModelHooks.taskActivity).toHaveBeenLastCalledWith("task-runtime");
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-my-work-comment-action']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.postWorkspaceTaskComment).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.postWorkspaceTaskComment).toHaveBeenCalledWith(
+      {
+        body: "Runtime my work comment",
+        taskId: "task-runtime"
+      },
+      expect.anything()
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.workspace.taskActivity("task-runtime")
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
     invalidateSpy.mockRestore();
   });
 });

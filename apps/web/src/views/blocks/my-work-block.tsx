@@ -10,7 +10,7 @@ import { DataTable } from "@/components/domain/data-table";
 import { PriorityFlag } from "@/components/domain/priority-flag";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
-import type { ScheduledTask, Task, TaskParticipantRole, TaskStatus } from "@/lib/api-types";
+import type { ScheduledTask, Task, TaskActivity, TaskParticipantRole, TaskStatus } from "@/lib/api-types";
 import { formatDateRange } from "@/lib/mock-data/format";
 import { buildTaskKanbanCards } from "@/lib/mock-data/scenario-presenters";
 import { useScenarioFixtures } from "@/lib/mock-data/scenario-context";
@@ -131,11 +131,18 @@ export type RuntimeMyWorkBlockProps = MyWorkBlockProps & {
   tasks?: Task[];
   scheduledTasks?: ScheduledTask[];
   taskStatuses?: TaskStatus[];
+  taskActivities?: TaskActivity[];
+  taskActivityError?: unknown;
+  taskActivityPending?: boolean;
   initialOpenTaskId?: string | undefined;
   readOnly?: boolean;
   currentUserId?: string | undefined;
   canManageProjectTasks?: boolean;
+  commentActionError?: unknown;
+  commentActionPending?: boolean;
   isMovingTaskStatus?: boolean;
+  onAddTaskComment?: (input: { taskId: string; body: string }) => Promise<unknown> | void;
+  onOpenTaskChange?: (taskId: string | undefined) => void;
   onMoveTaskStatus?: (input: { projectId: string; taskId: string; statusId: string }) => Promise<unknown>;
 };
 
@@ -209,10 +216,17 @@ export function RuntimeMyWorkBlock({
   tasks = [],
   scheduledTasks = [],
   taskStatuses = [],
+  taskActivities = [],
+  taskActivityError,
+  taskActivityPending = false,
   readOnly = true,
   currentUserId,
   canManageProjectTasks = false,
+  commentActionError,
+  commentActionPending = false,
   isMovingTaskStatus = false,
+  onAddTaskComment,
+  onOpenTaskChange,
   onMoveTaskStatus
 }: RuntimeMyWorkBlockProps = {}) {
   return (
@@ -222,11 +236,18 @@ export function RuntimeMyWorkBlock({
       tasks={tasks}
       scheduledTasks={scheduledTasks}
       taskStatuses={taskStatuses}
+      taskActivities={taskActivities}
+      taskActivityError={taskActivityError}
+      taskActivityPending={taskActivityPending}
       initialOpenTaskId={initialOpenTaskId}
       readOnly={readOnly}
       currentUserId={currentUserId}
       canManageProjectTasks={canManageProjectTasks}
+      commentActionError={commentActionError}
+      commentActionPending={commentActionPending}
       isMovingTaskStatus={isMovingTaskStatus}
+      {...(onAddTaskComment ? { onAddTaskComment } : {})}
+      {...(onOpenTaskChange ? { onOpenTaskChange } : {})}
       {...(onMoveTaskStatus ? { onMoveTaskStatus } : {})}
       fetchPhase="success"
       scenario="default"
@@ -240,11 +261,18 @@ function MyWorkBlockInner({
   tasks,
   scheduledTasks,
   taskStatuses,
+  taskActivities,
+  taskActivityError,
+  taskActivityPending = false,
   initialOpenTaskId,
   readOnly = false,
   currentUserId,
   canManageProjectTasks = false,
+  commentActionError,
+  commentActionPending = false,
   isMovingTaskStatus = false,
+  onAddTaskComment,
+  onOpenTaskChange,
   onMoveTaskStatus,
   fetchPhase,
   errorMessage,
@@ -287,6 +315,11 @@ function MyWorkBlockInner({
       return current && initialCards.some((card) => card.id === current) ? current : null;
     });
   }, [initialCards, initialOpenTaskId, runtime]);
+
+  useEffect(() => {
+    if (!runtime) return;
+    onOpenTaskChange?.(openCardId ?? undefined);
+  }, [onOpenTaskChange, openCardId, runtime]);
 
   const cardsOrdered = useMemo(() => flattenByColumns(cards), [cards]);
   const isEmpty = (!runtime && scenario === "empty") || cardsOrdered.length === 0;
@@ -508,6 +541,7 @@ function MyWorkBlockInner({
             ? {
                 id: openCard.id,
                 title: openCard.title,
+                description: sourceTasksById.get(openCard.id)?.description,
                 ...(openCard.meta?.find((meta) => meta.label.startsWith("Проект:"))?.label.replace("Проект: ", "")
                   ? {
                       project: openCard.meta
@@ -522,6 +556,16 @@ function MyWorkBlockInner({
               }
             : null
         }
+        activities={runtime ? taskActivities : undefined}
+        activityError={runtime ? taskActivityError : undefined}
+        activityPending={runtime ? taskActivityPending : undefined}
+        commentError={runtime ? commentActionError : undefined}
+        commentPending={runtime ? commentActionPending : undefined}
+        {...(runtime && onAddTaskComment && openCard
+          ? {
+              onAddComment: (body: string) => onAddTaskComment({ body, taskId: openCard.id })
+            }
+          : {})}
       />
     </div>
   );

@@ -58,8 +58,12 @@ export type EntityDetailBlockProps = {
   subtitle: string;
   stage?: { label: string; tone?: "info" | "violet" | "success" | "warning" };
   feed?: ReactNode;
+  feedComposer?: ReactNode;
   asideExtra?: ReactNode;
   primary?: ReactNode;
+  headerActions?: ReactNode | null;
+  hideDefaultAside?: boolean;
+  hideDefaultStageMeta?: boolean;
   initialStage?: string;
   initialAmount?: string;
   /** Задаёт набор полей в боковой панели + контракт сохранения. */
@@ -106,7 +110,11 @@ export function EntityDetailBlock({
   subtitle,
   stage,
   feed,
+  feedComposer,
   primary,
+  headerActions,
+  hideDefaultAside = false,
+  hideDefaultStageMeta = false,
   asideExtra,
   initialStage = "qual",
   initialAmount = "890 000",
@@ -208,49 +216,52 @@ export function EntityDetailBlock({
     ));
 
   const saveLabel = useMemo(() => (dirty ? "Сохранить · есть изменения" : "Сохранить"), [dirty]);
+  const defaultHeaderActions = (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton label="Действия" variant="ghost">
+            <MoreHorizontal />
+          </IconButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => toast.info("Встреча запланирована (демо)")}>
+            <Calendar className="size-4" aria-hidden />
+            Запланировать
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button
+        variant={dirty ? "primary" : "secondary"}
+        disabled={!dirty}
+        onClick={handleSave}
+        title={dirty ? undefined : "Нет изменений"}
+      >
+        {saveLabel}
+      </Button>
+    </>
+  );
 
   return (
     <>
       <PageIntro
         title={title}
         lead={subtitle}
-        actions={
-          <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label="Действия" variant="ghost">
-                  <MoreHorizontal />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => toast.info("Встреча запланирована (демо)")}>
-                  <Calendar className="size-4" aria-hidden />
-                  Запланировать
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant={dirty ? "primary" : "secondary"}
-              disabled={!dirty}
-              onClick={handleSave}
-              title={dirty ? undefined : "Нет изменений"}
-            >
-              {saveLabel}
-            </Button>
-          </>
-        }
+        actions={headerActions === undefined ? defaultHeaderActions : headerActions}
       />
       {stage ? (
         <div className="entity-stage-bar">
           <Chip variant={stage.tone ?? "info"}>{stage.label}</Chip>
-          <BemAvatarStack more="+2">
-            <BemAvatar initials="ИИ" color="c1" />
-            <BemAvatar initials="АП" color="c2" />
-            <BemAvatar initials="КБ" color="c4" />
-          </BemAvatarStack>
+          {hideDefaultStageMeta ? null : (
+            <BemAvatarStack more="+2">
+              <BemAvatar initials="ИИ" color="c1" />
+              <BemAvatar initials="АП" color="c2" />
+              <BemAvatar initials="КБ" color="c4" />
+            </BemAvatarStack>
+          )}
         </div>
       ) : null}
-      <div className="entity-grid">
+      <div className={hideDefaultAside ? "entity-grid entity-grid--main-only" : "entity-grid"}>
         <div className="entity-grid__main">
           {primary ?? (
             <CardPanel title="Описание" subtitle="Контекст для команды">
@@ -272,7 +283,7 @@ export function EntityDetailBlock({
           ) : null}
           <CardPanel title="Лента" subtitle="Активность по сущности" flush className="u-mt-3">
             <ul className="feed">{feedContent}</ul>
-            {!feed ? (
+            {feedComposer ?? (!feed ? (
               <div className="feed__compose">
                 <Textarea
                   rows={2}
@@ -307,64 +318,66 @@ export function EntityDetailBlock({
                   </Button>
                 </div>
               </div>
-            ) : null}
+            ) : null)}
           </CardPanel>
         </div>
-        <aside className="entity-grid__aside">
-          {variant === "task" ? (
-            <TaskAside form={taskForm} issues={taskIssues} onChange={updateTask} />
-          ) : (
-            <CardPanel title="Параметры" subtitle="Свойства сущности">
-              <FormSection title="Основное" lead="Доступно владельцу и админу.">
-                <FormGrid columns={1}>
-                  <Field label="Стадия">
-                    <Select value={stageValue} onValueChange={setStageValue}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="lead">Лид</SelectItem>
-                        <SelectItem value="qual">Квалификация</SelectItem>
-                        <SelectItem value="proposal">КП</SelectItem>
-                        <SelectItem value="deal">Договор</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Срок">
-                    <DatePicker placeholder="Выбрать дату" />
-                  </Field>
-                  <Field label="Сумма" htmlFor="entity-amount">
-                    <Input
-                      id="entity-amount"
-                      className="mono"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      inputMode="numeric"
-                    />
-                  </Field>
-                </FormGrid>
-              </FormSection>
-            </CardPanel>
-          )}
-          {asideExtra ?? (
-            <CardPanel title="Связи" subtitle="Проекты и продукты" className="u-mt-3">
-              <ul className="link-list">
-                {LINKED_PROJECTS.map((p) => (
-                  <li key={p.id}>
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 justify-start gap-2 font-normal"
-                      onClick={() => toast.info(`Открыть проект ${p.id} (демо)`)}
-                    >
-                      <Briefcase className="size-4 shrink-0" aria-hidden />
-                      {p.label}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </CardPanel>
-          )}
-        </aside>
+        {hideDefaultAside ? null : (
+          <aside className="entity-grid__aside">
+            {variant === "task" ? (
+              <TaskAside form={taskForm} issues={taskIssues} onChange={updateTask} />
+            ) : (
+              <CardPanel title="Параметры" subtitle="Свойства сущности">
+                <FormSection title="Основное" lead="Доступно владельцу и админу.">
+                  <FormGrid columns={1}>
+                    <Field label="Стадия">
+                      <Select value={stageValue} onValueChange={setStageValue}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="lead">Лид</SelectItem>
+                          <SelectItem value="qual">Квалификация</SelectItem>
+                          <SelectItem value="proposal">КП</SelectItem>
+                          <SelectItem value="deal">Договор</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Срок">
+                      <DatePicker placeholder="Выбрать дату" />
+                    </Field>
+                    <Field label="Сумма" htmlFor="entity-amount">
+                      <Input
+                        id="entity-amount"
+                        className="mono"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        inputMode="numeric"
+                      />
+                    </Field>
+                  </FormGrid>
+                </FormSection>
+              </CardPanel>
+            )}
+            {asideExtra ?? (
+              <CardPanel title="Связи" subtitle="Проекты и продукты" className="u-mt-3">
+                <ul className="link-list">
+                  {LINKED_PROJECTS.map((p) => (
+                    <li key={p.id}>
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 justify-start gap-2 font-normal"
+                        onClick={() => toast.info(`Открыть проект ${p.id} (демо)`)}
+                      >
+                        <Briefcase className="size-4 shrink-0" aria-hidden />
+                        {p.label}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </CardPanel>
+            )}
+          </aside>
+        )}
       </div>
     </>
   );
