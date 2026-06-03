@@ -283,6 +283,55 @@ describe("RuntimeMyWorkBlock", () => {
     expect(updates).toContainEqual({ fields: { dueDate: "2026-06-09" }, taskId: "task-fields" });
   });
 
+  it("shows the blocker action as an explicit data-contract gap instead of a fake mutation", async () => {
+    const updates: Array<{ taskId: string }> = [];
+    const task = makeTask({ id: "task-blocker-gap", title: "Runtime blocker gap" });
+
+    await renderRuntimeMyWork([task], {
+      canManageProjectTasks: true,
+      onUpdateTaskFields: async (updatedTask) => {
+        updates.push({ taskId: updatedTask.id });
+      }
+    });
+
+    await act(async () => {
+      host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-blocker-gap"]')?.click();
+    });
+
+    const blockerButton = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="Блокер задачи Runtime blocker gap"]'
+    );
+    expect(blockerButton).not.toBeNull();
+    expect(blockerButton?.disabled).toBe(true);
+    expect(document.body.textContent).toContain(
+      "Причина блокера не хранится в текущих данных; для внимания используйте статус «Ожидает»."
+    );
+
+    await act(async () => {
+      blockerButton?.click();
+    });
+    expect(updates).toEqual([]);
+
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('button[aria-label="Закрыть"]')?.click();
+    });
+
+    const waitingTask = {
+      ...makeTask({ id: "task-blocker-waiting", title: "Runtime waiting blocker" }),
+      status: "waiting" as const,
+      statusCategory: "waiting" as const,
+      statusId: "task-status-waiting",
+      statusName: "Ожидает"
+    };
+
+    await renderRuntimeMyWork([waitingTask], { canManageProjectTasks: true });
+    await act(async () => {
+      host?.querySelector<HTMLElement>('tr[aria-label="Открыть карточку task-blocker-waiting"]')?.click();
+    });
+
+    expect(document.body.textContent).toContain("Ожидает: задача уже попадает во внимание.");
+  });
+
   async function renderRuntimeMyWork(
     tasks: Task[],
     options: {

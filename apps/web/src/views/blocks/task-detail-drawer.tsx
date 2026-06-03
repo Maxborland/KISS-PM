@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Send } from "lucide-react";
+import { ExternalLink, Send, ShieldAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
@@ -24,7 +24,7 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaskActivity, WorkspaceUser } from "@/lib/api-types";
+import type { TaskActivity, TaskStatusCategory, WorkspaceUser } from "@/lib/api-types";
 import { EntityDetailBlock } from "@/views/blocks/entity-detail-block";
 import { mockTaskProjectRef } from "@/views/catalog";
 
@@ -34,6 +34,8 @@ export type TaskDetailTask = {
   description?: string | null | undefined;
   ownerUserId?: string | undefined;
   plannedFinish?: string | undefined;
+  statusCategory?: TaskStatusCategory | undefined;
+  statusName?: string | undefined;
   stage?: { label: string; tone?: "info" | "violet" | "success" | "warning" };
   project?: string | undefined;
 };
@@ -187,7 +189,7 @@ function RuntimeTaskFieldsPanel({
   const canEditDue = canEdit && Boolean(dueDate);
 
   return (
-    <CardPanel title="Параметры" subtitle="Ответственный и срок" className="u-mt-3">
+    <CardPanel title="Параметры" subtitle="Ответственный, срок и блокер" className="u-mt-3">
       <FormGrid columns={2}>
         <Field label="Ответственный">
           {canEditOwner ? (
@@ -236,6 +238,27 @@ function RuntimeTaskFieldsPanel({
           )}
         </Field>
       </FormGrid>
+      <div className="u-mt-3">
+        <Field label="Блокер">
+          <div className="u-flex u-items-center u-gap-2 u-flex-wrap">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled
+              aria-label={`Блокер задачи ${task.title}`}
+            >
+              <ShieldAlert className="size-4" aria-hidden />
+              {task.statusCategory === "waiting" ? "Блокер в статусе" : "Отметить блокер"}
+            </Button>
+            <span className="u-text-body">
+              {task.statusCategory === "waiting"
+                ? `${task.statusName ?? "Ожидает"}: задача уже попадает во внимание.`
+                : "Причина блокера не хранится в текущих данных; для внимания используйте статус «Ожидает»."}
+            </span>
+          </div>
+        </Field>
+      </div>
       {!canEdit ? (
         <p className="u-text-xs u-text-muted u-mt-2">
           Ответственного и срок меняет руководитель проекта.
