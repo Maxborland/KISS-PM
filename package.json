@@ -25,6 +25,7 @@
     "qa:fast": "node scripts/run-fast-pr-gate.mjs",
     "qa:no-placeholders": "pnpm --filter @kiss-pm/web test src/__health__/beta-runtime-no-placeholders.health.test.ts",
     "qa:screenshots": "node scripts/run-runtime-screenshots.mjs",
+    "qa:walkthrough": "pnpm db:migrate && pnpm db:seed:dev && pnpm exec playwright test --config playwright.config.ts e2e/runtime/founder-beta-walkthrough.spec.ts --grep @founder-beta-walkthrough",
     "qa:runtime": "node scripts/check-runtime-qa-db.mjs && pnpm db:migrate && pnpm db:seed:dev && node scripts/run-runtime-qa.mjs",
     "typecheck": "tsc -b --pretty false",
     "build": "pnpm --filter @kiss-pm/web build && pnpm typecheck",
