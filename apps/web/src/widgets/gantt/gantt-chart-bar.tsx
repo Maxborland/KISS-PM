@@ -79,6 +79,7 @@ export function GanttChartBar({
   const progressPct = Math.round(progress * 100);
   const canLink = interactive && (row.kind === "task" || row.kind === "milestone");
   const showEndpoints = canLink && (linkMode || selected || linkSourceId === row.id);
+  const isCritical = Boolean(showCritical && row.critical);
 
   if (row.kind === "milestone") {
     return (
@@ -89,6 +90,7 @@ export function GanttChartBar({
         role="img"
         aria-label={row.name}
         data-gantt-row-id={row.id}
+        data-gantt-critical={isCritical ? "true" : undefined}
       >
         <span className={cn("gmile", barIssueClass(row))} />
         {showEndpoints ? (
@@ -121,9 +123,8 @@ export function GanttChartBar({
         ? "gbar--overdue"
         : row.scheduleState === "at-risk"
           ? "gbar--at-risk"
-          : showCritical && row.critical
-            ? "gbar--critical"
-            : "gbar--task",
+          : "gbar--task",
+    isCritical && row.kind !== "summary" && "gbar--critical",
     selected && "gbar--selected",
     activeDrag && "gbar--preview",
     barIssueClass(row),
@@ -147,6 +148,7 @@ export function GanttChartBar({
         role="img"
         aria-label={row.name}
         data-gantt-row-id={row.id}
+        data-gantt-critical={isCritical && row.kind !== "summary" ? "true" : undefined}
         data-gantt-bar-selected={selected ? "true" : undefined}
         onPointerDown={interactive && row.kind === "task" ? onPointerDownMove : undefined}
       >

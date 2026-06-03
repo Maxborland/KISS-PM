@@ -68,3 +68,20 @@ test("project timeline zoom switches between day week and month views", async ({
   await page.screenshot({ fullPage: true, path: screenshotPath });
   expect(statSync(screenshotPath).size).toBeGreaterThan(8_000);
 });
+
+test("project timeline keeps critical task indicators on live overdue and waiting tasks", async ({ page }) => {
+  const login = await page.request.post("/api/auth/login", {
+    data: adminCredentials
+  });
+  expect(login.status()).toBe(200);
+
+  await page.goto("/projects/project-beta-school-renovation/timeline");
+
+  const criticalSurvey = page.locator('[data-gantt-row-id="task-beta-school-survey"]').first();
+  await expect(criticalSurvey).toHaveAttribute("data-gantt-critical", "true");
+  await expect(criticalSurvey).toHaveClass(/gbar--critical/);
+
+  const criticalFireBrief = page.locator('[data-gantt-row-id="task-beta-school-fire-brief"]').first();
+  await expect(criticalFireBrief).toHaveAttribute("data-gantt-critical", "true");
+  await expect(criticalFireBrief).toHaveClass(/gbar--critical/);
+});

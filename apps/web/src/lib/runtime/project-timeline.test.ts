@@ -33,6 +33,7 @@ describe("buildProjectTimelineGanttData", () => {
         }),
         expect.objectContaining({
           assignee: { initials: "МИ", color: "c1" },
+          critical: true,
           durationDays: 3,
           id: "task-survey",
           level: 1,
@@ -96,7 +97,7 @@ function task(overrides: Partial<Task> = {}): Task {
     plannedFinish: "2026-06-02T00:00:00.000Z",
     plannedStart: "2026-06-02T00:00:00.000Z",
     plannedWork: 8,
-    priority: "normal",
+    priority: "critical",
     progress: 0,
     projectId: "project-runtime",
     requesterUserId: "usr-1",
