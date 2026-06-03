@@ -335,6 +335,8 @@ function RuntimeMyWorkScreen({
 }) {
   const queryClient = useQueryClient();
   const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
+  const [activityTaskId, setActivityTaskId] = useState<string | undefined>(undefined);
+  const taskActivity = useTaskActivityReadModelQuery(activityTaskId);
   const canManageProjectTasks = hasPermission(permissions, "tenant.projects.manage");
   const updateTaskStatus = useMutation({
     mutationFn: updateWorkspaceProjectTaskStatus,
@@ -344,6 +346,16 @@ function RuntimeMyWorkScreen({
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.workspaceAgentThread });
       readModel.refetchAll();
+    }
+  });
+  const postTaskComment = useMutation({
+    mutationFn: postWorkspaceTaskComment,
+    onSuccess: (_activity, input) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.taskActivity(input.taskId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.myWork(currentUserId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+      taskActivity.refetch();
     }
   });
 
@@ -367,11 +379,18 @@ function RuntimeMyWorkScreen({
       tasks={readModel.data.tasks}
       scheduledTasks={readModel.data.scheduledTasks}
       taskStatuses={readModel.data.taskStatuses}
+      taskActivities={taskActivity.data?.activities ?? []}
+      taskActivityError={taskActivity.error}
+      taskActivityPending={taskActivity.isPending || taskActivity.isFetching}
       currentUserId={currentUserId}
       canManageProjectTasks={canManageProjectTasks}
       initialOpenTaskId={initialTaskId}
       readOnly
+      commentActionError={postTaskComment.error}
+      commentActionPending={postTaskComment.isPending}
       isMovingTaskStatus={updateTaskStatus.isPending}
+      onAddTaskComment={(input) => postTaskComment.mutateAsync(input)}
+      onOpenTaskChange={setActivityTaskId}
       onMoveTaskStatus={(input) => updateTaskStatus.mutateAsync(input)}
     />
   ) : null;
