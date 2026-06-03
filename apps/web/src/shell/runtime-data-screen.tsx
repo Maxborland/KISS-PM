@@ -17,6 +17,7 @@ import {
   fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
   postWorkspaceTaskComment,
+  updateWorkspaceUserStatus,
   updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus,
   useAdminAccessRolesReadModelQuery,
@@ -193,7 +194,7 @@ export function RuntimeDataScreen({
   if (screenId === "09-admin") {
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
-        <RuntimeAdminUsersScreen />
+        <RuntimeAdminUsersScreen currentUserId={currentUserId} permissions={permissions} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -886,8 +887,24 @@ function RuntimeAuditEventsScreen() {
   return query.data ? <AuditEventsRuntimeBlock auditEvents={query.data.auditEvents} /> : null;
 }
 
-function RuntimeAdminUsersScreen() {
+function RuntimeAdminUsersScreen({
+  currentUserId,
+  permissions
+}: {
+  currentUserId?: string | undefined;
+  permissions: readonly string[];
+}) {
+  const queryClient = useQueryClient();
   const query = useAdminUsersReadModelQuery();
+  const canManageUsers = hasPermission(permissions, "tenant.users.manage");
+  const updateUserStatus = useMutation({
+    mutationFn: updateWorkspaceUserStatus,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.users });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+      void query.refetch();
+    }
+  });
 
   if (query.isPending || query.isFetching) {
     return <LoadingState layout="table" level="L1" label="Загружаем пользователей…" />;
@@ -904,7 +921,19 @@ function RuntimeAdminUsersScreen() {
     );
   }
 
-  return query.data ? <AdminUsersRuntimeBlock users={query.data.users} /> : null;
+  return query.data ? (
+    <AdminUsersRuntimeBlock
+      users={query.data.users}
+      currentUserId={currentUserId}
+      statusActionError={updateUserStatus.error}
+      statusActionPending={updateUserStatus.isPending}
+      {...(canManageUsers
+        ? {
+            onChangeUserStatus: (input) => updateUserStatus.mutateAsync(input)
+          }
+        : {})}
+    />
+  ) : null;
 }
 
 function RuntimeAdminAccessRolesScreen() {

@@ -34,6 +34,7 @@ const readModelHooks = vi.hoisted(() => ({
   createWorkspaceProjectTask: vi.fn(),
   postWorkspaceAgentMessage: vi.fn(),
   postWorkspaceTaskComment: vi.fn(),
+  updateWorkspaceUserStatus: vi.fn(),
   updateWorkspaceTaskFields: vi.fn(),
   updateWorkspaceProjectTaskStatus: vi.fn()
 }));
@@ -46,6 +47,7 @@ vi.mock("@/lib/api/read-models", () => ({
   fetchWorkspaceProjects: readModelHooks.fetchWorkspaceProjects,
   postWorkspaceAgentMessage: readModelHooks.postWorkspaceAgentMessage,
   postWorkspaceTaskComment: readModelHooks.postWorkspaceTaskComment,
+  updateWorkspaceUserStatus: readModelHooks.updateWorkspaceUserStatus,
   updateWorkspaceTaskFields: readModelHooks.updateWorkspaceTaskFields,
   updateWorkspaceProjectTaskStatus: readModelHooks.updateWorkspaceProjectTaskStatus,
   useAgentCockpitReadModelQuery: readModelHooks.agent,
@@ -397,10 +399,31 @@ vi.mock("@/views/blocks/audit-events-runtime-block", () => ({
 }));
 
 vi.mock("@/views/blocks/admin-users-runtime-block", () => ({
-  AdminUsersRuntimeBlock: ({ users }: { users: { name: string }[] }) =>
+  AdminUsersRuntimeBlock: ({
+    currentUserId,
+    onChangeUserStatus,
+    statusActionError,
+    statusActionPending,
+    users
+  }: {
+    currentUserId?: string;
+    onChangeUserStatus?: (input: { status: "active" | "inactive"; userId: string }) => Promise<unknown>;
+    statusActionError?: unknown;
+    statusActionPending?: boolean;
+    users: { id: string; name: string }[];
+  }) =>
     createElement(
-      "div",
-      { "data-testid": "runtime-admin-users" },
+      "button",
+      {
+        "data-current-user-id": currentUserId ?? "",
+        "data-error": statusActionError ? "true" : "false",
+        "data-has-status-action": String(Boolean(onChangeUserStatus)),
+        "data-pending": String(statusActionPending),
+        "data-testid": "runtime-admin-users",
+        onClick: () => {
+          void onChangeUserStatus?.({ userId: "usr-2", status: "inactive" });
+        }
+      },
       users.map((user) => user.name).join(", ")
     )
 }));
@@ -506,6 +529,7 @@ describe("RuntimeDataScreen permission gate", () => {
     readModelHooks.taskActivity.mockReturnValue(successQuery({ activities: [] }));
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.postWorkspaceTaskComment.mockResolvedValue({ id: "activity-runtime" });
+    readModelHooks.updateWorkspaceUserStatus.mockResolvedValue({ id: "usr-2", status: "inactive" });
     readModelHooks.confirmWorkspaceAgentProposal.mockResolvedValue({ context: {}, messages: [], proposals: [] });
     readModelHooks.updateWorkspaceProjectTaskStatus.mockResolvedValue({ id: "task-runtime" });
     readModelHooks.updateWorkspaceTaskFields.mockResolvedValue({
@@ -1141,7 +1165,63 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(host.textContent).toContain("Runtime Admin");
     expect(host.textContent).not.toContain("fixture fallback");
+    expect(host.querySelector("[data-testid='runtime-admin-users']")?.getAttribute("data-has-status-action")).toBe(
+      "false"
+    );
     expect(readModelHooks.adminUsers).toHaveBeenCalled();
+  });
+
+  it("updates admin user status through the workspace user API and refreshes users plus audit", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const refetch = vi.fn();
+    readModelHooks.adminUsers.mockReturnValue(
+      successQuery(
+        {
+          users: [
+            {
+              id: "usr-1",
+              name: "Runtime Admin"
+            },
+            {
+              id: "usr-2",
+              name: "Runtime Architect"
+            }
+          ]
+        },
+        { refetch }
+      )
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "09-admin",
+        permissions: ["tenant.users.read", "tenant.users.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    expect(host.querySelector("[data-testid='runtime-admin-users']")?.getAttribute("data-current-user-id")).toBe(
+      "usr-1"
+    );
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-admin-users']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceUserStatus).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceUserStatus).toHaveBeenCalledWith(
+      {
+        status: "inactive",
+        userId: "usr-2"
+      },
+      expect.anything()
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.users });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentAuditEvents });
+    expect(refetch).toHaveBeenCalled();
+    invalidateSpy.mockRestore();
   });
 
   it("renders admin access roles from the runtime access roles read model without fixture fallback", async () => {
