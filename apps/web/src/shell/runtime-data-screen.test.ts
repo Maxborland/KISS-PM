@@ -409,14 +409,25 @@ vi.mock("@/views/blocks/project-detail-block", () => ({
 vi.mock("@/views/blocks/project-timeline-block", () => ({
   ProjectTimelineBlock: ({
     data,
+    onUpdateTaskDueDate,
+    tasks,
     project
   }: {
     data: { rows: { name: string }[] };
+    onUpdateTaskDueDate?: (task: { id: string }, dueDate: string) => Promise<unknown>;
     project: { title?: string };
+    tasks?: { id: string; title?: string }[];
   }) =>
     createElement(
-      "div",
-      { "data-testid": "runtime-project-timeline" },
+      "button",
+      {
+        "data-has-date-action": String(Boolean(onUpdateTaskDueDate)),
+        "data-testid": "runtime-project-timeline",
+        onClick: () => {
+          const firstTask = tasks?.[0];
+          if (firstTask) void onUpdateTaskDueDate?.(firstTask, "2026-06-10");
+        }
+      },
       [project.title, data.rows.map((row) => row.name).join(", ")].join(" ")
     )
 }));
@@ -1269,6 +1280,144 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).not.toContain("fixture fallback");
     expect(host.textContent).not.toContain("Разработать концепцию");
     expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
+  });
+
+  it("gates timeline task date updates by real task edit permissions", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: {
+          id: "project-runtime",
+          title: "Runtime project timeline",
+          tenantId: "tenant-runtime",
+          clientName: "Runtime client",
+          plannedStart: "2026-06-01T00:00:00.000Z",
+          plannedFinish: "2026-06-12T00:00:00.000Z",
+          plannedHours: 120
+        },
+        taskStatuses: [],
+        tasks: [
+          {
+            actualWork: 0,
+            archivedAt: null,
+            id: "task-runtime",
+            ownerUserId: "usr-1",
+            plannedFinish: "2026-06-04T00:00:00.000Z",
+            plannedStart: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            priority: "normal",
+            progress: 0.5,
+            projectId: "project-runtime",
+            requesterUserId: "usr-1",
+            stageId: null,
+            statusCategory: "in_progress",
+            statusId: "task-status-progress",
+            statusName: "В работе",
+            tenantId: "tenant-runtime",
+            title: "Runtime timeline task"
+          }
+        ],
+        workspaceUsers: []
+      })
+    );
+
+    const readerHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "12-project-gantt",
+        projectId: "project-runtime",
+        permissions: ["tenant.project_plan.read"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      readerHost
+        .querySelector("[data-testid='runtime-project-timeline']")
+        ?.getAttribute("data-has-date-action")
+    ).toBe("false");
+
+    const managerHost = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "12-project-gantt",
+        projectId: "project-runtime",
+        permissions: ["tenant.project_plan.read", "tenant.projects.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+    expect(
+      managerHost
+        .querySelector("[data-testid='runtime-project-timeline']")
+        ?.getAttribute("data-has-date-action")
+    ).toBe("true");
+  });
+
+  it("updates timeline task due dates through the safe full task update API", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: {
+          id: "project-runtime",
+          title: "Runtime project timeline",
+          tenantId: "tenant-runtime",
+          clientName: "Runtime client",
+          plannedStart: "2026-06-01T00:00:00.000Z",
+          plannedFinish: "2026-06-12T00:00:00.000Z",
+          plannedHours: 120
+        },
+        taskStatuses: [],
+        tasks: [
+          {
+            actualWork: 0,
+            archivedAt: null,
+            id: "task-runtime",
+            ownerUserId: "usr-1",
+            plannedFinish: "2026-06-04T00:00:00.000Z",
+            plannedStart: "2026-06-02T00:00:00.000Z",
+            plannedWork: 8,
+            priority: "normal",
+            progress: 0.5,
+            projectId: "project-runtime",
+            requesterUserId: "usr-1",
+            stageId: null,
+            statusCategory: "in_progress",
+            statusId: "task-status-progress",
+            statusName: "В работе",
+            tenantId: "tenant-runtime",
+            title: "Runtime timeline task"
+          }
+        ],
+        workspaceUsers: []
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "12-project-gantt",
+        projectId: "project-runtime",
+        permissions: ["tenant.project_plan.read", "tenant.projects.manage"],
+        currentUserId: "usr-1"
+      })
+    );
+
+    await act(async () => {
+      host
+        .querySelector("[data-testid='runtime-project-timeline']")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await vi.waitFor(() => expect(readModelHooks.updateWorkspaceTaskFields).toHaveBeenCalled());
+    });
+
+    expect(readModelHooks.updateWorkspaceTaskFields.mock.calls[0]?.[0]).toEqual({
+      dueDate: "2026-06-10",
+      task: expect.objectContaining({
+        id: "task-runtime",
+        projectId: "project-runtime",
+        title: "Runtime timeline task"
+      })
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.project("project-runtime") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.projects });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.operationsCockpit });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tenant.currentScheduledTasksRoot });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.workspace.myWork("usr-1") });
+    invalidateSpy.mockRestore();
   });
 
   it("renders audit from the runtime audit read model without fixture fallback", async () => {
