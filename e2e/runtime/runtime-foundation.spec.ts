@@ -12,6 +12,7 @@ const betaRuntimeRoutes = [
   { path: "/my-work", marker: "Моя работа" },
   { path: "/agent", marker: "Генри Гантт" },
   { path: "/projects", marker: "Проекты" },
+  { path: "/projects/project-beta-school-renovation", marker: "Школа на 600 мест" },
   { path: "/deals", marker: "Сделки" }
 ] as const;
 

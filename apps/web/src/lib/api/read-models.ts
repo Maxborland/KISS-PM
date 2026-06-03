@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
@@ -62,6 +62,11 @@ const EMPTY_OPERATIONS_COCKPIT: OperationsCockpitReadModel = {
 export type ProjectsListReadModel = {
   projects: Project[];
   projectTemplates: ProjectTemplate[];
+};
+
+export type ProjectDetailReadModel = {
+  project: Project;
+  tasks: Task[];
 };
 
 export type DealsBoardReadModel = {
@@ -183,6 +188,13 @@ export async function fetchWorkspaceProjects(): Promise<Project[]> {
   return response.projects;
 }
 
+export async function fetchWorkspaceProjectDetail(projectId: string): Promise<ProjectDetailReadModel> {
+  return apiFetch<ProjectDetailReadModel>(
+    `/api/workspace/projects/${encodeURIComponent(projectId)}`,
+    { method: "GET" }
+  );
+}
+
 export async function fetchWorkspaceProjectTemplates(): Promise<ProjectTemplate[]> {
   const response = await apiFetch<ListResponse<"projectTemplates", ProjectTemplate>>(
     "/api/workspace/config/project-templates",
@@ -302,6 +314,17 @@ export function useProjectsListReadModelQuery() {
       : undefined;
 
   return aggregateQueries<ProjectsListReadModel>(queries, data);
+}
+
+export function useProjectDetailReadModelQuery(projectId: string | undefined) {
+  return useQuery({
+    enabled: Boolean(projectId),
+    queryKey: projectId ? queryKeys.workspace.project(projectId) : queryKeys.workspace.project(""),
+    queryFn: () => {
+      if (!projectId) throw new Error("project_id_required");
+      return fetchWorkspaceProjectDetail(projectId);
+    }
+  });
 }
 
 export function useAgentCockpitReadModelQuery() {

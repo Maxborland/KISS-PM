@@ -43,6 +43,7 @@ describe("navigation-registry", () => {
     expect(screenIdForPath("/agent")).toBe("20-agent-cockpit");
     expect(screenIdForPath("/my-work")).toBe("02-my-work");
     expect(screenIdForPath("/deals")).toBe("05-deals");
+    expect(screenIdForPath("/projects/project-alpha")).toBe("07b-project-detail");
     expect(screenIdForPath("/projects/demo/gantt")).toBe("12-project-gantt");
     expect(screenIdForPath("/settings")).toBe("10-settings");
     expect(screenIdForPath("/login")).toBe("19-login");
@@ -52,6 +53,7 @@ describe("navigation-registry", () => {
     expect(pathForScreenId("01-dashboard")).toBe("/dashboard");
     expect(pathForScreenId("20-agent-cockpit")).toBe("/agent");
     expect(pathForScreenId("05-deals")).toBe("/deals");
+    expect(pathForScreenId("07b-project-detail")).toBe("/projects/:projectId");
     expect(pathForScreenId("12-project-gantt")).toBe("/projects/demo/gantt");
   });
 
@@ -69,8 +71,14 @@ describe("navigation-registry", () => {
 
   it("hides non-beta runtime paths from navigation until they are API-backed", () => {
     expect(canOpenRuntimePath("/showcase/spacing", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo", ["tenant.projects.read"])).toBe(false);
     expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
     expect(canOpenRuntimePath("/settings", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
+  it("allows real project detail paths for project readers", () => {
+    expect(canOpenRuntimePath("/projects/project-alpha", ["tenant.projects.read"])).toBe(true);
+    expect(canOpenRuntimePath("/projects/project-alpha", [])).toBe(false);
   });
 
   it("exposes the workspace agent as an overview surface", () => {

@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/api/query-keys";
 import { RuntimeDataScreen, canOpenStaticRuntimeScreen } from "@/shell/runtime-data-screen";
 
@@ -15,6 +16,7 @@ const readModelHooks = vi.hoisted(() => ({
   dashboard: vi.fn(),
   deals: vi.fn(),
   myWork: vi.fn(),
+  projectDetail: vi.fn(),
   projects: vi.fn(),
   projectsBlock: vi.fn(),
   confirmWorkspaceAgentProposal: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("@/lib/api/read-models", () => ({
   useDashboardReadModelQueries: readModelHooks.dashboard,
   useDealsBoardReadModelQueries: readModelHooks.deals,
   useMyWorkReadModelQueries: readModelHooks.myWork,
+  useProjectDetailReadModelQuery: readModelHooks.projectDetail,
   useProjectsListReadModelQuery: readModelHooks.projects
 }));
 
@@ -84,15 +87,17 @@ vi.mock("@/views/blocks/my-work-block", () => ({
 
 vi.mock("@/views/blocks/projects-list-block", () => ({
   ProjectsListBlock: ({
+    getProjectHref,
     projectTemplates,
     projects,
     readOnly
   }: {
+    getProjectHref?: (project: { id: string }) => string;
     projectTemplates: { tenantLabel?: string }[];
-    projects: { title?: string }[];
+    projects: { id: string; title?: string }[];
     readOnly?: boolean;
   }) => {
-    readModelHooks.projectsBlock({ projectTemplates, projects, readOnly });
+    readModelHooks.projectsBlock({ getProjectHref, projectTemplates, projects, readOnly });
     return createElement(
       "div",
       {
@@ -105,6 +110,26 @@ vi.mock("@/views/blocks/projects-list-block", () => ({
       ].join(" ")
     );
   }
+}));
+
+vi.mock("@/views/blocks/project-detail-block", () => ({
+  ProjectDetailBlock: ({
+    project,
+    readOnly,
+    tasks
+  }: {
+    project: { title?: string };
+    readOnly?: boolean;
+    tasks: { title?: string }[];
+  }) =>
+    createElement(
+      "div",
+      {
+        "data-testid": "runtime-project-detail",
+        "data-read-only": String(readOnly)
+      },
+      [project.title, tasks.map((task) => task.title).join(", ")].join(" ")
+    )
 }));
 
 vi.mock("@/views/layout/workspace-chrome", () => ({
@@ -150,6 +175,12 @@ describe("RuntimeDataScreen permission gate", () => {
       successReadModel({
         projects: [],
         projectTemplates: []
+      })
+    );
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        tasks: []
       })
     );
     readModelHooks.postWorkspaceAgentMessage.mockResolvedValue({ context: {}, messages: [], proposals: [] });
@@ -382,10 +413,14 @@ describe("RuntimeDataScreen permission gate", () => {
     expect(host.textContent).toContain("Runtime template");
     expect(host.textContent).not.toContain("fixture fallback");
     expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      getProjectHref: expect.any(Function),
       projects: [{ id: "project-runtime", title: "Runtime architecture project" }],
       projectTemplates: [{ id: "template-runtime", tenantLabel: "Runtime template" }],
       readOnly: true
     });
+    expect(readModelHooks.projectsBlock.mock.calls[0]?.[0].getProjectHref({ id: "project-runtime" })).toBe(
+      "/projects/project-runtime"
+    );
   });
 
   it("keeps runtime projects explicit when project templates are unavailable", async () => {
@@ -405,10 +440,53 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(host.textContent).toContain("Runtime project without templates");
     expect(readModelHooks.projectsBlock).toHaveBeenCalledWith({
+      getProjectHref: expect.any(Function),
       projects: [{ id: "project-runtime", title: "Runtime project without templates" }],
       projectTemplates: [],
       readOnly: true
     });
+  });
+
+  it("renders project detail from the runtime project read model", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery({
+        project: { id: "project-runtime", title: "Runtime project detail" },
+        tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-runtime",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Runtime project detail");
+    expect(host.textContent).toContain("Runtime task detail");
+    expect(host.textContent).not.toContain("fixture fallback");
+    expect(readModelHooks.projectDetail).toHaveBeenCalledWith("project-runtime");
+  });
+
+  it("shows not-found state for unknown runtime project ids", async () => {
+    readModelHooks.projectDetail.mockReturnValue(
+      successQuery(undefined, {
+        error: new ApiError(404, "not_found", "project_not_found", {
+          error: "project_not_found"
+        })
+      })
+    );
+
+    const host = await renderRuntime(
+      createElement(RuntimeDataScreen, {
+        screenId: "07b-project-detail",
+        projectId: "project-missing",
+        permissions: ["tenant.projects.read"]
+      })
+    );
+
+    expect(host.textContent).toContain("Проект не найден");
   });
 
   it("passes the agent task deep link into runtime my work", async () => {
@@ -442,6 +520,26 @@ function successReadModel<T>(data: T) {
     isPending: false,
     isFetching: false,
     refetchAll: vi.fn()
+  };
+}
+
+function successQuery<T>(
+  data: T,
+  overrides: Partial<{
+    data: T;
+    error: unknown;
+    isPending: boolean;
+    isFetching: boolean;
+    refetch: ReturnType<typeof vi.fn>;
+  }> = {}
+) {
+  return {
+    data,
+    error: null,
+    isPending: false,
+    isFetching: false,
+    refetch: vi.fn(),
+    ...overrides
   };
 }
 

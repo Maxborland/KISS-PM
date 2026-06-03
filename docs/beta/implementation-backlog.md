@@ -9,8 +9,8 @@
 | Dashboard / attention | `/dashboard` | CEO-01, PM-02, CEO-03 | wired+attention | Нужны filters/actions, role proof и screenshot evidence после полного runtime QA | `runtime-dashboard-screen.test.ts`, `read-models.test.ts`, route smoke |
 | Agent cockpit | `/agent` | AGENT-01, AGENT-02, PM-04, CEO-03 | wired | Нужно доказать grounded context answers шире seeded task proposal; нужны failure states/action audit hardening | `e2e/runtime/agent-confirmation.spec.ts` confirmation loop |
 | My Work | `/my-work` | SPEC-01, SPEC-02 | wired/prototype | Нужны статус/owner/due/comment actions по contract (`docs/beta/task-action-contract.md`) | route smoke |
-| Projects list | `/projects` | PM-01, CEO-01 | wired/prototype | Нужны filters, open project flow, realistic empty/no-results states | route smoke |
-| Project detail | `/projects/demo` | PM-01, PM-02, LEAD-01 | prototype | Demo route; нужен runtime project detail by id, tasks, owners, blockers | нет beta proof |
+| Projects list | `/projects` | PM-01, CEO-01 | wired/read-only | Нужны filters, realistic empty/no-results states и create/edit flow; open project теперь ведёт в runtime detail | route smoke + `ProjectsListBlock` href regression |
+| Project detail | `/projects/:id` | PM-01, PM-02, LEAD-01 | wired/read-only | Нужны task mutations, blocker/comment/activity, resources/timeline links | `read-models.test.ts`, `runtime-data-screen.test.ts`, `navigation-registry.test.ts`, `pnpm qa:fast` route smoke |
 | Planning / Gantt | `/projects/demo/gantt` | PM-03 | prototype | Demo route; нужен runtime timeline data/update proof | нет beta proof |
 | Project resources | `/projects/demo/resources` | LEAD-01, HR-01, HR-02 | prototype | Demo route; нужен runtime workload/read-model proof | нет beta proof |
 | Deals pipeline | `/deals` | CEO-02, SALES-02 | wired | Нужны stage mutation, next action, persistence proof | route smoke + read-model contract tests |
@@ -24,8 +24,8 @@
 
 - Runtime QA локально сейчас не доказан в новом worktree: `pnpm qa:runtime` остановился на миграции, потому что Docker/Postgres недоступен (`127.0.0.1:55432` closed).
 - `/dashboard` подключен к operations cockpit и показывает attention/workload/pipeline sections, но еще не beta-ready: нет role proof, filters/actions и свежего screenshot evidence полного runtime QA.
-- `/projects/demo*` остаются prototype/demo routes; beta требует runtime project detail/planning/resource surfaces.
-- Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback, но сами runtime slices для project detail/planning/resources/clients/settings ещё не сделаны.
+- `/projects/:id` теперь runtime read-only route с project/tasks read-model; `/projects/demo/gantt` и `/projects/demo/resources` остаются prototype/demo routes.
+- Non-beta/demo routes больше не попадают в runtime-навигацию и не падают в Storybook fixture fallback, но runtime slices для planning/resources/clients/settings ещё не сделаны.
 - `/my-work` не доказывает реальные mutations для contract-сигнатур: status/owner/due/comment; blocker требует отдельного backend gap.
 - Agent safety partially proven: confirmation loop есть, но grounded context answer and failure/action audit coverage incomplete.
 - В `docs/beta/task-action-contract.md` зафиксирован split: что есть, что отсутствует (`blocker` пока только как gap).
@@ -52,7 +52,8 @@
 | Dashboard block | needs-adaptation | Нужна operational attention hierarchy, не только summary |
 | Agent cockpit block | needs-adaptation | Хорошая база; нужно grounded context, failure/result audit polish |
 | Deals block | needs-adaptation | Нужны mutations/stage persistence и handoff affordances |
-| Projects list block | needs-adaptation | Нужны filters/open/detail path and realistic empty states |
+| Projects list block | needs-adaptation | Runtime detail path подключен; нужны API-backed filters/create/edit and realistic empty states |
+| Project detail block | needs-adaptation | Runtime read-only foundation есть; нужны task mutations, blocker/comment/activity and planning/resources links |
 | My Work block | needs-adaptation | Нужны status/owner/due/comment actions по contract; blocker только как read-only gap/disabled reason |
 | Demo project planning blocks | outdated-for-runtime | Можно использовать визуальные паттерны, но не как runtime data contract |
 
@@ -64,7 +65,7 @@
 | `/agent` | Grounded answer references real entities; proposal has confirmation; apply mutates; audit/result visible; failure path |
 | `/my-work` | Assigned task visible; status/owner/due/comment mutation persists; blocker gap shown without fake mutation; forbidden state |
 | `/projects` | Projects and templates load without permission trap; filters/open project; empty/error/forbidden |
-| Project detail | Open real project by id; add/update task; blocker visible; reload proof |
+| Project detail | Open real project by id; task list visible without fixture fallback; add/update task; blocker visible; reload proof |
 | Timeline | Task renders in date range; date/status update persists |
 | `/deals` | Pipeline loads with only used catalogs; stage move persists; no hidden clients/projectTypes dependency |
 | Clients/create | Client/deal create, duplicate/validation/save error |
@@ -81,8 +82,9 @@
    - Evidence: `RuntimeDashboardScreen` renders operations attention, workload and pipeline pressure from `/api/workspace/operations-cockpit`.
 
 3. **Project detail + task mutations**
-   - Real `/projects/:id` route with tasks, owner, due date, status, blocker.
-   - Evidence: add/update task persists after reload.
+   - Status: runtime read-only foundation done for `/projects/:id`; next slice is confirmed task mutations.
+   - Evidence now: project detail API/query tests, runtime route tests, `/projects/project-beta-school-renovation` in `pnpm qa:fast`.
+   - Beta evidence still required: add/update task persists after reload.
 
 4. **My Work execution actions**
    - Contract-first: status/owner/due/comment по `docs/beta/task-action-contract.md`.
@@ -98,6 +100,8 @@
 - `docs/beta/runtime-route-inventory.md`: current beta runtime allowlist and hidden route list.
 - `navigation-registry.test.ts`: non-beta routes are hidden from runtime navigation.
 - `runtime-data-screen.test.ts`: non-beta routes render `Раздел не включён в beta` and do not fall back to fixture screens.
+- `runtime-data-screen.test.ts`: `/projects/:id` loads project/tasks from runtime read-model and does not fall back to Storybook fixtures.
+- `pnpm qa:fast`: opens `/projects/project-beta-school-renovation` and checks the seeded project detail route for blank/error/overflow regressions.
 - `pnpm db:reset:dev`: resets only the documented compose dev database by default, then seeds and checks beta fixture counts.
 - `pnpm qa:fast`: standardized as the default local PR gate for small beta slices.
 - `pnpm qa:runtime`: remains the broader runtime+Storybook foundation gate.

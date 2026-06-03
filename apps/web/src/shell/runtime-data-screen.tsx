@@ -14,6 +14,7 @@ import {
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
+  useProjectDetailReadModelQuery,
   useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@/lib/mock-data/scenario-presenters";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
+import { ProjectDetailBlock } from "@/views/blocks/project-detail-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
 import {
@@ -43,11 +45,13 @@ export function canOpenStaticRuntimeScreen(
 export function RuntimeDataScreen({
   screenId,
   permissions = [],
+  projectId,
   currentUserId,
   initialTaskId
 }: {
   screenId: ScreenId;
   permissions?: readonly string[];
+  projectId?: string | undefined;
   currentUserId?: string | undefined;
   initialTaskId?: string | undefined;
 }) {
@@ -100,6 +104,14 @@ export function RuntimeDataScreen({
     return (
       <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
         <RuntimeProjectsListScreen />
+      </RuntimeWorkspaceFrame>
+    );
+  }
+
+  if (screenId === "07b-project-detail") {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeProjectDetailScreen projectId={projectId} />
       </RuntimeWorkspaceFrame>
     );
   }
@@ -258,9 +270,55 @@ function RuntimeProjectsListScreen() {
     <ProjectsListBlock
       projects={query.data.projects}
       projectTemplates={query.data.projectTemplates}
+      getProjectHref={(project) => `/projects/${encodeURIComponent(project.id)}`}
       readOnly
     />
   ) : null;
+}
+
+function RuntimeProjectDetailScreen({ projectId }: { projectId?: string | undefined }) {
+  const query = useProjectDetailReadModelQuery(projectId);
+
+  if (!projectId) {
+    return (
+      <ErrorState
+        level="L1"
+        title="Проект не выбран"
+        description="Откройте проект из списка или проверьте адрес страницы."
+      />
+    );
+  }
+
+  if (query.isPending || query.isFetching) {
+    return <LoadingState layout="table" level="L1" label="Загружаем проект…" />;
+  }
+
+  if (query.error) {
+    if (
+      query.error instanceof ApiError &&
+      query.error.body.error === "project_not_found"
+    ) {
+      return (
+        <ErrorState
+          level="L1"
+          title="Проект не найден"
+          description="Проверьте ссылку или вернитесь к списку проектов."
+          onRetry={() => void query.refetch()}
+        />
+      );
+    }
+
+    return (
+      <RuntimeReadModelError
+        error={query.error}
+        title="Не удалось загрузить проект"
+        forbiddenTitle="Нет доступа к проекту"
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  return query.data ? <ProjectDetailBlock project={query.data.project} tasks={query.data.tasks} readOnly /> : null;
 }
 
 function RuntimeDealsScreen() {

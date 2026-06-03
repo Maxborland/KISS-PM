@@ -13,6 +13,7 @@ import {
   confirmWorkspaceAgentProposal,
   fetchWorkspaceMyWorkTasks,
   fetchWorkspaceOpportunities,
+  fetchWorkspaceProjectDetail,
   fetchWorkspaceProjectTemplates,
   fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
@@ -20,6 +21,7 @@ import {
   useDashboardReadModelQueries,
   useDealsBoardReadModelQueries,
   useMyWorkReadModelQueries,
+  useProjectDetailReadModelQuery,
   useProjectsListReadModelQuery
 } from "@/lib/api/read-models";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -34,6 +36,7 @@ describe("runtime read model API", () => {
 
   it("declares stable query keys for projects and CRM board data", () => {
     expect(queryKeys.workspace.projects).toEqual(["workspace", "projects"]);
+    expect(queryKeys.workspace.project("project-alpha")).toEqual(["workspace", "projects", "project-alpha"]);
     expect(queryKeys.workspace.projectTemplates).toEqual(["workspace", "config", "project-templates"]);
     expect(queryKeys.workspace.operationsCockpit).toEqual(["workspace", "operations-cockpit"]);
     expect(queryKeys.workspace.myWork("usr-1")).toEqual(["workspace", "my-work", "usr-1"]);
@@ -55,6 +58,9 @@ describe("runtime read model API", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-1" }] });
+      if (path === "/api/workspace/projects/project-1") {
+        return json({ project: { id: "project-1" }, tasks: [{ id: "task-1" }] });
+      }
       if (path === "/api/workspace/config/project-templates") {
         return json({ projectTemplates: [{ id: "template-1" }] });
       }
@@ -104,6 +110,10 @@ describe("runtime read model API", () => {
     });
 
     await expect(fetchWorkspaceProjects()).resolves.toEqual([{ id: "project-1" }]);
+    await expect(fetchWorkspaceProjectDetail("project-1")).resolves.toEqual({
+      project: { id: "project-1" },
+      tasks: [{ id: "task-1" }]
+    });
     await expect(fetchWorkspaceProjectTemplates()).resolves.toEqual([{ id: "template-1" }]);
     await expect(fetchWorkspaceMyWorkTasks()).resolves.toEqual([{ id: "task-1" }]);
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
@@ -180,6 +190,7 @@ describe("runtime read model API", () => {
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
       "/api/workspace/projects",
+      "/api/workspace/projects/project-1",
       "/api/workspace/config/project-templates",
       "/api/workspace/my-work",
       "/api/workspace/opportunities",
@@ -190,11 +201,17 @@ describe("runtime read model API", () => {
       "/api/workspace/agent-thread/proposals/proposal-1/confirm",
       "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
     ]);
-    expect(fetchMock.mock.calls[7]?.[1]).toMatchObject({
+    const postMessageCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/agent-thread/messages"
+    );
+    const confirmProposalCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/agent-thread/proposals/proposal-1/confirm"
+    );
+    expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify("Что горит?")
     });
-    expect(fetchMock.mock.calls[8]?.[1]).toMatchObject({
+    expect(confirmProposalCall?.[1]).toMatchObject({
       method: "POST",
       body: JSON.stringify({ decision: "apply" })
     });
@@ -296,6 +313,63 @@ describe("runtime read model API", () => {
         );
       });
       expect(latestError).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
+
+  it("loads project detail by real project id without storybook fallback", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/projects/project-runtime") {
+        return json({
+          project: { id: "project-runtime", title: "Runtime project detail" },
+          tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+        });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function ProjectDetailProbe() {
+      const readModel = useProjectDetailReadModelQuery("project-runtime");
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProjectDetailProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            project: { id: "project-runtime", title: "Runtime project detail" },
+            tasks: [{ id: "task-runtime", title: "Runtime task detail" }]
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        "/api/workspace/projects/project-runtime"
+      ]);
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain(
+        "/api/storybook/projects/project-runtime"
+      );
     } finally {
       await act(async () => root.unmount());
       queryClient.clear();
