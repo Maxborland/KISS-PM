@@ -93,7 +93,7 @@ export function ErrorState({
           <AlertCircle className="size-8 text-[var(--danger)]" strokeWidth={1.75} />
         </div>
         <div className="u-flex u-items-center u-gap-2 u-justify-center">
-          <p className="state-illu__title u-margin-0">{resolvedTitle}</p>
+          <h2 className="state-illu__title u-margin-0">{resolvedTitle}</h2>
           {resolvedHint ? (
             <Tooltip>
               <TooltipTrigger asChild>
