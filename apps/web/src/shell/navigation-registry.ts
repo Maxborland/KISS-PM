@@ -33,7 +33,8 @@ export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
   "05-deals",
   "07-projects-list",
   "07b-project-detail",
-  "12-project-gantt"
+  "12-project-gantt",
+  "13-project-resources"
 ] as const satisfies readonly ScreenId[];
 
 const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
@@ -374,12 +375,12 @@ export const SCREEN_ROUTE_BY_ID: Record<ScreenId, ScreenRouteMeta> = {
   "13-project-resources": route({
     id: "13-project-resources",
     storyTitle: "13 Ресурсы проекта",
-    pageTitle: mockProjectScreenTitle("Ресурсы"),
-    lead: "Матрица загрузки и назначения.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Ресурсы", current: true }],
+    pageTitle: "Ресурсы проекта",
+    lead: "Живая матрица загрузки и назначений проекта.",
+    breadcrumb: [{ label: "Проекты" }, { label: "Карточка проекта" }, { label: "Ресурсы", current: true }],
     railSection: "projects",
     contextActiveItem: "Ресурсы",
-    path: "/projects/demo/resources",
+    path: "/projects/:projectId/resources",
     requiredPermissions: ["tenant.project_resources.read"]
   }),
   "14-project-baseline": route({
@@ -513,7 +514,7 @@ export function projectIdForRuntimePath(path: string): string | null {
   const [, section, projectId, ...rest] = normalizeRuntimePath(path).split("/");
   if (section !== "projects") return null;
   if (rest.length > 1) return null;
-  if (rest.length === 1 && rest[0] !== "timeline") return null;
+  if (rest.length === 1 && !["timeline", "resources"].includes(rest[0] ?? "")) return null;
   if (!projectId || projectId === "demo" || projectId.startsWith(":")) return null;
   return projectId;
 }
@@ -523,6 +524,9 @@ function screenIdForDynamicRuntimePath(path: string): ScreenId | null {
   const [, section, , view] = normalized.split("/");
   if (section === "projects" && view === "timeline" && projectIdForRuntimePath(path)) {
     return "12-project-gantt";
+  }
+  if (section === "projects" && view === "resources" && projectIdForRuntimePath(path)) {
+    return "13-project-resources";
   }
   return projectIdForRuntimePath(path) ? "07b-project-detail" : null;
 }
