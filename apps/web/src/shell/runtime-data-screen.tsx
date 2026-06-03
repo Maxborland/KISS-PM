@@ -9,8 +9,10 @@ import { ApiError } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/query-keys";
 import {
+  activateWorkspaceOpportunityProject,
   confirmWorkspaceAgentProposal,
   createWorkspaceProjectTask,
+  fetchWorkspaceProjects,
   postWorkspaceAgentMessage,
   postWorkspaceTaskComment,
   updateWorkspaceTaskFields,
@@ -29,6 +31,7 @@ import {
   useProjectsListReadModelQuery,
   useTaskActivityReadModelQuery
 } from "@/lib/api/read-models";
+import type { Opportunity, Project } from "@/lib/api-types";
 import {
   buildFunnelDeals,
   buildFunnelStagesFromDealStages
@@ -560,6 +563,20 @@ function RuntimeDealsScreen() {
 
 function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
   const query = useDealDetailReadModelQuery(dealId);
+  const queryClient = useQueryClient();
+  const [activatedProject, setActivatedProject] = useState<Project | null>(null);
+  const activateProject = useMutation({
+    mutationFn: (opportunity: Opportunity) => activateOrResolveProjectFromOpportunity(opportunity),
+    onSuccess: (project, opportunity) => {
+      setActivatedProject(project);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunity(opportunity.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.opportunities });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.projects });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.project(project.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspace.operationsCockpit });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenant.currentAuditEvents });
+    }
+  });
 
   if (!dealId) {
     return (
@@ -597,7 +614,49 @@ function RuntimeDealDetailScreen({ dealId }: { dealId?: string | undefined }) {
     );
   }
 
-  return query.data ? <DealDetailRuntimeBlock opportunity={query.data.opportunity} /> : null;
+  const dealDetail = query.data;
+
+  return dealDetail ? (
+    <DealDetailRuntimeBlock
+      activatedProject={activatedProject}
+      activationError={activateProject.error}
+      activationPending={activateProject.isPending}
+      opportunity={dealDetail.opportunity}
+      onActivateProject={() => activateProject.mutateAsync(dealDetail.opportunity)}
+    />
+  ) : null;
+}
+
+async function activateOrResolveProjectFromOpportunity(opportunity: Opportunity): Promise<Project> {
+  const existingProject = await findProjectLinkedToOpportunity(opportunity.id);
+  if (existingProject) return existingProject;
+
+  try {
+    return await activateWorkspaceOpportunityProject({
+      acceptedRiskReason: "Риск принят пользователем при передаче сделки в проект из runtime карточки.",
+      opportunityId: opportunity.id
+    });
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.body.error === "source_opportunity_already_activated"
+    ) {
+      const project = await findProjectLinkedToOpportunity(opportunity.id);
+      if (project) return project;
+    }
+
+    throw error;
+  }
+}
+
+async function findProjectLinkedToOpportunity(opportunityId: string): Promise<Project | undefined> {
+  try {
+    const projects = await fetchWorkspaceProjects();
+    return projects.find((project) => project.sourceOpportunityId === opportunityId);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "forbidden") return undefined;
+    throw error;
+  }
 }
 
 function RuntimeProjectTimelineScreen({ projectId }: { projectId?: string | undefined }) {

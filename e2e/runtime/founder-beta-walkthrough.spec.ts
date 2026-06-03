@@ -7,14 +7,9 @@ const adminCredentials = {
   password: "admin12345"
 };
 
-test("founder-beta management walkthrough reaches the first unresolved beta blocker @founder-beta-walkthrough", async ({
+test("founder-beta management walkthrough covers the current runtime spine through deal handoff @founder-beta-walkthrough", async ({
   page
 }, testInfo) => {
-  test.fail(
-    true,
-    "Current blocker: deal-to-project handoff action is not wired. Founder-beta walkthrough can reach dashboard, project, Gantt, My Work, agent, resources, audit, admin users, admin roles, clients, contacts, products and live deal detail, but still needs activation/handoff proof."
-  );
-
   const login = await page.request.post("/api/auth/login", {
     data: adminCredentials
   });
@@ -43,7 +38,7 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
     );
     await attentionLink.click();
     await expect(page).toHaveURL(/\/projects\/project-beta-school-renovation\?taskId=task-beta-school-survey$/);
-    await expect(page.getByRole("heading", { name: "Школа на 600 мест — реконструкция" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Школа на 600 мест — реконструкция" })).toBeVisible();
   });
 
   await test.step("existing project/timeline/my-work/agent surfaces stay reachable", async () => {
@@ -60,46 +55,56 @@ test("founder-beta management walkthrough reaches the first unresolved beta bloc
 
   await test.step("project resources must be a live runtime route for workload proof", async () => {
     await page.goto("/projects/project-beta-school-renovation/resources");
-    await expect(page.getByRole("heading", { name: /Ресурсы/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Ресурсы/ })).toBeVisible();
   });
 
   await test.step("audit must be a live runtime route for mutation proof", async () => {
     await page.goto("/admin/audit");
-    await expect(page.getByRole("heading", { name: /Аудит/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Аудит/ })).toBeVisible();
   });
 
   await test.step("admin users must be a live runtime route for RBAC proof", async () => {
     await page.goto("/admin/users");
-    await expect(page.getByRole("heading", { name: /Пользователи/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Пользователи/ })).toBeVisible();
   });
 
   await test.step("client directory must be live runtime data for deal handoff proof", async () => {
     await page.goto("/directories/clients");
-    await expect(page.getByRole("heading", { name: /Клиенты/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Клиенты/ })).toBeVisible();
   });
 
   await test.step("contact directory must be live runtime data for deal handoff proof", async () => {
     await page.goto("/directories/contacts");
-    await expect(page.getByRole("heading", { name: /Контакты/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Контакты/ })).toBeVisible();
   });
 
   await test.step("products directory must be live runtime data for deal handoff proof", async () => {
     await page.goto("/directories/products");
-    await expect(page.getByRole("heading", { name: /Продукты/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Продукты/ })).toBeVisible();
   });
 
   await test.step("admin roles must be a live runtime route for RBAC proof", async () => {
     await page.goto("/admin/roles");
-    await expect(page.getByRole("heading", { name: /Роли/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Роли/ })).toBeVisible();
   });
 
   await test.step("deal detail must be a live runtime route for handoff proof", async () => {
     await page.goto("/deals/opportunity-beta-school-renovation");
-    await expect(page.getByRole("heading", { name: /Сделка/ })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Школа на 600 мест/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Сделка/ })).toBeVisible();
+    await expect(page.getByText("Школа на 600 мест — реконструкция", { exact: true })).toBeVisible();
   });
 
   await test.step("deal handoff must create or open a real project", async () => {
-    await expect(page.getByRole("button", { name: /Передать в проект/ })).toBeVisible();
+    await page.getByRole("button", { name: /Передать в проект/ }).click();
+    await page.getByRole("button", { name: /Подтвердить передачу/ }).click();
+    await expect(page.getByRole("link", { name: /Открыть проект/ })).toBeVisible();
+    await page.getByRole("link", { name: /Открыть проект/ }).click();
+    await expect(page).toHaveURL(/\/projects\/project-beta-school-renovation$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Школа на 600 мест — реконструкция" })).toBeVisible();
+  });
+
+  await test.step("audit must show project evidence after handoff path", async () => {
+    await page.goto("/admin/audit");
+    await expect(page.getByText("project.risk.seeded")).toBeVisible();
   });
 });
