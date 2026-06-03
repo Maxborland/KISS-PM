@@ -30,6 +30,7 @@ import {
   postWorkspaceTaskComment,
   postWorkspaceAgentMessage,
   updateWorkspaceAccessRolePermission,
+  updateWorkspaceOpportunity,
   updateWorkspaceTaskFields,
   updateWorkspaceUserStatus,
   updateWorkspaceProjectTaskStatus,
@@ -93,7 +94,7 @@ describe("runtime read model API", () => {
   });
 
   it("passes focused workspace agent context through thread and message API calls", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
       if (path === "/api/workspace/agent-thread?projectId=project-1") {
         return json(
@@ -138,7 +139,7 @@ describe("runtime read model API", () => {
   });
 
   it("fetches read-only screen data through documented same-origin endpoints", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
       if (path === "/api/workspace/projects") return json({ projects: [{ id: "project-1" }] });
       if (path === "/api/workspace/projects/project-1") {
@@ -241,6 +242,15 @@ describe("runtime read model API", () => {
         return json({ opportunities: [{ id: "opp-1" }] });
       }
       if (path === "/api/workspace/opportunities/opp-1") {
+        if (init?.method === "PATCH") {
+          return json({
+            opportunity: {
+              id: "opp-1",
+              title: "Runtime deal",
+              customFieldValues: { next_action: "Созвониться с заказчиком" }
+            }
+          });
+        }
         return json({ opportunity: { id: "opp-1", title: "Runtime deal" } });
       }
       if (path === "/api/workspace/opportunities/opp-1/stage") {
@@ -426,6 +436,41 @@ describe("runtime read model API", () => {
     await expect(fetchWorkspaceOpportunities()).resolves.toEqual([{ id: "opp-1" }]);
     await expect(fetchWorkspaceOpportunity("opp-1")).resolves.toEqual({ id: "opp-1", title: "Runtime deal" });
     await expect(
+      updateWorkspaceOpportunity({
+        clientId: "client-1",
+        clientName: "Runtime client",
+        contactName: "Runtime contact",
+        contractValue: 100000,
+        createdAt: "2026-06-01T09:00:00.000Z",
+        customFieldValues: { next_action: "Созвониться с заказчиком" },
+        demand: [],
+        description: null,
+        feasibilityCheckedAt: null,
+        feasibilityResult: null,
+        feasibilityStatus: null,
+        id: "opp-1",
+        ownerUserId: "usr-1",
+        plannedFinish: "2026-06-30T00:00:00.000Z",
+        plannedHourlyRate: 5000,
+        plannedHours: 20,
+        plannedStart: "2026-06-01T00:00:00.000Z",
+        primaryContactId: "contact-1",
+        probability: 70,
+        projectType: "Интерьеры",
+        projectTypeId: "project-type-1",
+        stageId: "deal-stage-contract",
+        status: "active",
+        templateId: null,
+        tenantId: "tenant-alpha",
+        title: "Runtime deal",
+        updatedAt: "2026-06-01T10:00:00.000Z"
+      })
+    ).resolves.toEqual({
+      customFieldValues: { next_action: "Созвониться с заказчиком" },
+      id: "opp-1",
+      title: "Runtime deal"
+    });
+    await expect(
       changeWorkspaceOpportunityStage({
         opportunityId: "opp-1",
         stageId: "deal-stage-contract"
@@ -549,6 +594,7 @@ describe("runtime read model API", () => {
       "/api/workspace/task-statuses",
       "/api/workspace/opportunities",
       "/api/workspace/opportunities/opp-1",
+      "/api/workspace/opportunities/opp-1",
       "/api/workspace/opportunities/opp-1/stage",
       "/api/workspace/opportunities/opp-1/activate",
       "/api/workspace/deal-stages",
@@ -588,6 +634,9 @@ describe("runtime read model API", () => {
     );
     const changeOpportunityStageCall = fetchMock.mock.calls.find(
       (call) => call[0] === "/api/workspace/opportunities/opp-1/stage"
+    );
+    const updateOpportunityCall = fetchMock.mock.calls.find(
+      (call) => call[0] === "/api/workspace/opportunities/opp-1" && call[1]?.method === "PATCH"
     );
     expect(postMessageCall?.[1]).toMatchObject({
       method: "POST",
@@ -657,6 +706,10 @@ describe("runtime read model API", () => {
     expect(changeOpportunityStageCall?.[1]).toMatchObject({
       method: "PATCH",
       body: JSON.stringify({ stageId: "deal-stage-contract" })
+    });
+    expect(updateOpportunityCall?.[1]).toMatchObject({
+      method: "PATCH",
+      body: expect.stringContaining('"next_action":"Созвониться с заказчиком"')
     });
     const auditEventsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/tenant/current/audit-events");
     expect(auditEventsCall?.[1]).toMatchObject({ method: "GET" });
