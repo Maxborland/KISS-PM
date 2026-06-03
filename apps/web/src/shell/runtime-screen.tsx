@@ -9,16 +9,19 @@ import {
   useAuthMeQuery,
   useWorkspaceBootstrapQueries
 } from "@/lib/api/bootstrap";
+import type { WorkspaceAgentContextInput } from "@/lib/api/read-models";
 import type { ScreenId } from "@/views/catalog";
 import { RuntimeDataScreen } from "@/shell/runtime-data-screen";
 import { RuntimeLoginScreen } from "@/shell/runtime-login-screen";
 
 export function RuntimeScreen({
+  agentContext,
   dealId,
   screenId,
   projectId,
   initialTaskId
 }: {
+  agentContext?: WorkspaceAgentContextInput | undefined;
   dealId?: string | undefined;
   screenId: ScreenId;
   projectId?: string | undefined;
@@ -31,6 +34,7 @@ export function RuntimeScreen({
   return (
     <AuthenticatedRuntimeScreen
       screenId={screenId}
+      agentContext={agentContext}
       dealId={dealId}
       projectId={projectId}
       initialTaskId={initialTaskId}
@@ -39,11 +43,13 @@ export function RuntimeScreen({
 }
 
 function AuthenticatedRuntimeScreen({
+  agentContext,
   dealId,
   screenId,
   projectId,
   initialTaskId
 }: {
+  agentContext?: WorkspaceAgentContextInput | undefined;
   dealId?: string | undefined;
   screenId: ScreenId;
   projectId?: string | undefined;
@@ -122,6 +128,7 @@ function AuthenticatedRuntimeScreen({
   return (
     <RuntimeDataScreen
       screenId={screenId}
+      agentContext={agentContext}
       dealId={dealId}
       projectId={projectId}
       permissions={authQuery.data?.permissions ?? []}

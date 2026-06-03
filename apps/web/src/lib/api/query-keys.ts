@@ -19,6 +19,8 @@ export const queryKeys = {
     operationsCockpit: ["workspace", "operations-cockpit"] as const,
     myWork: (userId: string) => ["workspace", "my-work", userId] as const,
     workspaceAgentThread: ["workspace", "agent-thread"] as const,
+    workspaceAgentThreadContext: (contextKey: string) =>
+      ["workspace", "agent-thread", contextKey] as const,
     opportunities: ["workspace", "opportunities"] as const,
     opportunity: (opportunityId: string) => ["workspace", "opportunities", opportunityId] as const,
     dealStages: ["workspace", "deal-stages"] as const

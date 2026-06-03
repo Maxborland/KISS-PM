@@ -73,6 +73,11 @@ describe("runtime read model API", () => {
     expect(queryKeys.workspace.myWork("usr-2")).toEqual(["workspace", "my-work", "usr-2"]);
     expect(queryKeys.workspace.taskStatuses).toEqual(["workspace", "task-statuses"]);
     expect(queryKeys.workspace.workspaceAgentThread).toEqual(["workspace", "agent-thread"]);
+    expect(queryKeys.workspace.workspaceAgentThreadContext("project:project-alpha")).toEqual([
+      "workspace",
+      "agent-thread",
+      "project:project-alpha"
+    ]);
     expect(queryKeys.workspace.opportunities).toEqual(["workspace", "opportunities"]);
     expect(queryKeys.workspace.opportunity("opp-1")).toEqual(["workspace", "opportunities", "opp-1"]);
     expect(queryKeys.workspace.dealStages).toEqual(["workspace", "deal-stages"]);
@@ -85,6 +90,51 @@ describe("runtime read model API", () => {
       "2026-05-30",
       "2026-05-30"
     ]);
+  });
+
+  it("passes focused workspace agent context through thread and message API calls", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/agent-thread?projectId=project-1") {
+        return json(
+          agentThreadPayload({
+            context: { focus: { type: "project", id: "project-1", title: "Runtime project" } },
+            messages: [{ id: "agent-message-focused" }]
+          })
+        );
+      }
+      if (path === "/api/workspace/agent-thread/messages") {
+        return json(
+          agentThreadPayload({
+            context: { focus: { type: "project", id: "project-1", title: "Runtime project" } },
+            messages: [{ id: "agent-message-focused-reply" }]
+          }),
+          201
+        );
+      }
+      return json({ error: "not_found" }, 404);
+    });
+
+    await expect(fetchWorkspaceAgentThread({ projectId: "project-1" })).resolves.toMatchObject({
+      context: { focus: { type: "project", id: "project-1", title: "Runtime project" } },
+      messages: [{ id: "agent-message-focused" }]
+    });
+    await expect(postWorkspaceAgentMessage("Создай задачу", { projectId: "project-1" })).resolves.toMatchObject({
+      context: { focus: { type: "project", id: "project-1", title: "Runtime project" } },
+      messages: [{ id: "agent-message-focused-reply" }]
+    });
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/workspace/agent-thread?projectId=project-1",
+      "/api/workspace/agent-thread/messages"
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        body: "Создай задачу",
+        context: { projectId: "project-1" }
+      })
+    });
   });
 
   it("fetches read-only screen data through documented same-origin endpoints", async () => {
@@ -1034,8 +1084,14 @@ describe("runtime read model API", () => {
     });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/workspace/agent-thread") {
-        return json(agentThreadPayload({ messages: [{ id: "agent-message-1" }], proposals: [] }));
+      if (path === "/api/workspace/agent-thread?projectId=project-runtime") {
+        return json(
+          agentThreadPayload({
+            context: { focus: { type: "project", id: "project-runtime", title: "Runtime project" } },
+            messages: [{ id: "agent-message-1" }],
+            proposals: []
+          })
+        );
       }
       if (path === "/api/workspace/operations-cockpit") {
         return json({
@@ -1050,7 +1106,7 @@ describe("runtime read model API", () => {
     });
 
     function AgentProbe() {
-      useAgentCockpitReadModelQuery();
+      useAgentCockpitReadModelQuery({ projectId: "project-runtime" });
       return null;
     }
 
@@ -1067,10 +1123,18 @@ describe("runtime read model API", () => {
 
       await vi.waitFor(() =>
         expect(fetchMock.mock.calls.map((call) => call[0]).sort()).toEqual([
-          "/api/workspace/agent-thread",
+          "/api/workspace/agent-thread?projectId=project-runtime",
           "/api/workspace/operations-cockpit"
         ])
       );
+      expect(queryClient.getQueryData(queryKeys.workspace.workspaceAgentThread)).toBeUndefined();
+      expect(
+        queryClient.getQueryData(
+          queryKeys.workspace.workspaceAgentThreadContext("deal:|project:project-runtime|task:")
+        )
+      ).toMatchObject({
+        context: { focus: { type: "project", id: "project-runtime", title: "Runtime project" } }
+      });
       expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/storybook/agent");
     } finally {
       act(() => root.unmount());
