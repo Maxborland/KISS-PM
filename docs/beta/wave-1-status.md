@@ -76,7 +76,7 @@ Wave 1 foundation is complete on current `origin/design-v3` `846434f` with fresh
 
 Next work continues in PR-sized slices from clean `origin/design-v3`:
 
-- My Work: status/owner/due/comment actions and blocker gap UX are runtime-proven; next My Work slice is forbidden/read-only proof.
+- My Work: status/owner/due/comment actions, blocker gap UX and participant read-only proof are runtime-proven.
 - Project detail: create task, owner/due/comment, blocker/activity proof.
 - Timeline/resources: move from read-only runtime foundations toward interaction/proof slices.
 - Agent: grounded context and confirmation/audit hardening after task/deal/project contracts stabilize.

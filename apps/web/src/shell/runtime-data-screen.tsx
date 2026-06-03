@@ -356,10 +356,14 @@ function RuntimeMyWorkScreen({
   permissions: readonly string[];
 }) {
   const queryClient = useQueryClient();
-  const readModel = useMyWorkReadModelQueries({ assigneeUserId: currentUserId });
+  const canManageProjectTasks = hasPermission(permissions, "tenant.projects.manage");
+  const canReadWorkspaceUsers = hasPermission(permissions, "tenant.users.read");
+  const readModel = useMyWorkReadModelQueries({
+    assigneeUserId: currentUserId,
+    canReadWorkspaceUsers
+  });
   const [activityTaskId, setActivityTaskId] = useState<string | undefined>(undefined);
   const taskActivity = useTaskActivityReadModelQuery(activityTaskId);
-  const canManageProjectTasks = hasPermission(permissions, "tenant.projects.manage");
   const updateTaskStatus = useMutation({
     mutationFn: updateWorkspaceProjectTaskStatus,
     onSuccess: () => {

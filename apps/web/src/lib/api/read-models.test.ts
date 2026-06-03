@@ -1968,6 +1968,67 @@ describe("runtime read model API", () => {
       host.remove();
     }
   });
+
+  it("skips workspace user lookup for my-work users without user-read permission", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/workspace/my-work") return json({ tasks: [{ id: "task-1" }] });
+      if (path === "/api/workspace/task-statuses") return json({ taskStatuses: [{ id: "task-status-1" }] });
+      if (
+        path ===
+        "/api/tenant/current/scheduled-tasks?assigneeUserId=usr-1&fromDate=2026-05-30&toDate=2026-05-30"
+      ) {
+        return json({ tasks: [] });
+      }
+      return json({ error: "not_found" }, 404);
+    });
+    let latestData: unknown;
+
+    function MyWorkProbe() {
+      const readModel = useMyWorkReadModelQueries({
+        assigneeUserId: "usr-1",
+        canReadWorkspaceUsers: false,
+        fromDate: "2026-05-30",
+        toDate: "2026-05-30"
+      });
+      latestData = readModel.data;
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(MyWorkProbe)
+          )
+        );
+      });
+
+      await act(async () => {
+        await vi.waitFor(() =>
+          expect(latestData).toEqual({
+            scheduledTasks: [],
+            tasks: [{ id: "task-1" }],
+            taskStatuses: [{ id: "task-status-1" }],
+            workspaceUsers: []
+          })
+        );
+      });
+      expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/workspace/users");
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      host.remove();
+    }
+  });
 });
 
 function json(payload: unknown, status = 200): Response {

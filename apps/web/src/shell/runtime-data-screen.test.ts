@@ -1112,7 +1112,10 @@ describe("RuntimeDataScreen permission gate", () => {
 
     expect(host.textContent).toContain("Runtime my work task");
     expect(host.textContent).not.toContain("fixture fallback");
-    expect(readModelHooks.myWork).toHaveBeenCalledWith({ assigneeUserId: "usr-1" });
+    expect(readModelHooks.myWork).toHaveBeenCalledWith({
+      assigneeUserId: "usr-1",
+      canReadWorkspaceUsers: false
+    });
   });
 
   it("renders projects from runtime projects and project templates without fixture fallback", async () => {
