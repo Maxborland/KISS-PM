@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canOpenRuntimePath,
   contextNavForSection,
   pathForScreenId,
   RAIL_SECTIONS,
@@ -66,6 +67,12 @@ describe("navigation-registry", () => {
     ]);
   });
 
+  it("hides non-beta runtime paths from navigation until they are API-backed", () => {
+    expect(canOpenRuntimePath("/showcase/spacing", ["tenant.projects.read"])).toBe(false);
+    expect(canOpenRuntimePath("/projects/demo/gantt", ["tenant.project_plan.read"])).toBe(false);
+    expect(canOpenRuntimePath("/settings", ["tenant.workspace_config.read"])).toBe(false);
+  });
+
   it("exposes the workspace agent as an overview surface", () => {
     const agent = SCREEN_ROUTE_BY_ID["20-agent-cockpit"];
     expect(agent.railSection).toBe("overview");
@@ -93,7 +100,7 @@ describe("navigation-registry", () => {
         "tenant.clients.read",
         "tenant.workspace_config.read"
       ]).map((section) => section.href)
-    ).toEqual(["/dashboard", "/my-work", "/deals", "/projects", "/directories/clients", "/settings"]);
+    ).toEqual(["/dashboard", "/my-work", "/deals", "/projects"]);
   });
 
   it("requires both opportunities and deal stages for the deals route", () => {
@@ -118,6 +125,6 @@ describe("navigation-registry", () => {
       contextNavForSection("settings", "Рабочая область", ["tenant.workspace_config.read"]).flatMap(
         (group) => group.items.map((item) => item.href ?? null)
       )
-    ).toEqual(["/settings", null]);
+    ).toEqual([null]);
   });
 });

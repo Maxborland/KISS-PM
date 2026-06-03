@@ -24,8 +24,11 @@ import { DealsBlock } from "@/views/blocks/deals-block";
 import { RuntimeMyWorkBlock } from "@/views/blocks/my-work-block";
 import { ProjectsListBlock } from "@/views/blocks/projects-list-block";
 import type { ScreenId } from "@/views/catalog";
-import { canOpenScreenRoute, getScreenRoute } from "@/views/screens/screen-route";
-import { ScreenView } from "@/views/screens/screen-view";
+import {
+  canOpenScreenRoute,
+  getScreenRoute,
+  isCurrentBetaRuntimeScreen
+} from "@/views/screens/screen-route";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 import { RuntimeAgentScreen } from "@/shell/runtime-agent-screen";
 import { RuntimeDashboardScreen } from "@/shell/runtime-dashboard-screen";
@@ -55,6 +58,14 @@ export function RuntimeDataScreen({
         title="Нет доступа"
         description="Недостаточно прав для просмотра этого раздела рабочей области."
       />
+    );
+  }
+
+  if (!isCurrentBetaRuntimeScreen(screenId)) {
+    return (
+      <RuntimeWorkspaceFrame screenId={screenId} permissions={permissions}>
+        <RuntimeDisabledBetaRouteState />
+      </RuntimeWorkspaceFrame>
     );
   }
 
@@ -101,7 +112,7 @@ export function RuntimeDataScreen({
     );
   }
 
-  return <ScreenView id={screenId} permissions={permissions} />;
+  return <RuntimeDisabledBetaRouteState />;
 }
 
 function RuntimeMissingUserState() {
@@ -110,6 +121,16 @@ function RuntimeMissingUserState() {
       level="L1"
       title="Не удалось загрузить пользователя"
       description="Сессия активна, но API не вернул идентификатор пользователя для runtime read model."
+    />
+  );
+}
+
+function RuntimeDisabledBetaRouteState() {
+  return (
+    <ErrorState
+      level="L1"
+      title="Раздел не включён в beta"
+      description="Этот экран скрыт из runtime-навигации, пока не подключён к реальным данным и проверкам beta gate."
     />
   );
 }

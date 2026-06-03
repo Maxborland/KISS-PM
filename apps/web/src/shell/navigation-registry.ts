@@ -26,6 +26,20 @@ export const RAIL_SECTIONS = [
 
 export type RailSectionId = (typeof RAIL_SECTIONS)[number]["id"];
 
+export const CURRENT_BETA_RUNTIME_SCREEN_IDS = [
+  "01-dashboard",
+  "20-agent-cockpit",
+  "02-my-work",
+  "05-deals",
+  "07-projects-list"
+] as const satisfies readonly ScreenId[];
+
+const CURRENT_BETA_RUNTIME_SCREEN_ID_SET = new Set<ScreenId>(CURRENT_BETA_RUNTIME_SCREEN_IDS);
+
+export function isCurrentBetaRuntimeScreen(screenId: ScreenId): boolean {
+  return CURRENT_BETA_RUNTIME_SCREEN_ID_SET.has(screenId);
+}
+
 export type ScreenRouteMeta = {
   id: ScreenId;
   storyTitle: string;
@@ -510,7 +524,7 @@ export function canOpenScreenRoute(
 
 export function canOpenRuntimePath(path: string, permissions?: readonly string[]): boolean {
   const screenId = screenIdForPath(path);
-  if (!screenId) return true;
+  if (!screenId || !isCurrentBetaRuntimeScreen(screenId)) return false;
   return canOpenScreenRoute(SCREEN_ROUTE_BY_ID[screenId], permissions);
 }
 
