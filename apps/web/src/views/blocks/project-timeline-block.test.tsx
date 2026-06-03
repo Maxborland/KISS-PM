@@ -80,6 +80,27 @@ describe("ProjectTimelineBlock", () => {
     ]);
   });
 
+  it("lets runtime users switch timeline zoom without replacing live task data", async () => {
+    await renderTimeline(() => undefined);
+
+    expect(lastGanttProps?.zoom).toBe("day");
+    expect(host?.textContent).toContain("Runtime timeline task");
+
+    await act(async () => {
+      host?.querySelector<HTMLInputElement>("input[value='week']")?.click();
+    });
+
+    expect(lastGanttProps?.zoom).toBe("week");
+    expect(host?.textContent).toContain("Runtime timeline task");
+
+    await act(async () => {
+      host?.querySelector<HTMLInputElement>("input[value='month']")?.click();
+    });
+
+    expect(lastGanttProps?.zoom).toBe("month");
+    expect(host?.textContent).toContain("Runtime timeline task");
+  });
+
   async function renderTimeline(onOpenTask: (href: string) => void) {
     host = document.createElement("div");
     document.body.append(host);
