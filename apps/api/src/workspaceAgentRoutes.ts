@@ -863,6 +863,10 @@ async function applyCreateTaskProposal(
     targetTenantId: actor.tenantId
   });
   if (!decision.allowed && !legacyManageDecision.allowed) {
+    await recordDeniedCreateTaskProposalAudit(deps, actor, proposal, {
+      reason: decision.reason,
+      taskPayload
+    });
     return { ok: false, status: 403, error: decision.reason };
   }
 
@@ -1078,6 +1082,42 @@ async function createTaskSystemActivity(
     fileSizeBytes: null,
     mimeType: null,
     authorUserId: input.actorUserId
+  });
+}
+
+async function recordDeniedCreateTaskProposalAudit(
+  deps: WorkspaceAgentRouteDeps,
+  actor: TenantUser,
+  proposal: WorkspaceAgentActionProposalRecord,
+  input: {
+    reason: string;
+    taskPayload: CreateTaskProposalPayload;
+  }
+) {
+  await deps.appendManagementAuditEvent({
+    tenantId: actor.tenantId,
+    actorUserId: actor.id,
+    actionType: "workspace.agent_action.denied",
+    sourceWorkflow: "workspace_agent_action",
+    sourceEntity: { type: "WorkspaceAgentProposal", id: proposal.id },
+    commandInput: {
+      proposalId: proposal.id,
+      decision: "apply",
+      actionType: proposal.actionType,
+      payload: { ...proposal.payload, task: input.taskPayload }
+    },
+    beforeState: { status: proposal.status },
+    afterState: { status: proposal.status },
+    permissionResult: {
+      allowed: false,
+      reason: input.reason,
+      permission: "tenant.tasks.create",
+      fallbackPermission: "tenant.projects.manage"
+    },
+    executionResult: {
+      status: "denied",
+      mutationApplied: false
+    }
   });
 }
 
