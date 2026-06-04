@@ -42,6 +42,19 @@ flowchart LR
   I --> J[Audit trail]
 ```
 
+## Product direction
+
+KISS PM is built around **Project Management as Code**: project state, decisions, proposals, and reviews should be treated with the same discipline software teams use for code changes.
+
+That means the product is not just an agent UI. The long-term direction is a dedicated Pi-based project-management harness with its own tools for reading project state, preparing safe changes, reviewing alternatives, applying approved updates, and preserving a traceable decision history.
+
+Two ideas guide the system:
+
+1. **Project Management as Code** — project changes are prepared as structured diffs, reviewed before application, and handled through explicit tools instead of hidden automation.
+2. **Audit as commit history** — audit is not only a log entry. Important decisions should become repository-like commits that can be reviewed, compared, reverted, and branched.
+
+This enables project teams and agents to work with decisions directly: create separate branches for hypotheses, compare possible plans, review proposed changes, apply only selected hunks, and roll back decisions when the chosen path is no longer valid.
+
 ## What is included
 
 - **Agent-first project workflow** — the agent prepares changes, but does not silently mutate project state.
@@ -176,21 +189,7 @@ Key areas:
 - [`docs/runbooks/`](docs/runbooks/) — backend operations, self-hosted deployment, and E2E smoke.
 - [`docs/plans/`](docs/plans/) — active implementation and improvement plans.
 - [`docs/status/`](docs/status/) — status ledgers, evidence, and closed phase history.
-- [`AGENTS.md`](AGENTS.md) — repository rules for agent/agent work.
-
-## Open source and open-source maintainer program readiness
-
-This repository is prepared as an open-source project under the [Apache License 2.0](LICENSE).
-
-For maintainers applying to the [open-source maintainer program](https://developers.openai.com/codex/oss-program-terms), this README makes the expected project facts explicit:
-
-- the project license is visible and permissive;
-- the repository purpose, scope, stack, setup, and verification commands are documented;
-- maintainers can point reviewers to active docs, runbooks, plans, and status evidence;
-- security or code review activity should only be run on repositories the maintainer owns, maintains, or is authorized to administer;
-- application materials should not include confidential information.
-
-Nothing in this README states or implies approval by AI provider. Program participation is subject to AI provider's own eligibility, verification, and selection process.
+- [`AGENTS.md`](AGENTS.md) — repository rules for agent-assisted work.
 
 ## Development principles
 
