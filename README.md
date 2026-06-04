@@ -1,79 +1,174 @@
 # KISS PM
 
-KISS PM — это русскоязычная продуктовая спецификация и будущая реализация SaaS/self-hosted платформы для управления проектами, ресурсной загрузкой и управленческим контролем.
+[![status](https://img.shields.io/badge/status-founder--beta%20readiness-2563eb)](#статус-проекта)
+[![stack](https://img.shields.io/badge/stack-Node%20%2B%20Hono%20%2B%20Next.js%20%2B%20PostgreSQL-111827)](#технологический-стек)
+[![package manager](https://img.shields.io/badge/pnpm-10.33.2-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![language](https://img.shields.io/badge/docs-Русский-16a34a)](#документация)
 
-Текущий репозиторий перезапущен в режиме **docs-first**: старый код считается непригодным для продолжения и не является основой новой реализации. История Git сохраняет прежние материалы, но рабочая версия развивается заново: сначала цельная документация, затем новая реализация по утвержденному фазовому плану.
+**KISS PM** — агентная SaaS/self-hosted платформа для управления проектами, ресурсной загрузкой и управленческими действиями.
 
-## Что строим
-
-KISS PM — не набор отчетов и не BitrixReports-клон. Это платформа, где CRM-вход, оценка емкости, проектный план, Gantt, задачи, ресурсная матрица, KPI, управленческие действия, аудит и ретроспективы образуют один рабочий контур.
-
-Ключевая идея:
+Главный рабочий цикл продукта:
 
 ```txt
-увидел сигнал -> понял причину -> выбрал разрешенное действие -> система проверила действие -> действие записано в аудит -> состояние пересчитано
+цель → запуск агента → proposed project diff → ревью → применение → аудит
 ```
 
-## Что находится в репозитории сейчас
+KISS PM не пытается стать еще одной доской задач или BI-панелью. Продукт ведет пользователя от намерения к проверяемому изменению проекта: агент готовит структурированный diff, человек выбирает, что применить, система проверяет права и сохраняет след решения.
 
-- `AGENTS.md` — правила работы для agent/агентов.
-- `docs/` — русскоязычный canonical baseline продукта.
-- `docs/references/` — обязательные референсы: BR2-скриншоты и русские выжимки по MS Project scheduling.
-- `apps/api` — первый Node/Hono API shell.
-- `apps/web` — Next.js App Router web shell на React/TypeScript.
-- `packages/domain` — минимальная tenant/user domain model.
-- `packages/access-control` — минимальная проверка tenant access.
-- `packages/persistence` — PostgreSQL/Drizzle schema, первая migration и audit event foundation.
-- `packages/test-fixtures` — детерминированные фикстуры для Phase 1.
-- Phase 2.2 runtime — single-workspace экран входа, пользователи, роли доступа, должности, профиль, тема и audit-backed CRUD через API.
-- Web runtime: Next.js App Router. Authenticated workspace shell остается client-side UI поверх cookie-сессии `kiss_pm_session`; `/api/...` и `/health` в dev проксируются Next rewrites в отдельный Node/Hono backend `apps/api`.
+---
 
-## Команды старта
+## Что внутри
+
+- **Agent-first project management** — проектный агент готовит изменения, но не меняет состояние без ревью.
+- **Project diff / Сверка** — задачи, сроки, владельцы, зависимости, риски и сообщения видны до применения.
+- **Управленческий контроль** — важные действия проходят права, preconditions и audit trail.
+- **Планирование и ресурсы** — Gantt/WBS, задачи, роли, capacity, resource matrix и KPI строятся на единой модели.
+- **Founder-beta runtime** — рабочие маршруты с реальными API contracts, PostgreSQL persistence, RBAC и E2E/QA gate.
+
+```mermaid
+flowchart LR
+  A[Цель пользователя] --> B[Запуск агента]
+  B --> C[Диагностика проекта]
+  C --> D[Proposed project diff]
+  D --> E{Ревью человеком}
+  E -->|Применить выбранное| F[Application command]
+  E -->|Отклонить| G[Без изменения состояния]
+  F --> H[Проверка прав и preconditions]
+  H --> I[Изменение проекта]
+  I --> J[Audit trail]
+```
+
+## Статус проекта
+
+Репозиторий уже содержит рабочую Node + pnpm монорепо-реализацию и остается **docs-first** по архитектурным решениям.
+
+Текущий фокус: **founder-beta / runtime readiness** — не декоративные экраны, а проверяемые маршруты с реальными данными, действиями, правами, аудитом и screenshot/runtime evidence.
+
+## Технологический стек
+
+| Слой | Технологии |
+|---|---|
+| Backend | Node.js, Hono, OpenAPI/Scalar |
+| Frontend | Next.js App Router, React, TypeScript |
+| Persistence | PostgreSQL, Drizzle |
+| UI | design-v3 tokens, BEM-oriented styles, Storybook catalog |
+| Testing | Vitest, Playwright, runtime QA gates |
+| Monorepo | pnpm workspaces |
+
+## Структура репозитория
+
+```txt
+apps/
+  api/       Node/Hono backend, OpenAPI, RBAC, audit, runtime routes
+  web/       Next.js runtime UI, workspace shell, design-v3 screens
+  landing/   marketing-facing landing experiments
+
+packages/
+  domain/                 доменная модель
+  access-control/         права и access checks
+  persistence/            PostgreSQL/Drizzle schema и migrations
+  planning-client/        planning API client/contracts
+  planning-gantt-ui/      Gantt/planning UI package
+  tenant-org-structure/   оргструктура tenant/workspace
+  test-fixtures/          детерминированные фикстуры
+
+docs/        canonical product, architecture, API, beta, runbook и marketing docs
+e2e/         Playwright smoke, runtime, planning и a11y проверки
+scripts/     dev seed, runtime QA и security automation
+```
+
+## Быстрый старт
+
+### 1. Установить зависимости
 
 ```bash
 pnpm install
-pnpm test
-pnpm typecheck
-pnpm dev:api
-pnpm dev:web
 ```
 
-Чтобы держать PostgreSQL, API и web включенными через Docker Compose с live reload:
+### 2. Запустить полный dev runtime через Docker Compose
 
 ```bash
 pnpm dev:compose
 ```
 
-Для фонового запуска:
+Команда поднимает PostgreSQL, API и web, применяет миграции, выполняет dev seed и держит frontend/backend включенными для live reload.
+
+Для фонового режима:
 
 ```bash
 pnpm dev:compose:detached
 ```
 
-После запуска web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, PostgreSQL — на `127.0.0.1:55432`. Compose сам ставит зависимости в Linux-volume, применяет миграции и выполняет dev seed перед стартом API.
+### 3. Открыть приложение
 
-Для локального PostgreSQL слоя через Docker Compose:
+| Сервис | URL |
+|---|---|
+| Web | `http://127.0.0.1:3000` |
+| API | `http://127.0.0.1:4000` |
+| PostgreSQL | `127.0.0.1:55432` |
+
+Dev-вход после seed:
+
+```txt
+admin@kiss-pm.local / local-admin-password
+```
+
+Пример окружения без секретов находится в `.env.example`.
+
+## Ручной запуск слоев
 
 ```bash
 pnpm db:up
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed:dev
-pnpm test:db
-pnpm test:e2e:smoke
+pnpm dev:api
+pnpm dev:web
+```
+
+Остановить локальный PostgreSQL слой:
+
+```bash
 pnpm db:down
 ```
 
-Playwright smoke поднимает отдельные web/API процессы на `127.0.0.1:3100` и `127.0.0.1:4100`, чтобы не переиспользовать живой Docker/dev runtime на `3000/4000`. Порты можно переопределить через `E2E_WEB_PORT` и `E2E_API_PORT`.
+## Проверки
 
-Локальный вход после seed: `admin@kiss-pm.local` / `local-admin-password`.
+| Команда | Что проверяет |
+|---|---|
+| `pnpm typecheck` | TypeScript project references |
+| `pnpm test` | unit/integration tests через Vitest |
+| `pnpm test:db` | DB-backed тесты |
+| `pnpm test:e2e:smoke` | основной browser/API smoke |
+| `pnpm qa:runtime` | runtime QA gate для beta routes |
+| `pnpm verify:storybook-contract` | Storybook/design-v3 contract |
+| `pnpm security:check` | backend security audit + scan |
+| `pnpm qa:release` | полный release-like gate |
 
-`DATABASE_URL` задается через окружение. Пример без секретов есть в `.env.example`.
+Playwright smoke поднимает изолированные web/API процессы на `127.0.0.1:3100` и `127.0.0.1:4100`, чтобы не переиспользовать случайно запущенный dev runtime. Порты можно переопределить через `E2E_WEB_PORT` и `E2E_API_PORT`.
 
-## Как работать дальше
+## Документация
 
-1. Сначала читать `AGENTS.md`.
-2. Затем читать `docs/README.md` и документы по порядку.
-3. Писать код только внутри утвержденной фазы и с тестами.
-4. Любая реализация должна иметь E2E-доказательство для управленческих потоков.
-5. В пользовательском языке продукт описывается по-русски. Кодовые идентификаторы в будущей реализации могут быть на английском.
+Главный вход: [`docs/README.md`](docs/README.md).
+
+Ключевые разделы:
+
+- [`docs/api/`](docs/api/) — frontend-facing API conventions, OpenAPI coverage и screen recipes.
+- [`docs/design-v3/`](docs/design-v3/) — визуальный контракт, токены, Storybook правила и shadcn overrides.
+- [`docs/runbooks/`](docs/runbooks/) — backend operations, self-hosted deployment и E2E smoke.
+- [`docs/plans/`](docs/plans/) — активные планы реализации и улучшений.
+- [`docs/status/`](docs/status/) — ledger/status документы, evidence и история закрытых фаз.
+- [`AGENTS.md`](AGENTS.md) — обязательные правила для agent/агентов в этом репозитории.
+
+## Принципы разработки
+
+1. Сначала документация и контракт, затем реализация.
+2. Runtime UI не показывает fake/demo controls без рабочего сценария или явного disabled reason.
+3. Существенное изменение состояния проходит `proposal → confirmation → result/audit`.
+4. Tenant-специфичные роли, стадии, KPI, поля и названия живут в настройках, не в коде.
+5. CRM, Bitrix24, AmoCRM, Jira, Slack, email и MS Project — интеграционные адаптеры, не ядро домена.
+6. Любая beta/runtime доработка должна иметь targeted verification: тест, E2E, screenshot или документированный blocker.
+
+## Лицензия
+
+Лицензия в репозитории не указана.
