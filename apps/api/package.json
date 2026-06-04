@@ -19,7 +19,7 @@
     "@kiss-pm/test-fixtures": "workspace:*",
     "@scalar/hono-api-reference": "^0.10.19",
     "hono": "^4.7.10",
-    "redis": "^5.12.1"
+    "redis": "^6.0.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
