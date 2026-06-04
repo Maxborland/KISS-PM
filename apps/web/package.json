@@ -84,7 +84,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.20.0",
     "eslint-config-next": "^16.2.6",
-    "happy-dom": "^15.11.7",
+    "happy-dom": "^20.10.1",
     "postcss": "^8.5.14",
     "serve": "^14.2.4",
     "shadcn": "^4.7.0",
