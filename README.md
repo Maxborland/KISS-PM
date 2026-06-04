@@ -99,7 +99,7 @@ packages/
   tenant-org-structure/   tenant/workspace organization model
   test-fixtures/          deterministic test fixtures
 
-docs/        product, architecture, API, runbook, planning, and status docs
+.github/     workflows, issue templates, and pull request template
 e2e/         Playwright smoke, runtime, planning, and accessibility checks
 scripts/     dev seed, runtime QA, and security automation
 ```
@@ -140,13 +140,9 @@ pnpm dev:compose:detached
 | API | `http://127.0.0.1:4000` |
 | PostgreSQL | `127.0.0.1:55432` |
 
-Development seed login:
+Development seed credentials are intentionally local-only and may change. Check the seed script or local runtime output after `pnpm db:seed:dev`.
 
-```txt
-admin@kiss-pm.local / local-admin-password
-```
-
-A secret-free environment example is available in `.env.example`.
+A secret-free environment example is available in `.env.example`; replace all example values before using any non-local environment.
 
 ## Manual service workflow
 
@@ -178,18 +174,15 @@ pnpm db:down
 
 Playwright smoke tests start isolated web/API processes on `127.0.0.1:3100` and `127.0.0.1:4100` so they do not accidentally reuse an already-running development runtime. Override ports with `E2E_WEB_PORT` and `E2E_API_PORT` when needed.
 
-## Documentation
+## Public project resources
 
-Start with [`docs/README.md`](docs/README.md).
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution workflow and review expectations.
+- [SECURITY.md](SECURITY.md) — private vulnerability reporting and safe testing scope.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards.
+- [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE) — issue forms for bugs and feature requests.
+- [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — pull request checklist.
 
-Key areas:
-
-- [`docs/api/`](docs/api/) — frontend-facing API conventions, OpenAPI coverage, and screen recipes.
-- [`docs/design-v3/`](docs/design-v3/) — visual contract, tokens, Storybook rules, and shadcn overrides.
-- [`docs/runbooks/`](docs/runbooks/) — backend operations, self-hosted deployment, and E2E smoke.
-- [`docs/plans/`](docs/plans/) — active implementation and improvement plans.
-- [`docs/status/`](docs/status/) — status ledgers, evidence, and closed phase history.
-- [`AGENTS.md`](AGENTS.md) — repository rules for agent-assisted work.
+Detailed product strategy, private planning notes, reference screenshots, and operational runbooks are intentionally not published in this public repository.
 
 ## Development principles
 
@@ -202,7 +195,7 @@ Key areas:
 
 ## Contributing
 
-Issues and pull requests are welcome when they preserve the product direction: reviewable project changes, human confirmation, permission checks, and auditability. For larger changes, start from the relevant docs and keep the implementation slice small, testable, and grounded in existing architecture.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests are welcome when they preserve the product direction: reviewable project changes, human confirmation, permission checks, and auditability.
 
 ## License
 
