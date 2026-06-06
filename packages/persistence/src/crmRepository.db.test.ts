@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -21,7 +21,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client`
       INSERT INTO tenants (id, name, created_at)
       VALUES
@@ -35,7 +35,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -217,5 +217,135 @@ describe("Phase 3.1 CRM persistence", () => {
         demand: [{ positionId: "position-engineer", requiredHours: 20 }]
       })
     ).rejects.toThrow();
+  });
+
+  it("persists CRM pipelines, stages, transition rules and automation definitions per tenant", async () => {
+    const pipeline = await dataSource.createCrmPipeline({
+      id: "pipeline-architecture-sales",
+      tenantId: "tenant-alpha",
+      name: "Architecture sales",
+      status: "active",
+      lifecycleGraphMetadata: {
+        pipelineId: "pipeline-architecture-sales",
+        initialStageId: null,
+        finalStageIds: [],
+        stages: [],
+        transitions: []
+      }
+    });
+
+    const firstStage = await dataSource.createCrmPipelineStage({
+      id: "pipeline-stage-intake",
+      tenantId: "tenant-alpha",
+      pipelineId: pipeline.id,
+      name: "Intake",
+      sortOrder: 10,
+      status: "active",
+      lifecycleState: "open",
+      isFinal: false
+    });
+    const wonStage = await dataSource.createCrmPipelineStage({
+      id: "pipeline-stage-won",
+      tenantId: "tenant-alpha",
+      pipelineId: pipeline.id,
+      name: "Won",
+      sortOrder: 90,
+      status: "active",
+      lifecycleState: "won_closed",
+      isFinal: true
+    });
+    const rule = await dataSource.createCrmPipelineTransitionRule({
+      id: "pipeline-rule-intake-won",
+      tenantId: "tenant-alpha",
+      pipelineId: pipeline.id,
+      fromStageId: firstStage.id,
+      toStageId: wonStage.id,
+      requiredPermission: "tenant.opportunities.manage",
+      requiredFields: ["contractValue", "plannedFinish"],
+      requireReason: true,
+      status: "active"
+    });
+    const automation = await dataSource.createCrmPipelineStageAutomationDefinition({
+      id: "pipeline-automation-won-task",
+      tenantId: "tenant-alpha",
+      pipelineId: pipeline.id,
+      stageId: wonStage.id,
+      trigger: "stage_entered",
+      actionType: "create_task",
+      actionConfig: { title: "Prepare project handoff" },
+      status: "active"
+    });
+
+    await expect(dataSource.listCrmPipelines("tenant-alpha")).resolves.toEqual([
+      expect.objectContaining({ id: pipeline.id, name: "Architecture sales" })
+    ]);
+    await expect(dataSource.listCrmPipelines("tenant-beta")).resolves.toEqual([]);
+    await expect(
+      dataSource.findCrmPipelineById("tenant-alpha", pipeline.id)
+    ).resolves.toMatchObject({ id: pipeline.id });
+    await expect(
+      dataSource.findCrmPipelineById("tenant-beta", pipeline.id)
+    ).resolves.toBeUndefined();
+    await expect(dataSource.listCrmPipelineStages("tenant-alpha", pipeline.id)).resolves.toEqual([
+      expect.objectContaining({ id: firstStage.id, sortOrder: 10 }),
+      expect.objectContaining({ id: wonStage.id, isFinal: true })
+    ]);
+    await expect(
+      dataSource.listCrmPipelineTransitionRules("tenant-alpha", pipeline.id)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: rule.id,
+        requiredFields: ["contractValue", "plannedFinish"]
+      })
+    ]);
+    await expect(
+      dataSource.listCrmPipelineStageAutomationDefinitions("tenant-alpha", pipeline.id)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: automation.id,
+        actionConfig: { title: "Prepare project handoff" }
+      })
+    ]);
+
+    await expect(
+      dataSource.updateCrmPipelineStage({
+        ...firstStage,
+        name: "Initial intake",
+        status: "archived"
+      })
+    ).resolves.toMatchObject({
+      id: firstStage.id,
+      name: "Initial intake",
+      status: "archived"
+    });
+    await expect(
+      dataSource.updateCrmPipelineTransitionRule({
+        ...rule,
+        requireReason: false,
+        status: "archived"
+      })
+    ).resolves.toMatchObject({ id: rule.id, requireReason: false, status: "archived" });
+    await expect(
+      dataSource.updateCrmPipelineStageAutomationDefinition({
+        ...automation,
+        actionConfig: { title: "Prepare project handoff", priority: "high" },
+        status: "archived"
+      })
+    ).resolves.toMatchObject({
+      id: automation.id,
+      actionConfig: { title: "Prepare project handoff", priority: "high" },
+      status: "archived"
+    });
+    await expect(
+      dataSource.updateCrmPipeline({
+        ...pipeline,
+        name: "Architecture sales v2",
+        status: "archived"
+      })
+    ).resolves.toMatchObject({
+      id: pipeline.id,
+      name: "Architecture sales v2",
+      status: "archived"
+    });
   });
 });
