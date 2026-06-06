@@ -89,4 +89,42 @@ describe("CRM pipeline API contract schemas", () => {
     expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}/transition-rules"]?.post?.requestBody).toBeDefined();
     expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}/automations"]?.post?.requestBody).toBeDefined();
   });
+
+  it("documents CRM pipeline PATCH bodies as partial updates", () => {
+    const document = createKissPmOpenApiDocument() as {
+      components: {
+        schemas: Record<string, { required?: string[] }>;
+      };
+      paths: Record<
+        string,
+        Record<string, { requestBody?: { content?: { "application/json"?: { schema?: { $ref?: string } } } } }>
+      >;
+    };
+
+    expect(document.components.schemas.CrmPipelinePatchRequest).toBeDefined();
+    expect(document.components.schemas.CrmPipelineStagePatchRequest).toBeDefined();
+    expect(document.components.schemas.CrmPipelineTransitionRulePatchRequest).toBeDefined();
+    expect(document.components.schemas.CrmPipelineStageAutomationPatchRequest).toBeDefined();
+    expect(document.components.schemas.CrmPipelinePatchRequest?.required).toBeUndefined();
+    expect(document.components.schemas.CrmPipelineStagePatchRequest?.required).toBeUndefined();
+    expect(document.components.schemas.CrmPipelineTransitionRulePatchRequest?.required).toBeUndefined();
+    expect(document.components.schemas.CrmPipelineStageAutomationPatchRequest?.required).toBeUndefined();
+    expect(
+      document.paths["/api/workspace/crm/pipelines/{pipelineId}"]?.patch?.requestBody?.content?.[
+        "application/json"
+      ]?.schema?.$ref
+    ).toBe("#/components/schemas/CrmPipelinePatchRequest");
+    expect(
+      document.paths["/api/workspace/crm/pipelines/{pipelineId}/stages/{stageId}"]?.patch?.requestBody
+        ?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/CrmPipelineStagePatchRequest");
+    expect(
+      document.paths["/api/workspace/crm/pipelines/{pipelineId}/transition-rules/{ruleId}"]?.patch
+        ?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/CrmPipelineTransitionRulePatchRequest");
+    expect(
+      document.paths["/api/workspace/crm/pipelines/{pipelineId}/automations/{automationId}"]?.patch
+        ?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/CrmPipelineStageAutomationPatchRequest");
+  });
 });

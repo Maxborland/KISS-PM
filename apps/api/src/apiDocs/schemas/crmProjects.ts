@@ -314,6 +314,14 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  CrmPipelinePatchRequest: {
+    type: "object",
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      status: crmStatusSchema
+    },
+    additionalProperties: false
+  },
   CrmPipelinesResponse: {
     type: "object",
     required: ["pipelines"],
@@ -357,6 +365,17 @@ export const crmProjectSchemas = openApiSchemaFragment({
       status: crmStatusSchema,
       lifecycleState: { type: "string", enum: ["open", "won_closed", "lost_rejected"], default: "open" },
       isFinal: { type: "boolean", default: false }
+    },
+    additionalProperties: false
+  },
+  CrmPipelineStagePatchRequest: {
+    type: "object",
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
+      status: crmStatusSchema,
+      lifecycleState: { type: "string", enum: ["open", "won_closed", "lost_rejected"] },
+      isFinal: { type: "boolean" }
     },
     additionalProperties: false
   },
@@ -408,6 +427,18 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  CrmPipelineTransitionRulePatchRequest: {
+    type: "object",
+    properties: {
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema,
+      requiredPermission: nullableStringSchema,
+      requiredFields: { type: "array", items: { type: "string" } },
+      requireReason: { type: "boolean" },
+      status: crmStatusSchema
+    },
+    additionalProperties: false
+  },
   CrmPipelineTransitionRulesResponse: {
     type: "object",
     required: ["transitionRules"],
@@ -446,6 +477,17 @@ export const crmProjectSchemas = openApiSchemaFragment({
     required: ["stageId", "trigger", "actionType", "actionConfig"],
     properties: {
       id: stringIdSchema,
+      stageId: stringIdSchema,
+      trigger: { type: "string", enum: ["stage_entered", "stage_left"] },
+      actionType: { type: "string", minLength: 1, maxLength: 120 },
+      actionConfig: schemaRef("AnyJsonObject"),
+      status: crmStatusSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineStageAutomationPatchRequest: {
+    type: "object",
+    properties: {
       stageId: stringIdSchema,
       trigger: { type: "string", enum: ["stage_entered", "stage_left"] },
       actionType: { type: "string", minLength: 1, maxLength: 120 },

@@ -144,6 +144,115 @@ describe("CRM pipeline routes", () => {
     ]);
   });
 
+  it("preserves omitted CRM pipeline PATCH fields", async () => {
+    const fixture = createRouteFixture(adminProfile);
+    const headers = {
+      "content-type": "application/json",
+      cookie: "kiss_pm_session=test"
+    };
+    const requestJson = (path: string, method: "POST" | "PATCH", body: Record<string, unknown>) =>
+      fixture.app.request(path, { method, headers, body: JSON.stringify(body) });
+    const expectCreated = async (path: string, body: Record<string, unknown>) => {
+      const response = await requestJson(path, "POST", body);
+      expect(response.status).toBe(201);
+    };
+
+    await expectCreated("/api/workspace/crm/pipelines", {
+      id: "pipeline-retained",
+      name: "Retained",
+      status: "archived"
+    });
+    await expectCreated("/api/workspace/crm/pipelines/pipeline-retained/stages", {
+      id: "pipeline-stage-open",
+      name: "Open",
+      sortOrder: 10
+    });
+    await expectCreated("/api/workspace/crm/pipelines/pipeline-retained/stages", {
+      id: "pipeline-stage-final",
+      name: "Final",
+      sortOrder: 90,
+      lifecycleState: "won_closed",
+      isFinal: true
+    });
+    await expectCreated("/api/workspace/crm/pipelines/pipeline-retained/transition-rules", {
+      id: "pipeline-rule-retained",
+      fromStageId: "pipeline-stage-open",
+      toStageId: "pipeline-stage-final",
+      requiredPermission: "tenant.crm.deals.close",
+      requiredFields: ["contractValue"],
+      requireReason: true
+    });
+    await expectCreated("/api/workspace/crm/pipelines/pipeline-retained/automations", {
+      id: "pipeline-automation-retained",
+      stageId: "pipeline-stage-final",
+      trigger: "stage_left",
+      actionType: "create_task",
+      actionConfig: { title: "Prepare handoff" },
+      status: "archived"
+    });
+
+    const pipelinePatch = await requestJson("/api/workspace/crm/pipelines/pipeline-retained", "PATCH", {
+      name: "Retained renamed"
+    });
+    expect(pipelinePatch.status).toBe(200);
+    await expect(pipelinePatch.json()).resolves.toMatchObject({
+      pipeline: {
+        name: "Retained renamed",
+        status: "archived",
+        lifecycleGraphMetadata: {
+          initialStageId: "pipeline-stage-open",
+          finalStageIds: ["pipeline-stage-final"]
+        }
+      }
+    });
+
+    const stagePatch = await requestJson(
+      "/api/workspace/crm/pipelines/pipeline-retained/stages/pipeline-stage-final",
+      "PATCH",
+      { name: "Final renamed", sortOrder: 95, status: "archived" }
+    );
+    expect(stagePatch.status).toBe(200);
+    await expect(stagePatch.json()).resolves.toMatchObject({
+      stage: {
+        name: "Final renamed",
+        sortOrder: 95,
+        status: "archived",
+        lifecycleState: "won_closed",
+        isFinal: true
+      }
+    });
+
+    const transitionRulePatch = await requestJson(
+      "/api/workspace/crm/pipelines/pipeline-retained/transition-rules/pipeline-rule-retained",
+      "PATCH",
+      { status: "archived" }
+    );
+    expect(transitionRulePatch.status).toBe(200);
+    await expect(transitionRulePatch.json()).resolves.toMatchObject({
+      transitionRule: {
+        status: "archived",
+        requiredPermission: "tenant.crm.deals.close",
+        requiredFields: ["contractValue"],
+        requireReason: true
+      }
+    });
+
+    const automationPatch = await requestJson(
+      "/api/workspace/crm/pipelines/pipeline-retained/automations/pipeline-automation-retained",
+      "PATCH",
+      { actionType: "create_task_v2" }
+    );
+    expect(automationPatch.status).toBe(200);
+    await expect(automationPatch.json()).resolves.toMatchObject({
+      automation: {
+        trigger: "stage_left",
+        actionType: "create_task_v2",
+        actionConfig: { title: "Prepare handoff" },
+        status: "archived"
+      }
+    });
+  });
+
   it("records denied audit events for forbidden mutations", async () => {
     const fixture = createRouteFixture(readerProfile);
     const response = await fixture.app.request("/api/workspace/crm/pipelines", {

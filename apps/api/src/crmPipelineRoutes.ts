@@ -142,7 +142,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!beforeState) return context.json({ error: "crm_pipeline_not_found" }, 404);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCrmPipelineBody(body.value, actor.tenantId, beforeState);
+    const parsed = parseCrmPipelineBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, beforeState);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
@@ -300,7 +300,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!beforeState) return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCrmPipelineStageBody(body.value, actor.tenantId, pipelineId, stageId);
+    const parsed = parseCrmPipelineStageBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, pipelineId, stageId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const stage = await runDataSourceTransaction(async (transactionDataSource) => {
@@ -466,7 +466,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!beforeState) return context.json({ error: "crm_pipeline_transition_rule_not_found" }, 404);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCrmPipelineTransitionRuleBody(body.value, actor.tenantId, pipelineId, ruleId);
+    const parsed = parseCrmPipelineTransitionRuleBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, pipelineId, ruleId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     if (
       !(await dataSource.findCrmPipelineStageById(actor.tenantId, pipelineId, parsed.value.fromStageId)) ||
@@ -632,7 +632,12 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!beforeState) return context.json({ error: "crm_pipeline_stage_automation_not_found" }, 404);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCrmPipelineStageAutomationDefinitionBody(body.value, actor.tenantId, pipelineId, automationId);
+    const parsed = parseCrmPipelineStageAutomationDefinitionBody(
+      patchBodyWithExisting(beforeState, body.value),
+      actor.tenantId,
+      pipelineId,
+      automationId
+    );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     if (!(await dataSource.findCrmPipelineStageById(actor.tenantId, pipelineId, parsed.value.stageId))) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
@@ -692,6 +697,11 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       }
     });
   }
+}
+
+function patchBodyWithExisting<T extends object>(existing: T, body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  return { ...existing, ...(body as Record<string, unknown>) };
 }
 
 function auditInput(input: {
