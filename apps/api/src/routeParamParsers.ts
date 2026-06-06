@@ -74,6 +74,22 @@ export function parseDealStageIdParam(value: unknown): RouteParamParseResult {
   return parseCrmIdentifier(value, "invalid_deal_stage_id");
 }
 
+export function parseCrmPipelineIdParam(value: unknown): RouteParamParseResult {
+  return parseCrmIdentifier(value, "invalid_crm_pipeline_id");
+}
+
+export function parseCrmPipelineStageIdParam(value: unknown): RouteParamParseResult {
+  return parseCrmIdentifier(value, "invalid_crm_pipeline_stage_id");
+}
+
+export function parseCrmPipelineTransitionRuleIdParam(value: unknown): RouteParamParseResult {
+  return parseCrmIdentifier(value, "invalid_crm_pipeline_transition_rule_id");
+}
+
+export function parseCrmPipelineAutomationIdParam(value: unknown): RouteParamParseResult {
+  return parseCrmIdentifier(value, "invalid_crm_pipeline_automation_id");
+}
+
 export function parseOpportunityIdParam(value: unknown): RouteParamParseResult {
   return parseCrmIdentifier(value, "invalid_opportunity_id");
 }

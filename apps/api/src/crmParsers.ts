@@ -1,6 +1,15 @@
+import {
+  isCrmPipelineAutomationTrigger,
+  isCrmPipelineLifecycleState,
+  isCrmPipelineStatus
+} from "@kiss-pm/domain";
 import type {
   ClientInput,
   ContactInput,
+  CrmPipelineInput,
+  CrmPipelineStageAutomationDefinitionInput,
+  CrmPipelineStageInput,
+  CrmPipelineTransitionRuleInput,
   DealStageInput,
   ProductInput,
   ProjectTypeInput
@@ -28,7 +37,10 @@ const maxLengths = {
   sku: 80,
   unit: 40,
   telegram: 80,
-  role: 120
+  role: 120,
+  actionType: 120,
+  permission: 160,
+  fieldKey: 120
 } as const;
 
 export function parseClientBody(
@@ -184,6 +196,161 @@ export function parseProjectTypeBody(
   return { ok: true, value: { id, tenantId, name, description, status } };
 }
 
+
+export function parseCrmPipelineBody(
+  body: unknown,
+  tenantId: string,
+  existing?: Pick<CrmPipelineInput, "id" | "lifecycleGraphMetadata">
+): ParseResult<CrmPipelineInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existing?.id ?? getOptionalString(input, "id") ?? `crm-pipeline-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
+    return { ok: false, error: "invalid_crm_pipeline_name" };
+  }
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      name,
+      status,
+      lifecycleGraphMetadata: existing?.lifecycleGraphMetadata ?? {
+        pipelineId: id,
+        initialStageId: null,
+        finalStageIds: [],
+        stages: [],
+        transitions: []
+      }
+    }
+  };
+}
+
+export function parseCrmPipelineStageBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineStageInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-stage-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const sortOrder = parsePositiveInteger(input.sortOrder);
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+  const lifecycleState = parseCrmPipelineLifecycleStateValue(
+    getOptionalString(input, "lifecycleState") ?? "open"
+  );
+  const isFinal = parseBoolean(input.isFinal, false);
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_stage_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
+    return { ok: false, error: "invalid_crm_pipeline_stage_name" };
+  }
+  if (sortOrder === null) return { ok: false, error: "invalid_sort_order" };
+  if (!status) return { ok: false, error: "invalid_status" };
+  if (!lifecycleState) return { ok: false, error: "invalid_lifecycle_state" };
+  if (isFinal === null) return { ok: false, error: "invalid_is_final" };
+  if (isFinal && lifecycleState === "open") return { ok: false, error: "invalid_final_lifecycle_state" };
+  if (!isFinal && lifecycleState !== "open") {
+    return { ok: false, error: "invalid_open_lifecycle_state" };
+  }
+
+  return {
+    ok: true,
+    value: { id, tenantId, pipelineId, name, sortOrder, status, lifecycleState, isFinal }
+  };
+}
+
+export function parseCrmPipelineTransitionRuleBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineTransitionRuleInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-rule-${crypto.randomUUID()}`;
+  const fromStageId = getOptionalString(input, "fromStageId");
+  const toStageId = getOptionalString(input, "toStageId");
+  const requiredPermission = getOptionalString(input, "requiredPermission") ?? null;
+  const requiredFields = parseStringArray(input.requiredFields ?? []);
+  const requireReason = parseBoolean(input.requireReason, false);
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_transition_rule_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!fromStageId || !isId(fromStageId)) return { ok: false, error: "invalid_from_stage_id" };
+  if (!toStageId || !isId(toStageId)) return { ok: false, error: "invalid_to_stage_id" };
+  if (fromStageId === toStageId) return { ok: false, error: "invalid_transition_self_loop" };
+  if (
+    requiredPermission !== null &&
+    !isSafeSingleLineText(requiredPermission, maxLengths.permission)
+  ) {
+    return { ok: false, error: "invalid_required_permission" };
+  }
+  if (!requiredFields || !requiredFields.every(isFieldKey)) {
+    return { ok: false, error: "invalid_required_fields" };
+  }
+  if (requireReason === null) return { ok: false, error: "invalid_require_reason" };
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      pipelineId,
+      fromStageId,
+      toStageId,
+      requiredPermission,
+      requiredFields,
+      requireReason,
+      status
+    }
+  };
+}
+
+export function parseCrmPipelineStageAutomationDefinitionBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineStageAutomationDefinitionInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-automation-${crypto.randomUUID()}`;
+  const stageId = getOptionalString(input, "stageId");
+  const trigger = parseCrmPipelineAutomationTriggerValue(
+    getOptionalString(input, "trigger") ?? "stage_entered"
+  );
+  const actionType = getOptionalString(input, "actionType");
+  const actionConfig = parseJsonObject(input.actionConfig ?? {});
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_automation_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!stageId || !isId(stageId)) return { ok: false, error: "invalid_crm_pipeline_stage_id" };
+  if (!trigger) return { ok: false, error: "invalid_automation_trigger" };
+  if (!actionType || !isSafeSingleLineText(actionType, maxLengths.actionType)) {
+    return { ok: false, error: "invalid_action_type" };
+  }
+  if (!actionConfig) return { ok: false, error: "invalid_action_config" };
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: { id, tenantId, pipelineId, stageId, trigger, actionType, actionConfig, status }
+  };
+}
+
 export function parseDealStageBody(
   body: unknown,
   tenantId: string
@@ -215,6 +382,45 @@ export function parseDealStageChangeBody(body: unknown): ParseResult<{ stageId: 
 
 export function isId(value: string): boolean {
   return idPattern.test(value);
+}
+
+
+function parseCrmPipelineStatusValue(value: string) {
+  return isCrmPipelineStatus(value) ? value : null;
+}
+
+function parseCrmPipelineLifecycleStateValue(value: string) {
+  return isCrmPipelineLifecycleState(value) ? value : null;
+}
+
+function parseCrmPipelineAutomationTriggerValue(value: string) {
+  return isCrmPipelineAutomationTrigger(value) ? value : null;
+}
+
+function parseBoolean(value: unknown, defaultValue: boolean): boolean | null {
+  if (value === undefined) return defaultValue;
+  return typeof value === "boolean" ? value : null;
+}
+
+function parseStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const parsed: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") return null;
+    const trimmed = item.trim();
+    if (!trimmed) return null;
+    parsed.push(trimmed);
+  }
+  return parsed;
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function isFieldKey(value: string): boolean {
+  return isSafeSingleLineText(value, maxLengths.fieldKey) && /^[a-zA-Z][a-zA-Z0-9_.-]*$/.test(value);
 }
 
 function parseStatus(value: string): "active" | "archived" | null {
