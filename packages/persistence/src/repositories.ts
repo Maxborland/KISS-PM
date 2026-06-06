@@ -39,6 +39,10 @@ import {
   type ClientRecord,
   type ContactInput,
   type ContactRecord,
+  type CrmPipelineInput,
+  type CrmPipelineStageAutomationDefinitionInput,
+  type CrmPipelineStageInput,
+  type CrmPipelineTransitionRuleInput,
   type CrmRepository,
   type DealStageInput,
   type DealStageRecord,
@@ -102,7 +106,7 @@ export type ProjectTemplateRecord = {
   updatedAt: Date;
 };
 export type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
-export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
+export type { ClientInput, ClientRecord, ContactInput, ContactRecord, CrmPipelineInput, CrmPipelineStageAutomationDefinitionInput, CrmPipelineStageInput, CrmPipelineTransitionRuleInput, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;

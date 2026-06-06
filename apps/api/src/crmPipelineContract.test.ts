@@ -76,4 +76,17 @@ describe("CRM pipeline API contract schemas", () => {
       "updatedAt"
     ]);
   });
+
+  it("publishes first-class pipeline management routes", () => {
+    const document = createKissPmOpenApiDocument() as {
+      paths: Record<string, Record<string, { responses?: Record<number, unknown>; requestBody?: unknown }>>;
+    };
+
+    expect(document.paths["/api/workspace/crm/pipelines"]?.get?.responses?.[200]).toBeDefined();
+    expect(document.paths["/api/workspace/crm/pipelines"]?.post?.requestBody).toBeDefined();
+    expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}"]?.patch?.requestBody).toBeDefined();
+    expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}/stages"]?.post?.requestBody).toBeDefined();
+    expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}/transition-rules"]?.post?.requestBody).toBeDefined();
+    expect(document.paths["/api/workspace/crm/pipelines/{pipelineId}/automations"]?.post?.requestBody).toBeDefined();
+  });
 });
