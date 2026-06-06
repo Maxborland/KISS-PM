@@ -6,8 +6,8 @@ import {
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { Hono } from "hono";
-import type { ManagementAuditEventInput } from "./apiTypes";
+import type { Context, Hono } from "hono";
+import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
 import {
   parseCrmPipelineBody,
   parseCrmPipelineStageAutomationDefinitionBody,
@@ -22,6 +22,17 @@ import {
   parseCrmPipelineTransitionRuleIdParam
 } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
+
+type CrmPipelinePolicy = (input: {
+  actor: TenantUser;
+  profile: Awaited<ReturnType<ApiRouteDeps["getActorProfile"]>>;
+  targetTenantId: string;
+}) => PolicyDecision;
+
+type AuditEntity = {
+  type: string;
+  id: string;
+};
 
 export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
   const {
@@ -39,11 +50,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canReadCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canReadCrmPipelines);
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     return context.json({ pipelines: await dataSource.listCrmPipelines(actor.tenantId) });
@@ -60,21 +67,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canManageCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelines);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline.create_denied",
         sourceEntity: { type: "CrmPipeline", id: "unknown" },
-        commandInput: { endpoint: "createCrmPipeline" },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "createCrmPipeline" }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const body = await readLimitedJsonBody(context);
@@ -82,24 +83,19 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createCrmPipeline) {
-        throw new Error("transactional_crm_pipeline_create_not_configured");
+    const pipeline = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline.created",
+      sourceEntityType: "CrmPipeline",
+      commandInput: parsed.value,
+      beforeState: null,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.createCrmPipeline) {
+          throw new Error("transactional_crm_pipeline_create_not_configured");
+        }
+        return transactionDataSource.createCrmPipeline(parsed.value);
       }
-      const created = await transactionDataSource.createCrmPipeline(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline.created",
-          sourceEntity: { type: "CrmPipeline", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
     });
 
     return context.json({ pipeline }, 201);
@@ -121,21 +117,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     }
 
     const pipelineId = parsedPipelineId.value;
-    const decision = canManageCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelines);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline.update_denied",
         sourceEntity: { type: "CrmPipeline", id: pipelineId },
-        commandInput: { endpoint: "updateCrmPipeline", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "updateCrmPipeline", pipelineId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const beforeState = await dataSource.findCrmPipelineById(actor.tenantId, pipelineId);
@@ -145,24 +135,19 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, beforeState);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateCrmPipeline) {
-        throw new Error("transactional_crm_pipeline_update_not_configured");
+    const pipeline = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline.updated",
+      sourceEntityType: "CrmPipeline",
+      commandInput: parsed.value,
+      beforeState,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.updateCrmPipeline) {
+          throw new Error("transactional_crm_pipeline_update_not_configured");
+        }
+        return transactionDataSource.updateCrmPipeline(parsed.value);
       }
-      const updated = await transactionDataSource.updateCrmPipeline(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline.updated",
-          sourceEntity: { type: "CrmPipeline", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
     });
 
     return context.json({ pipeline });
@@ -178,11 +163,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canReadCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canReadCrmPipelines);
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     const pipelineId = parsedPipelineId.value;
@@ -211,21 +192,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     }
 
     const pipelineId = parsedPipelineId.value;
-    const decision = canManageCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelines);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_stage.create_denied",
         sourceEntity: { type: "CrmPipelineStage", id: "unknown" },
-        commandInput: { endpoint: "createCrmPipelineStage", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "createCrmPipelineStage", pipelineId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const pipeline = await dataSource.findCrmPipelineById(actor.tenantId, pipelineId);
@@ -235,25 +210,21 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineStageBody(body.value, actor.tenantId, pipelineId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const stage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-        throw new Error("transactional_crm_pipeline_stage_create_not_configured");
+    const stage = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_stage.created",
+      sourceEntityType: "CrmPipelineStage",
+      commandInput: parsed.value,
+      beforeState: null,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.createCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+          throw new Error("transactional_crm_pipeline_stage_create_not_configured");
+        }
+        const created = await transactionDataSource.createCrmPipelineStage(parsed.value);
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+        return created;
       }
-      const created = await transactionDataSource.createCrmPipelineStage(parsed.value);
-      await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_stage.created",
-          sourceEntity: { type: "CrmPipelineStage", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
     });
 
     return context.json({ stage }, 201);
@@ -279,21 +250,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
 
     const pipelineId = parsedPipelineId.value;
     const stageId = parsedStageId.value;
-    const decision = canManageCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelines);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_stage.update_denied",
         sourceEntity: { type: "CrmPipelineStage", id: stageId },
-        commandInput: { endpoint: "updateCrmPipelineStage", pipelineId, stageId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "updateCrmPipelineStage", pipelineId, stageId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const beforeState = await dataSource.findCrmPipelineStageById(actor.tenantId, pipelineId, stageId);
@@ -303,25 +268,21 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineStageBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, pipelineId, stageId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const stage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-        throw new Error("transactional_crm_pipeline_stage_update_not_configured");
+    const stage = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_stage.updated",
+      sourceEntityType: "CrmPipelineStage",
+      commandInput: parsed.value,
+      beforeState,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.updateCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+          throw new Error("transactional_crm_pipeline_stage_update_not_configured");
+        }
+        const updated = await transactionDataSource.updateCrmPipelineStage(parsed.value);
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+        return updated;
       }
-      const updated = await transactionDataSource.updateCrmPipelineStage(parsed.value);
-      await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_stage.updated",
-          sourceEntity: { type: "CrmPipelineStage", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
     });
 
     return context.json({ stage });
@@ -337,11 +298,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canReadCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canReadCrmPipelines);
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     const pipelineId = parsedPipelineId.value;
@@ -370,21 +327,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     }
 
     const pipelineId = parsedPipelineId.value;
-    const decision = canManageCrmPipelineRules({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelineRules);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_transition_rule.create_denied",
         sourceEntity: { type: "CrmPipelineTransitionRule", id: "unknown" },
-        commandInput: { endpoint: "createCrmPipelineTransitionRule", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "createCrmPipelineTransitionRule", pipelineId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const pipeline = await dataSource.findCrmPipelineById(actor.tenantId, pipelineId);
@@ -400,25 +351,21 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const transitionRule = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-        throw new Error("transactional_crm_pipeline_transition_rule_create_not_configured");
+    const transitionRule = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_transition_rule.created",
+      sourceEntityType: "CrmPipelineTransitionRule",
+      commandInput: parsed.value,
+      beforeState: null,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.createCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+          throw new Error("transactional_crm_pipeline_transition_rule_create_not_configured");
+        }
+        const created = await transactionDataSource.createCrmPipelineTransitionRule(parsed.value);
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+        return created;
       }
-      const created = await transactionDataSource.createCrmPipelineTransitionRule(parsed.value);
-      await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_transition_rule.created",
-          sourceEntity: { type: "CrmPipelineTransitionRule", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
     });
 
     return context.json({ transitionRule }, 201);
@@ -445,21 +392,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
 
     const pipelineId = parsedPipelineId.value;
     const ruleId = parsedRuleId.value;
-    const decision = canManageCrmPipelineRules({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelineRules);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_transition_rule.update_denied",
         sourceEntity: { type: "CrmPipelineTransitionRule", id: ruleId },
-        commandInput: { endpoint: "updateCrmPipelineTransitionRule", pipelineId, ruleId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "updateCrmPipelineTransitionRule", pipelineId, ruleId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const beforeState = await dataSource.findCrmPipelineTransitionRuleById(actor.tenantId, pipelineId, ruleId);
@@ -475,25 +416,21 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const transitionRule = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-        throw new Error("transactional_crm_pipeline_transition_rule_update_not_configured");
+    const transitionRule = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_transition_rule.updated",
+      sourceEntityType: "CrmPipelineTransitionRule",
+      commandInput: parsed.value,
+      beforeState,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.updateCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+          throw new Error("transactional_crm_pipeline_transition_rule_update_not_configured");
+        }
+        const updated = await transactionDataSource.updateCrmPipelineTransitionRule(parsed.value);
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+        return updated;
       }
-      const updated = await transactionDataSource.updateCrmPipelineTransitionRule(parsed.value);
-      await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_transition_rule.updated",
-          sourceEntity: { type: "CrmPipelineTransitionRule", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
     });
 
     return context.json({ transitionRule });
@@ -509,11 +446,7 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canReadCrmPipelines({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canReadCrmPipelines);
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
     const pipelineId = parsedPipelineId.value;
@@ -541,21 +474,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     }
 
     const pipelineId = parsedPipelineId.value;
-    const decision = canManageCrmPipelineAutomations({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelineAutomations);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_stage_automation.create_denied",
         sourceEntity: { type: "CrmPipelineStageAutomationDefinition", id: "unknown" },
-        commandInput: { endpoint: "createCrmPipelineStageAutomationDefinition", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "createCrmPipelineStageAutomationDefinition", pipelineId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const pipeline = await dataSource.findCrmPipelineById(actor.tenantId, pipelineId);
@@ -568,24 +495,19 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const automation = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createCrmPipelineStageAutomationDefinition) {
-        throw new Error("transactional_crm_pipeline_automation_create_not_configured");
+    const automation = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_stage_automation.created",
+      sourceEntityType: "CrmPipelineStageAutomationDefinition",
+      commandInput: parsed.value,
+      beforeState: null,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.createCrmPipelineStageAutomationDefinition) {
+          throw new Error("transactional_crm_pipeline_automation_create_not_configured");
+        }
+        return transactionDataSource.createCrmPipelineStageAutomationDefinition(parsed.value);
       }
-      const created = await transactionDataSource.createCrmPipelineStageAutomationDefinition(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_stage_automation.created",
-          sourceEntity: { type: "CrmPipelineStageAutomationDefinition", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
     });
 
     return context.json({ automation }, 201);
@@ -611,21 +533,15 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
 
     const pipelineId = parsedPipelineId.value;
     const automationId = parsedAutomationId.value;
-    const decision = canManageCrmPipelineAutomations({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
+    const decision = await decide(actor, canManageCrmPipelineAutomations);
     if (!decision.allowed) {
-      await appendDeniedAudit({
+      return deny(context, {
         actor,
+        decision,
         actionType: "crm_pipeline_stage_automation.update_denied",
         sourceEntity: { type: "CrmPipelineStageAutomationDefinition", id: automationId },
-        commandInput: { endpoint: "updateCrmPipelineStageAutomationDefinition", pipelineId, automationId },
-        permissionResult: decision,
-        error: decision.reason
+        commandInput: { endpoint: "updateCrmPipelineStageAutomationDefinition", pipelineId, automationId }
       });
-      return context.json({ error: decision.reason }, 403);
     }
 
     const beforeState = await dataSource.findCrmPipelineStageAutomationDefinitionById(actor.tenantId, pipelineId, automationId);
@@ -643,24 +559,19 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const automation = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateCrmPipelineStageAutomationDefinition) {
-        throw new Error("transactional_crm_pipeline_automation_update_not_configured");
+    const automation = await runMutationWithAudit({
+      actor,
+      decision,
+      actionType: "crm_pipeline_stage_automation.updated",
+      sourceEntityType: "CrmPipelineStageAutomationDefinition",
+      commandInput: parsed.value,
+      beforeState,
+      mutate: async (transactionDataSource) => {
+        if (!transactionDataSource.updateCrmPipelineStageAutomationDefinition) {
+          throw new Error("transactional_crm_pipeline_automation_update_not_configured");
+        }
+        return transactionDataSource.updateCrmPipelineStageAutomationDefinition(parsed.value);
       }
-      const updated = await transactionDataSource.updateCrmPipelineStageAutomationDefinition(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "crm_pipeline_stage_automation.updated",
-          sourceEntity: { type: "CrmPipelineStageAutomationDefinition", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
     });
 
     return context.json({ automation });
@@ -670,13 +581,66 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     return getSessionActorFromHeaders(cookie);
   }
 
+  async function decide(actor: TenantUser, policy: CrmPipelinePolicy): Promise<PolicyDecision> {
+    return policy({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+  }
+
+  async function deny(
+    context: Context,
+    input: {
+      actor: TenantUser;
+      decision: PolicyDecision;
+      actionType: string;
+      sourceEntity: AuditEntity;
+      commandInput: Record<string, unknown>;
+    }
+  ) {
+    await appendDeniedAudit({
+      actor: input.actor,
+      actionType: input.actionType,
+      sourceEntity: input.sourceEntity,
+      commandInput: input.commandInput,
+      permissionResult: input.decision,
+      error: input.decision.reason
+    });
+    return context.json({ error: input.decision.reason }, 403);
+  }
+
+  async function runMutationWithAudit<T extends Record<string, unknown> & { id: string }>(input: {
+    actor: TenantUser;
+    decision: PolicyDecision;
+    actionType: string;
+    sourceEntityType: string;
+    commandInput: Record<string, unknown>;
+    beforeState: Record<string, unknown> | null;
+    mutate(transactionDataSource: ApiTenantDataSource): Promise<T>;
+  }): Promise<T> {
+    return runDataSourceTransaction(async (transactionDataSource) => {
+      const afterState = await input.mutate(transactionDataSource);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor: input.actor,
+          actionType: input.actionType,
+          sourceEntity: { type: input.sourceEntityType, id: afterState.id },
+          commandInput: input.commandInput,
+          beforeState: input.beforeState,
+          afterState,
+          permissionResult: input.decision
+        }),
+        transactionDataSource
+      );
+      return afterState;
+    });
+  }
+
   async function appendDeniedAudit(input: {
     actor: TenantUser;
     actionType: string;
-    sourceEntity: {
-      type: string;
-      id: string;
-    };
+    sourceEntity: AuditEntity;
     commandInput: Record<string, unknown>;
     permissionResult: PolicyDecision;
     error: string;
